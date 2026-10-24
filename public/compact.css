@@ -179,3 +179,12 @@ body[data-view="shorts"][data-reel="ready"] .reel-meta { position: absolute; lef
 }
 body[data-view="shorts"][data-reel="ready"] .reel-item video{max-height:none!important;height:100%!important;border-radius:0!important}
 body[data-view="shorts"][data-reel="ready"] .view-shorts{margin:0!important;padding:0!important}
+#app>nav{display:grid!important;grid-template-columns:repeat(5,1fr)!important;justify-items:center;align-items:center}
+#app>nav [data-tab]{width:100%}
+#app>nav #admin-tab[hidden]{display:none!important}
+#app>nav #create-post{margin:0!important;justify-self:center}
+@media (min-width:1000px){#app>nav{display:flex!important;grid-template-columns:none!important}}
+#app>nav #admin-tab{display:none!important}
+#app .me-panel [hidden]{display:none!important}
+#app .tile-chip{left:auto!important;right:52px;top:8px;font-size:12px}
+#app .tile-photo .profile-badge,#app .tile-photo .badge-new{top:8px;left:8px}

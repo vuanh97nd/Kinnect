@@ -252,6 +252,7 @@ $("auth-form").onsubmit = async (e) => {
 async function enter() {
   if (websiteSessionProbe) { tellWebsiteSession(true); return; }
   $("admin-tab").hidden = me.role !== "admin";
+  $("admin-menu").hidden = me.role !== "admin";
   $("auth").hidden = true;
   $("app").hidden = false;
   $("name").value = me.name;
@@ -307,6 +308,7 @@ for (const b of mePanel.querySelectorAll("[data-go]"))
   b.onclick = () => {
     menu(false);
     if (b.dataset.go === "settings") navigate("profile", { settings: true });
+    else if (b.dataset.go === "admin") navigate("admin");
     else navigate("profile");
   };
 $("logout").onclick = async () => {
@@ -424,7 +426,7 @@ function userCard(u) {
   const card = node("article", undefined, "social-card person-tile");
   const photo = node("div", undefined, "tile-photo " + hue(u.id));
   photo.append(avatar(u));
-  if (u.distanceBand) photo.append(node("span", u.distanceBand, "tile-chip"));
+  if (u.distanceBand) photo.append(node("span", "📍 " + (["< 5 km", "5–20 km", "20–50 km", "> 50 km"][u.band] || u.distanceBand), "tile-chip"));
   const head = node("button", undefined, "tile-name");
   head.type = "button";
   head.append(node("h3", u.name), node("p", "@" + u.username, "muted"));
@@ -445,7 +447,8 @@ function userCard(u) {
   if (u.isActive) presence.append(node("span", "● Online", "presence online"));
   if (u.isNew) presence.append(node("span", "Mới", "presence new-member"));
   photo.append(presence);
-  card.append(photo, profileBadges(u), node("p", u.bio || "Một người bạn mới đang chờ câu chuyện của bạn.", "tile-bio"));
+  card.append(photo, profileBadges(u));
+  if (u.bio) card.append(node("p", u.bio, "tile-bio"));
   const tags = node("div", undefined, "tags");
   u.interests.slice(0, 4).forEach((v) => tags.append(node("span", v)));
   card.append(tags);

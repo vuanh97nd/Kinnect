@@ -150,6 +150,7 @@
         <span id="connection" class="sr-only">Đang kết nối…</span>
         <div class="top-actions">
           <button data-tab="live" class="icon-tab live-tab" aria-label="Live">Live</button>
+          <button data-tab="inbox" class="icon-tab live-tab" aria-label="Tin nhắn">Tin nhắn</button>
           <button id="notification-bell" data-tab="notifications" class="icon-tab" aria-label="Thông báo" aria-expanded="false" aria-controls="notification-center">
             Thông báo <span id="unread"></span></button>
           <div class="me-menu">
@@ -158,6 +159,7 @@
               <div class="me-head"><b id="me-name"></b><small id="me-username"></small></div>
               <button type="button" role="menuitem" data-go="profile">Trang cá nhân</button>
               <button type="button" role="menuitem" data-go="settings">Cài đặt tài khoản</button>
+              <button type="button" role="menuitem" data-go="admin" id="admin-menu" hidden>Quản trị</button>
               <a role="menuitem" href="https://kinnect.io.vn/" target="_blank" rel="noopener">Giới thiệu Kinnect</a>
               <a role="menuitem" href="https://kinnect.io.vn/community" target="_blank" rel="noopener">Quy tắc cộng đồng</a>
               <a role="menuitem" href="https://kinnect.io.vn/privacy" target="_blank" rel="noopener">Quyền riêng tư</a>
@@ -169,11 +171,10 @@
       </header>
       <p id="notice" role="status"></p>
       <nav aria-label="Điều hướng chính">
-        <button data-tab="discover">Khám phá</button
-        ><button data-tab="feed">Bảng tin</button
+        <button data-tab="feed">Bảng tin</button
+        ><button data-tab="discover">Khám phá</button
         ><button id="create-post" class="create-tab" aria-label="Quay video"><span aria-hidden="true">+</span></button
         ><button data-tab="shorts">Video</button
-        ><button data-tab="inbox">Tin nhắn</button
         ><button data-tab="profile">Hồ sơ</button
         ><button data-tab="admin" id="admin-tab" hidden>Quản trị</button>
       </nav>

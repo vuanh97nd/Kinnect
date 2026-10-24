@@ -4,6 +4,7 @@ import { resolve, dirname } from "node:path";
 import { openSocial } from "./lib/social.js";
 import { loadMailEnv, mailConfigured, sendMail } from "./lib/mailer.js";
 import { readFile, readdir, stat } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { randomUUID } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { fileURLToPath } from "node:url";
@@ -37,6 +38,19 @@ export function createApp({ dbPath = ":memory:", fetchImpl } = {}) {
     },
   });
   const rooms = new Map();
+  // Mã phiên bản chung của giao diện: đổi khi bất kỳ file trong public/ thay đổi.
+  let versionCache = { at: 0, value: "" };
+  async function buildVersion() {
+    if (Date.now() - versionCache.at < 5000) return versionCache.value;
+    const dir = new URL("./public/", import.meta.url);
+    const h = createHash("sha1");
+    for (const name of (await readdir(dir)).sort()) {
+      const st = await stat(new URL(name, dir));
+      if (st.isFile()) h.update(name + st.size + ":" + st.mtimeMs);
+    }
+    versionCache = { at: Date.now(), value: h.digest("hex").slice(0, 10) };
+    return versionCache.value;
+  }
   const server = http.createServer(async (req, res) => {
     const path = new URL(req.url, "http://localhost").pathname;
     if (path.startsWith("/api/")) {
@@ -144,7 +158,20 @@ export function createApp({ dbPath = ":memory:", fetchImpl } = {}) {
         "Content-Security-Policy":
           "default-src 'self'; connect-src 'self' ws: wss:; media-src 'self' blob:; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self'",
       });
-      res.end(await readFile(new URL("./public/" + file, import.meta.url)));
+      let body = await readFile(new URL("./public/" + file, import.meta.url));
+      if (type === "text/html" || type === "text/javascript") {
+        // Gắn mã phiên bản theo nội dung vào mọi đường dẫn JS/CSS nội bộ, để trình duyệt và
+        // Cloudflare luôn lấy bản mới ngay sau khi cập nhật (sw.js giữ nguyên đường dẫn).
+        const version = await buildVersion();
+        body = Buffer.from(
+          body
+            .toString("utf8")
+            .replace(/(["'])(\.?\/)([\w.-]+\.(?:js|css))(?:\?v=[\w.-]*)?(["'])/g, (m, q1, pre, name, q2) =>
+              name === "sw.js" || !files["/" + name] ? m : q1 + pre + name + "?v=" + version + q2,
+            ),
+        );
+      }
+      res.end(body);
     } catch {
       res.writeHead(500);
       res.end();
