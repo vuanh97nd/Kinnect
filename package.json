@@ -1,13 +1,14 @@
 {
   "name": "kinnect-live",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node server.js",
     "test": "node --test",
     "moderate": "node scripts/moderate.js",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "admin": "node scripts/admin.js"
   },
   "dependencies": {
     "ws": "8.22.0"

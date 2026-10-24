@@ -59,7 +59,7 @@ function authMode(value) {
   $("register-fields").hidden = mode !== "register";
   $("register-fields").disabled = mode !== "register";
   $("auth-submit").textContent =
-    mode === "register" ? "Tạo tài khoản 18+" : "Đăng nhập";
+    mode === "register" ? "Tạo tài khoản" : "Đăng nhập";
   $("password").autocomplete =
     mode === "register" ? "new-password" : "current-password";
   $("auth-status").textContent = "";
@@ -74,7 +74,6 @@ $("auth-form").onsubmit = async (e) => {
       username: $("username").value,
       password: $("password").value,
       name: $("display-name").value,
-      birthDate: $("birth-date").value,
       agree18: $("agree").checked,
     });
     me = result.user;
@@ -87,12 +86,19 @@ $("auth-form").onsubmit = async (e) => {
   }
 };
 async function enter() {
+  $("admin-tab").hidden = me.role !== "admin";
   $("auth").hidden = true;
   $("app").hidden = false;
   $("name").value = me.name;
   connectLive();
   status("Chào " + me.name + ". Hãy bắt đầu bằng một lời chào!");
-  await navigate("feed");
+  await navigate(
+    new URL(location.href).searchParams.get("view") === "live"
+      ? "live"
+      : "discover",
+  );
+  if (new URL(location.href).searchParams.get("view") === "live")
+    document.body.classList.add("live-only");
   clearInterval(notificationTimer);
   notificationTimer = setInterval(() => refreshUnread().catch(() => {}), 15000);
   await refreshUnread();
@@ -127,6 +133,7 @@ async function navigate(value) {
     if (value === "profile") await profile(panel);
     if (value === "inbox") await inbox(panel);
     if (value === "notifications") await notifications(panel);
+    if (value === "admin") await adminPanel(panel);
   } catch (e) {
     status(e.message);
     panel.append(node("p", "Không tải được dữ liệu. Hãy thử lại."));
@@ -527,7 +534,11 @@ async function notifications(panel) {
       node("strong", n.actor.name),
       node(
         "p",
-        n.kind === "follow" ? "đã theo dõi bạn." : "đã gửi tin nhắn cho bạn.",
+        n.kind === "follow"
+          ? "đã theo dõi bạn."
+          : n.kind === "gift"
+            ? "đã gửi quà thử nghiệm miễn phí."
+            : "đã gửi tin nhắn cho bạn.",
       ),
     );
     if (n.kind === "message")
@@ -538,6 +549,78 @@ async function notifications(panel) {
     panel.append(node("p", "Chưa có thông báo mới.", "muted"));
   await api("/notifications", "POST", {});
   await refreshUnread();
+}
+async function adminPanel(panel) {
+  panel.append(
+    node("h2", "Quản trị Kinnect"),
+    node(
+      "p",
+      "Báo cáo cần được xem xét thủ công. Chỉ xử lý nội dung có bằng chứng.",
+      "muted",
+    ),
+  );
+  const { reports } = await api("/admin/reports");
+  if (!reports.length) panel.append(node("p", "Chưa có báo cáo."));
+  for (const r of reports) {
+    const card = node("article", undefined, "social-card");
+    card.append(
+      node("h3", r.target_type + " · " + r.status),
+      node("p", r.reason),
+      node(
+        "p",
+        r.subject?.body || r.subject?.username || "Nội dung không còn tồn tại.",
+      ),
+    );
+    const perform = async (action, target) => {
+      if (!confirm("Xác nhận " + action + "?")) return;
+      await api("/admin/moderate", "POST", { action, target });
+      await navigate("admin");
+    };
+    if (r.target_type === "short" && r.subject)
+      card.append(
+        action(r.subject.hidden ? "Hiện video" : "Ẩn video", () =>
+          perform(r.subject.hidden ? "show-short" : "hide-short", r.target_id),
+        ),
+      );
+    if (r.target_type === "post" && r.subject)
+      card.append(
+        action(r.subject.hidden ? "Hiện bài" : "Ẩn bài", () =>
+          perform(r.subject.hidden ? "show-post" : "hide-post", r.target_id),
+        ),
+      );
+    if (r.subject?.userId)
+      card.append(
+        action("Đình chỉ tài khoản", () =>
+          perform("suspend-user", r.subject.userId),
+        ),
+      );
+    if (r.status === "open")
+      card.append(action("Đóng báo cáo", () => perform("close-report", r.id)));
+    panel.append(card);
+  }
+  const { users } = await api("/admin/users");
+  panel.append(node("h3", "Tài khoản gần đây"));
+  for (const u of users) {
+    const row = node("article", undefined, "social-card");
+    row.append(
+      node(
+        "strong",
+        u.username + " · " + u.role + (u.suspended ? " · Đã đình chỉ" : ""),
+      ),
+    );
+    if (u.role !== "admin")
+      row.append(
+        action(u.suspended ? "Khôi phục" : "Đình chỉ", async () => {
+          if (!confirm("Thay đổi trạng thái " + u.username + "?")) return;
+          await api("/admin/moderate", "POST", {
+            action: u.suspended ? "restore-user" : "suspend-user",
+            target: u.id,
+          });
+          await navigate("admin");
+        }),
+      );
+    panel.append(row);
+  }
 }
 try {
   me = (await api("/me")).user;

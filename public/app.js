@@ -85,6 +85,7 @@ export function connectLive() {
         );
         hostUserId = m.hostUserId || null;
         $("report-live").hidden = role === "host";
+        $("gift").hidden = $("gift-kind").hidden = role === "host";
         $("lobby").hidden = true;
         $("live").hidden = false;
         $("room-title").textContent = m.room.title;
@@ -138,6 +139,15 @@ export function connectLive() {
         pending.delete(m.id);
       }
       if (m.type === "count") $("count").textContent = `${m.viewers} người xem`;
+      if (m.type === "gift") {
+        const item = document.createElement("p");
+        item.textContent =
+          m.name +
+          " gửi " +
+          ({ heart: "♥", rainbow: "🌈", star: "★" }[m.kind] || "quà") +
+          " · quà thử nghiệm miễn phí";
+        $("messages").append(item);
+      }
       if (m.type === "chat") {
         const p = document.createElement("p");
         const b = document.createElement("strong");
@@ -273,3 +283,5 @@ window.addEventListener("kinnect-background", () => {
     notify("Đã dừng livestream khi mở ứng dụng khác.");
   }
 });
+
+$("gift").onclick = () => send({ type: "gift", kind: $("gift-kind").value });

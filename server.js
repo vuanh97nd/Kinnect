@@ -18,7 +18,7 @@ export function createApp({ dbPath = ":memory:" } = {}) {
     }
     if (path === "/health") {
       res.writeHead(200, { "Content-Type": "application/json" });
-      return res.end(JSON.stringify({ ok: true }));
+      return res.end(JSON.stringify({ ok: true, version: "0.3.0" }));
     }
     const files = {
       "/social.js": ["social.js", "text/javascript"],
@@ -214,6 +214,25 @@ export function createApp({ dbPath = ":memory:" } = {}) {
       }
       const room = rooms.get(ws.room);
       if (!room) return error("Bạn chưa tham gia phòng.");
+      if (m.type === "gift") {
+        try {
+          const gift = social.gift(
+            ws.userId,
+            room.host.userId,
+            room.id,
+            m.kind,
+          );
+          broadcast(room, {
+            type: "gift",
+            name: ws.name,
+            senderId: ws.userId,
+            ...gift,
+          });
+        } catch (e) {
+          error(e.message);
+        }
+        return;
+      }
       if (m.type === "chat") {
         const text =
           typeof m.text === "string" ? m.text.trim().slice(0, 500) : "";

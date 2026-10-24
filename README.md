@@ -1,126 +1,112 @@
-# Kinnect 0.2 — cộng đồng, kết bạn và livestream thử nghiệm
+# Kinnect 0.3.0 — Android native + Node.js trên Windows
 
-Node.js tự chạy trên Windows, SQLite lưu bền, Android WebView kết nối HTTPS. Dùng thương hiệu/thiết kế riêng. [Nghiên cứu nguồn và lộ trình](docs/research-and-roadmap.md) ghi rõ nguồn nào đã xác minh, giấy phép, tiến độ và phần còn thiếu.
+Tên app **Kinnect**, package `app.kinnect.live`, Android 8+, APK versionCode 5. Màn hình đăng nhập/đăng ký, khám phá, hồ sơ, bảng tin, DM, thông báo, quản trị và video ngắn là Android Views native gọi API HTTPS. Riêng module livestream vẫn WebRTC trong WebView; video live qua Internet chưa có TURN/SFU và chưa xác nhận hoạt động. Đây là bản alpha, chưa phải đầy đủ/ngang chất lượng HeeSay hoặc TikTok.
 
-## Chạy trên Windows (PowerShell)
+[Nguồn tham khảo và giấy phép](docs/research-and-roadmap.md) · [Ghi chú 0.3.0](docs/releases/v0.3.0.md). Không sao chép thương hiệu/giao diện/mã HeeSay; chưa tìm được mã nguồn chính thức có bằng chứng.
 
-Cài Git và **Node.js LTS >=22.13** có `node:sqlite` (khuyến nghị Node 24 LTS). Không cần cài máy chủ database riêng.
+## Cập nhật máy chủ Windows trước khi cài APK mới
+
+Backend 0.2 không có API quản trị, tìm quanh đây và video ngắn. **Cần cập nhật backend 0.3 và khởi động lại**, không chỉ cài APK. Cài Node >=22.13, khuyến nghị Node 24 LTS. Không cần máy chủ database riêng.
+
+1. Dừng Node.js bằng Ctrl+C. Giữ dữ liệu/thay đổi riêng. Sao lưu toàn bộ DATA_DIR khi mọi tiến trình ghi SQLite đã dừng, gồm .sqlite/WAL/SHM nếu có. Không sao chép riêng file .sqlite đang ghi WAL.
+2. Chạy PowerShell trong thư mục checkout:
 
 ```powershell
-git clone --branch feature/social-core https://github.com/vuanh97nd/Kinnect.git
-Set-Location Kinnect
+git status --short
+git fetch origin
+git switch feature/social-core
+git pull --ff-only origin feature/social-core
 npm ci
 npm test
+$env:SECURE_COOKIES = '1'
+# Nếu trước đây dùng DATA_DIR tùy chỉnh, phải giữ đúng giá trị đó.
 npm start
 ```
 
-Nếu đã clone, giữ thay đổi riêng trước khi `git fetch origin` rồi checkout nhánh/commit bàn giao. Không reset thay đổi của người dùng. Lệnh `npm ci`, `npm test`, `npm start` và cổng 3000 giữ tương thích quy trình trước; WebSocket hiện yêu cầu đăng nhập, không còn chế độ live ẩn danh.
+Nếu chưa clone: `git clone --branch feature/social-core https://github.com/vuanh97nd/Kinnect.git`, sau đó `Set-Location Kinnect`. Không reset thay đổi riêng nếu Git báo xung đột.
 
-Kiểm tra ở PowerShell thứ hai:
+Ở PowerShell thứ hai:
 
 ```powershell
 Invoke-RestMethod http://localhost:3000/health
 ```
 
-Kết quả mong đợi `ok: True`. Mở `http://localhost:3000`, đăng ký tài khoản người từ 18 tuổi. Không có tài khoản mặc định hoặc mật khẩu quản trị cài sẵn.
+Cần thấy `ok: True` và `version: 0.3.0`. Cổng mặc định 3000, biến PORT có thể đổi. DATA_DIR mặc định `data` tương đối với thư mục chạy; có thể đặt `$env:DATA_DIR = 'C:\KinnectData'` trước khi chạy. Chưa dùng dotenv; file .env không tự nạp. SECURE_COOKIES=1 cho HTTPS/Tunnel, bỏ biến khi chỉ thử bằng trình duyệt HTTP localhost.
 
-## Dữ liệu và cấu hình
+## SQLite và migration
 
-`npm start` tự tạo **data/kinnect.sqlite** cùng file WAL/SHM nếu có. Hồ sơ/ảnh, hash mật khẩu, session, theo dõi, chặn, bài, DM, thông báo, báo cáo và audit lưu ở đây, còn nguyên sau restart. Phòng live và tin chat trong phòng là tạm thời. Thư mục data và khóa ký bị Git bỏ qua.
+Tự tạo/nâng schema bằng cách thêm cột/bảng, giữ users/password/session và dữ liệu 0.2. Schema hiện tại 5, có role, vị trí gần đúng tùy chọn, quà miễn phí và video ngắn/likes/comments. Video BLOB và ảnh nằm trong cùng SQLite nên cần tính dung lượng backup. Phòng live/tin chat trong phòng vẫn tạm thời. Không commit DATA_DIR, SQLite, cookie, khóa ký hoặc token.
 
-Ví dụ PowerShell, đặt trước `npm start`:
+Để khôi phục, dừng server/CLI và khôi phục toàn bộ DATA_DIR đã sao lưu. Chưa có backup tự động hoặc diễn tập khôi phục trên Windows. Chủ máy có thể đọc dữ liệu SQLite; chưa có mã hóa đầu cuối/database. Session HttpOnly/SameSite=Strict, hết hạn sau 7 ngày; mật khẩu scrypt + salt. App native hiện giữ cookie trong RAM, nên khi tiến trình app bị hủy có thể phải đăng nhập lại.
 
-```powershell
-$env:PORT = '3000'
-$env:DATA_DIR = 'C:\KinnectData'
-# Đặt 1 khi truy cập qua HTTPS/Tunnel. Để unset cho thử trình duyệt localhost HTTP.
-$env:SECURE_COOKIES = '1'
-npm start
-```
+## Kết nối điện thoại
 
-`DATA_DIR` mặc định là `data` tương đối với thư mục chạy. Không đặt trong thư mục public hoặc commit vào Git. Chưa dùng dotenv; tạo file .env không tự nạp cấu hình. Session hết hạn sau 7 ngày. `SECURE_COOKIES=1` thêm Secure vào cookie HttpOnly/SameSite=Strict; dùng khi đưa app qua HTTPS. Giữ máy tính có mạng, không sleep và giữ Node.js/Tunnel chạy. Máy tắt thì dịch vụ dừng.
-
-**Sao lưu:** dừng Node.js và công cụ moderation, sao chép toàn bộ DATA_DIR sang nơi riêng tư rồi khởi động lại. Khi khôi phục, dừng tiến trình và khôi phục toàn bộ thư mục cùng nhau. Không copy riêng file .sqlite trong lúc đang ghi WAL. Chưa có backup tự động hoặc diễn tập khôi phục; cần chủ máy chủ bảo vệ ổ đĩa và bản sao. Ngày sinh, DM và ảnh là dữ liệu riêng tư có thể được chủ máy chủ truy cập; chưa có mã hóa đầu cuối hoặc mã hóa database.
-
-## Kết nối APK tới máy chủ Windows
-
-Cài cloudflared từ tài liệu chính thức của Cloudflare và chạy ở PowerShell thứ hai:
+Máy chủ mặc định của APK vẫn là `https://estimated-drink-beta-alerts.trycloudflare.com`. Đây là **Quick Tunnel tạm thời**, không phải hostname cố định. Máy Windows và Node/Tunnel phải hoạt động, không sleep. Cài cloudflared theo tài liệu Cloudflare, chạy ở terminal khác:
 
 ```powershell
 cloudflared tunnel --url http://localhost:3000
 ```
 
-Trong APK, nhập URL **https://...trycloudflare.com** được in ra rồi chọn **Vào Kinnect**. URL lưu trên điện thoại bằng SharedPreferences; đổi bằng **Đổi máy chủ / Ngắt kết nối**. Không sửa URL trong Java, không đưa URL kèm mật khẩu/token vào repo. Không dùng localhost của máy Windows làm URL trên điện thoại. APK chỉ nhận HTTPS với chứng chỉ hợp lệ; không tắt xác minh TLS.
+Nếu URL thay đổi, trong Kinnect mở **Cài đặt → Đổi máy chủ** và nhập URL HTTPS mới. Đổi origin sẽ đăng xuất phiên native; không đưa token/password vào URL. Không dùng localhost của Windows trên điện thoại. Giữ TLS verification, Host/Origin và WebSocket đúng. Tunnel chỉ chuyển web/API/signaling, không thay thế TURN/SFU cho livestream.
 
-Frontend tự dùng WSS cùng origin. Reverse proxy phải hỗ trợ WebSocket và Host/Origin nhất quán; không bỏ kiểm tra Origin để né lỗi. Tunnel thử nghiệm có thể đổi URL và không cam kết uptime. **Tunnel không chuyển tiếp video WebRTC**: video khác mạng còn cần TURN/SFU. Chỉ dùng nhóm thử nghiệm tin cậy.
+## Đăng ký và thành viên xung quanh
 
-## Luồng dùng thử
+- Nút **Tạo tài khoản**, password tối thiểu **6 ký tự**, không bắt buộc chữ hoa/số/ký tự đặc biệt; tối đa 128 ký tự.
+- Bắt buộc chọn **Tôi xác nhận mình đủ 18 tuổi**. Không yêu cầu/thu ngày sinh ở đăng ký mới. Đây là tự xác nhận, không xác minh danh tính. Cột ngày sinh cũ giữ tương thích, không công khai, không thêm ngày giả.
+- Sau đăng nhập mở Khám phá. Chưa cấp vị trí: gợi ý sở thích, không tạo khoảng cách giả.
+- **Bật danh sách xung quanh** yêu cầu đồng ý và quyền Android vị trí gần đúng; không xin FINE_LOCATION. Nếu không lấy được fix thì báo rõ và vẫn dùng khám phá sở thích.
+- Server làm tròn tọa độ theo ô 0.05 độ (khoảng 5 km theo vĩ độ), chỉ trả dải khoảng cách (<5, 5–20, 20–50, 50–100 km), không trả tọa độ người khác. Dữ liệu còn hiệu lực 24 giờ, được xóa khi có API request sau hết hạn. Tắt/xóa ngay trong Hồ sơ.
+- Chỉ hiện thành viên đồng ý chia sẻ vị trí, cho phép khám phá, không bị chặn/đình chỉ. Danh sách hiện xét tối đa 500 tài khoản gần đây, trả tối đa 50; chưa là dịch vụ geo quy mô lớn. Làm tròn không bảo đảm chống mọi suy luận vị trí; không chia sẻ nếu không thoải mái.
 
-1. Đăng ký username/mật khẩu, nhập ngày sinh hợp lệ và đồng ý 18+/quy tắc. Cổng tự khai không xác minh danh tính.
-2. Mở Hồ sơ, lưu giới thiệu, sở thích (phân cách dấu phẩy), ảnh <=1 MB và quyền nhận DM/hiện trong khám phá.
-3. Tạo tài khoản thứ hai trên thiết bị/trình duyệt riêng, tìm nhau ở Khám phá; hai bên Theo dõi để mở chat mặc định.
-4. Gửi DM; đăng bài cho thành viên hoặc chỉ người theo dõi; xem thông báo trong ứng dụng.
-5. Chặn/báo cáo từ Khám phá, báo cáo bài/tin nhắn. Xem/bỏ chặn tại Hồ sơ. Người bị chặn không thể liên hệ và không xuất hiện trên bảng tin/khám phá.
-6. Vào Live, cấp camera/micro để phát; viewer không cần cấp quyền camera. Tối đa 6 viewer/phòng. Camera dừng khi app ra nền.
+## Tài khoản quản trị viên
 
-Thông báo trong app chưa phải push Android. Chat riêng cập nhật mỗi 4 giây, thông báo mỗi 15 giây. Chưa mã hóa đầu cuối, khôi phục mật khẩu, xóa/xuất tài khoản, quà tặng, thanh toán, album, bình luận hoặc xác minh tuổi nâng cao.
+Không có username/mật khẩu mặc định, không tự tạo mật khẩu chung. Đăng ký tài khoản thật trong app, rồi **chủ máy Windows** mở PowerShell tại repo với cùng DATA_DIR và chạy:
 
-## Xử lý báo cáo trên máy chủ
+```powershell
+npm run admin -- promote ten_dang_nhap
+```
 
-Chạy tại thư mục repo, với cùng DATA_DIR của server. CLI chỉ dành cho người quản lý máy; không có endpoint admin công khai hoặc admin password mặc định.
+Thay `ten_dang_nhap` bằng username đã đăng ký (chữ thường). Nếu không thấy tài khoản, kiểm tra DATA_DIR, không tạo database mới để thay thế database đang dùng. Mở lại Hồ sơ/đăng nhập lại: có **Quản trị viên · Quản lý cộng đồng**. Web UI cũng có tab Quản trị cho admin. API kiểm tra role phía server; tài khoản thường không tự cấp quyền được.
+
+Có thể xem báo cáo/nội dung được báo cáo, ẩn/hiện bài/video, đình chỉ/khôi phục thành viên, đóng báo cáo. Không có quyền đọc toàn bộ DM tùy ý; quản trị chỉ nhận nội dung tin nhắn được báo cáo. Audit lưu SQLite. Không đình chỉ admin qua API; không hạ quyền admin cuối cùng. Để hạ quyền cục bộ: `npm run admin -- demote ten_dang_nhap` khi có admin khác.
+
+CLI moderation cũ vẫn dùng được:
 
 ```powershell
 npm run moderate -- reports
 npm run moderate -- hide-post POST_ID
+npm run moderate -- hide-short SHORT_ID
 npm run moderate -- suspend-user USER_ID
 npm run moderate -- close-report REPORT_ID
 ```
 
-Có `show-post POST_ID`, `restore-user USER_ID`. Thay ID bằng ID thực từ báo cáo. Audit log lưu trong SQLite. Suspend vô hiệu session; websocket bị từ chối khi gửi tiếp/có thay đổi hoặc broadcast, người dùng bị ẩn khỏi truy vấn xã hội. Đây là công cụ xử lý thủ công, không tự quyết định tính đúng sai của báo cáo và không cung cấp đội kiểm duyệt 24/24. Không công khai đầu ra báo cáo vì có nội dung người dùng.
+Có show-post/show-short/restore-user. Không công khai đầu ra báo cáo hoặc dữ liệu SQLite. Kiểm duyệt thủ công, chưa có đội 24/24 hoặc kiểm duyệt tự động.
 
-## Kiểm thử
+## Video ngắn
+
+Tab Video native: quay qua ứng dụng camera hệ thống hoặc chọn MP4, thêm caption, upload, vuốt/chọn video trước/sau, âm thanh bật/tắt, thích, bình luận và báo cáo. Chủ bài xóa được video; admin ẩn/hiện video. Khi rời màn hình, playback dừng; khi app ra nền, video tạm dừng.
+
+Giới hạn alpha: MP4 có metadata mvhd đọc được, >0 và <=60 giây, <=12 MB; tối đa 10 uploads/ngày/người; kho tối đa 500 MB, hai upload đang xử lý đồng thời. Server kiểm tra size/duration/container, **không transcoding, không quét toàn bộ codec/nội dung**; khuyến nghị H.264/AAC, thiết bị có thể không hỗ trợ một số MP4. Không có bộ dựng/cắt video, nhạc bản quyền, hiệu ứng làm đẹp hoặc thuật toán như TikTok. Feed xếp mới trước, tối đa 50. Có HTTP Range/HEAD cho player. Chỉ thành viên đăng nhập được xem; chặn/đình chỉ/ẩn có hiệu lực ở API. File đã tải/cache trên thiết bị không thể thu hồi.
+
+Video lưu BLOB SQLite phù hợp thử nghiệm nhỏ; chưa có CDN/chuyển mã/stream adaptive. Không đăng nội dung bất hợp pháp hoặc hình ảnh người khác khi chưa có quyền. Fixture test/fixtures/short.mp4 là video màu tổng hợp 1 giây tạo bằng ffmpeg, không chứa người dùng hoặc nội dung bên thứ ba.
+
+## Các chức năng xã hội và live
+
+Hồ sơ/bio/sở thích/avatar <=1 MB; theo dõi, DM mặc định cùng theo dõi; bảng tin văn bản public cho thành viên hoặc followers; chặn/báo cáo; thông báo trong app. DM polling mỗi 4 giây khi mở chat, chưa push Android. Chưa có khôi phục password/xóa-xuất tài khoản/album hoặc bình luận bảng tin.
+
+Live còn module WebView/WebRTC, tối đa 6 viewer, camera dừng khi ra nền. Có ba quà **miễn phí thử nghiệm**, giới hạn 5 quà/phút; lưu sự kiện và count, không có xu mua bằng tiền, thanh toán hoặc rút tiền. Video Internet chưa có TURN/SFU, không tuyên bố đã hoạt động.
+
+## Kiểm thử và build
 
 ```powershell
 npm test
-# Cài browser cho kiểm thử tùy chọn (một lần, cần mạng):
 npx playwright install chromium
 npm run test:e2e
 ```
 
-Integration tests dùng SQLite trong RAM/thư mục tạm, không ghi đè data thật. Playwright khởi động backend RAM ở cổng 3210, chạy Chromium viewport điện thoại với hai tài khoản thử nghiệm. Không cần camera thật cho test này; không xác minh video. Nếu đã có Chromium hệ thống, có thể đặt `PLAYWRIGHT_CHROMIUM_EXECUTABLE` trỏ tới executable; môi trường Linux hiện tại dùng `/usr/bin/chromium`.
+Backend tests dùng RAM/thư mục tạm, gồm auth/password/18+, RBAC, CLI promote, moderation, block/privacy, vị trí, SQLite restart, gifts, MP4 validation/range/comments/likes. Browser tests dùng camera giả và fixture MP4, không phải kiểm thử native Android. Kiểm tra media WebRTC mặc định skipped do cloud Chromium cấm non-proxied UDP; chạy opt-in KINNECT_MEDIA_E2E=1 ở hạ tầng phù hợp sau khi có TURN. Không vô hiệu hóa policy.
 
-## Android / build APK
-
-Mã tại android/app/src/main. APK Android 8+, package `app.kinnect.live`, phiên bản 0.2.0, vẫn WebView chứ không phải Compose native. Cần Android System WebView cập nhật.
-
-Trong môi trường Linux đã chuẩn bị toolchain:
-
-```sh
-bash scripts/build-apk.sh
-```
-
-Tệp xuất `dist/kinnect-live-debug.apk`; không commit APK/khóa ký. Script dùng SDK 35, Build Tools 35.0.0 và ECJ 3.39.0 ở `/workspace/toolchains` (có thể đổi KINNECT_TOOLS). Các gói đã kiểm tra checksum khi tải; thư mục toolchain không nằm trong repo. Chưa có Gradle/Gradle Wrapper: **không chạy script trực tiếp bằng PowerShell**, Codex Windows cần chuẩn hóa Android Studio/Gradle hoặc dựng toolchain tương đương. Khóa debug tiêu chuẩn sinh cục bộ, không phải khóa phát hành; giữ nó riêng nếu cần cài bản cập nhật debug. Không dùng để phát hành Play.
-
-Đã kiểm thử backend/browser và build/chữ ký APK trên Linux; chưa chạy Windows hoặc Android thật trong phiên này. Không tạo dịch vụ trả phí hoặc tích hợp thanh toán. Trước khi công khai cần TURN/SFU, kiểm thử thiết bị, chính sách dữ liệu/tuổi, quy trình xử lý nội dung và vận hành bảo mật.
-
-### Kiểm thử video riêng
-
-Chromium cloud hiện có chính sách `WebRtcIPHandling=disable_non_proxied_udp`. Lần thử nhận khung hình đã thất bại dù host mở camera giả và có offer/answer; chưa có TURN để chuyển tiếp. Test nhận video vì thế tách riêng và mặc định skipped, không được tính là pass. Test browser mặc định chỉ xác minh luồng xã hội, camera giả phía host, chat/phòng và dừng live khi ra nền. Khi có mạng hỗ trợ/TURN đã tích hợp, bật kiểm tra video:
-
-```powershell
-$env:KINNECT_MEDIA_E2E = '1'
-npm run test:e2e
-```
-
-Không vô hiệu hóa chính sách mạng để làm test đạt. Android đã thêm trình chọn ảnh hệ thống cho avatar, nhưng picker/quyền/lifecycle vẫn cần kiểm thử trên thiết bị thật.
-
-## Android 0.2.2 — máy chủ mặc định và GitHub Releases
-
-Tên ứng dụng vẫn **Kinnect**. APK 0.2.2/versionCode 4 mở ngay backend tại `https://estimated-drink-beta-alerts.trycloudflare.com`, hiển thị đăng nhập/đăng ký trên backend 0.2. Đây là **Quick Tunnel tạm thời**, không phải hostname cố định. URL tùy chỉnh đã lưu được ưu tiên. Vào **Cài đặt → Đổi máy chủ** để cập nhật tunnel hoặc dùng lại URL mặc định; không cần sửa mã hoặc build lại khi đổi URL qua cài đặt.
-
-Source của URL mặc định và bộ kiểm tra HTTPS nằm ở `android/app/src/main/java/app/kinnect/live/ServerConfig.java`. Không chứa token hoặc mật khẩu. Quyền camera/micro vẫn bị giới hạn theo origin đã chọn. Khi trở lại app từ nền, app tự mở lại backend, không quay về màn hình nhập máy chủ. Nếu backend/tunnel tắt, menu Cài đặt vẫn có thể dùng để đổi địa chỉ.
-
-Các lệnh Linux để dựng lại bộ công cụ/build không phụ thuộc snapshot cloud:
+Linux CI/build có Java 21, curl, unzip, zip, sha256sum:
 
 ```sh
 bash scripts/prepare-android-tools.sh
@@ -128,8 +114,4 @@ bash scripts/test-android-config.sh
 bash scripts/build-apk.sh
 ```
 
-Cần Java 21, curl, unzip, zip và sha256sum; `KINNECT_TOOLS` trỏ tới nơi ghi được. Tất cả gói toolchain được kiểm tra SHA-256 cố định. Mã này vẫn chưa có Gradle; lệnh PowerShell chạy backend giữ nguyên.
-
-Workflow `.github/workflows/android-release.yml` phát hành prerelease khi push tag phiên bản: tải toolchain có checksum, kiểm thử URL, build APK, kiểm tra chữ ký rồi upload APK và SHA-256 lên Releases. Actions được pin SHA. CI dùng GITHUB_TOKEN tự cấp, không đặt token vào source. Khóa debug tạo tạm trên runner, không được upload/commit; mỗi lần build sạch có thể có chữ ký khác, xem lưu ý cài cập nhật trong release notes. APK không dùng khóa Play Store.
-
-Xem [ghi chú bản 0.2.2](docs/releases/v0.2.2.md). Không coi việc đặt URL mặc định là bằng chứng video Internet hoạt động: TURN/SFU vẫn chưa có. Chưa kiểm thử native trên Android thật; /health và UI của tunnel được chủ máy chủ Windows xác nhận, môi trường cloud này không được phép truy cập miền tunnel để kiểm tra lại.
+KINNECT_TOOLS chọn thư mục ghi được. Toolchain download có checksum pin. Output dist/kinnect-live-debug.apk. Chưa có Gradle/Android Studio project hoặc emulator trong phiên này; **chưa kiểm thử picker, vị trí, video và layout native trên điện thoại thật**. APK ký debug cho thử nghiệm, không dùng Play Store. Workflow tag v* phát hành APK/SHA-256 lên GitHub Releases, khóa debug tạo tạm không commit/upload. Chữ ký có thể đổi giữa các CI release: gỡ bản cũ có thể mất cookie/URL cục bộ, không xóa tài khoản trên server; chỉ gỡ sau khi lưu thông tin đăng nhập.

@@ -83,4 +83,15 @@ test("local moderation CLI hides posts, revokes sessions and audits actions", as
   );
   store.close();
   await assert.rejects(command("hide-post", "missing-post"));
+  async function admin(...args) {
+    return exec(process.execPath, ["scripts/admin.js", ...args], {
+      env: { ...process.env, DATA_DIR: dir },
+    });
+  }
+  await assert.rejects(admin("promote", "missing_user"));
+  await admin("promote", "test_user");
+  store = openSocial(path);
+  assert.equal(store.db.prepare("SELECT role FROM users").get().role, "admin");
+  store.close();
+  await assert.rejects(admin("demote", "test_user"));
 });

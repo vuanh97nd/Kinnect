@@ -13,8 +13,8 @@
       <p class="eyebrow">KHÔNG GIAN CỦA CHÚNG MÌNH</p>
       <h1>Kết nối bằng chính bạn.</h1>
       <p class="muted">
-        Bạn bè, những câu chuyện và khoảnh khắc chung. Dành cho người từ 18
-        tuổi.
+        Bạn bè, những câu chuyện và khoảnh khắc chung. Kết nối tôn trọng, chia
+        sẻ có đồng thuận.
       </p>
       <div class="auth-tabs">
         <button id="login-mode">Đăng nhập</button
@@ -34,7 +34,7 @@
             id="password"
             type="password"
             autocomplete="current-password"
-            minlength="10"
+            minlength="6"
             maxlength="128"
             required
         /></label>
@@ -44,21 +44,17 @@
               id="display-name"
               maxlength="60"
               required /></label
-          ><label
-            >Ngày sinh · chỉ dùng để kiểm tra 18+, không hiển thị công
-            khai<input id="birth-date" type="date" required /></label
           ><label class="check"
-            ><input id="agree" type="checkbox" required />Tôi từ 18 tuổi, đồng ý
-            tôn trọng cộng đồng; không quấy rối, lừa đảo hoặc đăng nội dung bất
-            hợp pháp.</label
+            ><input id="agree" type="checkbox" required />Tôi xác nhận mình đủ
+            18 tuổi và tôn trọng quy tắc cộng đồng.</label
           >
         </fieldset>
         <button id="auth-submit">Đăng nhập</button>
       </form>
       <p id="auth-status" role="status"></p>
       <p class="muted fine">
-        Bản thử nghiệm tự lưu trữ. Ngày sinh là tự khai, chưa xác minh danh
-        tính. Chưa có khôi phục mật khẩu.
+        Bản thử nghiệm tự lưu trữ. Tuổi được người dùng tự xác nhận. Chưa có
+        khôi phục mật khẩu.
       </p>
     </section>
     <main id="app" hidden>
@@ -76,7 +72,8 @@
         ><button data-tab="live">Live</button
         ><button data-tab="notifications">
           Thông báo <span id="unread"></span></button
-        ><button data-tab="profile">Hồ sơ</button>
+        ><button data-tab="profile">Hồ sơ</button
+        ><button data-tab="admin" id="admin-tab" hidden>Quản trị</button>
       </nav>
       <section id="social-panel"></section>
       <div id="live-panel" hidden>
@@ -123,6 +120,11 @@
           <div class="controls">
             <button id="mic">Tắt micro</button
             ><button id="camera">Tắt camera</button
+            ><select id="gift-kind" aria-label="Quà thử nghiệm">
+              <option value="rainbow">Cầu vồng</option>
+              <option value="heart">Trái tim</option>
+              <option value="star">Ngôi sao</option></select
+            ><button id="gift" class="secondary">Gửi quà miễn phí</button
             ><button id="report-live" class="secondary" hidden>
               Báo cáo người phát</button
             ><button id="leave" class="danger">Rời phòng</button>

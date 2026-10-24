@@ -241,3 +241,9 @@ header #logout {
     display: none;
   }
 }
+
+.live-only #app > header,
+.live-only nav,
+.live-only footer {
+  display: none;
+}

@@ -79,6 +79,15 @@ test("room lifecycle, chat, signaling isolation, host disconnect and HTTP", asyn
     description: { type: "offer", sdp: "unauthorized" },
   });
   assert.match((await outsider.get("error")).message, /chưa tham gia/);
+  viewer.send({ type: "gift", kind: "invalid" });
+  assert.match((await viewer.get("error")).message, /không hợp lệ/);
+  for (let i = 0; i < 5; i++) {
+    viewer.send({ type: "gift", kind: "rainbow" });
+    assert.equal((await host.get("gift")).kind, "rainbow");
+  }
+  viewer.send({ type: "gift", kind: "heart" });
+  assert.match((await viewer.get("error")).message, /5 lần/);
+  assert.equal(social.db.prepare("SELECT count(*) AS n FROM gifts").get().n, 5);
   viewer.send({ type: "leave" });
   assert.equal((await host.get("peer-left")).id, viewer.id);
   viewer.send({ type: "join", room: joined.room.id });

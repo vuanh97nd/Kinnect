@@ -5,9 +5,8 @@ async function signUp(page, name) {
     .getByRole("button", { name: "Tạo tài khoản", exact: true })
     .click();
   await page.locator("#username").fill(name);
-  await page.locator("#password").fill("test-password-for-browser");
+  await page.locator("#password").fill("abcdef");
   await page.locator("#display-name").fill(name);
-  await page.locator("#birth-date").fill("1995-03-21");
   await page.locator("#agree").check();
   await page.locator("#auth-submit").click();
   await expect(page.locator("#app")).toBeVisible();
@@ -167,4 +166,44 @@ test("received video frames over local WebRTC", async ({ browser }) => {
     await hc.close();
     await vc.close();
   }
+});
+
+test("uploaded MP4 is decoded and played through authenticated HTTP video endpoint", async ({
+  page,
+}) => {
+  const { readFile } = await import("node:fs/promises");
+  const bytes = await readFile(
+    new URL("../test/fixtures/short.mp4", import.meta.url),
+  );
+  await signUp(page, "short_browser");
+  const response = await page.request.post("/api/shorts", {
+    data: {
+      caption: "Browser video smoke",
+      data: "data:video/mp4;base64," + bytes.toString("base64"),
+    },
+  });
+  expect(response.status()).toBe(201);
+  const { id } = await response.json();
+  await page.evaluate((id) => {
+    const v = document.createElement("video");
+    v.id = "test-short-video";
+    v.muted = true;
+    v.autoplay = true;
+    v.controls = true;
+    v.src = "/api/shorts/" + id + "/video";
+    document.body.append(v);
+  }, id);
+  await expect
+    .poll(() =>
+      page
+        .locator("#test-short-video")
+        .evaluate((v) => v.videoWidth === 160 && v.readyState >= 2),
+    )
+    .toBe(true);
+  await page.evaluate(() => document.getElementById("test-short-video").play());
+  await expect
+    .poll(() =>
+      page.locator("#test-short-video").evaluate((v) => v.currentTime),
+    )
+    .toBeGreaterThan(0);
 });

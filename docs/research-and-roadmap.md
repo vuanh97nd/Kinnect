@@ -64,3 +64,7 @@ Kiểm tra khung hình được giữ nguyên assertion và tách thành test op
 ### Phụ thuộc bảo mật
 
 `npm audit` phát hiện ws 8.18.3 của bản nền nằm trong GHSA-58qx-3vcg-4xpx và GHSA-96hv-2xvq-fx4p. Đã đọc advisory, nâng lên ws 8.22.0 (bản vá tương ứng từ 8.20.1/8.21.0), khóa trong package-lock.json và chạy lại kiểm thử. Audit toàn bộ dependency/devDependency sau nâng cấp báo 0 lỗ hổng đã biết tại thời điểm chạy; đây không phải chứng nhận không có lỗi bảo mật.
+
+## Cập nhật tiến độ 0.3.0
+
+Phần mô tả 0.2 ở trên là lịch sử. 0.3 đã chuyển màn hình xã hội sang Android Views native; riêng Live còn WebView/WebRTC. Đăng ký mới dùng xác nhận 18+ không nhập ngày sinh, mật khẩu >=6. Có role admin/API quản trị và CLI promote tài khoản có sẵn, vị trí gần đúng tự nguyện/khám phá quanh đây, quà miễn phí và video ngắn MP4 với thích/bình luận/báo cáo. Chi tiết giới hạn, vận hành, quyền riêng tư và cập nhật Windows ở README và release notes 0.3.0. Chưa có kiểm thử native trên thiết bị/emulator, TURN/SFU, push hoặc trình dựng video. Kết quả khảo sát HeeSay chính thức vẫn chưa hoàn tất do các miền bị chặn; không suy diễn các tính năng đã làm thành bằng chứng tương đương HeeSay.
