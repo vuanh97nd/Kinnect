@@ -14,3 +14,9 @@ dist/
 local.properties
 .gradle/
 .idea/
+/data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+/test-results/
+/playwright-report/
