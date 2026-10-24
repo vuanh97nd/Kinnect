@@ -7,7 +7,7 @@ PLATFORM="$KINNECT_TOOLS/android/android-35-ext15/android.jar"
 mkdir -p android/build/classes android/build/dex dist
 "$TOOLS/aapt2" compile --dir android/app/src/main/res -o android/build/resources.zip
 "$TOOLS/aapt2" link -R android/build/resources.zip -I "$PLATFORM" --manifest android/app/src/main/AndroidManifest.xml -o android/build/unsigned.apk
-java -jar "$KINNECT_TOOLS/ecj.jar" -1.8 -proc:none -bootclasspath "$PLATFORM:$TOOLS/core-lambda-stubs.jar" -d android/build/classes android/app/src/main/java/app/kinnect/live/MainActivity.java
+java -jar "$KINNECT_TOOLS/ecj.jar" -1.8 -proc:none -bootclasspath "$PLATFORM:$TOOLS/core-lambda-stubs.jar" -d android/build/classes android/app/src/main/java/app/kinnect/live/*.java
 find android/build/classes -name '*.class' -print > android/build/classes.list
 "$TOOLS/d8" --min-api 26 --lib "$PLATFORM" --output android/build/dex @android/build/classes.list
 (cd android/build/dex && zip -q -u ../unsigned.apk classes.dex)
