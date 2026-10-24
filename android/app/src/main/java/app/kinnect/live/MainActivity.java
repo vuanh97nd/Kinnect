@@ -495,22 +495,6 @@ public class MainActivity extends Activity {
     title.setTypeface(null, Typeface.BOLD);
     panel.addView(title);
     panel.addView(label(register ? "Miễn phí, chỉ mất một phút." : "Đăng nhập để tiếp tục với Kinnect.", 15, MUTED));
-    // Hai tab Đăng nhập / Tạo tài khoản như web
-    LinearLayout tabs = row();
-    tabs.setPadding(dp(4), dp(4), dp(4), dp(4));
-    tabs.setBackground(background(SOFT, 14));
-    for (int i = 0; i < 2; i++) {
-      final boolean reg = i == 1;
-      TextView t = label(reg ? "Tạo tài khoản" : "Đăng nhập", 15, reg == register ? TEXT : MUTED);
-      t.setGravity(Gravity.CENTER);
-      t.setTypeface(null, Typeface.BOLD);
-      if (reg == register) t.setBackground(background(CARD, 11));
-      t.setOnClickListener(v -> { if (reg != register) auth(reg); });
-      tabs.addView(t, new LinearLayout.LayoutParams(0, dp(42), 1));
-    }
-    LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, -2);
-    tp.setMargins(0, dp(14), 0, dp(12));
-    panel.addView(tabs, tp);
     final LinearLayout extras = column();
     panel.addView(extras);
     LinearLayout saved = content;
@@ -583,6 +567,20 @@ public class MainActivity extends Activity {
         });
     });
     panel.addView(submit);
+    // Chỉ một chế độ trên màn; dòng nhỏ ở cuối để chuyển qua lại như web
+    TextView swap = new TextView(this);
+    android.text.SpannableStringBuilder sw = new android.text.SpannableStringBuilder(register ? "Đã có tài khoản? " : "Chưa có tài khoản? ");
+    int start = sw.length();
+    sw.append(register ? "Đăng nhập" : "Tạo tài khoản mới");
+    sw.setSpan(new android.text.style.ForegroundColorSpan(ACCENT), start, sw.length(), 0);
+    sw.setSpan(new android.text.style.StyleSpan(Typeface.BOLD), start, sw.length(), 0);
+    swap.setText(sw);
+    swap.setTextColor(MUTED);
+    swap.setTextSize(14);
+    swap.setGravity(Gravity.CENTER);
+    swap.setPadding(0, dp(14), 0, dp(2));
+    swap.setOnClickListener(v -> auth(!register));
+    panel.addView(swap);
     TextView foot = label("Kinnect tôn trọng quyền riêng tư. Tuổi do người dùng tự xác nhận.", 12, MUTED);
     foot.setGravity(Gravity.CENTER);
     content.addView(foot);

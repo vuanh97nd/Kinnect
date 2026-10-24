@@ -760,3 +760,5 @@ body[data-view="shorts"][data-reel="ready"] .reel-item video{object-position:cen
 /* Nút Tải app góc phải màn chào mừng */
 .ob-top .ob-get{margin-left:auto;padding:7px 14px;border-radius:999px;background:linear-gradient(135deg,#6d4aff,#ff4f9a);color:#fff!important;font-weight:700;font-size:14px;text-decoration:none;white-space:nowrap}
 .ob-top .ob-home{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;margin-right:6px;border-radius:12px;background:#00000033;color:#fff!important;font-size:20px;font-weight:700;text-decoration:none;flex:none}
+/* Màn đăng nhập/đăng ký chỉ hiện đúng một chế độ; đổi bằng dòng ở cuối form */
+#auth .auth-tabs{display:none!important}
