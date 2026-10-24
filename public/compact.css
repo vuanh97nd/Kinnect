@@ -762,3 +762,20 @@ body[data-view="shorts"][data-reel="ready"] .reel-item video{object-position:cen
 .ob-top .ob-home{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;margin-right:6px;border-radius:12px;background:#00000033;color:#fff!important;font-size:20px;font-weight:700;text-decoration:none;flex:none}
 /* Màn đăng nhập/đăng ký chỉ hiện đúng một chế độ; đổi bằng dòng ở cuối form */
 #auth .auth-tabs{display:none!important}
+/* Màn đăng nhập/đăng ký đồng bộ với màn chào mừng: nền tím–hồng, đầu trang có nút ← và logo */
+@media (max-width:999px){
+#auth.auth-shell{background:radial-gradient(120% 60% at 30% 0%,#6d4aff55,transparent 60%),radial-gradient(90% 50% at 100% 100%,#ff4f9a40,transparent 60%),var(--bg)!important}
+#auth .auth-brand{display:none!important}
+}
+#auth .auth-top{display:flex;align-items:center;gap:10px;margin:0 0 18px}
+#auth .auth-top img{width:36px;height:36px;border-radius:10px}
+#auth .auth-top strong{font-size:22px;font-weight:800;background:linear-gradient(90deg,#8b6dff,#ff4f9a);-webkit-background-clip:text;background-clip:text;color:transparent}
+#auth .auth-back{display:inline-flex;align-items:center;justify-content:center;width:40px!important;min-width:40px;height:40px!important;min-height:40px!important;padding:0!important;border:0;border-radius:12px!important;background:#7c5cff26!important;color:var(--ink)!important;font-size:22px!important;font-weight:700;cursor:pointer}
+#auth .auth-logo,#auth .auth-home{display:none!important}
+#auth #auth-status:empty{display:none!important}
+#auth .remember-device{margin:8px 0 12px!important}
+#auth #register-fields{margin-bottom:0!important;padding-bottom:0!important}
+#auth #register-fields .check{margin:10px 0 0!important}
+#auth #auth-submit{background:linear-gradient(135deg,#6d4aff,#ff4f9a)!important;color:#fff!important;border-radius:999px!important;min-height:54px!important}
+#auth .remember-device{margin:-8px 0 6px!important;gap:12px!important;font-size:14px!important;color:var(--ink)!important}
+#auth .remember-device input{width:22px!important;height:22px!important;min-height:22px!important;flex:0 0 22px!important;margin:0!important}

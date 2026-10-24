@@ -264,3 +264,6 @@ window.addEventListener("kinnect-logged-in", (e) => rememberAccount(e.detail));
 if (window.kinnectAuthShown) onAuthShown();
 
 window.addEventListener("kinnect-quick-login-failed",()=>{document.getElementById("auth").classList.remove("has-recent");document.getElementById("login-mode")?.click();document.getElementById("password")?.focus();});
+
+// Nút ← trên màn đăng nhập/đăng ký: quay lại màn chào mừng (trang trước).
+document.querySelector(".auth-back")?.addEventListener("click", () => openOnboarding());

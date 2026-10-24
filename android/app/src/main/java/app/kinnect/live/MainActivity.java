@@ -489,9 +489,19 @@ public class MainActivity extends Activity {
     shell("Kinnect", false);
     getWindow().setStatusBarColor(CARD);
     getWindow().setNavigationBarColor(CARD);
+    // Nút ← góc trái: quay lại màn chào mừng (trang trước), giống bản web
+    root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { PRIMARY_SOFT, BG, BG }));
+    FrameLayout backBtn = new FrameLayout(this);
+    backBtn.setBackground(background(PRIMARY_SOFT, 12));
+    backBtn.addView(icon("back", 22, TEXT), new FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER));
+    backBtn.setContentDescription("Quay lại trang trước");
+    backBtn.setOnClickListener(v -> intro());
+    LinearLayout.LayoutParams bb = new LinearLayout.LayoutParams(dp(40), dp(40));
+    bb.rightMargin = dp(8);
+    toolbar.addView(backBtn, 0, bb);
     LinearLayout panel = card();
     panel.setPadding(dp(20), dp(22), dp(20), dp(22));
-    TextView title = label(register ? "Tạo tài khoản mới" : "Chào mừng trở lại", 26, TEXT);
+    TextView title = label(register ? "Tạo tài khoản Kinnect" : "Chào mừng trở lại", 26, TEXT);
     title.setTypeface(null, Typeface.BOLD);
     panel.addView(title);
     panel.addView(label(register ? "Miễn phí, chỉ mất một phút." : "Đăng nhập để tiếp tục với Kinnect.", 15, MUTED));
@@ -501,11 +511,7 @@ public class MainActivity extends Activity {
     content = extras;
     if (!register) authExtras();
     content = saved;
-    if (!register) {
-      TextView divider = label("hoặc dùng tên đăng nhập", 13, MUTED);
-      divider.setGravity(Gravity.CENTER);
-      panel.addView(divider);
-    }
+
     panel.addView(fieldLabel("Tên đăng nhập"));
     final EditText username = input(panel, "vd: minh_anh", "", false);
     username.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
@@ -584,11 +590,7 @@ public class MainActivity extends Activity {
     TextView foot = label("Kinnect tôn trọng quyền riêng tư. Tuổi do người dùng tự xác nhận.", 12, MUTED);
     foot.setGravity(Gravity.CENTER);
     content.addView(foot);
-    TextView back = label("← Xem lại giới thiệu", 14, ACCENT);
-    back.setGravity(Gravity.CENTER);
-    back.setPadding(0, dp(10), 0, dp(10));
-    back.setOnClickListener(v -> intro());
-    content.addView(back);
+
   }
 
   private TextView fieldLabel(String text) {
@@ -2267,6 +2269,11 @@ public class MainActivity extends Activity {
     });
     api.call("GET", "/api/oauth/providers", null, (data, error, status) -> {
       JSONArray providers = data == null ? null : data.optJSONArray("providers");
+      if (providers != null && providers.length() > 0) {
+        TextView divider = label("hoặc dùng tên đăng nhập", 13, MUTED);
+        divider.setGravity(Gravity.CENTER);
+        box.addView(divider);
+      }
       for (int i = 0; providers != null && i < providers.length() && !isDestroyed(); i++) {
         final String provider = providers.optString(i);
         box.addView(button(provider.equals("google") ? "Tiếp tục với Google" : "Tiếp tục với Facebook", () -> {
