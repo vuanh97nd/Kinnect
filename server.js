@@ -51,7 +51,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl } = {}) {
     }
     if (path === "/health") {
       res.writeHead(200, { "Content-Type": "application/json" });
-      return res.end(JSON.stringify({ ok: true, version: "0.3.0" }));
+      return res.end(JSON.stringify({ ok: true, version: "0.3.1" }));
     }
     const files = {
       "/website/support.html": ["website/support.html", "text/html"],

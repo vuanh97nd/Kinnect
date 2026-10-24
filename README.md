@@ -1,8 +1,8 @@
-# Kinnect 0.3.0 — Android native + Node.js trên Windows
+# Kinnect 0.3.1 — Android native + Node.js trên Windows
 
 Tên app **Kinnect**, package `app.kinnect.live`, Android 8+, APK versionCode 5. Màn hình đăng nhập/đăng ký, khám phá, hồ sơ, bảng tin, DM, thông báo, quản trị và video ngắn là Android Views native gọi API HTTPS. Riêng module livestream vẫn WebRTC trong WebView; video live qua Internet chưa có TURN/SFU và chưa xác nhận hoạt động. Đây là bản alpha, chưa phải đầy đủ/ngang chất lượng HeeSay hoặc TikTok.
 
-[Nguồn tham khảo và giấy phép](docs/research-and-roadmap.md) · [Ghi chú 0.3.0](docs/releases/v0.3.0.md). Không sao chép thương hiệu/giao diện/mã HeeSay; chưa tìm được mã nguồn chính thức có bằng chứng.
+[Nguồn tham khảo và giấy phép](docs/research-and-roadmap.md) · [Ghi chú 0.3.1](docs/releases/v0.3.1.md). Không sao chép thương hiệu/giao diện/mã HeeSay; chưa tìm được mã nguồn chính thức có bằng chứng.
 
 ## Cập nhật máy chủ Windows trước khi cài APK mới
 
@@ -31,7 +31,7 @@ Nếu chưa clone: `git clone --branch feature/social-core https://github.com/vu
 Invoke-RestMethod http://localhost:3000/health
 ```
 
-Cần thấy `ok: True` và `version: 0.3.0`. Cổng mặc định 3000, biến PORT có thể đổi. DATA_DIR mặc định `data` tương đối với thư mục chạy; có thể đặt `$env:DATA_DIR = 'C:\KinnectData'` trước khi chạy. Chưa dùng dotenv; file .env không tự nạp. SECURE_COOKIES=1 cho HTTPS/Tunnel, bỏ biến khi chỉ thử bằng trình duyệt HTTP localhost.
+Cần thấy `ok: True` và `version: 0.3.1`. Cổng mặc định 3000, biến PORT có thể đổi. DATA_DIR mặc định `data` tương đối với thư mục chạy; có thể đặt `$env:DATA_DIR = 'C:\KinnectData'` trước khi chạy. Chưa dùng dotenv; file .env không tự nạp. SECURE_COOKIES=1 cho HTTPS/Tunnel, bỏ biến khi chỉ thử bằng trình duyệt HTTP localhost.
 
 ## SQLite và migration
 
