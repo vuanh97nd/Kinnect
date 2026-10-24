@@ -487,24 +487,24 @@ function profileBadges(user) {
 }
 async function discover(panel, q = "") {
   const head = node("div", undefined, "view-head discover-head");
-  head.append(node("span", "KẾT NỐI MỚI MỖI NGÀY", "eyebrow"), node("h2", "Khám phá"), node("p", "Tìm người ở gần, gặp bạn mới cùng sở thích.", "muted"));
+  head.append(node("h2", "Khám phá"));
   panel.append(head);
   let selected = discoveryMode, request = 0;
   const tools = node("section", undefined, "discovery-tools social-card");
   const chips = node("div", undefined, "chips discovery-tabs");
   chips.setAttribute("aria-label", "Lọc thành viên");
-  for (const [label, value] of [["Quanh đây", "nearby"], ["Mới tham gia", "new"], ["Đang hoạt động", "active"], ["Cùng sở thích", "interests"]]) {
+  for (const [label, value] of [["📍 Gần đây", "nearby"], ["✨ Mới", "new"], ["🟢 Online", "active"], ["💜 Hợp gu", "interests"]]) {
     const b = node("button", label, "chip" + (value === selected ? " active" : "")); b.type = "button"; b.setAttribute("aria-pressed", String(value === selected));
     b.onclick = () => { selected = discoveryMode = value; for (const c of chips.children) { c.classList.toggle("active", c === b); c.setAttribute("aria-pressed", String(c === b)); } load().catch(showError); };
     chips.append(b);
   }
   const form = node("form", undefined, "search-bar");
-  const search = node("input"); search.type = "search"; search.value = q; search.placeholder = "Tìm tên, khu vực hoặc sở thích…"; search.setAttribute("aria-label", "Tìm bạn");
+  const search = node("input"); search.type = "search"; search.value = q; search.placeholder = "Tìm bạn…"; search.setAttribute("aria-label", "Tìm bạn");
   const button = node("button", "Tìm"); form.append(search, button);
   const location = node("section", undefined, "nearby-consent");
   const locationText = node("p", "", "muted"); locationText.setAttribute("role", "status");
-  const enable = node("button", "Bật vị trí để tìm quanh đây", "secondary"); enable.type = "button";
-  const disable = node("button", "Tắt Quanh đây", "ghost"); disable.type = "button";
+  const enable = node("button", "Bật vị trí", "secondary"); enable.type = "button";
+  const disable = node("button", "Tắt", "ghost"); disable.type = "button";
   location.append(locationText, enable, disable); tools.append(chips, form, location); panel.append(tools);
   const heading = node("h3", "", "section-title discovery-results-title");
   const list = node("div", undefined, "people-grid"); panel.append(heading, list);
@@ -515,11 +515,11 @@ async function discover(panel, q = "") {
     if (version !== request) return;
     me = own;
     location.hidden = mode !== "nearby";
-    enable.textContent = me.hasLocation ? "Cập nhật vị trí" : "Bật vị trí để tìm quanh đây";
+    enable.textContent = me.hasLocation ? "Cập nhật" : "Bật vị trí";
     disable.hidden = !me.hasLocation;
     locationText.textContent = me.hasLocation
-      ? "Đang tìm trong khoảng 100 km. Khoảng cách được ước lượng, vị trí tự hết hạn sau 24 giờ."
-      : "Cho phép vị trí để tìm người gần bạn. Chỉ lưu vị trí làm tròn khoảng 5 km; bạn có thể tắt bất cứ lúc nào.";
+      ? "📍 Trong 100 km · vị trí làm tròn"
+      : "📍 Bật vị trí để thấy người gần bạn";
     const nearby = mode === "nearby" && me.hasLocation;
     heading.textContent = mode === "nearby" ? (nearby ? "Thành viên quanh bạn" : "Mới tham gia") : mode === "active" ? "Đang hoạt động" : mode === "interests" ? "Người cùng sở thích" : "Mới tham gia";
     list.replaceChildren(skeleton("grid"));
@@ -644,18 +644,17 @@ function postCard(p) {
     liked = !!p.liked,
     count = p.comments || 0;
   const stats = node("div", undefined, "post-stats");
+  stats.hidden = true;
   const paintStats = () => {
-    stats.textContent = "";
-    if (likes) stats.append(node("span", "♥ " + likes, "likes"));
-    if (count) stats.append(node("span", count + " bình luận"));
-    stats.hidden = !likes && !count;
+    comment.textContent = "💬 " + (count || "");
+    comment.setAttribute("aria-label", "Bình luận" + (count ? " (" + count + ")" : ""));
   };
-  paintStats();
   const bar = node("div", undefined, "post-actions");
   const like = node("button", undefined, "act like");
   like.type = "button";
   const paintLike = () => {
-    like.textContent = liked ? "♥ Đã thích" : "♡ Thích";
+    like.textContent = (liked ? "♥ " : "♡ ") + (likes || "");
+    like.setAttribute("aria-label", (liked ? "Bỏ thích" : "Thích") + (likes ? " (" + likes + ")" : ""));
     like.classList.toggle("on", liked);
     like.setAttribute("aria-pressed", String(liked));
   };
@@ -674,8 +673,9 @@ function postCard(p) {
       like.disabled = false;
     }
   };
-  const comment = node("button", "💬 Bình luận", "act");
+  const comment = node("button", undefined, "act");
   comment.type = "button";
+  paintStats();
   const thread = node("div", undefined, "comments");
   thread.hidden = true;
   comment.onclick = async () => {
@@ -698,7 +698,8 @@ function postCard(p) {
     input.maxLength = 1000;
     input.required = true;
     input.setAttribute("aria-label", "Viết bình luận");
-    const send = node("button", "Gửi bình luận", "ghost");
+    const send = node("button", "➤", "ghost");
+    send.setAttribute("aria-label", "Gửi bình luận");
     form.append(avatar(me), input, send);
     form.onsubmit = async (e) => {
       e.preventDefault();
@@ -718,7 +719,11 @@ function postCard(p) {
     thread.append(form);
   }
   bar.append(like, comment);
-  if (p.user_id !== me.id) bar.append(action("✉ Nhắn tin", () => openChat(p.author), "act"));
+  if (p.user_id !== me.id) {
+    const dm = action("✉", () => openChat(p.author), "act");
+    dm.setAttribute("aria-label", "Nhắn tin cho " + p.author.name);
+    bar.append(dm);
+  }
   card.append(stats, bar, thread);
   return card;
 }
@@ -753,8 +758,7 @@ async function shorts(panel) {
   const rec = node("button", "🎥 Quay video", "create-rec");
   rec.type = "button";
   rec.onclick = async () => {
-    const { openStudio } = await import("./camera.js?v=1");
-    await openStudio({ onDone: postVideo, notify: status });
+    await openCamera();
   };
   const pick = node("label", undefined, "file-pick");
   const file = node("input");
@@ -949,7 +953,8 @@ async function profile(panel, opts = {}) {
     upload.type = "file";
     upload.accept = "image/png,image/jpeg,image/webp";
     upload.setAttribute("aria-label", "Đổi ảnh đại diện, tối đa 1 MB");
-    pick.append(upload, node("span", "📷 Đổi ảnh đại diện"));
+    pick.append(upload, node("span", "📷"));
+    pick.classList.add("avatar-cam");
     upload.onchange = async () => {
       const f = upload.files[0];
       if (!f) return;
@@ -1252,7 +1257,7 @@ function notificationOptIn() {
   if (!("Notification" in window) || Notification.permission !== "default") return;
   try { if (sessionStorage.getItem("kinnect-notification-dismissed") === "1") return; } catch {}
   const banner = node("aside", undefined, "notification-optin"); banner.setAttribute("aria-label", "Bật thông báo tin nhắn");
-  const text = node("div"); text.append(node("b", "Không bỏ lỡ lời chào mới"), node("p", "Nhận thông báo tin nhắn khi Kinnect đang mở, kể cả lúc bạn chuyển sang tab khác."));
+  const text = node("div"); text.append(node("b", "Bật thông báo tin nhắn?"), node("p", "Nhận thông báo tin nhắn khi Kinnect đang mở, kể cả lúc bạn chuyển sang tab khác."));
   const enable = node("button", "Bật thông báo"); enable.type = "button"; enable.onclick = requestBrowserNotifications;
   const dismiss = node("button", "×", "ghost"); dismiss.type = "button"; dismiss.setAttribute("aria-label", "Để sau"); dismiss.onclick = () => { banner.remove(); try { sessionStorage.setItem("kinnect-notification-dismissed", "1"); } catch {} };
   banner.append(text, enable, dismiss); $("social-panel").before(banner);
@@ -1492,10 +1497,35 @@ try {
   showAuth();
 }
 
-$("create-post").onclick = async () => {
-  await navigate("feed");
-  document.querySelector(".composer textarea")?.focus();
-};
+// Nút "+" giữa thanh dưới: mở camera quay video ngay (như TikTok)
+async function openCamera() {
+  const toBase64 = (blob) =>
+    new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result).replace(/^data:[^;]*;/, "data:video/mp4;"));
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+  const { openStudio } = await import("./camera.js?v=3");
+  await openStudio({
+    notify: status,
+    // Từ chế độ LIVE của Studio: mở phòng live với tiêu đề và hiệu ứng đã chọn
+    onLive: async (live) => {
+      await navigate("live");
+      if (!live) return;
+      window.kinnectPendingFx = live.state;
+      $("title").value = live.title;
+      $("create").requestSubmit();
+    },
+    onDone: async (blob, caption) => {
+      if (blob.size > 12 * 1024 * 1024) throw Error("Video tối đa 12 MB.");
+      await api("/shorts", "POST", { data: await toBase64(blob), caption });
+      status("Đã đăng video.");
+      await navigate("shorts");
+    },
+  });
+}
+$("create-post").onclick = () => openCamera().catch((e) => status(e.message));
 
 window.addEventListener("kinnect-report", (event) =>
   report(event.detail.targetType, event.detail.targetId).catch((e) =>

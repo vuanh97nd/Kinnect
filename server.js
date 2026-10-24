@@ -3,7 +3,7 @@ import { mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { openSocial } from "./lib/social.js";
 import { loadMailEnv, mailConfigured, sendMail } from "./lib/mailer.js";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir, stat } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { fileURLToPath } from "node:url";
@@ -42,6 +42,49 @@ export function createApp({ dbPath = ":memory:", fetchImpl } = {}) {
     if (path.startsWith("/api/")) {
       res.once("finish", () => enforceAccess());
       return social.api(req, res, path);
+    }
+    // Thư viện nhạc dùng chung cho Studio. Chỉ đặt vào MUSIC_DIR những bản nhạc được phép sử dụng.
+    if (path === "/api/music" || path.startsWith("/music/")) {
+      if (!social.authenticate(req)) {
+        res.writeHead(401, { "Content-Type": "application/json; charset=utf-8" });
+        return res.end(JSON.stringify({ error: "Vui lòng đăng nhập." }));
+      }
+      const dir = resolve(process.env.MUSIC_DIR || "music");
+      if (path === "/api/music") {
+        let names = [];
+        try {
+          names = (await readdir(dir)).filter((n) => /\.(mp3|m4a|aac)$/i.test(n)).sort().slice(0, 300);
+        } catch {}
+        res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+        return res.end(
+          JSON.stringify({
+            tracks: names.map((n) => ({
+              title: n.replace(/\.[^.]+$/, "").replace(/[_]+/g, " ").replace(/\s*\[[^\]]*\]\s*$/, "").trim(),
+              url: "/music/" + encodeURIComponent(n),
+            })),
+          }),
+        );
+      }
+      let name;
+      try {
+        name = decodeURIComponent(path.slice(7));
+      } catch {
+        name = "";
+      }
+      if (!name || name.includes("/") || name.includes("\\") || name.startsWith(".") || !/\.(mp3|m4a|aac)$/i.test(name)) {
+        res.writeHead(404);
+        return res.end();
+      }
+      try {
+        const file = resolve(dir, name);
+        await stat(file);
+        const type = /\.mp3$/i.test(name) ? "audio/mpeg" : "audio/mp4";
+        res.writeHead(200, { "Content-Type": type, "Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff" });
+        return res.end(await readFile(file));
+      } catch {
+        res.writeHead(404);
+        return res.end();
+      }
     }
     if (path === "/website" || path.startsWith("/website/")) {
       // Website giới thiệu đã chuyển sang kinnect.io.vn.

@@ -51,3 +51,87 @@ body.studio-open { overflow: hidden; }
 .create-bar { display: flex; gap: 8px; padding: 8px; background: #111; border-radius: 14px; margin-bottom: 10px; }
 #app .create-rec { flex: 1; min-height: 44px; border-radius: 12px; background: linear-gradient(135deg, #6d4aff, #fe2c55) !important; color: #fff !important; font-weight: 800; font-size: 15px; }
 .create-bar .file-pick { flex: 1; justify-content: center; min-height: 44px; max-width: none; }
+
+/* ===== Studio kiểu TikTok ===== */
+.studio.tt { background: #000; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); display: flex; flex-direction: column; }
+.tt-card { position: relative; flex: 1; min-height: 0; margin: 6px 0 0; border-radius: 22px; overflow: hidden; background: #111; }
+@media (min-width: 700px) { .tt-card { width: min(100%, calc((100dvh - 120px) * 9 / 16)); margin: 12px auto 0; } }
+.tt-stage { position: absolute; inset: 0; display: grid; place-items: center; }
+.tt-stage canvas { width: 100%; height: 100%; object-fit: cover; }
+.tt-progress { position: absolute; top: 8px; left: 12px; right: 12px; height: 4px; border-radius: 4px; background: #ffffff33; z-index: 3; opacity: 0; transition: opacity .2s; }
+.tt-progress i { display: block; height: 100%; width: 0; border-radius: 4px; background: #fe2c55; }
+.studio.recording .tt-progress { opacity: 1; }
+.tt-x { position: absolute; top: 16px; left: 12px; z-index: 3; width: 44px; height: 44px; border: 0; background: none !important; color: #fff !important; font-size: 26px; text-shadow: 0 1px 4px #0008; cursor: pointer; }
+.tt-time { position: absolute; top: 24px; left: 50%; transform: translateX(-50%); z-index: 3; color: #fff; font-weight: 800; font-size: 15px; text-shadow: 0 1px 4px #0008; }
+.tt-rail { position: absolute; top: 14px; right: 6px; z-index: 3; display: flex; flex-direction: column; gap: 10px; }
+.tt-tool { width: 56px; border: 0; background: none !important; color: #fff !important; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; padding: 2px 0; }
+.tt-tool svg { width: 30px; height: 30px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 3px #0009); }
+.tt-tool small { font-size: 11px; font-weight: 700; text-shadow: 0 1px 3px #000c; }
+.tt-tool.on svg { stroke: #fe2c55; }
+.studio.recording .tt-rail, .studio.recording .tt-modes, .studio.recording .tt-carousel, .studio.recording .tt-x { opacity: 0; pointer-events: none; }
+.tt-sheet { position: absolute; left: 0; right: 0; bottom: 168px; z-index: 4; padding: 10px 0; background: #000a; backdrop-filter: blur(10px); }
+.tt-sheet[hidden] { display: none; }
+.tt-count { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; font-size: 120px; font-weight: 900; color: #fff; text-shadow: 0 4px 20px #0009; pointer-events: none; }
+.tt-count[hidden] { display: none; }
+.tt-modes { position: absolute; left: 0; right: 0; bottom: 118px; z-index: 3; display: flex; justify-content: center; gap: 6px; }
+.tt-modes button { border: 0; min-height: 32px; padding: 0 14px; border-radius: 999px; background: none !important; color: #ffffffcc !important; font-weight: 800; font-size: 15px; text-shadow: 0 1px 3px #0009; cursor: pointer; }
+.tt-modes button.on { background: #fff !important; color: #111 !important; text-shadow: none; }
+.tt-shutter-row { position: absolute; left: 0; right: 0; bottom: 18px; z-index: 3; height: 92px; display: flex; align-items: center; justify-content: center; }
+.tt-carousel { position: absolute; inset: 0; display: flex; align-items: center; gap: 14px; overflow-x: auto; padding: 0 calc(50% - 30px) 0 calc(50% + 56px); scrollbar-width: none; scroll-snap-type: x mandatory; }
+.tt-carousel::-webkit-scrollbar { display: none; }
+.tt-fx { flex: 0 0 60px; height: 60px; border-radius: 50%; border: 2px solid #ffffff99; background: #ffffff26 !important; display: grid; place-items: center; font-size: 30px; cursor: pointer; scroll-snap-align: center; padding: 0; backdrop-filter: blur(6px); }
+.tt-fx.on { border: 3px solid #fff; box-shadow: 0 0 0 3px #fe2c55; }
+.tt-shutter { position: relative; z-index: 2; width: 84px; height: 84px; border-radius: 50%; border: 0; padding: 0; background: transparent !important; box-shadow: inset 0 0 0 6px #fff; display: grid; place-items: center; cursor: pointer; }
+.tt-shutter span { width: 66px; height: 66px; border-radius: 50%; background: #fff; transition: all .2s; }
+.studio.recording .tt-shutter { box-shadow: inset 0 0 0 6px #fe2c5599; }
+.studio.recording .tt-shutter span { width: 34px; height: 34px; border-radius: 8px; background: #fe2c55; }
+.tt-bottom { display: flex; align-items: center; justify-content: space-between; padding: 12px 18px 10px; color: #fff; }
+.tt-gallery { position: relative; width: 56px; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; }
+.tt-gallery input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.tt-gallery span { width: 42px; height: 42px; border-radius: 10px; border: 2px solid #fff; display: grid; place-items: center; font-size: 20px; background: #333; }
+.tt-gallery small { font-size: 11px; font-weight: 700; }
+.tt-gallery:focus-within span { outline: 3px solid #fe2c55; }
+.tt-tabs { display: flex; gap: 22px; align-items: center; font-size: 15px; letter-spacing: .5px; }
+.tt-tabs b { color: #fff; }
+.tt-live { border: 0; background: none !important; color: #ffffff99 !important; font-weight: 800; font-size: 15px; letter-spacing: .5px; cursor: pointer; }
+.tt-spacer { width: 56px; }
+/* Màn đăng */
+.tt-post { position: absolute; inset: 0; z-index: 10; background: #000; display: flex; flex-direction: column; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+.tt-post[hidden] { display: none; }
+.tt-post-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid #222; color: #fff; font-size: 17px; }
+.tt-back { width: 44px; height: 44px; border: 0; background: none !important; color: #fff !important; font-size: 32px; line-height: 1; cursor: pointer; }
+.tt-post-head span { width: 44px; }
+.tt-post-body { display: flex; gap: 12px; padding: 14px; }
+.tt-caption { flex: 1; min-width: 0; border: 0; background: transparent; color: #fff; font-size: 16px; resize: none; outline: none; }
+.tt-caption::placeholder { color: #888; }
+.tt-preview { width: 108px; height: 192px; object-fit: cover; border-radius: 10px; background: #222; }
+.tt-post-actions { margin-top: auto; display: grid; grid-template-columns: 1fr 1.6fr; gap: 10px; padding: 12px 14px 16px; }
+.tt-retake, .tt-publish { min-height: 50px; border: 0; border-radius: 10px; font-weight: 800; font-size: 16px; cursor: pointer; }
+.tt-retake { background: #262626 !important; color: #fff !important; }
+.tt-publish { background: #fe2c55 !important; color: #fff !important; }
+.tt-publish:disabled { opacity: .6; }
+
+/* Âm thanh */
+.tt-sound { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); z-index: 3; max-width: 56%; min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: #0007 !important; color: #fff !important; font-weight: 800; font-size: 15px; display: flex; align-items: center; gap: 6px; backdrop-filter: blur(8px); cursor: pointer; }
+.tt-sound span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tt-sound.on { background: #fe2c55cc !important; }
+.studio.recording .tt-sound { pointer-events: none; }
+.studio.recording .tt-time { top: 66px; }
+.tt-tracks { display: grid; gap: 4px; max-height: 42vh; overflow-y: auto; padding: 0 12px; }
+.tt-track { display: flex; align-items: center; min-height: 44px; padding: 0 14px; border: 0; border-radius: 12px; background: #ffffff1a !important; color: #fff !important; font-weight: 700; font-size: 14.5px; text-align: left; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; position: relative; }
+.tt-track.on { background: #fe2c55 !important; }
+.tt-track.own input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.tt-track.own:focus-within { outline: 3px solid #fff; }
+.tt-sheet { bottom: 130px !important; border-radius: 18px 18px 0 0; }
+/* Chế độ LIVE */
+.tt-tabs { gap: 6px !important; }
+.tt-mode { border: 0; min-height: 36px; padding: 0 12px; background: none !important; color: #ffffff88 !important; font-weight: 800; font-size: 15px; letter-spacing: .5px; cursor: pointer; }
+.tt-mode.on { color: #fff !important; }
+.studio[data-mode="live"] .tt-modes, .studio[data-mode="live"] .tt-shutter-row, .studio[data-mode="live"] .tt-gallery, .studio[data-mode="live"] .tt-sound, .studio[data-mode="live"] [data-tool="timer"] { visibility: hidden; }
+.tt-golive { position: absolute; left: 12px; right: 12px; bottom: 16px; z-index: 4; padding: 14px; border-radius: 18px; background: #0009; backdrop-filter: blur(10px); display: grid; gap: 12px; }
+.tt-golive[hidden] { display: none; }
+.tt-title { min-height: 46px; padding: 0 12px; border: 0; border-radius: 12px; background: #ffffff1f; color: #fff; font-size: 16px; font-weight: 700; outline: none; }
+.tt-title::placeholder { color: #ffffffaa; }
+.tt-golive-btn { min-height: 52px; border: 0; border-radius: 999px; background: #fe2c55 !important; color: #fff !important; font-size: 17px; font-weight: 800; cursor: pointer; }
+.studio small{background:none!important;padding:0!important;border:0!important;color:#fff!important;font-size:11px}
+.studio[data-mode="live"] [data-tool="timer"]{display:none}

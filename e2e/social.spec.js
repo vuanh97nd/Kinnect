@@ -186,7 +186,7 @@ test("uploaded MP4 is decoded and played through authenticated HTTP video endpoi
   await expect(page.getByRole("heading", { name: "Chưa có video nào" })).toBeVisible();
   await expect(page.locator("body")).toHaveAttribute("data-reel", "empty");
   expect(await page.locator("body").evaluate(el => getComputedStyle(el).backgroundColor)).not.toBe("rgb(0, 0, 0)");
-  await navigation.getByRole("button", { name: "Live", exact: true }).click();
+  await page.getByRole("button", { name: "Live", exact: true }).click();
   await expect(page.locator("#live-panel")).toBeVisible();
   await expect(page.locator("#social-panel")).toBeHidden();
   const response = await page.request.post("/api/shorts", {
@@ -212,7 +212,7 @@ test("uploaded MP4 is decoded and played through authenticated HTTP video endpoi
     )
     .toBeGreaterThan(0);
   await page.locator(".reel-item video").evaluate(v => { window.reviewVideo = v; });
-  await navigation.getByRole("button", { name: "Live", exact: true }).click();
+  await page.getByRole("button", { name: "Live", exact: true }).click();
   expect(await page.evaluate(() => window.reviewVideo.paused)).toBe(true);
   await expect(page.locator("#live-panel")).toBeVisible();
 });
@@ -228,13 +228,16 @@ test("nearby consent, optional Les identity and notification permission/bell wor
   const p=await ctx.newPage();await signUp(p,"community_browser");
   await expect(p.getByRole("heading",{name:"Khám phá",exact:true})).toBeVisible();
   expect(await p.evaluate(()=>[window.locationRequests,window.notificationRequests])).toEqual([0,0]);
-  await p.getByRole("button",{name:"Bật thông báo",exact:true}).click();
+  // Lời mời bật thông báo nằm trong trung tâm thông báo (không chen vào nội dung).
+  await p.locator("#notification-bell").click();
+  await p.getByRole("button",{name:"Bật thông báo trình duyệt",exact:true}).click();
   expect(await p.evaluate(()=>window.notificationRequests)).toBe(1);
-  await p.getByRole("button",{name:"Bật vị trí để tìm quanh đây",exact:true}).click();
+  await p.keyboard.press("Escape");
+  await p.getByRole("button",{name:"Bật vị trí",exact:true}).click();
   await expect(p.getByRole("heading",{name:"Thành viên quanh bạn",exact:true})).toBeVisible();
   expect(await p.evaluate(()=>window.locationRequests)).toBe(1);
-  await p.getByRole("button",{name:"Tắt Quanh đây",exact:true}).click();
-  await expect(p.getByRole("button",{name:"Bật vị trí để tìm quanh đây",exact:true})).toBeVisible();
+  await p.getByRole("button",{name:"Tắt",exact:true}).click();
+  await expect(p.getByRole("button",{name:"Bật vị trí",exact:true})).toBeVisible();
   await p.getByRole("button",{name:"Hồ sơ",exact:true}).click();
   await p.getByRole("button",{name:"Sửa hồ sơ",exact:true}).click();
   await p.getByLabel("Xu hướng tính dục",{exact:true}).fill("Les / Đồng tính nữ");

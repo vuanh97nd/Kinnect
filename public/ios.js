@@ -12,7 +12,7 @@ help.type = 'button'; help.className = 'ios-help-trigger'; help.textContent = 'D
 document.querySelector('#auth .auth-panel')?.append(help); help.hidden = !isIOS;
 if (isIOS && !isStandalone()) {
   const banner = document.createElement('aside'); banner.className = 'ios-install-banner';
-  const text = document.createElement('span'); text.textContent = 'Kinnect trên iPhone · Thêm vào màn hình chính để mở nhanh hơn.';
+  const text = document.createElement('span'); text.textContent = 'Thêm Kinnect vào màn hình chính';
   const install = document.createElement('button'); install.textContent = 'Cách thêm'; install.onclick = () => dialog.showModal();
   const close = document.createElement('button'); close.className = 'dismiss-install'; close.textContent = '×'; close.setAttribute('aria-label','Ẩn gợi ý cài đặt'); close.onclick = () => banner.remove();
   banner.append(text,install,close);document.body.prepend(banner);

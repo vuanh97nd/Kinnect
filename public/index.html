@@ -16,7 +16,7 @@
     <link rel="stylesheet" href="/ios.css" />
     <link rel="stylesheet" href="/theme.css?v=2fcbf56e08bc" />
     <link rel="stylesheet" href="/app-ui.css?v=d466220eae70" />
-    <link rel="stylesheet" href="/studio.css?v=1" />
+    <link rel="stylesheet" href="/studio.css?v=3" />
     <link rel="stylesheet" href="/compact.css?v=1" />
   </head>
   <body>
@@ -149,6 +149,7 @@
         </form>
         <span id="connection" class="sr-only">Đang kết nối…</span>
         <div class="top-actions">
+          <button data-tab="live" class="icon-tab live-tab" aria-label="Live">Live</button>
           <button id="notification-bell" data-tab="notifications" class="icon-tab" aria-label="Thông báo" aria-expanded="false" aria-controls="notification-center">
             Thông báo <span id="unread"></span></button>
           <div class="me-menu">
@@ -170,9 +171,8 @@
       <nav aria-label="Điều hướng chính">
         <button data-tab="discover">Khám phá</button
         ><button data-tab="feed">Bảng tin</button
-        ><button id="create-post" class="create-tab" aria-label="Tạo bài viết"><span aria-hidden="true">+</span></button
+        ><button id="create-post" class="create-tab" aria-label="Quay video"><span aria-hidden="true">+</span></button
         ><button data-tab="shorts">Video</button
-        ><button data-tab="live">Live</button
         ><button data-tab="inbox">Tin nhắn</button
         ><button data-tab="profile">Hồ sơ</button
         ><button data-tab="admin" id="admin-tab" hidden>Quản trị</button>
@@ -183,7 +183,7 @@
         <section id="lobby">
           <div class="hero">
             <span class="eyebrow">LIVE CÙNG KINNECT</span>
-            <h2>Gặp nhau trực tiếp.</h2>
+            <h2>Live</h2>
             <p>Chia sẻ câu chuyện và trò chuyện cùng cộng đồng.</p>
           </div>
           <form id="create">
@@ -191,7 +191,7 @@
               >Chủ đề buổi live<input
                 id="title"
                 maxlength="100"
-                placeholder="Một tối trò chuyện cùng nhau…"
+                placeholder="Chủ đề buổi live…"
                 required /></label
             ><button id="start">Bắt đầu livestream</button>
           </form>
@@ -202,7 +202,7 @@
             <input
               id="search"
               type="search"
-              placeholder="Tìm chủ đề hoặc người phát…"
+              placeholder="Tìm phòng live…"
               aria-label="Tìm phòng livestream"
             /><select id="sort" aria-label="Sắp xếp phòng">
               <option value="new">Mới lên sóng</option>

@@ -786,7 +786,7 @@ body[data-view="shorts"][data-reel="ready"] #social-panel {
     font-size: 15px;
   }
   #app .create-tab span::after {
-    content: "  Tạo bài viết";
+    content: "  Quay video";
   }
   #rail {
     display: block;

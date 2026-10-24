@@ -22,3 +22,5 @@ local.properties
 /playwright-report/
 mail.env
 oauth.env
+/music/*
+!/music/README.txt

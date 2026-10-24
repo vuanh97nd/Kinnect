@@ -1,4 +1,4 @@
-import { createEffects, effectPicker } from "./camera.js?v=1";
+import { createEffects, effectPicker } from "./camera.js?v=3";
 const $ = (id) => document.getElementById(id);
 // stream: luồng đã qua hiệu ứng (gửi cho người xem); rawStream: camera/micro gốc.
 let rawStream = null,
@@ -210,6 +210,10 @@ $("create").onsubmit = async (e) => {
     });
     // Hiệu ứng (bộ lọc, làm mịn, sticker) áp lên hình gửi cho người xem.
     fx = createEffects(rawStream, { width: 720, height: 1280 });
+    if (window.kinnectPendingFx) {
+      fx.set(window.kinnectPendingFx);
+      window.kinnectPendingFx = null;
+    }
     stream = fx.stream;
     send({ type: "create", name: $("name").value, title: $("title").value });
   } catch (error) {
