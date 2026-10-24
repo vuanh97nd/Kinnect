@@ -52,6 +52,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit } = {}) {
     versionCache = { at: Date.now(), value: h.digest("hex").slice(0, 10) };
     return versionCache.value;
   }
+  let latestApk = null;
   const server = http.createServer(async (req, res) => {
     const path = new URL(req.url, "http://localhost").pathname;
     if (path.startsWith("/api/") && path !== "/api/music") {
@@ -181,6 +182,27 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit } = {}) {
         res.writeHead(404);
         return res.end();
       }
+    }
+    // Nút "Tải app": tự tìm APK của bản phát hành mới nhất trên GitHub và chuyển thẳng tới file để tải.
+    if (path === "/download/android") {
+      const fallback = "https://github.com/vuanh97nd/Kinnect/releases/latest";
+      try {
+        if (!latestApk || latestApk.expires < Date.now()) {
+          const r = await fetch("https://api.github.com/repos/vuanh97nd/Kinnect/releases?per_page=10", {
+            headers: { Accept: "application/vnd.github+json", "User-Agent": "Kinnect-Server" },
+            signal: AbortSignal.timeout(8000),
+          });
+          if (!r.ok) throw Error("GitHub " + r.status);
+          const release = (await r.json()).find((x) => !x.draft && x.assets?.some((a) => a.name.endsWith(".apk")));
+          const asset = release?.assets.find((a) => a.name.endsWith(".apk"));
+          if (!asset || !asset.browser_download_url.startsWith("https://github.com/vuanh97nd/Kinnect/releases/download/")) throw Error("Không có APK");
+          latestApk = { url: asset.browser_download_url, expires: Date.now() + 10 * 60000 };
+        }
+        res.writeHead(302, { Location: latestApk.url, "Cache-Control": "no-store" });
+      } catch {
+        res.writeHead(302, { Location: fallback, "Cache-Control": "no-store" });
+      }
+      return res.end();
     }
     if (path === "/website" || path.startsWith("/website/")) {
       // Website giới thiệu đã chuyển sang kinnect.io.vn.

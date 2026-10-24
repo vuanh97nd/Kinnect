@@ -85,15 +85,10 @@ function openOnboarding() {
   root.setAttribute("aria-label", "Giới thiệu Kinnect");
   root.innerHTML =
     '<div class="ob-blob b1"></div><div class="ob-blob b2"></div>' +
-    '<header class="ob-top"><img src="/kinnect-icon.png?v=4" alt="" /><strong>Kinnect</strong><a class="ob-site" href="https://kinnect.io.vn/">Tìm hiểu thêm ↗</a><button type="button" class="ob-skip">Bỏ qua</button></header>' +
+    '<header class="ob-top"><a class="ob-home" href="https://kinnect.io.vn/" aria-label="Về trang chủ Kinnect">←</a><img src="/kinnect-icon.png?v=4" alt="" /><strong>Kinnect</strong><a class="ob-site ob-get" href="' + (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? '/install-ios' : '/download/android') + '" target="_blank" rel="noopener">⬇ Tải app</a><button type="button" class="ob-skip">Bỏ qua</button></header>' +
     '<div class="ob-track" tabindex="0" aria-roledescription="carousel"></div>' +
     '<div class="ob-dots" role="tablist" aria-label="Chọn trang giới thiệu"></div>' +
-    '<div class="ob-actions"><button type="button" class="ob-start">Bắt đầu ngay</button><button type="button" class="ob-login">Tôi đã có tài khoản</button>' +
-    // Tải app: Android (APK) và iPhone/iPad (hồ sơ cài đặt); ẩn khi đã mở từ màn hình chính.
-    (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone ? '' :
-      '<div class="ob-download"><a class="ob-dl ob-dl-android" href="https://github.com/vuanh97nd/Kinnect/releases/latest" target="_blank" rel="noopener"><b>Tải app Android</b><small>File APK</small></a>' +
-      '<a class="ob-dl ob-dl-ios" href="/install-ios"><b>Cài trên iPhone</b><small>Tải hồ sơ cài đặt</small></a></div>') +
-    '</div>';
+    '<div class="ob-actions"><button type="button" class="ob-start">Bắt đầu ngay</button><button type="button" class="ob-login">Tôi đã có tài khoản</button></div>';
   const track = root.querySelector(".ob-track");
   const dots = root.querySelector(".ob-dots");
   slides.forEach((s, i) => {
