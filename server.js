@@ -1,3 +1,4 @@
+import {createCalls} from "./lib/calls.js";
 import http from "node:http";
 import { mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
@@ -9,13 +10,13 @@ import { randomUUID } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { fileURLToPath } from "node:url";
 
-export function createApp({ dbPath = ":memory:", fetchImpl } = {}) {
+export function createApp({ dbPath = ":memory:", fetchImpl, authLimit } = {}) {
   loadMailEnv();
   loadMailEnv("oauth.env");
   let notifyNotifications = () => {};
   const social = openSocial(dbPath, {
     onNotification: ({ userId }) => notifyNotifications(userId),
-    fetchImpl,
+    fetchImpl,authLimit,
     // Báo về email quản trị khi có người gửi yêu cầu quên mật khẩu.
     onResetRequest: (r) => {
       const when = new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
@@ -80,7 +81,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl } = {}) {
       if (path === "/api/music" && req.method === "GET") {
         let names = [];
         try {
-          names = (await readdir(dir)).filter((n) => /\.(mp3|m4a|aac)$/i.test(n)).sort().slice(0, 300);
+          names = (await readdir(dir)).filter((n) => /\.(mp3|m4a|aac)$/i.test(n)).sort().slice(0, 2000);
         } catch {}
         const credits = await readCredits();
         return sendJson(200, {
@@ -160,8 +161,22 @@ export function createApp({ dbPath = ":memory:", fetchImpl } = {}) {
         const file = resolve(dir, name);
         await stat(file);
         const type = /\.mp3$/i.test(name) ? "audio/mpeg" : "audio/mp4";
-        res.writeHead(200, { "Content-Type": type, "Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff" });
-        return res.end(await readFile(file));
+        const bytes = await readFile(file);
+        const headers = { "Content-Type": type, "Accept-Ranges": "bytes", "Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff" };
+        // Safari trên iPhone chỉ phát âm thanh khi máy chủ trả từng đoạn theo yêu cầu (HTTP Range).
+        const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || "");
+        if (range && (range[1] || range[2])) {
+          let start = range[1] ? Number(range[1]) : Math.max(0, bytes.length - Number(range[2]));
+          let end = range[1] && range[2] ? Math.min(Number(range[2]), bytes.length - 1) : bytes.length - 1;
+          if (start > end || start >= bytes.length) {
+            res.writeHead(416, { "Content-Range": "bytes */" + bytes.length });
+            return res.end();
+          }
+          res.writeHead(206, { ...headers, "Content-Range": `bytes ${start}-${end}/${bytes.length}`, "Content-Length": end - start + 1 });
+          return res.end(req.method === "HEAD" ? undefined : bytes.subarray(start, end + 1));
+        }
+        res.writeHead(200, { ...headers, "Content-Length": bytes.length });
+        return res.end(req.method === "HEAD" ? undefined : bytes);
       } catch {
         res.writeHead(404);
         return res.end();
@@ -182,8 +197,25 @@ export function createApp({ dbPath = ":memory:", fetchImpl } = {}) {
       "/website/privacy.html": ["website/privacy.html", "text/html"],
       "/website/community.html": ["website/community.html", "text/html"],
       "/kinnect-mark.svg": ["kinnect-mark.svg", "image/svg+xml"],
+      "/favicon.ico": ["favicon.ico", "image/x-icon"],
+      "/favicon-32.png": ["favicon-32.png", "image/png"],
+      "/kinnect-ios-120-v7.png": ["kinnect-ios-120-v7.png", "image/png"],
+      "/apple-touch-icon-120x120.png": ["kinnect-ios-120-v7.png", "image/png"],
+      "/apple-touch-icon-120x120-precomposed.png": ["kinnect-ios-120-v7.png", "image/png"],
+      "/kinnect-ios-152-v7.png": ["kinnect-ios-152-v7.png", "image/png"],
+      "/apple-touch-icon-152x152.png": ["kinnect-ios-152-v7.png", "image/png"],
+      "/apple-touch-icon-152x152-precomposed.png": ["kinnect-ios-152-v7.png", "image/png"],
+      "/kinnect-ios-167-v7.png": ["kinnect-ios-167-v7.png", "image/png"],
+      "/apple-touch-icon-167x167.png": ["kinnect-ios-167-v7.png", "image/png"],
+      "/apple-touch-icon-167x167-precomposed.png": ["kinnect-ios-167-v7.png", "image/png"],
+      "/kinnect-ios-180-v7.png": ["kinnect-ios-180-v7.png", "image/png"],
+      "/apple-touch-icon-180x180.png": ["kinnect-ios-180-v7.png", "image/png"],
+      "/apple-touch-icon-180x180-precomposed.png": ["kinnect-ios-180-v7.png", "image/png"],
       "/kinnect-icon-192.png": ["kinnect-icon-192.png", "image/png"],
       "/apple-touch-icon.png": ["apple-touch-icon.png", "image/png"],
+      "/apple-touch-icon-v5.png": ["apple-touch-icon-v5.png", "image/png"],
+      "/apple-touch-icon-v6.png": ["apple-touch-icon-v6.png", "image/png"],
+      "/apple-touch-icon-precomposed.png": ["apple-touch-icon.png", "image/png"],
       "/website/apple-touch-icon.png": ["website/apple-touch-icon.png", "image/png"],
       "/website/": ["website/index.html", "text/html"],
       "/website/index.html": ["website/index.html", "text/html"],
@@ -202,12 +234,31 @@ export function createApp({ dbPath = ":memory:", fetchImpl } = {}) {
       "/manifest.webmanifest": ["manifest.webmanifest", "application/manifest+json"],
       "/offline.html": ["offline.html", "text/html"],
       "/social.js": ["social.js", "text/javascript"],
+      "/calls.js": ["calls.js", "text/javascript"],
       "/camera.js": ["camera.js", "text/javascript"],
+      "/vendor/vision/face_landmarker.task": ["vendor/vision/face_landmarker.task", "application/octet-stream"],
+      "/vendor/vision/vision_bundle.mjs": ["vendor/vision/vision_bundle.mjs", "text/javascript"],
+      "/vendor/vision/wasm/vision_wasm_internal.js": ["vendor/vision/wasm/vision_wasm_internal.js", "text/javascript"],
+      "/vendor/vision/wasm/vision_wasm_internal.wasm": ["vendor/vision/wasm/vision_wasm_internal.wasm", "application/wasm"],
+      "/vendor/vision/wasm/vision_wasm_module_internal.js": ["vendor/vision/wasm/vision_wasm_module_internal.js", "text/javascript"],
+      "/vendor/vision/wasm/vision_wasm_module_internal.wasm": ["vendor/vision/wasm/vision_wasm_module_internal.wasm", "application/wasm"],
+      "/vendor/vision/wasm/vision_wasm_nosimd_internal.js": ["vendor/vision/wasm/vision_wasm_nosimd_internal.js", "text/javascript"],
+      "/vendor/vision/wasm/vision_wasm_nosimd_internal.wasm": ["vendor/vision/wasm/vision_wasm_nosimd_internal.wasm", "application/wasm"],
       "/studio.css": ["studio.css", "text/css"],
       "/compact.css": ["compact.css", "text/css"],
+      "/desktop.css": ["desktop.css", "text/css"],
       "/social.css": ["social.css", "text/css"],
       "/kinnect-icon.png": ["kinnect-icon.png", "image/png"],
       "/": ["index.html", "text/html"],
+      "/ios": ["index.html", "text/html"],
+      "/install-ios": ["install-ios.html", "text/html"],
+      "/install-ios-manifest": ["install-ios-manifest.html", "text/html"],
+      "/ios.webmanifest": ["ios.webmanifest", "application/manifest+json"],
+      "/Kinnect.mobileconfig": ["Kinnect.mobileconfig", "application/x-apple-aspen-config"],
+      "/kinnect-ios-install-qr.png": ["kinnect-ios-install-qr.png", "image/png"],
+      "/kinnect-maskable-512.png": ["kinnect-maskable-512.png", "image/png"],
+      "/install-ios.css": ["install-ios.css", "text/css"],
+      "/install-ios.js": ["install-ios.js", "text/javascript"],
       "/app.js": ["app.js", "text/javascript"],
       "/style.css": ["style.css", "text/css"],
     };
@@ -217,14 +268,6 @@ export function createApp({ dbPath = ":memory:", fetchImpl } = {}) {
     }
     try {
       const [file, type] = files[path];
-      res.writeHead(200, {
-        "Content-Type": type + "; charset=utf-8",
-        "Cache-Control": "no-cache",
-        "X-Content-Type-Options": "nosniff",
-        "Referrer-Policy": "no-referrer",
-        "Content-Security-Policy":
-          "default-src 'self'; connect-src 'self' ws: wss:; media-src 'self' blob:; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self'",
-      });
       let body = await readFile(new URL("./public/" + file, import.meta.url));
       if (type === "text/html" || type === "text/javascript") {
         // Gắn mã phiên bản theo nội dung vào mọi đường dẫn JS/CSS nội bộ, để trình duyệt và
@@ -238,6 +281,16 @@ export function createApp({ dbPath = ":memory:", fetchImpl } = {}) {
             ),
         );
       }
+      res.writeHead(200, {
+        "Content-Length": body.length,
+        "Content-Type": /^(text\/|application\/(?:json|manifest\+json)|image\/svg\+xml)/.test(type) ? type + "; charset=utf-8" : type,
+        "Cache-Control": path === "/Kinnect.mobileconfig" ? "no-store" : "no-cache",
+        ...(path === "/Kinnect.mobileconfig" ? {"Content-Disposition": 'attachment; filename="Kinnect.mobileconfig"'} : {}),
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer",
+        "Content-Security-Policy":
+          "default-src 'self'; connect-src 'self' ws: wss:; img-src 'self' data: blob: https://raw.githubusercontent.com/vuanh97nd/Kinnect/ https://*.vnecdn.net https://*.tuoitre.vn; media-src 'self' blob: data:; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'wasm-unsafe-eval'",
+      });
       res.end(body);
     } catch {
       res.writeHead(500);
@@ -248,6 +301,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl } = {}) {
   const send = (ws, data) => {
     if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data));
   };
+  const calls=createCalls({social,wss,send});
   notifyNotifications = (userId) => {
     for (const client of wss.clients)
       if (client.userId === userId && social.authenticate(client.authRequest)) send(client, { type: "notifications-changed" });
@@ -284,6 +338,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl } = {}) {
       });
     });
   function enforceAccess() {
+    calls.enforce();
     for (const ws of wss.clients) {
       const u = ws.authRequest && social.authenticate(ws.authRequest);
       if (!u) {
@@ -360,6 +415,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl } = {}) {
       }
       if (!m || typeof m !== "object") return;
       const error = (message) => send(ws, { type: "error", message });
+      if(calls.handle(ws,m))return;
       if (m.type === "create") {
         if (ws.room) return error("Hãy rời phòng hiện tại trước.");
         if (rooms.size >= 100) return error("Máy chủ đã đầy.");
@@ -469,7 +525,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl } = {}) {
           send(target, { type: "signal", from: ws.id, candidate: m.candidate });
       }
     });
-    ws.on("close", () => leave(ws));
+    ws.on("close", () => {calls.disconnect(ws);leave(ws);});
   });
   return { server, wss, rooms, social };
 }

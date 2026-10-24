@@ -68,7 +68,7 @@ body.studio-open { overflow: hidden; }
 .tt-tool svg { width: 30px; height: 30px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 3px #0009); }
 .tt-tool small { font-size: 11px; font-weight: 700; text-shadow: 0 1px 3px #000c; }
 .tt-tool.on svg { stroke: #ff4f9a; }
-.studio.recording .tt-rail, .studio.recording .tt-modes, .studio.recording .tt-carousel, .studio.recording .tt-x { opacity: 0; pointer-events: none; }
+.studio.recording .tt-rail, .studio.recording .tt-modes, .studio.recording .tt-carousel { opacity: 0; pointer-events: none; }
 .tt-sheet { position: absolute; left: 0; right: 0; bottom: 168px; z-index: 4; padding: 10px 0; background: #000a; backdrop-filter: blur(10px); }
 .tt-sheet[hidden] { display: none; }
 .tt-count { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; font-size: 120px; font-weight: 900; color: #fff; text-shadow: 0 4px 20px #0009; pointer-events: none; }

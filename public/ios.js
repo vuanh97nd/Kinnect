@@ -3,13 +3,16 @@ const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platfor
 const dialog = document.createElement('dialog');
 dialog.className = 'ios-help';
 dialog.setAttribute('aria-labelledby', 'ios-install-title');
-dialog.innerHTML = '<button class="ios-help-close" aria-label="Đóng hướng dẫn">×</button><p class="eyebrow">KINNECT TRÊN iPHONE & iPAD</p><h2 id="ios-install-title">Thêm một nơi là mình.</h2><p>Mở trang này bằng Safari để thêm Kinnect ra màn hình chính.</p><ol><li>Chạm nút <b>Chia sẻ</b> của Safari (hình vuông có mũi tên hướng lên).</li><li>Chọn <b>Thêm vào MH chính</b>.</li><li>Bật <b>Mở dưới dạng ứng dụng web</b> nếu có, rồi chạm <b>Thêm</b>.</li></ol><p>Kinnect cần Internet và máy chủ đang hoạt động. Video trực tiếp vẫn đang được hoàn thiện. Chưa hỗ trợ thông báo đẩy iOS.</p>';
+dialog.innerHTML = "<button class=\"ios-help-close\" aria-label=\"Đóng hướng dẫn\">×</button><p class=\"eyebrow\">KINNECT TRÊN iPHONE &amp; iPAD</p><h2 id=\"ios-install-title\">Cài Kinnect trên iPhone</h2><section class=\"ios-profile-install\" aria-labelledby=\"ios-profile-heading\"><h3 id=\"ios-profile-heading\">Cài biểu tượng Kinnect có logo</h3><p>Đang dùng máy tính? Dùng camera iPhone quét mã QR bên dưới. Đang dùng iPhone? Mở bằng Safari và bấm Tải hồ sơ Kinnect.</p><img class=\"ios-profile-qr\" src=\"/kinnect-ios-install-qr.png\" width=\"410\" height=\"410\" alt=\"Mã QR tải hồ sơ biểu tượng Kinnect trên iPhone\"><a class=\"ios-profile-download\" href=\"/Kinnect.mobileconfig\">Tải hồ sơ Kinnect</a><ol><li>Trong Safari trên iPhone, chọn <b>Cho phép</b> tải hồ sơ.</li><li>Mở <b>Cài đặt → Hồ sơ đã tải về → Cài đặt</b>. Nếu chưa thấy, vào <b>Cài đặt chung → VPN &amp; Quản lý thiết bị → Kinnect</b>.</li><li>Xác nhận cài đặt rồi trở về màn hình chính.</li></ol><p class=\"ios-profile-note\">Hồ sơ chỉ chứa một Web Clip Kinnect với logo nhúng sẵn. iOS sẽ hiển thị cảnh báo hồ sơ chưa ký. Đây là cách cài thay thế khi Safari hiện chữ K thường.</p></section><details class=\"ios-icon-help\"><summary>Thêm trực tiếp từ Safari</summary><p>Mở app.kinnect.io.vn bằng Safari trên iPhone, chọn <b>Chia sẻ → Thêm vào màn hình chính</b>. Bật <b>Mở dưới dạng ứng dụng web</b> nếu có, rồi chọn Thêm. Nếu hình xem trước chỉ hiện chữ K thường, có thể dùng cách cài hồ sơ có logo phía trên.</p></details>";
+dialog.insertAdjacentHTML('beforeend', '<details class="ios-icon-help"><summary>Nếu biểu tượng chỉ hiện chữ K thường</summary><p>Biểu tượng tự động có thể chưa được Safari chọn đúng trên máy này. Có thể dùng Phím tắt để tự chọn logo:</p><ol><li>Mở <a href="/kinnect-ios-180-v7.png" target="_blank" rel="noopener">logo Kinnect</a>, nhấn giữ ảnh và chọn Lưu vào Ảnh.</li><li>Mở ứng dụng Phím tắt, tạo phím tắt với tác vụ <b>Mở URL</b> và địa chỉ <b>https://app.kinnect.io.vn</b>.</li><li>Chọn <b>Thêm vào màn hình chính</b>, chạm biểu tượng → <b>Chọn ảnh</b>, chọn logo vừa lưu, đặt tên Kinnect rồi bấm Thêm.</li></ol><p>Cách này tạo lối tắt mở Kinnect trong Safari. Đây là cách tạm thời, không sửa bộ chọn icon tự động của Safari.</p></details>');
+
 document.body.append(dialog);
+window.addEventListener("kinnect-install-ios",()=>{if(!dialog.open)dialog.showModal();});
 dialog.querySelector('button').onclick = () => dialog.close();
 dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
 const help = document.createElement('button');
-help.type = 'button'; help.className = 'ios-help-trigger'; help.textContent = 'Dùng như app trên iPhone / iPad ↗'; help.onclick = () => dialog.showModal();
-document.querySelector('#auth .auth-panel')?.append(help); help.hidden = !isIOS;
+help.type = 'button'; help.className = 'ios-help-trigger'; help.textContent = 'Cài Kinnect cho iOS'; help.onclick = () => dialog.showModal();
+document.querySelector('#auth .auth-panel')?.append(help); help.hidden = /Android/i.test(navigator.userAgent);
 if (isIOS && !isStandalone()) {
   const banner = document.createElement('aside'); banner.className = 'ios-install-banner';
   const text = document.createElement('span'); text.textContent = 'Thêm Kinnect vào màn hình chính';
@@ -54,3 +57,9 @@ platforms.querySelector('button').onclick=()=>dialog.showModal();
 platforms.querySelector('.platform-note').textContent=isDesktop?'Bạn đang dùng bản web trên máy tính. Mở '+location.host+' trên điện thoại để cài app.':isIOS?'Bạn đang dùng iPhone/iPad.':isAndroid?'Bạn đang dùng Android.':'';
 if(!inAndroidApp){const rail=document.getElementById('rail');if(rail){const keep=()=>{if(!rail.querySelector('.platforms'))rail.append(platforms);};new MutationObserver(keep).observe(rail,{childList:true});keep();}}
 for(const copy of document.querySelectorAll('#auth .platforms')){copy.querySelector('button').onclick=()=>dialog.showModal();}
+
+// Install prompts belong to the login screen; keep them out of authenticated app layout.
+const installAppRoot=document.getElementById('app');
+const syncInstallPrompts=()=>{for(const banner of document.querySelectorAll('.ios-install-banner'))banner.hidden=!!installAppRoot&&!installAppRoot.hidden;};
+if(installAppRoot)new MutationObserver(syncInstallPrompts).observe(installAppRoot,{attributes:true,attributeFilter:['hidden']});
+syncInstallPrompts();

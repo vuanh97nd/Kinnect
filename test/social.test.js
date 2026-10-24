@@ -141,7 +141,7 @@ test("18+ confirmation, six-character passwords, session privacy and logout", as
   assert.equal((await once(ws, "close"))[0], 4401);
 });
 
-test("profile matching, mutual-only DMs, posts privacy, blocking and reports", async (t) => {
+test("profile matching, open DMs, posts privacy, blocking and reports", async (t) => {
   const app = await start();
   t.after(() => app.stop());
   const a = await register(app, "alice"),
@@ -162,14 +162,13 @@ test("profile matching, mutual-only DMs, posts privacy, blocking and reports", a
   assert.equal(discover.body.users.length, 1);
   assert.equal(discover.body.users[0].score, 1);
   assert.equal(discover.body.users[0].id, b.id);
-  assert.equal(
-    (
-      await as(app, a, "/users/" + b.id + "/messages", "POST", {
-        body: "hello",
-      })
-    ).status,
-    403,
-  );
+  assert.equal((await as(app,b,"/me")).body.user.dmMode,"everyone");
+  assert.equal((await as(app,a,"/users/"+b.id+"/messages","POST",{body:"Hello without following"})).status,201);
+  await as(app,b,"/me","PATCH",{dmMode:"mutual"});
+  assert.equal((await as(app,b,"/me")).body.user.dmMode,"everyone");
+  // Legacy stored preferences must not prevent messaging without follows.
+  app.social.db.prepare("UPDATE users SET dm_mode='mutual' WHERE id=?").run(b.id);
+  assert.equal((await as(app,a,"/users/"+b.id+"/messages","POST",{body:"Legacy preference still allows messages"})).status,201);
   await as(app, a, "/users/" + b.id + "/follow", "POST", {});
   await as(app, b, "/users/" + a.id + "/follow", "POST", {});
   const msg = await as(app, a, "/users/" + b.id + "/messages", "POST", {
@@ -177,7 +176,7 @@ test("profile matching, mutual-only DMs, posts privacy, blocking and reports", a
   });
   assert.equal(msg.status, 201);
   assert.equal(
-    (await as(app, b, "/users/" + a.id + "/messages")).body.messages[0].body,
+    (await as(app, b, "/users/" + a.id + "/messages")).body.messages.at(-1).body,
     "hello friend",
   );
   assert.equal(
@@ -213,7 +212,7 @@ test("profile matching, mutual-only DMs, posts privacy, blocking and reports", a
   );
   assert.equal(
     (await as(app, b, "/notifications")).body.notifications.length,
-    2,
+    4,
   );
   await as(app, a, "/users/" + b.id + "/block", "POST", {});
   assert.equal((await as(app, a, "/discover")).body.users.length, 0);
@@ -228,7 +227,7 @@ test("profile matching, mutual-only DMs, posts privacy, blocking and reports", a
   assert.equal(
     (await as(app, a, "/users/" + b.id + "/messages", "POST", { body: "new" }))
       .status,
-    403,
+    201,
   );
 });
 
@@ -288,7 +287,7 @@ test("SQLite survives restart, avatar format checks, moderation suspends session
     "Stored video",
   );
   assert.equal((await as(app, a, "/me")).body.user.bio, "Stored profile");
-  assert.equal((await as(app, a, "/posts")).body.posts[0].body, "Stored post");
+  assert.ok((await as(app, a, "/posts")).body.posts.some(p=>p.body==="Stored post"));
   app.social.db.prepare("UPDATE users SET suspended=1 WHERE id=?").run(a.id);
   assert.equal((await as(app, a, "/me")).status, 401);
 });
@@ -443,14 +442,16 @@ test("nearby discovery requires consent, hides coordinates and expires locations
   const result = await as(app, a, "/discover?nearby=1");
   assert.equal(result.body.users.length, 1);
   assert.equal(result.body.users[0].id, b.id);
+  assert.equal(result.body.users[0].distanceMeters,100);
+  assert.equal(result.body.users[0].distanceLabel,"100 m");
   assert.ok(result.body.users[0].distanceBand);
   assert.equal(result.body.users[0].lat, undefined);
   assert.equal(result.body.users[0].latitude, undefined);
   const stored = app.social.db
     .prepare("SELECT lat,lng FROM users WHERE id=?")
     .get(a.id);
-  assert.equal(stored.lat, 10.75);
-  assert.equal(stored.lng, 106.7);
+  assert.equal(stored.lat, 10.7734);
+  assert.equal(stored.lng, 106.6989);
   await as(app, b, "/me", "PATCH", { discoverable: false });
   assert.equal((await as(app, a, "/discover?nearby=1")).body.users.length, 0);
   await as(app, b, "/me", "PATCH", { discoverable: true });
@@ -565,6 +566,13 @@ test("short videos upload, durable bytes/ranges, likes, comments, reports and mo
     ).status,
     201,
   );
+  assert.equal((await as(app, b, "/shorts?feed=following")).body.shorts.length, 0);
+  await as(app, b, "/users/" + a.id + "/follow", "POST", {});
+  const followed = (await as(app, b, "/shorts?feed=following")).body.shorts;
+  assert.equal(followed[0].id, id);
+  assert.equal(followed[0].comments, 1);
+  await as(app, b, "/users/" + a.id + "/follow", "DELETE", {});
+  assert.equal((await as(app, b, "/shorts?feed=following")).body.shorts.length, 0);
   assert.equal((await as(app, b, "/shorts/" + id, "DELETE", {})).status, 403);
   await as(app, a, "/users/" + b.id + "/block", "POST", {});
   assert.equal((await as(app, b, "/shorts")).body.shorts.length, 0);
@@ -631,7 +639,7 @@ test("legacy 0.2 SQLite user data survives additive role/location/video migratio
     assert.equal(user.lat, null);
     assert.equal(
       app.social.db.prepare("PRAGMA user_version").get().user_version,
-      6,
+      7,
     );
     assert.ok(
       app.social.db
@@ -778,6 +786,21 @@ test("Google login: state check, first-login 18+ confirmation, then direct login
     });
     assert.match(cb2.headers.get("set-cookie"), /kinnect_session=/);
     assert.doesNotMatch(await cb2.text(), /ticket=/);
+    // App Android: quay về kinnect://oauth với mã dùng một lần, app đổi mã lấy phiên
+    const start3 = await fetch(url + "/api/oauth/google/start?client=android", { redirect: "manual" });
+    const state3 = new URL(start3.headers.get("location")).searchParams.get("state");
+    const cb3 = await fetch(url + `/api/oauth/google/callback?code=good-code&state=${state3}`, {
+      headers: { Cookie: start3.headers.get("set-cookie").split(";")[0] },
+    });
+    assert.doesNotMatch(cb3.headers.get("set-cookie"), /kinnect_session=[a-f0-9]/);
+    const code = (await cb3.text()).match(/kinnect:\/\/oauth\?code=([a-f0-9]+)/)[1];
+    const exchange = (c) =>
+      fetch(url + "/api/oauth/app-session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: c }) });
+    const appSession = await exchange(code);
+    assert.equal(appSession.status, 200);
+    assert.equal((await appSession.json()).user.username, "minhanh");
+    assert.match(appSession.headers.get("set-cookie"), /kinnect_session=/);
+    assert.equal((await exchange(code)).status, 401);
   } finally {
     for (const ws of app.wss.clients) ws.terminate();
     await new Promise((r) => app.wss.close(r));
@@ -799,8 +822,9 @@ test("post likes, comments, profile stats and conversation preview", async () =>
     });
     const pid = created.body.id;
     const like = await request(app, `/posts/${pid}/like`, { cookie: b.cookie, method: "POST", body: {} });
-    assert.deepEqual(like.body, { likes: 1, liked: true });
+    assert.deepEqual(like.body, { likes: 1, liked: true,myReaction:"like",reactions:{like:1} });
     await request(app, `/posts/${pid}/like`, { cookie: b.cookie, method: "POST", body: {} });
+    for(const reaction of ['love','haha','wow','sad','angry']){const changed=await request(app,`/posts/${pid}/like`,{cookie:b.cookie,method:'POST',body:{reaction}});assert.equal(changed.body.likes,1);assert.equal(changed.body.myReaction,reaction);assert.deepEqual(changed.body.reactions,{[reaction]:1});}
     const c = await request(app, `/posts/${pid}/comments`, {
       cookie: b.cookie,
       method: "POST",
@@ -904,6 +928,20 @@ test("music library: members list tracks, only admins upload or delete, rights c
     const list = await (await call(member.cookie, "GET")).json();
     assert.deepEqual(list.tracks.map((t) => [t.file, t.artist, t.license]), [[file, "Ban", "CC0"]]);
     assert.equal((await fetch(app.url + list.tracks[0].url, { headers: { Cookie: member.cookie } })).status, 200);
+    const musicURL = app.url + list.tracks[0].url;
+    const part = await fetch(musicURL, { headers: { Cookie: member.cookie, Range: "bytes=0-2" } });
+    assert.equal(part.status, 206);
+    assert.equal(part.headers.get("content-range"), "bytes 0-2/67");
+    assert.equal(await part.text(), "ID3");
+    const suffix = await fetch(musicURL, { headers: { Cookie: member.cookie, Range: "bytes=-4" } });
+    assert.equal(suffix.status, 206);
+    assert.equal((await suffix.arrayBuffer()).byteLength, 4);
+    const invalid = await fetch(musicURL, { headers: { Cookie: member.cookie, Range: "bytes=67-" } });
+    assert.equal(invalid.status, 416);
+    const head = await fetch(musicURL, { method: "HEAD", headers: { Cookie: member.cookie, Range: "bytes=0-2" } });
+    assert.equal(head.status, 206);
+    assert.equal(head.headers.get("content-length"), "3");
+    assert.equal(await head.text(), "");
     assert.equal((await fetch(app.url + "/music/..%2Fserver.js", { headers: { Cookie: member.cookie } })).status, 404);
     assert.equal((await call(member.cookie, "DELETE", { file })).status, 403);
     assert.equal((await call(admin.cookie, "DELETE", { file })).status, 200);
@@ -914,4 +952,135 @@ test("music library: members list tracks, only admins upload or delete, rights c
     else process.env.MUSIC_DIR = prev;
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test('post media and 24-hour stories enforce follower, block and expiry visibility',async t=>{
+ const app=await start();t.after(()=>app.stop());
+ const a=await register(app,'media_author'),b=await register(app,'media_follower'),c=await register(app,'media_stranger');
+ const image='data:image/png;base64,'+(await readFile(new URL('../public/apple-touch-icon.png',import.meta.url))).toString('base64');
+ const post=await as(app,a,'/posts','POST',{body:'',visibility:'followers',media:image});assert.equal(post.status,201);
+ const path='/api/posts/'+post.body.id+'/media';
+ assert.equal((await fetch(app.url+path,{headers:{Cookie:c.cookie}})).status,404);
+ await as(app,b,'/users/'+a.id+'/follow','POST',{});
+ const feed=(await as(app,b,'/posts')).body.posts;assert.equal(feed[0].media.kind,'image');
+ assert.equal((await fetch(app.url+path,{headers:{Cookie:b.cookie}})).status,200);
+ assert.equal((await fetch(app.url+path,{headers:{Cookie:b.cookie,Range:'bytes=0-7'}})).status,206);
+ assert.equal((await as(app,a,'/posts','POST',{body:'',visibility:'public',media:'data:image/png;base64,YmFk'})).status,400);
+ const story=await as(app,a,'/stories','POST',{body:'Tin mới',media:image});assert.equal(story.status,201);
+ assert.equal((await as(app,b,'/stories')).body.stories.length,1);
+ assert.equal((await as(app,c,'/stories')).body.stories.length,0);
+ assert.equal((await as(app,b,'/posts')).body.posts.length,1);
+ app.social.db.prepare('UPDATE post_stories SET expires=? WHERE post_id=?').run(Date.now()-1,story.body.id);
+ assert.equal((await as(app,b,'/stories')).body.stories.length,0);
+ assert.equal((await fetch(app.url+'/api/posts/'+story.body.id+'/media',{headers:{Cookie:b.cookie}})).status,404);
+ await as(app,a,'/users/'+b.id+'/block','POST',{});
+ assert.equal((await fetch(app.url+path,{headers:{Cookie:b.cookie}})).status,404);
+ const video='data:video/mp4;base64,'+(await readFile(new URL('../test/fixtures/short.mp4',import.meta.url))).toString('base64');
+ assert.equal((await as(app,a,'/posts','POST',{body:'Video trong bảng tin',visibility:'public',media:video})).status,201);
+});
+
+test('remembered device login survives explicit logout, requires its cookie, and is revoked by password change',async t=>{
+ const app=await start();t.after(()=>app.stop());const a=await register(app,'trusted_device');
+ const login=await fetch(app.url+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'trusted_device',password:'very-strong-test-password',remember:true})});
+ assert.equal(login.status,200);const cookies=login.headers.getSetCookie();const session=cookies.find(c=>c.startsWith('kinnect_session=')).split(';')[0],device=cookies.find(c=>c.startsWith('kinnect_device=')).split(';')[0];
+ assert.ok(cookies.find(c=>c.startsWith('kinnect_device=')).includes('HttpOnly'));
+ await request(app,'/logout',{cookie:session,method:'POST',body:{}});
+ assert.equal((await request(app,'/me',{cookie:session})).status,401);
+ const remembered=await request(app,'/remembered',{cookie:device});assert.equal(remembered.body.accounts[0].id,a.id);
+ assert.equal((await request(app,'/remembered/login',{method:'POST',body:{userId:a.id}})).status,401);
+ const quick=await request(app,'/remembered/login',{cookie:device,method:'POST',body:{userId:a.id}});assert.equal(quick.status,200);
+ assert.equal((await request(app,'/me',{cookie:quick.cookie})).status,200);
+ await request(app,'/me/password',{cookie:quick.cookie,method:'POST',body:{current:'very-strong-test-password',next:'new-password'}});
+ assert.equal((await request(app,'/remembered',{cookie:device})).body.accounts.length,0);
+ assert.equal((await request(app,'/remembered/login',{cookie:device,method:'POST',body:{userId:a.id}})).status,401);
+ const again=await fetch(app.url+'/api/login',{method:'POST',headers:{'Content-Type':'application/json',Cookie:device},body:JSON.stringify({username:'trusted_device',password:'new-password',remember:true})});assert.equal(again.status,200);
+ assert.equal((await request(app,'/remembered/'+a.id,{cookie:device,method:'DELETE',body:{}})).status,200);
+ assert.equal((await request(app,'/remembered',{cookie:device})).body.accounts.length,0);
+});
+
+
+test('group membership protects messages, unread counts and ownership transfer',async t=>{
+ const app=await start();t.after(()=>app.stop());const a=await register(app,'group_a'),b=await register(app,'group_b'),c=await register(app,'group_c'),outsider=await register(app,'group_out');
+ assert.equal((await as(app,a,'/groups','POST',{name:'Bạn bè',members:[]})).status,400);
+ const created=await as(app,a,'/groups','POST',{name:'Bạn bè',members:[b.id,b.id]});assert.equal(created.status,201);const id=created.body.group.id;assert.equal(created.body.group.members.length,2);
+ assert.equal((await as(app,outsider,'/groups/'+id+'/messages')).status,404);
+ assert.equal((await as(app,outsider,'/groups/'+id+'/messages','POST',{body:'intruder'})).status,404);
+ assert.equal((await as(app,b,'/groups/'+id+'/members','POST',{members:[c.id]})).status,403);
+ assert.equal((await as(app,a,'/groups/'+id+'/members','POST',{members:[c.id]})).status,200);
+ assert.equal((await as(app,b,'/groups/'+id+'/members','DELETE',{userId:c.id})).status,403);
+ assert.equal((await as(app,a,'/groups/'+id+'/members','DELETE',{userId:a.id})).status,400);
+ assert.equal((await as(app,a,'/groups/'+id+'/members','DELETE',{userId:c.id})).status,200);
+ assert.equal((await as(app,c,'/groups/'+id+'/messages')).status,404);
+ assert.equal((await as(app,a,'/groups/'+id+'/members','POST',{members:[c.id]})).status,200);
+ assert.equal((await as(app,b,'/groups/'+id,'PATCH',{name:'wrong'})).status,403);
+ assert.equal((await as(app,a,'/groups/'+id,'PATCH',{name:'Nhóm mới'})).body.group.name,'Nhóm mới');
+ assert.equal((await as(app,a,'/groups/'+id+'/messages','POST',{body:'Xin chào nhóm'})).status,201);
+ assert.equal((await as(app,b,'/groups')).body.groups[0].unread,1);
+ assert.equal((await as(app,b,'/groups/'+id+'/messages')).body.messages[0].body,'Xin chào nhóm');
+ assert.equal((await as(app,b,'/groups')).body.groups[0].unread,0);
+ assert.ok((await as(app,b,'/notifications')).body.notifications.filter(n=>n.kind==='group_message').every(n=>n.seen));
+ await as(app,a,'/groups/'+id+'/leave','POST',{});assert.equal((await as(app,a,'/groups/'+id)).status,404);
+ const remaining=(await as(app,b,'/groups/'+id)).body.group;assert.notEqual(remaining.owner,a.id);assert.equal(remaining.members.length,2);
+ const nextOwner=remaining.owner===b.id?b:c;assert.equal((await as(app,nextOwner,'/groups/'+id,'PATCH',{name:'Sau chuyển quyền'})).status,200);
+ await as(app,b,'/groups/'+id+'/leave','POST',{});await as(app,c,'/groups/'+id+'/leave','POST',{});assert.equal(app.social.db.prepare('SELECT COUNT(*) AS n FROM chat_groups WHERE id=?').get(id).n,0);
+});
+
+test('private call signaling requires acceptance and blocks outsiders, revoked sessions and blocked users',async t=>{
+ const app=await start();t.after(()=>app.stop());const a=await register(app,'call_a'),b=await register(app,'call_b'),c=await register(app,'call_out');
+ async function client(u){const ws=new WebSocket(app.url,{headers:{Cookie:u.cookie}}),queue=[];ws.on('message',raw=>queue.push(JSON.parse(raw)));await once(ws,'open');return {ws,queue,send:m=>ws.send(JSON.stringify(m)),wait:async type=>{const until=Date.now()+2000;while(Date.now()<until){const i=queue.findIndex(m=>m.type===type);if(i>=0)return queue.splice(i,1)[0];await new Promise(r=>setTimeout(r,10));}throw Error('Missing '+type);}};}
+ const aa=await client(a),bb=await client(b),cc=await client(c);
+ aa.send({type:'call-start',to:b.id,requestId:'one'});const ring=await aa.wait('call-ringing'),incoming=await bb.wait('call-incoming');assert.equal(incoming.from.id,a.id);assert.equal(incoming.callId,ring.callId);
+ aa.send({type:'call-signal',callId:ring.callId,description:{type:'offer',sdp:'before accept'}});await new Promise(r=>setTimeout(r,30));assert.ok(!bb.queue.some(m=>m.type==='call-signal'));
+ cc.send({type:'call-end',callId:ring.callId});bb.send({type:'call-accept',callId:ring.callId});await aa.wait('call-accepted');await bb.wait('call-accepted');
+ cc.send({type:'call-signal',callId:ring.callId,description:{type:'offer',sdp:'intruder'}});aa.send({type:'call-signal',callId:ring.callId,description:{type:'offer',sdp:'legitimate'}});assert.equal((await bb.wait('call-signal')).description.sdp,'legitimate');
+ cc.send({type:'call-start',to:b.id,requestId:'busy'});assert.equal((await cc.wait('call-ended')).reason,'busy');
+ await as(app,b,'/users/'+a.id+'/block','POST',{});assert.equal((await aa.wait('call-ended')).reason,'unavailable');await bb.wait('call-ended');
+ aa.send({type:'call-start',to:b.id,requestId:'blocked'});assert.equal((await aa.wait('call-ended')).reason,'unavailable');
+ await as(app,b,'/users/'+a.id+'/block','DELETE',{});aa.send({type:'call-start',to:b.id,requestId:'decline'});const declined=await aa.wait('call-ringing');await bb.wait('call-incoming');bb.send({type:'call-decline',callId:declined.callId});assert.equal((await aa.wait('call-ended')).reason,'declined');await bb.wait('call-ended');
+ aa.send({type:'call-start',to:b.id,requestId:'logout'});await aa.wait('call-ringing');await bb.wait('call-incoming');await as(app,a,'/logout','POST',{});assert.equal((await bb.wait('call-ended')).reason,'unavailable');
+ assert.equal((await request(app,'/call-config')).status,401);assert.equal((await as(app,b,'/call-config')).status,200);
+});
+
+ test('comment replies and reactions persist with resource and block checks',async t=>{
+ const app=await start();t.after(()=>app.stop());const a=await register(app,'thread_a'),b=await register(app,'thread_b');const image='data:image/png;base64,'+(await readFile(new URL('../public/apple-touch-icon.png',import.meta.url))).toString('base64');
+ for(const resource of ['posts','shorts']){const data=resource==='posts'?{body:'Thread test'}:{caption:'Thread test',data:'data:video/mp4;base64,'+(await readFile(new URL('./fixtures/short.mp4',import.meta.url))).toString('base64')};const made=await as(app,a,'/'+resource,'POST',data);assert.equal(made.status,201);const base='/'+resource+'/'+made.body.id+'/comments',root=(await as(app,a,base,'POST',{body:'Root'})).body.id;const reply=await as(app,b,base,'POST',{body:'Reply',parentId:root});assert.equal(reply.status,201);assert.equal((await as(app,b,base,'POST',{body:'Bad',parentId:'missing'})).status,404);assert.equal((await as(app,b,base+'/'+root+'/reaction','POST',{reaction:'love'})).body.comment.reactions.love,1);assert.equal((await as(app,b,base+'/'+root+'/reaction','POST',{reaction:'haha'})).body.comment.reactions.haha,1);const comments=(await as(app,a,base)).body.comments;assert.equal(comments.find(c=>c.id===reply.body.id).parentId,root);assert.equal(comments.find(c=>c.id===root).reactions.love,undefined);await as(app,b,base+'/'+root+'/reaction','POST',{reaction:null});assert.deepEqual((await as(app,b,base)).body.comments.find(c=>c.id===root).reactions,{});}
+ const update=await as(app,a,'/me/cover','POST',{data:image});assert.equal(update.status,200);assert.ok(update.body.user.cover);const cover=await fetch(app.url+update.body.user.cover,{headers:{Cookie:b.cookie}});assert.equal(cover.status,200);assert.ok((await as(app,b,'/posts')).body.posts.some(p=>p.body==='đã cập nhật ảnh bìa.'&&p.media));
+ await as(app,b,'/users/'+a.id+'/block','POST',{});assert.equal((await fetch(app.url+update.body.user.cover,{headers:{Cookie:b.cookie}})).status,404);
+ });
+
+test('chat files support images, video ranges, downloads and conversation membership',async t=>{
+ const app=await start();t.after(()=>app.stop());const a=await register(app,'file_a'),b=await register(app,'file_b'),c=await register(app,'file_out');
+ const fixtures=[['photo.png',await readFile(new URL('../public/apple-touch-icon.png',import.meta.url)),'image'],['clip.mp4',await readFile(new URL('./fixtures/short.mp4',import.meta.url)),'video'],['notes.txt',Buffer.from('private attachment'),'file']];
+ const group=(await as(app,a,'/groups','POST',{name:'Tệp nhóm',members:[b.id]})).body.group;
+ for(const [kind,base] of [['direct','/users/'+b.id+'/messages'],['group','/groups/'+group.id+'/messages']])for(const [name,bytes,type] of fixtures){const sent=await as(app,a,base,'POST',{body:'',attachment:{name,data:'data:application/octet-stream;base64,'+bytes.toString('base64')}});assert.equal(sent.status,201,JSON.stringify(sent.body));const list=await as(app,b,kind==='direct'?'/users/'+a.id+'/messages':base);const file=list.body.messages.find(m=>m.id===sent.body.message.id).attachment;assert.equal(file.kind,type);assert.equal(file.name,name);const response=await fetch(app.url+file.url,{headers:{Cookie:b.cookie}});assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),bytes);if(type==='file')assert.match(response.headers.get('content-disposition'),/^attachment/);assert.equal((await fetch(app.url+file.url,{headers:{Cookie:c.cookie}})).status,404);assert.equal((await fetch(app.url+file.url)).status,401);const range=await fetch(app.url+file.url,{headers:{Cookie:b.cookie,Range:'bytes=0-7'}});assert.equal(range.status,206);assert.deepEqual(Buffer.from(await range.arrayBuffer()),bytes.subarray(0,8));}
+ const grouped=(await as(app,b,'/groups/'+group.id+'/messages')).body.messages[0].attachment;await as(app,b,'/groups/'+group.id+'/leave','POST',{});assert.equal((await fetch(app.url+grouped.url,{headers:{Cookie:b.cookie}})).status,404);
+ const direct=(await as(app,b,'/users/'+a.id+'/messages')).body.messages[0].attachment;await as(app,b,'/users/'+a.id+'/block','POST',{});assert.equal((await fetch(app.url+direct.url,{headers:{Cookie:b.cookie}})).status,404);
+ assert.equal((await as(app,a,'/users/'+c.id+'/messages','POST',{attachment:{name:'empty',data:'data:;base64,'}})).status,400);
+});
+
+test('message delete recall reactions and conversation clearing stay scoped to each user',async t=>{
+ const app=await start();t.after(()=>app.stop());const a=await register(app,'actions_a'),b=await register(app,'actions_b'),c=await register(app,'actions_out');const g=(await as(app,a,'/groups','POST',{name:'Actions',members:[b.id]})).body.group;
+ for(const kind of ['direct','group']){const from=kind==='direct'?'/users/'+b.id+'/messages':'/groups/'+g.id+'/messages',to=kind==='direct'?'/users/'+a.id+'/messages':from;const sent=await as(app,a,from,'POST',{body:'Message one'});assert.equal(sent.status,201);const id=sent.body.message.id,action='/chat-messages/'+kind+'/'+id;
+ assert.equal((await as(app,c,action,'DELETE',{})).status,404);assert.equal((await as(app,b,action+'/recall','POST',{})).status,403);
+ assert.equal((await as(app,b,action+'/reaction','POST',{reaction:'love'})).body.message.reactions.love,1);assert.equal((await as(app,a,from)).body.messages[0].reactions.love,1);
+ await as(app,b,action,'DELETE',{});assert.equal((await as(app,b,to)).body.messages.length,0);assert.equal((await as(app,a,from)).body.messages.length,1);
+ const second=(await as(app,a,from,'POST',{body:'Recall me'})).body.message;await as(app,a,'/chat-messages/'+kind+'/'+second.id+'/recall','POST',{});const recalled=(await as(app,b,to)).body.messages.find(m=>m.id===second.id);assert.equal(recalled.recalled,true);assert.equal(recalled.body,'Tin nhắn đã được thu hồi');assert.equal((await as(app,b,'/chat-messages/'+kind+'/'+second.id+'/reaction','POST',{reaction:'like'})).status,404);
+ await as(app,b,to,'DELETE',{});assert.equal((await as(app,b,to)).body.messages.length,0);assert.ok((await as(app,a,from)).body.messages.length>0);assert.equal(kind==='direct'?(await as(app,b,'/conversations')).body.users.length:(await as(app,b,'/groups')).body.groups.length,0);
+ await as(app,a,from,'POST',{body:'New conversation'});assert.equal((await as(app,b,to)).body.messages.length,1);assert.equal(kind==='direct'?(await as(app,b,'/conversations')).body.users.length:(await as(app,b,'/groups')).body.groups.length,1);
+ }
+});
+
+test('delivery and seen receipts are independent from notification read state and presence privacy',async t=>{
+ const app=await start();t.after(()=>app.stop());const a=await register(app,'receipt_a'),b=await register(app,'receipt_b');const sent=(await as(app,a,'/users/'+b.id+'/messages','POST',{body:'Read state'})).body.message;
+ let m=(await as(app,a,'/users/'+b.id+'/messages')).body.messages.find(m=>m.id===sent.id);assert.equal(m.receipt.deliveredAt,undefined);await as(app,b,'/notifications');m=(await as(app,a,'/users/'+b.id+'/messages')).body.messages[0];assert.ok(m.receipt.deliveredAt);assert.equal(m.receipt.seenAt,null);await as(app,b,'/notifications','POST',{});assert.equal((await as(app,a,'/users/'+b.id+'/messages')).body.messages[0].receipt.seenAt,null);await as(app,b,'/users/'+a.id+'/messages');assert.ok((await as(app,a,'/users/'+b.id+'/messages')).body.messages[0].receipt.seenAt);
+ app.social.db.prepare('UPDATE users SET last_active=? WHERE id=?').run(Date.now()-5*60000,b.id);assert.ok((await as(app,a,'/users/'+b.id)).body.user.lastActiveAt);await as(app,b,'/me','PATCH',{showActivity:false});const hidden=(await as(app,a,'/users/'+b.id)).body.user;assert.equal(hidden.lastActiveAt,null);assert.equal(hidden.isActive,false);
+});
+
+test('pins are shared and mute is per member without losing unread messages',async t=>{
+ const app=await start();t.after(()=>app.stop());const a=await register(app,'pin_a'),b=await register(app,'pin_b'),out=await register(app,'pin_out');const g=(await as(app,a,'/groups','POST',{name:'Pinned',members:[b.id]})).body.group;
+ for(const kind of ['direct','group']){const from=kind==='direct'?'/users/'+b.id+'/messages':'/groups/'+g.id+'/messages',to=kind==='direct'?'/users/'+a.id+'/messages':from,id=(await as(app,a,from,'POST',{body:'Pin this'})).body.message.id;
+ assert.equal((await as(app,a,'/chat-messages/'+kind+'/'+id+'/pin','POST',{})).status,200);assert.equal((await as(app,b,to)).body.messages[0].pinned,true);assert.equal((await as(app,out,'/chat-messages/'+kind+'/'+id+'/pin','POST',{})).status,404);
+ const preference='/chat-preferences/'+kind+'/'+(kind==='direct'?a.id:g.id);assert.equal((await as(app,b,preference,'POST',{muted:true})).body.muted,true);assert.equal((await as(app,b,preference)).body.muted,true);const fresh=(await as(app,a,from,'POST',{body:'Muted but unread'})).body.message;const note=(await as(app,b,'/notifications')).body.notifications.find(n=>kind==='direct'?n.ref===fresh.id:n.kind==='group_message'&&!n.seen);assert.equal(note.muted,true);assert.equal(note.seen,0);assert.equal((await as(app,b,preference,'POST',{muted:false})).body.muted,false);
+ await as(app,a,'/chat-messages/'+kind+'/'+id+'/recall','POST',{});assert.ok(!(await as(app,b,to)).body.messages[0].pinned);
+ }
 });

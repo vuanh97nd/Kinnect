@@ -8,16 +8,18 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Kinnect" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=4" />
-    <link rel="icon" href="/kinnect-mark.svg?v=4" type="image/svg+xml" />
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" sizes="180x180" type="image/png" href="https://raw.githubusercontent.com/vuanh97nd/Kinnect/81a7a0ba474f208332f9c7f0407e4a769daa6a81/public/kinnect-ios-180-v7.png" />
+    <link rel="icon" href="/favicon.ico?v=7" sizes="16x16 32x32 48x48 64x64 128x128 256x256" />
+    <link rel="icon" href="/favicon-32.png?v=7" type="image/png" sizes="32x32" />
+    <link rel="manifest" href="/manifest.webmanifest?v=7" />
     <link rel="stylesheet" href="/style.css" />
     <link rel="stylesheet" href="/social.css" />
     <link rel="stylesheet" href="/ios.css" />
     <link rel="stylesheet" href="/theme.css?v=2fcbf56e08bc" />
     <link rel="stylesheet" href="/app-ui.css?v=d466220eae70" />
-    <link rel="stylesheet" href="/studio.css?v=3" />
+    <link rel="stylesheet" href="/studio.css?v=4" />
     <link rel="stylesheet" href="/compact.css?v=1" />
+    <link rel="stylesheet" href="/desktop.css?v=1" />
   </head>
   <body>
     <section id="auth" class="auth-shell" hidden>
@@ -32,6 +34,7 @@
         <div class="auth-phone"><img src="/auth-preview.jpg?v=1" alt="" /></div>
       </aside>
       <div class="auth-panel">
+        <a class="auth-home" href="https://kinnect.io.vn/">← Về trang giới thiệu</a>
         <img src="/kinnect-icon.png?v=4" class="auth-logo" alt="Kinnect" width="56" height="56" />
         <h1 id="auth-title">Chào mừng trở lại</h1>
         <p class="auth-sub" id="auth-sub">Đăng nhập để tiếp tục với Kinnect.</p>
@@ -95,6 +98,7 @@
             <label class="check"><input id="agree" type="checkbox" required /><span>Tôi xác nhận mình <b>đủ 18 tuổi</b> và đồng ý với <a href="https://kinnect.io.vn/community" target="_blank" rel="noopener">quy tắc cộng đồng</a>.</span></label>
           </fieldset>
           <p id="auth-status" role="alert"></p>
+          <label class="remember-device"><input type="checkbox" id="remember-device"><span>Ghi nhớ đăng nhập trên thiết bị này</span></label>
           <button id="auth-submit" type="submit">Đăng nhập</button>
         </form>
         <div id="forgot-view" hidden>
@@ -159,6 +163,7 @@
               <div class="me-head"><b id="me-name"></b><small id="me-username"></small></div>
               <button type="button" role="menuitem" data-go="profile">Trang cá nhân</button>
               <button type="button" role="menuitem" data-go="settings">Cài đặt tài khoản</button>
+              <button type="button" role="menuitem" data-go="ios-install">Cài Kinnect cho iOS</button>
               <button type="button" role="menuitem" data-go="admin" id="admin-menu" hidden>Quản trị</button>
               <a role="menuitem" href="https://kinnect.io.vn/" target="_blank" rel="noopener">Giới thiệu Kinnect</a>
               <a role="menuitem" href="https://kinnect.io.vn/community" target="_blank" rel="noopener">Quy tắc cộng đồng</a>
@@ -184,7 +189,7 @@
         <section id="lobby">
           <div class="hero">
             <span class="eyebrow">LIVE CÙNG KINNECT</span>
-            <h2>Live</h2>
+            <h2>Trực tiếp</h2>
             <p>Chia sẻ câu chuyện và trò chuyện cùng cộng đồng.</p>
           </div>
           <form id="create">
@@ -192,9 +197,9 @@
               >Chủ đề buổi live<input
                 id="title"
                 maxlength="100"
-                placeholder="Chủ đề buổi live…"
+                placeholder="Bạn muốn chia sẻ điều gì?"
                 required /></label
-            ><button id="start">Bắt đầu livestream</button>
+            ><button id="start">Phát trực tiếp</button>
           </form>
           <h2 class="section-title">
             <span class="live-dot"></span> Đang trực tiếp
@@ -203,7 +208,7 @@
             <input
               id="search"
               type="search"
-              placeholder="Tìm phòng live…"
+              placeholder="Tìm buổi trực tiếp…"
               aria-label="Tìm phòng livestream"
             /><select id="sort" aria-label="Sắp xếp phòng">
               <option value="new">Mới lên sóng</option>

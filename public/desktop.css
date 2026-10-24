@@ -1,0 +1,92 @@
+/* Giao diện PC (≥1000px). Chỉ áp dụng trên màn hình rộng — giao diện mobile giữ nguyên. */
+@media (min-width: 1000px) {
+  body { background: var(--bg); }
+  main#app {
+    display: grid !important;
+    grid-template-columns: 248px minmax(0, 640px) 320px !important;
+    grid-template-areas: "top top top" "nav optin rail" "nav notice rail" "nav main rail" "nav foot rail" !important;
+    grid-template-rows: auto auto auto 1fr auto !important;
+    column-gap: 32px !important;
+    justify-content: center;
+    max-width: 1320px !important;
+    margin: 0 auto !important;
+    padding: 0 24px !important;
+    box-sizing: border-box;
+  }
+
+  /* Thanh trên: cố định, ba vùng thẳng hàng với ba cột */
+  #app > header.topbar {
+    grid-area: top;
+    position: sticky; top: 0; z-index: 40;
+    display: grid !important;
+    grid-template-columns: 248px minmax(0, 640px) 320px;
+    column-gap: 32px; align-items: center;
+    height: 64px; margin: 0 -24px; padding: 0 24px;
+    background: color-mix(in srgb, var(--bg) 88%, transparent) !important;
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--line);
+  }
+  #app > header.topbar .brand { justify-self: start; }
+  #app > header.topbar .top-search { width: 100%; max-width: none; justify-self: stretch; }
+  #app > header.topbar .top-actions { justify-self: end; gap: 6px !important; }
+  #app #notification-bell { font-size: 0 !important; }
+  #app #notification-bell #unread { position: absolute; top: 2px; right: 0; font-size: 11px; }
+  #app .top-actions .icon-tab { border-radius: 12px !important; }
+  #app .top-actions .icon-tab:hover { background: var(--soft) !important; }
+
+  /* Menu trái dọc, dính khi cuộn */
+  #app > nav {
+    grid-area: nav;
+    position: sticky !important; top: 80px; align-self: start;
+    display: flex !important; flex-direction: column !important; align-items: stretch !important;
+    gap: 4px; width: auto !important; height: auto !important;
+    margin: 16px 0 0 !important; padding: 0 !important;
+    background: none !important; border: 0 !important; box-shadow: none !important;
+    inset: auto !important; transform: none !important;
+  }
+  #app > nav [data-tab] {
+    display: flex !important; flex-direction: row !important; align-items: center; justify-content: flex-start !important;
+    gap: 14px; width: 100% !important; height: 48px; min-height: 48px; padding: 0 14px !important;
+    border-radius: 12px !important; font-size: 15px !important; font-weight: 600;
+    color: var(--ink) !important; background: none !important; text-align: left;
+  }
+  #app > nav [data-tab] .tab-icon, #app > nav [data-tab] svg { width: 24px; height: 24px; flex-shrink: 0; }
+  #app > nav [data-tab]:hover { background: var(--soft) !important; }
+  #app > nav [data-tab].active, #app > nav [data-tab][aria-current="page"] {
+    background: color-mix(in srgb, var(--brand, #8b5cf6) 16%, transparent) !important;
+    color: var(--brand, #8b5cf6) !important;
+  }
+  #app > nav #create-post {
+    order: 10; display: flex !important; align-items: center; justify-content: center; gap: 8px;
+    width: 100% !important; height: 46px !important; min-height: 46px; margin: 14px 0 0 !important;
+    border-radius: 999px !important; padding: 0 !important; position: static !important; transform: none !important;
+    background: linear-gradient(135deg, #8b5cf6, #ff4f9a) !important; color: #fff !important;
+    font-size: 15px !important; font-weight: 700; box-shadow: 0 10px 24px -12px #8b5cf6;
+  }
+  #app > nav #create-post::before, #app > nav #create-post::after { content: none !important; }
+  #app > nav #create-post span { font-size: 0 !important; width: auto !important; height: auto !important; background: none !important; box-shadow: none !important; position: static !important; }
+  #app > nav #create-post span::after { content: "＋  Quay video"; font-size: 15px; }
+
+  /* Cột giữa và cột phải */
+  #social-panel, #live-panel { grid-area: main; min-width: 0; padding-top: 16px; }
+  #rail { grid-area: rail; position: sticky; top: 80px; align-self: start; max-height: calc(100dvh - 96px); overflow: auto; margin-top: 16px; scrollbar-width: none; }
+  #app #notice:empty { display: none; }
+  #app #notice:not(:empty) { position: fixed !important; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 60; }
+
+  /* Lưới thẻ người dùng rộng hơn */
+  #app .user-grid, #app .grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 14px !important; }
+  #app .social-card { border-radius: 16px; }
+
+  /* Video ngắn: khung dọc giữa màn hình */
+  body[data-view="shorts"][data-reel="ready"] .reel { width: min(100%, calc((100dvh - 96px) * 9 / 16)) !important; margin: 0 auto; }
+
+  /* Live và tin nhắn dùng cả cột giữa + phải */
+  body[data-view="live"] #rail, body[data-view="inbox"] #rail { display: none !important; }
+  body[data-view="live"] #live-panel, body[data-view="inbox"] #social-panel { grid-column: 2 / 4 !important; }
+}
+@media (min-width: 1000px) and (max-width: 1239px) {
+  main#app { grid-template-columns: 220px minmax(0, 1fr) !important; grid-template-areas: "top top" "nav optin" "nav notice" "nav main" "nav foot" !important; }
+  #app > header.topbar { grid-template-columns: 220px minmax(0, 1fr) auto; }
+  #rail { display: none !important; }
+  body[data-view="live"] #live-panel, body[data-view="inbox"] #social-panel { grid-column: 2 !important; }
+}

@@ -1,4 +1,4 @@
-import { createEffects, effectPicker } from "./camera.js?v=3";
+import { createEffects, effectPicker } from "./camera.js?v=4";
 const $ = (id) => document.getElementById(id);
 // stream: luồng đã qua hiệu ứng (gửi cho người xem); rawStream: camera/micro gốc.
 let rawStream = null,
@@ -19,11 +19,16 @@ let stream = null,
 const peers = new Map(),
   pending = new Map();
 let ws;
+let liveRevision = 0;
+let reconnectTimer = 0;
+let reconnectDelay = 1000;
+let liveEnabled = false;
 const notify = (text) => ($("notice").textContent = text);
 const send = (data) => {
   if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data));
 };
 function cleanup() {
+  liveRevision++;
   for (const p of peers.values()) p.close();
   peers.clear();
   pending.clear();
@@ -69,23 +74,36 @@ function peer(id) {
   return p;
 }
 export function connectLive() {
-  ws = new WebSocket(
+  liveEnabled = true;
+  clearTimeout(reconnectTimer);
+  if (ws && [WebSocket.OPEN, WebSocket.CONNECTING].includes(ws.readyState)) return;
+  const socket = ws = new WebSocket(
     `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}`,
   );
   ws.onopen = () => {
+    if (ws !== socket) return;
+    reconnectDelay = 1000;
     connected = true;
     $("connection").textContent = "Đã kết nối";
   };
   ws.onclose = () => {
+    if (ws !== socket) return;
     connected = false;
+    window.dispatchEvent(new Event("kinnect-call-disconnected"));
     cleanup();
     $("connection").textContent = "Mất kết nối";
-    notify("Mất kết nối máy chủ. Tải lại trang để kết nối lại.");
+    if (liveEnabled) {
+      notify("Mất kết nối livestream. Đang kết nối lại…");
+      reconnectTimer = setTimeout(connectLive, reconnectDelay);
+      reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+    }
   };
   ws.onerror = () => notify("Không kết nối được máy chủ livestream.");
   ws.onmessage = async (event) => {
+    if (ws !== socket) return;
     try {
       const m = JSON.parse(event.data);
+      if(String(m.type).startsWith("call-"))window.dispatchEvent(new CustomEvent("kinnect-call-event",{detail:m}));
       if (m.type === "notifications-changed") window.dispatchEvent(new Event("kinnect-notifications"));
       if (m.type === "rooms") {
         rooms = m.rooms;
@@ -192,22 +210,33 @@ export function connectLive() {
   };
 }
 export function disconnectLive() {
+  liveEnabled = false;
+  clearTimeout(reconnectTimer);
+  connected = false;
+  const previous = ws;
+  ws = null;
   cleanup();
-  ws?.close();
+  previous?.close();
 }
 $("create").onsubmit = async (e) => {
   e.preventDefault();
   if (busy) return;
   if (!connected) return notify("Máy chủ chưa kết nối.");
   busy = true;
+  const revision = liveRevision;
   $("start").disabled = true;
   try {
     if (!navigator.mediaDevices?.getUserMedia)
       throw Error("Camera cần HTTPS hoặc localhost.");
-    rawStream = await navigator.mediaDevices.getUserMedia({
+    const captured = await navigator.mediaDevices.getUserMedia({
       video: { width: { ideal: 1280 }, height: { ideal: 720 } },
       audio: true,
     });
+    if (revision !== liveRevision || !connected) {
+      captured.getTracks().forEach(t => t.stop());
+      return;
+    }
+    rawStream = captured;
     // Hiệu ứng (bộ lọc, làm mịn, sticker) áp lên hình gửi cho người xem.
     fx = createEffects(rawStream, { width: 720, height: 1280 });
     if (window.kinnectPendingFx) {
@@ -217,6 +246,7 @@ $("create").onsubmit = async (e) => {
     stream = fx.stream;
     send({ type: "create", name: $("name").value, title: $("title").value });
   } catch (error) {
+    stopCamera();
     notify("Không mở được camera/micro: " + error.message);
   } finally {
     busy = false;
@@ -244,9 +274,15 @@ for (const [id, kind, label] of [
     $(id).textContent = (enabled ? "Tắt " : "Bật ") + label;
   };
 window.addEventListener("pagehide", () => {
+  clearTimeout(reconnectTimer);
+  const previous = ws;
+  ws = null;
+  connected = false;
   cleanup();
-  ws?.close();
+  previous?.close();
 });
+window.addEventListener("pageshow", e => { if (e.persisted && liveEnabled) connectLive(); });
+window.addEventListener("online", () => { if (liveEnabled) connectLive(); });
 
 function renderRooms() {
   const query = $("search").value.trim().toLocaleLowerCase("vi");
@@ -301,7 +337,7 @@ $("report-live").onclick = () => {
 };
 
 window.addEventListener("kinnect-background", () => {
-  if (role) {
+  if (role || busy || rawStream) {
     send({ type: "leave" });
     cleanup();
     notify("Đã dừng livestream khi mở ứng dụng khác.");
@@ -309,3 +345,5 @@ window.addEventListener("kinnect-background", () => {
 });
 
 $("gift").onclick = () => send({ type: "gift", kind: $("gift-kind").value });
+
+export function sendCallSignal(message){if(ws?.readyState!==WebSocket.OPEN)throw Error("Chưa kết nối máy chủ. Vui lòng thử lại.");send(message);}

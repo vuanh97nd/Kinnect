@@ -88,7 +88,12 @@ function openOnboarding() {
     '<header class="ob-top"><img src="/kinnect-icon.png?v=4" alt="" /><strong>Kinnect</strong><a class="ob-site" href="https://kinnect.io.vn/">Tìm hiểu thêm ↗</a><button type="button" class="ob-skip">Bỏ qua</button></header>' +
     '<div class="ob-track" tabindex="0" aria-roledescription="carousel"></div>' +
     '<div class="ob-dots" role="tablist" aria-label="Chọn trang giới thiệu"></div>' +
-    '<div class="ob-actions"><button type="button" class="ob-start">Bắt đầu ngay</button><button type="button" class="ob-login">Tôi đã có tài khoản</button></div>';
+    '<div class="ob-actions"><button type="button" class="ob-start">Bắt đầu ngay</button><button type="button" class="ob-login">Tôi đã có tài khoản</button>' +
+    // Tải app: Android (APK) và iPhone/iPad (hồ sơ cài đặt); ẩn khi đã mở từ màn hình chính.
+    (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone ? '' :
+      '<div class="ob-download"><a class="ob-dl ob-dl-android" href="https://github.com/vuanh97nd/Kinnect/releases/latest" target="_blank" rel="noopener"><b>Tải app Android</b><small>File APK</small></a>' +
+      '<a class="ob-dl ob-dl-ios" href="/install-ios"><b>Cài trên iPhone</b><small>Tải hồ sơ cài đặt</small></a></div>') +
+    '</div>';
   const track = root.querySelector(".ob-track");
   const dots = root.querySelector(".ob-dots");
   slides.forEach((s, i) => {
@@ -169,10 +174,12 @@ function rememberAccount(user) {
   const rest = recentAccounts().filter((a) => a.username !== user.username);
   saveAccounts([{ username: user.username, name: user.name || user.username }, ...rest]);
 }
+let quickAccounts=[];
 function showRecent() {
   const auth = document.getElementById("auth");
   auth.querySelector(".recent-accounts")?.remove();
-  const accounts = recentAccounts();
+  const stored=recentAccounts();
+  const accounts=[...quickAccounts,...stored.filter(item=>!quickAccounts.some(q=>q.username===item.username))].slice(0,5);
   if (!accounts.length) {
     auth.classList.remove("has-recent");
     return false;
@@ -204,7 +211,9 @@ function showRecent() {
     small.textContent = "@" + a.username;
     label.append(strong, small);
     pick.append(letter, label);
+    if(a.id){const quick=document.createElement("small");quick.textContent="Chạm để đăng nhập";quick.className="recent-quick-hint";label.append(quick);}
     pick.onclick = () => {
+      if(a.id){pick.disabled=true;window.dispatchEvent(new CustomEvent("kinnect-quick-login",{detail:a.id}));setTimeout(()=>{pick.disabled=false;},2000);return;}
       auth.classList.remove("has-recent");
       document.getElementById("login-mode")?.click();
       document.getElementById("username").value = a.username;
@@ -215,7 +224,8 @@ function showRecent() {
     remove.className = "recent-remove";
     remove.textContent = "×";
     remove.setAttribute("aria-label", "Gỡ " + a.name + " khỏi thiết bị này");
-    remove.onclick = () => {
+    remove.onclick = async () => {
+      if(a.id){try{const r=await fetch("/api/remembered/"+a.id,{method:"DELETE",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:"{}"});if(!r.ok)return;quickAccounts=quickAccounts.filter(q=>q.id!==a.id);}catch{return;}}
       saveAccounts(recentAccounts().filter((x) => x.username !== a.username));
       if (!showRecent()) document.getElementById("username").focus();
     };
@@ -251,8 +261,11 @@ function showRecent() {
 // đóng giới thiệu xong mới tới "Đăng nhập gần đây" hoặc form đăng nhập.
 function onAuthShown() {
   showRecent();
+  fetch("/api/remembered",{credentials:"same-origin",cache:"no-store"}).then(r=>r.ok?r.json():{accounts:[]}).then(({accounts})=>{quickAccounts=accounts||[];showRecent();if(quickAccounts.length){document.querySelector(".onboarding")?.remove();document.body.classList.remove("ob-open");}}).catch(()=>{});
   openOnboarding();
 }
 window.addEventListener("kinnect-auth-shown", onAuthShown);
 window.addEventListener("kinnect-logged-in", (e) => rememberAccount(e.detail));
 if (window.kinnectAuthShown) onAuthShown();
+
+window.addEventListener("kinnect-quick-login-failed",()=>{document.getElementById("auth").classList.remove("has-recent");document.getElementById("login-mode")?.click();document.getElementById("password")?.focus();});

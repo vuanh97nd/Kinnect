@@ -14,6 +14,13 @@ public final class NativeApi {
   private final ExecutorService executor = Executors.newFixedThreadPool(3);
   private final Handler main = new Handler(Looper.getMainLooper());
   private volatile int epoch = 0;
+  private SessionStore sessions;
+  public synchronized void initialize(android.content.Context context,String server){sessions=new SessionStore(context);configure(server);cookie=sessions.load(origin);device=sessions.loadDevice(origin);}
+  private volatile String device = "";
+  private static String join(String a, String b) { return a.isEmpty() ? b : b.isEmpty() ? a : a + "; " + b; }
+  /** Cookie header for media players (session + remembered device). */
+  public String jar() { return join(cookie, device); }
+  public String origin() { return origin; }
   private volatile String origin = ServerConfig.DEFAULT_ORIGIN,
     cookie = "";
 
@@ -29,6 +36,7 @@ public final class NativeApi {
     String next = ServerConfig.normalize(value);
     if (!next.equals(origin)) {
       cookie = "";
+      device = "";
       epoch++;
     }
     origin = next;
@@ -40,6 +48,7 @@ public final class NativeApi {
 
   public synchronized void clear() {
     cookie = "";
+    if(sessions!=null)sessions.save(origin, "");
     epoch++;
   }
 
@@ -70,10 +79,8 @@ public final class NativeApi {
         connection.setRequestMethod(method);
         connection.setRequestProperty("Accept", "application/json");
         connection.setRequestProperty("Origin", server);
-        if (!session.isEmpty()) connection.setRequestProperty(
-          "Cookie",
-          session
-        );
+        String jar = join(session, device);
+        if (!jar.isEmpty()) connection.setRequestProperty("Cookie", jar);
         if (data != null) {
           connection.setDoOutput(true);
           connection.setRequestProperty(
@@ -86,14 +93,14 @@ public final class NativeApi {
           }
         }
         status = connection.getResponseCode();
-        String responseCookie = connection.getHeaderField("Set-Cookie");
+        java.util.List<String> setCookies = connection.getHeaderFields().get("Set-Cookie");
         synchronized (this) {
-          if (
-            responseCookie != null &&
-            responseCookie.startsWith("kinnect_session=") &&
-            server.equals(origin) &&
-            revision == epoch
-          ) cookie = responseCookie.split(";", 2)[0];
+          for (int i = 0; setCookies != null && i < setCookies.size(); i++) {
+            String responseCookie = setCookies.get(i);
+            if (responseCookie == null || !server.equals(origin) || revision != epoch) continue;
+            if (responseCookie.startsWith("kinnect_session=")) {cookie = responseCookie.split(";", 2)[0];if(cookie.equals("kinnect_session="))cookie="";if(sessions!=null)sessions.save(origin,cookie);}
+            if (responseCookie.startsWith("kinnect_device=")) {device = responseCookie.split(";", 2)[0];if(sessions!=null)sessions.saveDevice(origin,device);}
+          }
         }
         InputStream input =
           status >= 200 && status < 300
@@ -127,18 +134,17 @@ public final class NativeApi {
       HttpURLConnection c = null;
       try {
         if (
-          !path.startsWith("/api/users/") ||
-          !path.endsWith("/avatar") ||
+          !(path.startsWith("/api/users/") || path.startsWith("/api/posts/") || path.startsWith("/api/chat-attachments/") || path.startsWith("/music/")) ||
           path.contains("..")
         ) throw new IOException();
         c = (HttpURLConnection) new URL(server + path).openConnection();
         c.setInstanceFollowRedirects(false);
         c.setConnectTimeout(10000);
         c.setReadTimeout(10000);
-        c.setRequestProperty("Cookie", session);
+        c.setRequestProperty("Cookie", join(session, device));
         if (c.getResponseCode() == 200) bytes = read(
           c.getInputStream(),
-          1100000
+          path.endsWith("/avatar") ? 1100000 : 30000000
         );
       } catch (Exception ignored) {
       } finally {

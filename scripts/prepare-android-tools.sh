@@ -19,3 +19,10 @@ unzip -oq "$work_dir/build-tools.zip" -d "$KINNECT_TOOLS/android"
 cp "$work_dir/ecj.jar" "$KINNECT_TOOLS/ecj.jar"
 chmod +x "$KINNECT_TOOLS/android/android-15/"{aapt,aapt2,d8,apksigner,zipalign}
 echo 'Android toolchain downloaded and checksums verified.'
+
+# Native media and signaling libraries, pinned by SHA-256.
+mkdir -p "$KINNECT_TOOLS/deps/webrtc"
+fetch_verified 'https://repo.maven.apache.org/maven2/io/github/webrtc-sdk/android/144.7559.09/android-144.7559.09.aar' '34cf91dd7497e5fe88adb76ba29ccae35db42dd6614ce548b79ce037b6d634d5' "$KINNECT_TOOLS/deps/webrtc.aar"
+fetch_verified 'https://repo.maven.apache.org/maven2/com/squareup/okhttp3/okhttp/3.12.13/okhttp-3.12.13.jar' '508234e024ef7e270ab1a6d5b356f5b98e786511239ca986d684fd1e2cf7bc82' "$KINNECT_TOOLS/deps/okhttp.jar"
+fetch_verified 'https://repo.maven.apache.org/maven2/com/squareup/okio/okio/1.17.2/okio-1.17.2.jar' 'f80ce42d2ffac47ad4c47e1d6f980d604d247ceb1a886705cf4581ab0c9fe2b8' "$KINNECT_TOOLS/deps/okio.jar"
+unzip -oq "$KINNECT_TOOLS/deps/webrtc.aar" -d "$KINNECT_TOOLS/deps/webrtc"

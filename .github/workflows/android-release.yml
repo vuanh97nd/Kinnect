@@ -22,6 +22,12 @@ jobs:
         run: bash scripts/prepare-android-tools.sh
       - name: Test server URL selection
         run: bash scripts/test-android-config.sh
+      - name: Restore stable signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          # Cùng một khoá cho mọi bản phát hành để điện thoại cập nhật đè được. Không có secret thì dùng khoá tạm.
+          if [ -n "$KEYSTORE_B64" ]; then echo "$KEYSTORE_B64" | base64 -d > android/debug.keystore; fi
       - name: Build and verify signed testing APK
         run: |
           bash scripts/build-apk.sh

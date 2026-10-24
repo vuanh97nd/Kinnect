@@ -25,3 +25,5 @@ oauth.env
 /music/*
 !/music/README.txt
 !/music/credits.json
+
+/work/

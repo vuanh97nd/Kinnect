@@ -166,11 +166,8 @@
 .block-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
 #app .block-row .avatar { width: 36px; height: 36px; font-size: 14px; }
 .block-row span { flex: 1; }
-/* Video: thanh trên tối đồng bộ */
+/* Video upload controls. The app header keeps the shared theme. */
 .file-pick { position: relative; display: inline-flex; align-items: center; padding: 0 14px; min-height: 38px; border-radius: 10px; background: #2a2a2a; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; max-width: 46%; overflow: hidden; text-overflow: ellipsis; }
-body[data-view="shorts"][data-reel="ready"] #app > header.topbar { background: #111; border-color: #222; }
-body[data-view="shorts"][data-reel="ready"] #app > header.topbar .icon-tab { background: #222 !important; color: #eee !important; }
-body[data-view="shorts"][data-reel="ready"] .top-search input { background: #222 !important; color: #eee; }
 body[data-view="shorts"][data-reel="ready"] .reel .empty-state { background: transparent; box-shadow: none; color: #ddd; padding-top: 30%; }
 body[data-view="shorts"][data-reel="ready"] .reel .empty-state h3 { color: #fff; }
 /* Cột phải trên máy tính */

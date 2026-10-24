@@ -1,10 +1,11 @@
 import { defineConfig } from "@playwright/test";
+const port = Number(process.env.E2E_PORT || 3210);
 export default defineConfig({
   testDir: "./e2e",
   workers: 1,
   timeout: 30000,
   use: {
-    baseURL: "http://127.0.0.1:3210",
+    baseURL: `http://127.0.0.1:${port}`,
     viewport: { width: 412, height: 915 },
     launchOptions: {
       ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
@@ -19,7 +20,7 @@ export default defineConfig({
   },
   webServer: {
     command: "node scripts/e2e-server.js",
-    url: "http://127.0.0.1:3210/health",
+    url: `http://127.0.0.1:${port}/health`,
     reuseExistingServer: false,
   },
 });

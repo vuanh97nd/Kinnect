@@ -20,6 +20,16 @@ export const STICKERS = [
   ["sparkle", "Lấp lánh", "✨"],
 ];
 
+let faceEnginePromise = null;
+let lastFaceTimestamp = 0;
+function faceEngine() {
+  if(!faceEnginePromise) faceEnginePromise=(async()=>{
+    const {FaceLandmarker, FilesetResolver}=await import("./vendor/vision/vision_bundle.mjs");
+    const wasm=await FilesetResolver.forVisionTasks("/vendor/vision/wasm");
+    return FaceLandmarker.createFromOptions(wasm,{baseOptions:{modelAssetPath:"/vendor/vision/face_landmarker.task",delegate:"CPU"},runningMode:"VIDEO",numFaces:1,minFaceDetectionConfidence:0.5,minFacePresenceConfidence:0.5,minTrackingConfidence:0.5});
+  })().catch(e=>{faceEnginePromise=null;throw e;});
+  return faceEnginePromise;
+}
 // Bộ xử lý: video gốc → canvas có hiệu ứng → MediaStream mới (giữ nguyên âm thanh).
 export function createEffects(rawStream, { width = 540, height = 960 } = {}) {
   const video = document.createElement("video");
@@ -35,29 +45,30 @@ export function createEffects(rawStream, { width = 540, height = 960 } = {}) {
   const ctx = canvas.getContext("2d");
   const state = { filter: "none", soft: false, sticker: "none", mirror: true };
   let face = null;
-  let detector = null;
-  let detecting = false;
-  let raf = 0;
-  let stopped = false;
-  if ("FaceDetector" in window) {
-    try {
-      detector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
-    } catch {
-      detector = null;
-    }
-  }
-  const faceSupported = !!detector;
+  let detector = null, detecting = false, lastDetection=0, trackingFailed=false;
+  let raf = 0, stopped = false;
+  let missedFaces=0;
+  let statusText="";const statusListeners=new Set();
+  const publish=text=>{if(text!==statusText){statusText=text;for(const callback of statusListeners)callback(text);}};
   async function detect() {
-    if (!detector || detecting || state.sticker === "none") return;
-    detecting = true;
+    if(stopped || detecting || trackingFailed || (!state.soft && state.sticker==="none") || video.readyState<2 || performance.now()-lastDetection<120)return;
+    detecting=true;lastDetection=performance.now();
     try {
-      const faces = await detector.detect(canvas);
-      face = faces[0]?.boundingBox || null;
-    } catch {
-      face = null;
-    } finally {
-      detecting = false;
-    }
+      if(!detector){publish("Đang tải nhận diện khuôn mặt…");detector=await faceEngine();}
+      if(stopped)return;
+      const timestamp=Math.max(performance.now(),lastFaceTimestamp+1);lastFaceTimestamp=timestamp;
+      const points=detector.detectForVideo(video,timestamp).faceLandmarks[0];
+      if(!points){if(++missedFaces>=3){face=null;publish("Đưa khuôn mặt vào khung hình");}return;}
+      missedFaces=0;
+      const [x,y,w,h]=cover();
+      const project=p=>({x:state.mirror?canvas.width-(x+p.x*w):x+p.x*w,y:y+p.y*h});
+      const projected=points.map(project),xs=projected.map(p=>p.x),ys=projected.map(p=>p.y);
+      let left=project(points[33]),right=project(points[263]);if(left.x>right.x)[left,right]=[right,left];
+      const next={x:Math.min(...xs),y:Math.min(...ys),width:Math.max(...xs)-Math.min(...xs),height:Math.max(...ys)-Math.min(...ys),eyeY:(left.y+right.y)/2,angle:Math.atan2(right.y-left.y,right.x-left.x)};
+      if(face)for(const key of ["x","y","width","height","eyeY","angle"])next[key]=face[key]*0.45+next[key]*0.55;
+      face=next;publish("Đã nhận diện khuôn mặt");
+    }catch(e){face=null;trackingFailed=true;publish("Chưa tải được nhận diện. Chọn lại hiệu ứng để thử lại.");}
+    finally{detecting=false;}
   }
   function cover() {
     const vw = video.videoWidth || canvas.width;
@@ -70,13 +81,8 @@ export function createEffects(rawStream, { width = 540, height = 960 } = {}) {
   function drawSticker() {
     const emoji = STICKERS.find((s) => s[0] === state.sticker)?.[2];
     if (!emoji) return;
-    // Có nhận diện khuôn mặt: bám theo mặt. Không có: đặt ở vị trí mặc định phía trên giữa khung.
-    const box = face || {
-      x: canvas.width * 0.3,
-      y: canvas.height * 0.22,
-      width: canvas.width * 0.4,
-      height: canvas.width * 0.4,
-    };
+    if(!face)return;
+    const box = face;
     const cx = box.x + box.width / 2;
     ctx.save();
     ctx.filter = "none";
@@ -84,7 +90,8 @@ export function createEffects(rawStream, { width = 540, height = 960 } = {}) {
     ctx.textBaseline = "middle";
     if (state.sticker === "glasses") {
       ctx.font = Math.round(box.width * 0.9) + "px serif";
-      ctx.fillText("🕶️", cx, box.y + box.height * 0.42);
+      ctx.translate(cx,box.eyeY);ctx.rotate(box.angle);
+      ctx.fillText("🕶️", 0, 0);
     } else if (state.sticker === "crown") {
       ctx.font = Math.round(box.width * 0.75) + "px serif";
       ctx.fillText("👑", cx, box.y - box.height * 0.18);
@@ -122,15 +129,15 @@ export function createEffects(rawStream, { width = 540, height = 960 } = {}) {
       }
       ctx.filter = base;
       ctx.drawImage(video, x, y, w, h);
-      if (state.soft) {
-        // Làm mịn da nhẹ: phủ một lớp mờ trong suốt lên ảnh gốc.
-        ctx.globalAlpha = 0.35;
-        ctx.filter = (base === "none" ? "" : base + " ") + "blur(3px) brightness(1.06)";
-        ctx.drawImage(video, x, y, w, h);
-        ctx.globalAlpha = 1;
-      }
       ctx.restore();
-      if (++frame % 6 === 0) detect();
+      if (state.soft && face) {
+        ctx.save();
+        ctx.beginPath();ctx.ellipse(face.x+face.width/2,face.y+face.height*0.52,face.width*0.45,face.height*0.47,0,0,Math.PI*2);ctx.clip();
+        ctx.globalAlpha=0.3;ctx.filter=(base==="none"?"":base+" ")+"blur(3px) brightness(1.04)";
+        if(state.mirror){ctx.translate(canvas.width,0);ctx.scale(-1,1);}
+        ctx.drawImage(video,x,y,w,h);ctx.restore();
+      }
+      detect();
       drawSticker();
     }
     raf = requestAnimationFrame(draw);
@@ -150,13 +157,17 @@ export function createEffects(rawStream, { width = 540, height = 960 } = {}) {
     stream: output,
     canvas,
     state,
-    faceSupported,
+    get faceSupported(){return !!detector;},
+    get faceBox(){return face ? {...face} : null;},
+    onStatus(callback){statusListeners.add(callback);callback(statusText);return ()=>statusListeners.delete(callback);},
     set(patch) {
       Object.assign(state, patch);
-      if (patch.sticker === "none") face = null;
+      trackingFailed=false;
+      if(!state.soft && state.sticker==="none"){face=null;publish("");}else detect();
     },
     stop() {
       stopped = true;
+      statusListeners.clear();
       cancelAnimationFrame(raf);
       clearInterval(keepAlive);
       output.getVideoTracks().forEach((t) => t.stop());
@@ -204,12 +215,8 @@ export function effectPicker(fx, { dark = true } = {}) {
   const filters = row(FILTERS, "filter");
   filters.prepend(soft);
   box.append(filters, row(STICKERS, "sticker"));
-  if (!fx.faceSupported) {
-    const note = document.createElement("p");
-    note.className = "fx-note";
-    note.textContent = "Trình duyệt này chưa hỗ trợ nhận diện khuôn mặt: sticker hiển thị ở giữa khung hình.";
-    box.append(note);
-  }
+  const note=document.createElement("p");note.className="fx-note";
+  fx.onStatus(text=>{note.textContent=text;note.hidden=!text;});box.append(note);
   return box;
 }
 
@@ -239,16 +246,26 @@ const CAROUSEL = [
   ["filter", "vintage", "Cổ điển", "📷"],
 ];
 
-export async function openStudio({ onDone, onLive, notify = () => {}, mode: startMode = "camera" }) {
-  if (!navigator.mediaDevices?.getUserMedia) {
+async function photoSource(file) {
+  const url=URL.createObjectURL(file),image=new Image();
+  try { image.src=url;await image.decode(); } finally { URL.revokeObjectURL(url); }
+  const canvas=document.createElement("canvas");canvas.width=540;canvas.height=960;
+  const ctx=canvas.getContext("2d");
+  const draw=()=>{ctx.fillStyle="#101014";ctx.fillRect(0,0,540,960);const scale=Math.min(540/image.naturalWidth,960/image.naturalHeight);const w=image.naturalWidth*scale,h=image.naturalHeight*scale;ctx.drawImage(image,(540-w)/2,(960-h)/2,w,h);};
+  draw();const timer=setInterval(draw,33),stream=canvas.captureStream(30);
+  return {stream,stop(){clearInterval(timer);stream.getTracks().forEach(t=>t.stop());}};
+}
+export async function openStudio({ onDone, onLive, notify = () => {}, mode: startMode = "camera", story = false, photo = null }) {
+  if (!photo && !navigator.mediaDevices?.getUserMedia) {
     notify("Trình duyệt không cho dùng camera. Hãy mở Kinnect bằng HTTPS (app.kinnect.io.vn).");
     return;
   }
   const mime = pickMime();
   let facing = "user";
-  let raw;
+  let raw, still = null;
   try {
-    raw = await navigator.mediaDevices.getUserMedia({
+    if(photo) { still=await photoSource(photo);raw=still.stream; }
+    else raw = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: facing, width: { ideal: 720 }, height: { ideal: 1280 } },
       audio: true,
     });
@@ -257,13 +274,14 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
     return;
   }
   let fx = createEffects(raw);
-  let maxSec = 60;
+  if(still)fx.set({mirror:false});
+  let maxSec = photo || story ? 15 : 60;
   let delay = 0;
   const root = document.createElement("div");
   root.className = "studio tt";
   root.setAttribute("role", "dialog");
   root.setAttribute("aria-modal", "true");
-  root.setAttribute("aria-label", "Quay video");
+  root.setAttribute("aria-label", story ? "Tạo tin" : "Quay video");
   const rail = (key, label) =>
     `<button type="button" class="tt-tool" data-tool="${key}" aria-label="${label}">${ICON[key]}<small>${label}</small></button>`;
   root.innerHTML =
@@ -288,8 +306,22 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
   document.body.append(root);
   document.body.classList.add("studio-open");
   const $ = (s) => root.querySelector(s);
-  const mount = () => $(".tt-stage").replaceChildren(fx.canvas);
+  const trackingNote=document.createElement("p");trackingNote.className="tt-face-status";$(".tt-card").append(trackingNote);let unsubscribeStatus=null;
+  const mount = () => {$(".tt-stage").replaceChildren(fx.canvas);unsubscribeStatus?.();unsubscribeStatus=fx.onStatus(text=>{trackingNote.textContent=text;trackingNote.hidden=!text;});};
   mount();
+  if(story){
+    $('[data-mode="live"]').hidden=true;
+    $('[data-mode="camera"]').textContent=photo?"Tin ảnh + nhạc":"Quay tin";
+    $(".tt-post-head b").textContent="Xem lại tin";
+    $(".tt-publish").textContent="Đăng tin";
+    $(".tt-gallery input").accept="image/jpeg,image/png,image/webp,video/mp4";
+    $(".tt-gallery").setAttribute("aria-label","Chọn ảnh hoặc video");
+    $(".tt-caption").placeholder="Viết về tin của bạn…";
+    $(".tt-preview").muted=false;
+    $(".tt-preview").controls=true;
+    for(const b of root.querySelectorAll(".tt-modes button"))b.classList.toggle("on",Number(b.dataset.sec)===maxSec);
+  }
+  if(photo){$(".tt-shutter").setAttribute("aria-label","Tạo tin ảnh");$('[data-tool="flip"]').hidden=true;}
   // Dải hiệu ứng phía trên nút chụp
   const carousel = $(".tt-carousel");
   let picked = "none";
@@ -365,7 +397,8 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
     };
     list.append(own);
     item("🔇 Không dùng nhạc", !musicUrl, () => setMusic("", ""));
-    sheet.append(list);
+    const search=document.createElement("input");search.type="search";search.className="tt-music-search";search.placeholder="Tìm bài hát, nghệ sĩ…";search.setAttribute("aria-label","Tìm nhạc nền");search.oninput=()=>{const query=search.value.trim().toLocaleLowerCase("vi");for(const button of list.querySelectorAll("button.tt-track"))button.hidden=!!query&&!button.textContent.toLocaleLowerCase("vi").includes(query);};
+    sheet.append(search,list);
     sheet.hidden = false;
     try {
       const r = await fetch("/api/music", { credentials: "same-origin" });
@@ -415,7 +448,7 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
     if (kind === "beauty" && !fx.faceSupported) {
       const n = document.createElement("p");
       n.className = "fx-note";
-      n.textContent = "Sticker bám mặt cần trình duyệt hỗ trợ nhận diện khuôn mặt; nếu không sẽ hiện giữa khung.";
+      n.textContent = "Làm mịn và sticker nhận diện vùng mặt ngay trên thiết bị. Giữ mặt đủ sáng trong khung hình.";
       sheet.append(n);
     }
     sheet.hidden = false;
@@ -440,7 +473,11 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
   let counting = 0;
   let audioCtx = null;
   let musicNode = null;
+  let closed = false;
+  let flipping = false;
   function close() {
+    if (closed) return;
+    closed = true;
     try {
       recorder?.state === "recording" && recorder.stop();
     } catch {}
@@ -451,6 +488,7 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
     if (musicOwnUrl) URL.revokeObjectURL(musicOwnUrl);
     audioCtx?.close?.();
     fx.stop();
+    still?.stop();
     raw.getTracks().forEach((t) => t.stop());
     if (blobUrl) URL.revokeObjectURL(blobUrl);
     root.remove();
@@ -461,6 +499,7 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
   document.addEventListener("keydown", onKey);
   $(".tt-x").onclick = close;
   function setMode(m) {
+    if (counting || flipping || recorder?.state === "recording") return;
     root.dataset.mode = m;
     for (const b of root.querySelectorAll(".tt-mode")) b.classList.toggle("on", b.dataset.mode === m);
     $(".tt-golive").hidden = m !== "live";
@@ -478,13 +517,18 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
   };
   setMode(startMode);
   $('[data-tool="flip"]').onclick = async () => {
-    if (recorder?.state === "recording") return;
+    if (closed || flipping || counting || recorder?.state === "recording") return;
+    flipping = true;
     facing = facing === "user" ? "environment" : "user";
     try {
       const next = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: facing, width: { ideal: 720 }, height: { ideal: 1280 } },
         audio: true,
       });
+      if (closed) {
+        next.getTracks().forEach((t) => t.stop());
+        return;
+      }
       const keep = { ...fx.state, mirror: facing === "user" };
       fx.stop();
       raw.getTracks().forEach((t) => t.stop());
@@ -495,6 +539,8 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
     } catch (e) {
       facing = facing === "user" ? "environment" : "user";
       notify("Không đổi được camera: " + e.message);
+    } finally {
+      flipping = false;
     }
   };
   function review(blob) {
@@ -509,6 +555,7 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
     if (recorder?.state === "recording") recorder.stop();
   }
   function startRec() {
+    if (closed || flipping) return;
     if (!mime) return notify("Trình duyệt này chưa quay được MP4. Hãy chọn video có sẵn bằng nút Tải lên.");
     sheet.hidden = true;
     chunks = [];
@@ -536,9 +583,10 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
     recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
     recorder.onstop = () => {
       clearInterval(tick);
+      if (closed) return;
       music.pause();
       root.classList.remove("recording");
-      $(".tt-shutter").setAttribute("aria-label", "Bắt đầu quay");
+      $(".tt-shutter").setAttribute("aria-label", still ? "Tạo tin ảnh" : "Bắt đầu quay");
       $(".tt-progress i").style.width = "0";
       $(".tt-time").textContent = "";
       if ((performance.now() - started) / 1000 < 1) return notify("Video quá ngắn. Quay ít nhất 1 giây.");
@@ -573,11 +621,14 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
     }, 1000);
   };
   // Tải video có sẵn từ máy
-  $(".tt-gallery input").onchange = (e) => {
+  $(".tt-gallery input").onchange = async (e) => {
     const f = e.target.files[0];
     e.target.value = "";
     if (!f) return;
-    if (f.size > 12 * 1024 * 1024) return notify("Video tối đa 12 MB.");
+    if (f.size > 12 * 1024 * 1024) return notify("Tệp tối đa 12 MB.");
+    if(story && f.type.startsWith("image/")){
+      try{const next=await photoSource(f);if(closed){next.stop();return;}fx.stop();still?.stop();raw.getTracks().forEach(t=>t.stop());still=next;raw=next.stream;fx=createEffects(raw);fx.set({mirror:false});mount();$(".tt-shutter").setAttribute("aria-label","Tạo tin ảnh");$('[data-tool="flip"]').hidden=true;$('[data-mode="camera"]').textContent="Tin ảnh + nhạc";notify("Chọn nhạc nền rồi bấm Tạo tin ảnh. Bạn có thể dừng khi đủ đoạn nhạc mong muốn.");}catch(err){notify(err.message);}return;
+    }
     review(f);
   };
   const back = () => {
@@ -598,7 +649,7 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
     } catch (err) {
       notify(err.message);
       btn.disabled = false;
-      btn.textContent = "Chia sẻ";
+      btn.textContent = story ? "Đăng tin" : "Chia sẻ";
     }
   };
 }
