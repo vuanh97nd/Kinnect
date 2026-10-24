@@ -168,11 +168,11 @@
 .block-row span { flex: 1; }
 /* Video: thanh trên tối đồng bộ */
 .file-pick { position: relative; display: inline-flex; align-items: center; padding: 0 14px; min-height: 38px; border-radius: 10px; background: #2a2a2a; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; max-width: 46%; overflow: hidden; text-overflow: ellipsis; }
-body[data-view="shorts"] #app > header.topbar { background: #111; border-color: #222; }
-body[data-view="shorts"] #app > header.topbar .icon-tab { background: #222 !important; color: #eee !important; }
-body[data-view="shorts"] .top-search input { background: #222 !important; color: #eee; }
-body[data-view="shorts"] .reel .empty-state { background: transparent; box-shadow: none; color: #ddd; padding-top: 30%; }
-body[data-view="shorts"] .reel .empty-state h3 { color: #fff; }
+body[data-view="shorts"][data-reel="ready"] #app > header.topbar { background: #111; border-color: #222; }
+body[data-view="shorts"][data-reel="ready"] #app > header.topbar .icon-tab { background: #222 !important; color: #eee !important; }
+body[data-view="shorts"][data-reel="ready"] .top-search input { background: #222 !important; color: #eee; }
+body[data-view="shorts"][data-reel="ready"] .reel .empty-state { background: transparent; box-shadow: none; color: #ddd; padding-top: 30%; }
+body[data-view="shorts"][data-reel="ready"] .reel .empty-state h3 { color: #fff; }
 /* Cột phải trên máy tính */
 #rail { padding: 0 !important; background: none !important; box-shadow: none !important; }
 .rail-box { background: var(--card); border-radius: var(--radius); box-shadow: 0 1px 2px #0000001a; padding: 16px; margin-bottom: 12px; }
@@ -213,3 +213,11 @@ body[data-view="shorts"] .reel .empty-state h3 { color: #fff; }
 /* Keep device labels readable in the narrow desktop sidebar. */
 #rail .platform { flex-wrap: wrap; gap: 4px 12px; }
 #rail .platform small { flex: 1 1 120px; font-size: 12px; }
+
+/* The empty video library stays readable; only actual reels use a dark canvas. */
+body[data-view="shorts"]:not([data-reel="ready"]) .short-upload { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); flex-wrap: wrap; }
+body[data-view="shorts"]:not([data-reel="ready"]) #app .short-upload input { background: var(--soft); color: var(--ink); }
+body[data-view="shorts"]:not([data-reel="ready"]) .file-pick { background: var(--soft); color: var(--ink); }
+body[data-view="shorts"]:not([data-reel="ready"]) .reel { height: auto; min-height: 300px; margin-top: 16px; }
+body[data-view="shorts"][data-reel="ready"] .view-shorts > .view-head { color: #fff; }
+.video-error { position: absolute; inset: 25% 12%; display: grid; place-items: center; text-align: center; color: #fff; background: #222; border-radius: 14px; padding: 20px; }

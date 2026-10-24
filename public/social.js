@@ -5,6 +5,7 @@ let me = null,
   tab = "feed",
   timer = null,
   notificationTimer = null;
+let cleanupShorts = () => {};
 const node = (tag, text, cls) => {
   const e = document.createElement(tag);
   if (text !== undefined) e.textContent = text;
@@ -54,6 +55,8 @@ async function api(path, method = "GET", data) {
   return result;
 }
 function showAuth() {
+  cleanupShorts();
+  delete document.body.dataset.reel;
   clearInterval(timer);
   clearInterval(notificationTimer);
   $("auth").hidden = false;
@@ -310,6 +313,8 @@ function skeleton(kind) {
   return box;
 }
 async function navigate(value, opts = {}) {
+  cleanupShorts();
+  delete document.body.dataset.reel;
   clearInterval(timer);
   timer = null;
   tab = value;
@@ -669,6 +674,9 @@ async function feed(panel) {
   for (const p of posts) panel.append(postCard(p));
 }
 async function shorts(panel) {
+  const heading = node("div", undefined, "view-head");
+  heading.append(node("h2", "Video"), node("p", "Video ngắn từ cộng đồng. Muốn trò chuyện trực tiếp? Mở mục Live.", "muted"));
+  panel.append(heading);
   const upload = node("form", undefined, "short-upload");
   const pick = node("label", undefined, "file-pick");
   const file = node("input");
@@ -709,17 +717,26 @@ async function shorts(panel) {
   const reel = node("div", undefined, "reel");
   panel.append(reel);
   const { shorts: items } = await api("/shorts");
-  if (!items.length) reel.append(empty("🎬", "Chưa có video nào", "Hãy là người đăng video đầu tiên!"));
+  if (tab === "shorts") document.body.dataset.reel = items.length ? "ready" : "empty";
+  if (!items.length) {
+    reel.append(empty("🎬", "Chưa có video nào", "Chọn video MP4 để chia sẻ video đầu tiên của bạn."));
+    return;
+  }
   const watcher = new IntersectionObserver(
     (entries) => {
       for (const e of entries) {
         const v = e.target.querySelector("video");
-        if (e.isIntersecting) v.play().catch(() => {});
+        if (e.isIntersecting) v.play().catch(() => { v.controls = true; });
         else v.pause();
       }
     },
     { threshold: 0.6 },
   );
+  cleanupShorts = () => {
+    watcher.disconnect();
+    for (const video of reel.querySelectorAll("video")) video.pause();
+    cleanupShorts = () => {};
+  };
   for (const s of items) {
     const slide = node("article", undefined, "reel-item");
     const v = node("video");
@@ -728,6 +745,13 @@ async function shorts(panel) {
     v.muted = true;
     v.playsInline = true;
     v.preload = "metadata";
+    v.addEventListener("error", () => {
+      if (!slide.querySelector(".video-error")) {
+        const message = node("div", "Không phát được video này. Hãy thử video khác hoặc kiểm tra kết nối.", "video-error");
+        message.setAttribute("role", "status");
+        slide.append(message);
+      }
+    });
     v.onclick = () => (v.muted = !v.muted);
     const meta = node("div", undefined, "reel-meta");
     meta.append(node("strong", "@" + s.author.username), node("p", s.caption));

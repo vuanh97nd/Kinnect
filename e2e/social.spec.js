@@ -181,6 +181,14 @@ test("uploaded MP4 is decoded and played through authenticated HTTP video endpoi
     new URL("../test/fixtures/short.mp4", import.meta.url),
   );
   await signUp(page, "short_browser");
+  const navigation = page.getByRole("navigation", { name: "Điều hướng chính", exact: true });
+  await navigation.getByRole("button", { name: "Video", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Chưa có video nào" })).toBeVisible();
+  await expect(page.locator("body")).toHaveAttribute("data-reel", "empty");
+  expect(await page.locator("body").evaluate(el => getComputedStyle(el).backgroundColor)).not.toBe("rgb(0, 0, 0)");
+  await navigation.getByRole("button", { name: "Live", exact: true }).click();
+  await expect(page.locator("#live-panel")).toBeVisible();
+  await expect(page.locator("#social-panel")).toBeHidden();
   const response = await page.request.post("/api/shorts", {
     data: {
       caption: "Browser video smoke",
@@ -188,27 +196,23 @@ test("uploaded MP4 is decoded and played through authenticated HTTP video endpoi
     },
   });
   expect(response.status()).toBe(201);
-  const { id } = await response.json();
-  await page.evaluate((id) => {
-    const v = document.createElement("video");
-    v.id = "test-short-video";
-    v.muted = true;
-    v.autoplay = true;
-    v.controls = true;
-    v.src = "/api/shorts/" + id + "/video";
-    document.body.append(v);
-  }, id);
+  await navigation.getByRole("button", { name: "Video", exact: true }).click();
+  await expect(page.locator("body")).toHaveAttribute("data-reel", "ready");
   await expect
     .poll(() =>
       page
-        .locator("#test-short-video")
+        .locator(".reel-item video")
         .evaluate((v) => v.videoWidth === 160 && v.readyState >= 2),
     )
     .toBe(true);
-  await page.evaluate(() => document.getElementById("test-short-video").play());
+  await page.locator(".reel-item video").evaluate(v => v.play());
   await expect
     .poll(() =>
-      page.locator("#test-short-video").evaluate((v) => v.currentTime),
+      page.locator(".reel-item video").evaluate((v) => v.currentTime),
     )
     .toBeGreaterThan(0);
+  await page.locator(".reel-item video").evaluate(v => { window.reviewVideo = v; });
+  await navigation.getByRole("button", { name: "Live", exact: true }).click();
+  expect(await page.evaluate(() => window.reviewVideo.paused)).toBe(true);
+  await expect(page.locator("#live-panel")).toBeVisible();
 });

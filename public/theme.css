@@ -556,14 +556,14 @@ main#app {
 }
 
 /* ---------- Video dọc ---------- */
-body[data-view="shorts"] {
+body[data-view="shorts"][data-reel="ready"] {
   background: #000;
 }
-body[data-view="shorts"] #notice,
-body[data-view="shorts"] #app > footer {
+body[data-view="shorts"][data-reel="ready"] #notice,
+body[data-view="shorts"][data-reel="ready"] #app > footer {
   display: none;
 }
-body[data-view="shorts"] #social-panel {
+body[data-view="shorts"][data-reel="ready"] #social-panel {
   max-width: 520px;
   padding: 0;
 }
@@ -807,14 +807,14 @@ body[data-view="shorts"] #social-panel {
     height: calc(100dvh - 70px - 54px);
     border-radius: var(--radius);
   }
-  body[data-view="shorts"] #rail {
+  body[data-view="shorts"][data-reel="ready"] #rail {
     background: #111;
     color: #eee;
   }
-  body[data-view="shorts"] #app > nav [data-tab] {
+  body[data-view="shorts"][data-reel="ready"] #app > nav [data-tab] {
     color: #ddd;
   }
-  body[data-view="shorts"] #app > nav [data-tab]:hover {
+  body[data-view="shorts"][data-reel="ready"] #app > nav [data-tab]:hover {
     background: #222;
   }
 }
