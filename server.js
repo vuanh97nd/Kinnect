@@ -11,7 +11,9 @@ import { fileURLToPath } from "node:url";
 export function createApp({ dbPath = ":memory:", fetchImpl } = {}) {
   loadMailEnv();
   loadMailEnv("oauth.env");
+  let notifyNotifications = () => {};
   const social = openSocial(dbPath, {
+    onNotification: ({ userId }) => notifyNotifications(userId),
     fetchImpl,
     // Báo về email quản trị khi có người gửi yêu cầu quên mật khẩu.
     onResetRequest: (r) => {
@@ -105,6 +107,10 @@ export function createApp({ dbPath = ":memory:", fetchImpl } = {}) {
   const wss = new WebSocketServer({ server, maxPayload: 32768 });
   const send = (ws, data) => {
     if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data));
+  };
+  notifyNotifications = (userId) => {
+    for (const client of wss.clients)
+      if (client.userId === userId && social.authenticate(client.authRequest)) send(client, { type: "notifications-changed" });
   };
   const broadcast = (room, data) =>
     room.members.forEach((ws) => {

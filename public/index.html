@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="/social.css" />
     <link rel="stylesheet" href="/ios.css" />
     <link rel="stylesheet" href="/theme.css?v=2fcbf56e08bc" />
-    <link rel="stylesheet" href="/app-ui.css?v=3330874d532e" />
+    <link rel="stylesheet" href="/app-ui.css?v=d466220eae70" />
   </head>
   <body>
     <section id="auth" class="auth-shell" hidden>
@@ -147,7 +147,7 @@
         </form>
         <span id="connection" class="sr-only">Đang kết nối…</span>
         <div class="top-actions">
-          <button data-tab="notifications" class="icon-tab">
+          <button id="notification-bell" data-tab="notifications" class="icon-tab" aria-label="Thông báo" aria-expanded="false" aria-controls="notification-center">
             Thông báo <span id="unread"></span></button>
           <div class="me-menu">
             <button type="button" id="me-btn" class="me-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="me-panel" aria-label="Tài khoản"><span id="me-avatar" class="avatar fallback" aria-hidden="true">?</span></button>
@@ -166,8 +166,8 @@
       </header>
       <p id="notice" role="status"></p>
       <nav aria-label="Điều hướng chính">
-        <button data-tab="feed">Bảng tin</button
-        ><button data-tab="discover">Khám phá</button
+        <button data-tab="discover">Khám phá</button
+        ><button data-tab="feed">Bảng tin</button
         ><button id="create-post" class="create-tab" aria-label="Tạo bài viết"><span aria-hidden="true">+</span></button
         ><button data-tab="shorts">Video</button
         ><button data-tab="live">Live</button
@@ -180,9 +180,9 @@
       <div id="live-panel" hidden>
         <section id="lobby">
           <div class="hero">
-            <span class="eyebrow">KHÔNG GIAN CỦA CHÚNG MÌNH</span>
-            <h2>Lên sóng.<br />Kết nối bằng chính bạn.</h2>
-            <p>Một câu chuyện, một lời chào,<br />một người bạn mới.</p>
+            <span class="eyebrow">LIVE CÙNG KINNECT</span>
+            <h2>Gặp nhau trực tiếp.</h2>
+            <p>Chia sẻ câu chuyện và trò chuyện cùng cộng đồng.</p>
           </div>
           <form id="create">
             <input id="name" type="hidden" /><label
@@ -214,6 +214,7 @@
             <h2 id="room-title"></h2>
             <span id="count">0 người xem</span>
           </div>
+          <div class="live-layout"><div class="live-stage">
           <div class="video-wrap">
             <video id="video" autoplay playsinline></video
             ><span class="badge">● TRỰC TIẾP</span>
@@ -230,6 +231,7 @@
               Báo cáo người phát</button
             ><button id="leave" class="danger">Rời phòng</button>
           </div>
+          </div><aside class="live-chat" aria-label="Trò chuyện trong Live">
           <h3>Trò chuyện</h3>
           <div id="messages" role="log" aria-live="polite"></div>
           <form id="chat">
@@ -241,6 +243,7 @@
               required
             /><button>Gửi</button>
           </form>
+          </aside></div>
         </section>
       </div>
       <footer>
@@ -250,8 +253,8 @@
         <nav class="site-links" aria-label="Thông tin Kinnect"><a href="https://kinnect.io.vn/">Giới thiệu</a><a href="https://kinnect.io.vn/community">Cộng đồng</a><a href="https://kinnect.io.vn/privacy">Quyền riêng tư</a><a href="https://kinnect.io.vn/support">Hỗ trợ</a></nav>
       </footer>
     </main>
-    <script type="module" src="/social.js?v=74739dd75e32"></script>
-    <script src="/ios.js" defer></script>
+    <script type="module" src="/social.js?v=bbab00f793ed"></script>
+    <script src="/ios.js?v=d3fbe217d6aa" defer></script>
     <script src="/onboarding.js" defer></script>
   </body>
 </html>

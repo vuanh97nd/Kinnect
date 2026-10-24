@@ -216,3 +216,42 @@ test("uploaded MP4 is decoded and played through authenticated HTTP video endpoi
   expect(await page.evaluate(() => window.reviewVideo.paused)).toBe(true);
   await expect(page.locator("#live-panel")).toBeVisible();
 });
+
+test("nearby consent, optional Les identity and notification permission/bell work on mobile", async ({browser}) => {
+  const ctx=await browser.newContext({viewport:{width:390,height:844}});
+  await ctx.addInitScript(()=>{
+    window.locationRequests=0;window.notificationRequests=0;
+    Object.defineProperty(navigator,"geolocation",{value:{getCurrentPosition(resolve){window.locationRequests++;resolve({coords:{latitude:21.03,longitude:105.85}});}}});
+    class FakeNotification { static permission="default";static async requestPermission(){window.notificationRequests++;this.permission="granted";return "granted";} }
+    Object.defineProperty(window,"Notification",{value:FakeNotification});
+  });
+  const p=await ctx.newPage();await signUp(p,"community_browser");
+  await expect(p.getByRole("heading",{name:"Khám phá",exact:true})).toBeVisible();
+  expect(await p.evaluate(()=>[window.locationRequests,window.notificationRequests])).toEqual([0,0]);
+  await p.getByRole("button",{name:"Bật thông báo",exact:true}).click();
+  expect(await p.evaluate(()=>window.notificationRequests)).toBe(1);
+  await p.getByRole("button",{name:"Bật vị trí để tìm quanh đây",exact:true}).click();
+  await expect(p.getByRole("heading",{name:"Thành viên quanh bạn",exact:true})).toBeVisible();
+  expect(await p.evaluate(()=>window.locationRequests)).toBe(1);
+  await p.getByRole("button",{name:"Tắt Quanh đây",exact:true}).click();
+  await expect(p.getByRole("button",{name:"Bật vị trí để tìm quanh đây",exact:true})).toBeVisible();
+  await p.getByRole("button",{name:"Hồ sơ",exact:true}).click();
+  await p.getByRole("button",{name:"Sửa hồ sơ",exact:true}).click();
+  await p.getByLabel("Xu hướng tính dục",{exact:true}).fill("Les / Đồng tính nữ");
+  await p.getByLabel("Giới tính",{exact:true}).fill("Nữ");
+  await p.getByLabel("Vai trò",{exact:true}).fill("Vers Bottom");
+  await p.getByLabel("Hiển thị giới tính, xu hướng và vai trò trên hồ sơ",{exact:true}).check();
+  await p.getByRole("button",{name:"Lưu hồ sơ",exact:true}).click();
+  await expect(p.locator(".profile-head").getByText("Les / Đồng tính nữ",{exact:true})).toBeVisible();
+  const other=await browser.newContext();
+  await other.request.post("/api/register",{data:{username:"notification_browser",password:"abcdef",name:"Bạn mới",agree18:true}});
+  const own=(await (await ctx.request.get("/api/me")).json()).user;
+  await other.request.post("/api/users/"+own.id+"/follow",{data:{}});
+  await expect(p.locator("#unread")).toHaveText("1");
+  await p.locator("#notification-bell").click();
+  await expect(p.locator("#notification-center")).toBeVisible();
+  await expect(p.locator("#notification-center").getByText("đã theo dõi bạn.",{exact:true})).toBeVisible();
+  await p.locator("#notification-center").getByRole("button",{name:"Đánh dấu đã đọc",exact:true}).click();
+  await expect(p.locator("#unread")).toBeEmpty();
+  await other.close();await ctx.close();
+});

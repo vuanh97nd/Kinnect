@@ -74,6 +74,7 @@ export function connectLive() {
   ws.onmessage = async (event) => {
     try {
       const m = JSON.parse(event.data);
+      if (m.type === "notifications-changed") window.dispatchEvent(new Event("kinnect-notifications"));
       if (m.type === "rooms") {
         rooms = m.rooms;
         renderRooms();

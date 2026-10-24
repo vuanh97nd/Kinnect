@@ -28,7 +28,8 @@ window.addEventListener('online',network);window.addEventListener('offline',netw
 if('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('/sw.js').catch(error=>console.info('Kinnect web app:',error.message));
 
 const navigation=document.querySelector('#app>nav');
-const updateTabs=()=>{navigation.style.setProperty('--tab-count',navigation.querySelectorAll('button:not([hidden])').length);};
+const updateTabs=()=>{navigation.style.setProperty('--tab-count',[...navigation.querySelectorAll('button')].filter(button=>!button.hidden&&getComputedStyle(button).display!=='none').length);};
+window.addEventListener('resize',updateTabs);window.addEventListener('kinnect-logged-in',updateTabs);
 new MutationObserver(updateTabs).observe(navigation,{subtree:true,attributes:true,attributeFilter:['hidden']});updateTabs();
 
 const APK_URL='https://github.com/vuanh97nd/Kinnect/releases';

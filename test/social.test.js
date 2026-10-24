@@ -631,7 +631,7 @@ test("legacy 0.2 SQLite user data survives additive role/location/video migratio
     assert.equal(user.lat, null);
     assert.equal(
       app.social.db.prepare("PRAGMA user_version").get().user_version,
-      5,
+      6,
     );
     assert.ok(
       app.social.db
@@ -831,4 +831,48 @@ test("post likes, comments, profile stats and conversation preview", async () =>
   } finally {
     await app.stop();
   }
+});
+
+test("community identities remain optional/private, Les is searchable only when shared, presence and newest discovery", async (t) => {
+  const app = await start(); t.after(() => app.stop());
+  const a = await register(app, "community_a");
+  const b = await register(app, "community_b");
+  const c = await register(app, "community_c");
+  let r = await as(app,b,"/me","PATCH",{age:25,city:"Hà Nội",gender:"Nữ",orientation:"Les",relationshipRole:"Vers Bottom",identityPublic:false,showActivity:false});
+  assert.equal(r.body.user.orientation,"Les");
+  assert.equal((await as(app,a,"/users/"+b.id)).body.user.orientation,"");
+  assert.equal((await as(app,a,"/discover?q=Les")).body.users.length,0);
+  await as(app,b,"/me","PATCH",{identityPublic:true});
+  assert.equal((await as(app,a,"/discover?q=Les")).body.users[0].orientation,"Les");
+  await as(app,b,"/me","PATCH",{bio:"Cà phê"});
+  assert.equal((await as(app,b,"/me")).body.user.relationshipRole,"Vers Bottom");
+  assert.equal((await as(app,b,"/me","PATCH",{age:17})).status,400);
+  const people=(await as(app,a,"/discover")).body.users;
+  assert.equal(people[0].id,c.id);
+  await as(app,c,"/me/activity","POST",{});
+  let active=(await as(app,a,"/discover?sort=active")).body.users;
+  assert.ok(active.some(u=>u.id===c.id));assert.ok(!active.some(u=>u.id===b.id));
+  await as(app,c,"/logout","POST",{});
+  active=(await as(app,a,"/discover?sort=active")).body.users;
+  assert.ok(!active.some(u=>u.id===c.id));
+});
+
+test("notification delivery is realtime and read receipts affect only the recipient's selected items", async (t) => {
+  const app=await start();t.after(()=>app.stop());
+  const a=await register(app,"notify_a"), b=await register(app,"notify_b");
+  const ws=new WebSocket(app.url,{headers:{Cookie:a.cookie}});await once(ws,"open");
+  const changed=new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error("No realtime notification")),3000);ws.on("message",raw=>{if(JSON.parse(raw).type==="notifications-changed"){clearTimeout(timer);resolve();}});});
+  await as(app,b,"/users/"+a.id+"/follow","POST",{});await changed;
+  const notes=(await as(app,a,"/notifications")).body.notifications;
+  assert.equal(notes[0].seen,0);
+  await as(app,b,"/notifications","POST",{ids:[notes[0].id]});
+  assert.equal((await as(app,a,"/notifications")).body.notifications[0].seen,0);
+  await as(app,a,"/notifications","POST",{ids:[notes[0].id]});
+  assert.equal((await as(app,a,"/notifications")).body.notifications[0].seen,1);
+  await as(app,a,"/users/"+b.id+"/follow","POST",{});
+  await as(app,b,"/users/"+a.id+"/messages","POST",{body:"hello"});
+  assert.ok((await as(app,a,"/notifications")).body.notifications.some(n=>n.kind==="message"&&!n.seen));
+  await as(app,a,"/users/"+b.id+"/messages");
+  assert.ok((await as(app,a,"/notifications")).body.notifications.filter(n=>n.kind==="message").every(n=>n.seen));
+  ws.terminate();
 });

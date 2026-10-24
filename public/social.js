@@ -1,4 +1,4 @@
-import { connectLive, disconnectLive } from "./app.js";
+import { connectLive, disconnectLive } from "./app.js?v=806f6e17a7cc";
 const websiteSessionProbe = window.parent !== window && new URL(location.href).searchParams.get("website-session") === "1";
 const websiteOrigins = new Set(["https://kinnect.io.vn", "https://www.kinnect.io.vn"]);
 let websiteParentOrigin;
@@ -73,6 +73,9 @@ async function api(path, method = "GET", data) {
 }
 function showAuth() {
   if (websiteSessionProbe) { tellWebsiteSession(false); return; }
+  clearInterval(activityTimer); closeNotificationCenter();
+  notificationCache = []; knownNotificationIds.clear(); notificationBaseline = false;
+  document.querySelector(".notification-optin")?.remove();
   cleanupShorts();
   delete document.body.dataset.reel;
   clearInterval(timer);
@@ -253,20 +256,23 @@ async function enter() {
   $("app").hidden = false;
   $("name").value = me.name;
   paintMe();
+  initializeNotificationCenter(); startActivityHeartbeat();
   window.dispatchEvent(new CustomEvent("kinnect-logged-in", { detail: me }));
   connectLive();
   status("Chào " + me.name + "! 👋");
   await navigate(
     new URL(location.href).searchParams.get("view") === "live"
       ? "live"
-      : "feed",
+      : "discover",
   );
   if (new URL(location.href).searchParams.get("view") === "live")
     document.body.classList.add("live-only");
   rail().catch(() => {});
   clearInterval(notificationTimer);
-  notificationTimer = setInterval(() => refreshUnread().catch(() => {}), 15000);
+  notificationTimer = setInterval(() => refreshUnread().catch(() => {}), 10000);
   await refreshUnread();
+  const chatId = new URL(location.href).searchParams.get("chat");
+  if (chatId) { try { const { user } = await api("/users/" + encodeURIComponent(chatId)); await openChat(user); } catch (e) { status(e.message); } }
 }
 // Ảnh đại diện và tên trên nút tài khoản
 function paintMe() {
@@ -319,7 +325,7 @@ $("top-search").onsubmit = (e) => {
   e.preventDefault();
   navigate("discover", { q: $("top-search-input").value });
 };
-for (const button of document.querySelectorAll("[data-tab]"))
+for (const button of document.querySelectorAll("[data-tab]:not([data-tab=notifications])"))
   button.onclick = () =>
     navigate(button.dataset.tab).catch((e) => status(e.message));
 // Khung xám nhấp nháy trong lúc tải
@@ -332,6 +338,7 @@ function skeleton(kind) {
   return box;
 }
 async function navigate(value, opts = {}) {
+  closeNotificationCenter();
   cleanupShorts();
   delete document.body.dataset.reel;
   clearInterval(timer);
@@ -434,7 +441,11 @@ function userCard(u) {
       ["Báo cáo", () => report("user", u.id)],
     ]),
   );
-  card.append(photo, node("p", u.bio || "Một người bạn mới đang chờ câu chuyện của bạn.", "tile-bio"));
+  const presence = node("div", undefined, "presence-badges");
+  if (u.isActive) presence.append(node("span", "● Online", "presence online"));
+  if (u.isNew) presence.append(node("span", "Mới", "presence new-member"));
+  photo.append(presence);
+  card.append(photo, profileBadges(u), node("p", u.bio || "Một người bạn mới đang chờ câu chuyện của bạn.", "tile-bio"));
   const tags = node("div", undefined, "tags");
   u.interests.slice(0, 4).forEach((v) => tags.append(node("span", v)));
   card.append(tags);
@@ -458,54 +469,82 @@ async function report(targetType, targetId) {
   await api("/reports", "POST", { targetType, targetId, reason });
   status("Đã gửi báo cáo. Nếu cần, hãy chặn người dùng này.");
 }
+let discoveryMode = "nearby";
+function profileBadges(user) {
+  const box = node("div", undefined, "identity-badges");
+  const genderIcons = { "Nam": "♂", "Nữ": "♀", "Nam chuyển giới": "⚧", "Nữ chuyển giới": "⚧", "Phi nhị nguyên": "◇" };
+  const roles = { "Top": "↑", "Bottom": "↓", "Vers": "↕", "Vers Top": "↗", "Vers Bottom": "↘", "Side": "○" };
+  const labels = [
+    user.age ? [String(user.age) + " tuổi", "age"] : null,
+    user.city ? ["⌖ " + user.city, "location"] : null,
+    user.gender ? [(genderIcons[user.gender] || "◇") + " " + user.gender, "gender"] : null,
+    user.orientation ? [user.orientation, "orientation"] : null,
+    user.relationshipRole ? [(roles[user.relationshipRole] || "↕") + " " + user.relationshipRole, "role"] : null,
+    user.pronouns ? [user.pronouns, "pronouns"] : null,
+  ].filter(Boolean);
+  for (const [label, kind] of labels) { const badge = node("span", label, "identity-badge badge-" + kind); badge.title = label; box.append(badge); }
+  return box;
+}
 async function discover(panel, q = "") {
-  const head = node("div", undefined, "view-head");
-  head.append(
-    node("h2", "Khám phá"),
-    node("p", "Gợi ý theo sở thích chung. Vị trí chính xác không bao giờ được chia sẻ.", "muted"),
-  );
+  const head = node("div", undefined, "view-head discover-head");
+  head.append(node("span", "KẾT NỐI MỚI MỖI NGÀY", "eyebrow"), node("h2", "Khám phá"), node("p", "Tìm người ở gần, gặp bạn mới cùng sở thích.", "muted"));
   panel.append(head);
-  let nearby = false;
-  const chips = node("div", undefined, "chips");
-  const chip = (label, value) => {
-    const b = node("button", label, value === nearby ? "chip active" : "chip");
-    b.type = "button";
-    b.onclick = () => {
-      nearby = value;
-      for (const c of chips.children) c.classList.toggle("active", c === b);
-      load().catch((e) => {
-        list.replaceChildren(empty("📍", "Chưa bật Quanh đây", e.message));
-      });
-    };
-    return b;
-  };
-  chips.append(chip("Cùng sở thích", false), chip("Quanh đây", true));
-  const form = node("form", undefined, "search-bar");
-  const search = node("input");
-  search.type = "search";
-  search.value = q;
-  search.placeholder = "Tìm tên hoặc sở thích…";
-  search.setAttribute("aria-label", "Tìm bạn");
-  const button = node("button", "Tìm");
-  form.append(search, button);
-  panel.append(chips, form);
-  const list = node("div", undefined, "people-grid");
-  panel.append(list);
-  async function load() {
-    const { users } = await api(
-      "/discover?q=" + encodeURIComponent(search.value) + (nearby ? "&nearby=1" : ""),
-    );
-    list.replaceChildren();
-    users.forEach((u) => list.append(userCard(u)));
-    if (!users.length)
-      list.append(empty("🔎", "Chưa tìm thấy ai", "Thử từ khóa khác, bổ sung sở thích hoặc mời bạn bè tham gia."));
+  let selected = discoveryMode, request = 0;
+  const tools = node("section", undefined, "discovery-tools social-card");
+  const chips = node("div", undefined, "chips discovery-tabs");
+  chips.setAttribute("aria-label", "Lọc thành viên");
+  for (const [label, value] of [["Quanh đây", "nearby"], ["Mới tham gia", "new"], ["Đang hoạt động", "active"], ["Cùng sở thích", "interests"]]) {
+    const b = node("button", label, "chip" + (value === selected ? " active" : "")); b.type = "button"; b.setAttribute("aria-pressed", String(value === selected));
+    b.onclick = () => { selected = discoveryMode = value; for (const c of chips.children) { c.classList.toggle("active", c === b); c.setAttribute("aria-pressed", String(c === b)); } load().catch(showError); };
+    chips.append(b);
   }
-  form.onsubmit = (e) => {
-    e.preventDefault();
-    load().catch((e) => status(e.message));
+  const form = node("form", undefined, "search-bar");
+  const search = node("input"); search.type = "search"; search.value = q; search.placeholder = "Tìm tên, khu vực hoặc sở thích…"; search.setAttribute("aria-label", "Tìm bạn");
+  const button = node("button", "Tìm"); form.append(search, button);
+  const location = node("section", undefined, "nearby-consent");
+  const locationText = node("p", "", "muted"); locationText.setAttribute("role", "status");
+  const enable = node("button", "Bật vị trí để tìm quanh đây", "secondary"); enable.type = "button";
+  const disable = node("button", "Tắt Quanh đây", "ghost"); disable.type = "button";
+  location.append(locationText, enable, disable); tools.append(chips, form, location); panel.append(tools);
+  const heading = node("h3", "", "section-title discovery-results-title");
+  const list = node("div", undefined, "people-grid"); panel.append(heading, list);
+  function showError(e) { locationText.textContent = e.message; list.replaceChildren(empty("📍", "Chưa tải được thành viên", "Bạn có thể thử lại hoặc chọn Mới tham gia.")); }
+  async function load() {
+    const version = ++request, mode = selected;
+    const own = (await api("/me")).user;
+    if (version !== request) return;
+    me = own;
+    location.hidden = mode !== "nearby";
+    enable.textContent = me.hasLocation ? "Cập nhật vị trí" : "Bật vị trí để tìm quanh đây";
+    disable.hidden = !me.hasLocation;
+    locationText.textContent = me.hasLocation
+      ? "Đang tìm trong khoảng 100 km. Khoảng cách được ước lượng, vị trí tự hết hạn sau 24 giờ."
+      : "Cho phép vị trí để tìm người gần bạn. Chỉ lưu vị trí làm tròn khoảng 5 km; bạn có thể tắt bất cứ lúc nào.";
+    const nearby = mode === "nearby" && me.hasLocation;
+    heading.textContent = mode === "nearby" ? (nearby ? "Thành viên quanh bạn" : "Mới tham gia") : mode === "active" ? "Đang hoạt động" : mode === "interests" ? "Người cùng sở thích" : "Mới tham gia";
+    list.replaceChildren(skeleton("grid"));
+    const { users } = await api("/discover?q=" + encodeURIComponent(search.value) + (nearby ? "&nearby=1" : "") + "&sort=" + (mode === "nearby" ? "new" : mode));
+    if (version !== request) return;
+    list.replaceChildren(...users.map(userCard));
+    if (!users.length) list.append(empty(nearby ? "📍" : "🔎", nearby ? "Chưa có thành viên quanh bạn" : "Chưa tìm thấy ai", nearby ? "Chỉ những người đã bật vị trí trong 24 giờ gần nhất mới xuất hiện. Bạn có thể xem thêm ở Mới tham gia." : mode === "active" ? "Chưa có thành viên đang hoạt động. Hãy xem thêm ở Mới tham gia." : "Thử từ khóa khác hoặc bổ sung sở thích cho hồ sơ."));
+  }
+  enable.onclick = async () => {
+    enable.disabled = true;
+    locationText.textContent = "Đang lấy vị trí của bạn…";
+    try {
+      if (!window.isSecureContext || !navigator.geolocation) throw Error("Mở Kinnect bằng HTTPS hoặc localhost để sử dụng vị trí.");
+      const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 }));
+      me = (await api("/me/location", "PATCH", { enabled: true, latitude: position.coords.latitude, longitude: position.coords.longitude })).user;
+      await load();
+    } catch (e) {
+      locationText.textContent = e.code === 1 ? "Quyền vị trí đang bị chặn. Hãy cho phép vị trí trong quyền của trang rồi thử lại." : e.code === 2 ? "Chưa lấy được vị trí. Kiểm tra dịch vụ vị trí trên thiết bị rồi thử lại." : e.code === 3 ? "Lấy vị trí quá thời gian. Hãy thử lại ở nơi có tín hiệu tốt hơn." : e.message;
+    } finally { enable.disabled = false; }
   };
+  disable.onclick = async () => { disable.disabled = true; try { me = (await api("/me/location", "PATCH", { enabled: false })).user; await load(); } catch (e) { showError(e); } finally { disable.disabled = false; } };
+  form.onsubmit = (e) => { e.preventDefault(); load().catch(showError); };
   await load();
 }
+
 function timeAgo(t) {
   const m = Math.round((Date.now() - t) / 60000);
   if (m < 1) return "Vừa xong";
@@ -887,7 +926,9 @@ async function profile(panel, opts = {}) {
   const tags = node("div", undefined, "tags");
   (u.interests || []).forEach((v) => tags.append(node("span", v)));
   const acts = node("div", undefined, "profile-actions");
-  head.append(cover, big, id, bio, tags, nums, acts);
+  head.append(cover, big, id, profileBadges(u), bio, tags);
+  if (u.lookingFor) head.append(node("p", "Muốn kết nối: " + u.lookingFor, "profile-intent"));
+  head.append(nums, acts);
   panel.append(head);
   const settings = node("div", undefined, "settings");
   if (own) {
@@ -952,6 +993,22 @@ async function profile(panel, opts = {}) {
     bioInput.maxLength = 500;
     const interests = field(form, "Sở thích, phân cách bằng dấu phẩy", me.interests.join(", "));
     interests.maxLength = 350;
+    const age = field(form, "Tuổi (không bắt buộc)", me.age || "", "number"); age.min = 18; age.max = 99;
+    const city = field(form, "Khu vực / thành phố", me.city || ""); city.maxLength = 80;
+    const chooseIdentity = (label, value, values, key) => {
+      const input = field(form, label, value || ""); input.maxLength = 60;
+      const id = "profile-options-" + key; const options = node("datalist"); options.id = id;
+      for (const choice of values) { const option = node("option"); option.value = choice; options.append(option); }
+      input.setAttribute("list", id); input.placeholder = "Tự chọn, tự mô tả hoặc để trống"; form.append(options); return input;
+    };
+    const gender = chooseIdentity("Giới tính", me.gender, ["Nam", "Nữ", "Nam chuyển giới", "Nữ chuyển giới", "Phi nhị nguyên", "Đang tìm hiểu"], "gender");
+    const orientation = chooseIdentity("Xu hướng tính dục", me.orientation, ["Gay / Đồng tính nam", "Les / Đồng tính nữ", "Song tính", "Toàn tính", "Dị tính", "Vô tính", "Đang tìm hiểu"], "orientation");
+    const relationshipRole = chooseIdentity("Vai trò", me.relationshipRole, ["Top", "Bottom", "Vers", "Vers Top", "Vers Bottom", "Side", "Đang tìm hiểu"], "role");
+    const pronouns = field(form, "Cách xưng hô", me.pronouns || ""); pronouns.maxLength = 30;
+    const lookingFor = field(form, "Bạn muốn tìm kết nối như thế nào?", me.lookingFor || ""); lookingFor.maxLength = 100;
+    const identityLabel = node("label", undefined, "switch-row"); const identityPublic = node("input"); identityPublic.type = "checkbox"; identityPublic.checked = !!me.identityPublic; identityLabel.append(node("span", "Hiển thị giới tính, xu hướng và vai trò trên hồ sơ"), identityPublic); form.append(identityLabel);
+    form.append(node("p", "Tất cả thông tin đều do bạn tự chọn. Để trống nếu không muốn chia sẻ.", "muted field-help"));
+    const activityLabel = node("label", undefined, "switch-row"); const showActivity = node("input"); showActivity.type = "checkbox"; showActivity.checked = me.showActivity !== false; activityLabel.append(node("span", "Hiển thị khi tôi đang hoạt động"), showActivity); form.append(activityLabel);
     const visibleLabel = node("label", undefined, "switch-row");
     const visible = node("input");
     visible.type = "checkbox";
@@ -984,10 +1041,15 @@ async function profile(panel, opts = {}) {
             interests: interests.value.split(","),
             discoverable: visible.checked,
             dmMode: dm.value,
+            age: age.value ? Number(age.value) : null, city: city.value,
+            gender: gender.value, orientation: orientation.value, relationshipRole: relationshipRole.value,
+            pronouns: pronouns.value, lookingFor: lookingFor.value,
+            identityPublic: identityPublic.checked, showActivity: showActivity.checked,
           })
         ).user;
         $("name").value = me.name;
         paintMe();
+        await navigate("profile");
         status("Đã lưu hồ sơ.");
       } catch (e) {
         status(e.message);
@@ -1150,12 +1212,133 @@ async function openChat(u) {
     4000,
   );
 }
+let notificationCache = [], knownNotificationIds = new Set(), notificationBaseline = false;
+let unreadRequest = null, activityTimer = null, notificationPanel = null, notificationFilter = "all";
+let audioContext;
+let soundEnabled = true;
+try { soundEnabled = localStorage.getItem("kinnect-notification-sound") !== "off"; } catch {}
+document.addEventListener("pointerdown", () => {
+  if (!audioContext && (window.AudioContext || window.webkitAudioContext)) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioContext?.state === "suspended") audioContext.resume().catch(() => {});
+}, { passive: true });
+function notificationSound() {
+  if (!soundEnabled || !audioContext || audioContext.state !== "running" || document.hidden) return;
+  const tone = audioContext.createOscillator(), volume = audioContext.createGain(), now = audioContext.currentTime;
+  tone.type = "sine"; tone.frequency.setValueAtTime(880, now); tone.frequency.setValueAtTime(1174, now + .12);
+  volume.gain.setValueAtTime(.001, now); volume.gain.exponentialRampToValueAtTime(.08, now + .02); volume.gain.exponentialRampToValueAtTime(.001, now + .3);
+  tone.connect(volume); volume.connect(audioContext.destination); tone.start(now); tone.stop(now + .32);
+}
+function closeNotificationCenter() {
+  if (notificationPanel) notificationPanel.hidden = true;
+  $("notification-bell")?.setAttribute("aria-expanded", "false");
+}
+function requestBrowserNotifications() {
+  if (!("Notification" in window)) { status("Trình duyệt này chưa hỗ trợ thông báo. Trên iPhone, hãy thêm Kinnect vào màn hình chính trước."); return; }
+  if (Notification.permission === "denied") { status("Thông báo đang bị chặn. Bạn có thể bật lại trong phần quyền của trang trên trình duyệt."); return; }
+  Notification.requestPermission().then(permission => {
+    if (permission === "granted") { document.querySelector(".notification-optin")?.remove(); status("Đã bật thông báo khi Kinnect đang mở."); }
+    else status("Bạn vẫn nhận được thông báo ở biểu tượng chuông trong app.");
+    renderNotificationCenter();
+  }).catch(() => status("Chưa bật được thông báo trình duyệt. Bạn vẫn xem được thông báo trong app."));
+}
+function notificationOptIn() {
+  document.querySelector(".notification-optin")?.remove();
+  if (!("Notification" in window) || Notification.permission !== "default") return;
+  try { if (sessionStorage.getItem("kinnect-notification-dismissed") === "1") return; } catch {}
+  const banner = node("aside", undefined, "notification-optin"); banner.setAttribute("aria-label", "Bật thông báo tin nhắn");
+  const text = node("div"); text.append(node("b", "Không bỏ lỡ lời chào mới"), node("p", "Nhận thông báo tin nhắn khi Kinnect đang mở, kể cả lúc bạn chuyển sang tab khác."));
+  const enable = node("button", "Bật thông báo"); enable.type = "button"; enable.onclick = requestBrowserNotifications;
+  const dismiss = node("button", "×", "ghost"); dismiss.type = "button"; dismiss.setAttribute("aria-label", "Để sau"); dismiss.onclick = () => { banner.remove(); try { sessionStorage.setItem("kinnect-notification-dismissed", "1"); } catch {} };
+  banner.append(text, enable, dismiss); $("social-panel").before(banner);
+}
+async function openNotification(n) {
+  closeNotificationCenter();
+  if (!n.seen) await api("/notifications", "POST", { ids: [n.id] });
+  if (n.kind === "message") await openChat(n.actor);
+  else if (n.kind === "like" || n.kind === "comment") await navigate("profile");
+  else if (n.kind === "gift") await navigate("live");
+  else await navigate("profile", { user: n.actor.id });
+  await refreshUnread();
+}
+function renderNotificationCenter() {
+  if (!notificationPanel) return;
+  notificationPanel.replaceChildren();
+  const head = node("div", undefined, "notification-center-head"); head.append(node("h2", "Thông báo"));
+  const read = action("Đánh dấu đã đọc", async () => { await api("/notifications", "POST", {}); await refreshUnread(); }, "ghost");
+  head.append(read); notificationPanel.append(head);
+  const tabs = node("div", undefined, "chips");
+  for (const [label, value] of [["Tất cả", "all"], ["Chưa đọc", "unread"]]) { const b = node("button", label, "chip" + (notificationFilter === value ? " active" : "")); b.type = "button"; b.onclick = () => { notificationFilter = value; renderNotificationCenter(); }; tabs.append(b); }
+  notificationPanel.append(tabs);
+  const list = node("div", undefined, "notification-center-list");
+  const items = notificationCache.filter(n => notificationFilter !== "unread" || !n.seen).slice(0, 10);
+  for (const n of items) {
+    const row = node("button", undefined, "list-row note-row" + (n.seen ? "" : " unread")); row.type = "button";
+    const text = node("div", undefined, "row-text"); const line = node("p"); line.append(node("b", n.actor.name), " ", node("span", NOTE_TEXT[n.kind] || "có hoạt động mới."));
+    text.append(line, node("small", timeAgo(n.created), "meta")); row.append(avatar(n.actor), text); if (!n.seen) row.append(node("span", undefined, "dot"));
+    row.onclick = () => openNotification(n).catch(e => status(e.message)); list.append(row);
+  }
+  if (!items.length) list.append(empty("🔔", notificationFilter === "unread" ? "Bạn đã xem hết thông báo" : "Chưa có thông báo", "Lượt theo dõi và tin nhắn mới sẽ xuất hiện ở đây."));
+  notificationPanel.append(list);
+  const footer = node("div", undefined, "notification-center-footer");
+  footer.append(action("Xem tất cả thông báo", () => navigate("notifications"), "ghost wide"));
+  const permission = node("button", "Notification" in window && Notification.permission === "granted" ? "✓ Đã bật thông báo trình duyệt" : "Bật thông báo trình duyệt", "ghost wide"); permission.type = "button"; permission.disabled = "Notification" in window && Notification.permission === "granted"; permission.onclick = requestBrowserNotifications; footer.append(permission);
+  const sound = node("label", undefined, "notification-sound"); const check = node("input"); check.type = "checkbox"; check.checked = soundEnabled; check.onchange = () => { soundEnabled = check.checked; try { localStorage.setItem("kinnect-notification-sound", soundEnabled ? "on" : "off"); } catch {} }; sound.append(check, "Âm báo trong app"); footer.append(sound); notificationPanel.append(footer);
+}
+function initializeNotificationCenter() {
+  const bell = $("notification-bell");
+  if (!notificationPanel) {
+    notificationPanel = node("section", undefined, "notification-center"); notificationPanel.id = "notification-center"; notificationPanel.hidden = true; notificationPanel.setAttribute("role", "dialog"); notificationPanel.setAttribute("aria-label", "Thông báo"); $("app").append(notificationPanel);
+    document.addEventListener("click", event => { if (!notificationPanel.hidden && !notificationPanel.contains(event.target) && !bell.contains(event.target)) closeNotificationCenter(); });
+    document.addEventListener("keydown", event => { if (event.key === "Escape" && !notificationPanel.hidden) { closeNotificationCenter(); bell.focus(); } });
+  }
+  bell.onclick = () => { menu(false); notificationPanel.hidden = !notificationPanel.hidden; bell.setAttribute("aria-expanded", String(!notificationPanel.hidden)); if (!notificationPanel.hidden) { renderNotificationCenter(); refreshUnread().catch(e => status(e.message)); } };
+  notificationOptIn();
+}
+async function showSystemNotification(n) {
+  if (!("Notification" in window) || Notification.permission !== "granted" || !document.hidden) return;
+  const title = n.kind === "message" ? "Tin nhắn mới từ " + n.actor.name : "Thông báo từ " + n.actor.name;
+  const options = { body: n.kind === "message" ? "Bạn có tin nhắn mới trên Kinnect." : NOTE_TEXT[n.kind] || "Có hoạt động mới trên Kinnect.", icon: "/kinnect-icon-192.png", tag: "kinnect-" + n.id, data: { url: n.kind === "message" ? "/?chat=" + encodeURIComponent(n.actor.id) : "/" } };
+  try {
+    const registration = await navigator.serviceWorker?.getRegistration();
+    if (registration?.active) await registration.showNotification(title, options);
+    else { const notification = new Notification(title, options); notification.onclick = () => { window.focus(); notification.close(); openNotification(n).catch(e => status(e.message)); }; }
+  } catch {}
+}
 async function refreshUnread() {
   if (!me) return;
-  const { notifications } = await api("/notifications");
-  const count = notifications.filter((n) => !n.seen).length;
-  $("unread").textContent = count ? (count > 9 ? "9+" : String(count)) : "";
+  if (unreadRequest) return unreadRequest;
+  const userId = me.id;
+  unreadRequest = (async () => {
+    const { notifications } = await api("/notifications");
+    if (!me || me.id !== userId) return;
+    const fresh = notificationBaseline ? notifications.filter(n => !n.seen && !knownNotificationIds.has(n.id)) : [];
+    notificationCache = notifications; notificationBaseline = true;
+    notifications.forEach(n => knownNotificationIds.add(n.id));
+    if (knownNotificationIds.size > 500) knownNotificationIds = new Set(notifications.map(n => n.id));
+    const count = notifications.filter(n => !n.seen).length;
+    $("unread").textContent = count ? (count > 99 ? "99+" : String(count)) : "";
+    const inbox = document.querySelector('#app>nav [data-tab="inbox"]'); inbox.setAttribute("aria-label", "Tin nhắn");
+    let badge = inbox.querySelector(".nav-count"); if (!badge) { badge = node("span", "", "nav-count"); badge.setAttribute("aria-hidden", "true"); inbox.append(badge); }
+    const messages = notifications.filter(n => !n.seen && n.kind === "message").length;
+    badge.textContent = messages ? messages > 99 ? "99+" : String(messages) : ""; badge.hidden = !messages;
+    if (fresh.length) {
+      notificationSound(); const bell = $("notification-bell"); bell.classList.add("ringing"); setTimeout(() => bell.classList.remove("ringing"), 900);
+      const latest = fresh[0]; status(latest.actor.name + " " + (NOTE_TEXT[latest.kind] || "có hoạt động mới."));
+      await showSystemNotification(latest);
+    }
+    renderNotificationCenter();
+  })();
+  try { await unreadRequest; } finally { unreadRequest = null; }
 }
+function startActivityHeartbeat() {
+  clearInterval(activityTimer);
+  const beat = () => { if (me && !document.hidden) api("/me/activity", "POST", {}).catch(() => {}); };
+  beat(); activityTimer = setInterval(beat, 25000);
+}
+window.addEventListener("kinnect-notifications", () => refreshUnread().catch(() => {}));
+window.addEventListener("focus", () => { if (me) refreshUnread().catch(() => {}); });
+document.addEventListener("visibilitychange", () => { if (me && !document.hidden) { startActivityHeartbeat(); refreshUnread().catch(() => {}); } });
+
 const NOTE_TEXT = {
   follow: "đã theo dõi bạn.",
   message: "đã gửi tin nhắn cho bạn.",
@@ -1188,11 +1371,7 @@ async function notifications(panel) {
     text.append(line, node("small", timeAgo(n.created), "meta"));
     row.append(avatar(n.actor), text);
     if (!n.seen) row.append(node("span", undefined, "dot"));
-    row.onclick = () => {
-      if (n.kind === "message") openChat(n.actor).catch((e) => status(e.message));
-      else if (n.kind === "like" || n.kind === "comment") navigate("profile");
-      else navigate("profile", { user: n.actor.id });
-    };
+    row.onclick = () => openNotification(n).catch(e => status(e.message));
     list.append(row);
   }
   await api("/notifications", "POST", {});
