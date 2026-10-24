@@ -1,4 +1,15 @@
+import { createEffects, effectPicker } from "./camera.js?v=1";
 const $ = (id) => document.getElementById(id);
+// stream: luồng đã qua hiệu ứng (gửi cho người xem); rawStream: camera/micro gốc.
+let rawStream = null,
+  fx = null;
+function stopCamera() {
+  fx?.stop();
+  fx = null;
+  rawStream?.getTracks().forEach((t) => t.stop());
+  rawStream = null;
+  $("live-fx")?.replaceChildren();
+}
 let stream = null,
   role = null,
   busy = false,
@@ -18,6 +29,7 @@ function cleanup() {
   pending.clear();
   stream?.getTracks().forEach((t) => t.stop());
   stream = null;
+  stopCamera();
   role = null;
   window.dispatchEvent(
     new CustomEvent("kinnect-live-state", { detail: false }),
@@ -95,7 +107,10 @@ export function connectLive() {
           role === "host" ? "Kết thúc livestream" : "Rời phòng";
         $("video").muted = role === "host";
         $("video").controls = role !== "host";
-        if (role === "host") $("video").srcObject = stream;
+        if (role === "host") {
+          $("video").srcObject = stream;
+          if (fx) $("live-fx")?.replaceChildren(effectPicker(fx, { dark: false }));
+        }
         notify(
           role === "host"
             ? "Bạn đang phát trực tiếp."
@@ -167,6 +182,7 @@ export function connectLive() {
         if (!role && stream) {
           stream.getTracks().forEach((t) => t.stop());
           stream = null;
+          stopCamera();
         }
         notify(m.message);
       }
@@ -188,10 +204,13 @@ $("create").onsubmit = async (e) => {
   try {
     if (!navigator.mediaDevices?.getUserMedia)
       throw Error("Camera cần HTTPS hoặc localhost.");
-    stream = await navigator.mediaDevices.getUserMedia({
+    rawStream = await navigator.mediaDevices.getUserMedia({
       video: { width: { ideal: 1280 }, height: { ideal: 720 } },
       audio: true,
     });
+    // Hiệu ứng (bộ lọc, làm mịn, sticker) áp lên hình gửi cho người xem.
+    fx = createEffects(rawStream, { width: 720, height: 1280 });
+    stream = fx.stream;
     send({ type: "create", name: $("name").value, title: $("title").value });
   } catch (error) {
     notify("Không mở được camera/micro: " + error.message);

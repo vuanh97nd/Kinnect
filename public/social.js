@@ -581,7 +581,7 @@ function composer(panel) {
   input.placeholder = me.name + " ơi, bạn đang nghĩ gì?";
   input.maxLength = 2000;
   input.required = true;
-  input.rows = 2;
+  input.rows = 1;
   input.setAttribute("aria-label", "Nội dung bài viết");
   row.append(avatar(me), input);
   const visibility = node("select");
@@ -735,42 +735,48 @@ async function shorts(panel) {
   const heading = node("div", undefined, "view-head");
   heading.append(node("h2", "Video"), node("p", "Video ngắn từ cộng đồng. Muốn trò chuyện trực tiếp? Mở mục Live.", "muted"));
   panel.append(heading);
-  const upload = node("form", undefined, "short-upload");
+  // Thanh tạo video kiểu TikTok: quay bằng camera (có hiệu ứng) hoặc tải video có sẵn.
+  const toBase64 = (blob) =>
+    new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result).replace(/^data:[^;]*;/, "data:video/mp4;"));
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+  const postVideo = async (blob, caption) => {
+    if (blob.size > 12 * 1024 * 1024) throw Error("Video tối đa 12 MB.");
+    await api("/shorts", "POST", { data: await toBase64(blob), caption });
+    status("Đã đăng video.");
+    await navigate("shorts");
+  };
+  const upload = node("div", undefined, "create-bar");
+  const rec = node("button", "🎥 Quay video", "create-rec");
+  rec.type = "button";
+  rec.onclick = async () => {
+    const { openStudio } = await import("./camera.js?v=1");
+    await openStudio({ onDone: postVideo, notify: status });
+  };
   const pick = node("label", undefined, "file-pick");
   const file = node("input");
   file.type = "file";
   file.accept = "video/mp4";
-  file.setAttribute("aria-label", "Chọn video MP4, tối đa 12 MB");
-  const pickText = node("span", "🎬 Chọn video");
-  pick.append(file, pickText);
-  file.onchange = () => (pickText.textContent = file.files[0] ? "✓ " + file.files[0].name : "🎬 Chọn video");
-  const caption = node("input");
-  caption.maxLength = 500;
-  caption.placeholder = "Chú thích video…";
-  caption.setAttribute("aria-label", "Chú thích video");
-  const send = node("button", "Đăng");
-  upload.append(pick, caption, send);
-  upload.onsubmit = async (e) => {
-    e.preventDefault();
+  file.setAttribute("aria-label", "Tải video MP4 có sẵn, tối đa 12 MB và 60 giây");
+  pick.append(file, node("span", "📁 Tải video lên"));
+  file.onchange = async () => {
     const f = file.files[0];
-    if (!f) return status("Chọn một video MP4.");
-    if (f.size > 12 * 1024 * 1024) return status("Video tối đa 12 MB.");
-    send.disabled = true;
+    if (!f) return;
+    const caption = prompt("Chú thích cho video (có thể để trống):", "") ?? null;
+    if (caption === null) return void (file.value = "");
     try {
-      const data = await new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(r.result);
-        r.onerror = reject;
-        r.readAsDataURL(f);
-      });
-      await api("/shorts", "POST", { data, caption: caption.value });
-      status("Đã đăng video.");
-      await navigate("shorts");
+      status("Đang tải video lên…");
+      await postVideo(f, caption);
     } catch (e) {
       status(e.message);
-      send.disabled = false;
+    } finally {
+      file.value = "";
     }
   };
+  upload.append(rec, pick);
   panel.append(upload);
   const reel = node("div", undefined, "reel");
   panel.append(reel);

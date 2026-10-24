@@ -1,0 +1,81 @@
+/* Kinnect: bố cục gọn kiểu Facebook/TikTok (nạp sau cùng) */
+
+/* Huy hiệu thông báo chỉ hiện khi có số */
+#app #notification-bell #unread:empty { display: none !important; }
+
+/* Khung chung gọn hơn */
+#app .social-card { padding: 12px 14px; margin-bottom: 8px; border-radius: 14px; }
+#app .view-head { margin: 4px 2px 10px; }
+#app .view-head h2 { font-size: 20px; }
+#app .view-head p { font-size: 13.5px; }
+#social-panel { padding-top: 8px !important; }
+
+/* Dải tin */
+#app .stories { gap: 6px; padding: 2px 2px 8px; }
+#app .story { flex: 0 0 64px; gap: 4px; }
+#app .story .avatar { width: 54px; height: 54px; font-size: 20px; border-width: 2px; }
+#app .story span:not(.avatar) { font-size: 12px; max-width: 64px; }
+
+/* Ô soạn bài một dòng; công cụ chỉ hiện khi đang viết */
+#app .composer { padding: 10px 12px; }
+#app .composer-row { align-items: center; gap: 8px; }
+#app .composer-row .avatar { width: 38px; height: 38px; flex-basis: 38px; }
+#app .composer-row textarea { min-height: 40px; height: 40px; padding: 9px 14px; border-radius: 999px !important; resize: none; line-height: 1.4; transition: height .15s; }
+#app .composer:focus-within .composer-row textarea, #app .composer-row textarea:not(:placeholder-shown) { height: 84px; border-radius: 14px !important; resize: vertical; }
+#app .composer-tools { margin-top: 8px; padding-top: 8px; gap: 4px; flex-wrap: nowrap; }
+#app .composer-tools button.ghost { min-height: 36px; padding: 0 10px; font-size: 13.5px; }
+#app .composer-tools select { min-height: 36px !important; max-width: 46%; font-size: 13px !important; padding: 0 8px; }
+#app .composer-tools button:last-child { min-height: 36px; padding: 0 16px; }
+
+/* Bài viết */
+#app .post-head { gap: 8px; }
+#app .person-link .avatar { width: 38px; height: 38px; font-size: 15px; }
+#app .name-link { font-size: 15px; min-height: 0; }
+#app .meta { font-size: 12.5px; }
+#app .post-body { margin: 8px 0; font-size: 15px; line-height: 1.45; }
+#app .post-stats { padding: 0 0 6px; font-size: 13px; }
+#app .post-actions { padding-top: 2px; gap: 2px; }
+#app .post-actions .act, #app .post-actions button { min-height: 36px; font-size: 13.5px; white-space: nowrap; padding: 0 4px; }
+#app .more summary { width: 34px; height: 34px; font-size: 18px; }
+
+/* Thông báo xin quyền: một dòng gọn */
+#app .notification-optin { padding: 10px 12px !important; gap: 10px !important; border-radius: 14px; margin-bottom: 8px; }
+#app .notification-optin b { font-size: 14px; }
+#app .notification-optin p { font-size: 12.5px; margin: 2px 0 0; }
+#app .notification-optin button { min-height: 34px; padding: 0 12px; font-size: 13px; white-space: nowrap; }
+
+/* Danh sách, hồ sơ, khám phá */
+#app .list-row { min-height: 56px; padding: 8px; gap: 10px; }
+#app .list-row .avatar { width: 44px; height: 44px; flex-basis: 44px; font-size: 17px; }
+#app .cover { height: 110px; }
+#app .profile-head .avatar.big { width: 96px; height: 96px; margin-top: -48px; font-size: 38px; }
+#app .profile-stats { gap: 22px; margin-top: 12px; }
+#app .profile-stats b { font-size: 18px; }
+#app .people-grid { gap: 8px; }
+#app .tile-photo { aspect-ratio: 4 / 5; }
+#app .person-tile .tile-bio { margin: 6px 10px 2px; font-size: 13px; }
+#app .person-tile .card-actions { padding: 8px; gap: 6px; }
+#app .chips { margin: 0 0 8px; }
+#app .chip { min-height: 36px; padding: 0 14px; font-size: 14px; }
+#app .search-bar { margin-bottom: 10px; }
+#app .search-bar input, #app .search-bar button { min-height: 42px; }
+
+/* Điện thoại: thẻ tràn sát mép như Facebook, thanh dưới mảnh hơn */
+@media (max-width: 760px) {
+  #social-panel { padding-left: 0 !important; padding-right: 0 !important; }
+  #app .view > *:not(.post):not(.composer):not(.stories):not(.social-card) { margin-left: 12px; margin-right: 12px; }
+  #app .view > .social-card { border-radius: 0; margin-left: 0; margin-right: 0; box-shadow: none; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  #app .stories { padding-left: 10px; padding-right: 10px; }
+  #app .people-grid { margin: 0 8px; }
+  #app .notification-optin p { display: none; }
+  #app > nav [data-tab] { min-height: 48px; }
+}
+
+/* Máy tính: cột giữa gọn như Facebook */
+@media (min-width: 1000px) {
+  main#app { grid-template-columns: 240px minmax(0, 600px) 300px; column-gap: 24px; }
+}
+#app .composer-tools button{display:inline-flex!important;flex-direction:row!important;align-items:center;gap:4px;white-space:nowrap}
+#app .composer-tools select{flex:1;min-width:0}
+#app .notification-optin{margin-left:12px!important;margin-right:12px!important}
+#app .notification-optin{width:auto!important;max-width:none!important;box-sizing:border-box}
