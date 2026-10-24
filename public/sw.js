@@ -1,4 +1,4 @@
-const CACHE = 'kinnect-static-v18';
+const CACHE = 'kinnect-static-v19';
 self.addEventListener('message', event => { if(event.data === 'SKIP_WAITING') self.skipWaiting(); });
 const STATIC = ['/style.css','/social.css','/ios.css','/theme.css','/app-ui.css','/social.js','/app.js','/ios.js','/onboarding.js','/auth-preview.jpg','/kinnect-icon.png','/kinnect-icon-192.png','/apple-touch-icon.png','/kinnect-mark.svg','/offline.html'];
 self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(STATIC).then(() => self.skipWaiting()))); });

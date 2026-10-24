@@ -219,14 +219,14 @@ function pickMime() {
   return null;
 }
 
-// Studio quay video kiểu TikTok. onDone(blob, caption) khi bấm Đăng; onLive() khi chọn tab LIVE.
+// Kinnect Studio: quay video và lên sóng. onDone(blob, caption) khi bấm Đăng; onLive() khi chọn tab LIVE.
 const ICON = {
   flip: '<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0113.7-5.6L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 01-13.7 5.6L4 15.5M4 20v-4.5h4.5"/></svg>',
   timer: '<svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>',
   filter: '<svg viewBox="0 0 24 24"><circle cx="9" cy="9" r="5.5"/><circle cx="15" cy="9" r="5.5"/><circle cx="12" cy="15" r="5.5"/></svg>',
   beauty: '<svg viewBox="0 0 24 24"><circle cx="10" cy="8" r="4"/><path d="M3 21a7 7 0 0114 0M18 3l.8 1.7L20.5 5.5l-1.7.8L18 8l-.8-1.7-1.7-.8 1.7-.8z"/></svg>',
 };
-// Hiệu ứng trên vòng quanh nút chụp: sticker bám mặt + một số bộ lọc nhanh
+// Hiệu ứng nhanh: sticker bám mặt + một số bộ lọc
 const CAROUSEL = [
   ["none", "none", "Gốc", "🙂"],
   ["sticker", "glasses", "Kính", "😎"],
@@ -272,25 +272,25 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
     '<div class="tt-progress"><i></i></div>' +
     '<button type="button" class="tt-x" aria-label="Đóng">✕</button>' +
     '<span class="tt-time" aria-live="polite"></span>' +
-    '<button type="button" class="tt-sound" aria-label="Thêm âm thanh">♪ <span>Thêm âm thanh</span></button>' +
+    '<button type="button" class="tt-sound" aria-label="Nhạc nền">🎵 <span>Nhạc nền</span></button>' +
     '<div class="tt-rail">' + rail("flip", "Lật") + rail("timer", "Hẹn giờ") + rail("filter", "Bộ lọc") + rail("beauty", "Làm đẹp") + "</div>" +
     '<div class="tt-sheet" hidden></div>' +
     '<div class="tt-count" hidden></div>' +
-    '<div class="tt-modes" role="group" aria-label="Thời lượng"><button type="button" data-sec="60" class="on">60s</button><button type="button" data-sec="15">15s</button></div>' +
-    '<form class="tt-golive" hidden><input class="tt-title" maxlength="100" placeholder="Thêm tiêu đề…" aria-label="Tiêu đề buổi live" required><button type="submit" class="tt-golive-btn">Phát LIVE</button></form>' +
+    '<div class="tt-modes" role="group" aria-label="Thời lượng"><button type="button" data-sec="60" class="on">60 giây</button><button type="button" data-sec="15">15 giây</button></div>' +
+    '<form class="tt-golive" hidden><input class="tt-title" maxlength="100" placeholder="Bạn muốn trò chuyện về gì?" aria-label="Tiêu đề buổi live" required><button type="submit" class="tt-golive-btn">Lên sóng</button></form>' +
     '<div class="tt-shutter-row"><div class="tt-carousel" role="group" aria-label="Hiệu ứng"></div><button type="button" class="tt-shutter" aria-label="Bắt đầu quay"><span></span></button></div>' +
     "</div>" +
     '<div class="tt-bottom"><label class="tt-gallery" aria-label="Tải video từ máy"><input type="file" accept="video/mp4,video/quicktime"><span>🖼️</span><small>Tải lên</small></label>' +
-    '<div class="tt-tabs" role="group" aria-label="Chế độ"><button type="button" class="tt-mode on" data-mode="camera">CAMERA</button><button type="button" class="tt-mode" data-mode="live">LIVE</button></div><span class="tt-spacer"></span></div>' +
-    '<form class="tt-post" hidden><div class="tt-post-head"><button type="button" class="tt-back" aria-label="Quay lại">‹</button><b>Đăng</b><span></span></div>' +
-    '<div class="tt-post-body"><textarea class="tt-caption" maxlength="500" rows="4" placeholder="Thêm mô tả… #hashtag" aria-label="Chú thích video"></textarea><video class="tt-preview" playsinline loop muted autoplay></video></div>' +
-    '<div class="tt-post-actions"><button type="button" class="tt-retake">Quay lại</button><button type="submit" class="tt-publish">Đăng</button></div></form>';
+    '<div class="tt-tabs" role="group" aria-label="Chế độ"><button type="button" class="tt-mode on" data-mode="camera">Quay video</button><button type="button" class="tt-mode" data-mode="live">Phát trực tiếp</button></div><span class="tt-spacer"></span></div>' +
+    '<form class="tt-post" hidden><div class="tt-post-head"><button type="button" class="tt-back" aria-label="Quay lại">‹</button><b>Chia sẻ video</b><span></span></div>' +
+    '<div class="tt-post-body"><textarea class="tt-caption" maxlength="500" rows="4" placeholder="Viết vài dòng về video…" aria-label="Chú thích video"></textarea><video class="tt-preview" playsinline loop muted autoplay></video></div>' +
+    '<div class="tt-post-actions"><button type="button" class="tt-retake">Quay lại</button><button type="submit" class="tt-publish">Chia sẻ</button></div></form>';
   document.body.append(root);
   document.body.classList.add("studio-open");
   const $ = (s) => root.querySelector(s);
   const mount = () => $(".tt-stage").replaceChildren(fx.canvas);
   mount();
-  // Vòng hiệu ứng quanh nút chụp
+  // Dải hiệu ứng phía trên nút chụp
   const carousel = $(".tt-carousel");
   let picked = "none";
   for (const [kind, id, label, emoji] of CAROUSEL) {
@@ -299,7 +299,7 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
     b.className = "tt-fx" + (id === picked ? " on" : "");
     b.setAttribute("aria-label", label);
     b.setAttribute("aria-pressed", String(id === picked));
-    b.innerHTML = "<span>" + emoji + "</span>";
+    b.innerHTML = "<span>" + emoji + "</span><small>" + label + "</small>";
     b.onclick = () => {
       picked = id;
       if (kind === "none") fx.set({ sticker: "none", filter: "none" });
@@ -321,7 +321,7 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
   function setMusic(url, title) {
     music.pause();
     musicUrl = url || "";
-    soundLabel.textContent = title || "Thêm âm thanh";
+    soundLabel.textContent = title || "Nhạc nền";
     $(".tt-sound").classList.toggle("on", !!url);
     if (url) {
       music.src = url;
@@ -598,7 +598,7 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
     } catch (err) {
       notify(err.message);
       btn.disabled = false;
-      btn.textContent = "Đăng";
+      btn.textContent = "Chia sẻ";
     }
   };
 }

@@ -740,7 +740,7 @@ async function shorts(panel) {
   const heading = node("div", undefined, "view-head");
   heading.append(node("h2", "Video"), node("p", "Video ngắn từ cộng đồng. Muốn trò chuyện trực tiếp? Mở mục Live.", "muted"));
   panel.append(heading);
-  // Thanh tạo video kiểu TikTok: quay bằng camera (có hiệu ứng) hoặc tải video có sẵn.
+  // Thanh tạo video: quay bằng camera (có hiệu ứng) hoặc tải video có sẵn.
   const toBase64 = (blob) =>
     new Promise((resolve, reject) => {
       const r = new FileReader();
@@ -780,14 +780,18 @@ async function shorts(panel) {
       file.value = "";
     }
   };
-  upload.append(rec, pick);
-  panel.append(upload);
+  // Quay/tải video nằm trong Kinnect Studio (nút "+" giữa thanh dưới) nên không lặp nút ở đây.
   const reel = node("div", undefined, "reel");
   panel.append(reel);
   const { shorts: items } = await api("/shorts");
   if (tab === "shorts") document.body.dataset.reel = items.length ? "ready" : "empty";
   if (!items.length) {
-    reel.append(empty("🎬", "Chưa có video nào", "Chọn video MP4 để chia sẻ video đầu tiên của bạn."));
+    const box = empty("🎬", "Chưa có video nào", "Bấm + để quay video đầu tiên.");
+    const go = node("button", "+ Quay video", "empty-cta");
+    go.type = "button";
+    go.onclick = () => openCamera().catch((e) => status(e.message));
+    box.append(go);
+    reel.append(box);
     return;
   }
   const watcher = new IntersectionObserver(
@@ -1497,7 +1501,7 @@ try {
   showAuth();
 }
 
-// Nút "+" giữa thanh dưới: mở camera quay video ngay (như TikTok)
+// Nút "+" giữa thanh dưới: mở Kinnect Studio
 async function openCamera() {
   const toBase64 = (blob) =>
     new Promise((resolve, reject) => {

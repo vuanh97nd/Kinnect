@@ -43,7 +43,7 @@
 #app > nav [data-tab] { font-size: 12px; }
 /* Màu ảnh đại diện mặc định */
 #app .fallback.hue-0, .cover.hue-0, #app .tile-photo.hue-0 { background: linear-gradient(135deg, #8b6dff, #c084fc); }
-#app .fallback.hue-1, .cover.hue-1, #app .tile-photo.hue-1 { background: linear-gradient(135deg, #fe2c55, #ff8fa8); }
+#app .fallback.hue-1, .cover.hue-1, #app .tile-photo.hue-1 { background: linear-gradient(135deg, #ff4f9a, #ff8fa8); }
 #app .fallback.hue-2, .cover.hue-2, #app .tile-photo.hue-2 { background: linear-gradient(135deg, #0ea5e9, #6366f1); }
 #app .fallback.hue-3, .cover.hue-3, #app .tile-photo.hue-3 { background: linear-gradient(135deg, #f59e0b, #ef4444); }
 #app .fallback.hue-4, .cover.hue-4, #app .tile-photo.hue-4 { background: linear-gradient(135deg, #10b981, #0ea5e9); }
@@ -190,7 +190,7 @@ body[data-view="shorts"][data-reel="ready"] .reel .empty-state h3 { color: #fff;
 #app #lobby .hero p { color: var(--muted); font-size: 16px; }
 #app form#create { background: var(--card) !important; border: 0 !important; border-radius: var(--radius); box-shadow: 0 1px 2px #0000001a; padding: 18px; }
 #app form#create label { font-size: 14px; font-weight: 700; color: var(--ink); }
-#app #start { background: linear-gradient(135deg, #6d4aff, #fe2c55) !important; color: #fff !important; min-height: 48px; border-radius: 12px; }
+#app #start { background: linear-gradient(135deg, #6d4aff, #ff4f9a) !important; color: #fff !important; min-height: 48px; border-radius: 12px; }
 #app .discovery input, #app .discovery select { border: 1.5px solid var(--line) !important; background: var(--card) !important; border-radius: 12px; }
 #app #rooms .room { background: var(--card) !important; border: 0 !important; border-radius: var(--radius); box-shadow: 0 1px 2px #0000001a; }
 #app #rooms { color: var(--muted); }

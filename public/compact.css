@@ -1,4 +1,4 @@
-/* Kinnect: bố cục gọn kiểu Facebook/TikTok (nạp sau cùng) */
+/* Kinnect: bố cục gọn (nạp sau cùng) */
 
 /* Huy hiệu thông báo chỉ hiện khi có số */
 #app #notification-bell #unread:empty { display: none !important; }
@@ -119,7 +119,7 @@
   #app #live-panel { padding-left: 12px; padding-right: 12px; }
 }
 
-/* ===== Tối giản kiểu TikTok/HeeSay: ít chữ, nhiều biểu tượng ===== */
+/* ===== Tối giản: ít chữ, nhiều biểu tượng ===== */
 /* Bỏ các dòng mô tả dưới tiêu đề */
 #app .view-head p, #app #lobby .hero p, #app .section-head p { display: none !important; }
 #app .view-head { margin-bottom: 8px; }
@@ -161,3 +161,21 @@
 #app>nav #create-post{display:flex!important}
 #app .live-tab{font-size:0;width:40px;padding:0;justify-content:center}
 #app .live-tab .tab-icon{width:22px;height:22px}
+#app .empty-cta{margin-top:14px;min-height:44px;padding:0 22px;border-radius:999px;background:linear-gradient(135deg,#7c5cff,#ff4f9a)!important;color:#fff!important;font-weight:800;font-size:15px}
+/* ===== Tab Video: mỗi video chiếm trọn màn hình, nút nằm trên video ===== */
+body[data-view="shorts"][data-reel="ready"] .view-shorts > .view-head { display: none; }
+body[data-view="shorts"][data-reel="ready"] #social-panel { padding: 0 !important; max-width: 520px; }
+body[data-view="shorts"][data-reel="ready"] .reel {
+  height: calc(100dvh - 57px - var(--nav-h, 64px) - env(safe-area-inset-bottom));
+  margin: 0; border-radius: 0; overflow-y: auto; scroll-snap-type: y mandatory;
+}
+body[data-view="shorts"][data-reel="ready"] .reel-item { position: relative; height: 100%; min-height: 100%; scroll-snap-align: start; overflow: hidden; background: #000; }
+body[data-view="shorts"][data-reel="ready"] .reel-item video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+body[data-view="shorts"][data-reel="ready"] .reel-side { position: absolute; right: 10px; bottom: 90px; top: auto; z-index: 2; display: flex; flex-direction: column; gap: 14px; align-items: center; }
+body[data-view="shorts"][data-reel="ready"] .reel-meta { position: absolute; left: 14px; right: 76px; bottom: 18px; z-index: 2; color: #fff; text-shadow: 0 1px 3px #000a; }
+#app .reel-btn { width: 48px !important; min-height: 48px !important; }
+@media (min-width: 1000px) {
+  body[data-view="shorts"][data-reel="ready"] .reel { height: calc(100dvh - 90px); border-radius: 18px; }
+}
+body[data-view="shorts"][data-reel="ready"] .reel-item video{max-height:none!important;height:100%!important;border-radius:0!important}
+body[data-view="shorts"][data-reel="ready"] .view-shorts{margin:0!important;padding:0!important}
