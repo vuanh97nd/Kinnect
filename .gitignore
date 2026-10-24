@@ -1,0 +1,16 @@
+node_modules/
+.env
+*.log
+android/build/
+android/debug.keystore
+dist/
+.env.*
+!.env.example
+*.keystore
+*.jks
+*.p12
+*.pem
+*.key
+local.properties
+.gradle/
+.idea/
