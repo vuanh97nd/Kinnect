@@ -876,3 +876,42 @@ test("notification delivery is realtime and read receipts affect only the recipi
   assert.ok((await as(app,a,"/notifications")).body.notifications.filter(n=>n.kind==="message").every(n=>n.seen));
   ws.terminate();
 });
+
+test("music library: members list tracks, only admins upload or delete, rights confirmation required", async () => {
+  const { mkdtemp } = await import("node:fs/promises");
+  const dir = await mkdtemp(join(tmpdir(), "kinnect-music-"));
+  const prev = process.env.MUSIC_DIR;
+  process.env.MUSIC_DIR = dir;
+  const app = await start(":memory:");
+  try {
+    const member = await register(app, "nghe_nhac");
+    const admin = await register(app, "quan_ly_nhac");
+    app.social.db.prepare("UPDATE users SET role='admin' WHERE id=?").run(admin.id);
+    const mp3 = "data:audio/mpeg;base64," + Buffer.concat([Buffer.from("ID3"), Buffer.alloc(64)]).toString("base64");
+    const call = (cookie, method, body) =>
+      fetch(app.url + "/api/music", {
+        method,
+        headers: { Cookie: cookie, ...(body ? { "Content-Type": "application/json" } : {}) },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+    assert.equal((await fetch(app.url + "/api/music")).status, 401);
+    const track = { data: mp3, title: "Bai thu", artist: "Ban", license: "CC0", rights: true };
+    assert.equal((await call(member.cookie, "POST", track)).status, 403);
+    assert.equal((await call(admin.cookie, "POST", { ...track, rights: false })).status, 400);
+    const up = await call(admin.cookie, "POST", track);
+    assert.equal(up.status, 201);
+    const { file } = await up.json();
+    const list = await (await call(member.cookie, "GET")).json();
+    assert.deepEqual(list.tracks.map((t) => [t.file, t.artist, t.license]), [[file, "Ban", "CC0"]]);
+    assert.equal((await fetch(app.url + list.tracks[0].url, { headers: { Cookie: member.cookie } })).status, 200);
+    assert.equal((await fetch(app.url + "/music/..%2Fserver.js", { headers: { Cookie: member.cookie } })).status, 404);
+    assert.equal((await call(member.cookie, "DELETE", { file })).status, 403);
+    assert.equal((await call(admin.cookie, "DELETE", { file })).status, 200);
+    assert.equal((await (await call(member.cookie, "GET")).json()).tracks.length, 0);
+  } finally {
+    await app.stop();
+    if (prev === undefined) delete process.env.MUSIC_DIR;
+    else process.env.MUSIC_DIR = prev;
+    await rm(dir, { recursive: true, force: true });
+  }
+});

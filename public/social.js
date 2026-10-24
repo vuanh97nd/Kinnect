@@ -1396,14 +1396,10 @@ async function notifications(panel) {
   await refreshUnread();
 }
 async function adminPanel(panel) {
-  panel.append(
-    node("h2", "Quản trị Kinnect"),
-    node(
-      "p",
-      "Báo cáo cần được xem xét thủ công. Chỉ xử lý nội dung có bằng chứng.",
-      "muted",
-    ),
-  );
+  const head = node("div", undefined, "view-head");
+  head.append(node("h2", "Quản trị"));
+  panel.append(head);
+  await musicAdmin(panel);
   const { requests } = await api("/admin/password-resets");
   const open = requests.filter((r) => r.status === "open");
   panel.append(node("h3", "Yêu cầu quên mật khẩu" + (open.length ? " (" + open.length + ")" : "")));
@@ -1474,15 +1470,17 @@ async function adminPanel(panel) {
     panel.append(card);
   }
   const { users } = await api("/admin/users");
-  panel.append(node("h3", "Tài khoản gần đây"));
+  panel.append(node("h3", "Tài khoản gần đây", "section-title"));
+  const userList = node("div", undefined, "social-card list admin-list");
+  panel.append(userList);
   for (const u of users) {
-    const row = node("article", undefined, "social-card");
-    row.append(
-      node(
-        "strong",
-        u.username + " · " + u.role + (u.suspended ? " · Đã đình chỉ" : ""),
-      ),
+    const row = node("div", undefined, "admin-row");
+    const who = node("div", undefined, "row-text");
+    who.append(
+      node("b", "@" + u.username),
+      node("span", (u.role === "admin" ? "Quản trị viên" : "Thành viên") + (u.suspended ? " · Đã đình chỉ" : ""), "muted"),
     );
+    row.append(avatar({ id: u.id, name: u.username }), who);
     if (u.role !== "admin")
       row.append(
         action(u.suspended ? "Khôi phục" : "Đình chỉ", async () => {
@@ -1492,10 +1490,124 @@ async function adminPanel(panel) {
             target: u.id,
           });
           await navigate("admin");
-        }),
+        }, u.suspended ? "secondary" : "danger"),
       );
-    panel.append(row);
+    userList.append(row);
   }
+}
+// Quản trị: thư viện nhạc dùng chung trong Kinnect Studio
+async function musicAdmin(panel) {
+  panel.append(node("h3", "Thư viện nhạc", "section-title"));
+  const box = node("div", undefined, "social-card list admin-list");
+  panel.append(box);
+  let tracks = [];
+  try {
+    tracks = (await (await fetch("/api/music", { credentials: "same-origin" })).json()).tracks || [];
+  } catch {}
+  const player = new Audio();
+  if (!tracks.length) box.append(node("p", "Chưa có bài nào.", "muted admin-empty"));
+  for (const t of tracks) {
+    const row = node("div", undefined, "admin-row");
+    const play = node("button", "▶", "icon-btn");
+    play.type = "button";
+    play.setAttribute("aria-label", "Nghe thử " + t.title);
+    play.onclick = () => {
+      if (!player.paused && player.dataset.file === t.file) {
+        player.pause();
+        play.textContent = "▶";
+        return;
+      }
+      for (const b of box.querySelectorAll(".icon-btn")) b.textContent = "▶";
+      player.src = t.url;
+      player.dataset.file = t.file;
+      player.play().catch(() => {});
+      play.textContent = "⏸";
+    };
+    const text = node("div", undefined, "row-text");
+    text.append(node("b", t.title), node("span", [t.artist, t.license].filter(Boolean).join(" · ") || "Chưa có thông tin giấy phép", "muted"));
+    const del = action("Xoá", async () => {
+      if (!confirm("Xoá bài “" + t.title + "” khỏi thư viện?")) return;
+      const r = await fetch("/api/music", { method: "DELETE", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ file: t.file }) });
+      if (!r.ok) throw Error((await r.json()).error || "Không xoá được.");
+      player.pause();
+      status("Đã xoá bài nhạc.");
+      await navigate("admin");
+    }, "danger");
+    row.append(play, text, del);
+    box.append(row);
+  }
+  // Tải bài mới
+  const form = node("form", undefined, "social-card music-upload");
+  form.append(node("b", "Thêm bài vào thư viện"));
+  const pick = node("label", undefined, "btn-like secondary");
+  const file = node("input");
+  file.type = "file";
+  file.accept = "audio/mpeg,audio/mp4,.mp3,.m4a";
+  file.required = true;
+  file.setAttribute("aria-label", "Chọn file MP3 hoặc M4A, tối đa 15 MB");
+  const fileText = node("span", "🎵 Chọn file MP3/M4A");
+  pick.append(file, fileText);
+  const title = node("input");
+  title.placeholder = "Tên bài";
+  title.required = true;
+  title.maxLength = 80;
+  title.setAttribute("aria-label", "Tên bài");
+  const artist = node("input");
+  artist.placeholder = "Nghệ sĩ";
+  artist.required = true;
+  artist.maxLength = 60;
+  artist.setAttribute("aria-label", "Nghệ sĩ");
+  const license = node("input");
+  license.placeholder = "Giấy phép (vd: CC0, CC BY 4.0, tự sáng tác)";
+  license.required = true;
+  license.maxLength = 80;
+  license.setAttribute("aria-label", "Giấy phép");
+  const source = node("input");
+  source.placeholder = "Link nguồn (không bắt buộc)";
+  source.maxLength = 300;
+  source.setAttribute("aria-label", "Link nguồn");
+  const rightsLabel = node("label", undefined, "check");
+  const rights = node("input");
+  rights.type = "checkbox";
+  rights.required = true;
+  rightsLabel.append(rights, node("span", "Tôi có quyền dùng và chia sẻ bài này trên Kinnect."));
+  const send = node("button", "Tải lên");
+  form.append(pick, title, artist, license, source, rightsLabel, send);
+  file.onchange = () => {
+    const f = file.files[0];
+    fileText.textContent = f ? "✓ " + f.name : "🎵 Chọn file MP3/M4A";
+    if (f && !title.value) title.value = f.name.replace(/\.[^.]+$/, "");
+  };
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const f = file.files[0];
+    if (!f) return status("Chọn file nhạc.");
+    if (f.size > 15 * 1024 * 1024) return status("File nhạc tối đa 15 MB.");
+    send.disabled = true;
+    send.textContent = "Đang tải…";
+    try {
+      const data = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result).replace(/^data:[^;]*;/, /\.m4a$/i.test(f.name) ? "data:audio/mp4;" : "data:audio/mpeg;"));
+        r.onerror = reject;
+        r.readAsDataURL(f);
+      });
+      const r = await fetch("/api/music", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data, title: title.value, artist: artist.value, license: license.value, source: source.value, rights: rights.checked }),
+      });
+      if (!r.ok) throw Error((await r.json()).error || "Không tải lên được.");
+      status("Đã thêm bài vào thư viện nhạc.");
+      await navigate("admin");
+    } catch (err) {
+      status(err.message);
+      send.disabled = false;
+      send.textContent = "Tải lên";
+    }
+  };
+  panel.append(form);
 }
 try {
   me = (await api("/me")).user;

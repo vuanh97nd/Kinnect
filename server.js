@@ -3,7 +3,7 @@ import { mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { openSocial } from "./lib/social.js";
 import { loadMailEnv, mailConfigured, sendMail } from "./lib/mailer.js";
-import { readFile, readdir, stat } from "node:fs/promises";
+import { readFile, readdir, stat, writeFile, unlink } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { randomUUID } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
@@ -53,7 +53,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl } = {}) {
   }
   const server = http.createServer(async (req, res) => {
     const path = new URL(req.url, "http://localhost").pathname;
-    if (path.startsWith("/api/")) {
+    if (path.startsWith("/api/") && path !== "/api/music") {
       res.once("finish", () => enforceAccess());
       return social.api(req, res, path);
     }
@@ -64,20 +64,87 @@ export function createApp({ dbPath = ":memory:", fetchImpl } = {}) {
         return res.end(JSON.stringify({ error: "Vui lòng đăng nhập." }));
       }
       const dir = resolve(process.env.MUSIC_DIR || "music");
-      if (path === "/api/music") {
+      const me = social.authenticate(req);
+      const creditsFile = resolve(dir, "credits.json");
+      const readCredits = async () => {
+        try {
+          return JSON.parse(await readFile(creditsFile, "utf8"));
+        } catch {
+          return {};
+        }
+      };
+      const sendJson = (status, data) => {
+        res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+        res.end(JSON.stringify(data));
+      };
+      if (path === "/api/music" && req.method === "GET") {
         let names = [];
         try {
           names = (await readdir(dir)).filter((n) => /\.(mp3|m4a|aac)$/i.test(n)).sort().slice(0, 300);
         } catch {}
-        res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
-        return res.end(
-          JSON.stringify({
-            tracks: names.map((n) => ({
-              title: n.replace(/\.[^.]+$/, "").replace(/[_]+/g, " ").replace(/\s*\[[^\]]*\]\s*$/, "").trim(),
-              url: "/music/" + encodeURIComponent(n),
-            })),
-          }),
-        );
+        const credits = await readCredits();
+        return sendJson(200, {
+          tracks: names.map((n) => ({
+            file: n,
+            title: credits[n]?.title || n.replace(/\.[^.]+$/, "").replace(/[_]+/g, " ").replace(/\s*\[[^\]]*\]\s*$/, "").trim(),
+            artist: credits[n]?.artist || "",
+            license: credits[n]?.license || "",
+            source: credits[n]?.source || "",
+            url: "/music/" + encodeURIComponent(n),
+          })),
+        });
+      }
+      // Quản trị viên tải nhạc lên / xoá nhạc khỏi thư viện chung
+      if (path === "/api/music" && (req.method === "POST" || req.method === "DELETE")) {
+        if (me.role !== "admin") return sendJson(403, { error: "Chỉ quản trị viên được quản lý thư viện nhạc." });
+        if (req.headers["sec-fetch-site"] === "cross-site" || !(req.headers["content-type"] || "").startsWith("application/json"))
+          return sendJson(403, { error: "Yêu cầu không hợp lệ." });
+        let size = 0;
+        const chunks = [];
+        for await (const chunk of req) {
+          size += chunk.length;
+          if (size > 21 * 1024 * 1024) return sendJson(413, { error: "File nhạc tối đa 15 MB." });
+          chunks.push(chunk);
+        }
+        let b;
+        try {
+          b = JSON.parse(Buffer.concat(chunks).toString() || "{}");
+        } catch {
+          return sendJson(400, { error: "Dữ liệu không hợp lệ." });
+        }
+        const credits = await readCredits();
+        if (req.method === "DELETE") {
+          const name = typeof b.file === "string" ? b.file : "";
+          if (!/^[^/\\]+\.(mp3|m4a|aac)$/i.test(name) || name.startsWith(".")) return sendJson(400, { error: "Tên file không hợp lệ." });
+          try {
+            await unlink(resolve(dir, name));
+          } catch {}
+          delete credits[name];
+          await writeFile(creditsFile, JSON.stringify(credits, null, 2));
+          return sendJson(200, { ok: true });
+        }
+        const clean = (v, n) => (typeof v === "string" ? v.replace(/[\u0000-\u001f]/g, "").trim().slice(0, n) : "");
+        const title = clean(b.title, 80), artist = clean(b.artist, 60), license = clean(b.license, 80), source = clean(b.source, 300);
+        if (!title || !artist || !license) return sendJson(400, { error: "Nhập tên bài, nghệ sĩ và giấy phép." });
+        if (b.rights !== true) return sendJson(400, { error: "Cần xác nhận bạn có quyền dùng và chia sẻ bài này." });
+        const m = typeof b.data === "string" && b.data.match(/^data:audio\/(mpeg|mp3|mp4|x-m4a|aac);base64,([A-Za-z0-9+/=]+)$/);
+        if (!m) return sendJson(400, { error: "Chọn file MP3 hoặc M4A." });
+        const bytes = Buffer.from(m[2], "base64");
+        if (bytes.length > 15 * 1024 * 1024) return sendJson(413, { error: "File nhạc tối đa 15 MB." });
+        const isMp3 = bytes.slice(0, 3).toString("latin1") === "ID3" || (bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0);
+        const isMp4 = bytes.slice(4, 8).toString("latin1") === "ftyp";
+        if (!isMp3 && !isMp4) return sendJson(400, { error: "File không phải MP3/M4A hợp lệ." });
+        const base = (artist + " - " + title).replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 120);
+        let name = base + (isMp3 ? ".mp3" : ".m4a");
+        for (let i = 2; names_exist(name); i++) name = base + " (" + i + ")" + (isMp3 ? ".mp3" : ".m4a");
+        function names_exist(n) {
+          return Object.prototype.hasOwnProperty.call(credits, n);
+        }
+        mkdirSync(dir, { recursive: true });
+        await writeFile(resolve(dir, name), bytes);
+        credits[name] = { title, artist, license, source, addedBy: me.username, added: new Date().toISOString() };
+        await writeFile(creditsFile, JSON.stringify(credits, null, 2));
+        return sendJson(201, { ok: true, file: name });
       }
       let name;
       try {

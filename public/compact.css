@@ -188,3 +188,22 @@ body[data-view="shorts"][data-reel="ready"] .view-shorts{margin:0!important;padd
 #app .me-panel [hidden]{display:none!important}
 #app .tile-chip{left:auto!important;right:52px;top:8px;font-size:12px}
 #app .tile-photo .profile-badge,#app .tile-photo .badge-new{top:8px;left:8px}
+/* Trang quản trị: hàng đều, nút căn phải */
+#app .admin-list { padding: 4px 6px !important; }
+#app .admin-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; min-height: 56px; border-bottom: 1px solid var(--line); }
+#app .admin-row:last-child { border-bottom: 0; }
+#app .admin-row .avatar { width: 40px; height: 40px; flex: 0 0 40px; font-size: 16px; }
+#app .admin-row .row-text { flex: 1; min-width: 0; }
+#app .admin-row .row-text b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#app .admin-row .row-text span { font-size: 13px; }
+#app .admin-row > button:last-child { flex: 0 0 auto; min-height: 36px; padding: 0 14px; border-radius: 999px; font-size: 13.5px; margin: 0; }
+#app .admin-row .icon-btn { flex: 0 0 40px; background: var(--soft) !important; font-size: 15px; }
+#app .admin-row .danger { background: #ff4f9a1f !important; color: #e0306f !important; }
+#app .admin-empty { padding: 12px; margin: 0; }
+#app .music-upload { display: grid; gap: 10px; }
+#app .music-upload input:not([type="checkbox"]):not([type="file"]) { min-height: 44px; border-radius: 12px; padding: 0 12px; }
+#app .music-upload .btn-like { justify-content: center; }
+#app .music-upload .check { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; font-weight: 400; }
+#app .music-upload .check input { width: 20px; height: 20px; min-height: 20px; flex: 0 0 20px; margin-top: 1px; }
+#app .view-admin > .social-card:not(.list) { margin-bottom: 8px; }
+#app .view-admin h3:not(.section-title) { font-size: 16px; }

@@ -24,3 +24,4 @@ mail.env
 oauth.env
 /music/*
 !/music/README.txt
+!/music/credits.json

@@ -370,7 +370,7 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
     try {
       const r = await fetch("/api/music", { credentials: "same-origin" });
       const { tracks = [] } = r.ok ? await r.json() : {};
-      for (const t of tracks) item("♪ " + t.title, musicUrl === t.url, () => setMusic(t.url, t.title));
+      for (const t of tracks) item("♪ " + t.title + (t.artist ? " · " + t.artist : ""), musicUrl === t.url, () => setMusic(t.url, t.title));
       if (!tracks.length) {
         const n = document.createElement("p");
         n.className = "fx-note";
