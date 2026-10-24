@@ -114,9 +114,9 @@ npm run test:e2e
 
 Không vô hiệu hóa chính sách mạng để làm test đạt. Android đã thêm trình chọn ảnh hệ thống cho avatar, nhưng picker/quyền/lifecycle vẫn cần kiểm thử trên thiết bị thật.
 
-## Android 0.2.1 — máy chủ mặc định và GitHub Releases
+## Android 0.2.2 — máy chủ mặc định và GitHub Releases
 
-Tên ứng dụng vẫn **Kinnect**. APK 0.2.1/versionCode 3 mở ngay backend tại `https://estimated-drink-beta-alerts.trycloudflare.com`, hiển thị đăng nhập/đăng ký trên backend 0.2. Đây là **Quick Tunnel tạm thời**, không phải hostname cố định. URL tùy chỉnh đã lưu được ưu tiên. Vào **Cài đặt → Đổi máy chủ** để cập nhật tunnel hoặc dùng lại URL mặc định; không cần sửa mã hoặc build lại khi đổi URL qua cài đặt.
+Tên ứng dụng vẫn **Kinnect**. APK 0.2.2/versionCode 4 mở ngay backend tại `https://estimated-drink-beta-alerts.trycloudflare.com`, hiển thị đăng nhập/đăng ký trên backend 0.2. Đây là **Quick Tunnel tạm thời**, không phải hostname cố định. URL tùy chỉnh đã lưu được ưu tiên. Vào **Cài đặt → Đổi máy chủ** để cập nhật tunnel hoặc dùng lại URL mặc định; không cần sửa mã hoặc build lại khi đổi URL qua cài đặt.
 
 Source của URL mặc định và bộ kiểm tra HTTPS nằm ở `android/app/src/main/java/app/kinnect/live/ServerConfig.java`. Không chứa token hoặc mật khẩu. Quyền camera/micro vẫn bị giới hạn theo origin đã chọn. Khi trở lại app từ nền, app tự mở lại backend, không quay về màn hình nhập máy chủ. Nếu backend/tunnel tắt, menu Cài đặt vẫn có thể dùng để đổi địa chỉ.
 
@@ -132,4 +132,4 @@ Cần Java 21, curl, unzip, zip và sha256sum; `KINNECT_TOOLS` trỏ tới nơi 
 
 Workflow `.github/workflows/android-release.yml` phát hành prerelease khi push tag phiên bản: tải toolchain có checksum, kiểm thử URL, build APK, kiểm tra chữ ký rồi upload APK và SHA-256 lên Releases. Actions được pin SHA. CI dùng GITHUB_TOKEN tự cấp, không đặt token vào source. Khóa debug tạo tạm trên runner, không được upload/commit; mỗi lần build sạch có thể có chữ ký khác, xem lưu ý cài cập nhật trong release notes. APK không dùng khóa Play Store.
 
-Xem [ghi chú bản 0.2.1](docs/releases/v0.2.1.md). Không coi việc đặt URL mặc định là bằng chứng video Internet hoạt động: TURN/SFU vẫn chưa có. Chưa kiểm thử native trên Android thật; /health và UI của tunnel được chủ máy chủ Windows xác nhận, môi trường cloud này không được phép truy cập miền tunnel để kiểm tra lại.
+Xem [ghi chú bản 0.2.2](docs/releases/v0.2.2.md). Không coi việc đặt URL mặc định là bằng chứng video Internet hoạt động: TURN/SFU vẫn chưa có. Chưa kiểm thử native trên Android thật; /health và UI của tunnel được chủ máy chủ Windows xác nhận, môi trường cloud này không được phép truy cập miền tunnel để kiểm tra lại.
