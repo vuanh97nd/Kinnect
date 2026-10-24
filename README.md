@@ -41,7 +41,7 @@ Tự tạo/nâng schema bằng cách thêm cột/bảng, giữ users/password/se
 
 ## Kết nối điện thoại
 
-Máy chủ mặc định của APK vẫn là `https://estimated-drink-beta-alerts.trycloudflare.com`. Đây là **Quick Tunnel tạm thời**, không phải hostname cố định. Máy Windows và Node/Tunnel phải hoạt động, không sleep. Cài cloudflared theo tài liệu Cloudflare, chạy ở terminal khác:
+Máy chủ mặc định của APK vẫn là `https://app.kinnect.io.vn`. Đây là **Quick Tunnel tạm thời**, không phải hostname cố định. Máy Windows và Node/Tunnel phải hoạt động, không sleep. Cài cloudflared theo tài liệu Cloudflare, chạy ở terminal khác:
 
 ```powershell
 cloudflared tunnel --url http://localhost:3000
@@ -92,7 +92,7 @@ Video lưu BLOB SQLite phù hợp thử nghiệm nhỏ; chưa có CDN/chuyển m
 
 ## Các chức năng xã hội và live
 
-Hồ sơ/bio/sở thích/avatar <=1 MB; theo dõi, DM mặc định cùng theo dõi; bảng tin văn bản public cho thành viên hoặc followers; chặn/báo cáo; thông báo trong app. DM polling mỗi 4 giây khi mở chat, chưa push Android. Chưa có khôi phục password/xóa-xuất tài khoản/album hoặc bình luận bảng tin.
+Hồ sơ/bio/sở thích/avatar <=1 MB; theo dõi, DM mặc định cùng theo dõi; bảng tin văn bản public cho thành viên hoặc followers; chặn/báo cáo; thông báo trong app. DM polling mỗi 4 giây khi mở chat, chưa push Android. Web có thích/bình luận bài viết, thống kê hồ sơ, xem bài theo người đăng và tin nhắn cuối trong hộp thư. Khôi phục mật khẩu qua yêu cầu được quản trị viên xử lý; Google/Facebook cần cấu hình oauth.env. Chưa có xóa/xuất tài khoản hoặc album.
 
 Live còn module WebView/WebRTC, tối đa 6 viewer, camera dừng khi ra nền. Có ba quà **miễn phí thử nghiệm**, giới hạn 5 quà/phút; lưu sự kiện và count, không có xu mua bằng tiền, thanh toán hoặc rút tiền. Video Internet chưa có TURN/SFU, không tuyên bố đã hoạt động.
 

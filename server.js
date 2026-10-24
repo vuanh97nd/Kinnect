@@ -2,13 +2,38 @@ import http from "node:http";
 import { mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { openSocial } from "./lib/social.js";
+import { loadMailEnv, mailConfigured, sendMail } from "./lib/mailer.js";
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { fileURLToPath } from "node:url";
 
-export function createApp({ dbPath = ":memory:" } = {}) {
-  const social = openSocial(dbPath);
+export function createApp({ dbPath = ":memory:", fetchImpl } = {}) {
+  loadMailEnv();
+  loadMailEnv("oauth.env");
+  const social = openSocial(dbPath, {
+    fetchImpl,
+    // Báo về email quản trị khi có người gửi yêu cầu quên mật khẩu.
+    onResetRequest: (r) => {
+      const when = new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
+      console.log(`[quen-mat-khau] ${when} @${r.username} (${r.exists ? "có tài khoản" : "không có tài khoản"})`);
+      if (!mailConfigured()) return;
+      sendMail({
+        subject: `Kinnect: yêu cầu quên mật khẩu @${r.username}`,
+        text: [
+          "Có yêu cầu đặt lại mật khẩu trên Kinnect.",
+          "",
+          `Tên đăng nhập: @${r.username}${r.exists ? "" : " (KHÔNG có tài khoản này)"}`,
+          `Liên hệ: ${r.contact}`,
+          `Ghi chú: ${r.note || "(không có)"}`,
+          `Thời gian: ${when}`,
+          "",
+          "Xử lý: đăng nhập https://app.kinnect.io.vn bằng tài khoản quản trị → tab Quản trị → Yêu cầu quên mật khẩu → Cấp mật khẩu tạm,",
+          "rồi gửi mật khẩu tạm cho người dùng qua thông tin liên hệ ở trên. Hãy xác minh đúng chủ tài khoản trước khi gửi.",
+        ].join("\n"),
+      }).catch((e) => console.error("[quen-mat-khau] Không gửi được email:", e.message));
+    },
+  });
   const rooms = new Map();
   const server = http.createServer(async (req, res) => {
     const path = new URL(req.url, "http://localhost").pathname;
@@ -16,11 +41,40 @@ export function createApp({ dbPath = ":memory:" } = {}) {
       res.once("finish", () => enforceAccess());
       return social.api(req, res, path);
     }
+    if (path === "/website" || path.startsWith("/website/")) {
+      // Website giới thiệu đã chuyển sang kinnect.io.vn.
+      const page = path.replace(/^\/website\/?/, "").replace(/\.html$/, "").replace(/^index$/, "");
+      res.writeHead(301, { Location: "https://kinnect.io.vn/" + page });
+      return res.end();
+    }
     if (path === "/health") {
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(JSON.stringify({ ok: true, version: "0.3.0" }));
     }
     const files = {
+      "/website/support.html": ["website/support.html", "text/html"],
+      "/website/privacy.html": ["website/privacy.html", "text/html"],
+      "/website/community.html": ["website/community.html", "text/html"],
+      "/kinnect-mark.svg": ["kinnect-mark.svg", "image/svg+xml"],
+      "/kinnect-icon-192.png": ["kinnect-icon-192.png", "image/png"],
+      "/apple-touch-icon.png": ["apple-touch-icon.png", "image/png"],
+      "/website/apple-touch-icon.png": ["website/apple-touch-icon.png", "image/png"],
+      "/website/": ["website/index.html", "text/html"],
+      "/website/index.html": ["website/index.html", "text/html"],
+      "/website/style.css": ["website/style.css", "text/css"],
+      "/website/app.js": ["website/app.js", "text/javascript"],
+      "/website/mark.svg": ["website/mark.svg", "image/svg+xml"],
+      "/website/portrait.svg": ["website/portrait.svg", "image/svg+xml"],
+      "/website/qr-app.svg": ["website/qr-app.svg", "image/svg+xml"],
+      "/ios.css": ["ios.css", "text/css"],
+      "/auth-preview.jpg": ["auth-preview.jpg", "image/jpeg"],
+      "/theme.css": ["theme.css", "text/css"],
+      "/app-ui.css": ["app-ui.css", "text/css"],
+      "/ios.js": ["ios.js", "text/javascript"],
+      "/onboarding.js": ["onboarding.js", "text/javascript"],
+      "/sw.js": ["sw.js", "text/javascript"],
+      "/manifest.webmanifest": ["manifest.webmanifest", "application/manifest+json"],
+      "/offline.html": ["offline.html", "text/html"],
       "/social.js": ["social.js", "text/javascript"],
       "/social.css": ["social.css", "text/css"],
       "/kinnect-icon.png": ["kinnect-icon.png", "image/png"],
@@ -36,10 +90,11 @@ export function createApp({ dbPath = ":memory:" } = {}) {
       const [file, type] = files[path];
       res.writeHead(200, {
         "Content-Type": type + "; charset=utf-8",
+        "Cache-Control": "no-cache",
         "X-Content-Type-Options": "nosniff",
         "Referrer-Policy": "no-referrer",
         "Content-Security-Policy":
-          "default-src 'self'; connect-src 'self' ws: wss:; media-src 'self' blob:; style-src 'self'; script-src 'self'",
+          "default-src 'self'; connect-src 'self' ws: wss:; media-src 'self' blob:; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self'",
       });
       res.end(await readFile(new URL("./public/" + file, import.meta.url)));
     } catch {

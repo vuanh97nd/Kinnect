@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 async function signUp(page, name) {
   await page.goto("/");
+  await page.getByRole("button", { name: "Bỏ qua", exact: true }).click();
   await page
     .getByRole("button", { name: "Tạo tài khoản", exact: true })
     .click();
@@ -27,6 +28,7 @@ test("mobile social journey: register, profile, matching, mutual chat, post, not
   await signUp(a, "alice_browser");
   await signUp(b, "bruno_browser");
   await a.getByRole("button", { name: "Hồ sơ", exact: true }).click();
+  await a.getByRole("button", { name: "Sửa hồ sơ", exact: true }).click();
   await a
     .getByLabel("Giới thiệu", { exact: true })
     .fill("Một người bạn thích cà phê.");
@@ -34,6 +36,7 @@ test("mobile social journey: register, profile, matching, mutual chat, post, not
   await a.getByRole("button", { name: "Lưu hồ sơ", exact: true }).click();
   await expect(a.locator("#notice")).toHaveText("Đã lưu hồ sơ.");
   await b.getByRole("button", { name: "Hồ sơ", exact: true }).click();
+  await b.getByRole("button", { name: "Sửa hồ sơ", exact: true }).click();
   await b.getByLabel("Sở thích, phân cách bằng dấu phẩy").fill("coffee");
   await b.getByRole("button", { name: "Lưu hồ sơ", exact: true }).click();
   await expect(b.locator("#notice")).toHaveText("Đã lưu hồ sơ.");
@@ -57,7 +60,7 @@ test("mobile social journey: register, profile, matching, mutual chat, post, not
     a.getByText("Xin chào từ Kinnect", { exact: true }),
   ).toBeVisible();
   await b.getByRole("button", { name: "Tin nhắn", exact: true }).click();
-  await b.getByRole("button", { name: "Mở trò chuyện", exact: true }).click();
+  await b.locator(".inbox-row").first().click();
   await expect(
     b.getByText("Xin chào từ Kinnect", { exact: true }),
   ).toBeVisible();
@@ -79,6 +82,7 @@ test("mobile social journey: register, profile, matching, mutual chat, post, not
   ).toBeVisible();
   await b.getByRole("button", { name: "Khám phá", exact: true }).click();
   b.once("dialog", (d) => d.accept());
+  await b.locator(".person-tile .more summary").first().click();
   await b.getByRole("button", { name: "Chặn", exact: true }).click();
   await expect(
     b.getByRole("button", { name: "Nhắn tin", exact: true }),
@@ -95,7 +99,8 @@ test("mobile social journey: register, profile, matching, mutual chat, post, not
   await expect(
     a.getByRole("button", { name: "Bắt đầu livestream", exact: true }),
   ).toBeVisible();
-  await a.getByRole("button", { name: "Đăng xuất", exact: true }).click();
+  await a.getByRole("button", { name: "Tài khoản", exact: true }).click();
+  await a.getByRole("menuitem", { name: "Đăng xuất", exact: true }).click();
   await expect(a.locator("#auth")).toBeVisible();
   expect(errors).toEqual([]);
   await aContext.close();

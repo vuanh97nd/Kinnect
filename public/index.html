@@ -2,79 +2,180 @@
 <html lang="vi">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Kinnect — Kết nối bằng chính bạn</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>Kinnect — Kết nối đúng gu</title>
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Kinnect" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3" />
+    <link rel="icon" href="/kinnect-mark.svg?v=3" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="stylesheet" href="/style.css" />
     <link rel="stylesheet" href="/social.css" />
+    <link rel="stylesheet" href="/ios.css" />
+    <link rel="stylesheet" href="/theme.css?v=1" />
+    <link rel="stylesheet" href="/app-ui.css?v=1" />
   </head>
   <body>
-    <section id="auth" class="auth-shell">
-      <img src="/kinnect-icon.png" class="auth-logo" alt="Kinnect" />
-      <p class="eyebrow">KHÔNG GIAN CỦA CHÚNG MÌNH</p>
-      <h1>Kết nối bằng chính bạn.</h1>
-      <p class="muted">
-        Bạn bè, những câu chuyện và khoảnh khắc chung. Kết nối tôn trọng, chia
-        sẻ có đồng thuận.
-      </p>
-      <div class="auth-tabs">
-        <button id="login-mode">Đăng nhập</button
-        ><button id="register-mode" class="secondary">Tạo tài khoản</button>
+    <section id="auth" class="auth-shell" hidden>
+      <aside class="auth-brand" aria-hidden="true">
+        <div class="auth-brand-top"><img src="/kinnect-icon.png?v=3" alt="" width="40" height="40" /><b>Kinnect</b></div>
+        <h2>Kết nối đúng gu.<br />Sống đúng mình.</h2>
+        <ul>
+          <li>Bảng tin và video ngắn của bạn bè</li>
+          <li>Gặp người cùng sở thích, quanh đây</li>
+          <li>Nhắn tin riêng, chặn và báo cáo dễ dàng</li>
+        </ul>
+        <div class="auth-phone"><img src="/auth-preview.jpg?v=1" alt="" /></div>
+      </aside>
+      <div class="auth-panel">
+        <img src="/kinnect-icon.png?v=3" class="auth-logo" alt="Kinnect" width="56" height="56" />
+        <h1 id="auth-title">Chào mừng trở lại</h1>
+        <p class="auth-sub" id="auth-sub">Đăng nhập để tiếp tục với Kinnect.</p>
+        <div class="auth-tabs" role="group" aria-label="Chọn đăng nhập hoặc tạo tài khoản">
+          <button id="login-mode" type="button" aria-pressed="true" class="active">Đăng nhập</button
+          ><button id="register-mode" type="button" aria-pressed="false">Tạo tài khoản</button>
+        </div>
+        <div class="social-login" id="social-login" hidden>
+          <a class="social-btn" id="google-login" href="/api/oauth/google/start" hidden><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Tiếp tục với Google</span></a>
+          <a class="social-btn" id="facebook-login" href="/api/oauth/facebook/start" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#1877F2" d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.04V9.41c0-3.02 1.8-4.7 4.54-4.7 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.95.93-1.95 1.88v2.26h3.33l-.53 3.49h-2.8V24C19.61 23.1 24 18.1 24 12.07z"/></svg><span>Tiếp tục với Facebook</span></a>
+          <p class="divider"><span>hoặc dùng tên đăng nhập</span></p>
+        </div>
+        <form id="oauth-form" hidden>
+          <p class="oauth-hello" id="oauth-hello"></p>
+          <div class="field">
+            <label for="oauth-name">Tên hiển thị</label>
+            <div class="input-wrap">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 00-4-4L4 16z" /></svg>
+              <input id="oauth-name" maxlength="60" required />
+            </div>
+          </div>
+          <div class="field">
+            <label for="oauth-username">Tên đăng nhập</label>
+            <div class="input-wrap">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0116 0" /></svg>
+              <input id="oauth-username" autocapitalize="none" spellcheck="false" pattern="[a-zA-Z0-9_]{3,30}" maxlength="30" required />
+            </div>
+            <small class="hint">Dùng để bạn bè tìm bạn. 3–30 ký tự không dấu, số hoặc gạch dưới.</small>
+          </div>
+          <label class="check"><input id="oauth-agree" type="checkbox" required /><span>Tôi xác nhận mình <b>đủ 18 tuổi</b> và đồng ý với <a href="https://kinnect.io.vn/community" target="_blank" rel="noopener">quy tắc cộng đồng</a>.</span></label>
+          <p id="oauth-status" role="alert"></p>
+          <button id="oauth-submit" type="submit" class="auth-cta">Hoàn tất và vào Kinnect</button>
+          <button type="button" class="link-btn back" id="oauth-cancel">Huỷ, quay lại đăng nhập</button>
+        </form>
+        <form id="auth-form">
+          <div class="field">
+            <label for="username">Tên đăng nhập</label>
+            <div class="input-wrap">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0116 0" /></svg>
+              <input id="username" autocomplete="username" autocapitalize="none" spellcheck="false" pattern="[a-zA-Z0-9_]{3,30}" minlength="3" maxlength="30" placeholder="vd: minh_anh" required aria-describedby="username-hint" />
+            </div>
+            <small class="hint" id="username-hint">3–30 ký tự: chữ không dấu, số hoặc dấu gạch dưới.</small>
+          </div>
+          <div class="field">
+            <label for="password">Mật khẩu</label>
+            <div class="input-wrap">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V7a4 4 0 018 0v3" /></svg>
+              <input id="password" type="password" autocomplete="current-password" minlength="6" maxlength="128" placeholder="Tối thiểu 6 ký tự" required />
+              <button type="button" class="pw-toggle" id="pw-toggle" aria-label="Hiện mật khẩu" aria-pressed="false">Hiện</button>
+            </div>
+            <button type="button" class="link-btn" id="forgot-link">Quên mật khẩu?</button>
+          </div>
+          <fieldset id="register-fields" hidden disabled>
+            <div class="field">
+              <label for="display-name">Tên hiển thị</label>
+              <div class="input-wrap">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 00-4-4L4 16z" /></svg>
+                <input id="display-name" maxlength="60" placeholder="Tên mọi người sẽ thấy" required />
+              </div>
+            </div>
+            <label class="check"><input id="agree" type="checkbox" required /><span>Tôi xác nhận mình <b>đủ 18 tuổi</b> và đồng ý với <a href="https://kinnect.io.vn/community" target="_blank" rel="noopener">quy tắc cộng đồng</a>.</span></label>
+          </fieldset>
+          <p id="auth-status" role="alert"></p>
+          <button id="auth-submit" type="submit">Đăng nhập</button>
+        </form>
+        <div id="forgot-view" hidden>
+          <button type="button" class="link-btn back" id="forgot-back">← Quay lại đăng nhập</button>
+          <form id="forgot-form">
+            <div class="field">
+              <label for="forgot-username">Tên đăng nhập của bạn</label>
+              <div class="input-wrap">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0116 0" /></svg>
+                <input id="forgot-username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="30" placeholder="vd: minh_anh" required />
+              </div>
+            </div>
+            <div class="field">
+              <label for="forgot-contact">Cách liên hệ với bạn</label>
+              <div class="input-wrap">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></svg>
+                <input id="forgot-contact" maxlength="120" placeholder="Email, số điện thoại hoặc Zalo" required />
+              </div>
+              <small class="hint">Quản trị viên sẽ gửi mật khẩu tạm qua thông tin này.</small>
+            </div>
+            <div class="field">
+              <label for="forgot-note">Ghi chú (không bắt buộc)</label>
+              <div class="input-wrap">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z" /></svg>
+                <input id="forgot-note" maxlength="500" placeholder="Thông tin giúp xác minh bạn là chủ tài khoản" />
+              </div>
+            </div>
+            <p id="forgot-status" role="alert"></p>
+            <button id="forgot-submit" type="submit" class="auth-cta">Gửi yêu cầu đặt lại</button>
+          </form>
+          <div id="forgot-done" class="forgot-done" hidden>
+            <div class="done-ico" aria-hidden="true">✓</div>
+            <h2>Đã gửi yêu cầu</h2>
+            <p>Quản trị viên sẽ liên hệ với bạn để cấp mật khẩu tạm. Sau khi đăng nhập, hãy đổi sang mật khẩu mới.</p>
+            <button type="button" class="auth-cta" id="forgot-done-back">Về đăng nhập</button>
+          </div>
+        </div>
+        <p class="auth-switch" id="auth-switch">Chưa có tài khoản? <button type="button" data-mode="register">Tạo tài khoản mới</button></p>
+        <p class="fine">Bản thử nghiệm. Tuổi do người dùng tự xác nhận. Bằng việc tiếp tục, bạn đồng ý với quy tắc cộng đồng và chính sách quyền riêng tư.</p>
+        <nav class="site-links" aria-label="Thông tin Kinnect"><a href="https://kinnect.io.vn/">Giới thiệu</a><a href="https://kinnect.io.vn/community">Cộng đồng</a><a href="https://kinnect.io.vn/privacy">Quyền riêng tư</a><a href="https://kinnect.io.vn/support">Hỗ trợ</a></nav>
       </div>
-      <form id="auth-form">
-        <label
-          >Tên đăng nhập<input
-            id="username"
-            autocomplete="username"
-            pattern="[a-zA-Z0-9_]{3,30}"
-            minlength="3"
-            maxlength="30"
-            required /></label
-        ><label
-          >Mật khẩu<input
-            id="password"
-            type="password"
-            autocomplete="current-password"
-            minlength="6"
-            maxlength="128"
-            required
-        /></label>
-        <fieldset id="register-fields" hidden disabled>
-          <label
-            >Tên hiển thị<input
-              id="display-name"
-              maxlength="60"
-              required /></label
-          ><label class="check"
-            ><input id="agree" type="checkbox" required />Tôi xác nhận mình đủ
-            18 tuổi và tôn trọng quy tắc cộng đồng.</label
-          >
-        </fieldset>
-        <button id="auth-submit">Đăng nhập</button>
-      </form>
-      <p id="auth-status" role="status"></p>
-      <p class="muted fine">
-        Bản thử nghiệm tự lưu trữ. Tuổi được người dùng tự xác nhận. Chưa có
-        khôi phục mật khẩu.
-      </p>
     </section>
     <main id="app" hidden>
-      <header>
-        <img class="logo" src="/kinnect-icon.png" alt="Kinnect" />
-        <h1>Kinnect <small>COMMUNITY</small></h1>
-        <span id="connection">Đang kết nối…</span
-        ><button id="logout" class="secondary">Đăng xuất</button>
+      <header class="topbar">
+        <div class="brand">
+          <img class="logo" src="/kinnect-icon.png?v=3" alt="Kinnect" />
+          <h1>Kinnect <small>COMMUNITY</small></h1>
+        </div>
+        <form class="top-search" id="top-search" role="search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+          <input id="top-search-input" type="search" placeholder="Tìm bạn, sở thích…" aria-label="Tìm trên Kinnect" />
+        </form>
+        <span id="connection" class="sr-only">Đang kết nối…</span>
+        <div class="top-actions">
+          <button data-tab="live" class="icon-tab">Live</button
+          ><button data-tab="notifications" class="icon-tab">
+            Thông báo <span id="unread"></span></button>
+          <div class="me-menu">
+            <button type="button" id="me-btn" class="me-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="me-panel" aria-label="Tài khoản"><span id="me-avatar" class="avatar fallback" aria-hidden="true">?</span></button>
+            <div class="me-panel" id="me-panel" role="menu" hidden>
+              <div class="me-head"><b id="me-name"></b><small id="me-username"></small></div>
+              <button type="button" role="menuitem" data-go="profile">Trang cá nhân</button>
+              <button type="button" role="menuitem" data-go="settings">Cài đặt tài khoản</button>
+              <a role="menuitem" href="https://kinnect.io.vn/" target="_blank" rel="noopener">Giới thiệu Kinnect</a>
+              <a role="menuitem" href="https://kinnect.io.vn/community" target="_blank" rel="noopener">Quy tắc cộng đồng</a>
+              <a role="menuitem" href="https://kinnect.io.vn/privacy" target="_blank" rel="noopener">Quyền riêng tư</a>
+              <a role="menuitem" href="https://kinnect.io.vn/support" target="_blank" rel="noopener">Trợ giúp</a>
+              <button type="button" role="menuitem" id="logout" class="danger-item">Đăng xuất</button>
+            </div>
+          </div>
+        </div>
       </header>
-      <p id="notice" role="status">Chào mừng đến với Kinnect.</p>
+      <p id="notice" role="status"></p>
       <nav aria-label="Điều hướng chính">
         <button data-tab="feed">Bảng tin</button
         ><button data-tab="discover">Khám phá</button
+        ><button id="create-post" class="create-tab" aria-label="Tạo bài viết"><span aria-hidden="true">+</span></button
+        ><button data-tab="shorts">Video</button
         ><button data-tab="inbox">Tin nhắn</button
-        ><button data-tab="live">Live</button
-        ><button data-tab="notifications">
-          Thông báo <span id="unread"></span></button
         ><button data-tab="profile">Hồ sơ</button
         ><button data-tab="admin" id="admin-tab" hidden>Quản trị</button>
       </nav>
+      <aside id="rail" aria-label="Gợi ý"></aside>
       <section id="social-panel"></section>
       <div id="live-panel" hidden>
         <section id="lobby">
@@ -146,8 +247,11 @@
         Kinnect · Tôn trọng sự khác biệt, kết nối có đồng thuận.<br />Bản thử
         nghiệm 18+. Chưa xác minh tuổi; báo cáo được chủ máy chủ xử lý thủ công.
         Video Internet cần TURN/SFU.
+        <nav class="site-links" aria-label="Thông tin Kinnect"><a href="https://kinnect.io.vn/">Giới thiệu</a><a href="https://kinnect.io.vn/community">Cộng đồng</a><a href="https://kinnect.io.vn/privacy">Quyền riêng tư</a><a href="https://kinnect.io.vn/support">Hỗ trợ</a></nav>
       </footer>
     </main>
     <script type="module" src="/social.js"></script>
+    <script src="/ios.js" defer></script>
+    <script src="/onboarding.js" defer></script>
   </body>
 </html>

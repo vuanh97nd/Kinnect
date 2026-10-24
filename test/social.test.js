@@ -642,3 +642,193 @@ test("legacy 0.2 SQLite user data survives additive role/location/video migratio
     await app.stop();
   }
 });
+
+test("forgot password: request is stored, admin issues a temporary password, old sessions end", async () => {
+  const app = await start(":memory:");
+  try {
+    const member = await register(app, "quenmk");
+    const admin = await register(app, "quantri");
+    app.social.db.prepare("UPDATE users SET role='admin' WHERE id=?").run(admin.id);
+    const ask = (username, contact = "zalo 0900000000") =>
+      request(app, "/password-reset", { method: "POST", body: { username, contact } });
+    const ok = await ask("quenmk");
+    const missing = await ask("khongton_tai");
+    // Cùng một câu trả lời, không lộ tài khoản có tồn tại hay không.
+    assert.equal(ok.status, 200);
+    assert.deepEqual(ok.body, missing.body);
+    assert.equal((await ask("quenmk", "abc")).status, 400);
+    const forbidden = await request(app, "/admin/password-resets", { cookie: member.cookie });
+    assert.equal(forbidden.status, 403);
+    const list = await request(app, "/admin/password-resets", { cookie: admin.cookie });
+    const req = list.body.requests.find((r) => r.username === "quenmk");
+    assert.ok(req && req.status === "open");
+    const reset = await request(app, `/admin/password-resets/${req.id}/reset`, {
+      cookie: admin.cookie,
+      method: "POST",
+      body: {},
+    });
+    assert.equal(reset.status, 200);
+    assert.match(reset.body.temporaryPassword, /^[a-z2-9]{10}$/);
+    assert.equal((await request(app, "/me", { cookie: member.cookie })).status, 401);
+    const login = await request(app, "/login", {
+      method: "POST",
+      body: { username: "quenmk", password: reset.body.temporaryPassword },
+    });
+    assert.equal(login.status, 200);
+    const after = await request(app, "/admin/password-resets", { cookie: admin.cookie });
+    assert.equal(after.body.requests.find((r) => r.id === req.id).status, "done");
+  } finally {
+    await app.stop();
+  }
+});
+
+test("change password keeps current session and rejects wrong current password", async () => {
+  const app = await start(":memory:");
+  try {
+    const u = await register(app, "doimk");
+    const other = await request(app, "/login", {
+      method: "POST",
+      body: { username: "doimk", password: "very-strong-test-password" },
+    });
+    const wrong = await request(app, "/me/password", {
+      cookie: u.cookie,
+      method: "POST",
+      body: { current: "sai-mat-khau", next: "mat-khau-moi-1" },
+    });
+    assert.equal(wrong.status, 400);
+    const ok = await request(app, "/me/password", {
+      cookie: u.cookie,
+      method: "POST",
+      body: { current: "very-strong-test-password", next: "mat-khau-moi-1" },
+    });
+    assert.equal(ok.status, 200);
+    assert.equal((await request(app, "/me", { cookie: u.cookie })).status, 200);
+    assert.equal((await request(app, "/me", { cookie: other.cookie })).status, 401);
+    const login = await request(app, "/login", {
+      method: "POST",
+      body: { username: "doimk", password: "mat-khau-moi-1" },
+    });
+    assert.equal(login.status, 200);
+  } finally {
+    await app.stop();
+  }
+});
+
+test("Google login: state check, first-login 18+ confirmation, then direct login", async () => {
+  const env = { ...process.env };
+  Object.assign(process.env, {
+    GOOGLE_CLIENT_ID: "test-client",
+    GOOGLE_CLIENT_SECRET: "test-secret",
+    PUBLIC_URL: "https://app.example",
+  });
+  const fakeFetch = async (url, init = {}) => {
+    if (String(url).startsWith("https://oauth2.googleapis.com/token")) {
+      assert.equal(new URLSearchParams(init.body).get("code"), "good-code");
+      return new Response(JSON.stringify({ access_token: "at-1" }), { status: 200 });
+    }
+    if (String(url).startsWith("https://openidconnect.googleapis.com/v1/userinfo"))
+      return new Response(
+        JSON.stringify({ sub: "g-123", email: "minh.anh@gmail.com", email_verified: true, name: "Minh Anh" }),
+        { status: 200 },
+      );
+    throw Error("unexpected " + url);
+  };
+  const app = createApp({ dbPath: ":memory:", fetchImpl: fakeFetch });
+  app.server.listen(0, "127.0.0.1");
+  await once(app.server, "listening");
+  const url = `http://127.0.0.1:${app.server.address().port}`;
+  try {
+    const providers = await (await fetch(url + "/api/oauth/providers")).json();
+    assert.deepEqual(providers.providers, ["google"]);
+    const startRes = await fetch(url + "/api/oauth/google/start", { redirect: "manual" });
+    assert.equal(startRes.status, 302);
+    const loc = new URL(startRes.headers.get("location"));
+    assert.equal(loc.origin, "https://accounts.google.com");
+    assert.equal(loc.searchParams.get("redirect_uri"), "https://app.example/api/oauth/google/callback");
+    const state = loc.searchParams.get("state");
+    const stateCookie = startRes.headers.get("set-cookie").split(";")[0];
+    // Sai state → bị từ chối
+    const bad = await fetch(url + "/api/oauth/google/callback?code=good-code&state=wrong", {
+      headers: { Cookie: stateCookie },
+    });
+    assert.match(await bad.text(), /oauth_error=state/);
+    const cb = await fetch(url + `/api/oauth/google/callback?code=good-code&state=${state}`, {
+      headers: { Cookie: stateCookie },
+    });
+    const ticket = (await cb.text()).match(/ticket=([a-f0-9]+)/)[1];
+    const pending = await (await fetch(url + "/api/oauth/pending?ticket=" + ticket)).json();
+    assert.equal(pending.suggestedUsername, "minhanh");
+    const post = (body) =>
+      fetch(url + "/api/oauth/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    assert.equal((await post({ ticket, username: "minhanh", agree18: false })).status, 400);
+    const done = await post({ ticket, username: "minhanh", name: "Minh Anh", agree18: true });
+    assert.equal(done.status, 200);
+    const session = done.headers.get("set-cookie").split(";")[0];
+    const me = await (await fetch(url + "/api/me", { headers: { Cookie: session } })).json();
+    assert.equal(me.user.username, "minhanh");
+    // Lần sau: vào thẳng, có cookie phiên ngay ở callback
+    const start2 = await fetch(url + "/api/oauth/google/start", { redirect: "manual" });
+    const state2 = new URL(start2.headers.get("location")).searchParams.get("state");
+    const cb2 = await fetch(url + `/api/oauth/google/callback?code=good-code&state=${state2}`, {
+      headers: { Cookie: start2.headers.get("set-cookie").split(";")[0] },
+    });
+    assert.match(cb2.headers.get("set-cookie"), /kinnect_session=/);
+    assert.doesNotMatch(await cb2.text(), /ticket=/);
+  } finally {
+    for (const ws of app.wss.clients) ws.terminate();
+    await new Promise((r) => app.wss.close(r));
+    await new Promise((r) => app.server.close(r));
+    app.social.close();
+    process.env = env;
+  }
+});
+
+test("post likes, comments, profile stats and conversation preview", async () => {
+  const app = await start(":memory:");
+  try {
+    const a = await register(app, "thich_a");
+    const b = await register(app, "thich_b");
+    const created = await request(app, "/posts", {
+      cookie: a.cookie,
+      method: "POST",
+      body: { body: "Xin chào", visibility: "public" },
+    });
+    const pid = created.body.id;
+    const like = await request(app, `/posts/${pid}/like`, { cookie: b.cookie, method: "POST", body: {} });
+    assert.deepEqual(like.body, { likes: 1, liked: true });
+    await request(app, `/posts/${pid}/like`, { cookie: b.cookie, method: "POST", body: {} });
+    const c = await request(app, `/posts/${pid}/comments`, {
+      cookie: b.cookie,
+      method: "POST",
+      body: { body: "Chào bạn!" },
+    });
+    assert.equal(c.status, 201);
+    const feed = await request(app, "/posts", { cookie: a.cookie });
+    const p = feed.body.posts.find((x) => x.id === pid);
+    assert.equal(p.likes, 1);
+    assert.equal(p.comments, 1);
+    assert.equal(p.liked, false);
+    const comments = await request(app, `/posts/${pid}/comments`, { cookie: a.cookie });
+    assert.equal(comments.body.comments[0].body, "Chào bạn!");
+    const notes = await request(app, "/notifications", { cookie: a.cookie });
+    assert.deepEqual(notes.body.notifications.map((n) => n.kind).sort(), ["comment", "like"]);
+    await request(app, `/users/${a.id}/follow`, { cookie: b.cookie, method: "POST", body: {} });
+    const st = await request(app, `/users/${a.id}/stats`, { cookie: b.cookie });
+    assert.deepEqual([st.body.followers, st.body.following, st.body.posts], [1, 0, 1]);
+    const mine = await request(app, `/posts?user=${b.id}`, { cookie: a.cookie });
+    assert.equal(mine.body.posts.length, 0);
+    const unlike = await request(app, `/posts/${pid}/like`, { cookie: b.cookie, method: "DELETE", body: {} });
+    assert.equal(unlike.body.likes, 0);
+    await request(app, `/users/${b.id}/follow`, { cookie: a.cookie, method: "POST", body: {} });
+    await request(app, `/users/${a.id}/messages`, { cookie: b.cookie, method: "POST", body: { body: "Hello" } });
+    const inbox = await request(app, "/conversations", { cookie: a.cookie });
+    assert.equal(inbox.body.users[0].last.body, "Hello");
+    assert.equal(inbox.body.users[0].last.mine, false);
+  } finally {
+    await app.stop();
+  }
+});

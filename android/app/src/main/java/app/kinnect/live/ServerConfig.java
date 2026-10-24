@@ -6,7 +6,7 @@ import java.net.URI;
 public final class ServerConfig {
 
   public static final String DEFAULT_ORIGIN =
-    "https://estimated-drink-beta-alerts.trycloudflare.com";
+    "https://app.kinnect.io.vn";
 
   private ServerConfig() {}
 

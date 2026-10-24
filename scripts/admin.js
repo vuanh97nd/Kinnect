@@ -1,14 +1,16 @@
 import { resolve, dirname } from "node:path";
 import { existsSync, mkdirSync } from "node:fs";
-import { randomUUID } from "node:crypto";
+import { randomUUID, randomBytes, scrypt as scryptCallback } from "node:crypto";
+import { promisify } from "node:util";
 import { openSocial } from "../lib/social.js";
 const [action, username] = process.argv.slice(2);
 if (
-  !["promote", "demote"].includes(action) ||
+  !["promote", "demote", "create", "reset-password"].includes(action) ||
   !/^[a-z0-9_]{3,30}$/.test(username || "")
 ) {
   console.error(
-    "Usage: npm run admin -- promote USERNAME | demote USERNAME (tài khoản phải đăng ký trước)",
+    "Usage: npm run admin -- promote USERNAME | demote USERNAME | reset-password USERNAME\n" +
+      "       npm run admin -- create USERNAME  (mật khẩu đọc từ biến môi trường KINNECT_PASSWORD)",
   );
   process.exit(1);
 }
@@ -22,6 +24,38 @@ if (!existsSync(path)) {
 }
 const store = openSocial(path);
 try {
+  if (action === "create") {
+    // Tạo tài khoản quản trị mới. Mật khẩu lấy từ biến môi trường để không lưu vào lịch sử lệnh.
+    const password = process.env.KINNECT_PASSWORD || "";
+    if (password.length < 6 || password.length > 128)
+      throw Error("Đặt KINNECT_PASSWORD (6–128 ký tự) trước khi chạy lệnh create.");
+    if (store.db.prepare("SELECT 1 FROM users WHERE username=?").get(username))
+      throw Error("Tên đăng nhập đã tồn tại. Dùng promote để cấp quyền quản trị.");
+    const salt = randomBytes(16).toString("hex");
+    const hash = (await promisify(scryptCallback)(password, salt, 64)).toString("hex");
+    const id = randomUUID();
+    store.db
+      .prepare(
+        "INSERT INTO users(id,username,password,salt,name,birth_date,created,role,discoverable) VALUES(?,?,?,?,?,?,?,'admin',0)",
+      )
+      .run(id, username, hash, salt, "Quản trị Kinnect", "", Date.now());
+    store.db
+      .prepare("INSERT INTO moderation VALUES(?,?,?,?)")
+      .run(randomUUID(), "create-admin:local-owner", id, Date.now());
+    console.log("Đã tạo tài khoản quản trị @" + username + " (ẩn khỏi Khám phá).");
+    process.exit(0);
+  }
+  if (action === "reset-password") {
+    const u = store.db.prepare("SELECT id FROM users WHERE username=?").get(username);
+    if (!u) throw Error("Không có tài khoản @" + username + ".");
+    const temp = await store.resetPassword(u.id);
+    store.db
+      .prepare("INSERT INTO moderation VALUES(?,?,?,?)")
+      .run(randomUUID(), "reset-password:local-owner", u.id, Date.now());
+    console.log("Mật khẩu tạm của @" + username + ": " + temp);
+    console.log("Mọi phiên đăng nhập cũ đã bị đăng xuất. Gửi mật khẩu này cho đúng chủ tài khoản và nhắc họ đổi sau khi đăng nhập.");
+    process.exit(0);
+  }
   const user = store.db
     .prepare("SELECT id,role FROM users WHERE username=?")
     .get(username);
