@@ -85,7 +85,7 @@ function openOnboarding() {
   root.setAttribute("aria-label", "Giới thiệu Kinnect");
   root.innerHTML =
     '<div class="ob-blob b1"></div><div class="ob-blob b2"></div>' +
-    '<header class="ob-top"><a class="ob-home" href="https://kinnect.io.vn/" aria-label="Về trang chủ Kinnect">←</a><img src="/kinnect-icon.png?v=4" alt="" /><strong>Kinnect</strong><a class="ob-site ob-get" href="' + (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? '/install-ios' : '/download/android') + '" target="_blank" rel="noopener">⬇ Tải app</a><button type="button" class="ob-skip">Bỏ qua</button></header>' +
+    '<header class="ob-top"><a class="ob-home" href="https://kinnect.io.vn/" aria-label="Về trang chủ Kinnect">←</a><img src="/kinnect-icon.png?v=4" alt="" /><strong>Kinnect</strong><a class="ob-site ob-get" href="' + (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? '/install-ios' : '/download/android') + '" target="_blank" rel="noopener">⬇ Tải app</a></header>' +
     '<div class="ob-track" tabindex="0" aria-roledescription="carousel"></div>' +
     '<div class="ob-dots" role="tablist" aria-label="Chọn trang giới thiệu"></div>' +
     '<div class="ob-actions"><button type="button" class="ob-start">Bắt đầu ngay</button><button type="button" class="ob-login">Tôi đã có tài khoản</button></div>';
@@ -138,7 +138,7 @@ function openOnboarding() {
     if (modeButton) document.getElementById(modeButton)?.click();
     document.getElementById("username")?.focus();
   };
-  root.querySelector(".ob-skip").onclick = () => close("login-mode");
+  root.querySelector(".ob-skip") && (root.querySelector(".ob-skip").onclick = () => close("login-mode"));
   root.querySelector(".ob-login").onclick = () => close("login-mode");
   root.querySelector(".ob-start").onclick = (e) => {
     if (e.currentTarget.dataset.last === "true") close("register-mode");

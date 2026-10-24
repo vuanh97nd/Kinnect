@@ -155,6 +155,26 @@ public final class NativeApi {
     });
   }
 
+  /** Ảnh từ trang tin tức (chỉ HTTPS, tối đa 3 MB, không gửi cookie). */
+  public void remote(String url, Bytes callback) {
+    executor.execute(() -> {
+      byte[] bytes = null;
+      HttpURLConnection c = null;
+      try {
+        if (!url.startsWith("https://")) throw new IOException();
+        c = (HttpURLConnection) new URL(url).openConnection();
+        c.setConnectTimeout(10000);
+        c.setReadTimeout(10000);
+        if (c.getResponseCode() == 200) bytes = read(c.getInputStream(), 3000000);
+      } catch (Exception ignored) {
+      } finally {
+        if (c != null) c.disconnect();
+      }
+      final byte[] result = bytes;
+      main.post(() -> callback.done(result));
+    });
+  }
+
   public static byte[] read(InputStream input, int maximum) throws IOException {
     try (
       InputStream in = input;
