@@ -9,6 +9,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.hardware.camera2.*;
 import android.media.*;
 import android.net.Uri;
+import android.graphics.BitmapFactory;
 import android.os.*;
 import android.view.*;
 import android.widget.*;
@@ -23,7 +24,9 @@ import org.json.*;
  * đưa vào MediaRecorder (VIDEO_SOURCE_SURFACE), nên hiệu ứng nằm luôn trong video.
  */
 public final class StudioActivity extends Activity implements Choreographer.FrameCallback {
-  static final String EXTRA_VIDEO = "video";
+  static final String EXTRA_VIDEO = "video", EXTRA_STORY = "story", EXTRA_PHOTO = "photo";
+  private boolean story;
+  private Bitmap photo;
   private static final int W = 720, H = 1280, FW = 540, FH = 960;
   private static final String[][] FILTERS = {
     { "none", "Gốc" }, { "warm", "Ấm" }, { "cool", "Mát" }, { "bright", "Sáng da" },
@@ -191,6 +194,25 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     bottom.addView(actions);
     root.addView(bottom, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
     frame = Bitmap.createBitmap(FW, FH, Bitmap.Config.ARGB_8888);
+    story = getIntent().getBooleanExtra(EXTRA_STORY, false);
+    String photoUri = getIntent().getStringExtra(EXTRA_PHOTO);
+    if (story) { limitSeconds = 15; modeButton.setText("15 giây"); modeButton.setEnabled(false); }
+    if (photoUri != null) {
+      // Ảnh làm nền: cắt vừa khung dọc, áp bộ lọc/sticker/nhạc rồi ghi thành video 15 giây.
+      try {
+        Bitmap src = BitmapFactory.decodeStream(getContentResolver().openInputStream(Uri.parse(photoUri)));
+        Canvas c = new Canvas(frame);
+        float scale = Math.max(FW / (float) src.getWidth(), FH / (float) src.getHeight());
+        float w = src.getWidth() * scale, h = src.getHeight() * scale;
+        c.drawBitmap(src, null, new RectF((FW - w) / 2, (FH - h) / 2, (FW + w) / 2, (FH + h) / 2), new Paint(Paint.FILTER_BITMAP_FLAG));
+        photo = frame;
+        front = false;
+      } catch (Exception e) {
+        Toast.makeText(this, "Không mở được ảnh.", Toast.LENGTH_LONG).show();
+        finishCancelled();
+        return;
+      }
+    }
     if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
       || checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED)
       requestPermissions(new String[] { Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO }, 401);
@@ -257,7 +279,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   }
 
   private void openCamera() {
-    if (device != null || !camera.isAvailable()) return;
+    if (photo != null || device != null || !camera.isAvailable()) return;
     if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) return;
     try {
       if (cameraThread == null) {
@@ -310,8 +332,10 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   @Override
   public void doFrame(long nanos) {
     Choreographer.getInstance().postFrameCallback(this);
-    if (!camera.isAvailable() || device == null) return;
-    camera.getBitmap(frame);
+    if (photo == null) {
+      if (!camera.isAvailable() || device == null) return;
+      camera.getBitmap(frame);
+    }
     frameCount++;
     if (!sticker.equals("none") && frameCount % 5 == 0 && !detecting) detectFace();
     if (previewReady) {
@@ -346,7 +370,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     float x = f[0] * sx, y = f[1] * sy, eyes = f[2] * sx;
     c.save();
     c.rotate(f[3], x, y);
-    if (sticker.equals("glasses")) { emoji.setTextSize(eyes * 2.6f); c.drawText(glyph, x, y + eyes * 0.85f, emoji); }
+    if (sticker.equals("glasses")) { emoji.setTextSize(eyes * 2.3f); c.drawText("🕶", x, y + eyes * 0.45f, emoji); }
     else if (sticker.equals("crown")) { emoji.setTextSize(eyes * 2.4f); c.drawText(glyph, x, y - eyes * 1.5f, emoji); }
     else if (sticker.equals("cat")) {
       emoji.setTextSize(eyes * 1.4f);
@@ -418,7 +442,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
 
   // ===== Quay video =====
   private void startRecording() {
-    if (device == null) return;
+    if (device == null && photo == null) return;
     boolean withMusic = musicUrl != null || musicLocal != null;
     try {
       output = new File(getCacheDir(), "kinnect-" + System.currentTimeMillis() + ".mp4");
@@ -496,6 +520,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   private void done(File file) {
     Intent result = new Intent();
     result.putExtra(EXTRA_VIDEO, file.getAbsolutePath());
+    result.putExtra(EXTRA_STORY, story);
     setResult(RESULT_OK, result);
     finish();
   }

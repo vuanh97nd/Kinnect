@@ -779,3 +779,40 @@ body[data-view="shorts"][data-reel="ready"] .reel-item video{object-position:cen
 #auth #auth-submit{background:linear-gradient(135deg,#6d4aff,#ff4f9a)!important;color:#fff!important;border-radius:999px!important;min-height:54px!important}
 #auth .remember-device{margin:-8px 0 6px!important;gap:12px!important;font-size:14px!important;color:var(--ink)!important}
 #auth .remember-device input{width:22px!important;height:22px!important;min-height:22px!important;flex:0 0 22px!important;margin:0!important}
+/* Bình luận video kiểu TikTok */
+.rc-head{display:grid!important;grid-template-columns:36px 1fr 36px;align-items:center;padding:14px 12px 10px!important;border-bottom:0!important}
+.rc-head h2{text-align:center;font-size:15px!important;font-weight:700!important;margin:0!important}
+.rc-head .reel-close{width:36px;height:36px;min-height:36px;padding:0;border:0;border-radius:50%;background:transparent!important;color:inherit;display:grid;place-items:center}
+.reel-comments .reel-comments-list{padding:6px 16px 10px!important}
+.rc-item{display:flex;gap:10px;align-items:flex-start;padding:8px 0}
+.rc-item>.avatar{flex:0 0 34px;width:34px!important;height:34px!important;border-radius:50%!important;font-size:14px;display:grid;place-items:center;overflow:hidden}
+.rc-replies .rc-item>.avatar{flex-basis:26px;width:26px!important;height:26px!important;font-size:11px}
+.rc-body{flex:1;min-width:0}
+.rc-name{display:block;font-size:13px;color:var(--muted,#8a8494);font-weight:600}
+.rc-text{margin:2px 0 4px!important;font-size:15px;line-height:1.4;color:inherit;overflow-wrap:anywhere}
+.rc-meta{display:flex;gap:14px;align-items:center;font-size:12px;color:var(--muted,#8a8494)}
+.rc-meta time{font-size:12px!important;color:inherit!important}
+.rc-reply{background:none!important;border:0;padding:0!important;min-height:0!important;font-size:12px;font-weight:700;color:var(--muted,#8a8494)!important;cursor:pointer}
+.rc-like{flex:0 0 32px;display:flex;flex-direction:column;align-items:center;gap:2px;background:none!important;border:0;padding:4px 0 0!important;min-height:0!important;color:var(--muted,#8a8494)!important;cursor:pointer}
+.rc-like svg{width:18px;height:18px}
+.rc-like span{font-size:11px;line-height:1}
+.rc-like.is-liked{color:#fe2c55!important}.rc-like.is-liked svg{fill:#fe2c55;stroke:#fe2c55}
+.rc-replies{padding-left:44px}
+.rc-more{display:block;margin:0 0 6px 44px;background:none!important;border:0;padding:4px 0!important;min-height:0!important;font-size:12px;font-weight:700;color:var(--muted,#8a8494)!important;cursor:pointer}
+.rc-more::before{content:"";display:inline-block;width:22px;height:1px;background:currentColor;vertical-align:middle;margin-right:8px;opacity:.6}
+.rc-emojis{display:flex;justify-content:space-around;padding:8px 12px 4px;border-top:1px solid var(--line,#efedf3)}
+.rc-emojis button{background:none!important;border:0;font-size:22px;min-height:36px!important;padding:2px 4px!important;cursor:pointer}
+.rc-form{align-items:center;border-top:0!important;padding-top:6px!important}
+.rc-form>.avatar{flex:0 0 34px;width:34px!important;height:34px!important;border-radius:50%!important;font-size:14px;display:grid;place-items:center;overflow:hidden}
+/* Tạo tin: bảng trượt từ dưới, hai ô lớn cạnh nhau, ẩn ô chọn tệp thô */
+dialog.story-create{position:fixed;inset:auto 0 0;margin:0 auto;width:100%;max-width:520px;border-radius:24px 24px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));display:none}
+dialog.story-create[open]{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.story-create .story-create-head,.story-create>p{grid-column:1/-1}
+.story-create-head{margin-bottom:4px!important}.story-create-head h2{font-size:20px!important;text-align:center;flex:1}
+.story-create-camera,.story-create-photo{position:relative;min-height:210px!important;border-radius:18px!important;color:#fff;margin:0!important;cursor:pointer;overflow:hidden}
+.story-create-camera svg,.story-create-photo svg{width:34px;height:34px;padding:12px;border-radius:50%;background:#ffffff33;box-sizing:content-box}
+.story-create-camera strong,.story-create-photo strong{font-size:16px}
+.story-create-camera span,.story-create-photo span{font-size:12px;opacity:.9;text-align:center;padding:0 8px}
+.story-create-photo input{position:absolute!important;inset:0;opacity:0;width:100%!important;height:100%!important;cursor:pointer}
+.story-create>p{margin:2px 0 0;text-align:center;font-size:12px;color:var(--muted,#8a8494)}
+@media(prefers-color-scheme:dark){dialog.story-create{background:#242526;color:#e4e6eb}}

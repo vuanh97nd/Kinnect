@@ -134,7 +134,7 @@ final class LiveEffects implements VideoProcessor {
     for (String[] it : STICKERS) if (it[0].equals(s)) glyph = it[2];
     float x = f[0], y = f[1], eyes = f[2];
     c.rotate(f[3], x, y);
-    if (s.equals("glasses")) { emoji.setTextSize(eyes * 2.6f); c.drawText(glyph, x, y + eyes * 0.85f, emoji); }
+    if (s.equals("glasses")) { emoji.setTextSize(eyes * 2.3f); c.drawText("🕶", x, y + eyes * 0.45f, emoji); }
     else if (s.equals("crown")) { emoji.setTextSize(eyes * 2.4f); c.drawText(glyph, x, y - eyes * 1.5f, emoji); }
     else if (s.equals("cat")) { emoji.setTextSize(eyes * 1.4f); c.drawText(glyph, x - eyes * 1.3f, y - eyes * 1.4f, emoji); c.drawText(glyph, x + eyes * 1.3f, y - eyes * 1.4f, emoji); }
     else {

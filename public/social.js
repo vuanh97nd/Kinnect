@@ -33,6 +33,31 @@ function renderCommentThread(container,comments,base,onReply,reload){
 }
 function commentReplyBar(form,input){let parentId=null;const bar=node('div',undefined,'comment-replying');bar.hidden=true;const label=node('span'),cancel=node('button','×');cancel.type='button';cancel.setAttribute('aria-label','Hủy trả lời');bar.append(label,cancel);form.before(bar);const clear=()=>{parentId=null;bar.hidden=true;input.placeholder='Viết bình luận…';};cancel.onclick=clear;return {get parentId(){return parentId;},clear,reply:c=>{parentId=c.id;label.textContent='Đang trả lời '+c.author.name;bar.hidden=false;input.placeholder='Trả lời '+c.author.name+'…';input.focus();}};}
 let activeReelComments = null;
+// Bình luận video kiểu TikTok: avatar nhỏ, tên xám, thời gian · Trả lời, tim bên phải, trả lời thu gọn.
+function renderReelComments(container,comments,base,onReply,reload){
+ const ids=new Set(comments.map(c=>c.id)),children=new Map();
+ for(const c of comments){const parent=ids.has(c.parentId)?c.parentId:null;if(!children.has(parent))children.set(parent,[]);children.get(parent).push(c);}
+ const row=c=>{
+  const r=node('article',undefined,'rc-item'),body=node('div',undefined,'rc-body');
+  body.append(node('span',c.author.name,'rc-name'),node('p',c.body,'rc-text'));
+  const meta=node('div',undefined,'rc-meta');meta.append(node('time',timeAgo(c.created)));
+  const reply=node('button','Trả lời','rc-reply');reply.type='button';reply.onclick=()=>onReply(c);meta.append(reply);body.append(meta);
+  const total=Object.values(c.reactions||{}).reduce((a,b)=>a+b,0),liked=!!c.myReaction;
+  const like=node('button',undefined,'rc-like'+(liked?' is-liked':''));like.type='button';like.setAttribute('aria-label',liked?'Bỏ thích bình luận':'Thích bình luận');like.setAttribute('aria-pressed',String(liked));
+  like.innerHTML=reelIcon('heart');like.append(node('span',total?String(total):''));
+  like.onclick=async()=>{like.disabled=true;try{await api(base+'/'+c.id+'/reaction','POST',{reaction:liked?null:'love'});await reload();}catch(e){status(e.message);like.disabled=false;}};
+  r.append(avatar(c.author),body,like);return r;
+ };
+ for(const c of children.get(null)||[]){
+  container.append(row(c));
+  const kids=[];const walk=id=>{for(const k of children.get(id)||[]){kids.push(k);walk(k.id);}};walk(c.id);
+  if(!kids.length)continue;
+  const box=node('div',undefined,'rc-replies');box.hidden=true;for(const k of kids)box.append(row(k));
+  const more=node('button','Xem '+kids.length+' câu trả lời','rc-more');more.type='button';
+  more.onclick=()=>{box.hidden=!box.hidden;more.textContent=box.hidden?'Xem '+kids.length+' câu trả lời':'Ẩn câu trả lời';};
+  container.append(box,more);
+ }
+}
 function closeReelComments(){activeReelComments?.close();}
 function reelActions({s,video,api,status,avatar,personLink,report}){
  const side=document.createElement('aside');side.className='reel-side';side.setAttribute('aria-label','Tương tác video');
@@ -49,7 +74,9 @@ function reelActions({s,video,api,status,avatar,personLink,report}){
   if(activeReelComments)return;
   const dialog=document.createElement('dialog');dialog.className='reel-comments';dialog.setAttribute('aria-label','Bình luận video');
   document.body.classList.add("reel-comments-open");
-  dialog.innerHTML='<div class="reel-comments-head"><div><h2>Bình luận</h2></div><button type="button" class="reel-close" aria-label="Đóng bình luận">'+reelIcon('close')+'</button></div><div class="reel-comments-list" role="log" aria-live="polite"></div><form class="reel-comment-form"><input maxlength="500" required placeholder="Thêm bình luận…" aria-label="Bình luận của bạn"><button type="submit" aria-label="Gửi bình luận">'+reelIcon('send')+'</button></form>';
+  dialog.innerHTML='<div class="reel-comments-head rc-head"><span class="rc-spacer"></span><h2>'+count+' bình luận</h2><button type="button" class="reel-close" aria-label="Đóng bình luận">'+reelIcon('close')+'</button></div><div class="reel-comments-list" role="log" aria-live="polite"></div><div class="rc-emojis" aria-label="Chèn biểu tượng cảm xúc">'+['😍','😂','🔥','👏','🥰','😮','😢','💜'].map(e=>'<button type="button">'+e+'</button>').join('')+'</div><form class="reel-comment-form rc-form"><input maxlength="500" required placeholder="Thêm bình luận…" aria-label="Bình luận của bạn"><button type="submit" aria-label="Gửi bình luận">'+reelIcon('send')+'</button></form>';
+  if(me)dialog.querySelector('.rc-form').prepend(avatar(me));
+  dialog.querySelectorAll('.rc-emojis button').forEach(b=>b.onclick=()=>{const i=dialog.querySelector('.rc-form input');i.value+=b.textContent;i.focus();});
   document.body.append(dialog);activeReelComments=dialog;
   const list=dialog.querySelector('.reel-comments-list'),input=dialog.querySelector('input'),send=dialog.querySelector('[type=submit]');
   dialog.addEventListener('close',()=>{if(activeReelComments===dialog)activeReelComments=null;dialog.remove();document.body.classList.remove('reel-comments-open');},{once:true});
@@ -61,9 +88,9 @@ function reelActions({s,video,api,status,avatar,personLink,report}){
    list.textContent='Đang tải bình luận…';
    try{
     const {comments}=await api('/shorts/'+s.id+'/comments');if(!dialog.open)return;
-    count=comments.length;comment.querySelector('span').textContent=count;list.replaceChildren();
+    count=comments.length;comment.querySelector('span').textContent=count;dialog.querySelector('.rc-head h2').textContent=count+' bình luận';list.replaceChildren();
     if(!count){const empty=document.createElement('p');empty.className='reel-comments-empty';empty.textContent='Chưa có bình luận. Hãy mở đầu cuộc trò chuyện.';list.append(empty);}
-    renderCommentThread(list,comments,'/shorts/'+s.id+'/comments',c=>replyState.reply(c),load);
+    renderReelComments(list,comments,'/shorts/'+s.id+'/comments',c=>replyState.reply(c),load);
    }catch(e){if(dialog.open){list.textContent=e.message;const retry=document.createElement('button');retry.type='button';retry.textContent='Thử lại';retry.onclick=load;list.append(retry);}}
   }
   dialog.querySelector('form').onsubmit=async e=>{e.preventDefault();if(send.disabled)return;const body=input.value.trim();if(!body)return;send.disabled=true;try{await api('/shorts/'+s.id+'/comments','POST',{body,parentId:replyState.parentId});input.value='';replyState.clear();await load();if(dialog.open){list.scrollTop=list.scrollHeight;input.focus();}}catch(e){status(e.message);}finally{send.disabled=false;}};
@@ -740,8 +767,8 @@ async function stories(panel) {
 function createStory(){
  const dialog=node("dialog",undefined,"story-create");dialog.setAttribute("aria-label","Tạo tin mới");
  const head=node("div",undefined,"story-create-head"),close=node("button","×");close.type="button";close.setAttribute("aria-label","Đóng tạo tin");close.onclick=()=>dialog.close();head.append(node("h2","Tạo tin"),close);
- const camera=node("button",undefined,"story-create-camera");camera.type="button";camera.innerHTML=reelIcon("sound")+"<strong>Quay tin</strong><span>Camera · Nhạc · Hiệu ứng</span>";
- const photo=node("label",undefined,"story-create-photo");photo.innerHTML="<strong>Ảnh kèm nhạc</strong><span>Chọn ảnh và thêm bài hát của bạn</span>";
+ const camera=node("button",undefined,"story-create-camera");camera.type="button";camera.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="4"/></svg><strong>Quay tin</strong><span>Camera · Nhạc · Hiệu ứng</span>';
+ const photo=node("label",undefined,"story-create-photo");photo.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/><circle cx="16" cy="9" r="1.5"/></svg><strong>Ảnh kèm nhạc</strong><span>Chọn ảnh · thêm bài hát</span>';
  const input=node("input");input.type="file";input.accept="image/jpeg,image/png,image/webp";input.setAttribute("aria-label","Chọn ảnh tạo tin");photo.append(input);
  camera.onclick=()=>{dialog.close();openCamera({story:true}).catch(e=>status(e.message));};
  input.onchange=()=>{const file=input.files[0];if(!file)return;if(file.size>5*1024*1024){status("Ảnh tối đa 5 MB.");return;}dialog.close();openCamera({story:true,photo:file}).catch(e=>status(e.message));};
