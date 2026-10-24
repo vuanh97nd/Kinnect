@@ -1,4 +1,21 @@
 import { connectLive, disconnectLive } from "./app.js";
+const websiteSessionProbe = window.parent !== window && new URL(location.href).searchParams.get("website-session") === "1";
+const websiteOrigins = new Set(["https://kinnect.io.vn", "https://www.kinnect.io.vn"]);
+let websiteParentOrigin;
+try {
+  const origin = new URL(document.referrer).origin;
+  if (websiteOrigins.has(origin)) websiteParentOrigin = origin;
+} catch {}
+function tellWebsiteSession(authenticated) {
+  if (websiteParentOrigin)
+    window.parent.postMessage({ type: "kinnect:session-status", authenticated }, websiteParentOrigin);
+}
+if (websiteSessionProbe) window.addEventListener("message", async (event) => {
+  if (event.source !== window.parent || !websiteOrigins.has(event.origin) || event.data?.type !== "kinnect:check-session") return;
+  websiteParentOrigin = event.origin;
+  try { await api("/me"); tellWebsiteSession(true); }
+  catch { tellWebsiteSession(false); }
+});
 const $ = (id) => document.getElementById(id);
 let me = null,
   mode = "login",
@@ -55,6 +72,7 @@ async function api(path, method = "GET", data) {
   return result;
 }
 function showAuth() {
+  if (websiteSessionProbe) { tellWebsiteSession(false); return; }
   cleanupShorts();
   delete document.body.dataset.reel;
   clearInterval(timer);
@@ -229,6 +247,7 @@ $("auth-form").onsubmit = async (e) => {
   }
 };
 async function enter() {
+  if (websiteSessionProbe) { tellWebsiteSession(true); return; }
   $("admin-tab").hidden = me.role !== "admin";
   $("auth").hidden = true;
   $("app").hidden = false;
