@@ -424,6 +424,9 @@ function paintMe() {
   const fresh = avatar(me);
   fresh.id = "me-avatar";
   old.replaceWith(fresh);
+  const head = avatar(me);
+  head.id = "me-head-avatar";
+  $("me-head-avatar").replaceWith(head);
   $("me-name").textContent = me.name;
   $("me-username").textContent = "@" + me.username;
 }

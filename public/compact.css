@@ -842,3 +842,24 @@ body[data-view="shorts"] #app .reel-feed-tabs .reel-fullscreen svg{filter:drop-s
 .live-grid-empty b{font-size:18px}.live-grid-empty p{margin:0 0 10px;color:#fffa}
 /* Live đã nằm trong tab "Trực tiếp" của trang Video: bỏ nút camera trên thanh trên */
 #app .top-actions [data-tab="live"]{display:none!important}
+/* Menu tài khoản: thẻ hồ sơ + nhóm có biểu tượng */
+#app .me-panel{width:290px;padding:8px;gap:6px;border-radius:20px;max-height:calc(100dvh - 90px);overflow:auto;animation:mePop .16s ease-out}
+@keyframes mePop{from{opacity:0;transform:translateY(-6px) scale(.98)}}
+#app .me-panel .me-head{display:flex!important;flex-direction:row;align-items:center;gap:12px;height:auto;line-height:1.25;padding:12px!important;margin:0;border:0;border-radius:14px;background:var(--soft)!important}
+#app .me-head .avatar{width:46px;height:46px;flex:none;border-radius:50%;display:grid;place-items:center;font-size:18px}
+.me-who{display:flex;flex-direction:column;min-width:0;flex:1}
+.me-who b{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.me-who small{color:var(--muted);font-size:13px;font-weight:500}
+.me-group{display:grid;gap:1px}
+.me-label{margin:6px 12px 0;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+#app .me-panel .me-group>*,#app .me-panel .danger-item{display:flex!important;align-items:center;gap:12px;min-height:44px;line-height:1.2;padding:0 10px!important;font-size:14.5px}
+.me-ic{width:32px;height:32px;flex:none;border-radius:10px;display:grid;place-items:center;background:var(--soft);color:var(--ink)}
+.me-ic svg,.me-ext svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.me-panel span{flex:1}
+.me-ext{margin-left:auto;color:var(--muted);display:grid}
+.me-ext svg{width:15px;height:15px}
+#app .me-panel .danger-item{border-top:1px solid var(--line);border-radius:12px;margin-top:2px;padding-top:4px!important}
+#app .me-panel .danger-item .me-ic{background:#d0103a14;color:#d0103a}
+#app .me-panel .me-group>[hidden]{display:none!important}
+#app .me-panel .me-who small{display:block!important;margin-top:2px}
+#app .me-panel .danger-item{font-size:14.5px!important;font-weight:700}
