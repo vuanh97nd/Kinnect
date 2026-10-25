@@ -12,6 +12,15 @@
     fx.setAttribute("aria-pressed", String(open));
   };
   controls.prepend(fx);
+  // Nút ✕: người phát → hỏi rồi kết thúc live; người xem → rời phòng. Sau đó về trang Video.
+  document.getElementById("live-browse")?.addEventListener("click", (e) => {
+    if (live.hidden) return;
+    const leave = document.getElementById("leave");
+    if (/Kết thúc/.test(leave?.textContent || "")) {
+      if (!confirm("Kết thúc buổi livestream?")) { e.preventDefault(); e.stopImmediatePropagation(); return; }
+      leave.click();
+    }
+  }, true);
   // Video ngang (camera máy tính, luồng 16:9) thì hiện đủ khung thay vì cắt sát mặt.
   const video = document.getElementById("video");
   const fit = () => video.parentElement.classList.toggle("landscape", video.videoWidth > video.videoHeight);

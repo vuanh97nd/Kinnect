@@ -274,6 +274,16 @@ $("create").onsubmit = async (e) => {
       captured.getTracks().forEach(t => t.stop());
       return;
     }
+    // iPhone đôi khi trả hình ngang dù máy đang cầm dọc: xin lại khung dọc ngay trên track hiện tại.
+    if (matchMedia("(pointer: coarse)").matches) {
+      const track = captured.getVideoTracks()[0], s = track?.getSettings?.() || {};
+      if ((s.width || 0) > (s.height || 0) && innerHeight > innerWidth)
+        for (const c of [{ width: { exact: 720 }, height: { exact: 1280 } }, { aspectRatio: { exact: 9 / 16 } }, { width: { ideal: 480 }, height: { ideal: 640 } }]) {
+          try { await track.applyConstraints({ facingMode: "user", ...c }); } catch { continue; }
+          const n = track.getSettings();
+          if ((n.width || 0) < (n.height || 0)) break;
+        }
+    }
     rawStream = captured;
     // Hiệu ứng (bộ lọc, làm mịn, sticker) áp lên hình gửi cho người xem.
     fx = createEffects(rawStream, { width: 720, height: 1280, portrait: matchMedia("(pointer: coarse)").matches });
