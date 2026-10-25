@@ -267,7 +267,7 @@ $("create").onsubmit = async (e) => {
     if (!navigator.mediaDevices?.getUserMedia)
       throw Error("Camera cần HTTPS hoặc localhost.");
     const captured = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 }, resizeMode: "none" },
+      video: matchMedia("(pointer: coarse)").matches ? { facingMode: "user", width: { ideal: 720 }, height: { ideal: 1280 }, aspectRatio: { ideal: 9 / 16 } } : { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 }, resizeMode: "none" },
       audio: true,
     });
     if (revision !== liveRevision || !connected) {
