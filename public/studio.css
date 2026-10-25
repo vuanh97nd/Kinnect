@@ -217,3 +217,18 @@ body.studio-open { overflow: hidden; }
 @media(prefers-color-scheme:dark){.mp-sheet{background:#242526;color:#e4e6eb}.mp-close,.mp-search,.mp-tabs button,.mp-play{background:#3a3b3c!important;color:#e4e6eb!important}.mp-search input{color:#e4e6eb}.mp-play svg{fill:#e4e6eb}.mp-row:hover,.mp-upload:hover{background:#303133}.mp-row.on{background:#2e2752}.mp-tabs button.on{background:#2e2752!important;color:#b9a6ff!important}.mp-bar{border-color:#3a3b3c}.mp-meta small,.mp-now small,.mp-empty{color:#b0b3b8}}
 .mp-more{display:block;margin:8px auto;border:0;border-radius:999px;padding:8px 18px!important;min-height:0!important;background:#f0f2f5!important;color:#1c1e21!important;font-weight:700}@media(prefers-color-scheme:dark){.mp-more{background:#3a3b3c!important;color:#e4e6eb!important}}
 .mp small{background:none!important;padding:0!important;border-radius:0!important;color:#65676b!important;font-size:12.5px!important}@media(prefers-color-scheme:dark){.mp small{color:#b0b3b8!important}}
+/* Bảng hiệu ứng web kiểu app (bộ lọc có ảnh xem trước, làm đẹp dạng nút tròn) */
+.tt-sheet.fxp{padding:10px 0 12px!important;background:linear-gradient(#0000,#000c 30%)!important;backdrop-filter:none!important;border-radius:0!important}
+.fxp-filters{display:flex;gap:8px;overflow-x:auto;padding:4px 12px;scrollbar-width:none}
+.fxp-filters::-webkit-scrollbar{display:none}
+.fxp-filter{flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;background:none!important;border:0;padding:0!important;min-height:0!important;color:#fffc!important;font-size:11px;font-weight:600;cursor:pointer}
+.fxp-filter canvas{width:58px;height:76px;border-radius:12px;border:2px solid transparent;background:#333;object-fit:cover}
+.fxp-filter.on{color:#fff!important;font-weight:800}.fxp-filter.on canvas{border-color:#fff}
+.fxp-beauty{display:flex;justify-content:space-around;padding:6px 8px}
+.fxp-chip{display:flex;flex-direction:column;align-items:center;gap:4px;background:none!important;border:0;padding:0!important;min-height:0!important;color:#fffc!important;font-size:11px;font-weight:600;cursor:pointer}
+.fxp-chip i{font-style:normal;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:#ffffff33;font-size:20px;color:#fff}
+.fxp-chip.on{color:#fff!important;font-weight:800}.fxp-chip.on i{background:#fff;color:#1c1530}
+.fxp-slider{display:flex;align-items:center;gap:10px;padding:4px 18px 8px;color:#fff;font-size:12px;font-weight:700}
+.fxp-slider span{width:60px}.fxp-slider b{width:26px;text-align:right}
+.fxp-slider input{flex:1;accent-color:#fff;min-height:0!important;padding:0!important;background:none!important;border:0!important}
+.fxp-note{margin:4px 0 0;text-align:center;font-size:11px;color:#fffa}

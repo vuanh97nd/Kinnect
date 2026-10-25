@@ -4,12 +4,21 @@
 
 export const FILTERS = [
   ["none", "Gốc", "none"],
-  ["warm", "Ấm", "saturate(1.15) sepia(0.18) brightness(1.04)"],
-  ["cool", "Mát", "saturate(1.1) hue-rotate(-12deg) brightness(1.03)"],
-  ["vivid", "Rực", "saturate(1.55) contrast(1.08)"],
-  ["mono", "Đen trắng", "grayscale(1) contrast(1.12)"],
-  ["vintage", "Cổ điển", "sepia(0.45) contrast(0.95) brightness(1.05) saturate(0.9)"],
-  ["dream", "Mơ màng", "saturate(1.2) brightness(1.08) hue-rotate(8deg)"],
+  ["clear", "Trong trẻo", "contrast(1.08) saturate(1.08) brightness(1.05)"],
+  ["milk", "Sữa", "saturate(0.75) brightness(1.08) contrast(0.92) sepia(0.06)"],
+  ["peach", "Hồng đào", "saturate(1.05) sepia(0.12) hue-rotate(-12deg) brightness(1.05)"],
+  ["warm", "Ấm áp", "saturate(1.15) sepia(0.18) brightness(1.04)"],
+  ["cool", "Mát lạnh", "saturate(0.95) hue-rotate(-12deg) brightness(1.03)"],
+  ["film", "Phim cũ", "sepia(0.35) saturate(0.75) contrast(0.92) brightness(1.06)"],
+  ["mono", "Đen trắng", "grayscale(1) contrast(1.05)"],
+  ["noir", "Tương phản", "grayscale(1) contrast(1.4)"],
+  ["vivid", "Rực rỡ", "saturate(1.55) contrast(1.08)"],
+  ["sunset", "Hoàng hôn", "sepia(0.3) saturate(1.3) hue-rotate(-18deg) brightness(1.04)"],
+  ["candy", "Kẹo ngọt", "saturate(1.3) hue-rotate(-8deg) brightness(1.08) contrast(0.95)"],
+  ["mint", "Bạc hà", "hue-rotate(14deg) saturate(0.9) brightness(1.06)"],
+  ["dream", "Mộng mơ", "saturate(0.85) brightness(1.1) contrast(0.9) hue-rotate(8deg)"],
+  ["retro", "Retro", "sepia(0.25) contrast(1.1) saturate(0.9) hue-rotate(-6deg)"],
+  ["city", "Thành phố", "saturate(0.7) contrast(1.15) brightness(0.98)"],
 ];
 export const STICKERS = [
   ["none", "Không", ""],
@@ -43,7 +52,11 @@ export function createEffects(rawStream, { width = 540, height = 960 } = {}) {
   canvas.width = landscape ? height : width;
   canvas.height = landscape ? width : height;
   const ctx = canvas.getContext("2d");
-  const state = { filter: "none", soft: false, sticker: "none", mirror: true };
+  const state = { filter: "none", soft: false, smooth: 0.5, whiten: 0, blush: 0, auto: false, sticker: "none", mirror: true };
+  let autoBright = 1, autoContrast = 1, autoTick = 0;
+  const probe = document.createElement("canvas");
+  probe.width = 24; probe.height = 32;
+  const layer = document.createElement("canvas");
   let face = null;
   let detector = null, detecting = false, lastDetection=0, trackingFailed=false;
   let raf = 0, stopped = false;
@@ -51,7 +64,7 @@ export function createEffects(rawStream, { width = 540, height = 960 } = {}) {
   let statusText="";const statusListeners=new Set();
   const publish=text=>{if(text!==statusText){statusText=text;for(const callback of statusListeners)callback(text);}};
   async function detect() {
-    if(stopped || detecting || trackingFailed || (!state.soft && state.sticker==="none") || video.readyState<2 || performance.now()-lastDetection<120)return;
+    if(stopped || detecting || trackingFailed || (!state.soft && !state.blush && state.sticker==="none") || video.readyState<2 || performance.now()-lastDetection<120)return;
     detecting=true;lastDetection=performance.now();
     try {
       if(!detector){publish("Đang tải nhận diện khuôn mặt…");detector=await faceEngine();}
@@ -121,7 +134,10 @@ export function createEffects(rawStream, { width = 540, height = 960 } = {}) {
     if (stopped) return;
     if (video.readyState >= 2) {
       const [x, y, w, h] = cover();
-      const base = FILTERS.find((f) => f[0] === state.filter)?.[2] || "none";
+      let base = FILTERS.find((f) => f[0] === state.filter)?.[2] || "none";
+      // Sáng da + AI cân sáng (chạy trên máy, không gửi ảnh đi đâu)
+      const extra = (state.whiten ? ` brightness(${(1 + state.whiten * 0.1).toFixed(3)}) saturate(${(1 - state.whiten * 0.12).toFixed(3)})` : "") + (state.auto ? ` brightness(${autoBright.toFixed(3)}) contrast(${autoContrast.toFixed(3)})` : "");
+      if (extra) base = (base === "none" ? "" : base) + extra;
       ctx.save();
       if (state.mirror) {
         ctx.translate(canvas.width, 0);
@@ -131,11 +147,44 @@ export function createEffects(rawStream, { width = 540, height = 960 } = {}) {
       ctx.drawImage(video, x, y, w, h);
       ctx.restore();
       if (state.soft && face) {
+        // Mịn da: lớp mờ trong vùng mặt, mờ dần ra viền (mặt nạ chuyển sắc) để không lộ ranh giới.
+        if (layer.width !== canvas.width || layer.height !== canvas.height) { layer.width = canvas.width; layer.height = canvas.height; }
+        const l = layer.getContext("2d");
+        l.globalCompositeOperation = "source-over";
+        l.clearRect(0, 0, layer.width, layer.height);
+        l.save();
+        if (state.mirror) { l.translate(layer.width, 0); l.scale(-1, 1); }
+        l.filter = (base === "none" ? "" : base + " ") + "blur(" + (2 + state.smooth * 5).toFixed(1) + "px)";
+        l.drawImage(video, x, y, w, h);
+        l.restore();
+        const cxF = face.x + face.width / 2, cyF = face.y + face.height * 0.55, r = Math.max(face.width, face.height) * 0.62;
+        const g = l.createRadialGradient(cxF, cyF, r * 0.35, cxF, cyF, r);
+        g.addColorStop(0, "#000"); g.addColorStop(1, "#0000");
+        l.globalCompositeOperation = "destination-in";
+        l.fillStyle = g;
+        l.fillRect(0, 0, layer.width, layer.height);
         ctx.save();
-        ctx.beginPath();ctx.ellipse(face.x+face.width/2,face.y+face.height*0.52,face.width*0.45,face.height*0.47,0,0,Math.PI*2);ctx.clip();
-        ctx.globalAlpha=0.3;ctx.filter=(base==="none"?"":base+" ")+"blur(3px) brightness(1.04)";
-        if(state.mirror){ctx.translate(canvas.width,0);ctx.scale(-1,1);}
-        ctx.drawImage(video,x,y,w,h);ctx.restore();
+        ctx.globalAlpha = 0.25 + state.smooth * 0.55;
+        ctx.drawImage(layer, 0, 0);
+        ctx.restore();
+      }
+      if (state.blush > 0.01 && face) {
+        for (const side of [-1, 1]) {
+          const bx = face.x + face.width / 2 + side * face.width * 0.27, by = face.y + face.height * 0.62, br = face.width * 0.17;
+          const g = ctx.createRadialGradient(bx, by, 0, bx, by, br);
+          g.addColorStop(0, `rgba(255,105,140,${(state.blush * 0.45).toFixed(2)})`); g.addColorStop(1, "rgba(255,105,140,0)");
+          ctx.fillStyle = g; ctx.fillRect(bx - br, by - br, br * 2, br * 2);
+        }
+      }
+      if (state.auto && autoTick++ % 30 === 0) {
+        const p = probe.getContext("2d", { willReadFrequently: true });
+        p.drawImage(video, 0, 0, probe.width, probe.height);
+        const d = p.getImageData(0, 0, probe.width, probe.height).data;
+        let sum = 0, sq = 0;
+        for (let i = 0; i < d.length; i += 4) { const lum = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114; sum += lum; sq += lum * lum; }
+        const n = d.length / 4, mean = sum / n, std = Math.sqrt(Math.max(1, sq / n - mean * mean));
+        autoBright = Math.min(1.25, Math.max(0.88, 1 + (125 - mean) / 400));
+        autoContrast = Math.min(1.2, Math.max(0.92, 1 + (55 - std) / 300));
       }
       detect();
       drawSticker();
@@ -163,7 +212,7 @@ export function createEffects(rawStream, { width = 540, height = 960 } = {}) {
     set(patch) {
       Object.assign(state, patch);
       trackingFailed=false;
-      if(!state.soft && state.sticker==="none"){face=null;publish("");}else detect();
+      if(!state.soft && !state.blush && state.sticker==="none"){face=null;publish("");}else detect();
     },
     stop() {
       stopped = true;
@@ -467,43 +516,93 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
   }
   const ownTracks = [];
   $(".tt-sound").onclick = openSound;
+  // Bảng hiệu ứng kiểu app: bộ lọc có ảnh xem trước, làm đẹp dạng nút tròn + thanh trượt, hẹn giờ.
+  let beautyKey = "smooth";
   function openSheet(kind) {
     if (!sheet.hidden && sheet.dataset.kind === kind) return (sheet.hidden = true);
     sheet.dataset.kind = kind;
     sheet.replaceChildren();
-    const row = document.createElement("div");
-    row.className = "fx-row";
-    const add = (label, on, fn) => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "fx-chip" + (on ? " on" : "");
-      b.textContent = label;
-      b.setAttribute("aria-pressed", String(on));
-      b.onclick = () => {
-        fn();
-        for (const c of row.children) {
-          c.classList.toggle("on", c === b);
-          c.setAttribute("aria-pressed", String(c === b));
-        }
-      };
-      row.append(b);
+    sheet.classList.add("fxp");
+    const slider = (label, value, onInput) => {
+      const wrap = document.createElement("label");
+      wrap.className = "fxp-slider";
+      wrap.innerHTML = "<span></span><input type=\"range\" min=\"0\" max=\"100\"><b></b>";
+      wrap.querySelector("span").textContent = label;
+      const input = wrap.querySelector("input"), out = wrap.querySelector("b");
+      input.value = String(Math.round(value * 100));
+      out.textContent = input.value;
+      input.oninput = () => { out.textContent = input.value; onInput(Number(input.value) / 100); };
+      return wrap;
     };
-    if (kind === "filter") for (const [id, label] of FILTERS) add(label, fx.state.filter === id, () => fx.set({ filter: id }));
-    if (kind === "beauty") {
-      add("Tắt", !fx.state.soft, () => fx.set({ soft: false }));
-      add("✨ Làm mịn da", fx.state.soft, () => fx.set({ soft: true }));
+    if (kind === "filter") {
+      const row = document.createElement("div");
+      row.className = "fxp-filters";
+      const src = fx.canvas;
+      for (const [id, label, css] of FILTERS) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "fxp-filter" + (fx.state.filter === id ? " on" : "");
+        const thumb = document.createElement("canvas");
+        thumb.width = 60; thumb.height = 80;
+        const t = thumb.getContext("2d");
+        try { t.filter = css; t.drawImage(src, src.width * 0.15, src.height * 0.12, src.width * 0.7, src.height * 0.76, 0, 0, 60, 80); } catch {}
+        const name = document.createElement("span");
+        name.textContent = label;
+        b.append(thumb, name);
+        b.onclick = () => { fx.set({ filter: id }); for (const c of row.children) c.classList.toggle("on", c === b); };
+        row.append(b);
+      }
+      sheet.append(row);
     }
-    if (kind === "timer")
-      for (const s of [0, 3, 10]) add(s ? s + " giây" : "Tắt", delay === s, () => {
-        delay = s;
-        $('[data-tool="timer"]').classList.toggle("on", !!s);
-      });
-    sheet.append(row);
-    if (kind === "beauty" && !fx.faceSupported) {
-      const n = document.createElement("p");
-      n.className = "fx-note";
-      n.textContent = "Làm mịn và sticker nhận diện vùng mặt ngay trên thiết bị. Giữ mặt đủ sáng trong khung hình.";
-      sheet.append(n);
+    if (kind === "beauty") {
+      const items = [["auto", "🤖", "AI"], ["off", "⭕", "Tắt"], ["smooth", "✨", "Mịn da"], ["whiten", "☀️", "Sáng da"], ["blush", "🌸", "Má hồng"]];
+      const value = (k) => (k === "smooth" ? (fx.state.soft ? fx.state.smooth : 0) : fx.state[k] || 0);
+      const set = (k, v) => {
+        if (k === "smooth") fx.set({ soft: v > 0.01, smooth: v });
+        else fx.set({ [k]: v });
+      };
+      if (["smooth", "whiten", "blush"].includes(beautyKey)) sheet.append(slider(items.find((x) => x[0] === beautyKey)[2], value(beautyKey), (v) => set(beautyKey, v)));
+      const row = document.createElement("div");
+      row.className = "fxp-beauty";
+      for (const [k, glyph, label] of items) {
+        const on = k === "auto" ? fx.state.auto : k === "off" ? !fx.state.soft && !fx.state.whiten && !fx.state.blush : beautyKey === k && value(k) > 0;
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "fxp-chip" + (on ? " on" : "");
+        b.innerHTML = "<i></i><span></span>";
+        b.querySelector("i").textContent = glyph;
+        b.querySelector("span").textContent = k === "auto" && fx.state.auto ? "AI: bật" : label;
+        b.onclick = () => {
+          if (k === "auto") {
+            const next = !fx.state.auto;
+            fx.set(next ? { auto: true, soft: true, smooth: 0.6, whiten: 0.25, blush: 0.15 } : { auto: false });
+          } else if (k === "off") fx.set({ soft: false, whiten: 0, blush: 0, auto: false });
+          else { beautyKey = k; if (!value(k)) set(k, k === "smooth" ? 0.5 : 0.3); }
+          sheet.dataset.kind = "";
+          openSheet("beauty");
+        };
+        row.append(b);
+      }
+      sheet.append(row);
+      const note = document.createElement("p");
+      note.className = "fxp-note";
+      note.textContent = "AI làm đẹp và nhận diện khuôn mặt chạy ngay trên máy bạn.";
+      sheet.append(note);
+    }
+    if (kind === "timer") {
+      const row = document.createElement("div");
+      row.className = "fxp-beauty";
+      for (const s2 of [0, 3, 10]) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "fxp-chip" + (delay === s2 ? " on" : "");
+        b.innerHTML = "<i></i><span></span>";
+        b.querySelector("i").textContent = s2 ? String(s2) : "⏱";
+        b.querySelector("span").textContent = s2 ? s2 + " giây" : "Tắt";
+        b.onclick = () => { delay = s2; $('[data-tool="timer"]').classList.toggle("on", !!s2); for (const c of row.children) c.classList.toggle("on", c === b); };
+        row.append(b);
+      }
+      sheet.append(row);
     }
     sheet.hidden = false;
   }
