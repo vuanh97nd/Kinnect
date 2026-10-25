@@ -2053,6 +2053,20 @@ public class MainActivity extends Activity {
   @Override
   protected void onActivityResult(int request, int result, Intent data) {
     super.onActivityResult(request, result, data);
+    if ((request == 203 || request == 204) && result == RESULT_OK && data != null && data.getStringExtra(StudioActivity.EXTRA_IMAGE) != null) {
+      final java.io.File file = new java.io.File(data.getStringExtra(StudioActivity.EXTRA_IMAGE));
+      final String action = data.getStringExtra(StudioActivity.EXTRA_ACTION);
+      try {
+        String media = "data:image/jpeg;base64," + android.util.Base64.encodeToString(NativeApi.read(new java.io.FileInputStream(file), 5 * 1024 * 1024), android.util.Base64.NO_WRAP);
+        if ("story".equals(action)) { say("Đang đăng tin…"); request("POST", "/api/stories", json("body", "", "media", media), r -> { say("Đã đăng tin, hiển thị 24 giờ."); navigate("feed"); }); }
+        else { composePost(); pendingMedia = media; showComposePreview(file); }
+      } catch (Exception e) { say("Ảnh quá lớn (tối đa 5 MB)."); }
+      return;
+    }
+    if ((request == 203 || request == 204) && result == RESULT_FIRST_USER && data != null && data.getData() != null) {
+      uploadVideo(data.getData());
+      return;
+    }
     if ((request == 203 || request == 204) && result == RESULT_OK && data != null && data.getBooleanExtra(StudioActivity.EXTRA_STORY, false)) {
       postStoryVideo(new java.io.File(data.getStringExtra(StudioActivity.EXTRA_VIDEO)));
       return;
@@ -3711,6 +3725,25 @@ public class MainActivity extends Activity {
         }
       }).start();
     }).setNegativeButton("Huỷ", null).show();
+  }
+
+
+  // Ảnh vừa chụp hiện ngay trong ô tạo bài viết
+  private void showComposePreview(java.io.File file) {
+    BitmapFactory.Options o = new BitmapFactory.Options();
+    o.inSampleSize = 2;
+    Bitmap b = BitmapFactory.decodeFile(file.getAbsolutePath(), o);
+    if (b == null) return;
+    ImageView img = new ImageView(this);
+    img.setAdjustViewBounds(true);
+    img.setScaleType(ImageView.ScaleType.FIT_CENTER);
+    img.setImageBitmap(b);
+    img.setClipToOutline(true);
+    img.setBackground(background(SOFT, 14));
+    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+    lp.topMargin = dp(8);
+    if (content.getChildCount() > 1) ((LinearLayout) content.getChildAt(1)).addView(img, 3, lp);
+    if (attachLabel != null) attachLabel.setText("  ✓ Ảnh từ camera");
   }
 
 }
