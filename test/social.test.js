@@ -1084,3 +1084,23 @@ test('pins are shared and mute is per member without losing unread messages',asy
  await as(app,a,'/chat-messages/'+kind+'/'+id+'/recall','POST',{});assert.ok(!(await as(app,b,to)).body.messages[0].pinned);
  }
 });
+
+test('private albums require approval and revoke access immediately',async t=>{
+ const app=await start();t.after(()=>app.stop());const a=await register(app,'private_owner'),b=await register(app,'private_viewer'),c=await register(app,'private_other');
+ const bytes=await readFile(new URL('../public/apple-touch-icon.png',import.meta.url)),data='data:image/png;base64,'+bytes.toString('base64');
+ assert.equal((await as(app,a,'/me/private-photos','POST',{data:'data:image/png;base64,'+Buffer.alloc(32).toString('base64')})).status,400);
+ const made=await as(app,a,'/me/private-photos','POST',{data});assert.equal(made.status,201);const photo=made.body.photos[0],album='/users/'+a.id+'/private',decision='/me/private/requests/'+b.id;
+ const image=(u,method='GET')=>fetch(app.url+photo.url,{method,headers:u?{Cookie:u.cookie}:{}});
+ assert.equal((await image()).status,401);assert.equal((await image(b)).status,404);const own=await image(a);assert.equal(own.status,200);assert.equal(own.headers.get('cache-control'),'private, no-store');assert.deepEqual(Buffer.from(await own.arrayBuffer()),bytes);
+ assert.deepEqual((await as(app,b,album)).body.photos,[]);assert.equal((await as(app,b,'/me/private-photos/'+photo.id,'DELETE',{})).status,404);
+ for(let i=0;i<2;i++)assert.equal((await as(app,b,album+'/request','POST',{})).body.status,'pending');
+ assert.equal((await as(app,a,'/notifications')).body.notifications.filter(n=>n.kind==='private_request').length,1);
+ assert.equal((await as(app,c,decision,'POST',{action:'grant'})).status,404);
+ await as(app,a,decision,'POST',{action:'deny'});assert.equal((await image(b)).status,404);
+ await as(app,b,album+'/request','POST',{});await as(app,b,album+'/request','DELETE',{});assert.equal((await as(app,a,'/me/private/requests')).body.requests.length,0);
+ await as(app,b,album+'/request','POST',{});await as(app,a,decision,'POST',{action:'grant'});assert.equal((await image(b)).status,200);assert.equal((await image(c)).status,404);const head=await image(b,'HEAD');assert.equal(head.status,200);assert.equal((await head.arrayBuffer()).byteLength,0);
+ await as(app,a,decision,'POST',{action:'revoke'});assert.equal((await image(b)).status,404);
+ await as(app,b,album+'/request','POST',{});await as(app,a,decision,'POST',{action:'grant'});await as(app,b,'/users/'+a.id+'/block','POST',{});assert.equal((await image(b)).status,404);await as(app,b,'/users/'+a.id+'/block','DELETE',{});assert.equal((await image(b)).status,404);
+ await as(app,b,album+'/request','POST',{});await as(app,a,decision,'POST',{action:'grant'});app.social.db.prepare('UPDATE users SET suspended=1 WHERE id=?').run(a.id);assert.equal((await image(b)).status,404);app.social.db.prepare('UPDATE users SET suspended=0 WHERE id=?').run(a.id);
+ assert.equal((await as(app,a,'/me/private-photos/'+photo.id,'DELETE',{})).status,200);assert.equal((await image(a)).status,404);
+});

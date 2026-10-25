@@ -136,6 +136,9 @@ let me = null,
   tab = "feed",
   timer = null,
   notificationTimer = null;
+let privateAlbumRefresh=null;
+let privatePhotoViewer=null;
+function closePrivatePhoto(){privatePhotoViewer?.close();}
 let cleanupShorts = () => {};
 let videoFeed = "recommended";
 const node = (tag, text, cls) => {
@@ -213,6 +216,7 @@ function showAuth() {
   clearInterval(activityTimer); closeNotificationCenter();
   notificationCache = []; knownNotificationIds.clear(); notificationBaseline = false;
   document.querySelector(".notification-optin")?.remove();
+  privateAlbumRefresh=null;closePrivatePhoto();
   cleanupShorts();
   document.body.classList.remove("profile-edit-open");
   delete document.body.dataset.reel;
@@ -500,6 +504,7 @@ async function navigate(value, opts = {}) {
   nearbyRefresh=null;
   closeNotificationCenter();
   document.querySelectorAll("dialog.more-sheet,dialog.group-picker,dialog.profile-options-sheet").forEach(d=>d.close());
+  privateAlbumRefresh=null;closePrivatePhoto();
   cleanupShorts();
   document.body.classList.remove("profile-edit-open");
   delete document.body.dataset.reel;
@@ -509,7 +514,7 @@ async function navigate(value, opts = {}) {
   menu(false);
   document.body.dataset.view = value;
   for (const b of document.querySelectorAll("[data-tab]"))
-    b.classList.toggle("active", b.dataset.tab === value && !opts.user);
+    b.classList.toggle("active", (b.dataset.tab === value || value === "live" && b.dataset.tab === "shorts") && !opts.user);
   $("social-panel").hidden = value === "live";
   $("live-panel").hidden = value !== "live";
   const panel = $("social-panel");
@@ -532,6 +537,7 @@ async function navigate(value, opts = {}) {
   if (revision !== navigationRevision || !me) return false;
   panel.replaceChildren(view);
   window.scrollTo(0, 0);
+  if(opts.privateAlbum)view.querySelector(".private-album")?.scrollIntoView({block:"start"});
   return true;
 }
 function empty(icon, title, text) {
@@ -986,11 +992,8 @@ async function liveGrid(reel, isCurrent) {
     box.replaceChildren();
     if (!rooms.length) {
       const e = node("div", undefined, "live-grid-empty");
-      e.innerHTML = '<span class="live-grid-icon">' + reelIcon("live") + '</span><b>Chưa có ai đang live</b><p>Hãy là người mở màn buổi live đầu tiên!</p>';
-      const go = node("button", "Phát trực tiếp", "empty-cta");
-      go.type = "button";
-      go.onclick = () => navigate("live").catch((x) => status(x.message));
-      e.append(go);
+      e.innerHTML = '<span class="live-grid-icon">' + reelIcon("live") + '</span><b>Chưa có ai đang live</b><p>Các buổi trực tiếp sẽ xuất hiện tại đây.</p>';
+
       box.append(e);
     } else {
       box.append(node("p", "● " + rooms.length + " buổi đang live", "live-grid-count"));
@@ -1249,6 +1252,28 @@ async function profileConnections(user,kind){
  const title=kind==='followers'?'Người theo dõi':'Đang theo dõi',dialog=node('dialog',undefined,'connections-sheet');dialog.setAttribute('aria-label',title);const head=node('div',undefined,'report-sheet-head'),close=node('button','×');close.type='button';close.setAttribute('aria-label','Đóng danh sách theo dõi');close.onclick=()=>dialog.close();head.append(node('h2',title),close);const search=node('input');search.type='search';search.placeholder='Tìm theo tên';search.setAttribute('aria-label','Tìm trong danh sách theo dõi');const list=node('div',undefined,'connections-list');list.textContent='Đang tải…';dialog.append(head,search,list);document.body.append(dialog);dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();
  try{const {users}=await api('/users/'+user.id+'/'+kind);if(!dialog.open)return;function render(){const query=search.value.trim().toLocaleLowerCase('vi');const matches=users.filter(u=>(u.name+' '+u.username).toLocaleLowerCase('vi').includes(query));list.replaceChildren();for(const u of matches){const row=node('button',undefined,'connection-row');row.type='button';const copy=node('span',undefined,'connection-copy');copy.append(node('strong',u.name),node('small','@'+u.username));row.append(avatar(u),copy,node('span','›','connection-arrow'));row.onclick=()=>{dialog.close();navigate('profile',{user:u.id}).catch(e=>status(e.message));};list.append(row);}if(!matches.length)list.append(node('p',query?'Không tìm thấy tài khoản.':kind==='followers'?'Chưa có người theo dõi.':'Chưa theo dõi ai.','connections-empty'));}search.oninput=render;render();}catch(e){list.textContent=e.message;}
 }
+async function profilePrivateAlbum(panel,user,own){
+ const revision=navigationRevision,section=node('section',undefined,'social-card private-album');section.setAttribute('aria-label','Ảnh riêng tư');
+ const heading=node('div',undefined,'private-album-head'),title=node('div');title.append(node('h3','Ảnh riêng tư'),node('p','Chỉ người được bạn đồng ý mới xem được ảnh.','muted'));
+ const refresh=action('Làm mới',()=>reload().catch(e=>status(e.message)),'ghost');heading.append(title,refresh);section.append(heading);
+ const hint=node('p',own?'Quyền xem áp dụng cho toàn bộ album, gồm ảnh thêm sau này. Chỉ chia sẻ với người bạn tin tưởng; người xem có thể lưu hoặc chụp ảnh.':'Gửi yêu cầu để chủ album quyết định có chia sẻ với bạn hay không.','private-album-hint');section.append(hint);
+ let upload=null;
+ if(own){const tools=node('div',undefined,'private-album-tools'),pick=node('label',undefined,'btn-like primary');upload=node('input');upload.type='file';upload.accept='image/png,image/jpeg,image/webp';upload.setAttribute('aria-label','Thêm ảnh riêng tư');pick.append(upload,node('span','Thêm ảnh'));tools.append(pick,node('small','PNG, JPEG, WebP · tối đa 4 MB/ảnh · 24 ảnh'));section.append(tools);upload.onchange=async()=>{const file=upload.files[0];if(!file)return;if(file.size>4*1024*1024){upload.value='';status('Ảnh phải nhỏ hơn 4 MB.');return;}upload.disabled=true;try{await api('/me/private-photos','POST',{data:await readMediaFile(file)});await reload(true);status('Đã thêm ảnh riêng tư.');}catch(e){status(e.message);}finally{upload.disabled=false;upload.value='';}};}
+ const state=node('div',undefined,'private-album-state'),grid=node('div',undefined,'private-photo-grid'),requests=node('div',undefined,'private-access-list');section.append(state,grid,requests);panel.append(section);
+ let inFlight=null,signature='';
+ async function openPhoto(photo){try{const current=await api('/users/'+user.id+'/private');if(revision!==navigationRevision)return;if(!['owner','granted'].includes(current.status)||!current.photos.some(p=>p.id===photo.id)){await reload(true);status('Bạn chưa có quyền xem ảnh này.');return;}closePrivatePhoto();const dialog=node('dialog',undefined,'private-photo-viewer');privatePhotoViewer=dialog;dialog.setAttribute('aria-label','Xem ảnh riêng tư');const bar=node('div',undefined,'private-photo-viewer-bar'),close=action('×',()=>dialog.close(),'ghost');close.setAttribute('aria-label','Đóng ảnh riêng tư');bar.append(node('strong','Ảnh riêng tư'),close);const image=node('img');image.src=photo.url;image.alt='Ảnh riêng tư của '+user.name;image.onerror=()=>{dialog.close();reload(true).catch(()=>{});status('Ảnh không còn khả dụng.');};dialog.append(bar,image);dialog.addEventListener('close',()=>{image.onerror=null;image.removeAttribute('src');dialog.remove();if(privatePhotoViewer===dialog)privatePhotoViewer=null;},{once:true});document.body.append(dialog);dialog.showModal();}catch(e){status(e.message);}}
+ async function decide(viewer,decision,button){button.disabled=true;try{await api('/me/private/requests/'+viewer.id,'POST',{action:decision});await reload(true);status(decision==='grant'?'Đã đồng ý cho xem album.':decision==='revoke'?'Đã thu hồi quyền xem album.':'Đã từ chối yêu cầu.');}catch(e){status(e.message);button.disabled=false;}}
+ function render(album,access){state.replaceChildren();grid.replaceChildren();requests.replaceChildren();title.querySelector('p').textContent=album.count+' ảnh · '+(own?'Chỉ chia sẻ khi bạn đồng ý':album.status==='granted'?'Bạn đã được quyền xem':'Album được khóa');
+ if(!own&&!['owner','granted'].includes(album.status)){closePrivatePhoto();state.append(node('p',album.status==='pending'?'Đã gửi yêu cầu, đang chờ chủ album đồng ý.':album.status==='denied'?'Yêu cầu trước chưa được đồng ý.':'Ảnh chỉ hiển thị sau khi chủ album đồng ý.'));if(album.count){const pending=album.status==='pending',button=action(pending?'Hủy yêu cầu':'Yêu cầu xem',async()=>{button.disabled=true;try{await api('/users/'+user.id+'/private/request',pending?'DELETE':'POST',{});await reload(true);}catch(e){status(e.message);button.disabled=false;}},pending?'secondary':'primary');state.append(button);}for(let i=0;i<Math.min(album.count,6);i++){const locked=node('div',undefined,'private-photo-locked');locked.setAttribute('aria-label','Ảnh riêng tư đã khóa');locked.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 018 0v3"/><path d="M12 14v3"/></svg>';locked.append(node('span','Đã khóa'));grid.append(locked);}}
+ else{for(const photo of album.photos){const tile=node('div',undefined,'private-photo-item'),open=action('',()=>openPhoto(photo),'private-photo-open'),image=node('img');open.setAttribute('aria-label','Xem ảnh riêng tư');image.src=photo.url;image.alt='Ảnh riêng tư';image.loading='lazy';open.append(image);tile.append(open);if(own){const remove=action('×',async()=>{if(!confirm('Xóa ảnh riêng tư này?'))return;remove.disabled=true;try{await api('/me/private-photos/'+photo.id,'DELETE');closePrivatePhoto();await reload(true);}catch(e){status(e.message);remove.disabled=false;}},'private-photo-delete');remove.setAttribute('aria-label','Xóa ảnh riêng tư');tile.append(remove);}grid.append(tile);}}
+ if(!album.count)state.append(node('p',own?'Chưa có ảnh riêng tư. Bấm Thêm ảnh để tạo album.':'Album chưa có ảnh riêng tư.','muted'));
+ if(own){const pending=access.filter(r=>r.status==='pending'),granted=access.filter(r=>r.status==='granted');requests.append(node('h4','Yêu cầu xem ('+pending.length+')'));if(!pending.length)requests.append(node('p','Chưa có yêu cầu đang chờ.','muted'));if(granted.length)requests.append(node('p','Người được xem album','private-access-heading'));for(const request of [...pending,...granted]){const row=node('div',undefined,'private-access-row'),who=node('div',undefined,'private-access-person');who.append(personLink(request.user),node("span",request.user.name));const buttons=node('div',undefined,'private-access-actions');for(const [label,decision] of request.status==='pending'?[['Đồng ý','grant'],['Từ chối','deny']]:[['Thu hồi','revoke']]){const button=action(label,()=>decide(request.user,decision,button),decision==='grant'?'primary':'secondary');buttons.append(button);}row.append(who,buttons);requests.append(row);}}
+ }
+ async function reload(force=false){if(inFlight){await inFlight;if(!force)return;}inFlight=(async()=>{const [album,access]=await Promise.all([api('/users/'+user.id+'/private'),own?api('/me/private/requests'):Promise.resolve({requests:[]})]);if(revision!==navigationRevision)return;const next=JSON.stringify([album,access]);if(next!==signature){signature=next;render(album,access.requests);}if(!['owner','granted'].includes(album.status))closePrivatePhoto();})();try{await inFlight;}finally{inFlight=null;}}
+ privateAlbumRefresh=()=>{if(!document.hidden)return reload().catch(()=>{if(revision!==navigationRevision)return;closePrivatePhoto();state.textContent='Album không còn khả dụng.';grid.replaceChildren();requests.replaceChildren();});};
+ try{await reload();}catch(e){state.textContent=e.message;state.append(action('Thử lại',()=>reload(true).catch(e=>status(e.message)),'secondary'));}
+}
+
 async function profile(panel, opts = {}) {
   const own = !opts.user || opts.user === (me && me.id);
   if (own) {
@@ -1445,6 +1470,7 @@ async function profile(panel, opts = {}) {
     settings.append(form);
     panel.append(settings);
   }
+  await profilePrivateAlbum(panel,u,own);
   // Bài viết của người này
   panel.append(node("h3", own ? "Bài viết của bạn" : "Bài viết", "section-title"));
   const { posts } = await api("/posts?user=" + encodeURIComponent(u.id));
@@ -1737,7 +1763,9 @@ function notificationOptIn() {
 async function openNotification(n) {
   closeNotificationCenter();
   if (!n.seen) await api("/notifications", "POST", { ids: [n.id] });
-  if (n.kind === "message") await openChat(n.actor);
+  if(n.kind==="private_request")await navigate("profile",{privateAlbum:true});
+  else if(n.kind.startsWith("private_"))await navigate("profile",{user:n.actor.id,privateAlbum:true});
+  else if (n.kind === "message") await openChat(n.actor);
   else if(n.kind === "group_message")await openGroupChat(n.ref);
   else if (n.kind === "like" || n.kind === "comment") await navigate("profile");
   else if (n.kind === "gift") await navigate("live");
@@ -1812,6 +1840,7 @@ async function refreshUnread() {
     }
     renderNotificationCenter();
     inboxRefresh?.().catch(()=>{});
+    privateAlbumRefresh?.();
   })();
   try { await unreadRequest; } finally { unreadRequest = null; }
 }
@@ -1826,6 +1855,9 @@ document.addEventListener("visibilitychange", () => { if(document.hidden)stopLoc
 window.addEventListener("pagehide",stopLocationTracking);
 
 const NOTE_TEXT = {
+  private_request: "đã yêu cầu xem ảnh riêng tư của bạn.",
+  private_granted: "đã đồng ý cho bạn xem album riêng tư.",
+  private_revoked: "đã thu hồi quyền xem album riêng tư.",
   group_message: "đã gửi tin nhắn trong nhóm.",
   follow: "đã theo dõi bạn.",
   message: "đã gửi tin nhắn cho bạn.",

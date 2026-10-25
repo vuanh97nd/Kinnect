@@ -36,6 +36,8 @@ function cleanup() {
   stream = null;
   stopCamera();
   role = null;
+  watchingRoom=null;switchingLive=false;
+  updateLiveSwipe();
   window.dispatchEvent(
     new CustomEvent("kinnect-live-state", { detail: false }),
   );
@@ -74,7 +76,30 @@ function peer(id) {
   return p;
 }
 // Vào thẳng một phòng live (từ tab "Trực tiếp" ở trang Video).
-let pendingJoin = null;
+let pendingJoin = null, watchingRoom = null, switchingLive = false;
+function updateLiveSwipe(){
+ const viewing=role==='viewer';
+ $('live-swipe-controls').hidden=!viewing;
+ for(const id of ['live-previous','live-next'])$(id).disabled=!viewing||rooms.length<2||switchingLive;
+}
+function switchLive(direction){
+ if(role!=='viewer'||switchingLive)return;
+ const list=rooms.filter(r=>r.id!==watchingRoom);
+ if(!list.length)return notify('Chưa có buổi trực tiếp khác.');
+ const current=rooms.findIndex(r=>r.id===watchingRoom),next=rooms[(Math.max(0,current)+direction+rooms.length)%rooms.length];
+ if(!next||next.id===watchingRoom)return;
+ send({type:'leave'});cleanup();switchingLive=true;joinLiveRoom(next.id);updateLiveSwipe();
+}
+$('live-next').onclick=()=>switchLive(1);
+$('live-previous').onclick=()=>switchLive(-1);
+$('live-browse').addEventListener('click',()=>{if(role==='viewer'){send({type:'leave'});cleanup();}});
+let swipeStart=null,lastWheel=0;
+const liveSurface=$('video').closest('.video-wrap');
+liveSurface.addEventListener('touchstart',e=>{const t=e.touches[0];swipeStart=e.touches.length===1?{x:t.clientX,y:t.clientY}:null;},{passive:true});
+liveSurface.addEventListener('touchmove',e=>{if(role!=='viewer'||!swipeStart)return;const t=e.touches[0],dy=t.clientY-swipeStart.y;if(Math.abs(dy)>12&&Math.abs(dy)>Math.abs(t.clientX-swipeStart.x))e.preventDefault();},{passive:false});
+liveSurface.addEventListener('touchend',e=>{if(!swipeStart)return;const t=e.changedTouches[0],dy=t.clientY-swipeStart.y,dx=t.clientX-swipeStart.x;swipeStart=null;if(Math.abs(dy)>60&&Math.abs(dy)>Math.abs(dx)*1.4)switchLive(dy<0?1:-1);},{passive:true});
+liveSurface.addEventListener('touchcancel',()=>{swipeStart=null;},{passive:true});
+liveSurface.addEventListener('wheel',e=>{if(role!=='viewer'||Math.abs(e.deltaY)<40||Date.now()-lastWheel<800)return;e.preventDefault();lastWheel=Date.now();switchLive(e.deltaY>0?1:-1);},{passive:false});
 export function joinLiveRoom(id) {
   pendingJoin = id;
   if (ws && ws.readyState === WebSocket.OPEN) {
@@ -117,10 +142,12 @@ export function connectLive() {
       if (m.type === "rooms") {
         rooms = m.rooms;
         renderRooms();
+        updateLiveSwipe();
         if (pendingJoin) { send({ type: "join", room: pendingJoin, name: $("name").value || "Khách" }); pendingJoin = null; }
       }
       if (m.type === "joined") {
         role = m.role;
+        watchingRoom=m.room.id;switchingLive=false;updateLiveSwipe();
         window.dispatchEvent(
           new CustomEvent("kinnect-live-state", { detail: true }),
         );
@@ -207,6 +234,7 @@ export function connectLive() {
         notify("Buổi livestream đã kết thúc.");
       }
       if (m.type === "error") {
+        switchingLive=false;updateLiveSwipe();
         if (!role && stream) {
           stream.getTracks().forEach((t) => t.stop());
           stream = null;

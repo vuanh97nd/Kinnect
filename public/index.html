@@ -195,7 +195,7 @@
             <h2>Trực tiếp</h2>
             <p>Chia sẻ câu chuyện và trò chuyện cùng cộng đồng.</p>
           </div>
-          <form id="create">
+          <form id="create" hidden>
             <input id="name" type="hidden" /><label
               >Chủ đề buổi live<input
                 id="title"
@@ -221,7 +221,7 @@
           <div id="rooms"></div>
         </section>
         <section id="live" hidden>
-          <div class="live-heading">
+          <div class="live-heading"><button type="button" id="live-browse" data-tab="shorts" aria-label="Quay lại danh sách trực tiếp">‹ Trực tiếp</button>
             <h2 id="room-title"></h2>
             <span id="count">0 người xem</span>
           </div>
@@ -230,6 +230,7 @@
             <video id="video" autoplay playsinline></video
             ><span class="badge">● TRỰC TIẾP</span>
           </div>
+          <div id="live-swipe-controls" hidden><button type="button" id="live-previous" aria-label="Buổi trực tiếp trước">↑</button><span>Vuốt lên để xem live tiếp theo</span><button type="button" id="live-next" aria-label="Buổi trực tiếp tiếp theo">↓</button></div>
           <div id="live-fx" class="live-fx"></div>
           <div class="controls">
             <button id="mic">Tắt micro</button
