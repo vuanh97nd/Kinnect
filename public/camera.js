@@ -322,6 +322,8 @@ async function photoSource(file) {
 }
 // Lấy khung gốc của camera (không để trình duyệt cắt/phóng to) và đưa zoom về mức rộng nhất.
 function cameraConstraints(facing) {
+  // Điện thoại cầm dọc (iPhone): đặt kích thước sẽ nhận khung ngang bị cắt; chỉ xin hướng camera để có khung dọc.
+  if (matchMedia("(pointer: coarse)").matches && innerHeight > innerWidth) return { facingMode: facing };
   return { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 }, resizeMode: "none" };
 }
 async function widestZoom(stream) {
