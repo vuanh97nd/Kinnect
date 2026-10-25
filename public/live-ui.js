@@ -18,4 +18,22 @@
   video?.addEventListener("loadedmetadata", fit);
   video?.addEventListener("resize", fit);
   new MutationObserver(() => { if (live.hidden) { live.classList.remove("fx-open"); fx.setAttribute("aria-pressed", "false"); } }).observe(live, { attributes: true, attributeFilter: ["hidden"] });
+  // Bỏ trang danh sách "Trực tiếp": khi không ở trong phòng nào thì chuyển sang Video (đã có tab Trực tiếp).
+  const panel = document.getElementById("live-panel"), lobby = document.getElementById("lobby");
+  let timer = 0, busyUntil = 0;
+  // Đang mở camera để lên sóng / đang vào phòng: chờ, không chuyển trang.
+  document.getElementById("create")?.addEventListener("submit", () => { busyUntil = Date.now() + 20000; });
+  const check = () => {
+    clearTimeout(timer);
+    if (panel.hidden || !live.hidden) return;
+    const go = () => {
+      if (panel.hidden || !live.hidden) return;
+      if (Date.now() < busyUntil || document.getElementById("start")?.disabled) return void (timer = setTimeout(go, 1000));
+      document.getElementById("live-browse")?.click();
+    };
+    timer = setTimeout(go, 2500);
+  };
+  new MutationObserver(check).observe(panel, { attributes: true, attributeFilter: ["hidden"] });
+  new MutationObserver(() => { if (!live.hidden) busyUntil = 0; check(); }).observe(live, { attributes: true, attributeFilter: ["hidden"] });
+  if (lobby) lobby.classList.add("lobby-gone");
 })();

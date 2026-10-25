@@ -57,6 +57,7 @@ export function createEffects(rawStream, { width = 540, height = 960, portrait =
   const probe = document.createElement("canvas");
   probe.width = 24; probe.height = 32;
   const layer = document.createElement("canvas");
+  const tiny = document.createElement("canvas");
   let face = null;
   let detector = null, detecting = false, lastDetection=0, trackingFailed=false;
   let raf = 0, stopped = false;
@@ -149,9 +150,14 @@ export function createEffects(rawStream, { width = 540, height = 960, portrait =
       }
       if (portrait && w < canvas.width + 1 && h < canvas.height) {
         // Nền: chính khung hình phủ kín và làm mờ, để phần trên/dưới không bị đen.
-        const s = Math.max(canvas.width / w, canvas.height / h);
-        ctx.filter = "blur(24px) brightness(0.7)";
-        ctx.drawImage(video, (canvas.width - w * s) / 2, (canvas.height - h * s) / 2, w * s, h * s);
+        // Safari không hỗ trợ ctx.filter: làm mờ bằng cách thu nhỏ còn vài chục điểm ảnh rồi phóng to lại.
+        const vw = video.videoWidth, vh = video.videoHeight;
+        if (tiny.width !== 18 || tiny.height !== 32) { tiny.width = 18; tiny.height = 32; }
+        const t = tiny.getContext("2d"), sw = vh * tiny.width / tiny.height;
+        t.drawImage(video, (vw - sw) / 2, 0, sw, vh, 0, 0, tiny.width, tiny.height);
+        ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(tiny, 0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
       ctx.filter = base;
       ctx.drawImage(video, x, y, w, h);
