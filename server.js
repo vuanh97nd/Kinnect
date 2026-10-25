@@ -283,6 +283,8 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit } = {}) {
       "/studio.css": ["studio.css", "text/css"],
       "/compact.css": ["compact.css", "text/css"],
       "/desktop.css": ["desktop.css", "text/css"],
+      "/live.css": ["live.css", "text/css"],
+      "/live-ui.js": ["live-ui.js", "text/javascript"],
       "/social.css": ["social.css", "text/css"],
       "/kinnect-icon.png": ["kinnect-icon.png", "image/png"],
       "/": ["index.html", "text/html"],
