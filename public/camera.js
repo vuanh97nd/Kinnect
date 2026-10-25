@@ -736,7 +736,8 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
       audioCtx ||= new AudioContext();
       audioCtx.resume?.();
       const dest = audioCtx.createMediaStreamDestination();
-      const mic = raw.getAudioTracks();
+      // Đã chọn nhạc thì không thu micro: trên điện thoại micro thu lại tiếng nhạc từ loa gây rè/nhiễu.
+      const mic = [];
       if (mic.length) {
         const g = audioCtx.createGain();
         g.gain.value = 0.8;
@@ -815,7 +816,7 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
     btn.disabled = true;
     btn.textContent = "Đang đăng…";
     try {
-      await onDone(pendingBlob, $(".tt-caption").value);
+      await onDone(pendingBlob, $(".tt-caption").value, (p) => { btn.textContent = p < 100 ? "Đang tải lên " + p + "%" : "Đang xử lý…"; });
       close();
     } catch (err) {
       notify(err.message);

@@ -232,3 +232,14 @@ body.studio-open { overflow: hidden; }
 .fxp-slider span{width:60px}.fxp-slider b{width:26px;text-align:right}
 .fxp-slider input{flex:1;accent-color:#fff;min-height:0!important;padding:0!important;background:none!important;border:0!important}
 .fxp-note{margin:4px 0 0;text-align:center;font-size:11px;color:#fffa}
+/* Màn "Chia sẻ video / Đăng tin": theo màu giao diện của app (sáng/tối), xem trước lớn ở trên, chú thích bên dưới */
+.tt-post { background: var(--bg); color: var(--ink); }
+.tt-post-head { color: var(--ink); border-bottom: 1px solid var(--line); background: var(--card); font-weight: 800; }
+.tt-post-head .tt-back { color: var(--ink) !important; background: none !important; font-size: 26px; width: 44px; }
+.tt-post-body { flex-direction: column; align-items: center; gap: 14px; padding: 16px; overflow: auto; flex: 1; min-height: 0; }
+.tt-preview { width: auto; height: min(52dvh, 460px); aspect-ratio: 9 / 16; max-width: 100%; border-radius: 18px; background: #000; box-shadow: 0 12px 30px -12px #0006; object-fit: cover; }
+.tt-caption { width: 100%; flex: none; min-height: 84px; padding: 12px 14px; border: 1px solid var(--line) !important; border-radius: 14px; background: var(--card) !important; color: var(--ink) !important; }
+.tt-caption::placeholder { color: var(--muted); }
+.tt-post-actions { background: var(--card); border-top: 1px solid var(--line); }
+.tt-retake { background: var(--soft) !important; color: var(--ink) !important; border-radius: 14px; }
+.tt-publish { border-radius: 14px; }

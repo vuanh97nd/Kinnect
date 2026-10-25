@@ -174,6 +174,26 @@ const action = (text, fn, cls = "secondary") => {
 let authRevision = 0;
 let sessionCheck = null;
 let navigationRevision = 0;
+// Tải video lên kèm % tiến độ và giới hạn thời gian (mạng chập chờn không làm kẹt nút "Đang đăng…").
+function uploadJson(path, data, progress = () => {}) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open("POST", "/api" + path);
+    x.withCredentials = true;
+    x.timeout = 180000;
+    x.setRequestHeader("Content-Type", "application/json");
+    x.upload.onprogress = (e) => e.lengthComputable && progress(Math.round((e.loaded / e.total) * 100));
+    x.onload = () => {
+      let body = {};
+      try { body = JSON.parse(x.responseText || "{}"); } catch {}
+      if (x.status >= 200 && x.status < 300) resolve(body);
+      else reject(Error(body.error || "Đăng không thành công (" + x.status + ")."));
+    };
+    x.onerror = () => reject(Error("Mất kết nối khi tải video lên. Hãy thử lại."));
+    x.ontimeout = () => reject(Error("Tải lên quá lâu. Hãy kiểm tra mạng rồi thử lại."));
+    x.send(JSON.stringify(data));
+  });
+}
 async function api(path, method = "GET", data) {
   const revision = authRevision;
   const options = {
@@ -2202,10 +2222,10 @@ async function openCamera({story = false, photo = null} = {}) {
       $("title").value = live.title;
       $("create").requestSubmit();
     },
-    onDone: async (blob, caption) => {
+    onDone: async (blob, caption, progress) => {
       if (blob.size > 12 * 1024 * 1024) throw Error("Video tối đa 12 MB.");
       const data=await toBase64(blob);
-      await api(story ? "/stories" : "/shorts", "POST", story ? {media:data,body:caption} : {data,caption});
+      await uploadJson(story ? "/stories" : "/shorts", story ? {media:data,body:caption} : {data,caption}, progress);
       status(story ? "Đã đăng tin." : "Đã đăng video.");
       await navigate(story ? "feed" : "shorts");
     },
