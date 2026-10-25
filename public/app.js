@@ -266,23 +266,15 @@ $("create").onsubmit = async (e) => {
   try {
     if (!navigator.mediaDevices?.getUserMedia)
       throw Error("Camera cần HTTPS hoặc localhost.");
-    const captured = await navigator.mediaDevices.getUserMedia({
-      video: matchMedia("(pointer: coarse)").matches ? { facingMode: "user", width: { ideal: 720 }, height: { ideal: 1280 }, aspectRatio: { ideal: 9 / 16 } } : { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 }, resizeMode: "none" },
-      audio: true,
-    });
+    const captured = matchMedia("(pointer: coarse)").matches && innerHeight > innerWidth
+      ? await portraitCamera()
+      : await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 }, resizeMode: "none" },
+          audio: true,
+        });
     if (revision !== liveRevision || !connected) {
       captured.getTracks().forEach(t => t.stop());
       return;
-    }
-    // iPhone đôi khi trả hình ngang dù máy đang cầm dọc: xin lại khung dọc ngay trên track hiện tại.
-    if (matchMedia("(pointer: coarse)").matches) {
-      const track = captured.getVideoTracks()[0], s = track?.getSettings?.() || {};
-      if ((s.width || 0) > (s.height || 0) && innerHeight > innerWidth)
-        for (const c of [{ width: { exact: 720 }, height: { exact: 1280 } }, { aspectRatio: { exact: 9 / 16 } }, { width: { ideal: 480 }, height: { ideal: 640 } }]) {
-          try { await track.applyConstraints({ facingMode: "user", ...c }); } catch { continue; }
-          const n = track.getSettings();
-          if ((n.width || 0) < (n.height || 0)) break;
-        }
     }
     rawStream = captured;
     window.kinnectLiveCamera = captured;
@@ -302,6 +294,41 @@ $("create").onsubmit = async (e) => {
     $("start").disabled = false;
   }
 };
+// Điện thoại cầm dọc: iPhone có thể trả khung ngang 1280×720 tuỳ cách xin camera.
+// Thử lần lượt nhiều cách, đo khung hình thật và giữ cách đầu tiên cho ra khung dọc.
+async function frameSize(stream) {
+  const v = document.createElement("video");
+  v.muted = true; v.playsInline = true; v.srcObject = stream;
+  await Promise.race([new Promise((r) => v.addEventListener("loadedmetadata", r, { once: true })), new Promise((r) => setTimeout(r, 1500))]);
+  v.play().catch(() => {});
+  for (let i = 0; i < 10 && !v.videoWidth; i++) await new Promise((r) => setTimeout(r, 100));
+  const size = [v.videoWidth, v.videoHeight];
+  v.srcObject = null;
+  return size;
+}
+async function portraitCamera() {
+  const tries = [
+    { facingMode: "user", width: { ideal: 720 }, height: { ideal: 1280 } },
+    { facingMode: "user" },
+    { facingMode: "user", width: { ideal: 480 }, height: { ideal: 640 } },
+    { facingMode: "user", aspectRatio: { ideal: 3 / 4 } },
+    { facingMode: "user", width: { ideal: 1080 }, height: { ideal: 1920 } },
+  ];
+  let fallback = null, chosen = null, label = "";
+  for (const [i, video] of tries.entries()) {
+    let s;
+    try { s = await navigator.mediaDevices.getUserMedia({ video }); } catch { continue; }
+    const [w, h] = await frameSize(s);
+    if (w && h && w < h) { chosen = s; label = "#" + (i + 1); break; }
+    if (!fallback) { fallback = s; label = "#" + (i + 1) + " ngang"; } else s.getTracks().forEach((t) => t.stop());
+  }
+  if (chosen && fallback) fallback.getTracks().forEach((t) => t.stop());
+  const video = chosen || fallback || (await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } }));
+  const audio = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const stream = new MediaStream([...video.getVideoTracks(), ...audio.getAudioTracks()]);
+  stream.kinnectVariant = label;
+  return stream;
+}
 $("leave").onclick = () => {
   send({ type: "leave" });
   cleanup();

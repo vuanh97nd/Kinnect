@@ -57,6 +57,6 @@
     if (probe.srcObject !== cam) { probe.srcObject = cam; probe.play().catch(() => {}); }
     const s = track.getSettings();
     diag.hidden = false;
-    diag.textContent = "cam " + s.width + "×" + s.height + " · khung " + probe.videoWidth + "×" + probe.videoHeight + " · màn " + innerWidth + "×" + innerHeight;
+    diag.textContent = (cam.kinnectVariant ? "cách " + cam.kinnectVariant + " · " : "") + "cam " + s.width + "×" + s.height + " · khung " + probe.videoWidth + "×" + probe.videoHeight + " · màn " + innerWidth + "×" + innerHeight;
   }, 1000);
 })();
