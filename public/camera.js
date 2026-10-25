@@ -86,7 +86,8 @@ export function createEffects(rawStream, { width = 540, height = 960, portrait =
   function cover() {
     const vw = video.videoWidth || canvas.width;
     const vh = video.videoHeight || canvas.height;
-    const scale = Math.max(canvas.width / vw, canvas.height / vh);
+    // Khung dọc nhưng camera trả hình ngang (iPhone): vừa khít chiều ngang, không phóng to.
+    const scale = (portrait && vw > vh ? Math.min : Math.max)(canvas.width / vw, canvas.height / vh);
     const w = vw * scale;
     const h = vh * scale;
     return [(canvas.width - w) / 2, (canvas.height - h) / 2, w, h];
@@ -145,6 +146,12 @@ export function createEffects(rawStream, { width = 540, height = 960, portrait =
       if (state.mirror) {
         ctx.translate(canvas.width, 0);
         ctx.scale(-1, 1);
+      }
+      if (portrait && w < canvas.width + 1 && h < canvas.height) {
+        // Nền: chính khung hình phủ kín và làm mờ, để phần trên/dưới không bị đen.
+        const s = Math.max(canvas.width / w, canvas.height / h);
+        ctx.filter = "blur(24px) brightness(0.7)";
+        ctx.drawImage(video, (canvas.width - w * s) / 2, (canvas.height - h * s) / 2, w * s, h * s);
       }
       ctx.filter = base;
       ctx.drawImage(video, x, y, w, h);
