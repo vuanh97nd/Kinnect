@@ -490,7 +490,7 @@ function skeleton(kind) {
   if (kind === "grid") box.classList.add("grid");
   return box;
 }
-let inboxRefresh=null,stopChatViewport=null;
+let inboxRefresh=null,stopChatViewport=null,friendsRefresh=null;
 function fitChatViewport(box){
  stopChatViewport?.();if(!window.visualViewport||innerWidth>=1000)return;
  const viewport=window.visualViewport;
@@ -499,7 +499,7 @@ function fitChatViewport(box){
  stopChatViewport=()=>{viewport.removeEventListener('resize',fit);viewport.removeEventListener('scroll',fit);document.body.classList.remove('chat-keyboard-open');stopChatViewport=null;};
 }
 async function navigate(value, opts = {}) {
-  stopChatViewport?.();inboxRefresh=null;
+  stopChatViewport?.();inboxRefresh=null;friendsRefresh=null;
   const revision = ++navigationRevision;
   nearbyRefresh=null;
   closeNotificationCenter();
@@ -527,6 +527,7 @@ async function navigate(value, opts = {}) {
     if (value === "shorts") await shorts(view, () => revision === navigationRevision, opts.feed || videoFeed);
     if (value === "profile") await profile(view, opts);
     if (value === "inbox") await inbox(view);
+    if (value === "friends") await friendsPage(view,opts);
     if (value === "settings") await accountSettings(view);
     if (value === "notifications") await notifications(view);
     if (value === "admin") await adminPanel(view);
@@ -688,9 +689,6 @@ async function resumeLocationTracking(){
  if(opted)startLocationTracking();
 }
 async function discover(panel, q = "") {
-  const head = node("div", undefined, "view-head discover-head");
-  head.append(node("h2", "Khám phá"));
-  panel.append(head);
   let selected = discoveryMode, request = 0;
   const tools = node("section", undefined, "discovery-tools social-card");
   const chips = node("div", undefined, "chips discovery-tabs");
@@ -700,14 +698,11 @@ async function discover(panel, q = "") {
     b.onclick = () => { selected = discoveryMode = value; for (const c of chips.children) { c.classList.toggle("active", c === b); c.setAttribute("aria-pressed", String(c === b)); } if(value === "nearby"){if(!enable.disabled)enable.onclick();}else load().catch(showError); };
     chips.append(b);
   }
-  const form = node("form", undefined, "search-bar");
-  const search = node("input"); search.type = "search"; search.value = q; search.placeholder = "Tìm bạn…"; search.setAttribute("aria-label", "Tìm bạn");
-  const button = node("button", "Tìm"); form.append(search, button);
   const location = node("section", undefined, "nearby-consent");
   const locationText = node("p", "", "muted"); locationText.setAttribute("role", "status");
   const enable = node("button", "Bật vị trí", "secondary"); enable.type = "button";
   const disable = node("button", "Tắt", "ghost"); disable.type = "button";
-  location.append(locationText, enable, disable); tools.append(chips, form, location); panel.append(tools);
+  location.append(locationText, enable, disable); tools.append(chips, location); panel.append(tools);
   const heading = node("h3", "", "section-title discovery-results-title");
   const list = node("div", undefined, "people-grid"); panel.append(heading, list);
   function showError(e) { locationText.textContent = e.message; list.replaceChildren(empty("📍", "Chưa tải được thành viên", "Bạn có thể thử lại hoặc chọn Mới tham gia.")); }
@@ -726,10 +721,10 @@ async function discover(panel, q = "") {
     const nearby = mode === "nearby" && me.hasLocation;
     heading.textContent = mode === "nearby" ? (nearby ? "Thành viên quanh bạn" : "Mới tham gia") : mode === "active" ? "Đang hoạt động" : mode === "interests" ? "Người cùng sở thích" : "Mới tham gia";
     list.replaceChildren(skeleton("grid"));
-    const { users } = await api("/discover?q=" + encodeURIComponent(search.value) + (nearby ? "&nearby=1" : "") + "&sort=" + (mode === "nearby" ? "new" : mode));
+    const { users } = await api("/discover?q=" + encodeURIComponent(q) + (nearby ? "&nearby=1" : "") + "&sort=" + (mode === "nearby" ? "new" : mode));
     if (version !== request) return;
     list.replaceChildren(...users.map(userCard));
-    if (!users.length) list.append(empty(nearby ? "📍" : "🔎", nearby ? "Chưa có thành viên quanh bạn" : mode === "active" ? "Chưa có ai đang hoạt động" : "Chưa tìm thấy ai", nearby ? "Chỉ những người đã bật vị trí trong 24 giờ gần nhất mới xuất hiện. Bạn có thể xem thêm ở Mới tham gia." : mode === "active" ? "Chưa có thành viên đang hoạt động. Hãy xem thêm ở Mới tham gia." : "Thử từ khóa khác hoặc bổ sung sở thích cho hồ sơ."));
+    if (!users.length) list.append(empty(nearby ? "📍" : "🔎", nearby ? "Chưa có thành viên quanh bạn" : mode === "active" ? "Chưa có ai đang hoạt động" : "Chưa tìm thấy ai", nearby ? "Chỉ những người đã bật vị trí trong 24 giờ gần nhất mới xuất hiện. Bạn có thể xem thêm ở Mới tham gia." : mode === "active" ? "Chưa có thành viên đang hoạt động. Hãy xem thêm ở Mới tham gia." : "Bổ sung sở thích hoặc thử bộ lọc khác."));
   }
   enable.onclick = async () => {
     enable.disabled = true;
@@ -745,7 +740,6 @@ async function discover(panel, q = "") {
     } finally { enable.disabled = false; }
   };
   disable.onclick = async () => { disable.disabled = true; try { me = (await api("/me/location", "PATCH", { enabled: false })).user; rememberLocation(false);stopLocationTracking();await load(); } catch (e) { showError(e); } finally { disable.disabled = false; } };
-  form.onsubmit = (e) => { e.preventDefault(); load().catch(showError); };
   nearbyRefresh=()=>panel.isConnected&&selected==="nearby"?load().catch(showError):undefined;
   await load();
 }
@@ -1254,20 +1248,20 @@ async function profileConnections(user,kind){
 }
 async function profilePrivateAlbum(panel,user,own){
  const revision=navigationRevision,section=node('section',undefined,'social-card private-album');section.setAttribute('aria-label','Ảnh riêng tư');
- const heading=node('div',undefined,'private-album-head'),title=node('div');title.append(node('h3','Ảnh riêng tư'),node('p','Chỉ người được bạn đồng ý mới xem được ảnh.','muted'));
- const refresh=action('Làm mới',()=>reload().catch(e=>status(e.message)),'ghost');heading.append(title,refresh);section.append(heading);
- const hint=node('p',own?'Quyền xem áp dụng cho toàn bộ album, gồm ảnh thêm sau này. Chỉ chia sẻ với người bạn tin tưởng; người xem có thể lưu hoặc chụp ảnh.':'Gửi yêu cầu để chủ album quyết định có chia sẻ với bạn hay không.','private-album-hint');section.append(hint);
+ const heading=node('div',undefined,'private-album-head'),title=node('div');title.append(node('h3','Ảnh riêng tư'),node('p','0 ảnh','muted'));
+ const refresh=action('↻',()=>reload().catch(e=>status(e.message)),'ghost');refresh.setAttribute('aria-label','Làm mới');refresh.title='Làm mới';heading.append(title,refresh);section.append(heading);
+
  let upload=null;
- if(own){const tools=node('div',undefined,'private-album-tools'),pick=node('label',undefined,'btn-like primary');upload=node('input');upload.type='file';upload.accept='image/png,image/jpeg,image/webp';upload.setAttribute('aria-label','Thêm ảnh riêng tư');pick.append(upload,node('span','Thêm ảnh'));tools.append(pick,node('small','PNG, JPEG, WebP · tối đa 4 MB/ảnh · 24 ảnh'));section.append(tools);upload.onchange=async()=>{const file=upload.files[0];if(!file)return;if(file.size>4*1024*1024){upload.value='';status('Ảnh phải nhỏ hơn 4 MB.');return;}upload.disabled=true;try{await api('/me/private-photos','POST',{data:await readMediaFile(file)});await reload(true);status('Đã thêm ảnh riêng tư.');}catch(e){status(e.message);}finally{upload.disabled=false;upload.value='';}};}
- const state=node('div',undefined,'private-album-state'),grid=node('div',undefined,'private-photo-grid'),requests=node('div',undefined,'private-access-list');section.append(state,grid,requests);panel.append(section);
+ if(own){const tools=node('div',undefined,'private-album-tools'),pick=node('label',undefined,'btn-like primary');upload=node('input');upload.type='file';upload.accept='image/png,image/jpeg,image/webp';upload.setAttribute('aria-label','Thêm ảnh riêng tư');pick.append(upload,node('span','Thêm ảnh'));pick.title='PNG, JPEG, WebP · tối đa 4 MB/ảnh · 24 ảnh';tools.append(pick);section.append(tools);upload.onchange=async()=>{const file=upload.files[0];if(!file)return;if(file.size>4*1024*1024){upload.value='';status('Ảnh phải nhỏ hơn 4 MB.');return;}upload.disabled=true;try{await api('/me/private-photos','POST',{data:await readMediaFile(file)});await reload(true);status('Đã thêm ảnh riêng tư.');}catch(e){status(e.message);}finally{upload.disabled=false;upload.value='';}};}
+ const state=node('div',undefined,'private-album-state'),grid=node('div',undefined,'private-photo-grid'),requests=node('div',undefined,'private-access-list');const accessPanel=node('details',undefined,'private-access-panel'),accessSummary=node('summary','Quyền xem');accessPanel.append(accessSummary,requests);accessPanel.hidden=!own;section.append(grid,state,accessPanel);panel.append(section);
  let inFlight=null,signature='';
  async function openPhoto(photo){try{const current=await api('/users/'+user.id+'/private');if(revision!==navigationRevision)return;if(!['owner','granted'].includes(current.status)||!current.photos.some(p=>p.id===photo.id)){await reload(true);status('Bạn chưa có quyền xem ảnh này.');return;}closePrivatePhoto();const dialog=node('dialog',undefined,'private-photo-viewer');privatePhotoViewer=dialog;dialog.setAttribute('aria-label','Xem ảnh riêng tư');const bar=node('div',undefined,'private-photo-viewer-bar'),close=action('×',()=>dialog.close(),'ghost');close.setAttribute('aria-label','Đóng ảnh riêng tư');bar.append(node('strong','Ảnh riêng tư'),close);const image=node('img');image.src=photo.url;image.alt='Ảnh riêng tư của '+user.name;image.onerror=()=>{dialog.close();reload(true).catch(()=>{});status('Ảnh không còn khả dụng.');};dialog.append(bar,image);dialog.addEventListener('close',()=>{image.onerror=null;image.removeAttribute('src');dialog.remove();if(privatePhotoViewer===dialog)privatePhotoViewer=null;},{once:true});document.body.append(dialog);dialog.showModal();}catch(e){status(e.message);}}
  async function decide(viewer,decision,button){button.disabled=true;try{await api('/me/private/requests/'+viewer.id,'POST',{action:decision});await reload(true);status(decision==='grant'?'Đã đồng ý cho xem album.':decision==='revoke'?'Đã thu hồi quyền xem album.':'Đã từ chối yêu cầu.');}catch(e){status(e.message);button.disabled=false;}}
- function render(album,access){state.replaceChildren();grid.replaceChildren();requests.replaceChildren();title.querySelector('p').textContent=album.count+' ảnh · '+(own?'Chỉ chia sẻ khi bạn đồng ý':album.status==='granted'?'Bạn đã được quyền xem':'Album được khóa');
- if(!own&&!['owner','granted'].includes(album.status)){closePrivatePhoto();state.append(node('p',album.status==='pending'?'Đã gửi yêu cầu, đang chờ chủ album đồng ý.':album.status==='denied'?'Yêu cầu trước chưa được đồng ý.':'Ảnh chỉ hiển thị sau khi chủ album đồng ý.'));if(album.count){const pending=album.status==='pending',button=action(pending?'Hủy yêu cầu':'Yêu cầu xem',async()=>{button.disabled=true;try{await api('/users/'+user.id+'/private/request',pending?'DELETE':'POST',{});await reload(true);}catch(e){status(e.message);button.disabled=false;}},pending?'secondary':'primary');state.append(button);}for(let i=0;i<Math.min(album.count,6);i++){const locked=node('div',undefined,'private-photo-locked');locked.setAttribute('aria-label','Ảnh riêng tư đã khóa');locked.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 018 0v3"/><path d="M12 14v3"/></svg>';locked.append(node('span','Đã khóa'));grid.append(locked);}}
+ function render(album,access){state.replaceChildren();grid.replaceChildren();requests.replaceChildren();title.querySelector('p').textContent=album.count+' ảnh';
+ if(!own&&!['owner','granted'].includes(album.status)){closePrivatePhoto();if(album.status==='pending')state.append(node('p','Đang chờ duyệt.'));else if(album.status==='denied')state.append(node('p','Yêu cầu chưa được đồng ý.'));if(album.count){const pending=album.status==='pending',button=action(pending?'Hủy yêu cầu':'Yêu cầu xem ảnh riêng tư',async()=>{button.disabled=true;try{await api('/users/'+user.id+'/private/request',pending?'DELETE':'POST',{});await reload(true);if(!pending)status('Đã gửi yêu cầu trong tin nhắn.');}catch(e){status(e.message);button.disabled=false;}},pending?'secondary':'primary');state.append(button);}for(let i=0;i<Math.min(album.count,6);i++){const locked=node('div',undefined,'private-photo-locked');locked.setAttribute('aria-label','Ảnh riêng tư đã khóa');locked.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 018 0v3"/><path d="M12 14v3"/></svg>';grid.append(locked);}}
  else{for(const photo of album.photos){const tile=node('div',undefined,'private-photo-item'),open=action('',()=>openPhoto(photo),'private-photo-open'),image=node('img');open.setAttribute('aria-label','Xem ảnh riêng tư');image.src=photo.url;image.alt='Ảnh riêng tư';image.loading='lazy';open.append(image);tile.append(open);if(own){const remove=action('×',async()=>{if(!confirm('Xóa ảnh riêng tư này?'))return;remove.disabled=true;try{await api('/me/private-photos/'+photo.id,'DELETE');closePrivatePhoto();await reload(true);}catch(e){status(e.message);remove.disabled=false;}},'private-photo-delete');remove.setAttribute('aria-label','Xóa ảnh riêng tư');tile.append(remove);}grid.append(tile);}}
- if(!album.count)state.append(node('p',own?'Chưa có ảnh riêng tư. Bấm Thêm ảnh để tạo album.':'Album chưa có ảnh riêng tư.','muted'));
- if(own){const pending=access.filter(r=>r.status==='pending'),granted=access.filter(r=>r.status==='granted');requests.append(node('h4','Yêu cầu xem ('+pending.length+')'));if(!pending.length)requests.append(node('p','Chưa có yêu cầu đang chờ.','muted'));if(granted.length)requests.append(node('p','Người được xem album','private-access-heading'));for(const request of [...pending,...granted]){const row=node('div',undefined,'private-access-row'),who=node('div',undefined,'private-access-person');who.append(personLink(request.user),node("span",request.user.name));const buttons=node('div',undefined,'private-access-actions');for(const [label,decision] of request.status==='pending'?[['Đồng ý','grant'],['Từ chối','deny']]:[['Thu hồi','revoke']]){const button=action(label,()=>decide(request.user,decision,button),decision==='grant'?'primary':'secondary');buttons.append(button);}row.append(who,buttons);requests.append(row);}}
+ if(!album.count)state.append(node('p','Chưa có ảnh.','muted'));
+ if(own){const pending=access.filter(r=>r.status==='pending'),granted=access.filter(r=>r.status==='granted');accessSummary.textContent='Quyền xem'+(pending.length?' · '+pending.length+' chờ duyệt':'');requests.append(node('h4','Chờ duyệt ('+pending.length+')'));if(granted.length)requests.append(node('p','Đã cấp quyền','private-access-heading'));for(const request of [...pending,...granted]){const row=node('div',undefined,'private-access-row'),who=node('div',undefined,'private-access-person');who.append(personLink(request.user),node("span",request.user.name));const buttons=node('div',undefined,'private-access-actions');for(const [label,decision] of request.status==='pending'?[['Đồng ý','grant'],['Từ chối','deny']]:[['Thu hồi','revoke']]){const button=action(label,()=>decide(request.user,decision,button),decision==='grant'?'primary':'secondary');if(decision==='grant')button.title='Cho xem toàn bộ album, bao gồm ảnh thêm sau này. Người xem có thể lưu hoặc chụp ảnh.';buttons.append(button);}row.append(who,buttons);requests.append(row);}}
  }
  async function reload(force=false){if(inFlight){await inFlight;if(!force)return;}inFlight=(async()=>{const [album,access]=await Promise.all([api('/users/'+user.id+'/private'),own?api('/me/private/requests'):Promise.resolve({requests:[]})]);if(revision!==navigationRevision)return;const next=JSON.stringify([album,access]);if(next!==signature){signature=next;render(album,access.requests);}if(!['owner','granted'].includes(album.status))closePrivatePhoto();})();try{await inFlight;}finally{inFlight=null;}}
  privateAlbumRefresh=()=>{if(!document.hidden)return reload().catch(()=>{if(revision!==navigationRevision)return;closePrivatePhoto();state.textContent='Album không còn khả dụng.';grid.replaceChildren();requests.replaceChildren();});};
@@ -1304,28 +1298,32 @@ async function profile(panel, opts = {}) {
   const acts = node("div", undefined, "profile-actions");
   let directAvatar=null;
   if(own){directAvatar=node('button',undefined,'profile-avatar-edit');directAvatar.type='button';directAvatar.setAttribute('aria-label','Đổi ảnh đại diện trên trang cá nhân');directAvatar.title='Đổi ảnh đại diện';directAvatar.append(big);}
-  head.append(cover, directAvatar||big, id, profileBadges(u), bio, tags);
-  if (u.lookingFor) head.append(node("p", "Muốn kết nối: " + u.lookingFor, "profile-intent"));
+  head.append(cover, directAvatar||big, id);
+
   head.append(nums, acts);
+  if(own)acts.prepend(action('Thêm vào tin',()=>openCamera({story:true}),'profile-story-action'));
+  const navigation=node('div',undefined,'profile-sections');navigation.setAttribute('role','tablist');navigation.setAttribute('aria-label','Nội dung trang cá nhân');
+  for(const [key,label] of [['posts','Tất cả'],['about','Giới thiệu'],['photos','Ảnh riêng tư']]){const button=node('button',label);button.type='button';button.setAttribute('role','tab');button.id='profile-tab-'+key;button.setAttribute('aria-controls','profile-content-'+key);button.setAttribute('aria-selected',String(key==='posts'));button.tabIndex=key==='posts'?0:-1;button.onclick=()=>{panel.dataset.profileSection=key;for(const other of navigation.children){other.setAttribute('aria-selected',String(other===button));other.tabIndex=other===button?0:-1;}for(const region of panel.querySelectorAll('.profile-content-section')){region.hidden=region.dataset.section!==key&&!(key==='posts'&&region.dataset.section==='about');}};button.onkeydown=e=>{const buttons=[...navigation.children],i=buttons.indexOf(button);let next;if(e.key==='ArrowRight')next=(i+1)%buttons.length;if(e.key==='ArrowLeft')next=(i+buttons.length-1)%buttons.length;if(e.key==='Home')next=0;if(e.key==='End')next=buttons.length-1;if(next!==undefined){e.preventDefault();buttons[next].click();buttons[next].focus();}};navigation.append(button);}head.append(navigation);
+  panel.dataset.profileSection='posts';
+  const profileContent=node('div',undefined,'profile-content');
+  const intro=node('section',undefined,'profile-content-section profile-intro');intro.id='profile-content-about';intro.dataset.section='about';intro.setAttribute('role','region');intro.setAttribute('aria-label','Giới thiệu');intro.hidden=false;
+  const timeline=node('section',undefined,'profile-content-section profile-timeline');timeline.id='profile-content-posts';timeline.dataset.section='posts';timeline.setAttribute('role','tabpanel');timeline.setAttribute('aria-labelledby','profile-tab-posts');
+  const photos=node('section',undefined,'profile-content-section profile-photos');photos.id='profile-content-photos';photos.dataset.section='photos';photos.setAttribute('role','tabpanel');photos.setAttribute('aria-labelledby','profile-tab-photos');photos.hidden=true;
+  profileContent.append(intro,timeline,photos);
   panel.append(head);
   const personalRows=[['Tuổi',u.age?u.age+' tuổi':''],['Thành phố',u.city],['Cách xưng hô',u.pronouns],['Giới tính',u.gender],['Xu hướng',u.orientation],['Vai trò',u.relationshipRole],['Kiểu kết nối',u.lookingFor],['Sở thích',(u.interests||[]).join(', ')]];
-  if(personalRows.some(([,value])=>value)){
+  {
    const details=node('section',undefined,'social-card profile-personal-info');details.setAttribute('aria-label','Thông tin cá nhân');details.append(node('h3','Thông tin cá nhân'));
-   const values=node('dl');for(const [label,value] of personalRows){if(!value)continue;const row=node('div');row.append(node('dt',label),node('dd',String(value)));values.append(row);}details.append(values);
-   if(own&&!u.identityPublic&&[u.gender,u.orientation,u.relationshipRole,u.pronouns].some(Boolean))details.append(node('p','Thông tin danh tính chỉ hiển thị với bạn. Bật chia sẻ trong Sửa hồ sơ nếu muốn công khai.','profile-info-privacy'));
-   panel.append(details);
+   const values=node('dl');for(const [label,value] of personalRows){if(!value)continue;const row=node('div');const term=node('dt'),icon=node('span',undefined,'profile-detail-icon');icon.setAttribute('aria-hidden','true');const shape=label==='Thành phố'?'<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1116 0Z"/><circle cx="12" cy="10" r="3"/>':label==='Kiểu kết nối'?'<path d="m12 21-8-8a5 5 0 017-7l1 1 1-1a5 5 0 017 7Z"/>':label==='Sở thích'?'<path d="m12 3 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1Z"/>':'<circle cx="12" cy="8" r="4"/><path d="M4 22v-2a8 8 0 0116 0v2"/>';icon.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+shape+'</svg>';const description=node('span',label,'profile-detail-label');term.append(icon,description);term.title=label;row.append(term,node('dd',String(value)));values.append(row);}details.append(values);
+   if(own&&!u.identityPublic&&[u.gender,u.orientation,u.relationshipRole,u.pronouns].some(Boolean))details.append(node('p','Thông tin danh tính chỉ hiển thị với bạn. Bật chia sẻ trong Cài đặt → Chỉnh sửa tài khoản nếu muốn công khai.','profile-info-privacy'));
+   details.insertBefore(bio,details.querySelector('dl'));details.append(profileBadges(u),tags);
+   if(!personalRows.some(([,value])=>value))details.append(node('p',own?'Thêm thông tin để bạn bè hiểu bạn hơn.':'Chưa có thông tin được chia sẻ.','muted'));
+
+   intro.append(details);
   }
   const settings = node("div", undefined, "settings profile-edit-screen");
   let avatarPicker=null;
   if (own) {
-    const edit = node("button", "Sửa hồ sơ", "secondary");
-    edit.type = "button";
-    edit.onclick = () => {
-      settings.hidden = !settings.hidden;
-      document.body.classList.toggle("profile-edit-open",!settings.hidden);
-      edit.setAttribute("aria-expanded",String(!settings.hidden));
-      if (!settings.hidden)settings.scrollTop=0;
-    };
     const pick = node("label", undefined, "btn-like secondary");
     const upload = node("input");
     upload.type = "file";
@@ -1354,13 +1352,16 @@ async function profile(panel, opts = {}) {
       }finally{directAvatar.disabled=false;upload.value="";}
     };
     avatarPicker=pick;
-    acts.append(edit);
+
   } else {
-    acts.append(
-      action(u.following ? "Bỏ theo dõi" : "Theo dõi", async () => {
+    acts.append(friendshipAction(u,()=>navigate("profile",opts)));
+    if(u.friendship!=='outgoing')acts.append(
+      action(u.following ? "Đang theo dõi" : "Theo dõi", async () => {
         await api("/users/" + u.id + "/follow", u.following ? "DELETE" : "POST", {});
         await navigate("profile", opts);
-      }, u.following ? "secondary" : "follow"),
+      }, u.following ? "secondary" : "follow")
+    );
+    acts.append(
       action("Nhắn tin", () => openChat(u)),
       more([
         ["Chặn", async () => {
@@ -1470,17 +1471,50 @@ async function profile(panel, opts = {}) {
     settings.append(form);
     panel.append(settings);
   }
-  await profilePrivateAlbum(panel,u,own);
+  panel.append(profileContent);
+  await profilePrivateAlbum(photos,u,own);
   // Bài viết của người này
-  panel.append(node("h3", own ? "Bài viết của bạn" : "Bài viết", "section-title"));
+  const timelineHead=node('div',undefined,'social-card profile-timeline-head');timelineHead.append(node('h3','Bài viết'));if(own)timelineHead.append(action('Tạo bài viết',async()=>{await navigate('feed');document.querySelector('.composer textarea')?.focus();},'secondary'));timeline.append(timelineHead);
   const { posts } = await api("/posts?user=" + encodeURIComponent(u.id));
   if (!posts.length)
-    panel.append(empty("📝", "Chưa có bài viết", own ? "Chia sẻ điều đầu tiên trên Bảng tin nhé." : "Người này chưa đăng gì."));
-  for (const p of posts) panel.append(postCard(p));
+    timeline.append(empty("📝", "Chưa có bài viết", own ? "Chia sẻ điều đầu tiên trên Bảng tin nhé." : "Người này chưa đăng gì."));
+  for (const p of posts) timeline.append(postCard(p));
+  if(opts.privateAlbum)navigation.querySelector('#profile-tab-photos').click();
+}
+function friendshipAction(u,refresh){
+ if(u.friendship==='friends'){const menu=more([['Hủy kết bạn',async()=>{if(!confirm('Hủy kết bạn với '+u.name+'?'))return;await api('/users/'+u.id+'/friendship','DELETE',{});await refresh();}]],'Bạn bè');menu.classList.add('friendship-menu');menu.querySelector('summary').textContent='Bạn bè ▾';return menu;}
+ const incoming=u.friendship==='incoming',outgoing=u.friendship==='outgoing';
+ if(outgoing){const menu=more([['Hủy lời mời',async()=>{await api('/users/'+u.id+'/friend-request','DELETE',{});await refresh();}],...(u.following?[['Bỏ theo dõi',async()=>{await api('/users/'+u.id+'/follow','DELETE',{});await refresh();}]]:[])],'Lời mời đã gửi');menu.classList.add('friendship-menu');menu.querySelector('summary').textContent=u.following?'Đang theo dõi ▾':'Đã gửi lời mời ▾';return menu;}
+ const button=action(incoming?'Xác nhận kết bạn':outgoing?'Hủy lời mời':'Kết bạn',async()=>{button.disabled=true;try{await api('/users/'+u.id+'/friend-request'+(incoming?'/respond':''),outgoing?'DELETE':'POST',incoming?{action:'accept'}:{});await refresh();}catch(e){status(e.message);button.disabled=false;}},outgoing?'secondary':'primary');return button;
+}
+async function friendsPage(panel,opts={}){
+ const revision=navigationRevision;let section=opts.section||'friends',filter='all',payload=null,signature='';
+ const heading=node('div',undefined,'view-head');heading.append(node('h2','Bạn bè'));panel.append(heading);
+ const tabs=node('div',undefined,'friends-tabs');tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Kết nối bạn bè');panel.append(tabs);
+ for(const [key,label] of [['friends','Bạn bè'],['following','Đang theo dõi'],['requests','Lời mời'],['suggestions','Đề xuất']]){const b=node('button',label,'secondary');b.type='button';b.setAttribute('role','tab');b.setAttribute('aria-selected',String(key===section));b.onclick=()=>{section=key;for(const other of tabs.children)other.setAttribute('aria-selected',String(other===b));draw();};tabs.append(b);}
+ const search=node('input',undefined,'friends-search');search.type='search';search.placeholder='Tìm bạn bè';search.setAttribute('aria-label','Tìm trong bạn bè');search.oninput=()=>draw();panel.append(search);
+ const filters=node('div',undefined,'friends-filters');filters.setAttribute('role','group');filters.setAttribute('aria-label','Trạng thái bạn bè');panel.append(filters);
+ for(const [key,label] of [['all','Tất cả'],['online','Trực tuyến'],['offline','Ngoại tuyến']]){const b=node('button',label,'secondary');b.type='button';b.setAttribute('aria-pressed',String(key===filter));b.onclick=()=>{filter=key;for(const other of filters.children)other.setAttribute('aria-pressed',String(other===b));draw();};filters.append(b);}
+ const list=node('div',undefined,'friends-list');list.setAttribute('aria-live','polite');panel.append(list);
+ function row(u,mode){const card=node('article',undefined,'friend-row'),person=node('button',undefined,'friend-person');person.type='button';person.setAttribute('aria-label','Xem trang của '+u.name);const picture=node('span',undefined,'friend-picture');picture.append(avatar(u));if(u.isActive)picture.append(node('span',undefined,'friend-online-dot'));const text=node('span',undefined,'friend-copy');text.append(node('strong',u.name));const presence=u.activityShared===false?'Ẩn trạng thái':u.isActive?'Trực tuyến':'Ngoại tuyến';text.append(node('span',presence,'friend-presence '+(u.isActive?'is-online':'')));if(mode==='suggestions'&&(u.sharedInterests||u.sameCity))text.append(node('span',u.sharedInterests?u.sharedInterests+' sở thích chung':'Cùng thành phố','friend-reason'));person.append(picture,text);person.onclick=()=>navigate('profile',{user:u.id});const actions=node('div',undefined,'friend-row-actions');
+ if(mode==='requests'&&u.friendship==='incoming'){actions.append(friendshipAction(u,()=>reload(true)),action('Xóa lời mời',async()=>{await api('/users/'+u.id+'/friend-request/respond','POST',{action:'decline'});await reload(true);},'secondary'));}
+ else if(mode==='following'){actions.append(friendshipAction(u,()=>reload(true)),action('Bỏ theo dõi',async()=>{await api('/users/'+u.id+'/follow','DELETE',{});await reload(true);},'secondary'));}
+ else if(mode==='friends')actions.append(action('Nhắn tin',()=>openChat(u),'secondary'),friendshipAction(u,()=>reload(true)));
+ else {actions.append(friendshipAction(u,()=>reload(true)));if(mode==='suggestions')actions.append(action(u.following?'Đang theo dõi':'Theo dõi',async()=>{await api('/users/'+u.id+'/follow',u.following?'DELETE':'POST',{});await reload(true);},'secondary'));}
+ card.append(person,actions);return card;}
+ function draw(){if(!payload)return;filters.hidden=!['friends','following'].includes(section);list.replaceChildren();const q=search.value.trim().toLocaleLowerCase('vi');const matches=u=>(u.name+' '+u.username).toLocaleLowerCase('vi').includes(q);
+ if(section==='friends'&&!payload.friends.length&&filter==='all'){list.append(node('h3','Đề xuất kết bạn'));const suggestions=payload.suggestions.filter(matches);for(const u of suggestions)list.append(row(u,'suggestions'));if(!suggestions.length)list.append(node('p','Chưa có đề xuất phù hợp.','friends-empty'));return;}
+ if(section==='requests'){for(const [title,users] of [['Lời mời đã nhận',payload.incoming],['Lời mời đã gửi',payload.outgoing]]){const visible=users.filter(matches);if(!visible.length)continue;list.append(node('h3',title+' ('+visible.length+')'));for(const u of visible)list.append(row(u,'requests'));}}
+ else{const users=(section==='friends'?payload.friends:section==='following'?payload.following:payload.suggestions).filter(matches).filter(u=>!['friends','following'].includes(section)||filter==='all'||filter==='online'&&u.isActive||filter==='offline'&&!u.isActive&&u.activityShared!==false);users.sort((a,b)=>Number(b.isActive)-Number(a.isActive));for(const u of users)list.append(row(u,section));}
+ if(!list.children.length){list.append(node('p',search.value?'Không tìm thấy bạn bè.':section==='requests'?'Chưa có lời mời kết bạn.':section==='suggestions'?'Chưa có đề xuất mới.':filter==='online'?'Chưa có bạn bè trực tuyến.':filter==='offline'?'Chưa có bạn bè ngoại tuyến.':'Danh sách bạn bè đang trống.','friends-empty'));if(section==='friends'&&filter==='all')list.append(action('Xem đề xuất kết bạn',()=>tabs.children[3].click(),'primary'));}}
+ async function reload(force=false){const [friends,requests,suggestions,following]=await Promise.all([api('/friends'),api('/friend-requests'),api('/friend-suggestions'),api('/users/'+me.id+'/following')]);if(revision!==navigationRevision)return;payload={friends:friends.users,incoming:requests.incoming,outgoing:requests.outgoing,suggestions:suggestions.users,following:following.users};const badge=$('friends-count');if(badge)badge.textContent=requests.incoming.length?(requests.incoming.length>99?'99+':'+'+requests.incoming.length):'';const next=JSON.stringify(payload);if(force||next!==signature){signature=next;draw();}}
+ friendsRefresh=()=>reload().catch(()=>{});await reload();
 }
 async function accountSettings(panel) {
- const header=node("div",undefined,"view-head");header.append(node("h2","Cài đặt tài khoản"),node("p","Quản lý bảo mật và quyền truy cập tài khoản.","muted"));panel.append(header);
- const identity=node("section",undefined,"social-card account-settings-id");identity.append(avatar(me),node("strong",me.name),action("Chỉnh sửa hồ sơ",()=>navigate("profile",{settings:true}),"ghost"));panel.append(identity);
+ me=(await api('/me')).user;
+ const header=node('div',undefined,'view-head settings-heading');header.append(action('‹',()=>navigate('profile'),'settings-back'),node('div'));header.lastChild.append(node('h2','Cài đặt & quyền riêng tư'),node('p','Quản lý tài khoản theo cách của bạn.','muted'));header.firstChild.setAttribute('aria-label','Quay lại trang cá nhân');panel.append(header);
+ const search=node('input',undefined,'settings-search');search.type='search';search.placeholder='Tìm trong cài đặt';search.setAttribute('aria-label','Tìm trong cài đặt');panel.append(search);
+ const identity=node("section",undefined,"social-card account-settings-id");identity.append(avatar(me),node("strong",me.name),action("Chỉnh sửa tài khoản",()=>navigate("profile",{settings:true}),"ghost"));panel.append(identity);
  const iosInstall=node("section",undefined,"social-card ios-install-settings");iosInstall.append(node("h3","Cài Kinnect cho iOS"),node("p","Thêm biểu tượng Kinnect có logo trên iPhone hoặc iPad. Quét mã QR từ máy tính hoặc mở hướng dẫn bằng Safari.","muted"),action("Mở hướng dẫn cài iOS",()=>window.dispatchEvent(new Event("kinnect-install-ios")),"primary"));panel.append(iosInstall);
     // Đổi mật khẩu
     const pw = node("form", undefined, "social-card");
@@ -1532,6 +1566,23 @@ async function accountSettings(panel) {
  locationControl.append(action(locationEnabled?"Tắt vị trí":"Bật vị trí",async()=>{if(locationEnabled){me=(await api("/me/location","PATCH",{enabled:false})).user;rememberLocation(false);stopLocationTracking();await navigate("settings");}else{await navigate("discover");const enable=document.querySelector(".nearby-consent button");enable?.click();}}));panel.append(locationControl);
  const remembered=(await api("/remembered")).accounts;
  if(remembered.some(account=>account.id===me.id))quick.append(action("Tắt đăng nhập nhanh trên thiết bị này",async()=>{await api("/remembered/"+me.id,"DELETE",{});status("Đã gỡ quyền đăng nhập nhanh.");await navigate("settings");}));else quick.append(node("p","Tài khoản này chưa bật đăng nhập nhanh.","muted"));panel.append(quick);
+ const visibility=node('section',undefined,'social-card settings-visibility');visibility.append(node('h3','Quyền hiển thị'),node('p','Chọn những thông tin bạn muốn chia sẻ.','muted'));
+ for(const [key,label,description] of [['discoverable','Xuất hiện trong Khám phá','Cho phép thành viên khác tìm thấy hồ sơ của bạn.'],['showActivity','Trạng thái hoạt động','Hiển thị khi bạn đang online và lần hoạt động gần nhất.'],['identityPublic','Chia sẻ thông tin danh tính','Hiển thị giới tính, xu hướng và vai trò trên trang cá nhân.']]){const row=node('label',undefined,'settings-switch'),text=node('span'),input=node('input');input.type='checkbox';input.checked=key==='showActivity'?me[key]!==false:!!me[key];input.setAttribute('aria-label',label);text.append(node('strong',label),node('small',description));row.append(text,input);input.onchange=async()=>{const before=!input.checked;input.disabled=true;try{me=(await api('/me','PATCH',{[key]:input.checked})).user;status('Đã lưu '+label.toLowerCase()+'.');}catch(e){input.checked=before;status(e.message);}finally{input.disabled=false;}};visibility.append(row);}
+ const groups=[];
+ function group(title,items){const section=node('section',undefined,'settings-group');section.append(node('h3',title));for(const [label,description,icon,content] of items){const details=node('details',undefined,'settings-entry'),summary=node('summary'),glyph=node('span',undefined,'settings-entry-icon');glyph.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+icon+'</svg>';const copy=node('span',undefined,'settings-entry-copy');copy.append(node('strong',label),node('small',description));const arrow=node('span','›','settings-entry-arrow');arrow.setAttribute('aria-hidden','true');summary.append(glyph,copy,arrow);details.append(summary,content);section.append(details);}groups.push(section);panel.append(section);}
+ const userIcon='<circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0116 0v2"/>';
+ group('Tài khoản & bảo mật',[
+ ['Mật khẩu và đăng nhập','Đổi mật khẩu để bảo vệ tài khoản','<rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 018 0v3"/>',pw],
+ ['Đăng nhập nhanh','Quản lý đăng nhập trên thiết bị này','<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M10 18h4"/>',quick]]);
+ group('Đối tượng & quyền riêng tư',[
+ ['Quyền hiển thị','Khám phá, hoạt động và thông tin cá nhân',userIcon,visibility],
+ ['Chặn','Quản lý những người bạn đã chặn','<circle cx="12" cy="12" r="9"/><path d="m6 6 12 12"/>',blocks],
+ ['Vị trí','Quản lý tính năng tìm người ở gần','<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1116 0Z"/><circle cx="12" cy="10" r="3"/>',locationControl]]);
+ group('Ứng dụng & thiết bị',[
+ ['Cài Kinnect cho iOS','Thêm Kinnect vào màn hình chính iPhone','<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M9 11h6m-3-3v6"/>',iosInstall]]);
+ const noResults=node('p','Không tìm thấy cài đặt phù hợp.','settings-no-results');noResults.hidden=true;panel.append(noResults);
+ search.oninput=()=>{const q=search.value.trim().toLocaleLowerCase('vi');let count=0;for(const section of groups){let visible=0;for(const entry of section.querySelectorAll('.settings-entry')){entry.hidden=!!q&&!entry.textContent.toLocaleLowerCase('vi').includes(q);if(!entry.hidden){visible++;count++;}if(q&&!entry.hidden)entry.open=true;}section.hidden=!visible;}noResults.hidden=count>0;};
+
 }
 function holdConversation(row,u,refresh){
  const kind=u.isGroup?'group':'direct';let timer=null,x=0,y=0,held=false;
@@ -1584,6 +1635,15 @@ async function groupDetails(group){
  dialog.append(node('p',group.members.length+' thành viên','group-selection'));for(const u of group.members){const row=node('div',undefined,'group-candidate');row.append(avatar(u),node('span',u.name),node('small',u.id===group.owner?'Trưởng nhóm':''));if(group.owner===me.id&&u.id!==me.id){const remove=node('button','Xóa','group-remove');remove.type='button';remove.setAttribute('aria-label','Xóa '+u.name+' khỏi nhóm');remove.onclick=async()=>{if(!confirm('Xóa '+u.name+' khỏi nhóm?'))return;try{const {group:updated}=await api('/groups/'+group.id+'/members','DELETE',{userId:u.id});dialog.close();await openGroupChat(group.id);await groupDetails(updated);}catch(e){status(e.message);}};row.append(remove);}dialog.append(row);}
  if(group.owner===me.id){const add=node('button','Thêm thành viên','report-submit');add.type='button';add.onclick=async()=>{dialog.close();const selected=await memberPicker({title:'Thêm thành viên',existing:group.members.map(u=>u.id)});if(selected)try{await api('/groups/'+group.id+'/members','POST',selected);await openGroupChat(group.id);}catch(e){status(e.message);}};dialog.append(add);}
  const leave=node('button','Rời nhóm','group-leave');leave.type='button';leave.onclick=async()=>{if(!confirm('Rời nhóm '+group.name+'?'))return;try{await api('/groups/'+group.id+'/leave','POST',{});dialog.close();await navigate('inbox');}catch(e){status(e.message);}};dialog.append(leave);document.body.append(dialog);dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();
+}
+function renderPrivateAlbumMessage(bubble,m,reload){
+ const album=m.privateAlbum;if(!album||m.recalled)return false;
+ const card=node('div',undefined,'album-chat-card');card.append(node('strong','Ảnh riêng tư'));
+ const text=album.event==='request'?(album.owner===me.id?'Yêu cầu xem ảnh riêng tư của bạn':'Bạn đã gửi yêu cầu xem ảnh'):album.event==='granted'?'Đã đồng ý cho xem ảnh':album.event==='revoked'?'Đã thu hồi quyền xem':'Yêu cầu chưa được đồng ý';card.append(node('p',text));
+ if(album.status==='pending'&&album.event==='request'&&album.owner===me.id){const actions=node('div',undefined,'album-chat-actions');for(const [label,decision] of [['Đồng ý','grant'],['Từ chối','deny']]){const button=action(label,async()=>{for(const b of actions.children)b.disabled=true;try{await api('/me/private/requests/'+album.viewer,'POST',{action:decision,requestId:album.requestId});await reload();}catch(e){status(e.message);await reload();for(const b of actions.children)b.disabled=false;}},decision==='grant'?'primary':'secondary');actions.append(button);}card.append(actions);}
+ else if(album.status==='granted')card.append(action('Xem ảnh riêng tư',()=>navigate('profile',{user:album.owner,privateAlbum:true}),'primary'));
+ else card.append(node('span',album.status==='pending'?'Đang chờ duyệt':album.status==='denied'?'Chưa được đồng ý':'Yêu cầu đã kết thúc','album-chat-status'));
+ bubble.append(card);return true;
 }
 function messageControls(bubble,m,kind,reload,conversationId){
  bubble.dataset.messageId=m.id;
@@ -1679,7 +1739,7 @@ async function openChat(u) {
       }
       const mine = m.sender === me.id;
       const bubble = node("article", undefined, "bubble " + (mine ? "mine" : ""));
-      if(m.body)bubble.append(node("p",m.body));renderChatAttachment(bubble,m.attachment);bubble.append(node("small",clock(m.created)));
+      if(!renderPrivateAlbumMessage(bubble,m,load)&&m.body)bubble.append(node("p",m.body));renderChatAttachment(bubble,m.attachment);bubble.append(node("small",clock(m.created)));
       if (!mine) {
         const flag = node("button", "⚑", "bubble-flag");
         flag.type = "button";
@@ -1763,8 +1823,10 @@ function notificationOptIn() {
 async function openNotification(n) {
   closeNotificationCenter();
   if (!n.seen) await api("/notifications", "POST", { ids: [n.id] });
-  if(n.kind==="private_request")await navigate("profile",{privateAlbum:true});
-  else if(n.kind.startsWith("private_"))await navigate("profile",{user:n.actor.id,privateAlbum:true});
+  if(n.kind==="friend_request")await navigate("friends",{section:"requests"});
+  else if(n.kind==="friend_accepted")await navigate("friends");
+  else if(n.kind==="private_request")await openChat(n.actor);
+  else if(n.kind.startsWith("private_"))await openChat(n.actor);
   else if (n.kind === "message") await openChat(n.actor);
   else if(n.kind === "group_message")await openGroupChat(n.ref);
   else if (n.kind === "like" || n.kind === "comment") await navigate("profile");
@@ -1821,7 +1883,8 @@ async function refreshUnread() {
   if (unreadRequest) return unreadRequest;
   const userId = me.id;
   unreadRequest = (async () => {
-    const { notifications } = await api("/notifications");
+    const { notifications,friendRequestsPending } = await api("/notifications");
+    const friendBadge=$("friends-count");if(friendBadge)friendBadge.textContent=friendRequestsPending?(friendRequestsPending>99?"99+":"+"+String(friendRequestsPending)):"";
     if (!me || me.id !== userId) return;
     const fresh = notificationBaseline ? notifications.filter(n => !n.seen && !n.muted && !knownNotificationIds.has(n.id)) : [];
     notificationCache = notifications; notificationBaseline = true;
@@ -1840,7 +1903,7 @@ async function refreshUnread() {
     }
     renderNotificationCenter();
     inboxRefresh?.().catch(()=>{});
-    privateAlbumRefresh?.();
+    privateAlbumRefresh?.();friendsRefresh?.();
   })();
   try { await unreadRequest; } finally { unreadRequest = null; }
 }
@@ -1855,6 +1918,7 @@ document.addEventListener("visibilitychange", () => { if(document.hidden)stopLoc
 window.addEventListener("pagehide",stopLocationTracking);
 
 const NOTE_TEXT = {
+ friend_request:"đã gửi lời mời kết bạn.",friend_accepted:"đã chấp nhận lời mời kết bạn.",
   private_request: "đã yêu cầu xem ảnh riêng tư của bạn.",
   private_granted: "đã đồng ý cho bạn xem album riêng tư.",
   private_revoked: "đã thu hồi quyền xem album riêng tư.",

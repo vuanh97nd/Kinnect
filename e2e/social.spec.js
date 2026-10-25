@@ -247,15 +247,15 @@ test("nearby consent, optional Les identity and notification permission/bell wor
   await expect(p.locator(".nearby-consent")).toBeHidden();
   await p.getByRole("button",{name:"Tài khoản",exact:true}).click();
   await p.getByRole("menuitem",{name:"Cài đặt tài khoản",exact:true}).click();
-  await p.getByRole("button",{name:"Tắt vị trí",exact:true}).click();
+  await p.locator('.settings-entry>summary').filter({hasText:'Vị trí'}).click();await p.getByRole("button",{name:"Tắt vị trí",exact:true}).click();
   await p.getByRole("button",{name:"Hồ sơ",exact:true}).click();
-  await p.getByRole("button",{name:"Sửa hồ sơ",exact:true}).click();
+  await p.getByRole('button',{name:'Tài khoản',exact:true}).click();await p.getByRole('menuitem',{name:'Cài đặt tài khoản',exact:true}).click();await p.getByRole('button',{name:'Chỉnh sửa tài khoản',exact:true}).click();
   await p.getByLabel("Xu hướng tính dục",{exact:true}).fill("Les / Đồng tính nữ");
   await p.getByLabel("Giới tính",{exact:true}).fill("Nữ");
   await p.getByLabel("Vai trò",{exact:true}).fill("Vers Bottom");
   await p.getByLabel("Hiển thị giới tính, xu hướng và vai trò trên hồ sơ",{exact:true}).check();
   await p.getByRole("button",{name:"Xong",exact:true}).click();
-  await expect(p.locator(".profile-head").getByText("Les / Đồng tính nữ",{exact:true})).toBeVisible();
+  await expect(p.locator(".profile-intro").getByText("Les / Đồng tính nữ",{exact:true})).toBeVisible();
   const other=await browser.newContext();
   await other.request.post("/api/register",{data:{username:"notification_browser",password:"abcdef",name:"Bạn mới",agree18:true}});
   const own=(await (await ctx.request.get("/api/me")).json()).user;
