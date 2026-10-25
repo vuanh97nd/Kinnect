@@ -40,7 +40,7 @@ function faceEngine() {
   return faceEnginePromise;
 }
 // Bộ xử lý: video gốc → canvas có hiệu ứng → MediaStream mới (giữ nguyên âm thanh).
-export function createEffects(rawStream, { width = 540, height = 960 } = {}) {
+export function createEffects(rawStream, { width = 540, height = 960, portrait = false } = {}) {
   const video = document.createElement("video");
   video.muted = true;
   video.playsInline = true;
@@ -48,7 +48,7 @@ export function createEffects(rawStream, { width = 540, height = 960 } = {}) {
   const canvas = document.createElement("canvas");
   const settings = rawStream.getVideoTracks()[0]?.getSettings?.() || {};
   // Giữ đúng hướng camera: dọc trên điện thoại, ngang trên máy tính.
-  const landscape = (settings.width || 0) > (settings.height || 0);
+  const landscape = !portrait && (settings.width || 0) > (settings.height || 0);
   canvas.width = landscape ? height : width;
   canvas.height = landscape ? width : height;
   const ctx = canvas.getContext("2d");
@@ -135,7 +135,7 @@ export function createEffects(rawStream, { width = 540, height = 960 } = {}) {
     if (video.readyState >= 2) {
       // iPhone hay báo sai hướng trong getSettings(): lấy theo khung hình thật để không bị cắt phóng to.
       const vw = video.videoWidth, vh = video.videoHeight;
-      if (vw && vh && (vw > vh) !== (canvas.width > canvas.height)) { const t = canvas.width; canvas.width = canvas.height; canvas.height = t; }
+      if (!portrait && vw && vh && (vw > vh) !== (canvas.width > canvas.height)) { const t = canvas.width; canvas.width = canvas.height; canvas.height = t; }
       const [x, y, w, h] = cover();
       let base = FILTERS.find((f) => f[0] === state.filter)?.[2] || "none";
       // Sáng da + AI cân sáng (chạy trên máy, không gửi ảnh đi đâu)

@@ -276,7 +276,7 @@ $("create").onsubmit = async (e) => {
     }
     rawStream = captured;
     // Hiệu ứng (bộ lọc, làm mịn, sticker) áp lên hình gửi cho người xem.
-    fx = createEffects(rawStream, { width: 720, height: 1280 });
+    fx = createEffects(rawStream, { width: 720, height: 1280, portrait: matchMedia("(pointer: coarse)").matches });
     if (window.kinnectPendingFx) {
       fx.set(window.kinnectPendingFx);
       window.kinnectPendingFx = null;
