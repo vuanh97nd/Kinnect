@@ -45,4 +45,18 @@
   new MutationObserver(check).observe(panel, { attributes: true, attributeFilter: ["hidden"] });
   new MutationObserver(() => { if (!live.hidden) busyUntil = 0; check(); }).observe(live, { attributes: true, attributeFilter: ["hidden"] });
   if (lobby) lobby.classList.add("lobby-gone");
+  // Chẩn đoán tạm thời (chỉ người phát thấy): kích thước khung camera thật trên máy.
+  const diag = document.createElement("small");
+  diag.className = "live-diag";
+  live.append(diag);
+  const probe = document.createElement("video");
+  probe.muted = true; probe.playsInline = true;
+  setInterval(() => {
+    const cam = window.kinnectLiveCamera, track = cam?.getVideoTracks?.()[0];
+    if (live.hidden || !track || track.readyState !== "live") { diag.hidden = true; return; }
+    if (probe.srcObject !== cam) { probe.srcObject = cam; probe.play().catch(() => {}); }
+    const s = track.getSettings();
+    diag.hidden = false;
+    diag.textContent = "cam " + s.width + "×" + s.height + " · khung " + probe.videoWidth + "×" + probe.videoHeight + " · màn " + innerWidth + "×" + innerHeight;
+  }, 1000);
 })();
