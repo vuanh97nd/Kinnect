@@ -243,3 +243,7 @@ body.studio-open { overflow: hidden; }
 .tt-post-actions { background: var(--card); border-top: 1px solid var(--line); }
 .tt-retake { background: var(--soft) !important; color: var(--ink) !important; border-radius: 14px; }
 .tt-publish { border-radius: 14px; }
+/* Bố cục đăng: video xem lại lớn ở trên, chú thích gọn bên dưới */
+.tt-post-body { justify-content: flex-start; }
+.tt-preview { order: 0; height: min(58dvh, 520px); }
+.tt-caption { order: 1; min-height: 56px; max-height: 120px; }

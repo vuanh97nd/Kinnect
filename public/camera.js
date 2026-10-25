@@ -718,9 +718,13 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
     pendingBlob = blob;
     if (blobUrl) URL.revokeObjectURL(blobUrl);
     blobUrl = URL.createObjectURL(blob);
-    $(".tt-preview").src = blobUrl;
+    const preview = $(".tt-preview");
+    // Xem lại trước khi đăng: có nút phát/dừng, có tiếng, tua được.
+    preview.controls = true;
+    preview.muted = false;
+    preview.src = blobUrl;
     $(".tt-post").hidden = false;
-    $(".tt-preview").play().catch(() => {});
+    preview.play().catch(() => { preview.muted = true; preview.play().catch(() => {}); });
   }
   function stopRec() {
     if (recorder?.state === "recording") recorder.stop();
