@@ -277,7 +277,6 @@ $("create").onsubmit = async (e) => {
       return;
     }
     rawStream = captured;
-    window.kinnectLiveCamera = captured;
     // Hiệu ứng (bộ lọc, làm mịn, sticker) áp lên hình gửi cho người xem.
     fx = createEffects(rawStream, { width: 720, height: 1280, portrait: matchMedia("(pointer: coarse)").matches });
     if (window.kinnectPendingFx) {
@@ -294,40 +293,10 @@ $("create").onsubmit = async (e) => {
     $("start").disabled = false;
   }
 };
-// Điện thoại cầm dọc: iPhone có thể trả khung ngang 1280×720 tuỳ cách xin camera.
-// Thử lần lượt nhiều cách, đo khung hình thật và giữ cách đầu tiên cho ra khung dọc.
-async function frameSize(stream) {
-  const v = document.createElement("video");
-  v.muted = true; v.playsInline = true; v.srcObject = stream;
-  await Promise.race([new Promise((r) => v.addEventListener("loadedmetadata", r, { once: true })), new Promise((r) => setTimeout(r, 1500))]);
-  v.play().catch(() => {});
-  for (let i = 0; i < 10 && !v.videoWidth; i++) await new Promise((r) => setTimeout(r, 100));
-  const size = [v.videoWidth, v.videoHeight];
-  v.srcObject = null;
-  return size;
-}
-async function portraitCamera() {
-  const tries = [
-    { facingMode: "user", width: { ideal: 720 }, height: { ideal: 1280 } },
-    { facingMode: "user" },
-    { facingMode: "user", width: { ideal: 480 }, height: { ideal: 640 } },
-    { facingMode: "user", aspectRatio: { ideal: 3 / 4 } },
-    { facingMode: "user", width: { ideal: 1080 }, height: { ideal: 1920 } },
-  ];
-  let fallback = null, chosen = null, label = "";
-  for (const [i, video] of tries.entries()) {
-    let s;
-    try { s = await navigator.mediaDevices.getUserMedia({ video }); } catch { continue; }
-    const [w, h] = await frameSize(s);
-    if (w && h && w < h) { chosen = s; label = "#" + (i + 1); break; }
-    if (!fallback) { fallback = s; label = "#" + (i + 1) + " ngang"; } else s.getTracks().forEach((t) => t.stop());
-  }
-  if (chosen && fallback) fallback.getTracks().forEach((t) => t.stop());
-  const video = chosen || fallback || (await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } }));
-  const audio = await navigator.mediaDevices.getUserMedia({ audio: true });
-  const stream = new MediaStream([...video.getVideoTracks(), ...audio.getAudioTracks()]);
-  stream.kinnectVariant = label;
-  return stream;
+// Điện thoại cầm dọc: iPhone chỉ trả khung dọc (vd 480×640) khi không đặt kích thước;
+// xin kèm width/height thì nhận khung ngang 1280×720. Gọi đúng một lần (mở/tắt nhiều luồng làm iPhone đứng hình).
+function portraitCamera() {
+  return navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: true });
 }
 $("leave").onclick = () => {
   send({ type: "leave" });
