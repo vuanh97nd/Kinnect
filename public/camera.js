@@ -255,6 +255,15 @@ async function photoSource(file) {
   draw();const timer=setInterval(draw,33),stream=canvas.captureStream(30);
   return {stream,stop(){clearInterval(timer);stream.getTracks().forEach(t=>t.stop());}};
 }
+// Lấy khung gốc của camera (không để trình duyệt cắt/phóng to) và đưa zoom về mức rộng nhất.
+function cameraConstraints(facing) {
+  return { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 }, resizeMode: "none" };
+}
+async function widestZoom(stream) {
+  const track = stream.getVideoTracks()[0];
+  const caps = track?.getCapabilities?.() || {};
+  if (caps.zoom) try { await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min }] }); } catch {}
+}
 export async function openStudio({ onDone, onLive, notify = () => {}, mode: startMode = "camera", story = false, photo = null }) {
   if (!photo && !navigator.mediaDevices?.getUserMedia) {
     notify("Trình duyệt không cho dùng camera. Hãy mở Kinnect bằng HTTPS (app.kinnect.io.vn).");
@@ -266,9 +275,10 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
   try {
     if(photo) { still=await photoSource(photo);raw=still.stream; }
     else raw = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: facing, width: { ideal: 720 }, height: { ideal: 1280 } },
+      video: cameraConstraints(facing),
       audio: true,
     });
+    await widestZoom(raw);
   } catch (e) {
     notify("Không mở được camera/micro: " + e.message);
     return;
@@ -363,55 +373,99 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
   }
   // Bảng chọn từ cột công cụ
   const sheet = $(".tt-sheet");
+  // Chọn nhạc kiểu Facebook: bảng toàn màn, tìm kiếm, tab Thư viện / Nhạc của bạn, nghe thử từng bài, nút "Dùng bài này".
   async function openSound() {
-    if (!sheet.hidden && sheet.dataset.kind === "sound") {
-      music.pause();
-      return (sheet.hidden = true);
+    if (document.querySelector(".mp")) return;
+    const box = document.createElement("div");
+    box.className = "mp";
+    box.setAttribute("role", "dialog");
+    box.setAttribute("aria-label", "Chọn nhạc");
+    box.innerHTML =
+      '<div class="mp-sheet"><div class="mp-grip"></div>' +
+      '<div class="mp-head"><button type="button" class="mp-close" aria-label="Đóng">✕</button><h2>Âm nhạc</h2><span></span></div>' +
+      '<label class="mp-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" placeholder="Tìm bài hát hoặc nghệ sĩ" aria-label="Tìm nhạc"></label>' +
+      '<div class="mp-tabs" role="tablist"><button type="button" class="on" data-tab="lib">Thư viện</button><button type="button" data-tab="own">Nhạc của bạn</button></div>' +
+      '<div class="mp-list" role="list"></div>' +
+      '<div class="mp-bar" hidden><div class="mp-now"><b></b><small></small></div><button type="button" class="mp-use">Dùng bài này</button></div></div>';
+    const sheetEl = box.querySelector(".mp-sheet"), list = box.querySelector(".mp-list"), bar = box.querySelector(".mp-bar");
+    const preview = new Audio();
+    let tracks = [], tab = "lib", picked = null, playing = null, shown = 60;
+    const close = () => { preview.pause(); box.classList.remove("open"); setTimeout(() => box.remove(), 220); };
+    box.querySelector(".mp-close").onclick = close;
+    box.onclick = (e) => { if (e.target === box) close(); };
+    const hue = (t) => { let h = 0; for (const c of t) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+    const icon = (on) => on ? '<svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>' : '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+    function choose(t) {
+      picked = t;
+      bar.hidden = false;
+      bar.querySelector("b").textContent = t.title;
+      bar.querySelector("small").textContent = t.artist || "Nhạc của bạn";
+      render();
     }
-    sheet.dataset.kind = "sound";
-    sheet.replaceChildren();
-    const list = document.createElement("div");
-    list.className = "tt-tracks";
-    const item = (label, on, fn) => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "tt-track" + (on ? " on" : "");
-      b.textContent = label;
-      b.onclick = () => {
-        fn();
-        for (const c of list.querySelectorAll(".tt-track")) c.classList.toggle("on", c === b);
-      };
-      list.append(b);
-    };
-    const own = document.createElement("label");
-    own.className = "tt-track own";
-    own.innerHTML = '<input type="file" accept="audio/*" aria-label="Chọn nhạc của bạn"><span>📁 Nhạc của bạn</span>';
-    own.querySelector("input").onchange = (e) => {
-      const f = e.target.files[0];
-      if (!f) return;
-      if (f.size > 20 * 1024 * 1024) return notify("File nhạc tối đa 20 MB.");
-      if (musicOwnUrl) URL.revokeObjectURL(musicOwnUrl);
-      musicOwnUrl = URL.createObjectURL(f);
-      setMusic(musicOwnUrl, f.name.replace(/\.[^.]+$/, ""));
-      sheet.hidden = true;
-    };
-    list.append(own);
-    item("🔇 Không dùng nhạc", !musicUrl, () => setMusic("", ""));
-    const search=document.createElement("input");search.type="search";search.className="tt-music-search";search.placeholder="Tìm bài hát, nghệ sĩ…";search.setAttribute("aria-label","Tìm nhạc nền");search.oninput=()=>{const query=search.value.trim().toLocaleLowerCase("vi");for(const button of list.querySelectorAll("button.tt-track"))button.hidden=!!query&&!button.textContent.toLocaleLowerCase("vi").includes(query);};
-    sheet.append(search,list);
-    sheet.hidden = false;
+    function play(t, btn) {
+      if (playing === t.url) { preview.pause(); playing = null; render(); return; }
+      preview.src = t.url; preview.currentTime = 0; preview.play().catch(() => {}); playing = t.url; choose(t);
+    }
+    preview.onended = () => { playing = null; render(); };
+    function render() {
+      list.replaceChildren();
+      const q = box.querySelector(".mp-search input").value.trim().toLocaleLowerCase("vi");
+      if (tab === "own") {
+        const up = document.createElement("label");
+        up.className = "mp-upload";
+        up.innerHTML = '<span class="mp-art own">＋</span><span class="mp-meta"><b>Chọn nhạc trong máy</b><small>MP3, M4A… tối đa 20 MB · chỉ dùng trên máy bạn</small></span><input type="file" accept="audio/*" hidden>';
+        up.querySelector("input").onchange = (e) => {
+          const f = e.target.files[0];
+          if (!f) return;
+          if (f.size > 20 * 1024 * 1024) return notify("File nhạc tối đa 20 MB.");
+          if (musicOwnUrl) URL.revokeObjectURL(musicOwnUrl);
+          musicOwnUrl = URL.createObjectURL(f);
+          const t = { url: musicOwnUrl, title: f.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " "), artist: "" };
+          ownTracks.unshift(t);
+          choose(t);
+        };
+        list.append(up);
+      }
+      const rows = (tab === "own" ? ownTracks : tracks).filter((t) => !q || (t.title + " " + (t.artist || "")).toLocaleLowerCase("vi").includes(q));
+      if (!rows.length && tab === "lib") { const n = document.createElement("p"); n.className = "mp-empty"; n.textContent = q ? "Không tìm thấy bài phù hợp." : "Thư viện chưa có bài nào."; list.append(n); }
+      for (const t of rows.slice(0, shown)) {
+        const row = document.createElement("div");
+        row.className = "mp-row" + (picked && picked.url === t.url ? " on" : "");
+        row.setAttribute("role", "listitem");
+        row.innerHTML = '<span class="mp-art">♪</span><span class="mp-meta"><b></b><small></small></span><button type="button" class="mp-play" aria-label="Nghe thử">' + icon(playing === t.url) + '</button>';
+        row.querySelector(".mp-art").style.setProperty("--h", String(hue(t.title)));
+        row.querySelector("b").textContent = t.title;
+        row.querySelector("small").textContent = [t.artist, t.license].filter(Boolean).join(" · ") || "Nhạc của bạn";
+        row.querySelector(".mp-play").onclick = (e) => { e.stopPropagation(); play(t); };
+        row.onclick = () => play(t);
+        list.append(row);
+      }
+      if (rows.length > shown) {
+        const more = document.createElement("button");
+        more.type = "button"; more.className = "mp-more"; more.textContent = "Xem thêm (" + (rows.length - shown) + " bài)";
+        more.onclick = () => { shown += 60; render(); };
+        list.append(more);
+      }
+    }
+    box.querySelectorAll(".mp-tabs button").forEach((b) => (b.onclick = () => { tab = b.dataset.tab; box.querySelectorAll(".mp-tabs button").forEach((x) => x.classList.toggle("on", x === b)); render(); }));
+    box.querySelector(".mp-search input").oninput = () => { shown = 60; render(); };
+    box.querySelector(".mp-use").onclick = () => { if (picked) setMusic(picked.url, picked.title); close(); };
+    if (musicUrl) {
+      const off = document.createElement("button");
+      off.type = "button"; off.className = "mp-off"; off.textContent = "Bỏ nhạc nền";
+      off.onclick = () => { setMusic("", ""); close(); };
+      sheetEl.querySelector(".mp-head span").replaceWith(off);
+    }
+    (document.querySelector("dialog[open]") || document.body).append(box);
+    requestAnimationFrame(() => box.classList.add("open"));
+    render();
     try {
       const r = await fetch("/api/music", { credentials: "same-origin" });
-      const { tracks = [] } = r.ok ? await r.json() : {};
-      for (const t of tracks) item("♪ " + t.title + (t.artist ? " · " + t.artist : ""), musicUrl === t.url, () => setMusic(t.url, t.title));
-      if (!tracks.length) {
-        const n = document.createElement("p");
-        n.className = "fx-note";
-        n.textContent = "Thư viện chung chưa có bài nào. Bạn có thể chọn nhạc của mình.";
-        sheet.append(n);
-      }
+      tracks = (r.ok ? (await r.json()).tracks : []) || [];
+      render();
     } catch {}
   }
+  const ownTracks = [];
   $(".tt-sound").onclick = openSound;
   function openSheet(kind) {
     if (!sheet.hidden && sheet.dataset.kind === kind) return (sheet.hidden = true);
@@ -522,7 +576,7 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
     facing = facing === "user" ? "environment" : "user";
     try {
       const next = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: facing, width: { ideal: 720 }, height: { ideal: 1280 } },
+        video: cameraConstraints(facing),
         audio: true,
       });
       if (closed) {

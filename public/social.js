@@ -1,4 +1,4 @@
-import { connectLive, disconnectLive } from "./app.js?v=806f6e17a7cc";
+import { connectLive, disconnectLive, joinLiveRoom } from "./app.js?v=806f6e17a7cc";
 let callModule=null,callModuleLoading=null;
 function loadVideoCalls(){return callModuleLoading||(callModuleLoading=import('./calls.js').then(module=>{callModule=module;return module;}).catch(error=>{callModuleLoading=null;throw error;}));}
 async function startVideoCall(user,mode="video"){const module=await loadVideoCalls();return module.startVideoCall(user,mode);}
@@ -12,7 +12,8 @@ const REEL_ICONS = {
  muted: '<path d="m11 5-6 4H2v6h3l6 4V5Zm6 4 5 6m0-6-5 6"/>',
  more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
  close: '<path d="m6 6 12 12M6 18 18 6"/>',
- send: '<path d="m22 2-7 20-4-9-9-4 20-7ZM22 2 11 13"/>'
+ send: '<path d="m22 2-7 20-4-9-9-4 20-7ZM22 2 11 13"/>',
+ live: '<path d="M3 6h12v12H3zM15 10l6-4v12l-6-4"/>'
 };
 function reelIcon(kind){return '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+REEL_ICONS[kind]+'</svg>';}
 let reelMuted = false;
@@ -967,6 +968,49 @@ async function feed(panel) {
  if(!posts.length){const labels={community:['Bảng tin còn trống','Chia sẻ lời chào đầu tiên hoặc theo dõi thêm bạn mới.'],confessions:['Chưa có tâm sự','Chia sẻ câu chuyện, cảm xúc của bạn với cộng đồng.'],questions:['Chưa có câu hỏi','Đặt câu hỏi để cùng trao đổi và tìm lời khuyên.'],events:['Chưa có sự kiện','Chia sẻ hoạt động sắp diễn ra, thời gian và địa điểm trong bài viết.']};panel.append(empty('📝',...labels[feedSection]));}
  for(const [index,p] of posts.entries()){panel.append(postCard(p));if(index===1&&feedSection==='community')newsPanel(panel,{preview:true}).catch(()=>{});}if(posts.length<2&&feedSection==='community')newsPanel(panel,{preview:true}).catch(()=>{});
 }
+// Tab "Trực tiếp" của trang Video: lưới các buổi đang live, chạm để vào xem ngay.
+async function liveGrid(reel, isCurrent) {
+  reel.classList.add("live-grid-host");
+  const box = node("div", undefined, "live-grid");
+  reel.append(box);
+  // Trang được dựng ngoài màn rồi mới gắn vào, nên lần vẽ đầu không đòi box đã nằm trên trang.
+  let first = true;
+  const draw = async () => {
+    if (!isCurrent() || (!first && !box.isConnected)) return;
+    first = false;
+    let rooms = [];
+    try { rooms = (await api("/live/rooms")).rooms || []; } catch {}
+    box.replaceChildren();
+    if (!rooms.length) {
+      const e = node("div", undefined, "live-grid-empty");
+      e.innerHTML = '<span class="live-grid-icon">' + reelIcon("live") + '</span><b>Chưa có ai đang live</b><p>Hãy là người mở màn buổi live đầu tiên!</p>';
+      const go = node("button", "Phát trực tiếp", "empty-cta");
+      go.type = "button";
+      go.onclick = () => navigate("live").catch((x) => status(x.message));
+      e.append(go);
+      box.append(e);
+    } else {
+      box.append(node("p", "● " + rooms.length + " buổi đang live", "live-grid-count"));
+      const grid = node("div", undefined, "live-grid-cards");
+      for (const r of rooms) {
+        const card = node("button", undefined, "live-card " + hue(r.hostId));
+        card.type = "button";
+        const top = node("span", undefined, "live-card-top");
+        top.append(node("b", "LIVE", "live-card-badge"), node("span", "👁 " + r.viewers, "live-card-viewers"));
+        const face = avatar({ id: r.hostId, name: r.host, avatar: r.avatar });
+        face.classList.add("live-card-avatar");
+        const info = node("span", undefined, "live-card-info");
+        info.append(node("b", r.title), node("small", r.host));
+        card.append(top, face, info);
+        card.onclick = async () => { await navigate("live"); joinLiveRoom(r.id); };
+        grid.append(card);
+      }
+      box.append(grid);
+    }
+    setTimeout(draw, 8000);
+  };
+  await draw();
+}
 async function shorts(panel, isCurrent = () => true, feed = "recommended") {
   videoFeed = feed;
   const heading = node("div", undefined, "view-head");
@@ -1023,7 +1067,7 @@ async function shorts(panel, isCurrent = () => true, feed = "recommended") {
   }
   const reel = node("div", undefined, "reel");
   const full = node("button",undefined,"reel-fullscreen");full.type="button";full.setAttribute("aria-label","Toàn màn hình");full.innerHTML=reelIcon("fullscreen");
-  const liveShortcut=node("button","Trực tiếp","reel-live-shortcut");liveShortcut.type="button";liveShortcut.setAttribute("aria-label","Mở livestream");liveShortcut.onclick=()=>navigate("live").catch(e=>status(e.message));tabs.prepend(liveShortcut);
+  const liveShortcut=node("button","● Trực tiếp","reel-live-shortcut");liveShortcut.type="button";liveShortcut.setAttribute("aria-label","Các buổi đang live");liveShortcut.classList.toggle("active",feed==="live");liveShortcut.onclick=()=>navigate("shorts",{feed:"live"}).catch(e=>status(e.message));tabs.prepend(liveShortcut);
   const currentVideo=()=>{const bounds=reel.getBoundingClientRect();let best=null,area=-1;for(const slide of reel.children){const r=slide.getBoundingClientRect(),visible=Math.max(0,Math.min(r.bottom,bounds.bottom)-Math.max(r.top,bounds.top));if(visible>area&&slide.querySelector("video")){best=slide.querySelector("video");area=visible;}}return best;};
   const updateFullButton=()=>{const active=!!document.fullscreenElement||document.body.classList.contains("reel-immersive")||!!currentVideo()?.webkitDisplayingFullscreen;full.setAttribute("aria-label",active?"Thoát toàn màn hình":"Toàn màn hình");full.setAttribute("aria-pressed",String(active));};
   const viewportRoot=$("social-panel");
@@ -1042,6 +1086,7 @@ async function shorts(panel, isCurrent = () => true, feed = "recommended") {
     immersive(true);
   };tabs.append(full);
   panel.append(tabs, reel);
+  if (feed === "live") { if (tab === "shorts") document.body.dataset.reel = "ready"; await liveGrid(reel, isCurrent); return; }
   const requestedVideo = new URL(location.href).searchParams.get("video");
   const { shorts: items } = await api("/shorts?feed=" + feed + (requestedVideo && feed!=="following" ? "&video="+encodeURIComponent(requestedVideo) : ""));
   if (!isCurrent()) return;

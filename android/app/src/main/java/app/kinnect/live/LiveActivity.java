@@ -14,6 +14,7 @@ import org.webrtc.SurfaceViewRenderer;
 
 /** Sảnh live, phát và xem trực tiếp, trò chuyện trong phòng — giao diện theo bản web. Không dùng WebView. */
 public final class LiveActivity extends Activity implements NativeSocket.Events {
+  static final String EXTRA_ROOM = "room";
   private LinearLayout root, rooms, chat;
   private TextView status;
   private NativeSocket socket;
@@ -214,7 +215,13 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
 
   public void event(JSONObject m) {
     String type = m.optString("type");
-    if (type.equals("welcome")) { ready = true; renderRooms(); }
+    if (type.equals("welcome")) {
+      ready = true;
+      renderRooms();
+      // Mở từ tab "Trực tiếp": vào thẳng phòng đã chọn.
+      String room = getIntent().getStringExtra(EXTRA_ROOM);
+      if (room != null && !joined) { host = false; socket.send(NativeSocket.json("type", "join", "room", room)); getIntent().removeExtra(EXTRA_ROOM); }
+    }
     if (type.equals("rooms") && !joined) { lastRooms = m.optJSONArray("rooms"); renderRooms(); }
     if (type.equals("joined")) { joined = true; showRoom(m); }
     if (type.equals("peer") && rtc != null) rtc.offer(m.optString("id"));

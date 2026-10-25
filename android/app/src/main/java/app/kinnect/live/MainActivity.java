@@ -224,7 +224,6 @@ public class MainActivity extends Activity {
     brand.setPadding(dp(8), 0, 0, 0);
     toolbar.addView(brand, new LinearLayout.LayoutParams(0, -2, 1));
     if (me != null && navigation) {
-      toolbar.addView(topIcon("live", "Live", false, () -> startActivity(new Intent(this, LiveActivity.class)), null));
       FrameLayout inboxHolder = topIcon("inbox", "Tin nhắn", tab.equals("inbox"), () -> navigate("inbox"), "inbox");
       toolbar.addView(inboxHolder);
       toolbar.addView(topIcon("bell", "Thông báo", false, () -> notifications(), "bell"));
@@ -1603,27 +1602,150 @@ public class MainActivity extends Activity {
     }
   }
 
+  private String shortsTab = "for";
+
+  // Trang Video: nền đen toàn màn, thanh tab trong suốt nổi phía trên (Trực tiếp · Đề xuất · Đang theo dõi).
+  private FrameLayout reelStage() {
+    ScrollView scroll = (ScrollView) content.getParent();
+    int at = root.indexOfChild(scroll);
+    root.removeView(scroll);
+    FrameLayout stage = new FrameLayout(this);
+    stage.setBackgroundColor(0xff000000);
+    root.addView(stage, at, new LinearLayout.LayoutParams(-1, 0, 1));
+    return stage;
+  }
+
   private void shorts() {
-    content.addView(
-      label(
-        "Video từ thành viên · vuốt lên/xuống để chuyển. Tối đa 60 giây, MP4 12 MB.",
-        13,
-        MUTED
-      )
-    );
-    root.addView(reelTabs(), 2);
+    shortsFollowing = shortsTab.equals("following");
+    final FrameLayout stage = reelStage();
+    if (shortsTab.equals("live")) { liveGrid(stage); return; }
+    final TextView loading = label("Đang tải video…", 14, 0x99ffffff);
+    stage.addView(loading, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
+    stage.addView(reelTabs(), new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
     request("GET", shortsFollowing ? "/api/shorts?feed=following" : "/api/shorts", null, data -> {
       shortRows = data.optJSONArray("shorts");
       if (shortRows == null || shortRows.length() == 0) {
-        TextView empty = label("🎬\nChưa có video nào\nBấm + để quay video đầu tiên.", 16, MUTED);
-        empty.setGravity(Gravity.CENTER);
-        empty.setPadding(0, dp(60), 0, dp(16));
-        content.addView(empty);
-        content.addView(primary("＋ Quay video", () -> chooseVideo()));
+        stage.removeView(loading);
+        LinearLayout empty = column();
+        empty.setGravity(Gravity.CENTER_HORIZONTAL);
+        TextView t = label(shortsFollowing ? "🎬\nChưa có video từ người bạn theo dõi" : "🎬\nChưa có video nào", 16, 0xddffffff);
+        t.setGravity(Gravity.CENTER);
+        empty.addView(t);
+        Button b = primary("＋ Quay video", () -> chooseVideo());
+        b.setLayoutParams(new LinearLayout.LayoutParams(dp(200), dp(46)));
+        empty.addView(b);
+        stage.addView(empty, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
         return;
       }
       showShort(0);
     });
+  }
+
+  // Tab "Trực tiếp": lưới các buổi đang live, chạm để vào xem ngay.
+  private void liveGrid(final FrameLayout stage) {
+    final ScrollView scroll = new ScrollView(this);
+    final LinearLayout list = column();
+    list.setPadding(dp(10), dp(64), dp(10), dp(16));
+    scroll.addView(list);
+    stage.addView(scroll, new FrameLayout.LayoutParams(-1, -1));
+    stage.addView(reelTabs(), new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
+    final int generation = screen;
+    final Runnable[] load = new Runnable[1];
+    load[0] = () -> request("GET", "/api/live/rooms", null, d -> {
+      JSONArray rooms = d.optJSONArray("rooms");
+      list.removeAllViews();
+      if (rooms == null || rooms.length() == 0) {
+        LinearLayout empty = column();
+        empty.setGravity(Gravity.CENTER_HORIZONTAL);
+        empty.setPadding(0, dp(120), 0, 0);
+        FrameLayout circle = new FrameLayout(this);
+        circle.setBackground(background(0x22ffffff, 999));
+        circle.addView(icon("live", 34, WHITE), new FrameLayout.LayoutParams(dp(34), dp(34), Gravity.CENTER));
+        empty.addView(circle, new LinearLayout.LayoutParams(dp(76), dp(76)));
+        TextView t = label("Chưa có ai đang live", 18, WHITE);
+        t.setTypeface(null, Typeface.BOLD);
+        t.setPadding(0, dp(14), 0, 0);
+        t.setGravity(Gravity.CENTER);
+        empty.addView(t, new LinearLayout.LayoutParams(-1, -2));
+        TextView sub = label("Hãy là người mở màn buổi live đầu tiên!", 14, 0xaaffffff);
+        sub.setGravity(Gravity.CENTER);
+        empty.addView(sub, new LinearLayout.LayoutParams(-1, -2));
+        Button go = primary("Phát trực tiếp", () -> startActivity(new Intent(this, LiveActivity.class)));
+        LinearLayout.LayoutParams gp = new LinearLayout.LayoutParams(dp(200), dp(46));
+        gp.topMargin = dp(16);
+        empty.addView(go, gp);
+        list.addView(empty);
+      } else {
+        TextView head = label("● " + rooms.length() + " buổi đang live", 14, 0xffff4f9a);
+        head.setTypeface(null, Typeface.BOLD);
+        head.setPadding(dp(4), 0, 0, dp(6));
+        list.addView(head);
+        LinearLayout line = null;
+        for (int i = 0; i < rooms.length(); i++) {
+          if (i % 2 == 0) { line = row(); list.addView(line); }
+          LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(250), 1);
+          lp.setMargins(i % 2 == 0 ? 0 : dp(5), 0, i % 2 == 0 ? dp(5) : 0, dp(10));
+          line.addView(liveCard(rooms.optJSONObject(i)), lp);
+        }
+        if (rooms.length() % 2 == 1) line.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
+      }
+      handler.postDelayed(() -> { if (generation == screen && !stopped) load[0].run(); }, 8000);
+    });
+    load[0].run();
+  }
+
+  private FrameLayout liveCard(final JSONObject room) {
+    FrameLayout c = new FrameLayout(this);
+    float hue = Math.abs(room.optString("hostId").hashCode()) % 360;
+    GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { Color.HSVToColor(new float[] { hue, 0.65f, 0.6f }), Color.HSVToColor(new float[] { (hue + 50) % 360, 0.75f, 0.3f }) });
+    g.setCornerRadius(dp(16));
+    c.setBackground(g);
+    c.setClipToOutline(true);
+    LinearLayout center = column();
+    center.setGravity(Gravity.CENTER_HORIZONTAL);
+    FrameLayout ring = new FrameLayout(this);
+    GradientDrawable rg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { 0xffff3b5c, PINK });
+    rg.setShape(GradientDrawable.OVAL);
+    ring.setBackground(rg);
+    ring.setPadding(dp(3), dp(3), dp(3), dp(3));
+    LinearLayout holder = new LinearLayout(this);
+    JSONObject host = json("id", room.optString("hostId"), "name", room.optString("host"), "avatar", room.isNull("avatar") ? "" : room.optString("avatar"));
+    avatar(host, holder, 74);
+    ring.addView(holder);
+    center.addView(ring);
+    FrameLayout.LayoutParams cp = new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER);
+    cp.bottomMargin = dp(30);
+    c.addView(center, cp);
+    LinearLayout badges = row();
+    TextView live = label("LIVE", 11, WHITE);
+    live.setTypeface(null, Typeface.BOLD);
+    live.setPadding(dp(7), dp(2), dp(7), dp(2));
+    live.setBackground(background(0xffff3b5c, 6));
+    badges.addView(live);
+    TextView viewers = label("  👁 " + room.optInt("viewers") + "  ", 11, WHITE);
+    viewers.setBackground(background(0x66000000, 6));
+    LinearLayout.LayoutParams vp = new LinearLayout.LayoutParams(-2, -2);
+    vp.leftMargin = dp(6);
+    badges.addView(viewers, vp);
+    FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.START);
+    bp.setMargins(dp(8), dp(8), 0, 0);
+    c.addView(badges, bp);
+    LinearLayout info = column();
+    info.setPadding(dp(10), dp(24), dp(10), dp(10));
+    info.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x00000000, 0xbb000000 }));
+    TextView title = label(room.optString("title"), 14, WHITE);
+    title.setTypeface(null, Typeface.BOLD);
+    title.setMaxLines(2);
+    title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+    info.addView(title);
+    info.addView(label(room.optString("host"), 12, 0xccffffff));
+    c.addView(info, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
+    c.setOnClickListener(v -> {
+      Intent i = new Intent(this, LiveActivity.class);
+      i.putExtra(LiveActivity.EXTRA_ROOM, room.optString("id"));
+      startActivity(i);
+    });
+    return c;
   }
 
   private void showShort(int index) {
@@ -1635,7 +1757,6 @@ public class MainActivity extends Activity {
     ScrollView scroll = (ScrollView) content.getParent();
     int at = root.indexOfChild(scroll);
     root.removeView(scroll);
-    root.addView(reelTabs(), at++);
     FrameLayout stage = new FrameLayout(this);
     stage.setBackgroundColor(0xff000000);
     root.addView(stage, at, new LinearLayout.LayoutParams(-1, 0, 1));
@@ -1690,6 +1811,7 @@ public class MainActivity extends Activity {
     FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(dp(72), -2, Gravity.END | Gravity.BOTTOM);
     sp.bottomMargin = dp(24);
     stage.addView(side, sp);
+    stage.addView(reelTabs(), new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
     // Tên + chú thích
     LinearLayout meta = column();
     TextView name = label("@" + author.optString("username"), 16, WHITE);
@@ -1736,29 +1858,32 @@ public class MainActivity extends Activity {
   }
 
   // Thanh tab trắng phía trên video như web: Trực tiếp · Đề xuất · Đang theo dõi
+  // Thanh tab trong suốt nổi trên video: chữ trắng có bóng, gạch chân trắng ở tab đang chọn.
   private LinearLayout reelTabs() {
     LinearLayout bar = row();
-    bar.setBackgroundColor(CARD);
+    bar.setGravity(Gravity.CENTER);
+    bar.setPadding(0, dp(6), 0, dp(14));
+    bar.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x66000000, 0x00000000 }));
     String[][] items = { { "live", "Trực tiếp" }, { "for", "Đề xuất" }, { "following", "Đang theo dõi" } };
     for (final String[] it : items) {
-      boolean active = it[0].equals("following") ? shortsFollowing : it[0].equals("for") && !shortsFollowing;
+      boolean active = it[0].equals(shortsTab);
       LinearLayout cell = column();
-      cell.setGravity(Gravity.CENTER);
-      TextView t = label(it[1], 15, active ? ACCENT : TEXT);
+      cell.setGravity(Gravity.CENTER_HORIZONTAL);
+      cell.setPadding(dp(12), 0, dp(12), 0);
+      TextView t = label((it[0].equals("live") ? "● " : "") + it[1], 16, active ? WHITE : 0xb3ffffff);
       t.setTypeface(null, active ? Typeface.BOLD : Typeface.NORMAL);
-      t.setPadding(0, 0, 0, 0);
       t.setGravity(Gravity.CENTER);
-      cell.addView(t);
+      t.setShadowLayer(dp(3), 0, dp(1), 0xaa000000);
+      t.setPadding(0, 0, 0, 0);
+      t.setSingleLine(true);
+      cell.addView(t, new LinearLayout.LayoutParams(-1, -2));
       View line = new View(this);
-      line.setBackground(background(active ? ACCENT : CARD, 99));
-      LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(30), dp(3));
-      lp.topMargin = dp(6);
+      line.setBackground(background(active ? WHITE : 0x00000000, 99));
+      LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(24), dp(3));
+      lp.topMargin = dp(5);
       cell.addView(line, lp);
-      cell.setOnClickListener(v -> {
-        if (it[0].equals("live")) startActivity(new Intent(this, LiveActivity.class));
-        else { shortsFollowing = it[0].equals("following"); navigate("shorts"); }
-      });
-      bar.addView(cell, new LinearLayout.LayoutParams(0, dp(50), 1));
+      cell.setOnClickListener(v -> { shortsTab = it[0]; navigate("shorts"); });
+      bar.addView(cell, new LinearLayout.LayoutParams(dp(it[0].equals("following") ? 130 : 104), -2));
     }
     return bar;
   }

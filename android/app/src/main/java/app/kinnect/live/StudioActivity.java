@@ -141,7 +141,10 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
       public boolean onDoubleTap(MotionEvent e) { flip(); return true; }
       public boolean onSingleTapUp(MotionEvent e) { if (!panel.isEmpty()) showPanel(""); return true; }
     });
-    stage.setOnTouchListener((v, e) -> gestures.onTouchEvent(e));
+    final ScaleGestureDetector pinch = new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+      public boolean onScale(ScaleGestureDetector d) { if (still == null) setZoom(zoom * d.getScaleFactor()); return true; }
+    });
+    stage.setOnTouchListener((v, e) -> { pinch.onTouchEvent(e); if (!pinch.isInProgress() && e.getPointerCount() == 1) gestures.onTouchEvent(e); return true; });
 
     // Thanh trên: đóng · nhạc nền
     LinearLayout top = new LinearLayout(this);
@@ -560,6 +563,19 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         if (facing != null && facing == (front ? CameraCharacteristics.LENS_FACING_FRONT : CameraCharacteristics.LENS_FACING_BACK)) { chosen = id; break; }
       }
       if (chosen == null) chosen = manager.getCameraIdList()[0];
+      characteristics = manager.getCameraCharacteristics(chosen);
+      // Kích thước 16:9 lớn nhất ≤ 1920×1080: khi xoay dọc vừa khít khung 9:16, giữ trọn góc rộng của cảm biến.
+      bufferW = 1920; bufferH = 1080;
+      android.hardware.camera2.params.StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+      if (map != null) {
+        android.util.Size best = null;
+        for (android.util.Size sz : map.getOutputSizes(SurfaceTexture.class)) {
+          if (sz.getWidth() * 9 != sz.getHeight() * 16 || sz.getWidth() > 1920) continue;
+          if (best == null || sz.getWidth() > best.getWidth()) best = sz;
+        }
+        if (best != null) { bufferW = best.getWidth(); bufferH = best.getHeight(); }
+      }
+      zoom = 1f;
       manager.openCamera(chosen, new CameraDevice.StateCallback() {
         public void onOpened(CameraDevice d) { device = d; startPreview(); }
         public void onDisconnected(CameraDevice d) { d.close(); device = null; }
@@ -573,11 +589,15 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   private void startPreview() {
     try {
       SurfaceTexture texture = camera.getSurfaceTexture();
-      texture.setDefaultBufferSize(1920, 1080);
+      texture.setDefaultBufferSize(bufferW, bufferH);
       final Surface surface = new Surface(texture);
-      previewRequest = device.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
+      // TEMPLATE_PREVIEW + tắt chống rung: tránh máy tự cắt khung (bị "zoom gần") khi vừa mở camera.
+      previewRequest = device.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
       previewRequest.addTarget(surface);
-      previewRequest.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO);
+      previewRequest.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+      previewRequest.set(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_OFF);
+      previewRequest.set(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE, CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON);
+      applyZoomTo(previewRequest);
       device.createCaptureSession(Collections.singletonList(surface), new CameraCaptureSession.StateCallback() {
         public void onConfigured(CameraCaptureSession s) { session = s; applyTorch(); }
         public void onConfigureFailed(CameraCaptureSession s) {}
@@ -585,6 +605,30 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     } catch (Exception e) {
       ui.post(() -> faceStatus.setText("Không mở được camera."));
     }
+  }
+
+  private CameraCharacteristics characteristics;
+  private int bufferW = 1920, bufferH = 1080;
+  private float zoom = 1f;
+
+  /** Zoom bằng vùng cắt cảm biến (chụm 2 ngón); 1× = toàn bộ cảm biến. */
+  private void applyZoomTo(CaptureRequest.Builder b) {
+    if (characteristics == null) return;
+    Rect active = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+    if (active == null) return;
+    int cw = Math.round(active.width() / zoom), ch = Math.round(active.height() / zoom);
+    int left = active.left + (active.width() - cw) / 2, top = active.top + (active.height() - ch) / 2;
+    b.set(CaptureRequest.SCALER_CROP_REGION, new Rect(left, top, left + cw, top + ch));
+  }
+
+  private void setZoom(float value) {
+    Float max = characteristics == null ? null : characteristics.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM);
+    zoom = Math.max(1f, Math.min(max == null ? 4f : Math.min(max, 8f), value));
+    if (previewRequest != null && session != null) {
+      applyZoomTo(previewRequest);
+      try { session.setRepeatingRequest(previewRequest.build(), null, cameraHandler); } catch (Exception ignored) {}
+    }
+    showFilterName(String.format(java.util.Locale.US, "%.1f×", zoom));
   }
 
   private void applyTorch() {
@@ -959,32 +1003,259 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   }
 
   // ======================= Nhạc nền =======================
+  // Chọn nhạc kiểu Facebook: bảng gần toàn màn, tìm kiếm, tab Thư viện / Nhạc của bạn, nghe thử, "Dùng bài này".
+  private MediaPlayer previewPlayer;
+
   private void chooseMusic() {
     if (recording) return;
-    api.call("GET", "/api/music", null, (data, error, status) -> {
-      if (isFinishing()) return;
-      final JSONArray tracks = data == null ? null : data.optJSONArray("tracks");
-      int count = tracks == null ? 0 : tracks.length();
-      final String[] names = new String[count + 2];
-      names[0] = "Không dùng nhạc";
-      for (int i = 0; i < count; i++) {
-        JSONObject t = tracks.optJSONObject(i);
-        names[i + 1] = "♪ " + t.optString("title") + (t.optString("artist").isEmpty() ? "" : " · " + t.optString("artist"));
+    final android.app.Dialog dialog = new android.app.Dialog(this);
+    dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+    final boolean dark = (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+    final int bg = dark ? 0xff242526 : 0xffffffff, ink = dark ? 0xffe4e6eb : 0xff1c1e21, muted = dark ? 0xffb0b3b8 : 0xff65676b, soft = dark ? 0xff3a3b3c : 0xfff0f2f5, on = dark ? 0xff2e2752 : 0xfff1edff;
+    LinearLayout sheet = new LinearLayout(this);
+    sheet.setOrientation(LinearLayout.VERTICAL);
+    GradientDrawable shape = new GradientDrawable();
+    shape.setColor(bg);
+    float r = dp(22);
+    shape.setCornerRadii(new float[] { r, r, r, r, 0, 0, 0, 0 });
+    sheet.setBackground(shape);
+    View grip = new View(this);
+    grip.setBackground(round(dark ? 0xff4a4b4d : 0xffd0d3d8, 99));
+    LinearLayout.LayoutParams gp = new LinearLayout.LayoutParams(dp(40), dp(5));
+    gp.gravity = Gravity.CENTER_HORIZONTAL;
+    gp.topMargin = dp(8);
+    sheet.addView(grip, gp);
+    LinearLayout head = new LinearLayout(this);
+    head.setGravity(Gravity.CENTER_VERTICAL);
+    head.setPadding(dp(10), dp(4), dp(10), dp(4));
+    ImageView close = icon("close", ink);
+    close.setPadding(dp(9), dp(9), dp(9), dp(9));
+    close.setBackground(round(soft, 999));
+    close.setOnClickListener(v -> dialog.dismiss());
+    head.addView(close, new LinearLayout.LayoutParams(dp(38), dp(38)));
+    TextView title = plain("Âm nhạc", 17, ink, true);
+    title.setGravity(Gravity.CENTER);
+    head.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
+    TextView off = plain(musicUrl != null || musicLocal != null ? "Bỏ nhạc" : "", 13, 0xffe0245e, true);
+    off.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+    off.setOnClickListener(v -> { setMusic(null, null, null); dialog.dismiss(); });
+    head.addView(off, new LinearLayout.LayoutParams(dp(60), -2));
+    sheet.addView(head);
+    LinearLayout search = new LinearLayout(this);
+    search.setGravity(Gravity.CENTER_VERTICAL);
+    search.setPadding(dp(14), 0, dp(14), 0);
+    search.setBackground(round(soft, 999));
+    search.addView(icon("search", muted), new LinearLayout.LayoutParams(dp(18), dp(18)));
+    final EditText query = new EditText(this);
+    query.setHint("Tìm bài hát hoặc nghệ sĩ");
+    query.setHintTextColor(muted);
+    query.setTextColor(ink);
+    query.setTextSize(15);
+    query.setBackground(null);
+    query.setSingleLine(true);
+    search.addView(query, new LinearLayout.LayoutParams(0, -2, 1));
+    LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, dp(42));
+    sp.setMargins(dp(14), dp(6), dp(14), dp(4));
+    sheet.addView(search, sp);
+    final LinearLayout tabs = new LinearLayout(this);
+    tabs.setPadding(dp(14), dp(6), dp(14), dp(6));
+    sheet.addView(tabs);
+    final ScrollView scroll = new ScrollView(this);
+    final LinearLayout list = new LinearLayout(this);
+    list.setOrientation(LinearLayout.VERTICAL);
+    list.setPadding(dp(6), 0, dp(6), dp(8));
+    scroll.addView(list);
+    sheet.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+    final LinearLayout bar = new LinearLayout(this);
+    bar.setGravity(Gravity.CENTER_VERTICAL);
+    bar.setPadding(dp(14), dp(10), dp(14), dp(14));
+    bar.setVisibility(View.GONE);
+    final TextView nowTitle = plain("", 15, ink, true), nowSub = plain("", 12, muted, false);
+    LinearLayout now = new LinearLayout(this);
+    now.setOrientation(LinearLayout.VERTICAL);
+    now.addView(nowTitle);
+    now.addView(nowSub);
+    bar.addView(now, new LinearLayout.LayoutParams(0, -2, 1));
+    TextView use = plain("Dùng bài này", 15, 0xffffffff, true);
+    use.setGravity(Gravity.CENTER);
+    use.setPadding(dp(20), 0, dp(20), 0);
+    GradientDrawable ug = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { 0xff6d4aff, PINK });
+    ug.setCornerRadius(dp(999));
+    use.setBackground(ug);
+    bar.addView(use, new LinearLayout.LayoutParams(-2, dp(44)));
+    sheet.addView(bar);
+    final JSONArray[] tracks = { new JSONArray() };
+    final String[] tab = { "lib" }, picked = { null, null, null }, playing = { null };
+    final int[] shown = { 60 };
+    final Runnable[] render = new Runnable[1];
+    final Runnable drawTabs = new Runnable() {
+      public void run() {
+        tabs.removeAllViews();
+        for (final String[] t : new String[][] { { "lib", "Thư viện" }, { "own", "Nhạc của bạn" } }) {
+          boolean active = t[0].equals(tab[0]);
+          TextView b = plain(t[1], 14, active ? 0xff6d4aff : ink, true);
+          b.setPadding(dp(14), dp(7), dp(14), dp(7));
+          b.setBackground(round(active ? (dark ? 0xff2e2752 : 0xffe7e1ff) : soft, 999));
+          b.setOnClickListener(v -> { tab[0] = t[0]; shown[0] = 60; run(); render[0].run(); });
+          LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+          lp.rightMargin = dp(6);
+          tabs.addView(b, lp);
+        }
       }
-      names[count + 1] = "📁 Nhạc của bạn";
-      new Sheet(this).setTitle("Nhạc nền").setItems(names, (d, which) -> {
-        if (which == 0) setMusic(null, null, null);
-        else if (which == names.length - 1) {
+    };
+    final java.util.function.Consumer<String[]> choose = t -> {
+      picked[0] = t[0]; picked[1] = t[1]; picked[2] = t[2];
+      nowTitle.setText(t[1]);
+      nowSub.setText(t[2].isEmpty() ? "Nhạc của bạn" : t[2]);
+      bar.setVisibility(View.VISIBLE);
+    };
+    render[0] = () -> {
+      list.removeAllViews();
+      String q = query.getText().toString().trim().toLowerCase(Locale.ROOT);
+      if (tab[0].equals("own")) {
+        LinearLayout up = new LinearLayout(this);
+        up.setGravity(Gravity.CENTER_VERTICAL);
+        up.setPadding(dp(8), dp(8), dp(8), dp(8));
+        TextView art = plain("＋", 26, 0xff6d4aff, true);
+        art.setGravity(Gravity.CENTER);
+        art.setBackground(round(dark ? 0xff2e2752 : 0xffe7e1ff, 10));
+        up.addView(art, new LinearLayout.LayoutParams(dp(52), dp(52)));
+        LinearLayout meta = new LinearLayout(this);
+        meta.setOrientation(LinearLayout.VERTICAL);
+        meta.setPadding(dp(12), 0, 0, 0);
+        meta.addView(plain("Chọn nhạc trong máy", 15, ink, true));
+        meta.addView(plain("MP3, M4A… chỉ dùng cho video của bạn", 12, muted, false));
+        up.addView(meta);
+        up.setOnClickListener(v -> {
+          dialog.dismiss();
           Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
           pick.addCategory(Intent.CATEGORY_OPENABLE);
           pick.setType("audio/*");
           try { startActivityForResult(pick, 402); } catch (Exception e) { Toast.makeText(this, "Không mở được trình chọn nhạc.", Toast.LENGTH_SHORT).show(); }
-        } else {
-          JSONObject t = tracks.optJSONObject(which - 1);
-          setMusic(api.origin() + t.optString("url"), null, t.optString("title"));
-        }
-      }).show();
+        });
+        list.addView(up);
+        return;
+      }
+      int count = 0, total = 0;
+      for (int i = 0; i < tracks[0].length(); i++) {
+        final JSONObject t = tracks[0].optJSONObject(i);
+        String name = t.optString("title"), artist = t.optString("artist");
+        if (!q.isEmpty() && !(name + " " + artist).toLowerCase(Locale.ROOT).contains(q)) continue;
+        total++;
+        if (count >= shown[0]) continue;
+        count++;
+        final String url = api.origin() + t.optString("url");
+        boolean sel = url.equals(picked[0]);
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(8), dp(8), dp(8), dp(8));
+        row.setBackground(round(sel ? on : 0x00000000, 14));
+        float hue = Math.abs(name.hashCode()) % 360;
+        TextView art = plain("♪", 22, 0xffffffff, true);
+        art.setGravity(Gravity.CENTER);
+        GradientDrawable ag = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { Color.HSVToColor(new float[] { hue, 0.65f, 0.85f }), Color.HSVToColor(new float[] { (hue + 50) % 360, 0.75f, 0.6f }) });
+        ag.setCornerRadius(dp(10));
+        art.setBackground(ag);
+        row.addView(art, new LinearLayout.LayoutParams(dp(52), dp(52)));
+        LinearLayout meta = new LinearLayout(this);
+        meta.setOrientation(LinearLayout.VERTICAL);
+        meta.setPadding(dp(12), 0, dp(8), 0);
+        TextView tt = plain(name, 15, ink, true);
+        tt.setSingleLine(true);
+        tt.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        meta.addView(tt);
+        TextView st = plain(artist.isEmpty() ? "Thư viện Kinnect" : artist, 12, muted, false);
+        st.setSingleLine(true);
+        st.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        meta.addView(st);
+        row.addView(meta, new LinearLayout.LayoutParams(0, -2, 1));
+        FrameLayout play = new FrameLayout(this);
+        play.setBackground(round(sel ? 0xff6d4aff : soft, 999));
+        TextView glyph = plain(url.equals(playing[0]) ? "❚❚" : "▶", 13, sel ? 0xffffffff : ink, true);
+        glyph.setGravity(Gravity.CENTER);
+        play.addView(glyph, new FrameLayout.LayoutParams(-1, -1));
+        row.addView(play, new LinearLayout.LayoutParams(dp(38), dp(38)));
+        final String[] entry = { url, name, artist };
+        View.OnClickListener tap = v -> {
+          if (url.equals(playing[0])) { stopPreview(); playing[0] = null; render[0].run(); return; }
+          playPreview(url);
+          playing[0] = url;
+          choose.accept(entry);
+          render[0].run();
+        };
+        row.setOnClickListener(tap);
+        play.setOnClickListener(tap);
+        list.addView(row);
+      }
+      if (total == 0) {
+        TextView e = plain(q.isEmpty() ? "Thư viện chưa có bài nào." : "Không tìm thấy bài phù hợp.", 14, muted, false);
+        e.setGravity(Gravity.CENTER);
+        e.setPadding(0, dp(30), 0, dp(30));
+        list.addView(e, new LinearLayout.LayoutParams(-1, -2));
+      }
+      if (total > shown[0]) {
+        TextView more = plain("Xem thêm (" + (total - shown[0]) + " bài)", 14, ink, true);
+        more.setGravity(Gravity.CENTER);
+        more.setPadding(dp(18), dp(8), dp(18), dp(8));
+        more.setBackground(round(soft, 999));
+        more.setOnClickListener(v -> { shown[0] += 60; render[0].run(); });
+        LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(-2, -2);
+        mp.gravity = Gravity.CENTER_HORIZONTAL;
+        mp.setMargins(0, dp(8), 0, dp(8));
+        list.addView(more, mp);
+      }
+    };
+    query.addTextChangedListener(new android.text.TextWatcher() {
+      public void beforeTextChanged(CharSequence a, int b, int c, int d) {}
+      public void onTextChanged(CharSequence a, int b, int c, int d) {}
+      public void afterTextChanged(android.text.Editable e) { shown[0] = 60; render[0].run(); }
     });
+    use.setOnClickListener(v -> { if (picked[0] != null) setMusic(picked[0], null, picked[1]); dialog.dismiss(); });
+    dialog.setOnDismissListener(x -> stopPreview());
+    drawTabs.run();
+    render[0].run();
+    dialog.setContentView(sheet);
+    Window w = dialog.getWindow();
+    if (w != null) {
+      w.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0));
+      w.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, Math.round(getResources().getDisplayMetrics().heightPixels * 0.86f));
+      w.setGravity(Gravity.BOTTOM);
+      w.setDimAmount(0.5f);
+      w.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+    }
+    dialog.show();
+    if (music != null) music.pause();
+    api.call("GET", "/api/music", null, (data, error, status) -> {
+      if (isFinishing()) return;
+      JSONArray list2 = data == null ? null : data.optJSONArray("tracks");
+      if (list2 != null) tracks[0] = list2;
+      render[0].run();
+    });
+  }
+
+  private TextView plain(String s, float size, int color, boolean bold) {
+    TextView t = new TextView(this);
+    t.setText(s);
+    t.setTextSize(size);
+    t.setTextColor(color);
+    if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
+    return t;
+  }
+
+  private void playPreview(String url) {
+    stopPreview();
+    try {
+      previewPlayer = new MediaPlayer();
+      Map<String, String> headers = new HashMap<>();
+      headers.put("Cookie", api.jar());
+      previewPlayer.setDataSource(this, Uri.parse(url), headers);
+      previewPlayer.setOnPreparedListener(MediaPlayer::start);
+      previewPlayer.prepareAsync();
+    } catch (Exception ignored) {}
+  }
+
+  private void stopPreview() {
+    if (previewPlayer != null) { try { previewPlayer.release(); } catch (Exception ignored) {} previewPlayer = null; }
   }
 
   @Override
@@ -1006,7 +1277,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     if (music != null) { music.release(); music = null; }
     musicUrl = url;
     musicLocal = local;
-    musicLabel.setText(title == null ? "🎵  Thêm nhạc" : "🎵  " + title);
+    musicLabel.setText(title == null ? "🎵  Thêm nhạc" : "🎵  " + title.replaceAll("\\s+", " ").trim());
     if (url == null && local == null) return;
     try {
       music = new MediaPlayer();

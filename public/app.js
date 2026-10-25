@@ -73,6 +73,15 @@ function peer(id) {
   if (role === "host") stream.getTracks().forEach((t) => p.addTrack(t, stream));
   return p;
 }
+// Vào thẳng một phòng live (từ tab "Trực tiếp" ở trang Video).
+let pendingJoin = null;
+export function joinLiveRoom(id) {
+  pendingJoin = id;
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    send({ type: "join", room: id, name: $("name").value || "Khách" });
+    pendingJoin = null;
+  }
+}
 export function connectLive() {
   liveEnabled = true;
   clearTimeout(reconnectTimer);
@@ -108,6 +117,7 @@ export function connectLive() {
       if (m.type === "rooms") {
         rooms = m.rooms;
         renderRooms();
+        if (pendingJoin) { send({ type: "join", room: pendingJoin, name: $("name").value || "Khách" }); pendingJoin = null; }
       }
       if (m.type === "joined") {
         role = m.role;

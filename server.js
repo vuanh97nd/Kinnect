@@ -55,6 +55,20 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit } = {}) {
   let latestApk = null;
   const server = http.createServer(async (req, res) => {
     const path = new URL(req.url, "http://localhost").pathname;
+    // Danh sách buổi live đang phát (cho tab "Trực tiếp" ở trang Video, web và app).
+    if (path === "/api/live/rooms" && req.method === "GET") {
+      const me = social.authenticate(req);
+      res.writeHead(me ? 200 : 401, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+      if (!me) return res.end(JSON.stringify({ error: "Vui lòng đăng nhập." }));
+      const list = [...rooms.values()]
+        .filter((r) => social.user(r.host.userId)?.suspended === 0 && !social.blocked(me.id, r.host.userId))
+        .map((r) => {
+          const host = social.user(r.host.userId);
+          return { id: r.id, title: r.title, host: r.host.name, hostId: r.host.userId, hostUsername: host?.username || "", avatar: host?.avatar ? "/api/users/" + host.id + "/avatar" : null, viewers: r.members.size - 1, started: r.created || Date.now() };
+        })
+        .sort((a, b) => b.viewers - a.viewers || b.started - a.started);
+      return res.end(JSON.stringify({ rooms: list }));
+    }
     if (path.startsWith("/api/") && path !== "/api/music") {
       res.once("finish", () => enforceAccess());
       return social.api(req, res, path);
@@ -449,6 +463,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit } = {}) {
             .slice(0, 100),
           host: ws,
           members: new Map([[ws.id, ws]]),
+          created: Date.now(),
         };
         rooms.set(room.id, room);
         ws.room = room.id;
