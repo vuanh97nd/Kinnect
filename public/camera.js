@@ -133,6 +133,9 @@ export function createEffects(rawStream, { width = 540, height = 960 } = {}) {
   function draw() {
     if (stopped) return;
     if (video.readyState >= 2) {
+      // iPhone hay báo sai hướng trong getSettings(): lấy theo khung hình thật để không bị cắt phóng to.
+      const vw = video.videoWidth, vh = video.videoHeight;
+      if (vw && vh && (vw > vh) !== (canvas.width > canvas.height)) { const t = canvas.width; canvas.width = canvas.height; canvas.height = t; }
       const [x, y, w, h] = cover();
       let base = FILTERS.find((f) => f[0] === state.filter)?.[2] || "none";
       // Sáng da + AI cân sáng (chạy trên máy, không gửi ảnh đi đâu)

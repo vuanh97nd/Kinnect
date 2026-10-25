@@ -1,4 +1,4 @@
-import { connectLive, disconnectLive, joinLiveRoom } from "./app.js?v=806f6e17a7cc";
+import { connectLive, disconnectLive, joinLiveRoom } from "./app.js?v=live2";
 let callModule=null,callModuleLoading=null;
 function loadVideoCalls(){return callModuleLoading||(callModuleLoading=import('./calls.js').then(module=>{callModule=module;return module;}).catch(error=>{callModuleLoading=null;throw error;}));}
 async function startVideoCall(user,mode="video"){const module=await loadVideoCalls();return module.startVideoCall(user,mode);}
@@ -2190,7 +2190,7 @@ async function openCamera({story = false, photo = null} = {}) {
       r.onerror = reject;
       r.readAsDataURL(blob);
     });
-  const { openStudio } = await import("./camera.js?v=4");
+  const { openStudio } = await import("./camera.js?v=5");
   await openStudio({
     story, photo,
     notify: status,

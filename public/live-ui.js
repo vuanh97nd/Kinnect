@@ -5,7 +5,7 @@
   const fx = document.createElement("button");
   fx.type = "button";
   fx.className = "fx-toggle";
-  fx.textContent = "✨ Hiệu ứng";
+  fx.textContent = "Hiệu ứng";
   fx.setAttribute("aria-pressed", "false");
   fx.onclick = () => {
     const open = live.classList.toggle("fx-open");

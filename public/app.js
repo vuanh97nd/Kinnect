@@ -1,4 +1,4 @@
-import { createEffects, effectPicker } from "./camera.js?v=4";
+import { createEffects, effectPicker } from "./camera.js?v=5";
 const $ = (id) => document.getElementById(id);
 // stream: luồng đã qua hiệu ứng (gửi cho người xem); rawStream: camera/micro gốc.
 let rawStream = null,
@@ -267,7 +267,7 @@ $("create").onsubmit = async (e) => {
     if (!navigator.mediaDevices?.getUserMedia)
       throw Error("Camera cần HTTPS hoặc localhost.");
     const captured = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+      video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 }, resizeMode: "none" },
       audio: true,
     });
     if (revision !== liveRevision || !connected) {
