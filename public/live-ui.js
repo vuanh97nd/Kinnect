@@ -45,4 +45,26 @@
   new MutationObserver(check).observe(panel, { attributes: true, attributeFilter: ["hidden"] });
   new MutationObserver(() => { if (!live.hidden) busyUntil = 0; check(); }).observe(live, { attributes: true, attributeFilter: ["hidden"] });
   if (lobby) lobby.classList.add("lobby-gone");
+  // A readable identity and an explicit playback recovery action.
+  const heading = document.getElementById('room-title');
+  const identity = () => heading.dataset.initial = (heading.textContent.trim() || 'K').slice(0,1).toUpperCase();
+  new MutationObserver(identity).observe(heading, {childList:true,subtree:true,characterData:true});identity();
+  const play = document.createElement('button');play.type='button';play.className='live-play';play.hidden=true;
+  play.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m9 5 11 7-11 7V5Z"/></svg><span>Chạm để phát</span>';
+  video.parentElement.append(play);
+  function playback(){
+    if(live.hidden){play.hidden=true;return;}
+    const waiting=!video.srcObject || video.readyState<2;
+    play.disabled=waiting;play.querySelector('span').textContent=waiting?'Đang nhận hình ảnh…':'Chạm để phát';
+    play.hidden=!waiting&&!video.paused;
+  }
+  play.onclick=async()=>{try{await video.play();}catch{play.querySelector('span').textContent='Chạm để thử lại';}playback();};
+  for(const event of ['loadedmetadata','loadeddata','playing','pause','emptied','waiting'])video.addEventListener(event,playback);
+  new MutationObserver(playback).observe(live,{attributes:true,attributeFilter:['hidden']});
+  // Keep accessible names and muted states in step with existing media controls.
+  for(const id of ['mic','camera','gift','leave','report-live']){
+    const button=document.getElementById(id);
+    const sync=()=>{button.title=button.textContent.trim();button.setAttribute('aria-label',button.textContent.trim());if(id==='mic'||id==='camera')button.setAttribute('aria-pressed',String(button.textContent.trim().startsWith('Bật')));};
+    new MutationObserver(sync).observe(button,{childList:true,characterData:true,subtree:true});sync();
+  }
 })();

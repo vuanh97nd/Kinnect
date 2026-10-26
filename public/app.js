@@ -118,6 +118,7 @@ export function connectLive() {
     if (ws !== socket) return;
     reconnectDelay = 1000;
     connected = true;
+    window.dispatchEvent(new Event("kinnect-notifications"));
     $("connection").textContent = "Đã kết nối";
   };
   ws.onclose = () => {
@@ -137,8 +138,10 @@ export function connectLive() {
     if (ws !== socket) return;
     try {
       const m = JSON.parse(event.data);
+      if(m.type === "chat-typing")window.dispatchEvent(new CustomEvent("kinnect-chat-typing",{detail:m}));
       if(String(m.type).startsWith("call-"))window.dispatchEvent(new CustomEvent("kinnect-call-event",{detail:m}));
       if (m.type === "notifications-changed") window.dispatchEvent(new Event("kinnect-notifications"));
+      if (m.type === "conversations-changed") window.dispatchEvent(new Event("kinnect-conversations"));
       if (m.type === "rooms") {
         rooms = m.rooms;
         renderRooms();
@@ -392,3 +395,5 @@ window.addEventListener("kinnect-background", () => {
 $("gift").onclick = () => send({ type: "gift", kind: $("gift-kind").value });
 
 export function sendCallSignal(message){if(ws?.readyState!==WebSocket.OPEN)throw Error("Chưa kết nối máy chủ. Vui lòng thử lại.");send(message);}
+
+export function sendTypingSignal(message){if(ws?.readyState!==WebSocket.OPEN)return false;send({type:"chat-typing",...message});return true;}
