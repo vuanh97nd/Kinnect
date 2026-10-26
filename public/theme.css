@@ -1767,7 +1767,7 @@ body.ob-open {
 }
 
 /* ---------- Đăng nhập gần đây (kiểu Facebook) ---------- */
-#auth.has-recent .auth-panel > :not(.auth-logo):not(.recent-accounts):not(.site-links) {
+#auth.has-recent .auth-panel > :not(.auth-logo):not(.auth-top):not(.recent-accounts):not(.site-links) {
   display: none !important;
 }
 .recent-accounts h2 {

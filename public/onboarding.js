@@ -248,7 +248,7 @@ function showRecent() {
     document.getElementById("username").focus();
   };
   box.append(title, hint, list, other, create);
-  auth.querySelector(".auth-logo").after(box);
+  (auth.querySelector(".auth-top") || auth.querySelector(".auth-logo")).after(box);
   auth.classList.add("has-recent");
   return true;
 }

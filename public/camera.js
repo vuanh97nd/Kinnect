@@ -820,7 +820,7 @@ export async function openStudio({ onDone, onLive, notify = () => {}, mode: star
     btn.disabled = true;
     btn.textContent = "Đang đăng…";
     try {
-      await onDone(pendingBlob, $(".tt-caption").value, (p) => { btn.textContent = p < 100 ? "Đang tải lên " + p + "%" : "Đang xử lý…"; });
+      await onDone(pendingBlob, $(".tt-caption").value, (p) => { btn.textContent = p < 0 ? "Đang chuẩn bị video…" : p < 100 ? "Đang tải lên " + p + "%" : "Đang xử lý…"; });
       close();
     } catch (err) {
       notify(err.message);
