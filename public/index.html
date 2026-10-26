@@ -12,15 +12,17 @@
     <link rel="icon" href="/favicon.ico?v=7" sizes="16x16 32x32 48x48 64x64 128x128 256x256" />
     <link rel="icon" href="/favicon-32.png?v=7" type="image/png" sizes="32x32" />
     <link rel="manifest" href="/manifest.webmanifest?v=7" />
+    <link rel="stylesheet" href="/tokens.css" />
     <link rel="stylesheet" href="/style.css" />
     <link rel="stylesheet" href="/social.css" />
     <link rel="stylesheet" href="/ios.css" />
     <link rel="stylesheet" href="/theme.css?v=2fcbf56e08bc" />
     <link rel="stylesheet" href="/app-ui.css?v=d466220eae70" />
     <link rel="stylesheet" href="/studio.css?v=6" />
-    <link rel="stylesheet" href="/compact.css?v=2" />
-    <link rel="stylesheet" href="/desktop.css?v=1" />
-    <link rel="stylesheet" href="/live.css?v=5" />
+    <link rel="stylesheet" href="/compact.css?v=9" />
+    <link rel="stylesheet" href="/desktop.css?v=9" />
+    <link rel="stylesheet" href="/live.css?v=6" />
+    <link rel="stylesheet" href="/polish.css" />
   </head>
   <body>
     <section id="auth" class="auth-shell" hidden>
@@ -103,6 +105,17 @@
         </form>
         <div id="forgot-view" hidden>
           <button type="button" class="link-btn back" id="forgot-back">← Quay lại đăng nhập</button>
+          <form id="otp-request-form">
+            <div class="field"><label for="otp-email">Tên đăng nhập hoặc email khôi phục</label><div class="input-wrap"><input id="otp-email" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="254" required /></div></div>
+            <button id="otp-send" type="submit" class="auth-cta">Gửi mã OTP qua email</button>
+          </form>
+          <p id="otp-status" role="status"></p>
+          <form id="otp-reset-form" hidden>
+            <div class="field"><label for="otp-code">Mã OTP 6 chữ số</label><div class="input-wrap"><input id="otp-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required /></div></div>
+            <div class="field"><label for="otp-password">Mật khẩu mới</label><div class="input-wrap"><input id="otp-password" type="password" autocomplete="new-password" minlength="6" maxlength="128" required /></div></div>
+            <button id="otp-save" type="submit" class="auth-cta">Đặt lại mật khẩu bằng OTP</button>
+          </form>
+          <details><summary>Chưa có email khôi phục? Gửi yêu cầu cho quản trị viên</summary>
           <form id="forgot-form">
             <div class="field">
               <label for="forgot-username">Tên đăng nhập của bạn</label>
@@ -135,6 +148,7 @@
             <p>Quản trị viên sẽ liên hệ với bạn để cấp mật khẩu tạm. Sau khi đăng nhập, hãy đổi sang mật khẩu mới.</p>
             <button type="button" class="auth-cta" id="forgot-done-back">Về đăng nhập</button>
           </div>
+          </details>
         </div>
         <p class="auth-switch" id="auth-switch">Chưa có tài khoản? <button type="button" data-mode="register">Tạo tài khoản mới</button></p>
         <p class="fine">Bản thử nghiệm. Tuổi do người dùng tự xác nhận. Bằng việc tiếp tục, bạn đồng ý với quy tắc cộng đồng và chính sách quyền riêng tư.</p>
@@ -159,7 +173,7 @@
           <button id="notification-bell" data-tab="notifications" class="icon-tab" aria-label="Thông báo" aria-expanded="false" aria-controls="notification-center">
             Thông báo <span id="unread"></span></button>
           <div class="me-menu">
-            <button type="button" id="me-btn" class="me-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="me-panel" aria-label="Tài khoản"><span id="me-avatar" class="avatar fallback" aria-hidden="true">?</span></button>
+            <button type="button" id="me-btn" class="me-btn" aria-label="Tài khoản của tôi"><span id="me-avatar" class="avatar fallback" aria-hidden="true">?</span></button>
             <div class="me-panel" id="me-panel" role="menu" hidden>
               <button type="button" role="menuitem" class="me-head" data-go="profile"><span id="me-head-avatar" class="avatar fallback" aria-hidden="true">?</span><span class="me-who"><b id="me-name"></b><small id="me-username"></small></span><em class="me-ext"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></em></button>
               <div class="me-group">
@@ -229,7 +243,7 @@
           </div>
           <div class="live-layout"><div class="live-stage">
           <div class="video-wrap">
-            <video id="video" autoplay playsinline></video
+            <video id="video" autoplay playsinline controlslist="nofullscreen"></video
             ><span class="badge">● TRỰC TIẾP</span>
           </div>
           <div id="live-swipe-controls" hidden><button type="button" id="live-previous" aria-label="Buổi trực tiếp trước">↑</button><span>Vuốt lên để xem live tiếp theo</span><button type="button" id="live-next" aria-label="Buổi trực tiếp tiếp theo">↓</button></div>
@@ -268,9 +282,9 @@
         <nav class="site-links" aria-label="Thông tin Kinnect"><a href="https://kinnect.io.vn/">Giới thiệu</a><a href="https://kinnect.io.vn/community">Cộng đồng</a><a href="https://kinnect.io.vn/privacy">Quyền riêng tư</a><a href="https://kinnect.io.vn/support">Hỗ trợ</a></nav>
       </footer>
     </main>
-    <script type="module" src="/social.js?v=live2"></script>
+    <script type="module" src="/social.js?v=live8"></script>
     <script src="/ios.js?v=d3fbe217d6aa" defer></script>
     <script src="/onboarding.js" defer></script>
-    <script src="/live-ui.js?v=8" defer></script>
+    <script src="/live-ui.js?v=9" defer></script>
   </body>
 </html>

@@ -1,22 +1,27 @@
+import {createTyping} from './lib/typing.js';
 import {createCalls} from "./lib/calls.js";
 import http from "node:http";
 import { mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { openSocial } from "./lib/social.js";
-import { loadMailEnv, mailConfigured, sendMail } from "./lib/mailer.js";
+import { loadMailEnv, mailConfigured, smtpConfigured, sendMail } from "./lib/mailer.js";
 import { readFile, readdir, stat, writeFile, unlink } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { randomUUID } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { fileURLToPath } from "node:url";
 
-export function createApp({ dbPath = ":memory:", fetchImpl, authLimit } = {}) {
+export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSender, emailReady } = {}) {
   loadMailEnv();
   loadMailEnv("oauth.env");
+  loadMailEnv("turn.env");
   let notifyNotifications = () => {};
+  let notifyCallMessage = () => {};
   const social = openSocial(dbPath, {
     onNotification: ({ userId }) => notifyNotifications(userId),
+    onCallMessage: ({ userIds }) => notifyCallMessage(userIds),
     fetchImpl,authLimit,
+    sendEmail:emailSender||sendMail,mailReady:emailReady||smtpConfigured,
     // Báo về email quản trị khi có người gửi yêu cầu quên mật khẩu.
     onResetRequest: (r) => {
       const when = new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
@@ -284,6 +289,8 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit } = {}) {
       "/compact.css": ["compact.css", "text/css"],
       "/desktop.css": ["desktop.css", "text/css"],
       "/live.css": ["live.css", "text/css"],
+      "/calls.css": ["calls.css", "text/css"],
+      "/messenger.css": ["messenger.css", "text/css"],
       "/live-ui.js": ["live-ui.js", "text/javascript"],
       "/social.css": ["social.css", "text/css"],
       "/kinnect-icon.png": ["kinnect-icon.png", "image/png"],
@@ -299,6 +306,8 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit } = {}) {
       "/install-ios.js": ["install-ios.js", "text/javascript"],
       "/app.js": ["app.js", "text/javascript"],
       "/style.css": ["style.css", "text/css"],
+      "/tokens.css": ["tokens.css", "text/css"],
+      "/polish.css": ["polish.css", "text/css"],
     };
     if (!files[path]) {
       res.writeHead(404);
@@ -307,9 +316,11 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit } = {}) {
     try {
       const [file, type] = files[path];
       let body = await readFile(new URL("./public/" + file, import.meta.url));
-      if (type === "text/html" || type === "text/javascript") {
+      if ((type === "text/html" || type === "text/javascript") && path !== "/sw.js") {
         // Gắn mã phiên bản theo nội dung vào mọi đường dẫn JS/CSS nội bộ, để trình duyệt và
-        // Cloudflare luôn lấy bản mới ngay sau khi cập nhật (sw.js giữ nguyên đường dẫn).
+        // Cloudflare luôn lấy bản mới ngay sau khi cập nhật. Riêng sw.js phải GIỮ NGUYÊN
+        // nội dung (không gắn ?v=): danh sách STATIC bên trong so khớp theo url.pathname,
+        // nếu bị tiêm query thì cache-hit sẽ trượt và offline-fallback hỏng.
         const version = await buildVersion();
         body = Buffer.from(
           body
@@ -343,6 +354,11 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit } = {}) {
   notifyNotifications = (userId) => {
     for (const client of wss.clients)
       if (client.userId === userId && social.authenticate(client.authRequest)) send(client, { type: "notifications-changed" });
+  };
+  notifyCallMessage = (userIds) => {
+    const recipients = new Set(userIds);
+    for (const client of wss.clients)
+      if (recipients.has(client.userId) && social.authenticate(client.authRequest)) send(client, { type: "conversations-changed" });
   };
   const broadcast = (room, data) =>
     room.members.forEach((ws) => {
@@ -411,6 +427,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit } = {}) {
     }
     listing();
   }
+  const typing=createTyping({social,wss,send});
   wss.on("connection", (ws, req) => {
     ws.on("error", () => {});
     // Browser connections must originate from the same host.
@@ -453,6 +470,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit } = {}) {
       }
       if (!m || typeof m !== "object") return;
       const error = (message) => send(ws, { type: "error", message });
+      if(typing.handle(ws,m,account))return;
       if(calls.handle(ws,m))return;
       if (m.type === "create") {
         if (ws.room) return error("Hãy rời phòng hiện tại trước.");
@@ -564,7 +582,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit } = {}) {
           send(target, { type: "signal", from: ws.id, candidate: m.candidate });
       }
     });
-    ws.on("close", () => {calls.disconnect(ws);leave(ws);});
+    ws.on("close", () => {typing.disconnect(ws);calls.disconnect(ws);leave(ws);});
   });
   return { server, wss, rooms, social };
 }

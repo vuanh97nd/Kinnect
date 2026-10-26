@@ -1,7 +1,15 @@
-const CACHE = 'kinnect-static-v23';
+const CACHE = 'kinnect-static-v24';
 self.addEventListener('message', event => { if(event.data === 'SKIP_WAITING') self.skipWaiting(); });
 const STATIC = ['/style.css','/social.css','/ios.css','/theme.css','/app-ui.css','/social.js','/app.js','/ios.js','/onboarding.js','/auth-preview.jpg','/kinnect-icon.png','/kinnect-icon-192.png','/apple-touch-icon.png','/apple-touch-icon-v6.png','/kinnect-mark.svg','/offline.html'];
-self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(STATIC).then(() => self.skipWaiting()))); });
+// Cài đặt từng tệp riêng để một tệp lỗi không làm hỏng toàn bộ việc đăng ký SW.
+self.addEventListener('install', event => {
+  event.waitUntil(caches.open(CACHE).then(async cache => {
+    await Promise.all(STATIC.map(async url => {
+      try { await cache.add(url); } catch (e) { /* bỏ qua tệp lỗi lẻ, không chặn cài đặt */ }
+    }));
+    await self.skipWaiting();
+  }));
+});
 self.addEventListener('activate', event => { event.waitUntil(self.clients.claim().then(() => caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('kinnect-static-') && key !== CACHE).map(key => caches.delete(key)))))); });
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);

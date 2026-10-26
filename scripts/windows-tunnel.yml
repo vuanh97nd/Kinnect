@@ -1,0 +1,7 @@
+tunnel: 7605ff36-8ee1-4348-9f42-e3c25a08a1c7
+credentials-file: C:\Users\ANH\.cloudflared\7605ff36-8ee1-4348-9f42-e3c25a08a1c7.json
+protocol: http2
+ingress:
+  - hostname: app.kinnect.io.vn
+    service: http://127.0.0.1:3000
+  - service: http_status:404
