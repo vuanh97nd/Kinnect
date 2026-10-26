@@ -584,3 +584,63 @@ dialog.video-call .call-controls > button span {
 
 /* Match the mobile content offset, including devices without a top safe area. */
 @media(max-width:999px){#app>header.topbar{min-height:calc(57px + env(safe-area-inset-top))}}
+
+/* Keep the v2 finish authoritative over legacy header/toast overrides. */
+#app>header.topbar .top-actions>.icon-tab {
+  border-radius:var(--radius-pill)!important
+}
+#app>header.topbar :is(#friends-button,#notification-bell,[data-tab=inbox]).icon-tab:hover:not(.active) {
+  background:var(--soft)!important
+}
+#app>header.topbar #me-btn>.avatar {
+  box-sizing:border-box;
+  width:30px!important;
+  height:30px!important;
+  min-width:30px!important;
+  min-height:30px!important;
+  max-width:30px;
+  max-height:30px;
+  border:2px solid var(--card)!important;
+  box-shadow:0 0 0 2px var(--primary)
+}
+#app .profile-completion-actions>.primary {
+  background:var(--brand-gradient);
+  box-shadow:var(--shadow-glow)
+}
+#app article.social-card.post {
+  border-radius:20px;
+  box-shadow:0 2px 5px rgba(16,18,30,.06),0 12px 28px rgba(16,18,30,.07)!important
+}
+#app #notice[role="status"] {
+  position:fixed!important;
+  inset:auto auto calc(var(--nav-h,64px) + 20px + env(safe-area-inset-bottom)) 50%;
+  width:max-content;
+  min-width:0;
+  max-width:min(92vw,420px);
+  box-sizing:border-box;
+  margin:0;
+  padding:12px 18px;
+  border:0;
+  border-radius:var(--radius-pill);
+  background:var(--ink);
+  color:var(--card);
+  opacity:0;
+  transform:translate(-50%,16px);
+  transition:opacity var(--motion-base) var(--easing),transform var(--motion-base) var(--easing);
+  pointer-events:none
+}
+#app #notice[role="status"].show {
+  opacity:1;
+  transform:translate(-50%,0)
+}
+@media(min-width:1000px) {
+  #app #notice[role="status"] {
+    left:auto;
+    right:24px;
+    bottom:24px;
+    transform:translateY(16px)
+  }
+  #app #notice[role="status"].show {
+    transform:translateY(0)
+  }
+}
