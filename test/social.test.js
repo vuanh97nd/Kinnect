@@ -1026,7 +1026,7 @@ test('group membership protects messages, unread counts and ownership transfer',
 });
 
 test('private call signaling requires acceptance and blocks outsiders, revoked sessions and blocked users',async t=>{
- const app=await start();t.after(()=>app.stop());const a=await register(app,'call_a'),b=await register(app,'call_b'),c=await register(app,'call_out');
+ const app=await start();t.after(()=>app.stop());const a=await register(app,'call_a'),b=await register(app,'call_b'),c=await register(app,'call_out'),offline=await register(app,'call_offline');
  async function client(u){const ws=new WebSocket(app.url,{headers:{Cookie:u.cookie}}),queue=[];ws.on('message',raw=>queue.push(JSON.parse(raw)));await once(ws,'open');return {ws,queue,send:m=>ws.send(JSON.stringify(m)),wait:async type=>{const until=Date.now()+2000;while(Date.now()<until){const i=queue.findIndex(m=>m.type===type);if(i>=0)return queue.splice(i,1)[0];await new Promise(r=>setTimeout(r,10));}throw Error('Missing '+type);}};}
  const aa=await client(a),bb=await client(b),cc=await client(c);
  aa.send({type:'call-start',to:b.id,requestId:'one'});const ring=await aa.wait('call-ringing'),incoming=await bb.wait('call-incoming');assert.equal(incoming.from.id,a.id);assert.equal(incoming.callId,ring.callId);
@@ -1036,9 +1036,10 @@ test('private call signaling requires acceptance and blocks outsiders, revoked s
  cc.send({type:'call-start',to:b.id,requestId:'busy'});assert.equal((await cc.wait('call-ended')).reason,'busy');
  await as(app,b,'/users/'+a.id+'/block','POST',{});assert.equal((await aa.wait('call-ended')).reason,'unavailable');await bb.wait('call-ended');
  aa.send({type:'call-start',to:b.id,requestId:'blocked'});assert.equal((await aa.wait('call-ended')).reason,'unavailable');
- await as(app,b,'/users/'+a.id+'/block','DELETE',{});aa.send({type:'call-start',to:b.id,requestId:'decline'});const declined=await aa.wait('call-ringing');await bb.wait('call-incoming');bb.send({type:'call-decline',callId:declined.callId});assert.equal((await aa.wait('call-ended')).reason,'declined');await bb.wait('call-ended');
- aa.send({type:'call-start',to:b.id,requestId:'logout'});await aa.wait('call-ringing');await bb.wait('call-incoming');await as(app,a,'/logout','POST',{});assert.equal((await bb.wait('call-ended')).reason,'unavailable');
- assert.equal((await request(app,'/call-config')).status,401);assert.equal((await as(app,b,'/call-config')).status,200);
+ await as(app,b,'/users/'+a.id+'/block','DELETE',{});aa.send({type:'call-start',to:b.id,mode:'audio',requestId:'decline'});const declined=await aa.wait('call-ringing');await bb.wait('call-incoming');bb.send({type:'call-decline',callId:declined.callId});assert.equal((await aa.wait('call-ended')).reason,'declined');await bb.wait('call-ended');const declinedChat=(await as(app,a,'/users/'+b.id+'/messages')).body.messages;assert.ok(declinedChat.some(m=>m.body==='Cuộc gọi thoại bị từ chối.'));await aa.wait('conversations-changed');await bb.wait('conversations-changed');assert.ok((await as(app,a,'/conversations')).body.users.some(u=>u.id===b.id));assert.ok(!(await as(app,b,'/notifications')).body.notifications.some(n=>n.kind==='missed_call'));
+ aa.send({type:'call-start',to:offline.id,mode:'video',requestId:'offline'});assert.equal((await aa.wait('call-ended')).reason,'unavailable');const missedChat=(await as(app,a,'/users/'+offline.id+'/messages')).body.messages;assert.ok(missedChat.some(m=>m.body==='Cuộc gọi video nhỡ.'));assert.ok(!(await as(app,offline,'/notifications')).body.notifications.some(n=>n.kind==='missed_call'));
+  aa.send({type:'call-start',to:b.id,requestId:'logout'});await aa.wait('call-ringing');await bb.wait('call-incoming');await as(app,a,'/logout','POST',{});assert.equal((await bb.wait('call-ended')).reason,'unavailable');
+  assert.equal((await request(app,'/call-config')).status,401);assert.equal((await as(app,b,'/call-config')).status,200);
 });
 
  test('comment replies and reactions persist with resource and block checks',async t=>{
@@ -1095,6 +1096,8 @@ test('private albums require approval and revoke access immediately',async t=>{
  assert.deepEqual((await as(app,b,album)).body.photos,[]);assert.equal((await as(app,b,'/me/private-photos/'+photo.id,'DELETE',{})).status,404);
  for(let i=0;i<2;i++)assert.equal((await as(app,b,album+'/request','POST',{})).body.status,'pending');
  assert.equal((await as(app,a,'/notifications')).body.notifications.filter(n=>n.kind==='private_request').length,1);
+  app.social.db.prepare('INSERT INTO notifications(id,user_id,actor,kind,ref,seen,created) VALUES(?,?,?,?,?,?,?)').run('legacy-duplicate',a.id,b.id,'private_request',b.id,0,Date.now());
+  await as(app,b,album+'/request','POST',{});assert.equal((await as(app,a,'/notifications')).body.notifications.filter(n=>n.kind==='private_request'&&!n.seen).length,1);
  assert.equal((await as(app,c,decision,'POST',{action:'grant'})).status,404);
  await as(app,a,decision,'POST',{action:'deny'});assert.equal((await image(b)).status,404);
  await as(app,b,album+'/request','POST',{});await as(app,b,album+'/request','DELETE',{});assert.equal((await as(app,a,'/me/private/requests')).body.requests.length,0);

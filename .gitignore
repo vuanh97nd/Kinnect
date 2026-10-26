@@ -22,6 +22,7 @@ local.properties
 /playwright-report/
 mail.env
 oauth.env
+turn.env
 /music/*
 !/music/README.txt
 !/music/credits.json
