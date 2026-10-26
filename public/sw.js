@@ -1,6 +1,36 @@
-const CACHE = 'kinnect-static-v25';
+const CACHE = 'kinnect-static-v26';
 self.addEventListener('message', event => { if(event.data === 'SKIP_WAITING') self.skipWaiting(); });
-const STATIC = ['/social-feed.js','/social-discover.js','/social-profile.js','/social-messenger.js','/style.css','/social.css','/ios.css','/theme.css','/app-ui.css','/social.js','/app.js','/ios.js','/onboarding.js','/auth-preview.jpg','/kinnect-icon.png','/kinnect-icon-192.png','/apple-touch-icon.png','/apple-touch-icon-v6.png','/kinnect-mark.svg','/offline.html'];
+const STATIC = [
+  '/tokens.css',
+  '/style.css',
+  '/social.css',
+  '/ios.css',
+  '/theme.css',
+  '/app-ui.css',
+  '/studio.css',
+  '/compact.css',
+  '/desktop.css',
+  '/live.css',
+  '/polish.css',
+  '/social.js',
+  '/social-feed.js',
+  '/social-discover.js',
+  '/social-profile.js',
+  '/social-messenger.js',
+  '/app.js',
+  '/calls.js',
+  '/camera.js',
+  '/ios.js',
+  '/onboarding.js',
+  '/live-ui.js',
+  '/auth-preview.jpg',
+  '/kinnect-icon.png',
+  '/kinnect-icon-192.png',
+  '/apple-touch-icon.png',
+  '/apple-touch-icon-v6.png',
+  '/kinnect-mark.svg',
+  '/offline.html',
+];
 // Cài đặt từng tệp riêng để một tệp lỗi không làm hỏng toàn bộ việc đăng ký SW.
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(async cache => {
@@ -15,9 +45,16 @@ self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (event.request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
   if (event.request.mode === 'navigate') {
-    event.respondWith(fetch(event.request).catch(() => caches.match('/offline.html')));
+    const offlinePage = () => caches.match('/offline.html');
+    event.respondWith(self.navigator.onLine === false
+      ? offlinePage()
+      : fetch(event.request, { cache: "no-store" }).catch(offlinePage));
   } else if (STATIC.includes(url.pathname)) {
-    event.respondWith(fetch(event.request).then(response => {
+    if (self.navigator.onLine === false) {
+      event.respondWith(caches.match(url.pathname).then(response => response || Response.error()));
+      return;
+    }
+    event.respondWith(fetch(event.request, { cache: "no-store" }).then(response => {
       if (response.ok) { const copy = response.clone(); event.waitUntil(caches.open(CACHE).then(cache => cache.put(url.pathname, copy))); }
       return response;
     }).catch(() => caches.match(url.pathname)));

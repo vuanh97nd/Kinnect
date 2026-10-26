@@ -28,7 +28,7 @@ for(const button of document.querySelectorAll('#app [data-tab]')) {
 const offline = document.createElement('div'); offline.className='offline-strip';offline.setAttribute('role','status');offline.textContent='Bạn đang ngoại tuyến. Kết nối lại Internet để tiếp tục dùng Kinnect.';document.body.append(offline);
 function network(){offline.hidden=navigator.onLine;}
 window.addEventListener('online',network);window.addEventListener('offline',network);network();
-if('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('/sw.js').catch(error=>console.info('Kinnect web app:',error.message));
+if('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('/sw.js?v=static-v26', {updateViaCache:'none'}).catch(error=>console.info('Kinnect web app:',error.message));
 
 const navigation=document.querySelector('#app>nav');
 const updateTabs=()=>{navigation.style.setProperty('--tab-count',[...navigation.querySelectorAll('button')].filter(button=>!button.hidden&&getComputedStyle(button).display!=='none').length);};
