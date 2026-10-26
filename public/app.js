@@ -32,6 +32,9 @@ function cleanup() {
   for (const p of peers.values()) p.close();
   peers.clear();
   pending.clear();
+  peerTasks.clear();
+  livePeers.clear();
+  liveIceRequest = null;
   stream?.getTracks().forEach((t) => t.stop());
   stream = null;
   stopCamera();
@@ -51,10 +54,27 @@ function cleanup() {
   $("mic").textContent = "Tắt micro";
   $("camera").textContent = "Tắt camera";
 }
-function peer(id) {
+const peerTasks = new Map(), livePeers = new Set();
+let liveIceRequest = null;
+function liveIceConfig() {
+  if (!liveIceRequest) {
+    const request = fetch("/api/call-config", {credentials:"same-origin", cache:"no-store"})
+      .then(async response => {
+        const config = await response.json();
+        if (!response.ok) throw Error(config.error || "Không tải được cấu hình livestream.");
+        return config;
+      });
+    liveIceRequest = request;
+    request.finally(() => { if (liveIceRequest === request) liveIceRequest = null; }).catch(() => {});
+  }
+  return liveIceRequest;
+}
+async function peer(id) {
   if (peers.has(id)) return peers.get(id);
-  // Host candidates work on local networks. Public deployment needs configured STUN/TURN.
-  const p = new RTCPeerConnection({ iceServers: [] });
+  const revision = liveRevision;
+  const config = await liveIceConfig();
+  if (revision !== liveRevision || !livePeers.has(id)) return null;
+  const p = new RTCPeerConnection(config);
   peers.set(id, p);
   p.onicecandidate = (e) => {
     if (e.candidate)
@@ -69,7 +89,7 @@ function peer(id) {
   p.onconnectionstatechange = () => {
     if (p.connectionState === "failed")
       notify(
-        "Không kết nối được video. Kết nối qua Internet cần máy chủ TURN; bản hiện tại dành cho thử nghiệm cục bộ.",
+        "Không kết nối được livestream. Hãy kiểm tra mạng rồi thử lại.",
       );
   };
   if (role === "host") stream.getTracks().forEach((t) => p.addTrack(t, stream));
@@ -175,39 +195,35 @@ export function connectLive() {
             : "Đang kết nối với người phát…",
         );
       }
-      if (m.type === "peer" && role === "host") {
-        const p = peer(m.id);
-        await p.setLocalDescription(await p.createOffer());
-        send({
-          type: "signal",
-          to: m.id,
-          description: p.localDescription.toJSON(),
-        });
-      }
-      if (m.type === "signal") {
-        const p = peer(m.from);
-        if (m.description) {
-          await p.setRemoteDescription(m.description);
-          for (const c of pending.get(m.from) || []) await p.addIceCandidate(c);
-          pending.delete(m.from);
-          if (m.description.type === "offer") {
-            await p.setLocalDescription(await p.createAnswer());
-            send({
-              type: "signal",
-              to: m.from,
-              description: p.localDescription.toJSON(),
-            });
+      if ((m.type === "peer" && role === "host") || m.type === "signal") {
+        const id = m.type === "peer" ? m.id : m.from, revision = liveRevision;
+        livePeers.add(id);
+        const task = (peerTasks.get(id) || Promise.resolve()).then(async () => {
+          if (revision !== liveRevision || !livePeers.has(id)) return;
+          const p = await peer(id);
+          if (!p) return;
+          if (m.type === "peer") {
+            await p.setLocalDescription(await p.createOffer());
+            send({type:"signal", to:id, description:p.localDescription.toJSON()});
+          } else if (m.description) {
+            await p.setRemoteDescription(m.description);
+            for (const candidate of pending.get(id) || []) await p.addIceCandidate(candidate);
+            pending.delete(id);
+            if (m.description.type === "offer") {
+              await p.setLocalDescription(await p.createAnswer());
+              send({type:"signal", to:id, description:p.localDescription.toJSON()});
+            }
+          } else if (m.candidate) {
+            if (p.remoteDescription) await p.addIceCandidate(m.candidate);
+            else { const candidates = pending.get(id) || []; candidates.push(m.candidate); pending.set(id,candidates); }
           }
-        } else if (m.candidate) {
-          if (p.remoteDescription) await p.addIceCandidate(m.candidate);
-          else {
-            const q = pending.get(m.from) || [];
-            q.push(m.candidate);
-            pending.set(m.from, q);
-          }
-        }
+        }).catch(error => { if (revision === liveRevision && livePeers.has(id)) notify(error.message || "Không kết nối được livestream."); });
+        peerTasks.set(id,task);
+        task.finally(() => { if (peerTasks.get(id) === task) peerTasks.delete(id); });
       }
       if (m.type === "peer-left") {
+        livePeers.delete(m.id);
+        peerTasks.delete(m.id);
         peers.get(m.id)?.close();
         peers.delete(m.id);
         pending.delete(m.id);

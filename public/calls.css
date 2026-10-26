@@ -41,7 +41,7 @@ dialog.video-call::backdrop{background:#080d19bd;backdrop-filter:blur(16px)}
 /* Compact video stage; preserve camera proportions on all screen sizes. */
 dialog.video-call:not(.audio-call){width:min(960px,calc(100vw - 32px));height:min(640px,calc(100dvh - 32px));margin:auto;border-radius:24px}
 .video-call:not(.audio-call) .call-remote{inset:76px 0 138px;width:100%;height:calc(100% - 214px);object-fit:contain;aspect-ratio:auto}
-.video-call .call-local{width:144px;height:auto;aspect-ratio:4/3;object-fit:contain}
+.video-call .call-local{box-sizing:border-box;min-height:0;width:144px;height:108px;aspect-ratio:4/3;object-fit:contain}
 .video-call .call-controls{gap:14px}
-@media(max-width:599px){dialog.video-call:not(.audio-call){width:100%;height:min(620px,100dvh);border-radius:20px}.video-call .call-local{width:104px;height:auto;aspect-ratio:4/3}.video-call .call-controls{left:8px;right:8px;gap:6px}.video-call .call-controls button{width:66px;font-size:11px}.video-call .call-controls button svg{width:50px;height:50px;padding:14px}.video-call .call-controls button[aria-pressed=true]::after{top:24px;left:19px;width:27px}}
+@media(max-width:599px){dialog.video-call:not(.audio-call){width:100%;height:min(620px,100dvh);border-radius:20px}.video-call .call-local{width:104px;height:78px;aspect-ratio:4/3}.video-call .call-controls{left:8px;right:8px;gap:6px}.video-call .call-controls button{width:66px;font-size:11px}.video-call .call-controls button svg{width:50px;height:50px;padding:14px}.video-call .call-controls button[aria-pressed=true]::after{top:24px;left:19px;width:27px}}
 dialog.video-call.call-maximized,dialog.video-call:fullscreen{width:100vw;height:100dvh;border-radius:0}

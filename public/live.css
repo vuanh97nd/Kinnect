@@ -142,7 +142,7 @@
   #app #live #count::before{content:""}
   #app #live .video-wrap .badge{left:16px;top:calc(env(safe-area-inset-top) + 70px);padding:5px 8px;font-size:9px}
   #app #live .video-wrap::after{background:linear-gradient(#08060d88,transparent 25%,transparent 40%,#08060dbb)}
-  #app #live .controls{right:10px;gap:16px;bottom:calc(env(safe-area-inset-bottom) + 90px)}
+  #app #live .controls{z-index:4;right:10px;gap:16px;bottom:calc(env(safe-area-inset-bottom) + 90px)}
   #app #live .controls button{font-size:10px!important;max-width:60px;font-weight:500}
   #app #live .controls button::before{background:#ffffff18;box-shadow:inset 0 0 0 1px #ffffff20}
   #app #live .controls #gift::before{background:linear-gradient(145deg,#9a61ec,#ed4c94);box-shadow:0 6px 20px #e34b8d40}
@@ -302,7 +302,7 @@ dialog.video-call::backdrop{background:#080d19bd;backdrop-filter:blur(16px)}
 /* Compact video stage; preserve camera proportions on all screen sizes. */
 dialog.video-call:not(.audio-call){width:min(960px,calc(100vw - 32px));height:min(640px,calc(100dvh - 32px));margin:auto;border-radius:24px}
 .video-call:not(.audio-call) .call-remote{inset:76px 0 138px;width:100%;height:calc(100% - 214px);object-fit:contain;aspect-ratio:auto}
-.video-call .call-local{width:144px;height:auto;aspect-ratio:4/3;object-fit:contain}
+.video-call .call-local{box-sizing:border-box;min-height:0;width:144px;height:108px;aspect-ratio:4/3;object-fit:contain}
 .video-call .call-controls{gap:14px}
-@media(max-width:599px){dialog.video-call:not(.audio-call){width:100%;height:min(620px,100dvh);border-radius:20px}.video-call .call-local{width:104px;height:auto;aspect-ratio:4/3}.video-call .call-controls{left:8px;right:8px;gap:6px}.video-call .call-controls button{width:66px;font-size:11px}.video-call .call-controls button svg{width:50px;height:50px;padding:14px}.video-call .call-controls button[aria-pressed=true]::after{top:24px;left:19px;width:27px}}
+@media(max-width:599px){dialog.video-call:not(.audio-call){width:100%;height:min(620px,100dvh);border-radius:20px}.video-call .call-local{width:104px;height:78px;aspect-ratio:4/3}.video-call .call-controls{left:8px;right:8px;gap:6px}.video-call .call-controls button{width:66px;font-size:11px}.video-call .call-controls button svg{width:50px;height:50px;padding:14px}.video-call .call-controls button[aria-pressed=true]::after{top:24px;left:19px;width:27px}}
 dialog.video-call.call-maximized,dialog.video-call:fullscreen{width:100vw;height:100dvh;border-radius:0}
