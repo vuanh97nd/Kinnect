@@ -8,11 +8,12 @@ for(const width of [320,390,1440])test('video comments, sound and share at '+wid
   const bytes=await readFile(new URL('../test/fixtures/short.mp4',import.meta.url));
   const uploaded=await context.request.post('/api/shorts',{data:{caption:'Một khoảnh khắc trên Kinnect',data:'data:video/mp4;base64,'+bytes.toString('base64')}});expect(uploaded.status()).toBe(201);const {id}=await uploaded.json();
   await page.goto('/?video='+id);await expect(page.locator('.reel-item').first()).toBeVisible();
+  if(width>=1000){await expect(page.locator('#app>header')).toBeVisible();await expect(page.locator('#app>nav')).toBeVisible();await expect(page.locator('#rail')).toBeVisible();expect(await page.locator('#app').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(3);const center=await page.locator('#social-panel').boundingBox(),actions=await page.locator('.reel-side').first().boundingBox(),creator=await page.locator('.reel-meta').first().boundingBox();expect(actions.x).toBeGreaterThanOrEqual(center.x);expect(actions.x+actions.width).toBeLessThanOrEqual(center.x+center.width);expect(creator.x).toBeGreaterThanOrEqual(center.x);expect(creator.x+creator.width).toBeLessThanOrEqual(center.x+center.width);}
   await expect(page.locator('#auth')).toBeHidden();
   await expect(page.locator('#app>header .logo')).toBeVisible();
   expect(await page.locator('#app>header .logo').evaluate(img=>img.naturalWidth)).toBeGreaterThan(0);
   const navBoxes=await page.locator('.reel-feed-tabs>button').evaluateAll(buttons=>buttons.map(b=>{const r=b.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,overflow:b.scrollWidth>b.clientWidth};}));
-  expect(navBoxes).toHaveLength(4);
+  expect(navBoxes).toHaveLength(3);
   for(const b of navBoxes){expect(b.y).toBe(navBoxes[0].y);expect(b.h).toBe(48);expect(b.overflow).toBe(false);}
   expect(Math.abs(navBoxes[0].w-navBoxes[1].w)).toBeLessThan(1);
   expect(Math.abs(navBoxes[1].w-navBoxes[2].w)).toBeLessThan(1);
@@ -27,9 +28,9 @@ for(const width of [320,390,1440])test('video comments, sound and share at '+wid
   await expect.poll(()=>page.locator('.reel-item video').first().evaluate(v=>v.paused)).toBe(false);
   await page.getByRole('textbox',{name:'Bình luận của bạn'}).fill('Giao diện mới đẹp hơn');
   await page.getByRole('button',{name:'Gửi bình luận',exact:true}).click();
-  await expect(page.locator('.reel-comment p')).toHaveText('Giao diện mới đẹp hơn');
-  await page.locator('.fb-comment-actions').getByRole('button',{name:'Thích',exact:true}).click();await page.getByRole('dialog',{name:'Chọn biểu cảm'}).getByRole('button',{name:'Yêu thích',exact:true}).click();await expect(page.locator('.fb-reaction-count')).toContainText('❤️ 1');
-  await page.locator('.fb-comment-actions').getByRole('button',{name:'Trả lời',exact:true}).click();await page.getByRole('textbox',{name:'Bình luận của bạn'}).fill('Mình trả lời bình luận này');await page.getByRole('button',{name:'Gửi bình luận',exact:true}).click();await expect(page.locator('.fb-replies')).toContainText('Mình trả lời bình luận này');
+  await expect(page.locator('.rc-item .rc-text')).toHaveText('Giao diện mới đẹp hơn');
+  await page.getByRole('button',{name:'Thích bình luận',exact:true}).click();await expect(page.getByRole('button',{name:'Bỏ thích bình luận',exact:true})).toContainText('1');
+  await page.locator('.rc-meta').getByRole('button',{name:'Trả lời',exact:true}).click();await page.getByRole('textbox',{name:'Bình luận của bạn'}).fill('Mình trả lời bình luận này');await page.getByRole('button',{name:'Gửi bình luận',exact:true}).click();await page.getByRole('button',{name:'Xem 1 câu trả lời',exact:true}).click();await expect(page.locator('.rc-replies')).toContainText('Mình trả lời bình luận này');
   expect(await page.locator('.reel-item video').first().evaluate(v=>v.paused)).toBe(false);
 
   await page.screenshot({path:'C:/Users/ANH/Documents/Codex/2026-10-24/ki-m-tra-claude-ang-l/outputs/audit/'+width+'-comments.png'});

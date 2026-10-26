@@ -1,9 +1,9 @@
 import { test, expect } from "@playwright/test";
 async function signUp(page, name) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Bỏ qua", exact: true }).click();
+  await page.getByRole("button", { name: "Tôi đã có tài khoản", exact: true }).click();
   await page
-    .getByRole("button", { name: "Tạo tài khoản", exact: true })
+    .getByRole("button", { name: "Tạo tài khoản mới", exact: true })
     .click();
   await page.locator("#username").fill(name);
   await page.locator("#password").fill("abcdef");
@@ -28,15 +28,15 @@ test("mobile social journey: register, profile, matching, mutual chat, post, not
   await signUp(a, "alice_browser");
   await signUp(b, "bruno_browser");
   await a.getByRole("button", { name: "Hồ sơ", exact: true }).click();
-  await a.getByRole("button", { name: "Sửa hồ sơ", exact: true }).click();
+  await a.getByRole("button", {name:"Tài khoản",exact:true}).click();await a.getByRole("menuitem",{name:"Cài đặt tài khoản",exact:true}).click();await a.getByRole("button",{name:"Chỉnh sửa tài khoản",exact:true}).click();
   await a
-    .getByLabel("Giới thiệu", { exact: true })
+    .getByRole("textbox",{name:"Giới thiệu",exact:true})
     .fill("Một người bạn thích cà phê.");
   await a.getByLabel("Sở thích, phân cách bằng dấu phẩy").fill("coffee, music");
   await a.getByRole("button", { name: "Xong", exact: true }).click();
   await expect(a.locator("#notice")).toHaveText("Đã lưu hồ sơ.");
   await b.getByRole("button", { name: "Hồ sơ", exact: true }).click();
-  await b.getByRole("button", { name: "Sửa hồ sơ", exact: true }).click();
+  await b.getByRole("button", {name:"Tài khoản",exact:true}).click();await b.getByRole("menuitem",{name:"Cài đặt tài khoản",exact:true}).click();await b.getByRole("button",{name:"Chỉnh sửa tài khoản",exact:true}).click();
   await b.getByLabel("Sở thích, phân cách bằng dấu phẩy").fill("coffee");
   await b.getByRole("button", { name: "Xong", exact: true }).click();
   await expect(b.locator("#notice")).toHaveText("Đã lưu hồ sơ.");
@@ -82,6 +82,7 @@ test("mobile social journey: register, profile, matching, mutual chat, post, not
   await expect(
     b.getByText("đã gửi tin nhắn cho bạn.", { exact: true }),
   ).toBeVisible();
+  await b.getByRole("button",{name:"Đóng thông báo",exact:true}).click();
   await b.getByRole("button", { name: "Khám phá", exact: true }).click();
   b.once("dialog", (d) => d.accept());
   await alice.locator(".more summary").click();
@@ -101,10 +102,7 @@ test("mobile social journey: register, profile, matching, mutual chat, post, not
     path: "test-results/kinnect-mobile-feed.png",
     fullPage: true,
   });
-  await a.getByRole("button", { name: "Live", exact: true }).click();
-  await expect(
-    a.getByRole("button", { name: "Phát trực tiếp", exact: true }),
-  ).toBeVisible();
+  await a.getByRole("button",{name:"Video",exact:true}).click();await a.getByRole("button",{name:"Các buổi đang live",exact:true}).click();await expect(a.locator(".live-grid")).toBeVisible();
   await a.getByRole("button", { name: "Tài khoản", exact: true }).click();
   await a.getByRole("menuitem", { name: "Đăng xuất", exact: true }).click();
   await expect(a.locator("#auth")).toBeVisible();
@@ -122,14 +120,9 @@ async function livePair(browser, prefix) {
     viewer = await vc.newPage();
   await signUp(host, prefix + "_host");
   await signUp(viewer, prefix + "_viewer");
-  await host.getByRole("button", { name: "Live", exact: true }).click();
-  await host.locator("#title").fill("Local camera smoke test");
-  await host
-    .getByRole("button", { name: "Phát trực tiếp", exact: true })
-    .click();
+  await host.getByRole("button",{name:"Quay video",exact:true}).click();await host.getByRole("button",{name:"Phát trực tiếp",exact:true}).click();await host.getByRole("textbox",{name:"Tiêu đề buổi live",exact:true}).fill("Local camera smoke test");await host.getByRole("button",{name:"Lên sóng",exact:true}).click();
   await expect(host.locator("#live")).toBeVisible();
-  await viewer.getByRole("button", { name: "Live", exact: true }).click();
-  await viewer.getByRole("button", { name: "Vào xem", exact: true }).click();
+  await viewer.getByRole("button",{name:"Video",exact:true}).click();await viewer.getByRole("button",{name:"Các buổi đang live",exact:true}).click();await viewer.locator(".live-card").first().click();
   await expect(viewer.locator("#live")).toBeVisible();
   return { hc, vc, host, viewer };
 }
@@ -194,8 +187,8 @@ test("uploaded MP4 is decoded and played through authenticated HTTP video endpoi
   await expect(page.locator("body")).toHaveAttribute("data-reel", "empty");
   expect(await page.locator("body").evaluate(el => getComputedStyle(el).backgroundColor)).not.toBe("rgb(0, 0, 0)");
   await page.locator(".reel-live-shortcut").click();
-  await expect(page.locator("#live-panel")).toBeVisible();
-  await expect(page.locator("#social-panel")).toBeHidden();
+  await expect(page.locator(".live-grid")).toBeVisible();
+  await expect(page.locator("#social-panel")).toBeVisible();
   const response = await page.request.post("/api/shorts", {
     data: {
       caption: "Browser video smoke",
@@ -222,7 +215,7 @@ test("uploaded MP4 is decoded and played through authenticated HTTP video endpoi
   await page.locator(".reel-item video").first().evaluate(v => { window.reviewVideo = v; });
   await page.locator(".reel-live-shortcut").click();
   expect(await page.evaluate(() => window.reviewVideo.paused)).toBe(true);
-  await expect(page.locator("#live-panel")).toBeVisible();
+  await expect(page.locator(".live-grid")).toBeVisible();
 });
 
 test("nearby consent, optional Les identity and notification permission/bell work on mobile", async ({browser}) => {
@@ -234,14 +227,16 @@ test("nearby consent, optional Les identity and notification permission/bell wor
     Object.defineProperty(window,"Notification",{value:FakeNotification});
   });
   const p=await ctx.newPage();await signUp(p,"community_browser");
-  await expect(p.getByRole("heading",{name:"Khám phá",exact:true,level:2})).toBeVisible();
+  await expect(p.locator(".view-discover")).toBeVisible();
   expect(await p.evaluate(()=>[window.locationRequests,window.notificationRequests])).toEqual([0,0]);
-  // Lời mời bật thông báo nằm trong trung tâm thông báo (không chen vào nội dung).
-  await p.locator("#notification-bell").click();
+  // Notification permission is configured in account settings.
+  await p.getByRole("button",{name:"Tài khoản",exact:true}).click();
+  await p.getByRole("menuitem",{name:"Cài đặt tài khoản",exact:true}).click();
+  await p.locator(".settings-entry>summary").filter({hasText:"Thông báo và âm thanh"}).click();
   await p.getByRole("button",{name:"Bật thông báo trình duyệt",exact:true}).click();
   expect(await p.evaluate(()=>window.notificationRequests)).toBe(1);
   await p.keyboard.press("Escape");
-  await p.getByRole("button",{name:"Bật vị trí",exact:true}).click();
+  await p.getByRole("button",{name:"Khám phá",exact:true}).click();await p.getByRole("button",{name:"Gần đây",exact:true}).click();
   await expect(p.getByRole("heading",{name:"Thành viên quanh bạn",exact:true})).toBeVisible();
   expect(await p.evaluate(()=>window.locationRequests)).toBe(1);
   await expect(p.locator(".nearby-consent")).toBeHidden();
@@ -249,13 +244,13 @@ test("nearby consent, optional Les identity and notification permission/bell wor
   await p.getByRole("menuitem",{name:"Cài đặt tài khoản",exact:true}).click();
   await p.locator('.settings-entry>summary').filter({hasText:'Vị trí'}).click();await p.getByRole("button",{name:"Tắt vị trí",exact:true}).click();
   await p.getByRole("button",{name:"Hồ sơ",exact:true}).click();
-  await p.getByRole('button',{name:'Tài khoản',exact:true}).click();await p.getByRole('menuitem',{name:'Cài đặt tài khoản',exact:true}).click();await p.getByRole('button',{name:'Chỉnh sửa tài khoản',exact:true}).click();
+  await p.getByRole('button',{name:'Tài khoản của tôi',exact:true}).click();await p.getByRole('menuitem',{name:'Cài đặt tài khoản',exact:true}).click();await p.getByRole('button',{name:'Chỉnh sửa tài khoản',exact:true}).click();
   await p.getByLabel("Xu hướng tính dục",{exact:true}).fill("Les / Đồng tính nữ");
   await p.getByLabel("Giới tính",{exact:true}).fill("Nữ");
   await p.getByLabel("Vai trò",{exact:true}).fill("Vers Bottom");
   await p.getByLabel("Hiển thị giới tính, xu hướng và vai trò trên hồ sơ",{exact:true}).check();
   await p.getByRole("button",{name:"Xong",exact:true}).click();
-  await expect(p.locator(".profile-intro").getByText("Les / Đồng tính nữ",{exact:true})).toBeVisible();
+  await expect(p.getByRole("region",{name:"Thông tin cá nhân"}).getByRole("definition").filter({hasText:"Les / Đồng tính nữ"})).toBeVisible();
   const other=await browser.newContext();
   await other.request.post("/api/register",{data:{username:"notification_browser",password:"abcdef",name:"Bạn mới",agree18:true}});
   const own=(await (await ctx.request.get("/api/me")).json()).user;

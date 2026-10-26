@@ -1,5 +1,23 @@
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
-async function openReels(browser){const context=await browser.newContext({viewport:{width:390,height:844}});await context.request.post('/api/register',{data:{username:'fullscreen_'+Date.now(),password:'abcdef',name:'Fullscreen',agree18:true}});const bytes=await readFile(new URL('../test/fixtures/short.mp4',import.meta.url));let id;for(let i=0;i<2;i++){const r=await context.request.post('/api/shorts',{data:{caption:'Video '+i,data:'data:video/mp4;base64,'+bytes.toString('base64')}});expect(r.status()).toBe(201);id=(await r.json()).id;}const page=await context.newPage();await page.goto('/?video='+id);await expect(page.locator('.reel-item').first()).toBeVisible();await expect.poll(()=>page.locator('.reel').evaluate(r=>r.clientHeight)).toBeGreaterThan(500);return {context,page};}
-test('Safari enters native fullscreen for the currently visible video before requesting page fullscreen',async({browser})=>{const {context,page}=await openReels(browser);try{await page.locator('.reel').evaluate(r=>r.scrollTop=r.clientHeight);await expect.poll(()=>page.locator('.reel').evaluate(r=>Math.round(r.scrollTop/r.clientHeight))).toBe(1);await page.evaluate(()=>{window.nativeVideo=null;window.pageFullscreenCalls=0;document.querySelector('.view-shorts').requestFullscreen=()=>{window.pageFullscreenCalls++;return Promise.reject(Error('Unsupported'));};for(const v of document.querySelectorAll('.reel video'))v.webkitEnterFullscreen=function(){window.nativeVideo=this.src;};});const expected=await page.locator('.reel-item video').nth(1).evaluate(v=>v.src);await page.getByRole('button',{name:'Toàn màn hình',exact:true}).click();expect(await page.evaluate(()=>window.nativeVideo)).toBe(expected);expect(await page.evaluate(()=>window.pageFullscreenCalls)).toBe(0);}finally{await context.close();}});
-test('rejected fullscreen falls back to a full visible viewport and restores navigation on exit',async({browser})=>{const {context,page}=await openReels(browser);try{await page.evaluate(()=>{document.querySelector('.view-shorts').requestFullscreen=()=>Promise.reject(Error('Unsupported'));for(const v of document.querySelectorAll('.reel video'))v.webkitEnterFullscreen=undefined;});await page.getByRole('button',{name:'Toàn màn hình',exact:true}).click();await expect(page.locator('body')).toHaveClass(/reel-immersive/);await expect(page.locator('#app>header')).toBeHidden();await expect(page.locator('#app>nav')).toBeHidden();async function fits(height){await expect.poll(()=>page.locator('#social-panel').evaluate(e=>Math.round(e.getBoundingClientRect().height))).toBe(height);const bounds=await page.locator('.reel').boundingBox();expect(Math.round(bounds.x)).toBe(0);expect(Math.round(bounds.width)).toBe(390);expect(Math.round(bounds.y)).toBe(48);expect(Math.round(bounds.y+bounds.height)).toBe(height);const video=await page.locator('.reel video').first().boundingBox();expect(Math.round(video.height)).toBe(Math.round(bounds.height));expect(await page.locator('.reel video').first().evaluate(v=>getComputedStyle(v).objectFit)).toBe('contain');}await fits(844);await page.setViewportSize({width:390,height:640});await fits(640);await page.screenshot({path:'C:/Users/ANH/Documents/Codex/2026-10-24/ki-m-tra-claude-ang-l/outputs/audit/safari-video-immersive.png'});await page.getByRole('button',{name:'Thoát toàn màn hình',exact:true}).click();await expect(page.locator('body')).not.toHaveClass(/reel-immersive/);await expect(page.locator('#app>header .logo')).toBeVisible();await expect(page.locator('#app>nav')).toBeVisible();await expect.poll(async()=>{const r=await page.locator('.reel').boundingBox(),n=await page.locator('#app>nav').boundingBox();return Math.abs(r.y+r.height-n.y);}).toBeLessThan(2);}finally{await context.close();}});
+async function openReels(browser,width){
+ const context=await browser.newContext({viewport:{width,height:844}});
+ await context.request.post('/api/register',{data:{username:'no_fullscreen_'+width+'_'+Date.now(),password:'abcdef',name:'Video viewer',agree18:true}});
+ const bytes=await readFile(new URL('../test/fixtures/short.mp4',import.meta.url));
+ const response=await context.request.post('/api/shorts',{data:{caption:'Video kiểm tra',data:'data:video/mp4;base64,'+bytes.toString('base64')}});
+ expect(response.status()).toBe(201);
+ const {id}=await response.json();
+ const page=await context.newPage();await page.goto('/?video='+id);
+ await expect(page.locator('.reel-item video').first()).toBeVisible();
+ return {context,page};
+}
+for(const width of [390,1280])test('video viewer hides the fullscreen button at '+width+'px',async({browser})=>{
+ const {context,page}=await openReels(browser,width);
+ try{
+  await expect(page.locator('.reel-fullscreen')).toHaveCount(0);
+  await expect(page.getByRole('button',{name:/Toàn màn hình/})).toHaveCount(0);
+  await expect(page.locator('.reel-feed-tabs > button')).toHaveCount(3);
+  await expect(page.locator('.reel-item video').first()).toHaveAttribute('controlslist',/nofullscreen/);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+ }finally{await context.close();}
+});

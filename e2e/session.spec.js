@@ -14,7 +14,7 @@ test('valid session survives notification outage on reload',async({page})=>{
  await page.reload();
  await expect(page.locator('#app')).toBeVisible();
  await expect(page.locator('#auth')).toBeHidden();
- await expect(page.getByRole('heading',{name:'Khám phá',exact:true,level:2})).toBeVisible();
+ await expect(page.locator('.view-discover')).toBeVisible();
 });
 test('isolated background 401 does not discard a valid session',async({page})=>{
  await account(page,'session_background_a');

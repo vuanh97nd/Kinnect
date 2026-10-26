@@ -10,7 +10,7 @@ test('photo with music records and publishes as a story without requesting camer
  await page.getByLabel('Chọn ảnh tạo tin').setInputFiles({name:'photo.png',mimeType:'image/png',buffer:await readFile(new URL('../public/apple-touch-icon.png',import.meta.url))});
  await expect(page.getByRole('dialog',{name:'Tạo tin',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Nhạc nền',exact:true}).click();
- await page.getByLabel('Chọn nhạc của bạn').setInputFiles({name:'Test.wav',mimeType:'audio/wav',buffer:tone()});
+ await page.getByRole('button',{name:'Nhạc của bạn',exact:true}).click();await page.locator('.mp-upload input').setInputFiles({name:'Test.wav',mimeType:'audio/wav',buffer:tone()});await page.getByRole('button',{name:'Dùng bài này',exact:true}).click();
  await page.getByRole('button',{name:'Tạo tin ảnh',exact:true}).click();
  await expect(page.locator('.studio')).toHaveClass(/recording/);
  await page.waitForTimeout(1800);await page.getByRole('button',{name:'Dừng quay',exact:true}).click();
