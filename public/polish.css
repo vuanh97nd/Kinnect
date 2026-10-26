@@ -581,3 +581,6 @@ dialog.video-call .call-controls > button span {
   background: color-mix(in srgb, var(--primary-soft) 70%, var(--soft));
   color: var(--primary);
 }
+
+/* Match the mobile content offset, including devices without a top safe area. */
+@media(max-width:999px){#app>header.topbar{min-height:calc(57px + env(safe-area-inset-top))}}

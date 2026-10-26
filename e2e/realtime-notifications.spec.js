@@ -10,7 +10,7 @@ test('real message and friendship notifications arrive without reload, including
  await b.request.post('/api/users/'+ua.id+'/messages',{data:{body:'Tin nhắn thực tế'}});
  await expect(p.locator('[data-tab="inbox"] .nav-count')).toHaveText('1',{timeout:5000});
  await b.request.post('/api/users/'+ua.id+'/friend-request',{data:{}});
- await expect(p.locator('#friends-count')).toHaveText('+1',{timeout:5000});
+ await expect(p.locator('#friends-count')).toHaveText('●',{timeout:5000});
  await p.locator('#notification-bell').click();await expect(p.locator('#notification-center')).toContainText('đã gửi lời mời kết bạn');await expect(p.locator('#notification-center')).toContainText('đã gửi tin nhắn');await p.keyboard.press('Escape');
  // Delay a stale snapshot while a new event arrives. It must trigger a fresh fetch immediately.
  let release;const gate=new Promise(r=>release=r);let intercepted=false;

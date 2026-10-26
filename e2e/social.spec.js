@@ -28,7 +28,7 @@ test("mobile social journey: register, profile, matching, mutual chat, post, not
   await signUp(a, "alice_browser");
   await signUp(b, "bruno_browser");
   await a.getByRole("button", { name: "Hồ sơ", exact: true }).click();
-  await a.getByRole("button", {name:"Tài khoản",exact:true}).click();await a.getByRole("menuitem",{name:"Cài đặt tài khoản",exact:true}).click();await a.getByRole("button",{name:"Chỉnh sửa tài khoản",exact:true}).click();
+  await a.getByRole("button", {name:"Tài khoản của tôi",exact:true}).click();await a.getByRole("menuitem",{name:"Cài đặt tài khoản",exact:true}).click();await a.getByRole("button",{name:"Chỉnh sửa tài khoản",exact:true}).click();
   await a
     .getByRole("textbox",{name:"Giới thiệu",exact:true})
     .fill("Một người bạn thích cà phê.");
@@ -36,7 +36,7 @@ test("mobile social journey: register, profile, matching, mutual chat, post, not
   await a.getByRole("button", { name: "Xong", exact: true }).click();
   await expect(a.locator("#notice")).toHaveText("Đã lưu hồ sơ.");
   await b.getByRole("button", { name: "Hồ sơ", exact: true }).click();
-  await b.getByRole("button", {name:"Tài khoản",exact:true}).click();await b.getByRole("menuitem",{name:"Cài đặt tài khoản",exact:true}).click();await b.getByRole("button",{name:"Chỉnh sửa tài khoản",exact:true}).click();
+  await b.getByRole("button", {name:"Tài khoản của tôi",exact:true}).click();await b.getByRole("menuitem",{name:"Cài đặt tài khoản",exact:true}).click();await b.getByRole("button",{name:"Chỉnh sửa tài khoản",exact:true}).click();
   await b.getByLabel("Sở thích, phân cách bằng dấu phẩy").fill("coffee");
   await b.getByRole("button", { name: "Xong", exact: true }).click();
   await expect(b.locator("#notice")).toHaveText("Đã lưu hồ sơ.");
@@ -59,12 +59,12 @@ test("mobile social journey: register, profile, matching, mutual chat, post, not
     .fill("Xin chào từ Kinnect");
   await a.getByRole("button", { name: "Gửi", exact: true }).click();
   await expect(
-    a.getByText("Xin chào từ Kinnect", { exact: true }),
+    a.locator(".dm-log").getByText("Xin chào từ Kinnect", { exact: true }),
   ).toBeVisible();
   await b.getByRole("button", { name: "Tin nhắn", exact: true }).click();
   await b.locator(".inbox-row").first().click();
   await expect(
-    b.getByText("Xin chào từ Kinnect", { exact: true }),
+    b.locator(".dm-log").getByText("Xin chào từ Kinnect", { exact: true }),
   ).toBeVisible();
   await a.getByRole("button", { name: "Bảng tin", exact: true }).click();
   await a
@@ -103,7 +103,7 @@ test("mobile social journey: register, profile, matching, mutual chat, post, not
     fullPage: true,
   });
   await a.getByRole("button",{name:"Video",exact:true}).click();await a.getByRole("button",{name:"Các buổi đang live",exact:true}).click();await expect(a.locator(".live-grid")).toBeVisible();
-  await a.getByRole("button", { name: "Tài khoản", exact: true }).click();
+  await a.getByRole("button", { name: "Tài khoản của tôi", exact: true }).click();
   await a.getByRole("menuitem", { name: "Đăng xuất", exact: true }).click();
   await expect(a.locator("#auth")).toBeVisible();
   expect(errors).toEqual([]);
@@ -230,7 +230,7 @@ test("nearby consent, optional Les identity and notification permission/bell wor
   await expect(p.locator(".view-discover")).toBeVisible();
   expect(await p.evaluate(()=>[window.locationRequests,window.notificationRequests])).toEqual([0,0]);
   // Notification permission is configured in account settings.
-  await p.getByRole("button",{name:"Tài khoản",exact:true}).click();
+  await p.getByRole("button",{name:"Tài khoản của tôi",exact:true}).click();
   await p.getByRole("menuitem",{name:"Cài đặt tài khoản",exact:true}).click();
   await p.locator(".settings-entry>summary").filter({hasText:"Thông báo và âm thanh"}).click();
   await p.getByRole("button",{name:"Bật thông báo trình duyệt",exact:true}).click();
@@ -240,7 +240,7 @@ test("nearby consent, optional Les identity and notification permission/bell wor
   await expect(p.getByRole("heading",{name:"Thành viên quanh bạn",exact:true})).toBeVisible();
   expect(await p.evaluate(()=>window.locationRequests)).toBe(1);
   await expect(p.locator(".nearby-consent")).toBeHidden();
-  await p.getByRole("button",{name:"Tài khoản",exact:true}).click();
+  await p.getByRole("button",{name:"Tài khoản của tôi",exact:true}).click();
   await p.getByRole("menuitem",{name:"Cài đặt tài khoản",exact:true}).click();
   await p.locator('.settings-entry>summary').filter({hasText:'Vị trí'}).click();await p.getByRole("button",{name:"Tắt vị trí",exact:true}).click();
   await p.getByRole("button",{name:"Hồ sơ",exact:true}).click();

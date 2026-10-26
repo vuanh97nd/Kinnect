@@ -1,4 +1,9 @@
 import { defineConfig } from "@playwright/test";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+// Prefer installed Chrome on Windows for MP4 codecs; allow explicit CI/browser overrides.
+const windowsChrome = process.platform === "win32" && existsSync(join(process.env.PROGRAMFILES || "C:/Program Files", "Google/Chrome/Application/chrome.exe"));
+const channel = process.env.PLAYWRIGHT_CHANNEL || (windowsChrome ? "chrome" : "chromium");
 const port = Number(process.env.E2E_PORT || 3210);
 export default defineConfig({
   testDir: "./e2e",
@@ -11,6 +16,7 @@ export default defineConfig({
   retries: 1,
   reporter: process.env.CI ? [["list"], ["github"]] : [["list"]],
   use: {
+    channel,
     baseURL: `http://127.0.0.1:${port}`,
     viewport: { width: 412, height: 915 },
     actionTimeout: 10000,

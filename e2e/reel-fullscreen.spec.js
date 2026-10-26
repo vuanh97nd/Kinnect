@@ -2,7 +2,8 @@ import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 async function openReels(browser,width){
  const context=await browser.newContext({viewport:{width,height:844}});
- await context.request.post('/api/register',{data:{username:'no_fullscreen_'+width+'_'+Date.now(),password:'abcdef',name:'Video viewer',agree18:true}});
+ const registered=await context.request.post('/api/register',{data:{username:'nofull_'+width+'_'+Date.now(),password:'abcdef',name:'Video viewer',agree18:true}});
+ expect(registered.ok()).toBeTruthy();
  const bytes=await readFile(new URL('../test/fixtures/short.mp4',import.meta.url));
  const response=await context.request.post('/api/shorts',{data:{caption:'Video kiểm tra',data:'data:video/mp4;base64,'+bytes.toString('base64')}});
  expect(response.status()).toBe(201);
