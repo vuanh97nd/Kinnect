@@ -154,7 +154,8 @@ const status = (text) => {
   n.textContent = text;
   n.classList.toggle("show", !!text);
   clearTimeout(noticeTimer);
-  if (text) noticeTimer = setTimeout(() => n.classList.remove("show"), 4500);
+  // Toast tự ẩn nhanh hơn để không che vùng tương tác.
+  if (text) noticeTimer = setTimeout(() => n.classList.remove("show"), 2500);
 };
 const action = (text, fn, cls = "secondary") => {
   const b = node("button", text, cls);
@@ -195,7 +196,29 @@ function uploadJson(path, data, progress = () => {}) {
     x.send(JSON.stringify(data));
   });
 }
+// Gom các yêu cầu GET đang bay cùng một đường dẫn: nếu nhiều widget cùng gọi
+// (ví dụ /notifications, /conversations, /me) trong khi một request chưa xong,
+// chúng sẽ cùng dùng chung một promise thay vì mở nhiều kết nối trùng.
+const inFlightGets = new Map();
 async function api(path, method = "GET", data) {
+  if (method === "GET" && data === undefined) {
+    const existing = inFlightGets.get(path);
+    if (existing) {
+      // Trả bản sao để mỗi caller có thể sửa kết quả riêng mà không ảnh hưởng người khác.
+      const shared = await existing;
+      return typeof structuredClone === "function" ? structuredClone(shared) : JSON.parse(JSON.stringify(shared));
+    }
+    const promise = (async () => {
+      try { return await apiFetch(path, method, data); }
+      finally { if (inFlightGets.get(path) === promise) inFlightGets.delete(path); }
+    })();
+    inFlightGets.set(path, promise);
+    const shared = await promise;
+    return typeof structuredClone === "function" ? structuredClone(shared) : JSON.parse(JSON.stringify(shared));
+  }
+  return apiFetch(path, method, data);
+}
+async function apiFetch(path, method, data) {
   const revision = authRevision;
   const options = {
     method, credentials: "same-origin", cache: "no-store",
@@ -462,8 +485,8 @@ function menu(open) {
   mePanel.hidden = !open;
   meBtn.setAttribute("aria-expanded", String(open));
 }
-meBtn.onclick = (e) => {
-  e.stopPropagation();
+meBtn.onclick = () => {
+  // Popup "Tài khoản" dùng chung cho mọi khổ màn; URL /?tab=account vẫn hoạt động như deep-link.
   menu(mePanel.hidden);
 };
 document.addEventListener("click", (e) => {
@@ -1886,8 +1909,19 @@ function initializeNotificationCenter() {
     document.addEventListener("click", event => { if (!notificationPanel.hidden && !notificationPanel.contains(event.target) && !bell.contains(event.target)) closeNotificationCenter(); });
     document.addEventListener("keydown", event => { if (event.key === "Escape" && !notificationPanel.hidden) { closeNotificationCenter(); bell.focus(); } });
   }
-  bell.onclick = () => { menu(false); notificationPanel.hidden = !notificationPanel.hidden; bell.setAttribute("aria-expanded", String(!notificationPanel.hidden)); if (!notificationPanel.hidden) { renderNotificationCenter(); refreshUnread().catch(e => status(e.message)); } };
+  bell.onclick = () => openNotificationCenter();
   notificationOptIn();
+}
+// Mở popup Thông báo từ nút chuông.
+function openNotificationCenter() {
+  if (!notificationPanel) return;
+  menu(false);
+  notificationPanel.hidden = false;
+  $("notification-bell").setAttribute("aria-expanded", "true");
+  renderNotificationCenter();
+  refreshUnread().catch(e => status(e.message));
+  // Chuyển focus vào nút Đóng nếu giao diện có nút này.
+  notificationPanel.querySelector(".header-panel-back")?.focus();
 }
 async function showSystemNotification(n) {
   if (!("Notification" in window) || Notification.permission !== "granted" || !document.hidden) return;
