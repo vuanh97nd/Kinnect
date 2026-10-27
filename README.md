@@ -1,25 +1,19 @@
 # Kinnect
 
-[**Tải APK Android mới nhất**](https://github.com/vuanh97nd/Kinnect/releases/latest) · [Web mobile](https://app.kinnect.io.vn/)
+[**Tải APK Android 0.9.3**](https://github.com/vuanh97nd/Kinnect/releases/download/v0.9.3/Kinnect-0.9.3-native.apk) · [Web mobile](https://app.kinnect.io.vn/)
 
-Bản mới nhất: **0.8.6 — Android thử nghiệm**. Tải file `Kinnect-0.8.6-native.apk` ở Assets của release; file `.sha256` dùng để kiểm tra tính toàn vẹn. Chưa nghiệm thu thao tác/giao diện trên điện thoại thật.
+Bản thử nghiệm **0.9.3**, versionCode **30**. Bỏ giới hạn 60 giây và giới hạn dung lượng 5/12 MB riêng trong luồng đăng ảnh/video. Camera mặc định quay đến khi bấm dừng.
 
-[Mã nguồn đúng bản v0.8.6](https://github.com/vuanh97nd/Kinnect/tree/v0.8.6) · [Ghi chú phát hành](https://github.com/vuanh97nd/Kinnect/releases/tag/v0.8.6)
+[Mã nguồn v0.9.3](https://github.com/vuanh97nd/Kinnect/tree/v0.9.3) · [Ghi chú phát hành](https://github.com/vuanh97nd/Kinnect/releases/tag/v0.9.3)
 
-Ứng dụng Android dùng Android Views native, package `app.kinnect.live`, Android 8+, target SDK 35. Có tài khoản, bảng tin, tin 24 giờ, khám phá, bạn bè, chat/nhóm/tệp, video ngắn, hồ sơ và quyền riêng tư. Đăng nhập Google/Facebook hoạt động khi máy chủ đã cấu hình nhà cung cấp.
+Android 8+, package `app.kinnect.live`, giao diện Android Views native. Cài APK lên bản cũ để nâng cấp với cùng chứng chỉ ký.
 
-## Bản 0.8.6
+Đã build, xác minh chữ ký và kiểm tra API nhận, lưu nguyên vẹn media 13 MB với metadata video 125 giây. Chưa nghiệm thu thao tác/phát video trên điện thoại thật. Kích thước thực tế phụ thuộc bộ nhớ thiết bị, máy chủ và đường truyền; API máy chủ cần cập nhật cùng tag để nhận video trên 60 giây.
 
-Khôi phục nhãn Bảng tin, Khám phá, Video, Live khi chuyển mục. Giảm nhẹ các tiêu đề lớn sau đăng nhập và dùng đúng icon web hiện tại. Giữ nguyên chức năng và mã Live.
+## Chạy source
 
-Đã build, xác minh chữ ký và đối chiếu 83 icon với web. Chưa nghiệm thu trên điện thoại thật. Xem ghi chú phát hành về giới hạn kiểm tra theme và các chức năng còn cần hoàn thiện từ bản trước.
+Checkout tag `v0.9.3`. Backend Node.js >=22.13: `npm ci`, `npm start`. Giữ DATA_DIR và cấu hình máy chủ hiện có khi cập nhật; không đưa database, keystore, token hoặc khóa OAuth lên GitHub.
 
-## Chạy source của bản phát hành
+Build Windows: `python scripts/build-apk-windows.py` sau khi chuẩn bị toolchain theo script. Build Linux: `scripts/prepare-android-tools.sh`, `scripts/build-apk.sh`. Giữ khóa ký cũ khi nâng cấp.
 
-Checkout tag `v0.8.6` trước khi xem/build phiên bản này. Nhánh `main` có thể chưa chứa toàn bộ source phát hành; tag liên kết ở trên là mốc đúng bản APK.
-
-Backend Node.js >=22.13: `npm ci`, sau đó `npm start`. Database và cấu hình tài khoản/máy chủ không nằm trong APK. Giữ và sao lưu DATA_DIR đang dùng trước khi cập nhật máy chủ.
-
-Build native trên Windows: `python scripts/build-apk-windows.py`, sau khi chuẩn bị toolchain Android theo script/tài liệu trong tag. Build Linux dùng `scripts/prepare-android-tools.sh` và `scripts/build-apk.sh`. Giữ khóa ký hiện có để Android nhận bản nâng cấp; không đưa keystore, token, cấu hình OAuth/email hoặc database lên GitHub.
-
-APK hiện được ký cho thử nghiệm và chưa dành cho Google Play. Mã nguồn, bản build và ghi chú chi tiết được gắn với từng tag trong Releases.
+SHA-256 APK: `68fa993be1755a80ea06095994f5526028c7e06d61ccd9cda4207780c99a43bb`
