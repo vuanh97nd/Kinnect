@@ -129,12 +129,13 @@ public final class NativeApi {
   public void image(String path, Bytes callback) {
     final String server = origin,
       session = cookie;
+    final int revision = epoch;
     executor.execute(() -> {
       byte[] bytes = null;
       HttpURLConnection c = null;
       try {
         if (
-          !(path.startsWith("/api/users/") || path.startsWith("/api/posts/") || path.startsWith("/api/chat-attachments/") || path.startsWith("/music/")) ||
+          !(path.startsWith("/api/users/") || path.startsWith("/api/posts/") || path.startsWith("/api/chat-attachments/") || path.startsWith("/api/private-photos/") || path.startsWith("/api/shorts/") || path.startsWith("/music/")) ||
           path.contains("..")
         ) throw new IOException();
         c = (HttpURLConnection) new URL(server + path).openConnection();
@@ -151,7 +152,7 @@ public final class NativeApi {
         if (c != null) c.disconnect();
       }
       final byte[] result = bytes;
-      main.post(() -> callback.done(result));
+      main.post(() -> { if (epoch == revision && origin.equals(server)) callback.done(result); });
     });
   }
 

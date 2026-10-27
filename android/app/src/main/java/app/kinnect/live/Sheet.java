@@ -26,12 +26,10 @@ final class Sheet {
 
   Sheet(Context context) {
     this.context = context;
-    boolean dark = (context.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
-    bg = dark ? 0xff242526 : 0xffffffff;
-    ink = dark ? 0xffe4e6eb : 0xff1c1e21;
-    muted = dark ? 0xffb0b3b8 : 0xff65676b;
-    soft = dark ? 0xff3a3b3c : 0xfff2f3f5;
-    line = dark ? 0xff3a3b3c : 0xffe4e6eb;
+    boolean dark = WebTheme.isDark(context);
+    int variant = dark ? 1 : 0;
+    bg = WebDesign.CARD[variant]; ink = WebDesign.INK[variant]; muted = WebDesign.MUTED[variant];
+    soft = WebDesign.WASH[variant]; line = WebDesign.LINE[variant];
   }
 
   Sheet setTitle(CharSequence t) { title = t; return this; }
@@ -57,6 +55,7 @@ final class Sheet {
     TextView t = new TextView(context);
     t.setText(s);
     t.setTextSize(size);
+    t.setIncludeFontPadding(false);
     t.setTextColor(color);
     if (bold) t.setTypeface(null, Typeface.BOLD);
     return t;
@@ -138,15 +137,15 @@ final class Sheet {
     if (positive != null) buttons.addView(button(dialog, positive, onPositive, DialogInterface.BUTTON_POSITIVE, true), weight());
     if (buttons.getChildCount() > 0) box.addView(buttons);
     dialog.setContentView(box);
+    dialog.show();
     Window w = dialog.getWindow();
     if (w != null) {
       w.setBackgroundDrawable(new ColorDrawable(0));
-      w.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+      w.setLayout(Math.min(context.getResources().getDisplayMetrics().widthPixels, dp(560)), ViewGroup.LayoutParams.WRAP_CONTENT);
       w.setGravity(Gravity.BOTTOM);
       w.setDimAmount(0.45f);
       w.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
     }
-    dialog.show();
     return dialog;
   }
 
@@ -174,7 +173,7 @@ final class Sheet {
     b.setTypeface(null, Typeface.BOLD);
     b.setStateListAnimator(null);
     if (primary) {
-      GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { 0xff6d4aff, 0xffff4f9a });
+      GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { 0xff6c47e0, 0xff6c47e0 });
       g.setCornerRadius(dp(12));
       b.setBackground(g);
       b.setTextColor(0xffffffff);
