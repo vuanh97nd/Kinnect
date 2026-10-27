@@ -2,6 +2,13 @@ package app.kinnect.live;
 
 /** Native vector assets exported from the same SVG paths as the web. */
 final class WebIcons {
+  static android.graphics.drawable.Drawable load(android.content.Context context, String name) {
+    int preferred = resolve(context, name);
+    if (preferred != 0) try { return context.getDrawable(preferred).mutate(); } catch (RuntimeException invalidVector) { }
+    int legacy = context.getResources().getIdentifier("ic_" + name, "drawable", context.getPackageName());
+    if (legacy != 0 && legacy != preferred) try { return context.getDrawable(legacy).mutate(); } catch (RuntimeException invalidVector) { }
+    return new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT);
+  }
   static int resolve(android.content.Context context, String name) {
     String web = name;
     switch (name) {
@@ -11,7 +18,9 @@ final class WebIcons {
       case "music": web = "music_2"; break;
       case "flip": web = "switch_camera"; break;
       case "wand": web = "wand_sparkles"; break;
-      case "flag": web = "circle_help"; break;
+      case "flag": web = "flag"; break;
+      case "type": web = "type"; break;
+      case "upload": web = "upload"; break;
       case "feed": web = "house"; break;
       case "discover": web = "compass"; break;
       case "shorts": web = "clapperboard"; break;
