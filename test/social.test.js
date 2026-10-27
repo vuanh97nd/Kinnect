@@ -494,11 +494,14 @@ test("short videos upload, durable bytes/ranges, likes, comments, reports and mo
     ).status,
     400,
   );
-  const tooLong = Buffer.from(bytes);
-  const type = tooLong.indexOf(Buffer.from("mvhd")),
+  const longClip = Buffer.from(bytes);
+  const type = longClip.indexOf(Buffer.from("mvhd")),
     header = type + 4;
-  tooLong.writeUInt32BE(61 * tooLong.readUInt32BE(header + 12), header + 16);
-  assert.throws(() => mp4Duration(tooLong));
+  longClip.writeUInt32BE(61 * longClip.readUInt32BE(header + 12), header + 16);
+  assert.equal(mp4Duration(longClip), 61);
+  const zeroDuration = Buffer.from(longClip);
+  zeroDuration.writeUInt32BE(0, header + 16);
+  assert.throws(() => mp4Duration(zeroDuration));
   const result = await as(app, a, "/shorts", "POST", {
     data: "data:video/mp4;base64," + bytes.toString("base64"),
     caption: "A real playable fixture",

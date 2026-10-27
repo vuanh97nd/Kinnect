@@ -268,6 +268,7 @@ public class MainActivity extends Activity {
     stopShort();
     stopLocation();
     screen++;
+    preparingPostMedia = false;
     handler.removeCallbacksAndMessages(null);
     poll = null;
     resumeStory = null;
@@ -1445,6 +1446,7 @@ public class MainActivity extends Activity {
     toolbar.setVisibility(View.GONE);
     if (root.getChildCount() > 1) root.getChildAt(1).setVisibility(View.GONE);
     pendingMedia = null;
+    preparingPostMedia = false;
     content.setPadding(0, 0, 0, dp(24));
 
     LinearLayout head = row();
@@ -1522,7 +1524,7 @@ public class MainActivity extends Activity {
     TextView add = label("Thêm vào bài viết", 13, MUTED);
     tools.addView(add, new LinearLayout.LayoutParams(0, -2, 1));
     tools.addView(composeTool("image", 0xff22a565, "Thêm ảnh", () -> { attachButton = null; pickFile(300, "image/*"); }));
-    tools.addView(composeTool("video", 0xffe0245e, "Thêm video", () -> { attachButton = null; pickFile(300, "video/mp4"); }));
+    tools.addView(composeTool("video", 0xffe0245e, "Thêm video", () -> { attachButton = null; pickFile(300, "video/*"); }));
     tools.addView(composeTool("camera", ACCENT, "Chụp hoặc quay", () -> startActivityForResult(new Intent(this, StudioActivity.class), 203)));
     LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, dp(56));
     tp.topMargin = dp(16);
@@ -1530,6 +1532,7 @@ public class MainActivity extends Activity {
 
     post.setOnClickListener(v -> {
       if (!post.isEnabled()) return;
+      if (preparingPostMedia) { say("Đang chuẩn bị ảnh/video, vui lòng chờ."); return; }
       if (text.getText().toString().trim().isEmpty() && pendingMedia == null) { say("Viết nội dung hoặc chọn ảnh/video."); return; }
       post.setEnabled(false);
       post.setAlpha(0.7f);
@@ -3028,7 +3031,7 @@ public class MainActivity extends Activity {
     EditText caption = new EditText(this);
     caption.setHint("Viết chú thích cho video");
     new Sheet(this)
-      .setTitle("Đăng video · MP4")
+      .setTitle("Đăng video")
       .setView(caption)
       .setPositiveButton("Đăng", (dialog, which) -> {
         postingVideo = true;
@@ -3037,30 +3040,10 @@ public class MainActivity extends Activity {
         String text = caption.getText().toString();
         new Thread(() -> {
           try {
-            android.media.MediaMetadataRetriever metadata =
-              new android.media.MediaMetadataRetriever();
-            long duration;
-            try {
-              metadata.setDataSource(this, uri);
-              duration = Long.parseLong(
-                metadata.extractMetadata(
-                  android.media.MediaMetadataRetriever.METADATA_KEY_DURATION
-                )
-              );
-            } finally {
-              metadata.release();
-            }
-            if (duration <= 0) throw new Exception(
-              "Không đọc được thời lượng video."
-            );
-            byte[] bytes = NativeApi.readAll(getContentResolver().openInputStream(uri));
-            String encoded = android.util.Base64.encodeToString(
-              bytes,
-              android.util.Base64.NO_WRAP
-            );
+            NativeMedia.Prepared selected = NativeMedia.read(this, uri, true);
             JSONObject payload = json(
               "data",
-              "data:video/mp4;base64," + encoded,
+              selected.dataUrl(),
               "caption",
               text
             );
@@ -3078,13 +3061,11 @@ public class MainActivity extends Activity {
                 }
               }
             );
+          } catch (OutOfMemoryError e) {
+            runOnUiThread(() -> { postingVideo = false; if (generation == screen) say("Thiết bị không đủ bộ nhớ để chuẩn bị video này."); });
           } catch (Exception e) {
-            runOnUiThread(() -> {
-              postingVideo = false;
-              if (generation == screen) say(
-                "Chọn video MP4 hợp lệ."
-              );
-            });
+            final String reason = mediaFailure(e);
+            runOnUiThread(() -> { postingVideo = false; if (generation == screen) say(reason); });
           }
         }).start();
       })
@@ -3111,6 +3092,11 @@ public class MainActivity extends Activity {
   @Override
   protected void onActivityResult(int request, int result, Intent data) {
     super.onActivityResult(request, result, data);
+    if (result == RESULT_OK && data != null && data.getData() != null) {
+      try { getContentResolver().takePersistableUriPermission(data.getData(), data.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION); }
+      catch (SecurityException ignored) {}
+    }
+
     if (request == 309) {
       final String path = pendingDownload; pendingDownload = "";
       if (result != RESULT_OK || data == null || data.getData() == null || path.isEmpty()) return;
@@ -3138,7 +3124,7 @@ public class MainActivity extends Activity {
       return;
     }
     if ((request == 203 || request == 204) && result == RESULT_FIRST_USER && data != null && data.getData() != null) {
-      uploadVideo(data.getData());
+      if (request == 204) preparePostMedia(304, data.getData()); else uploadVideo(data.getData());
       return;
     }
     if ((request == 203 || request == 204) && result == RESULT_OK && data != null && data.getBooleanExtra(StudioActivity.EXTRA_STORY, false)) {
@@ -3154,7 +3140,7 @@ public class MainActivity extends Activity {
       startActivityForResult(studio, 204);
       return;
     }
-    if (request == 204 && result == RESULT_FIRST_USER) { pickFile(304, "image/*|video/mp4"); return; }
+    if (request == 204 && result == RESULT_FIRST_USER) { pickFile(304, "image/*|video/*"); return; }
     if (request == 203 && result == RESULT_OK && data != null && data.getStringExtra(StudioActivity.EXTRA_VIDEO) != null) {
       uploadVideo(android.net.Uri.fromFile(new java.io.File(data.getStringExtra(StudioActivity.EXTRA_VIDEO))));
       return;
@@ -3162,7 +3148,7 @@ public class MainActivity extends Activity {
     if (request == 203 && result == RESULT_FIRST_USER) {
       Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
       pick.addCategory(Intent.CATEGORY_OPENABLE);
-      pick.setType("video/mp4");
+      pick.setType("video/*");
       try { startActivityForResult(pick, 200); } catch (Exception e) { say("Không mở được trình chọn video."); }
       return;
     }
@@ -4506,16 +4492,59 @@ public class MainActivity extends Activity {
     pick.addCategory(Intent.CATEGORY_OPENABLE);
     if (types.contains("|")) {
       pick.setType("*/*");
-      pick.putExtra(Intent.EXTRA_MIME_TYPES, new String[] { "image/png", "image/jpeg", "image/webp", "video/mp4" });
+      pick.putExtra(Intent.EXTRA_MIME_TYPES, new String[] { "image/*", "video/*" });
     } else pick.setType(types);
     try { startActivityForResult(pick, code); } catch (Exception e) { say("Không mở được trình chọn tệp."); }
   }
 
-  private String dataUrlUnbounded(android.net.Uri uri, String forcedType) throws Exception {
-    byte[] bytes = NativeApi.readAll(getContentResolver().openInputStream(uri));
-    String type = forcedType != null ? forcedType : getContentResolver().getType(uri);
-    if (type == null) type = "application/octet-stream";
-    return "data:" + type + ";base64," + android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP);
+  private boolean preparingPostMedia = false;
+  private static String mediaFailure(Exception error) {
+    if (error instanceof SecurityException) return "Không có quyền đọc tệp. Hãy chọn lại video từ Thư viện hoặc Tệp trên máy.";
+    String message = error.getMessage();
+    return message == null || message.trim().isEmpty() ? "Không đọc được tệp đã chọn. Hãy tải tệp về máy và chọn lại." : message;
+  }
+
+  private void preparePostMedia(final int code, final android.net.Uri uri) {
+    if (preparingPostMedia) { say("Đang chuẩn bị ảnh/video, vui lòng chờ."); return; }
+    preparingPostMedia = true;
+    final int generation = screen;
+    say("Đang chuẩn bị ảnh/video…");
+    new Thread(() -> {
+      try {
+        final NativeMedia.Prepared selected = NativeMedia.read(this, uri, false);
+        final String media = selected.dataUrl();
+        final Bitmap preview;
+        if (selected.video()) preview = null;
+        else {
+          BitmapFactory.Options options = new BitmapFactory.Options(); options.inJustDecodeBounds = true;
+          BitmapFactory.decodeByteArray(selected.bytes, 0, selected.bytes.length, options);
+          options.inSampleSize = 1;
+          while (Math.max(options.outWidth, options.outHeight) / options.inSampleSize > 1080) options.inSampleSize *= 2;
+          options.inJustDecodeBounds = false;
+          preview = BitmapFactory.decodeByteArray(selected.bytes, 0, selected.bytes.length, options);
+        }
+        runOnUiThread(() -> {
+          if (generation != screen || isDestroyed()) { if (preview != null) preview.recycle(); return; }
+          preparingPostMedia = false;
+          if (code == 300) {
+            pendingMedia = media;
+            if (attachButton != null) attachButton.setText(selected.video() ? "✓ Đã chọn video" : "✓ Đã chọn ảnh");
+            composeAttached(preview, selected.video());
+          } else {
+            EditText caption = new EditText(this); caption.setHint("Viết gì đó cho tin (không bắt buộc)");
+            new Sheet(this).setTitle("Đăng tin 24 giờ").setView(caption).setPositiveButton("Đăng", (d,w) -> {
+              say("Đang đăng tin…");
+              request("POST", "/api/stories", json("body", caption.getText().toString(), "media", media), r -> { say("Đã đăng tin."); navigate("feed"); });
+            }).setNegativeButton("Hủy", null).show();
+          }
+        });
+      } catch (OutOfMemoryError error) {
+        runOnUiThread(() -> { if (generation == screen) { preparingPostMedia = false; say("Thiết bị không đủ bộ nhớ để chuẩn bị tệp này."); } });
+      } catch (Exception error) {
+        final String reason = mediaFailure(error);
+        runOnUiThread(() -> { if (generation == screen) { preparingPostMedia = false; say(reason); } });
+      }
+    }, "kinnect-prepare-media").start();
   }
 
   private String dataUrl(android.net.Uri uri, int max, String forcedType) throws Exception {
@@ -4536,24 +4565,7 @@ public class MainActivity extends Activity {
     String type = getContentResolver().getType(uri);
     boolean video = "video/mp4".equals(type);
     try {
-      if (code == 300 || code == 304) {
-        if (!video && !Arrays.asList("image/png", "image/jpeg", "image/webp").contains(type)) { say("Chọn ảnh PNG/JPEG/WebP hoặc video MP4."); return; }
-        String media = dataUrlUnbounded(uri, null);
-        if (code == 300) {
-          pendingMedia = media;
-          if (attachButton != null) attachButton.setText(video ? "✓ Đã chọn video" : "✓ Đã chọn ảnh");
-          composeAttached(video ? null : android.graphics.BitmapFactory.decodeStream(getContentResolver().openInputStream(uri), null, sampled(uri)), video);
-          return;
-        }
-        final EditText caption = new EditText(this);
-        caption.setHint("Viết gì đó cho tin (không bắt buộc)");
-        final String storyMedia = media;
-        new Sheet(this).setTitle("Đăng tin 24 giờ").setView(caption).setPositiveButton("Đăng", (d, w) -> {
-          say("Đang đăng tin…");
-          request("POST", "/api/stories", json("body", caption.getText().toString(), "media", storyMedia), r -> { say("Đã đăng tin, hiển thị 24 giờ với người theo dõi."); navigate("feed"); });
-        }).setNegativeButton("Hủy", null).show();
-        return;
-      }
+      if (code == 300 || code == 304) { preparePostMedia(code, uri); return; }
       if (code == 303) {
         JSONObject file = json("name", fileName(uri), "data", dataUrl(uri, 20 * 1024 * 1024, null));
         say("Đang gửi tệp…");

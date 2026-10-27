@@ -675,10 +675,10 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
 
   private void openGallery() {
     if (recording) return;
-    new Sheet(this).setTitle("Thư viện").setItems(new String[] { "🖼  Chỉnh ảnh từ máy", "🎬  Đăng video có sẵn (MP4)" }, (d, w) -> {
+    new Sheet(this).setTitle("Thư viện").setItems(new String[] { "🖼  Chỉnh ảnh từ máy", "🎬  Đăng video có sẵn" }, (d, w) -> {
       Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
       pick.addCategory(Intent.CATEGORY_OPENABLE);
-      pick.setType(w == 0 ? "image/*" : "video/mp4");
+      pick.setType(w == 0 ? "image/*" : "video/*");
       try { startActivityForResult(pick, w == 0 ? 403 : 404); } catch (Exception e) { Toast.makeText(this, "Không mở được thư viện.", Toast.LENGTH_SHORT).show(); }
     }).show();
   }
@@ -1274,6 +1274,10 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     if (request == 404) {
       Intent r = new Intent();
       r.setData(data.getData());
+      r.setClipData(android.content.ClipData.newRawUri("video", data.getData()));
+      r.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+      try { getContentResolver().takePersistableUriPermission(data.getData(), data.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION); }
+      catch (SecurityException ignored) {}
       r.putExtra(EXTRA_ACTION, "pick-video");
       setResult(RESULT_FIRST_USER, r);
       finish();

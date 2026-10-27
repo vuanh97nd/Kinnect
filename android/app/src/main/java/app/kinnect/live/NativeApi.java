@@ -88,6 +88,7 @@ public final class NativeApi {
             "application/json; charset=utf-8"
           );
           byte[] payload = data.toString().getBytes("UTF-8");
+          connection.setFixedLengthStreamingMode(payload.length);
           try (OutputStream out = connection.getOutputStream()) {
             out.write(payload);
           }
@@ -106,16 +107,19 @@ public final class NativeApi {
           status >= 200 && status < 300
             ? connection.getInputStream()
             : connection.getErrorStream();
-        result = new JSONObject(
-          input == null ? "{}" : new String(read(input, 2000000), "UTF-8")
-        );
-        if (status < 200 || status >= 300) error = result.optString(
-          "error",
-          "Không thể kết nối. HTTP " + status
-        );
+        String response = input == null ? "{}" : new String(read(input, 2000000), "UTF-8");
+        try { result = new JSONObject(response); }
+        catch (org.json.JSONException invalid) {
+          if (status >= 200 && status < 300) throw new IOException("Máy chủ trả về dữ liệu không hợp lệ.");
+          result = new JSONObject();
+        }
+        if (status < 200 || status >= 300) error = result.optString("error", httpFailure(status));
+      } catch (OutOfMemoryError failure) {
+        error = "Thiết bị không đủ bộ nhớ để chuẩn bị tệp tải lên.";
+      } catch (java.net.SocketTimeoutException failure) {
+        error = "Kết nối tải lên hết thời gian chờ. Kiểm tra mạng rồi thử lại.";
       } catch (Exception failure) {
-        error =
-          "Không kết nối được máy chủ. Kiểm tra mạng hoặc đổi URL trong Cài đặt.";
+        error = status >= 200 && status < 300 ? "Máy chủ trả về dữ liệu không hợp lệ." : status > 0 ? httpFailure(status) : "Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.";
       } finally {
         if (connection != null) connection.disconnect();
       }
@@ -124,6 +128,13 @@ public final class NativeApi {
       final int code = status;
       main.post(() -> callback.done(answer, message, code));
     });
+  }
+
+  private static String httpFailure(int status) {
+    if (status == 413) return "Máy chủ hoặc đường truyền từ chối kích thước tải lên (HTTP 413).";
+    if (status == 401) return "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.";
+    if (status == 429) return "Máy chủ đang bận hoặc cần chờ trước lần đăng tiếp theo (HTTP 429).";
+    return "Máy chủ chưa nhận được yêu cầu (HTTP " + status + ").";
   }
 
   public void image(String path, Bytes callback) {
