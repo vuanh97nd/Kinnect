@@ -39,7 +39,12 @@ public class MainActivity extends Activity {
   private boolean stopped = false;
   private Runnable poll, resumeStory;
   private NativeCalls calls;
-  private void ensureCalls(){if(me!=null&&calls==null)calls=new NativeCalls(this,server());}
+  private void ensureCalls(){if(me!=null&&calls==null){calls=new NativeCalls(this,server());setupBackground();}}
+  // Một lần: xin đủ quyền thông báo/cuộc gọi, cho phép toàn màn hình và chạy nền.
+  private void setupBackground(){android.content.SharedPreferences p=getSharedPreferences("native_setup",0);if(p.getBoolean("asked_v1",false)){backgroundExtras(false);return;}p.edit().putBoolean("asked_v1",true).apply();java.util.ArrayList<String> want=new java.util.ArrayList<>();if(Build.VERSION.SDK_INT>=33)want.add("android.permission.POST_NOTIFICATIONS");want.add(Manifest.permission.RECORD_AUDIO);want.add(Manifest.permission.CAMERA);if(Build.VERSION.SDK_INT>=31)want.add("android.permission.BLUETOOTH_CONNECT");java.util.ArrayList<String> missing=new java.util.ArrayList<>();for(String w:want)if(checkSelfPermission(w)!=PackageManager.PERMISSION_GRANTED)missing.add(w);if(missing.isEmpty())backgroundExtras(true);else requestPermissions(missing.toArray(new String[0]),950);}
+  private void backgroundExtras(boolean prompt){try{if(Build.VERSION.SDK_INT>=34&&!getSystemService(android.app.NotificationManager.class).canUseFullScreenIntent()){if(prompt)new AlertDialog.Builder(this).setTitle("Cuộc gọi toàn màn hình").setMessage("Cho phép Kinnect hiện cuộc gọi đến toàn màn hình, kể cả khi khóa máy.").setPositiveButton("Cho phép",(d,w)->{try{startActivity(new Intent("android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT",android.net.Uri.parse("package:"+getPackageName())));}catch(RuntimeException ignored){}}).setNegativeButton("Để sau",(d,w)->battery()).show();else battery();return;}}catch(RuntimeException ignored){}if(prompt)battery();}
+  private void battery(){android.os.PowerManager pm=(android.os.PowerManager)getSystemService(POWER_SERVICE);if(pm!=null&&!pm.isIgnoringBatteryOptimizations(getPackageName()))try{startActivity(new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,android.net.Uri.parse("package:"+getPackageName())));}catch(RuntimeException ignored){}}
+  private void handleExtras(Intent intent){if(intent==null||me==null)return;if(intent.getBooleanExtra("accept_call",false)){intent.removeExtra("accept_call");ensureCalls();if(calls!=null)calls.checkPending();}String n=intent.getStringExtra("notification");if(n!=null){intent.removeExtra("notification");try{openNotification(new JSONObject(n));}catch(JSONException ignored){}}}
   private LocationListener locationListener;
   // Màu lấy từ public/theme.css để app và web mobile trông giống nhau; tự theo chế độ sáng/tối của máy.
   private int BG, CARD, TEXT, MUTED, ACCENT, SOFT, LINE, PRIMARY_SOFT;
@@ -84,7 +89,7 @@ public class MainActivity extends Activity {
       startupHandler.postDelayed(() -> {
         if (isDestroyed() || isFinishing()) return;
         JSONObject user = data == null ? null : data.optJSONObject("user");
-        if (error == null && user != null) { me = user; navigate("feed"); }
+        if (error == null && user != null) { me = user; navigate("feed"); handleExtras(getIntent()); }
         else auth(false);
         handleLink(getIntent());
         CrashLog.showPending(this);
@@ -338,7 +343,7 @@ public class MainActivity extends Activity {
     headActions = null;
     if (navigation && me != null && !title.isEmpty()) {
       LinearLayout head = row();
-      TextView heading = label(title, 19, TEXT);
+      TextView heading = label(title, 17, TEXT);
       heading.setTypeface(null, Typeface.BOLD);
       head.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
       headActions = row();
@@ -375,8 +380,8 @@ public class MainActivity extends Activity {
         b.setGravity(Gravity.CENTER);
         FrameLayout pill = new FrameLayout(this);
         if (active) pill.setBackground(background(PRIMARY_SOFT, 99));
-        pill.addView(icon(it[1], 22, active ? ACCENT : MUTED), new FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER));
-        b.addView(pill, new LinearLayout.LayoutParams(dp(54), dp(30)));
+        pill.addView(icon(it[1], 20, active ? ACCENT : MUTED), new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
+        b.addView(pill, new LinearLayout.LayoutParams(dp(50), dp(28)));
         TextView t = label(it[2], 11, active ? ACCENT : MUTED);
         t.setPadding(0, dp(2), 0, 0);
         t.setGravity(Gravity.CENTER);
@@ -410,8 +415,8 @@ public class MainActivity extends Activity {
 
   private FrameLayout topIcon(String name, String label, boolean active, Runnable action, String badgeKey) {
     FrameLayout f = new FrameLayout(this);
-    ImageView i = icon(name, 23, active ? ACCENT : TEXT);
-    f.addView(i, new FrameLayout.LayoutParams(dp(23), dp(23), Gravity.CENTER));
+    ImageView i = icon(name, 20, active ? ACCENT : TEXT);
+    f.addView(i, new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
     f.setBackground(pressable(active ? PRIMARY_SOFT : CARD, 99));
     if (badgeKey != null) {
       TextView badge = label("", 1, WHITE);
@@ -427,7 +432,7 @@ public class MainActivity extends Activity {
     }
     f.setContentDescription(label);
     f.setOnClickListener(v -> action.run());
-    f.setLayoutParams(new LinearLayout.LayoutParams(dp(42), dp(42)));
+    f.setLayoutParams(new LinearLayout.LayoutParams(dp(40), dp(40)));
     return f;
   }
 
@@ -529,11 +534,11 @@ public class MainActivity extends Activity {
     subBack = back;
     LinearLayout heading = row();
     FrameLayout arrow = new FrameLayout(this);
-    arrow.addView(icon("back", 22, TEXT), new FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER));
+    arrow.addView(icon("back", 20, TEXT), new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
     arrow.setContentDescription("Quay lại");
     arrow.setOnClickListener(v -> back.run());
-    heading.addView(arrow, new LinearLayout.LayoutParams(dp(36), dp(44)));
-    TextView text = label(title, 19, TEXT);
+    heading.addView(arrow, new LinearLayout.LayoutParams(dp(36), dp(40)));
+    TextView text = label(title, 17, TEXT);
     text.setTypeface(null, Typeface.BOLD);
     heading.addView(text, new LinearLayout.LayoutParams(0, -2, 1));
     content.addView(heading);
@@ -595,6 +600,7 @@ public class MainActivity extends Activity {
     groupRow(end, "key_round", "Đổi mật khẩu", false, () -> changePassword());
     groupRow(end, "log_out", "Đăng xuất", true, () -> confirm("Đăng xuất khỏi Kinnect?", () -> request("POST", "/api/logout", json(), data -> {
       if (calls != null) { calls.close(); calls = null; }
+      KinnectService.stop(this);
       api.clear(); me = null; intro();
     })));
     TextView foot = label("Kinnect · Kết nối theo cách của bạn.", 12, MUTED);
@@ -629,16 +635,16 @@ public class MainActivity extends Activity {
     r.setBackground(pressable(CARD, 12));
     FrameLayout tile = new FrameLayout(this);
     tile.setBackground(background((tint & 0x00ffffff) | 0x1f000000, 10));
-    tile.addView(icon(iconName, 18, tint), new FrameLayout.LayoutParams(dp(18), dp(18), Gravity.CENTER));
-    r.addView(tile, new LinearLayout.LayoutParams(dp(36), dp(36)));
-    TextView t = label(title, 15, danger ? tint : TEXT);
+    tile.addView(icon(iconName, 17, tint), new FrameLayout.LayoutParams(dp(17), dp(17), Gravity.CENTER));
+    r.addView(tile, new LinearLayout.LayoutParams(dp(34), dp(34)));
+    TextView t = label(title, 14, danger ? tint : TEXT);
     t.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
     t.setPadding(dp(12), 0, 0, 0);
     r.addView(t, new LinearLayout.LayoutParams(0, -2, 1));
-    if (!danger) r.addView(icon("chevron_right", 17, MUTED), new LinearLayout.LayoutParams(dp(17), dp(17)));
+    if (!danger) r.addView(icon("chevron_right", 16, MUTED), new LinearLayout.LayoutParams(dp(16), dp(16)));
     r.setContentDescription(title);
     r.setOnClickListener(v -> action.run());
-    group.addView(r, new LinearLayout.LayoutParams(-1, dp(56)));
+    group.addView(r, new LinearLayout.LayoutParams(-1, dp(52)));
   }
 
   private void appearanceScreen() {
@@ -873,7 +879,7 @@ public class MainActivity extends Activity {
     home.setOnClickListener(v -> { introPage = 0; intro(); });
     body.addView(home, new LinearLayout.LayoutParams(-2, -2));
 
-    TextView title = label(register ? "Tạo tài khoản" : "Đăng nhập", 26, TEXT);
+    TextView title = label(register ? "Tạo tài khoản" : "Đăng nhập", 22, TEXT);
     title.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
     title.setPadding(0, dp(10), 0, dp(2));
     body.addView(title);
@@ -971,9 +977,9 @@ public class MainActivity extends Activity {
     bp.setMargins(dp(20), dp(18), 0, 0);
     hero.addView(brand, bp);
     LinearLayout words = column();
-    TextView line1 = label("Gặp người", 30, WHITE);
+    TextView line1 = label("Gặp người", 24, WHITE);
     line1.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
-    TextView line2 = label("cùng tần số.", 30, 0xffe9b6ff);
+    TextView line2 = label("cùng tần số.", 24, 0xffe9b6ff);
     line2.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
     words.addView(line1);
     words.addView(line2);
@@ -1044,10 +1050,10 @@ public class MainActivity extends Activity {
     if (filled) { b.setBackground(pressable(ACCENT, 14)); b.setElevation(dp(2)); }
     else b.setBackground(outlined(CARD, 14));
     int color = filled ? WHITE : TEXT;
-    if (iconName != null) b.addView(icon(iconName, 18, color), new LinearLayout.LayoutParams(dp(18), dp(18)));
-    TextView t = label(text, 15, color);
+    if (iconName != null) b.addView(icon(iconName, 16, color), new LinearLayout.LayoutParams(dp(16), dp(16)));
+    TextView t = label(text, 14, color);
     t.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-    t.setPadding(iconName == null ? 0 : dp(10), 0, 0, 0);
+    t.setPadding(iconName == null ? 0 : dp(8), 0, 0, 0);
     b.addView(t);
     b.setContentDescription(text);
     b.setClickable(true);
@@ -1540,10 +1546,10 @@ public class MainActivity extends Activity {
   private View composeTool(String iconName, int color, String description, Runnable action) {
     FrameLayout f = new FrameLayout(this);
     f.setBackground(pressable(CARD, 99));
-    f.addView(icon(iconName, 22, color), new FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER));
+    f.addView(icon(iconName, 20, color), new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
     f.setContentDescription(description);
     f.setOnClickListener(v -> action.run());
-    f.setLayoutParams(new LinearLayout.LayoutParams(dp(44), dp(44)));
+    f.setLayoutParams(new LinearLayout.LayoutParams(dp(40), dp(40)));
     return f;
   }
 
@@ -1756,7 +1762,7 @@ public class MainActivity extends Activity {
     identity.addView(holder, new LinearLayout.LayoutParams(dp(80), dp(80)));
     LinearLayout name = column();
     name.setPadding(dp(10), dp(28), 0, dp(3));
-    TextView title = label(user.optString("name"), 19, TEXT);
+    TextView title = label(user.optString("name"), 17, TEXT);
     title.setTypeface(null, Typeface.BOLD);
     name.addView(title);
     name.addView(label("@" + user.optString("username"), 12, MUTED));
@@ -2220,7 +2226,7 @@ public class MainActivity extends Activity {
 
   private void admin() {
     shell("Quản trị Kinnect", true);
-    content.addView(label("Báo cáo và tài khoản", 19, TEXT));
+    content.addView(label("Báo cáo và tài khoản", 16, TEXT));
     adminResets();
     adminMusic();
     request("GET", "/api/admin/reports", null, data -> {
@@ -2281,7 +2287,7 @@ public class MainActivity extends Activity {
     });
     request("GET", "/api/admin/users", null, data -> {
       JSONArray users = data.optJSONArray("users");
-      content.addView(label("Thành viên gần đây", 19, TEXT));
+      content.addView(label("Thành viên gần đây", 16, TEXT));
       for (int i = 0; users != null && i < users.length(); i++) {
         JSONObject u = users.optJSONObject(i);
         LinearLayout c = card();
@@ -2312,7 +2318,7 @@ public class MainActivity extends Activity {
   }
 
   private void live() {
-    content.addView(label("Trực tiếp cùng Kinnect", 26, TEXT));
+    content.addView(label("Trực tiếp cùng Kinnect", 20, TEXT));
     content.addView(label("Camera, micro, video và trò chuyện được xử lý bằng WebRTC native trên Android.",15,MUTED));
     content.addView(primary("Mở phòng trực tiếp", () -> startActivity(new Intent(this, LiveActivity.class))));
   }
@@ -2507,9 +2513,9 @@ public class MainActivity extends Activity {
     empty.setBackground(outlined(CARD, 16));
     FrameLayout bubble = new FrameLayout(this);
     bubble.setBackground(background(PRIMARY_SOFT, 99));
-    bubble.addView(icon(iconName, 28, ACCENT), new FrameLayout.LayoutParams(dp(28), dp(28), Gravity.CENTER));
-    empty.addView(bubble, new LinearLayout.LayoutParams(dp(64), dp(64)));
-    TextView t = label(title, 16, TEXT);
+    bubble.addView(icon(iconName, 24, ACCENT), new FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER));
+    empty.addView(bubble, new LinearLayout.LayoutParams(dp(56), dp(56)));
+    TextView t = label(title, 15, TEXT);
     t.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
     t.setGravity(Gravity.CENTER);
     t.setPadding(0, dp(14), 0, dp(2));
@@ -3010,10 +3016,6 @@ public class MainActivity extends Activity {
       android.provider.MediaStore.ACTION_VIDEO_CAPTURE
     );
     capture.putExtra(android.provider.MediaStore.EXTRA_DURATION_LIMIT, 60);
-    capture.putExtra(
-      android.provider.MediaStore.EXTRA_SIZE_LIMIT,
-      12L * 1024 * 1024
-    );
     capture.putExtra(android.provider.MediaStore.EXTRA_VIDEO_QUALITY, 0);
     try {
       startActivityForResult(capture, 201);
@@ -3026,7 +3028,7 @@ public class MainActivity extends Activity {
     EditText caption = new EditText(this);
     caption.setHint("Viết chú thích cho video");
     new Sheet(this)
-      .setTitle("Đăng video · MP4 ≤12 MB, ≤60 giây")
+      .setTitle("Đăng video · MP4")
       .setView(caption)
       .setPositiveButton("Đăng", (dialog, which) -> {
         postingVideo = true;
@@ -3048,13 +3050,10 @@ public class MainActivity extends Activity {
             } finally {
               metadata.release();
             }
-            if (duration <= 0 || duration > 60000) throw new Exception(
-              "Video phải dài không quá 60 giây."
+            if (duration <= 0) throw new Exception(
+              "Không đọc được thời lượng video."
             );
-            byte[] bytes = NativeApi.read(
-              getContentResolver().openInputStream(uri),
-              12 * 1024 * 1024
-            );
+            byte[] bytes = NativeApi.readAll(getContentResolver().openInputStream(uri));
             String encoded = android.util.Base64.encodeToString(
               bytes,
               android.util.Base64.NO_WRAP
@@ -3083,7 +3082,7 @@ public class MainActivity extends Activity {
             runOnUiThread(() -> {
               postingVideo = false;
               if (generation == screen) say(
-                "Chọn MP4 hợp lệ, tối đa 12 MB và 60 giây."
+                "Chọn video MP4 hợp lệ."
               );
             });
           }
@@ -3132,10 +3131,10 @@ public class MainActivity extends Activity {
       final java.io.File file = new java.io.File(data.getStringExtra(StudioActivity.EXTRA_IMAGE));
       final String action = data.getStringExtra(StudioActivity.EXTRA_ACTION);
       try {
-        String media = "data:image/jpeg;base64," + android.util.Base64.encodeToString(NativeApi.read(new java.io.FileInputStream(file), 5 * 1024 * 1024), android.util.Base64.NO_WRAP);
+        String media = "data:image/jpeg;base64," + android.util.Base64.encodeToString(NativeApi.readAll(new java.io.FileInputStream(file)), android.util.Base64.NO_WRAP);
         if ("story".equals(action)) { say("Đang đăng tin…"); request("POST", "/api/stories", json("body", "", "media", media), r -> { say("Đã đăng tin, hiển thị 24 giờ."); navigate("feed"); }); }
         else { composePost(); pendingMedia = media; showComposePreview(file); }
-      } catch (Exception e) { say("Ảnh quá lớn (tối đa 5 MB)."); }
+      } catch (Exception e) { say("Không đọc được ảnh. Vui lòng chọn tệp khác."); }
       return;
     }
     if ((request == 203 || request == 204) && result == RESULT_FIRST_USER && data != null && data.getData() != null) {
@@ -3333,6 +3332,7 @@ public class MainActivity extends Activity {
   ) {
     super.onRequestPermissionsResult(code, permissions, results);
     if(code==901){if(calls!=null)calls.permissionsResult(results);return;}
+    if(code==950){backgroundExtras(true);return;}
     if (code == 102) {
       if (
         results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED
@@ -3353,6 +3353,7 @@ public class MainActivity extends Activity {
   @Override
   protected void onStop() {
     super.onStop();
+    KinnectService.appVisible=false;
     if(calls!=null){calls.close();calls=null;}
     if (shortVideo != null) shortVideo.pause();
     resumeVideos.clear();
@@ -3374,9 +3375,11 @@ public class MainActivity extends Activity {
   protected void onResume() {
     super.onResume();
     stopped = false;
+    KinnectService.appVisible = true;
     notificationHandler.removeCallbacksAndMessages(null);
     notificationHandler.post(notificationPoll);
     ensureCalls();
+    if (calls != null) calls.checkPending();
     for (VideoView video : resumeVideos) if (video.isAttachedToWindow()) video.start();
     resumeVideos.clear();
     if (resumeStory != null) resumeStory.run();
@@ -3715,6 +3718,7 @@ public class MainActivity extends Activity {
   protected void onNewIntent(Intent intent) {
     super.onNewIntent(intent);
     handleLink(intent);
+    handleExtras(intent);
   }
 
   private void handleLink(Intent intent) {
@@ -4507,6 +4511,13 @@ public class MainActivity extends Activity {
     try { startActivityForResult(pick, code); } catch (Exception e) { say("Không mở được trình chọn tệp."); }
   }
 
+  private String dataUrlUnbounded(android.net.Uri uri, String forcedType) throws Exception {
+    byte[] bytes = NativeApi.readAll(getContentResolver().openInputStream(uri));
+    String type = forcedType != null ? forcedType : getContentResolver().getType(uri);
+    if (type == null) type = "application/octet-stream";
+    return "data:" + type + ";base64," + android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP);
+  }
+
   private String dataUrl(android.net.Uri uri, int max, String forcedType) throws Exception {
     byte[] bytes = NativeApi.read(getContentResolver().openInputStream(uri), max);
     String type = forcedType != null ? forcedType : getContentResolver().getType(uri);
@@ -4527,7 +4538,7 @@ public class MainActivity extends Activity {
     try {
       if (code == 300 || code == 304) {
         if (!video && !Arrays.asList("image/png", "image/jpeg", "image/webp").contains(type)) { say("Chọn ảnh PNG/JPEG/WebP hoặc video MP4."); return; }
-        String media = dataUrl(uri, (video ? 12 : 5) * 1024 * 1024, null);
+        String media = dataUrlUnbounded(uri, null);
         if (code == 300) {
           pendingMedia = media;
           if (attachButton != null) attachButton.setText(video ? "✓ Đã chọn video" : "✓ Đã chọn ảnh");
@@ -4565,7 +4576,7 @@ public class MainActivity extends Activity {
         request("POST", "/api/me/cover", json("data", dataUrl(uri, 3 * 1024 * 1024, null)), d -> { say("Đã đổi ảnh bìa."); if (profileEditorAvatar == null || !profileEditorAvatar.isAttachedToWindow()) navigate("profile"); });
       }
     } catch (Exception e) {
-      say(code == 308 ? "Ảnh riêng tư tối đa 4 MB." : code == 303 ? "Tệp tối đa 20 MB." : video ? "Video tối đa 12 MB." : "Ảnh tối đa 5 MB.");
+      say(code == 308 ? "Không tải được ảnh riêng tư." : code == 303 ? "Không gửi được tệp." : "Máy chủ chưa nhận được tệp media.");
     }
   }
 
@@ -5307,7 +5318,7 @@ public class MainActivity extends Activity {
     LinearLayout.LayoutParams gp = new LinearLayout.LayoutParams(dp(40), dp(5));
     gp.gravity = Gravity.CENTER_HORIZONTAL;
     sheet.addView(grip, gp);
-    TextView title = label("Tạo tin", 19, TEXT);
+    TextView title = label("Tạo tin", 17, TEXT);
     title.setTypeface(null, Typeface.BOLD);
     title.setGravity(Gravity.CENTER);
     title.setPadding(0, dp(10), 0, dp(12));
@@ -5372,11 +5383,11 @@ public class MainActivity extends Activity {
       final String text = caption.getText().toString();
       new Thread(() -> {
         try {
-          byte[] bytes = NativeApi.read(new java.io.FileInputStream(video), 12 * 1024 * 1024);
+          byte[] bytes = NativeApi.readAll(new java.io.FileInputStream(video));
           final String media = "data:video/mp4;base64," + android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP);
           runOnUiThread(() -> request("POST", "/api/stories", json("body", text, "media", media), r -> { say("Đã đăng tin, hiển thị 24 giờ."); navigate("feed"); }));
         } catch (Exception e) {
-          runOnUiThread(() -> say("Video tin tối đa 12 MB."));
+          runOnUiThread(() -> say("Không đọc được video. Vui lòng chọn tệp khác."));
         }
       }).start();
     }).setNegativeButton("Huỷ", null).show();

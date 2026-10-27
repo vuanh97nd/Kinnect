@@ -48,7 +48,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   private final Handler ui = new Handler(Looper.getMainLooper());
   private boolean front = true, recording = false, previewReady = false, torch = false, grid = false, story = false, busy = false;
   private String mode = "video", panel = "";
-  private int limitSeconds = 60, timerSeconds = 0, ratio = 0; // 0: 9:16 · 1: 3:4 · 2: 1:1
+  private int limitSeconds = 0, timerSeconds = 0, ratio = 0; // 0: 9:16 · 1: 3:4 · 2: 1:1
   private Bitmap frame, still, stillFull;
   private MediaRecorder recorder;
   private Surface recorderSurface;
@@ -99,7 +99,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     story = getIntent().getBooleanExtra(EXTRA_STORY, false);
     String startMode = getIntent().getStringExtra(EXTRA_MODE);
     if (startMode != null) mode = startMode;
-    if (story) { mode = "video"; limitSeconds = 15; }
+    if (story) { mode = "video"; limitSeconds = 0; }
     root = new FrameLayout(this);
     root.setBackgroundColor(0xff000000);
     setContentView(root);
@@ -269,7 +269,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     rail.addView(railButton("timer", timerSeconds == 0 ? "Hẹn giờ" : timerSeconds + " giây", () -> { timerSeconds = timerSeconds == 0 ? 3 : timerSeconds == 3 ? 10 : 0; buildRail(); }));
     rail.addView(railButton("grid", grid ? "Lưới: bật" : "Lưới", () -> { grid = !grid; gridOverlay.setGrid(grid); buildRail(); }));
     if (mode.equals("photo")) rail.addView(railButton("ratio", ratio == 0 ? "9:16" : ratio == 1 ? "3:4" : "1:1", () -> { ratio = (ratio + 1) % 3; gridOverlay.setRatio(ratio); buildRail(); }));
-    if (mode.equals("video") && !story) rail.addView(railButton("timer", limitSeconds + "s", () -> { limitSeconds = limitSeconds == 60 ? 15 : limitSeconds == 15 ? 30 : 60; buildRail(); }));
+    if (mode.equals("video") && !story) rail.addView(railButton("timer", (limitSeconds == 0 ? "∞" : limitSeconds + "s"), () -> { limitSeconds = limitSeconds == 0 ? 15 : limitSeconds == 15 ? 30 : limitSeconds == 30 ? 60 : 0; buildRail(); }));
   }
 
   private LinearLayout railButton(String iconName, String label, Runnable click) {
@@ -718,9 +718,9 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         try { fx.render(c, frame, face, frameCount); } finally { recorderSurface.unlockCanvasAndPost(c); }
       } catch (Exception ignored) {}
       float elapsed = (SystemClock.elapsedRealtime() - startedAt) / 1000f;
-      shutter.setProgress(elapsed / limitSeconds);
-      timer.setText("● " + (int) elapsed + "s / " + limitSeconds + "s");
-      if (elapsed >= limitSeconds) stopRecording();
+      shutter.setProgress(limitSeconds > 0 ? elapsed / limitSeconds : (elapsed % 60) / 60f);
+      timer.setText("● " + (int) elapsed + "s" + (limitSeconds > 0 ? " / " + limitSeconds + "s" : ""));
+      if (limitSeconds > 0 && elapsed >= limitSeconds) stopRecording();
     }
   }
 
@@ -934,9 +934,8 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
       recorder.setVideoSize(W, H);
       recorder.setVideoFrameRate(30);
       recorder.setVideoEncodingBitRate(limitSeconds <= 30 ? 2400000 : 1300000);
-      recorder.setMaxFileSize(11L * 1024 * 1024);
       recorder.setOutputFile(output.getAbsolutePath());
-      recorder.setOnInfoListener((r, what, extra) -> { if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED) ui.post(this::stopRecording); });
+      
       recorder.prepare();
       recorderSurface = recorder.getSurface();
       recorder.start();

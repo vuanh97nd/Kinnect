@@ -1,6 +1,7 @@
 import { publishedApk } from './lib/apk-releases.js';
 import {createTyping} from './lib/typing.js';
 import {createCalls} from "./lib/calls.js";
+import { createWebPush } from "./lib/webpush.js";
 import http from "node:http";
 import { mkdirSync, createReadStream } from "node:fs";
 import { resolve, dirname } from "node:path";
@@ -18,9 +19,10 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
   loadMailEnv("oauth.env");
   loadMailEnv("turn.env");
   let notifyNotifications = () => {};
+  let pushNotification = () => {};
   let notifyCallMessage = () => {};
   const social = openSocial(dbPath, {
-    onNotification: ({ userId }) => notifyNotifications(userId),
+    onNotification: ({ userId, id }) => { notifyNotifications(userId); if (id) pushNotification(userId, id); },
     onCallMessage: ({ userIds }) => notifyCallMessage(userIds),
     fetchImpl,authLimit,
     sendEmail:emailSender||sendMail,mailReady:emailReady||smtpConfigured,
@@ -76,6 +78,20 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         })
         .sort((a, b) => b.viewers - a.viewers || b.started - a.started);
       return res.end(JSON.stringify({ rooms: list }));
+    }
+    if (path.startsWith("/api/push/")) {
+      const out = (status, data) => { res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }); res.end(JSON.stringify(data)); };
+      if (path === "/api/push/key" && req.method === "GET") return out(200, { publicKey: webPush.publicKey });
+      const me = social.authenticate(req);
+      if (!me) return out(401, { error: "Vui lòng đăng nhập." });
+      if (req.method !== "POST") return out(405, { error: "Không hỗ trợ." });
+      let b = {};
+      try { let raw = ""; for await (const chunk of req) { raw += chunk; if (raw.length > 8192) return out(413, { error: "Quá lớn." }); } b = JSON.parse(raw || "{}"); } catch { return out(400, { error: "Dữ liệu không hợp lệ." }); }
+      if (path === "/api/push/subscribe") return webPush.subscribe(me.id, b.subscription) ? out(200, { ok: true }) : out(400, { error: "Đăng ký thông báo không hợp lệ." });
+      if (path === "/api/push/unsubscribe") { webPush.unsubscribe(me.id, b.endpoint); return out(200, { ok: true }); }
+      if (path === "/api/push/test") { await webPush.notifyTest(me.id); return out(200, { ok: true }); }
+      if (path === "/api/push/decline") { calls.declineById(me.id, String(b.callId || "")); return out(200, { ok: true }); }
+      return out(404, { error: "Không tìm thấy." });
     }
     if (path.startsWith("/api/") && path !== "/api/music") {
       res.once("finish", () => enforceAccess());
@@ -388,7 +404,11 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
   const send = (ws, data) => {
     if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data));
   };
-  const calls=createCalls({social,wss,send});
+  const webPush = createWebPush({ social, fetchImpl: fetchImpl || fetch });
+  pushNotification = (userId, id) => { if (!visible(userId)) webPush.notification(userId, id); };
+  // A user "sees" Kinnect when one of their browser tabs reports it is visible.
+  const visible = (userId) => [...wss.clients].some((c) => c.userId === userId && c.visible && social.authenticate(c.authRequest));
+  const calls=createCalls({social,wss,send,webPush,visible});
   notifyNotifications = (userId) => {
     for (const client of wss.clients)
       if (client.userId === userId && social.authenticate(client.authRequest)) send(client, { type: "notifications-changed" });
@@ -486,7 +506,9 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     ws.name = account.name;
     ws.window = Date.now();
     ws.messages = 0;
-    send(ws, { type: "welcome", id: ws.id, callResume: true });
+    ws.visible = false;
+    send(ws, { type: "welcome", id: ws.id, callResume: true, push: true });
+    calls.join(ws);
     listing();
     ws.on("message", (raw) => {
       const account = social.authenticate(req);
@@ -509,6 +531,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
       if (!m || typeof m !== "object") return;
       const error = (message) => send(ws, { type: "error", message });
       if(typing.handle(ws,m,account))return;
+      if(m.type==="visibility"){ws.visible=m.visible===true;return;}
       if(calls.handle(ws,m))return;
       if (m.type === "create") {
         if (ws.room) return error("Hãy rời phòng hiện tại trước.");

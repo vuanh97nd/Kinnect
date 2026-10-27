@@ -75,7 +75,7 @@ public final class NativeApi {
         ).openConnection();
         connection.setInstanceFollowRedirects(false);
         connection.setConnectTimeout(15000);
-        connection.setReadTimeout(15000);
+        connection.setReadTimeout(600000);
         connection.setRequestMethod(method);
         connection.setRequestProperty("Accept", "application/json");
         connection.setRequestProperty("Origin", server);
@@ -176,6 +176,15 @@ public final class NativeApi {
     });
   }
 
+  /** Read a selected media file without a fixed app-level size limit. */
+  public static byte[] readAll(InputStream input) throws IOException {
+    try (InputStream in=input; ByteArrayOutputStream out=new ByteArrayOutputStream()) {
+      byte[] buffer=new byte[65536]; int count;
+      while((count=in.read(buffer))!=-1) out.write(buffer,0,count);
+      return out.toByteArray();
+    }
+  }
+
   public static byte[] read(InputStream input, int maximum) throws IOException {
     try (
       InputStream in = input;
@@ -193,3 +202,4 @@ public final class NativeApi {
     }
   }
 }
+

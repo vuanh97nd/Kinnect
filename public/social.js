@@ -881,7 +881,6 @@ async function shorts(panel, isCurrent = () => true, feed = "recommended") {
       r.readAsDataURL(blob);
     });
   const postVideo = async (blob, caption) => {
-    if (blob.size > 12 * 1024 * 1024) throw Error("Video tối đa 12 MB.");
     const data = await toBase64(blob);
     await uploadJson("/shorts", { data, caption }, (percent) => {
       status(percent < 0 ? "Đang chuẩn bị video…" : percent < 100 ? `Đang tải video lên ${percent}%…` : "Đang xử lý video…");
@@ -899,7 +898,7 @@ async function shorts(panel, isCurrent = () => true, feed = "recommended") {
   const file = node("input");
   file.type = "file";
   file.accept = "video/mp4";
-  file.setAttribute("aria-label", "Tải video MP4 có sẵn, tối đa 12 MB và 60 giây");
+  file.setAttribute("aria-label", "Tải video MP4 có sẵn");
   pick.append(file, node("span", "📁 Tải video lên"));
   file.onchange = async () => {
     const f = file.files[0];
@@ -1706,7 +1705,6 @@ async function openCamera({story = false, photo = null} = {}) {
       $("create").requestSubmit();
     },
     onDone: async (blob, caption, progress) => {
-      if (blob.size > 12 * 1024 * 1024) throw Error("Video tối đa 12 MB.");
       progress(-1);
       const data=await toBase64(blob);
       progress(0);

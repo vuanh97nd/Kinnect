@@ -18,7 +18,9 @@ final class WebIcons {
       case "music": web = "music_2"; break;
       case "flip": web = "switch_camera"; break;
       case "wand": web = "wand_sparkles"; break;
-      case "flag": web = "circle_help"; break;
+      case "flag": web = "flag"; break;
+      case "type": web = "type"; break;
+      case "upload": web = "upload"; break;
       case "feed": web = "house"; break;
       case "discover": web = "compass"; break;
       case "shorts": web = "clapperboard"; break;

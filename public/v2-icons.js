@@ -89,3 +89,25 @@ Object.assign(window.KN_ICONS,{
 "headphones":'<path d="M3 14v-3a9 9 0 0118 0v3M3 13h4v8H3zM17 13h4v8h-4z"/>',
 "undo-2":'<path d="M3 7h10a7 7 0 010 14M3 7l5-5M3 7l5 5"/>'
 });
+
+// Approved icon set, used only after sign-in.
+window.KN_POSTLOGIN_ICONS = {
+  "house": "<path d=\"M3 10 12 3l9 7v10H15v-7H9v7H3Z\"/>",
+  "compass": "<path d=\"M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm5-15-3 7-7 3 3-7Z\"/>",
+  "message-square": "<path d=\"M21 11a8 8 0 0 1-8 8H7l-4 3V6a3 3 0 0 1 3-3h7a8 8 0 0 1 8 8Z\"/>",
+  "message-circle": "<path d=\"M21 11a8 8 0 0 1-8 8H7l-4 3V6a3 3 0 0 1 3-3h7a8 8 0 0 1 8 8Z\"/>",
+  "clapperboard": "<path d=\"M4 3h16v18H4zM4 9h16M8 3l4 6m3-6 4 6m-9 3 6 3-6 3Z\"/>",
+  "plus": "<path d=\"M12 5v14M5 12h14\"/>",
+  "settings": "<path d=\"M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1Z\"/>",
+  "search": "<path d=\"m16 16 5 5M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16\"/>",
+  "bell": "<path d=\"M5 17h14l-2-4V8a5 5 0 0 0-10 0v5ZM10 21h4\"/>",
+  "image": "<path d=\"M3 3h18v18H3zM3 17l6-6 5 5 3-3 4 4M15 7h.01\"/>",
+  "smile": "<path d=\"M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM8 9h.01M16 9h.01M7 14q5 7 10 0\"/>",
+  "send": "<path d=\"m3 3 19 9-19 9 4-9Zm4 9h15\"/>",
+  "send-horizontal": "<path d=\"m3 3 19 9-19 9 4-9Zm4 9h15\"/>",
+  "bookmark": "<path d=\"M6 3h12v18l-6-4-6 4Z\"/>",
+  "ellipsis": "<path d=\"M5 12h.01M12 12h.01M19 12h.01\"/>",
+  "user-plus": "<path d=\"M9 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10ZM1 22v-2a7 7 0 0 1 14 0v2M19 8v8M15 12h8\"/>",
+  "arrow-right": "<path d=\"M5 12h14m-6-6 6 6-6 6\"/>",
+  "phone": "<path d=\"M4 3h5l1 5-3 2q2 5 7 7l2-3 5 1v5q0 2-3 1C9 19 4 14 3 6q-1-3 1-3\"/>"
+};
