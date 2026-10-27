@@ -1,0 +1,4 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+  <item><color android:color="#F6F5FA"/></item>
+  <item android:width="96dp" android:height="96dp" android:gravity="center" android:drawable="@drawable/kinnect_icon"/>
+</layer-list>

@@ -12,7 +12,7 @@ function ring(c){
 function callSystemAlert(c){if(document.visibilityState==='visible'||!('Notification'in window)||Notification.permission!=='granted')return;try{const n=new Notification(c.mode==='audio'?'Cuộc gọi thoại đến':'Cuộc gọi video đến',{body:c.person.name,icon:'/kinnect-icon-192.png',tag:'kinnect-call-'+c.id,requireInteraction:true});n.onclick=()=>{window.focus();n.close();};c.systemNotification=n;}catch{}}
 const labels={busy:'Người này đang bận.',unavailable:'Người này chưa sẵn sàng nhận cuộc gọi.',missed:'Không có trả lời.',declined:'Cuộc gọi đã bị từ chối.',ended:'Cuộc gọi đã kết thúc.',disconnected:'Mất kết nối cuộc gọi.',answered_elsewhere:'Đã nhận trên thiết bị khác.'};
 function send(c,type,extra={}){sendCallSignal({type,callId:c.id,...extra});}
-function finish(c,message='Cuộc gọi đã kết thúc.'){if(current!==c)return;stopRingtone(c);c.ringtoneContext?.close().catch(()=>{});c.systemNotification?.close();current=null;clearTimeout(c.timeout);clearTimeout(c.recoveryTimer);clearInterval(c.clock);c.pc?.close();c.stream?.getTracks().forEach(t=>t.stop());c.dialog.close();c.dialog.remove();window.dispatchEvent(new CustomEvent('kinnect-call-status',{detail:message}));}
+function finish(c,message='Cuộc gọi đã kết thúc.'){if(current!==c)return;stopRingtone(c);c.ringtoneContext?.close().catch(()=>{});c.systemNotification?.close();current=null;c.configRequest?.abort();clearTimeout(c.timeout);clearTimeout(c.recoveryTimer);clearInterval(c.clock);c.pc?.close();c.stream?.getTracks().forEach(t=>t.stop());c.dialog.close();c.dialog.remove();window.dispatchEvent(new CustomEvent('kinnect-call-status',{detail:message}));}
 function shell(person,incoming=false,mode="video"){
  const dialog=document.createElement('dialog');dialog.className='video-call';dialog.setAttribute('aria-label',mode==='audio'?'Cuộc gọi thoại':'Cuộc gọi video');if(mode==='audio')dialog.classList.add('audio-call');
  dialog.innerHTML='<div class="call-topline"><span class="call-wordmark">Kinnect<span>CALL</span></span><button type="button" class="call-expand" aria-label="Toàn màn hình"></button></div><video class="call-remote" autoplay playsinline></video><video class="call-local" autoplay playsinline muted></video><div class="call-identity"><div class="call-avatar"></div><h2></h2><p role="status"></p></div><button class="call-audio" hidden>Bật âm thanh</button><div class="call-controls"><button type="button" class="call-mic">Tắt mic</button><button type="button" class="call-camera">Tắt camera</button><button type="button" class="call-output">Âm thanh</button><button type="button" class="call-accept">Nhận cuộc gọi</button><button type="button" class="call-end">Kết thúc</button></div>';
@@ -29,9 +29,9 @@ function shell(person,incoming=false,mode="video"){
  for(const selector of ['.call-mic','.call-camera'])dialog.querySelector(selector).hidden=incoming;
  dialog.querySelector('.call-accept').hidden=!incoming;
  const end=dialog.querySelector('.call-end');callButton(end,incoming?'Từ chối':'Kết thúc','phone');
- end.onclick=()=>{try{if(c.id)send(c,incoming&&!c.pc?'call-decline':'call-end');}catch{}finish(c);};
+ end.onclick=()=>{try{if(c.id)send(c,c.incoming&&!c.accepted?'call-decline':'call-end');}catch{}finish(c);};
  dialog.addEventListener('cancel',e=>{e.preventDefault();end.click();});
- dialog.querySelector('.call-accept').onclick=async()=>{stopRingtone(c);c.ringtoneContext?.close().catch(()=>{});c.systemNotification?.close();const accept=dialog.querySelector('.call-accept');accept.disabled=true;try{await media(c);if(current!==c)return;send(c,'call-accept');accept.hidden=true;dialog.classList.remove('is-incoming');callButton(end,'Kết thúc','phone');for(const sel of ['.call-mic','.call-camera'])dialog.querySelector(sel).hidden=false;c.status.textContent='Đang kết nối…';}catch(e){try{send(c,'call-decline');}catch{}finish(c,e.message);}};
+ dialog.querySelector('.call-accept').onclick=async()=>{stopRingtone(c);c.ringtoneContext?.close().catch(()=>{});c.systemNotification?.close();const accept=dialog.querySelector('.call-accept');accept.disabled=true;try{await media(c);if(current!==c)return;send(c,'call-accept');c.accepted=true;accept.hidden=true;dialog.classList.remove('is-incoming');callButton(end,'Kết thúc','phone');for(const sel of ['.call-mic','.call-camera'])dialog.querySelector(sel).hidden=false;c.status.textContent='Đang kết nối…';}catch(e){try{send(c,'call-decline');}catch{}finish(c,e.message);}};
  dialog.querySelector('.call-mic').onclick=e=>{const tracks=c.stream?.getAudioTracks()||[];const enabled=!tracks[0]?.enabled;tracks.forEach(t=>t.enabled=enabled);callButton(e.currentTarget,enabled?'Tắt mic':'Bật mic','mic');e.currentTarget.setAttribute('aria-pressed',String(!enabled));};
  dialog.querySelector('.call-camera').onclick=e=>{const tracks=c.stream?.getVideoTracks()||[];const enabled=!tracks[0]?.enabled;tracks.forEach(t=>t.enabled=enabled);callButton(e.currentTarget,enabled?'Tắt camera':'Bật camera','camera');c.dialog.classList.toggle('camera-muted',!enabled);e.currentTarget.setAttribute('aria-pressed',String(!enabled));};
  output.onclick=async()=>{
@@ -52,7 +52,11 @@ async function media(c){
 function connection(c){return c.connecting||(c.connecting=createConnection(c));}
 async function createConnection(c){
  if(c.pc)return c.pc;
- const response=await fetch('/api/call-config',{credentials:'same-origin'});const config=await response.json().catch(()=>null);if(!response.ok||!config)throw Error(config?.error||'Không tải được cấu hình cuộc gọi.');if(current!==c)return null;c.turnConfigured=(config.iceServers||[]).some(server=>(Array.isArray(server.urls)?server.urls:[server.urls]).some(url=>typeof url==='string'&&/^turns?:/i.test(url)));
+ c.status.textContent='Đang kết nối…';
+ c.configRequest=new AbortController();
+ // Cover configuration loading as well as ICE with the same deadline.
+ c.timeout=setTimeout(()=>{if(current===c){try{send(c,'call-end');}catch{}finish(c,'Kết nối cuộc gọi quá thời gian. Vui lòng thử lại.');}},30000);
+ const response=await fetch('/api/call-config',{credentials:'same-origin',signal:c.configRequest.signal});const config=await response.json().catch(()=>null);if(!response.ok||!config)throw Error(config?.error||'Không tải được cấu hình cuộc gọi.');if(current!==c)return null;c.turnConfigured=(config.iceServers||[]).some(server=>(Array.isArray(server.urls)?server.urls:[server.urls]).some(url=>typeof url==='string'&&/^turns?:/i.test(url)));
  const pc=new RTCPeerConnection(config);c.pc=pc;c.stream.getTracks().forEach(t=>pc.addTrack(t,c.stream));
  pc.onicecandidate=e=>{if(e.candidate&&current===c)try{send(c,'call-signal',{candidate:e.candidate.toJSON()});}catch{finish(c,'Mất kết nối cuộc gọi.');}};
  pc.ontrack=e=>{const remote=c.dialog.querySelector('.call-remote');remote.srcObject=e.streams[0]||new MediaStream([e.track]);remote.play().catch(()=>c.dialog.querySelector('.call-audio').hidden=false);c.dialog.classList.add('has-remote');};
@@ -62,7 +66,6 @@ async function createConnection(c){
   if(pc.connectionState==='failed'&&!c.incoming&&!c.iceRestarted){c.iceRestarted=true;c.signals=(c.signals||Promise.resolve()).then(async()=>{if(current!==c)return;await pc.setLocalDescription(await pc.createOffer({iceRestart:true}));send(c,'call-signal',{description:pc.localDescription.toJSON()});}).catch(()=>finish(c,'Không khôi phục được kết nối cuộc gọi.'));}
   return;
  }if(pc.connectionState==='closed'){try{send(c,'call-end');}catch{}finish(c,c.turnConfigured?'Không kết nối được cuộc gọi '+(c.mode==='audio'?'thoại':'video')+'. Hãy kiểm tra kết nối mạng rồi thử lại.':'Cuộc gọi '+(c.mode==='audio'?'thoại':'video')+' không xuyên được mạng này vì máy chủ chưa cấu hình TURN. Cần bật dịch vụ TURN cho Kinnect.');}};
- c.timeout=setTimeout(()=>{if(current===c&&pc.connectionState!=='connected'){try{send(c,'call-end');}catch{}finish(c,c.turnConfigured?'Kết nối cuộc gọi quá thời gian. Vui lòng thử lại.':'Chưa kết nối được: máy chủ Kinnect chưa cấu hình TURN để vượt NAT/firewall.');}},30000);
  return pc;
 }
 export async function startVideoCall(person,mode="video"){if(current)throw Error('Bạn đang có một cuộc gọi.');const c=shell(person,false,mode);try{await media(c);if(current!==c)return;sendCallSignal({type:'call-start',to:person.id,mode,requestId:c.requestId});c.status.textContent='Đang gọi…';}catch(e){finish(c,e.message);}}

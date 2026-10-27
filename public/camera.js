@@ -40,7 +40,7 @@ function faceEngine() {
   return faceEnginePromise;
 }
 // Bộ xử lý: video gốc → canvas có hiệu ứng → MediaStream mới (giữ nguyên âm thanh).
-export function createEffects(rawStream, { width = 540, height = 960, portrait = false } = {}) {
+export function createEffects(rawStream, { width = 540, height = 960, portrait = false, fit = "cover" } = {}) {
   const video = document.createElement("video");
   video.muted = true;
   video.playsInline = true;
@@ -52,7 +52,7 @@ export function createEffects(rawStream, { width = 540, height = 960, portrait =
   canvas.width = landscape ? height : width;
   canvas.height = landscape ? width : height;
   const ctx = canvas.getContext("2d");
-  const state = { filter: "none", soft: false, smooth: 0.5, whiten: 0, blush: 0, auto: false, sticker: "none", mirror: true };
+  const state = { fit, filter: "none", soft: false, smooth: 0.5, whiten: 0, blush: 0, auto: false, sticker: "none", mirror: true };
   let autoBright = 1, autoContrast = 1, autoTick = 0;
   const probe = document.createElement("canvas");
   probe.width = 24; probe.height = 32;
@@ -87,8 +87,8 @@ export function createEffects(rawStream, { width = 540, height = 960, portrait =
   function cover() {
     const vw = video.videoWidth || canvas.width;
     const vh = video.videoHeight || canvas.height;
-    // Khung dọc nhưng camera trả hình ngang (iPhone): vừa khít chiều ngang, không phóng to.
-    const scale = (portrait && vw > vh ? Math.min : Math.max)(canvas.width / vw, canvas.height / vh);
+    // Phủ kín khung đầu ra, cắt đều hai bên nếu camera trả hình ngang.
+    const scale = (state.fit === "contain" ? Math.min : Math.max)(canvas.width / vw, canvas.height / vh);
     const w = vw * scale;
     const h = vh * scale;
     return [(canvas.width - w) / 2, (canvas.height - h) / 2, w, h];
@@ -147,17 +147,6 @@ export function createEffects(rawStream, { width = 540, height = 960, portrait =
       if (state.mirror) {
         ctx.translate(canvas.width, 0);
         ctx.scale(-1, 1);
-      }
-      if (portrait && w < canvas.width + 1 && h < canvas.height) {
-        // Nền: chính khung hình phủ kín và làm mờ, để phần trên/dưới không bị đen.
-        // Safari không hỗ trợ ctx.filter: làm mờ bằng cách thu nhỏ còn vài chục điểm ảnh rồi phóng to lại.
-        const vw = video.videoWidth, vh = video.videoHeight;
-        if (tiny.width !== 18 || tiny.height !== 32) { tiny.width = 18; tiny.height = 32; }
-        const t = tiny.getContext("2d"), sw = vh * tiny.width / tiny.height;
-        t.drawImage(video, (vw - sw) / 2, 0, sw, vh, 0, 0, tiny.width, tiny.height);
-        ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(tiny, 0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
       ctx.filter = base;
       ctx.drawImage(video, x, y, w, h);

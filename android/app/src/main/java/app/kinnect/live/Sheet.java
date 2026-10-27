@@ -66,28 +66,28 @@ final class Sheet {
     dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
     LinearLayout box = new LinearLayout(context);
     box.setOrientation(LinearLayout.VERTICAL);
-    box.setPadding(dp(18), dp(10), dp(18), dp(18));
+    box.setPadding(dp(20), dp(10), dp(20), dp(20));
     GradientDrawable shape = new GradientDrawable();
     shape.setColor(bg);
-    float r = dp(22);
+    float r = dp(26);
     shape.setCornerRadii(new float[] { r, r, r, r, 0, 0, 0, 0 });
     box.setBackground(shape);
     // Thanh kéo nhỏ ở đầu như bottom sheet
     View grip = new View(context);
     grip.setBackground(round(line, 99));
-    LinearLayout.LayoutParams gp = new LinearLayout.LayoutParams(dp(40), dp(5));
+    LinearLayout.LayoutParams gp = new LinearLayout.LayoutParams(dp(36), dp(4));
     gp.gravity = Gravity.CENTER_HORIZONTAL;
-    gp.bottomMargin = dp(10);
+    gp.bottomMargin = dp(14);
     box.addView(grip, gp);
     if (title != null && title.length() > 0) {
-      TextView t = text(title, 18, ink, true);
-      t.setPadding(0, dp(4), 0, dp(6));
+      TextView t = text(title, 19, ink, true);
+      t.setPadding(0, dp(2), 0, dp(8));
       box.addView(t);
     }
     if (message != null) {
-      TextView m = text(message, 15, muted, false);
-      m.setPadding(0, 0, 0, dp(10));
-      m.setLineSpacing(0, 1.15f);
+      TextView m = text(message, 14, muted, false);
+      m.setPadding(0, 0, 0, dp(14));
+      m.setLineSpacing(0, 1.3f);
       box.addView(m);
     }
     if (view != null) {
@@ -111,7 +111,7 @@ final class Sheet {
         LinearLayout row = new LinearLayout(context);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(14), 0, dp(14), 0);
-        row.setBackground(round(soft, 14));
+        row.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x226c47e0), round(bg, 12), round(0xff000000, 12)));
         String label = String.valueOf(items[i]);
         boolean danger = label.startsWith("Xoá") || label.startsWith("Xóa") || label.startsWith("Chặn") || label.startsWith("Đăng xuất") || label.startsWith("Thu hồi") || label.startsWith("Rời");
         if (checked != null) {
@@ -122,16 +122,22 @@ final class Sheet {
           row.setOnClickListener(v -> { checked[index] = !checked[index]; box2.setChecked(checked[index]); if (onCheck != null) onCheck.onClick(dialog, index, checked[index]); });
         } else row.setOnClickListener(v -> { dialog.dismiss(); if (onItem != null) onItem.onClick(dialog, index); });
         TextView t = text(label, 16, danger ? 0xffe0245e : ink, false);
+        t.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         row.addView(t, new LinearLayout.LayoutParams(0, -2, 1));
-        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, dp(50));
-        rp.bottomMargin = dp(6);
-        list.addView(row, rp);
+        if (i > 0) {
+          View sep = new View(context);
+          sep.setBackgroundColor(line);
+          LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, 1);
+          sp.setMargins(dp(14), 0, dp(14), 0);
+          list.addView(sep, sp);
+        }
+        list.addView(row, new LinearLayout.LayoutParams(-1, dp(54)));
       }
       int max = context.getResources().getDisplayMetrics().heightPixels * 6 / 10;
       box.addView(scroll, new LinearLayout.LayoutParams(-1, Math.min(max, items.length * dp(56))));
     }
     LinearLayout buttons = new LinearLayout(context);
-    buttons.setPadding(0, dp(8), 0, 0);
+    buttons.setPadding(0, dp(12), 0, 0);
     if (neutral != null) buttons.addView(button(dialog, neutral, onNeutral, DialogInterface.BUTTON_NEUTRAL, false), weight());
     if (negative != null) buttons.addView(button(dialog, negative, onNegative, DialogInterface.BUTTON_NEGATIVE, false), weight());
     if (positive != null) buttons.addView(button(dialog, positive, onPositive, DialogInterface.BUTTON_POSITIVE, true), weight());
@@ -143,26 +149,32 @@ final class Sheet {
       w.setBackgroundDrawable(new ColorDrawable(0));
       w.setLayout(Math.min(context.getResources().getDisplayMetrics().widthPixels, dp(560)), ViewGroup.LayoutParams.WRAP_CONTENT);
       w.setGravity(Gravity.BOTTOM);
-      w.setDimAmount(0.45f);
+      w.setDimAmount(0.5f);
+      w.setWindowAnimations(android.R.style.Animation_InputMethod);
       w.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
     }
     return dialog;
   }
 
   private LinearLayout.LayoutParams weight() {
-    LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(48), 1);
-    p.setMargins(dp(4), 0, dp(4), 0);
+    LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(50), 1);
+    p.setMargins(dp(5), 0, dp(5), 0);
     return p;
   }
 
   private void styleInput(EditText e) {
     e.setTextColor(ink);
     e.setHintTextColor(muted);
-    e.setBackground(round(soft, 12));
-    e.setPadding(dp(14), dp(12), dp(14), dp(12));
-    ViewGroup.MarginLayoutParams p = new ViewGroup.MarginLayoutParams(-1, -2);
-    p.bottomMargin = dp(8);
-    e.setLayoutParams(new LinearLayout.LayoutParams(p));
+    GradientDrawable field = round(bg, 14);
+    field.setStroke(dp(1), line);
+    e.setBackground(field);
+    e.setTextSize(15);
+    e.setPadding(dp(14), dp(13), dp(14), dp(13));
+    if (e.getParent() == null || e.getParent() instanceof LinearLayout) {
+      LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
+      p.bottomMargin = dp(8);
+      e.setLayoutParams(p);
+    }
   }
 
   private Button button(Dialog dialog, CharSequence label, DialogInterface.OnClickListener l, int which, boolean primary) {
@@ -170,15 +182,17 @@ final class Sheet {
     b.setText(label);
     b.setAllCaps(false);
     b.setTextSize(15);
-    b.setTypeface(null, Typeface.BOLD);
+    b.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
     b.setStateListAnimator(null);
+    android.content.res.ColorStateList ripple = android.content.res.ColorStateList.valueOf(primary ? 0x33ffffff : 0x226c47e0);
+    boolean danger = label.toString().startsWith("Xoá") || label.toString().startsWith("Xóa") || label.toString().startsWith("Chặn") || label.toString().startsWith("Đăng xuất") || label.toString().startsWith("Thu hồi");
     if (primary) {
-      GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { 0xff6c47e0, 0xff6c47e0 });
-      g.setCornerRadius(dp(12));
-      b.setBackground(g);
+      b.setBackground(new android.graphics.drawable.RippleDrawable(ripple, round(danger ? 0xffe0245e : 0xff6c47e0, 14), null));
       b.setTextColor(0xffffffff);
     } else {
-      b.setBackground(round(soft, 12));
+      GradientDrawable g = round(bg, 14);
+      g.setStroke(dp(1), line);
+      b.setBackground(new android.graphics.drawable.RippleDrawable(ripple, g, null));
       b.setTextColor(ink);
     }
     b.setOnClickListener(v -> { dialog.dismiss(); if (l != null) l.onClick(dialog, which); });

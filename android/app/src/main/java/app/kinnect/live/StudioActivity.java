@@ -84,7 +84,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   private ImageView icon(String name, int color) {
     ImageView v = new ImageView(this);
     int id = WebIcons.resolve(this, name);
-    if (id != 0) { android.graphics.drawable.Drawable d = getDrawable(id).mutate(); d.setTint(color); v.setImageDrawable(d); }
+    if (id != 0) { android.graphics.drawable.Drawable d = WebIcons.load(this, name); d.setTint(color); v.setImageDrawable(d); }
     return v;
   }
 
@@ -290,7 +290,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
 
   private void renderModes() {
     modeTabs.removeAllViews();
-    String[][] modes = story ? new String[][] { { "video", "TIN 15 GIÂY" } } : new String[][] { { "photo", "ẢNH" }, { "video", "VIDEO" } };
+    String[][] modes = story ? new String[][] { { "video", "TIN 15 GIÂY" } } : new String[][] { { "photo", "ẢNH" }, { "video", "VIDEO" }, { "live", "LIVE" } };
     for (final String[] m : modes) {
       boolean on = m[0].equals(mode);
       LinearLayout cell = new LinearLayout(this);
@@ -307,8 +307,9 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
       LinearLayout.LayoutParams dp5 = new LinearLayout.LayoutParams(dp(5), dp(5));
       dp5.topMargin = dp(4);
       cell.addView(dot, dp5);
-      cell.setOnClickListener(v -> { if (!recording && !busy) { mode = m[0]; renderModes(); buildRail(); shutter.setMode(mode); gridOverlay.setRatio(mode.equals("photo") ? ratio : 0); } });
-      modeTabs.addView(cell, new LinearLayout.LayoutParams(dp(story ? 140 : 96), -2));
+      if (m[0].equals("live")) t.setTextColor(0xffff5c7c);
+      cell.setOnClickListener(v -> { if (m[0].equals("live")) { if (!recording && !busy) { closeCamera(); startActivity(new android.content.Intent(this, LiveActivity.class).putExtra(LiveActivity.EXTRA_HOST, true)); finish(); } return; } if (!recording && !busy) { mode = m[0]; renderModes(); buildRail(); shutter.setMode(mode); gridOverlay.setRatio(mode.equals("photo") ? ratio : 0); } });
+      modeTabs.addView(cell, new LinearLayout.LayoutParams(dp(story ? 140 : 84), -2));
     }
     if (shutter != null) shutter.setMode(mode);
   }
@@ -683,6 +684,8 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   }
 
   // ======================= Vẽ từng khung hình =======================
+  private boolean hardwarePreview = true;
+
   @Override
   public void doFrame(long nanos) {
     Choreographer.getInstance().postFrameCallback(this);
@@ -698,11 +701,15 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     if (previewReady) {
       Canvas c = null;
       try {
-        c = preview.getHolder().lockCanvas();
+        if (hardwarePreview) {
+          try { c = preview.getHolder().getSurface().lockHardwareCanvas(); }
+          catch (Exception e) { hardwarePreview = false; c = null; }
+        }
+        if (c == null && !hardwarePreview) c = preview.getHolder().lockCanvas();
         if (c != null) fx.render(c, frame, face, frameCount);
       } catch (Exception ignored) {
       } finally {
-        if (c != null) try { preview.getHolder().unlockCanvasAndPost(c); } catch (Exception ignored) {}
+        if (c != null) try { if (hardwarePreview) preview.getHolder().getSurface().unlockCanvasAndPost(c); else preview.getHolder().unlockCanvasAndPost(c); } catch (Exception ignored) {}
       }
     }
     if (recording && recorderSurface != null) {
@@ -874,7 +881,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
 
   private android.graphics.drawable.Drawable tinted(String name) {
     int id = WebIcons.resolve(this, name);
-    android.graphics.drawable.Drawable d = getDrawable(id).mutate();
+    android.graphics.drawable.Drawable d = WebIcons.load(this, name);
     d.setTint(0xffffffff);
     d.setBounds(0, 0, dp(18), dp(18));
     return d;

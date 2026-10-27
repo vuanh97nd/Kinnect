@@ -1114,6 +1114,7 @@ html, body { margin: 0; min-height: 100%; background: #f6f5fa; }
 #kn .discover-people{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
 #kn .discover-person{display:flex;flex-direction:column;padding:20px 16px 16px;border-radius:16px;min-width:0;text-align:center;gap:10px}
 #kn .app .discover-person-link{display:flex;flex-direction:column;align-items:center;width:100%;padding:0;gap:6px;background:transparent}
+#kn .discover-info{display:flex;flex-direction:column;align-items:inherit;gap:2px}
 #kn .discover-avatar{margin-bottom:7px}
 #kn .discover-avatar .av{width:80px;height:80px;font-size:25px;border-radius:50%;box-shadow:0 0 0 5px var(--k-wash)}
 #kn .discover-person-link strong{font-size:16px;overflow-wrap:anywhere}
@@ -1140,8 +1141,19 @@ html, body { margin: 0; min-height: 100%; background: #f6f5fa; }
  #kn .app[data-device=pc][data-screen=discover] .side{width:auto;padding:22px 14px;border-right:1px solid var(--k-line)}
  #kn .app[data-device=pc][data-screen=discover] .side>button{justify-content:flex-start;min-height:46px;padding:11px 14px;font-size:14px;border-radius:11px;margin-bottom:4px;gap:12px}
  #kn .app[data-device=pc][data-screen=discover] main{padding:30px;min-width:0}
+ #kn .app[data-device=pc] .discover-people{display:flex!important;flex-direction:column!important;gap:8px!important;max-width:none!important;margin:0!important}
+ #kn .app[data-device=pc] .discover-person{flex-direction:row!important;align-items:center!important;padding:14px 18px!important;border-radius:12px;text-align:left!important;gap:14px!important;background:var(--k-card);margin:0!important}
+ #kn .app[data-device=pc] .discover-person:hover{background:var(--k-wash)}
+ #kn .app[data-device=pc] .discover-person .discover-person-link{flex-direction:row!important;align-items:center!important;gap:14px!important;flex:1;min-width:0}
+ #kn .app[data-device=pc] .discover-person .discover-avatar .av{width:48px!important;height:48px!important;font-size:16px}
+ #kn .app[data-device=pc] .discover-info{display:flex!important;flex-direction:column!important;flex:1;min-width:0;text-align:left!important;align-items:flex-start!important}
+ #kn .app[data-device=pc] .discover-person-link strong{font-size:15px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block!important;-webkit-line-clamp:unset!important}
+ #kn .app[data-device=pc] .discover-person-link small{font-size:13px!important;display:block!important}
+ #kn .app[data-device=pc] .discover-person .discover-city{justify-content:flex-start;font-size:12px}
+ #kn .app[data-device=pc] .discover-person-actions{margin-top:0!important;display:flex!important;flex-direction:row!important;gap:8px;flex-shrink:0;width:auto!important;padding-top:0!important}
+ #kn .app[data-device=pc] .discover-person-actions button{width:auto!important;min-width:90px;font-size:13px;min-height:36px;padding:6px 14px}
 }
-@media(min-width:900px) and (max-width:1100px){#kn .discover-people{grid-template-columns:repeat(2,minmax(0,1fr))}#kn .discover-heading h1{font-size:25px}}
+@media(min-width:900px) and (max-width:1100px){#kn .discover-heading h1{font-size:25px}}
 @media(max-width:899px){
  #kn .app[data-screen=discover] main{padding:20px 16px 90px}
  #kn .discover-heading{margin-bottom:20px;gap:10px}
@@ -1505,25 +1517,24 @@ html, body { margin: 0; min-height: 100%; background: #f6f5fa; }
 @media(max-width:899px){#kn .app[data-screen=studio] .story-camera-shell>.story-camera-stage{width:100%;aspect-ratio:auto}}
 /* Kinnect PC — approved social layout, 2026-10-27. Mobile and capture flows retain their layouts. */
 #kn .pc-top-nav{display:none}
+#kn .top-search-form{display:none}
 @media(min-width:900px){
  #kn .app[data-device=pc]:not(.auth-mode):not(.landing-mode){width:100%;max-width:none;margin:0;border:0;border-radius:0;min-height:100dvh;font-size:15px;line-height:1.5;background:light-dark(#f3f4f8,#17161d)}
- #kn .app[data-device=pc]:not(.auth-mode):not(.landing-mode)>.top{height:70px;min-height:70px;padding:0 24px;gap:20px;position:relative;z-index:30;background:var(--k-card)}
- #kn .app[data-device=pc] .brand{font-size:25px;letter-spacing:-1px;gap:9px;flex-shrink:0}
- #kn .app[data-device=pc] .brand em{width:34px;height:36px;font-size:24px;border-radius:12px 12px 12px 4px}
- #kn .app[data-device=pc] .top>.search{flex:0 1 280px;max-width:280px;min-width:120px;border-radius:24px;background:var(--k-wash);padding:11px 16px;min-height:42px;font-size:14px;text-align:left;color:var(--k-muted)}
- #kn .app[data-device=pc] .pc-top-nav{display:flex;align-self:stretch;justify-content:center;gap:8px;flex:1}
- #kn .app[data-device=pc] .pc-top-nav>button{padding:15px 26px;min-width:64px;border-radius:0;color:var(--k-muted)}
- #kn .app[data-device=pc] .pc-top-nav>button.active{box-shadow:inset 0 -3px var(--k-purple);color:var(--k-purple);background:transparent}
- #kn .app[data-device=pc] .pc-top-nav svg{width:24px;height:24px}
- #kn .app[data-device=pc] .top-actions{gap:8px;flex-shrink:0}
- #kn .app[data-device=pc] .top-actions>.icon{width:40px;height:40px;min-height:40px;border-radius:50%;background:var(--k-wash)}
+ #kn .app[data-device=pc]:not(.auth-mode):not(.landing-mode)>.top{height:60px;min-height:60px;padding:0 24px;gap:16px;position:relative;z-index:30;background:var(--k-card);border-bottom:1px solid var(--k-line)}
+ #kn .app[data-device=pc] .brand{font-size:22px;letter-spacing:-.5px;gap:8px;flex-shrink:0}
+ #kn .app[data-device=pc] .brand em{width:30px;height:32px;font-size:20px;border-radius:10px 10px 10px 4px}
+ #kn .app[data-device=pc] .top>.search{display:none}
+ #kn .app[data-device=pc] .top-search-form{display:flex;align-items:center;gap:8px;flex:0 1 300px;max-width:300px;min-width:140px;border-radius:20px;background:var(--k-wash);padding:0 14px;min-height:38px;margin-left:auto}
+ #kn .app[data-device=pc] .top-search-form svg{width:16px;height:16px;color:var(--k-muted);flex-shrink:0}
+ #kn .app[data-device=pc] .top-search-form input{flex:1;border:0;background:transparent;font-size:14px;padding:9px 0;color:var(--k-text);outline:none;min-width:0}
+ #kn .app[data-device=pc] .pc-top-nav{display:none!important}
+ #kn .app[data-device=pc] .top-actions{gap:4px;flex-shrink:0}
+ #kn .app[data-device=pc] .top-actions>.icon{display:none}
  #kn .app[data-device=pc] .top-actions>.message-header-button{display:none}
- #kn .app[data-device=pc] .pc-top-nav [data-value=inbox]{position:relative}
- #kn .app[data-device=pc] .top:has(.message-header-button.has-unread) .pc-top-nav [data-value=inbox]:after{content:'';position:absolute;top:16px;right:20px;width:7px;height:7px;border-radius:50%;background:var(--k-purple);border:2px solid var(--k-card);box-sizing:content-box}
  #kn .app[data-device=pc]:not(.auth-mode):not(.landing-mode)>.shell,
  #kn .app[data-device=pc][data-screen=feed]>.shell,
  #kn .app[data-device=pc][data-screen=discover]>.shell,
- #kn .app[data-device=pc][data-screen=live]>.shell{grid-template-columns:220px minmax(0,1fr);min-height:calc(100dvh - 70px)}
+ #kn .app[data-device=pc][data-screen=live]>.shell{grid-template-columns:220px minmax(0,1fr);min-height:calc(100dvh - 60px)}
  #kn .app[data-device=pc] .side{width:auto;padding:24px 14px;border-right:1px solid var(--k-line);gap:4px;background:var(--k-card)}
  #kn .app[data-device=pc] .side>button,
  #kn .app[data-device=pc][data-screen=feed] .side>button,
@@ -1531,6 +1542,8 @@ html, body { margin: 0; min-height: 100%; background: #f6f5fa; }
  #kn .app[data-device=pc][data-screen=live] .side>button{justify-content:flex-start;gap:12px;width:100%;padding:12px 14px;min-height:46px;margin:0;border-radius:10px;font-size:15px;font-weight:550;line-height:1.4}
  #kn .app[data-device=pc] .side>button svg{width:22px;height:22px}
  #kn .app[data-device=pc] .side>.primary{margin-top:20px;justify-content:center;color:white}
+ #kn .app[data-device=pc] .side [data-value=notifications]{position:relative}
+ #kn .app[data-device=pc] .top:has(.notification-button.has-unread) ~ .shell .side [data-value=notifications]:after{content:'';position:absolute;top:12px;left:28px;width:8px;height:8px;border-radius:50%;background:var(--k-purple)}
  #kn .app[data-device=pc] .side>footer{display:none}
  #kn .app[data-device=pc] main{padding:28px 32px 40px;min-width:0}
  #kn .app[data-device=pc] h1{font-size:24px;line-height:1.3;font-weight:700;letter-spacing:-.6px}
@@ -1751,3 +1764,479 @@ html, body { margin: 0; min-height: 100%; background: #f6f5fa; }
 }
 @media(min-width:1600px){#kn .app[data-device=pc] .v2-messenger{grid-template-columns:360px minmax(0,1fr)}#kn .app[data-device=pc].v2-inbox-mode main{padding:28px 32px}}
 @media(min-width:900px) and (max-height:650px){#kn .app[data-device=pc].v2-inbox-mode main{padding:12px 18px}#kn .app[data-device=pc].v2-inbox-mode main>.heading{margin-bottom:10px}#kn .app[data-device=pc].v2-inbox-mode main>.heading p{display:none}#kn .app[data-device=pc] .v2-chat-header{min-height:60px;padding:8px 14px}#kn .app[data-device=pc] .v2-chat-compose{padding:8px 12px}}
+/* Friends: keep identity and actions together instead of centering a growing button. */
+#kn .friends-page{width:100%;max-width:960px;min-width:0;margin:0 auto}
+#kn .friends-page>.heading{margin-bottom:20px}
+#kn .friends-page>.v2-search{margin:16px 0 24px;padding:4px 6px 4px 14px;border:1px solid var(--k-line);border-radius:14px;background:var(--k-card);gap:6px}
+#kn .friends-page>.v2-search input{background:transparent;border:0;padding:10px 0;font-size:15px}
+#kn .friends-page>.v2-search:focus-within{outline:2px solid var(--k-purple);outline-offset:2px}
+#kn .friends-page>.v2-friend-section{margin:24px 0}
+#kn .friends-page .v2-friend-section>h2{margin:0 0 10px;display:flex;align-items:center;gap:8px}
+#kn .friends-page .v2-friend-section>h2 small{font-weight:400}
+#kn .app .v2-friend-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:16px;min-width:0;padding:16px 0}
+#kn .app .v2-friend-row>.person-link{display:flex;justify-content:flex-start;align-items:center;text-align:left;width:100%;min-width:0;padding:4px 0;border-radius:10px}
+#kn .app .v2-friend-row>.person-link>.person{width:100%;min-width:0;justify-content:flex-start;gap:12px}
+#kn .app .v2-friend-row .person>.grow{flex:1;min-width:0}
+#kn .app .v2-friend-row .person strong{display:block;text-align:left;overflow-wrap:anywhere;line-height:1.45}
+#kn .app .v2-friend-row .person small{display:block;text-align:left;overflow-wrap:anywhere;white-space:normal;line-height:1.5;margin-top:4px}
+#kn .app .v2-friend-row>.friend-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin:0;min-width:0}
+#kn .app .v2-friend-row .friend-actions>button{min-height:40px;white-space:nowrap;padding:9px 13px;gap:7px;font-size:14px;line-height:1.4}
+#kn .app .v2-friend-row .friend-actions>button svg{width:18px;height:18px}
+@media(min-width:900px){
+ #kn .app[data-device=pc][data-screen=friends] main{padding:32px clamp(24px,4vw,72px) 48px}
+ #kn .app[data-device=pc] .friends-page>.tabs{margin-bottom:0}
+ #kn .app[data-device=pc] .friends-page .v2-friend-row .person>.av{width:46px;height:46px}
+ #kn .app[data-device=pc] .friends-page .v2-friend-row .person strong{font-size:15px}
+ #kn .app[data-device=pc] .friends-page .v2-friend-row .person small{font-size:13px}
+ #kn .app[data-device=pc] .friends-page .kn-empty{padding:28px 16px}
+}
+@media(max-width:899px){
+ #kn .friends-page{max-width:680px}
+ #kn .friends-page>.heading{margin-bottom:16px}
+ #kn .friends-page>.v2-search{margin:14px 0 20px;padding-left:12px}
+ #kn .friends-page>.v2-search input{font-size:16px}
+ #kn .app .v2-friend-row{gap:12px;padding:14px 0}
+ #kn .app .v2-friend-row>.person-link>.person{gap:10px}
+ #kn .app .v2-friend-row .person>.av{width:40px;height:40px}
+ #kn .app .v2-friend-row .person strong{font-size:14px}
+ #kn .app .v2-friend-row .person small{font-size:12px}
+ #kn .app .v2-friend-row .friend-actions>button{min-height:44px;font-size:13px;padding:9px 11px}
+}
+@media(max-width:430px){
+ #kn .app .v2-friend-row:has(.friend-actions>button:nth-child(2)){grid-template-columns:minmax(0,1fr);gap:8px}
+ #kn .app .v2-friend-row:has(.friend-actions>button:nth-child(2))>.friend-actions{justify-content:flex-start;padding-left:50px}
+ #kn .app .v2-friend-row:has(.friend-actions>button:nth-child(2))>.friend-actions>button{flex:1;justify-content:center;padding:9px}
+}
+/* Media uses available viewport height instead of a fixed 264px portrait. */
+@media(min-width:900px){
+ #kn .app[data-device=pc][data-screen=video].v2-media-mode main{display:flex;flex-direction:column;height:100%;min-height:0;padding:16px 24px;overflow:hidden}
+ #kn .app[data-device=pc][data-screen=video] main>.heading{flex-shrink:0;margin-bottom:10px}
+ #kn .app[data-device=pc][data-screen=video] main>.heading p{margin-top:3px}
+ #kn .app[data-device=pc][data-screen=video] main>.tabs{flex-shrink:0;margin-bottom:12px}
+ #kn .app[data-device=pc].v2-media-mode .stage-cols.approved-video{flex:1;min-height:0;height:auto;grid-template-columns:minmax(0,1fr) 320px;align-items:stretch;gap:20px}
+ #kn .app[data-device=pc] .approved-video>.theatre{height:100%;min-height:0;padding:12px;display:grid;grid-template-rows:minmax(0,1fr) 40px;gap:8px;align-items:stretch;justify-items:center;overflow:hidden}
+ #kn .app[data-device=pc] .approved-video .v2-video-stage.reel{height:100%;width:auto;max-width:100%;max-height:none;min-height:0;aspect-ratio:9/16;align-self:center;justify-self:center;border-radius:14px}
+ #kn .app[data-device=pc] .approved-video .v2-video-stage>video{width:100%;height:100%;object-fit:contain}
+ #kn .app[data-device=pc] .approved-video-paging{height:40px;align-items:center}
+ #kn .app[data-device=pc] .approved-video>.details{height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden;padding:18px}
+ #kn .app[data-device=pc] .approved-video>.details>.person,#kn .app[data-device=pc] .approved-video>.details>h2,#kn .app[data-device=pc] .approved-video>.details>hr{flex-shrink:0}
+ #kn .app[data-device=pc] .approved-video .v2-media-comments{flex:1;min-height:0;display:flex;flex-direction:column}
+ #kn .app[data-device=pc] .approved-video .approved-comment-list{flex:1;min-height:0;max-height:none;overflow-y:auto;overscroll-behavior:contain}
+ #kn .app[data-device=pc] .approved-video .comment-form{flex-shrink:0}
+ #kn .app[data-device=pc] .approved-video .v2-video-actions{right:10px;bottom:80px;gap:10px}
+ #kn .app[data-device=pc] .approved-video .v2-video-actions button{width:48px;min-width:48px;min-height:42px;font-size:12px}
+ #kn .app[data-device=pc] .approved-video .v2-video-actions svg{width:26px;height:26px}
+ #kn .app[data-device=pc][data-screen=live].v2-media-mode main{display:flex;flex-direction:column;height:100%;min-height:0;padding:16px 24px;overflow:hidden}
+ #kn .app[data-device=pc].v2-media-mode .stage-cols.live-desktop{flex:1;min-height:0;height:100%;padding:0;grid-template-columns:minmax(0,1fr) 320px;gap:20px;align-items:stretch}
+ #kn .app[data-device=pc] .live-desktop>div{min-width:0;min-height:0;height:100%;padding:12px;background:#131118;border-radius:16px;align-items:center;overflow:hidden}
+ #kn .app[data-device=pc] .live-desktop .live-immersive{height:100%;width:auto;max-width:100%;max-height:none;aspect-ratio:9/16;min-height:0;border-radius:14px}
+ #kn .app[data-device=pc] .live-desktop>.details{height:100%;min-height:0;padding:18px;overflow:hidden}
+}
+@media(min-width:900px) and (max-width:1199px){
+ #kn .app[data-device=pc].v2-media-mode .stage-cols.approved-video,#kn .app[data-device=pc].v2-media-mode .stage-cols.live-desktop{grid-template-columns:minmax(0,1fr) 260px;gap:14px}
+ #kn .app[data-device=pc][data-screen=video].v2-media-mode main,#kn .app[data-device=pc][data-screen=live].v2-media-mode main{padding:12px 16px}
+}
+@media(min-width:900px) and (max-height:650px){
+ #kn .app[data-device=pc][data-screen=video] main>.heading{display:none}
+ #kn .app[data-device=pc] .approved-video .v2-video-actions{bottom:55px;gap:2px}
+ #kn .app[data-device=pc] .approved-video .v2-video-actions button{min-height:30px;font-size:11px;padding:3px}
+ #kn .app[data-device=pc] .approved-video .v2-video-actions svg{width:20px;height:20px}
+}
+/* Shared scale for everyday app pages. Media/camera/story canvases keep their own controls. */
+#kn .app{--ui-body:15px;--ui-label:14px;--ui-meta:13px;--ui-title:24px;--ui-section:18px;--ui-control:44px}
+@media(max-width:899px){#kn .app{--ui-body:14px;--ui-label:13px;--ui-meta:12px;--ui-title:21px;--ui-section:16px}}
+#kn .app:not(.auth-mode):not(.v2-media-mode):not([data-screen=storyView]) main :is(.heading,.create-heading,.account-child-heading) h1,
+#kn .app:not(.auth-mode):not(.v2-media-mode) main .account-page-title{font-size:var(--ui-title);line-height:1.35;letter-spacing:-.5px}
+#kn .app:not(.auth-mode):not(.v2-media-mode) main :is(.settings-section,.security-page,.account-page,.notif-list) h2{font-size:var(--ui-section);line-height:1.4}
+#kn .app:not(.auth-mode):not(.v2-media-mode) main :is(.account-flat-row,.account-page-link,.settings-section button,.security-page button){font-size:var(--ui-label);line-height:1.5;min-height:var(--ui-control)}
+#kn .app:not(.auth-mode):not(.v2-media-mode) main :is(.body-copy,.settings-section p,.security-page p,.notif-row>div){font-size:var(--ui-body);line-height:1.6}
+#kn .app:not(.auth-mode):not(.v2-media-mode) main :is(.notif-row small,.account-profile-card small,.setting-toggle small,.security-page small){font-size:var(--ui-meta);line-height:1.5}
+#kn .app:not(.auth-mode):not(.v2-media-mode) main :is(.notif-row,.account-profile-card) .av{width:42px;height:42px;flex-shrink:0}
+#kn .app:not(.auth-mode):not(.v2-media-mode) main :is(.settings-section,.security-page,.profile-edit-page) :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),select){min-height:var(--ui-control);box-sizing:border-box;max-width:100%}
+#kn .app:not(.auth-mode):not(.v2-media-mode) main :is(.settings-section,.security-page,.notif-list,.account-page){min-width:0;overflow-wrap:anywhere}
+#kn .app:not(.auth-mode):not(.v2-media-mode) main .notif-row{min-height:76px;gap:12px;padding:14px;text-align:left;justify-content:flex-start}
+#kn .app:not(.auth-mode):not(.v2-media-mode) main .account-flat-row{gap:12px;padding:12px 4px;min-height:54px}
+@media(min-width:900px){
+ #kn .app[data-device=pc] main :is(.account-page,.security-page,.profile-edit-page){width:100%;max-width:720px;margin-left:auto;margin-right:auto}
+ #kn .app[data-device=pc]:is([data-screen=settings],[data-screen=notificationSettings],[data-screen=devices],[data-screen=blockedAccounts],[data-screen=recoveryEmail],[data-screen=changePassword],[data-screen=appearance],[data-screen=help]) main>:is(.heading,.account-child-heading,.settings-section,.panel){width:100%;max-width:720px;margin-left:auto;margin-right:auto}
+ #kn .app[data-device=pc][data-screen=notifications] main>:is(.heading,.notif-list,.panel){width:100%;max-width:960px;margin-left:auto;margin-right:auto}
+ #kn .app[data-device=pc]:not(.auth-mode):not(.v2-media-mode) main :is(.password-field,.field,.setting-toggle,.v2-field){font-size:var(--ui-label);line-height:1.5}
+}
+@media(max-width:899px){
+ #kn .app:not(.auth-mode):not(.v2-media-mode) main :is(.settings-section,.security-page,.profile-edit-page) :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),select,textarea){font-size:16px}
+ #kn .app:not(.auth-mode):not(.v2-media-mode) main :is(.notif-row,.account-profile-card) .av{width:40px;height:40px}
+}
+/* Mobile conversation header: back, identity, then call actions. */
+@media(max-width:899px){
+ #kn .app.v2-inbox-mode main:has(>.v2-messenger.has-chat)>.heading{display:none}
+ #kn .app.v2-inbox-mode .v2-chat-header{display:flex;align-items:center;gap:4px;padding:8px 10px;min-height:60px}
+ #kn .app.v2-inbox-mode .v2-chat-header>button[data-do=community-back]{flex:0 0 36px;width:36px;min-height:44px;padding:8px 6px}
+ #kn .app.v2-inbox-mode .v2-chat-header>.person-link{display:flex;flex:1;min-width:0;justify-content:flex-start;text-align:left;margin:0;padding:4px 2px}
+ #kn .app.v2-inbox-mode .v2-chat-header>.person-link>.person{display:flex;justify-content:flex-start;gap:9px;min-width:0;width:100%}
+ #kn .app.v2-inbox-mode .v2-chat-header .person>.av{width:36px;height:36px;flex-shrink:0}
+ #kn .app.v2-inbox-mode .v2-chat-header .person>.grow{min-width:0;flex:1}
+ #kn .app.v2-inbox-mode .v2-chat-header .person strong{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ #kn .app.v2-inbox-mode .v2-chat-header .person small{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ #kn .app.v2-inbox-mode .v2-chat-header>button[data-do=call-audio],#kn .app.v2-inbox-mode .v2-chat-header>button[data-do=call-video]{flex:0 0 36px;width:36px;min-height:44px;padding:8px}
+}
+#kn .app .v2-message-reactions{display:flex;align-items:center;gap:2px;flex-wrap:wrap;margin-top:6px;max-width:100%}
+#kn .app .v2-message-reactions>.icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 32px;width:32px;min-width:32px;height:32px;min-height:32px;padding:7px;border-radius:50%;background:transparent;color:inherit;box-shadow:none}
+#kn .app .v2-message-reactions>.icon:hover{background:#88888822}
+#kn .app .v2-message-reactions>.icon svg{width:16px;height:16px}
+#kn .app .v2-bubble{min-width:140px}
+#kn .app .message-forward-sheet{max-width:460px;width:100%;min-width:0}
+#kn .message-forward-sheet .forward-preview{margin:12px 0;padding:12px;background:var(--k-wash);border-radius:10px;max-height:100px;overflow:auto;overflow-wrap:anywhere;font-size:14px}
+#kn .message-forward-sheet .forward-recipients{max-height:45dvh;overflow-y:auto;margin-top:12px}
+#kn .app .message-forward-sheet .v2-share-person{width:100%;display:flex;align-items:center;justify-content:space-between;text-align:left;gap:12px;min-height:56px}
+#kn .message-forward-sheet .v2-share-person>.person{flex:1;min-width:0}
+#kn .message-forward-sheet button:disabled{opacity:.5;cursor:wait}
+#kn .app .v2-message-tools{display:inline-flex;align-items:center;flex-wrap:nowrap;gap:2px;flex-shrink:0}
+#kn .app .v2-message-tools>.icon{width:32px;min-width:32px;height:32px;min-height:32px;padding:7px;border-radius:50%;background:transparent;color:inherit;box-shadow:none}
+#kn .app .v2-message-tools>.icon:hover{background:#88888822}
+#kn .app .v2-bubble{min-width:min(168px,100%)}
+/* Profile photo albums; the private cover never reveals restricted images. */
+#kn .profile-album-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+#kn .app .profile-album-card{display:block;min-width:0;padding:0;text-align:left;border:1px solid var(--k-line);border-radius:16px;background:var(--k-card);overflow:hidden;box-shadow:none}
+#kn .profile-album-cover{position:relative;aspect-ratio:4/3;display:grid;place-items:center;background:var(--k-soft);color:var(--k-purple);overflow:hidden}
+#kn .profile-album-cover>img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
+#kn .profile-album-cover>svg{width:42px;height:42px;opacity:.75}
+#kn .profile-album-cover>span{position:absolute;bottom:12px;right:12px;display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:var(--k-card);color:var(--k-purple);box-shadow:0 2px 8px #0001}
+#kn .profile-album-cover>span svg{width:17px;height:17px}
+#kn .private-album-cover{background:linear-gradient(145deg,var(--k-soft),var(--k-wash))}
+#kn .profile-album-caption{padding:14px 16px;display:grid;gap:6px}
+#kn .profile-album-caption strong{font-size:14px;font-weight:600}
+#kn .profile-album-caption small{font-size:11px;color:var(--k-muted);line-height:1.5}
+#kn .album-detail-heading{display:flex;gap:10px;align-items:center;margin-bottom:16px}
+#kn .album-detail-heading h2{font-size:17px}
+#kn .album-detail-heading small{font-size:11px;color:var(--k-muted);display:block;margin-top:4px}
+@media(max-width:899px){#kn .profile-album-grid{gap:12px}#kn .profile-album-caption{padding:12px}#kn .profile-album-caption strong{font-size:13px}#kn .profile-album-caption small{font-size:10px}#kn .profile-album-cover>svg{width:34px;height:34px}}
+#kn .profile-albums-section{background:var(--k-card);border:1px solid var(--k-line);border-radius:16px;padding:20px}
+#kn .profile-albums-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}
+#kn .profile-albums-toolbar h2{font-size:20px;letter-spacing:-.3px}
+#kn .app .profile-albums-toolbar button{font-size:12px;min-height:36px;border-radius:8px;padding:7px 11px;color:var(--k-purple);background:var(--k-soft);border:0}
+#kn .profile-album-grid{gap:20px}
+#kn .app .profile-album-card{border:0;border-radius:10px;background:transparent;overflow:visible}
+#kn .app .profile-album-card:hover{background:transparent}
+#kn .profile-album-cover{aspect-ratio:1;border-radius:10px;border:1px solid var(--k-line);transition:filter .15s}
+#kn .profile-album-card:hover .profile-album-cover{filter:brightness(.97)}
+#kn .profile-album-caption{padding:12px 0 2px;gap:4px}
+#kn .profile-album-caption strong{font-size:15px;font-weight:650}
+#kn .profile-album-caption small{font-size:12px}
+#kn .profile-album-detail{background:var(--k-card);border:1px solid var(--k-line);border-radius:16px;padding:18px}
+#kn .profile-album-detail .profile-media{gap:6px;grid-template-columns:repeat(3,minmax(0,1fr));margin:0}
+#kn .profile-album-detail .profile-media-tile{aspect-ratio:1;border-radius:8px;overflow:hidden;display:block;position:relative}
+#kn .profile-album-detail .profile-media-tile img{width:100%;height:100%;object-fit:cover}
+@media(max-width:899px){#kn .profile-albums-section{padding:16px}#kn .profile-albums-toolbar{margin-bottom:16px}#kn .profile-albums-toolbar h2{font-size:18px}#kn .profile-album-grid{gap:14px}#kn .profile-album-caption strong{font-size:13px}#kn .profile-album-caption small{font-size:10px}#kn .profile-album-detail{padding:12px}}
+#kn .private-album-panel{padding:20px;max-width:900px;margin:0 auto 18px}
+#kn .private-album-toolbar{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:20px}
+#kn .album-privacy-label{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--k-muted)}
+#kn .album-privacy-label svg{width:15px;height:15px}
+#kn .private-album-toolbar small{display:block;color:var(--k-muted);font-size:11px;margin-top:7px}
+#kn .private-add-photo{display:inline-flex;align-items:center;gap:7px;padding:10px 12px;border-radius:9px;background:var(--k-soft);color:var(--k-purple);font-size:12px;white-space:nowrap;cursor:pointer}
+#kn .private-album-media{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+#kn .private-album-media .profile-media-tile{display:block;aspect-ratio:1;border-radius:8px;overflow:hidden}
+#kn .private-album-locked{display:flex;align-items:center;flex-direction:column;justify-content:center;min-height:300px;padding:20px;text-align:center}
+#kn .private-album-locked .kn-empty{padding:10px}
+#kn .album-access-panel{max-width:900px;margin:auto;padding:20px}
+#kn .album-access-panel h2{font-size:16px;margin-bottom:12px}
+@media(max-width:899px){#kn .private-album-panel,#kn .album-access-panel{padding:16px}#kn .album-privacy-label{font-size:11px}#kn .private-album-toolbar{gap:10px}}
+/* Bell dot reflects unread notification state, never a permanent decoration. */
+#kn .app .top-actions .notification-button:not(.has-unread):after{display:none}
+#kn .app .top-actions .notification-button.has-unread:after{display:block}
+@media(min-width:900px){#kn .profile-album-grid{grid-template-columns:repeat(auto-fill,minmax(160px,220px));justify-content:start}}
+@media(min-width:900px){#kn .app[data-device=pc][data-screen=settings] main>.privacy-page{width:100%;max-width:720px;margin-left:auto;margin-right:auto}}
+/* Compact discovery: more people, no interest chips or biography on cards. */
+#kn .app .discover-people{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+#kn .app .discover-person{padding:14px 10px 10px;gap:7px;border-radius:12px;text-align:center;min-width:0}
+#kn .app .discover-person-link{gap:4px;min-width:0}
+#kn .app .discover-avatar{margin:0 0 4px}
+#kn .app .discover-avatar>.av{width:52px;height:52px;font-size:16px}
+#kn .app .discover-person-link strong{font-size:14px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;max-width:100%}
+#kn .app .discover-person-link small{font-size:12px;line-height:1.4;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#kn .app .discover-city,#kn .app .discover-person .distance{font-size:12px;margin:0;line-height:1.4;max-width:100%;overflow-wrap:anywhere}
+#kn .app .discover-person-actions{gap:5px;padding-top:5px}
+#kn .app .discover-person-actions button{font-size:13px;min-height:38px;padding:7px 5px;gap:5px;border-radius:9px}
+#kn .app .discover-person-actions button svg{width:16px;height:16px}
+#kn .app .discover-controls:has(>.tabs:only-child){padding:8px 12px}
+#kn .app .discover-controls>.tabs{margin-bottom:0}
+@media(max-width:899px){
+ #kn .app .discover-people{grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:10px}
+ #kn .app .discover-person{padding:12px 8px 9px;gap:6px}
+ #kn .app .discover-avatar>.av{width:48px;height:48px}
+ #kn .app .discover-person-actions button{min-height:44px;font-size:12px}
+}
+/* Phone capture and live viewing fill the space between app navigation bars. */
+@media(max-width:899px){
+ #kn .app[data-device=mobile].v2-media-mode{width:100%;max-width:none;height:var(--media-viewport-height,100dvh);min-height:0;max-height:var(--media-viewport-height,100dvh);margin:0;border:0;border-radius:0;overflow:hidden}
+ #kn .app[data-device=mobile].v2-media-mode>.top,#kn .app[data-device=mobile].v2-media-mode>.bottom{flex-shrink:0}
+ #kn .app[data-device=mobile].v2-media-mode>.shell{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;height:auto;overflow:hidden}
+ #kn .app[data-device=mobile].v2-media-mode main{display:block;flex:1;min-height:0;min-width:0;height:100%;width:100%;padding:0;overflow:hidden}
+ #kn .app[data-device=mobile][data-screen=studio] main>.v2-camera-stage,
+ #kn .app[data-device=mobile][data-screen=studio] .story-camera-shell>.story-camera-stage,
+ #kn .app[data-device=mobile][data-screen=live] main>.live-immersive{width:100%;height:100%;min-width:0;min-height:0;max-width:none;max-height:none;aspect-ratio:auto;margin:0;border-radius:0;flex:1}
+ #kn .app[data-device=mobile][data-screen=studio] .v2-camera-stage>video,
+ #kn .app[data-device=mobile][data-screen=studio] .story-camera-stage>.story-photo-preview,
+ #kn .app[data-device=mobile][data-screen=live] .live-immersive>video{width:100%;height:100%;object-fit:cover}
+ #kn .app[data-device=mobile] .story-camera-shell{height:100%;width:100%;min-height:0;padding:0}
+ #kn .app[data-device=mobile] .v2-camera-stage .v2-camera-top{top:12px;left:12px;right:12px}
+ #kn .app[data-device=mobile] .v2-camera-stage .v2-camera-bottom{left:0;right:0;bottom:0;padding:12px 16px;max-height:70%;overflow:auto;box-sizing:border-box}
+ #kn .app[data-device=mobile] .v2-camera-bottom .v2-shutter-row{grid-template-columns:minmax(0,1fr) 72px minmax(0,1fr);gap:10px}
+ #kn .app[data-device=mobile] .live-immersive>.v2-live-chat{bottom:12px}
+}
+@media(max-width:899px) and (max-height:500px){
+ #kn .app[data-device=mobile].v2-media-mode>.top{height:44px;min-height:44px}
+ #kn .app[data-device=mobile].v2-media-mode>.bottom{min-height:48px;padding:3px 8px}
+ #kn .app[data-device=mobile].v2-media-mode>.bottom button{min-height:40px}
+ #kn .app[data-device=mobile] .v2-camera-stage .v2-camera-bottom{padding:6px 12px;gap:5px}
+ #kn .app[data-device=mobile] .v2-camera-bottom .v2-shutter{width:48px;min-height:48px;height:48px}
+ #kn .app[data-device=mobile] .v2-camera-stage .v2-camera-tools{top:58px;right:8px;gap:2px}
+ #kn .app[data-device=mobile] .v2-camera-tools button{min-height:32px;padding:4px;font-size:9px;gap:2px}
+ #kn .app[data-device=mobile] .live-immersive .live-side-actions{bottom:64px;gap:5px}
+ #kn .app[data-device=mobile] .live-immersive .v2-live-chat-log{height:70px;max-height:22dvh}
+}
+/* Discovery: compact three-column profile grid. */
+#kn .app .discover-people{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;max-width:780px;margin:0 auto}
+#kn .app .discover-person{padding:10px 7px 8px;gap:4px;border-radius:11px}
+#kn .app .discover-avatar{margin:0 0 2px}
+#kn .app .discover-avatar>.av{width:40px;height:40px;font-size:13px}
+#kn .app .discover-person-link{gap:3px}
+#kn .app .discover-person-link strong{font-size:12px;line-height:1.35;font-weight:600}
+#kn .app .discover-person-link small{font-size:11px;line-height:1.3}
+#kn .app .discover-city,#kn .app .discover-person .distance{font-size:11px;line-height:1.3}
+#kn .app .discover-person-actions{display:grid;grid-template-columns:minmax(0,1fr) 30px;gap:4px;align-items:center;padding-top:4px;width:100%;min-width:0}
+#kn .app .discover-person-actions>button{font-size:11px;min-height:32px;padding:5px 4px;gap:3px;min-width:0;margin:0;justify-content:center;box-shadow:none;border-radius:8px}
+#kn .app .discover-person-actions>button svg{width:14px;height:14px;display:block}
+#kn .app .discover-person-actions>button[data-do=open-profile]{width:30px;padding:7px}
+#kn .app .discover-person-actions>button[data-do=open-profile]>span{display:none}
+#kn .app .discover-person-actions>button:first-child>svg{display:none}
+@media(max-width:899px){
+ #kn .app .discover-people{gap:7px}
+ #kn .app .discover-person{padding:9px 5px 7px;gap:4px}
+ #kn .app .discover-avatar>.av{width:36px;height:36px;font-size:12px}
+ #kn .app .discover-person-link strong{font-size:11px;line-height:1.35}
+ #kn .app .discover-person-link small{font-size:10px;line-height:1.3}
+ #kn .app .discover-person-actions{grid-template-columns:minmax(0,1fr) 26px;gap:3px}
+ #kn .app .discover-person-actions>button{font-size:10px;min-height:32px;padding:5px 2px}
+ #kn .app .discover-person-actions>button[data-do=open-profile]{width:26px;padding:5px}
+}
+/* Discovery card actions are icon-only, with accessible labels retained. */
+#kn .app .discover-person-actions{display:flex;align-items:center;justify-content:center;gap:6px}
+#kn .app .discover-person-actions>button,#kn .app .discover-person-actions>button[data-do=open-profile]{width:32px;min-width:32px;height:32px;min-height:32px;padding:7px;flex:0 0 32px;justify-content:center}
+#kn .app .discover-person-actions>button>span{display:none}
+#kn .app .discover-person-actions>button svg,#kn .app .discover-person-actions>button:first-child>svg{display:block;width:16px;height:16px}
+/* Smaller identity text in the compact discovery grid. */
+#kn .app .discover-person-link strong{font-size:11px;line-height:1.35;font-weight:500}
+#kn .app .discover-person-link small{font-size:10px;line-height:1.3}
+#kn .app .discover-city,#kn .app .discover-person .distance{font-size:10px;line-height:1.3}
+@media(max-width:899px){#kn .app .discover-person-link strong{font-size:10px}#kn .app .discover-person-link small{font-size:9px}}
+/* Compact post actions and immersive sound library */
+.post{position:relative}#kn .app .post-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}#kn .app .post-head .person-link{flex:1;min-width:0}#kn .app .post-menu-trigger{flex:none;margin-left:auto;width:36px;height:36px;border-radius:50%}#kn .app .post-options{position:absolute;right:16px;top:60px;z-index:15;width:260px;padding:6px;border:1px solid var(--line,#36333e);box-shadow:0 12px 36px #0004;border-radius:14px;background:var(--panel,#24232c)}#kn .app .post-options button{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;padding:10px 12px;border:0;border-radius:9px;text-align:left;background:transparent}#kn .app .post-options button:hover{background:#8b68ff18}#kn .app .post-options .danger{color:#f37888}#kn .app .post-hidden{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px}#kn .app .post-hidden span{display:flex;align-items:center;gap:8px}#kn .app .post-audience-sheet{max-width:480px;margin:24px auto;padding:24px}#kn .app .post-audience-sheet .field{margin:24px 0}#kn .app .post-audience-sheet>.primary{width:100%}#kn .app .sound-picker-layer{position:absolute;inset:0;z-index:80;background:#0007;display:flex;align-items:flex-end;isolation:isolate}#kn .app .sound-picker{width:100%;max-height:92%;display:flex;flex-direction:column;min-height:0;background:#18171f;color:#f6f5fa;border-radius:24px 24px 0 0;box-shadow:0 -12px 60px #0005;padding:8px 20px max(14px,env(safe-area-inset-bottom));text-align:left}#kn .app .sound-picker button,#kn .app .sound-picker input{font:inherit}#kn .app .sound-grip{width:36px;height:4px;background:#595661;border-radius:8px;align-self:center;margin-bottom:14px;flex:none}#kn .app .sound-picker header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}#kn .app .sound-picker header small{font-size:10px;font-weight:700;letter-spacing:1.8px;color:#a69bbd}#kn .app .sound-picker h2{font-size:23px;letter-spacing:-.5px;margin:3px 0 0}#kn .app .sound-picker button{cursor:pointer;color:inherit}#kn .app .sound-picker .icon{width:38px;min-width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;padding:8px;border:0;border-radius:50%;background:transparent}#kn .app .sound-picker header .icon{background:#ffffff0c}#kn .app .sound-search{display:flex;align-items:center;gap:10px;background:#ffffff09;border:1px solid #ffffff0d;border-radius:12px;padding:0 12px;flex:none}#kn .app .sound-search svg{width:18px;color:#9d96ab}#kn .app .sound-search input{border:0!important;outline:0;background:transparent!important;color:#fff;width:100%;height:44px;padding:0!important;font-size:16px!important;min-width:0}#kn .app .sound-tabs{display:flex;align-items:center;gap:6px;border-bottom:1px solid #ffffff0c;padding:12px 0 10px;flex:none}#kn .app .sound-tabs button,#kn .app .sound-upload{display:inline-flex;align-items:center;gap:6px;min-height:36px;border:0;border-radius:9px;background:transparent;color:#b2acbf;padding:7px 10px;font-size:12px;font-weight:600;white-space:nowrap}#kn .app .sound-tabs .active{background:#8061ef22;color:#c5b3ff}#kn .app .sound-tabs svg{width:16px;height:16px}#kn .app .sound-upload{cursor:pointer;margin-left:auto}#kn .app .sound-section-label{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:16px 0 8px;font-size:12px;flex:none}#kn .app .sound-section-label span{color:#8e879d;font-size:11px}#kn .app .sound-results{overflow-y:auto;overscroll-behavior:contain;min-height:90px;flex:1;scrollbar-width:thin}#kn .app .sound-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #ffffff07}#kn .app .sound-cover{width:46px;height:46px;flex:none;border:0;border-radius:11px;display:grid;place-items:center;background:linear-gradient(145deg,#8067bb,#3d2b60)}#kn .app .sound-cover svg{width:19px;height:19px;fill:currentColor}#kn .app .sound-color-1{background:linear-gradient(145deg,#568b93,#24444f)}#kn .app .sound-color-2{background:linear-gradient(145deg,#b17e66,#674335)}#kn .app .sound-color-3{background:linear-gradient(145deg,#aa7194,#4e2a4a)}#kn .app .sound-color-4{background:linear-gradient(145deg,#6580aa,#293b60)}#kn .app .sound-info{flex:1;min-width:0}#kn .app .sound-info strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:600}#kn .app .sound-info small{display:block;font-size:11px;color:#9e97ad;margin-top:5px}#kn .app .sound-picker .sound-save{width:32px;min-width:32px;padding:7px;color:#aaa2ba}#kn .app .sound-save[aria-pressed=true]{color:#b299ff}#kn .app .sound-use{border:1px solid #ffffff19;background:#ffffff08;border-radius:8px;padding:8px 10px;font-size:11px!important;flex:none;min-height:34px}#kn .app .sound-use svg{display:none}#kn .app .sound-row.selected .sound-use{color:#d0bdff;background:#8761e726;border-color:#a078ff55}#kn .app .sound-mix{padding-top:12px;border-top:1px solid #ffffff12;flex:none}#kn .app .sound-current{display:flex;align-items:center;gap:9px;font-size:12px;margin-bottom:8px}#kn .app .sound-current>svg{width:16px;color:#b299ff;flex:none}#kn .app .sound-current strong{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex:1}#kn .app .sound-mix label{display:block;color:#a9a1b9;font-size:11px}#kn .app .sound-mix output{float:right;color:#eee6ff;font-variant-numeric:tabular-nums}#kn .app .sound-mix input[type=range]{display:block;width:100%;height:24px;min-height:0;padding:0;margin:2px 0 5px;accent-color:#a384ff;background:transparent;border:0}#kn .app .sound-volumes{display:grid;grid-template-columns:1fr 1fr;gap:18px}#kn .app .sound-mix>.primary{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:0;border-radius:12px;background:#8061ef;color:#fff;min-height:42px;margin-top:6px}#kn .app .sound-hint{display:flex;align-items:center;justify-content:center;gap:8px;color:#9c93ac;font-size:11px;padding:16px 0 6px;flex:none}#kn .app .sound-hint svg{width:15px}#kn .app .sound-empty{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;min-height:160px;text-align:center;color:#a79db7;font-size:12px;padding:24px}#kn .app .sound-empty strong{color:#eee8f7}#kn .app .sound-empty>svg{width:28px;height:28px}#kn .app .sound-picker button:focus-visible,#kn .app .sound-upload:focus-within{outline:2px solid #b299ff;outline-offset:2px}
+@media(min-width:900px){#kn .app .sound-picker-layer{position:fixed;inset:0;align-items:center;justify-content:center;z-index:150;backdrop-filter:blur(6px)}#kn .app .sound-picker{width:520px;max-height:min(820px,92dvh);height:760px;border:1px solid #ffffff17;border-radius:24px;padding:18px 24px}#kn .app .sound-grip{display:none}#kn .app .sound-info strong{font-size:14px}#kn .app .sound-info small{font-size:12px}#kn .app .sound-row{padding:12px 0}#kn .app .sound-picker .icon{min-width:40px;height:40px}#kn .app .sound-use{min-height:38px}}
+@media(max-width:370px){#kn .app .sound-picker{padding-left:12px;padding-right:12px}#kn .app .sound-row{gap:6px}#kn .app .sound-picker .sound-save{min-width:28px;width:28px}#kn .app .sound-cover{height:40px;width:40px}#kn .app .sound-use{padding:6px}#kn .app .sound-tabs button,#kn .app .sound-upload{padding:7px;font-size:11px}}
+@media(max-height:500px){#kn .app .sound-picker{max-height:100%;border-radius:0;padding-top:8px}#kn .app .sound-grip,#kn .app .sound-picker header small,#kn .app .sound-section-label{display:none}#kn .app .sound-picker header{margin-bottom:6px}#kn .app .sound-picker h2{font-size:18px}#kn .app .sound-mix{padding-top:4px}#kn .app .sound-volumes{display:none}}
+
+#kn .app .sound-picker-layer{position:fixed;inset:0;z-index:250;align-items:flex-end}#kn .app .sound-picker{height:min(780px,92dvh);max-height:92dvh;box-sizing:border-box;overflow:hidden}#kn .app .sound-results{min-height:0}#kn .app .sound-picker h2{color:#f6f5fa}#kn .app .sound-picker button{color:#f6f5fa}#kn .app .sound-picker .sound-cover{background:linear-gradient(145deg,#8067bb,#3d2b60);padding:0;min-height:46px;border-radius:11px}#kn .app .sound-picker .sound-use{min-width:50px;color:#e6dcff;background:#ffffff0d;border:1px solid #ffffff20;padding:8px 10px;border-radius:8px}#kn .app .sound-picker .sound-save{color:#b8a9d1}#kn .app .sound-picker .sound-mix input[type=range]{background:transparent;min-height:0;border:0;padding:0;height:24px}#kn .app .sound-picker .sound-mix>.primary{background:#8061ef;color:white}#kn .app .post-options button.danger{color:#dd4167}@media(min-width:900px){#kn .app .sound-picker-layer{align-items:center}}
+/* Keep feed author alignment and post menus consistent with the active theme. */
+#kn .app .post{position:relative}
+#kn .app .post-head{align-items:center}
+#kn .app .post-head>.person-link{display:flex;justify-content:flex-start;align-items:center;text-align:left;padding:0;margin:0;border:0;background:transparent;box-shadow:none;min-width:0;min-height:44px;color:var(--k-ink)}
+#kn .app .post-head>.person-link>.person{display:flex;justify-content:flex-start;align-items:center;gap:10px;width:100%;margin:0;text-align:left}
+#kn .app .post-head .person .av{flex-shrink:0;margin:0}
+#kn .app .post-head .person .grow{flex:1;min-width:0;text-align:left}
+#kn .app .post-head .person strong{display:block;color:var(--k-ink)}
+#kn .app .post-head .person small{display:block;color:var(--k-muted)}
+#kn .app .post-head>.post-menu-trigger{background:transparent;color:var(--k-muted);box-shadow:none}
+#kn .app .post-head>.post-menu-trigger:hover,#kn .app .post-head>.post-menu-trigger[aria-expanded=true]{background:var(--k-soft);color:var(--k-purple)}
+#kn .app .post>.post-options{top:58px;right:14px;max-width:calc(100% - 28px);background:var(--k-card,#fff);color:var(--k-ink,#191526);border:1px solid var(--k-line,#e6e0ef);box-shadow:0 8px 28px #20113b1a}
+#kn .app .post>.post-options>button{color:var(--k-ink,#191526);background:transparent;justify-content:flex-start;text-align:left;box-shadow:none}
+#kn .app .post>.post-options>button:hover{background:var(--k-soft,#f3efff)}
+#kn .app .post>.post-options>button.danger{color:#d53f60}
+#kn .app .post>.post-options>button svg{width:19px;height:19px;flex-shrink:0;color:inherit}
+/* Sound library follows the application theme instead of hard-coded camera black. */
+#kn .app .sound-picker{background:var(--k-card);color:var(--k-ink);border-color:var(--k-line);box-shadow:0 -8px 40px #17102022}
+#kn .app .sound-picker header,#kn .app .sound-picker footer{background:transparent;border-color:var(--k-line)}
+#kn .app .sound-picker h2,#kn .app .sound-picker button,#kn .app .sound-picker .sound-info strong,#kn .app .sound-picker .sound-current{color:var(--k-ink)}
+#kn .app .sound-picker :is(header small,.sound-info small,.sound-section-label,.sound-hint,.sound-empty,.sound-mix label){color:var(--k-muted)}
+#kn .app .sound-picker .sound-grip{background:var(--k-line)}
+#kn .app .sound-picker .sound-search{background:var(--k-wash);color:var(--k-muted);border:1px solid var(--k-line)}
+#kn .app .sound-picker .sound-search input{color:var(--k-ink);background:transparent}
+#kn .app .sound-picker .sound-search input::placeholder{color:var(--k-muted)}
+#kn .app .sound-picker .sound-tabs{border-color:var(--k-line)}
+#kn .app .sound-picker .sound-tabs button{color:var(--k-muted)}
+#kn .app .sound-picker .sound-tabs button.active{color:var(--k-purple);background:var(--k-soft);box-shadow:inset 0 -2px var(--k-purple)}
+#kn .app .sound-picker .sound-upload{color:var(--k-purple);background:var(--k-soft)}
+#kn .app .sound-picker .sound-row{border-color:var(--k-line)}
+#kn .app .sound-picker .sound-cover{background:var(--k-soft);color:var(--k-purple)}
+#kn .app .sound-picker .sound-save{color:var(--k-muted)}
+#kn .app .sound-picker .sound-save[aria-pressed=true]{color:var(--k-purple)}
+#kn .app .sound-picker .sound-use{background:var(--k-wash);color:var(--k-ink);border-color:var(--k-line)}
+#kn .app .sound-picker .sound-row.selected .sound-use{background:var(--k-soft);color:var(--k-purple);border-color:var(--k-purple)}
+#kn .app .sound-picker .sound-mix{border-color:var(--k-line)}
+#kn .app .sound-picker .sound-mix output{color:var(--k-ink)}
+#kn .app .sound-picker .sound-current>svg{color:var(--k-purple)}
+#kn .app .sound-picker .sound-mix input[type=range]{accent-color:var(--k-purple)}
+#kn .app .sound-picker .sound-mix>.primary{background:var(--k-purple);color:#fff}
+/* PC: every standard tab uses the Discover frame — 900px centred. */
+@media(min-width:900px){
+ #kn .app[data-device=pc]:not(.v2-inbox-mode):not(.v2-media-mode):not(.auth-mode):not(.landing-mode) main{padding:28px 32px 40px!important}
+ #kn .app[data-device=pc]:not(.v2-inbox-mode):not(.v2-media-mode):not(.auth-mode):not(.landing-mode) main>*{width:100%;max-width:900px!important;margin-left:auto!important;margin-right:auto!important;box-sizing:border-box}
+ #kn .app[data-device=pc][data-screen=feed] main>.heading{max-width:900px!important;margin:0 auto 20px!important}
+ #kn .app[data-device=pc] .feed-cols{max-width:900px!important;grid-template-columns:minmax(0,1fr) 240px!important;gap:24px!important}
+}
+/* PC account page: grouped cards. */
+@media(min-width:900px){
+ #kn .app[data-device=pc] .account-flat{display:flex;flex-direction:column;gap:16px}
+ #kn .app[data-device=pc] .account-flat>.account-page-title{margin:0 0 4px}
+ #kn .app[data-device=pc] .account-flat>.account-profile-card{display:flex;align-items:center;gap:16px;width:100%;padding:20px 22px;border-radius:16px;border:1px solid var(--k-line);background:linear-gradient(135deg,color-mix(in srgb,var(--k-purple) 9%,var(--k-card)),var(--k-card) 60%);text-align:left;box-shadow:0 2px 10px #1f1d2b08}
+ #kn .app[data-device=pc] .account-profile-card>.av{width:60px!important;height:60px!important;font-size:20px;flex:0 0 60px!important;border-radius:50%}
+ #kn .app[data-device=pc] .account-profile-card>span:not(.av){display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+ #kn .app[data-device=pc] .account-profile-card strong{font-size:18px;font-weight:700}
+ #kn .app[data-device=pc] .account-profile-card small{font-size:13px;color:var(--k-muted)}
+ #kn .app[data-device=pc] .account-flat-list,#kn .app[data-device=pc] .account-flat-bottom{display:flex;flex-direction:column;background:var(--k-card);border:1px solid var(--k-line);border-radius:16px;padding:6px;margin:0;border-top:1px solid var(--k-line)}
+ #kn .app[data-device=pc] .account-flat-row{display:flex;align-items:center;gap:14px;width:100%;padding:12px 14px;min-height:56px;border-radius:12px;background:transparent;font-size:15px;font-weight:550;text-align:left;justify-content:flex-start}
+ #kn .app[data-device=pc] .account-flat-row+.account-flat-row{box-shadow:0 -1px 0 var(--k-line)}
+ #kn .app[data-device=pc] .account-flat-row:hover{background:var(--k-wash);box-shadow:none}
+ #kn .app[data-device=pc] .account-flat-row:hover+.account-flat-row{box-shadow:none}
+ #kn .app[data-device=pc] .account-flat-row>span:nth-child(2){flex:1}
+ #kn .app[data-device=pc] .account-flat-row>svg{width:18px;height:18px;color:var(--k-muted)}
+ #kn .app[data-device=pc] .account-flat-icon{display:grid;place-items:center;width:38px;height:38px;border-radius:11px;background:color-mix(in srgb,var(--k-purple) 10%,var(--k-card));color:var(--k-purple);flex-shrink:0}
+ #kn .app[data-device=pc] .account-flat-icon svg{width:19px;height:19px}
+ #kn .app[data-device=pc] .account-flat-row.logout-action{color:#d23c5a}
+ #kn .app[data-device=pc] .logout-action .account-flat-icon{background:#d23c5a14;color:#d23c5a}
+ #kn .app[data-device=pc] .account-flat>.account-page-foot{text-align:center;margin-top:4px}
+}
+/* Mobile account page: same grouped cards as PC, compact sizing. */
+@media(max-width:899px){
+ #kn .app .account-flat{display:flex;flex-direction:column;gap:12px}
+ #kn .app .account-flat>.account-page-title{margin:0 0 2px}
+ #kn .app .account-flat>.account-profile-card{display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;border-radius:14px;border:1px solid var(--k-line);background:linear-gradient(135deg,color-mix(in srgb,var(--k-purple) 9%,var(--k-card)),var(--k-card) 60%);text-align:left}
+ #kn .app .account-profile-card>.av{width:48px!important;height:48px!important;flex:0 0 48px!important;border-radius:50%}
+ #kn .app .account-profile-card>span:not(.av){display:flex;flex-direction:column;gap:1px;flex:1;min-width:0}
+ #kn .app .account-flat-list,#kn .app .account-flat-bottom{display:flex;flex-direction:column;background:var(--k-card);border:1px solid var(--k-line)!important;border-radius:14px;padding:4px;margin:0!important}
+ #kn .app .account-flat-row{display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;min-height:52px;border-radius:10px;background:transparent;text-align:left;justify-content:flex-start}
+ #kn .app .account-flat-row+.account-flat-row{box-shadow:0 -1px 0 var(--k-line)}
+ #kn .app .account-flat-row>span:nth-child(2){flex:1}
+ #kn .app .account-flat-row>svg{width:17px;height:17px;color:var(--k-muted)}
+ #kn .app .account-flat-icon{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:color-mix(in srgb,var(--k-purple) 10%,var(--k-card));color:var(--k-purple);flex-shrink:0}
+ #kn .app .account-flat-icon svg{width:18px;height:18px}
+ #kn .app .account-flat-row.logout-action{color:#d23c5a}
+ #kn .app .logout-action .account-flat-icon{background:#d23c5a14;color:#d23c5a}
+ #kn .app .account-flat>.account-page-foot{text-align:center;margin-top:2px}
+}
+#kn .app .account-flat-list>.account-flat-row,#kn .app .account-flat-bottom>.account-flat-row{border:0!important}
+/* PC: non-feed tabs match the feed post column (900 - 240 - 24 = 636px), centred. */
+@media(min-width:900px){
+ #kn .app[data-device=pc]:not([data-screen=feed]):not(.v2-inbox-mode):not(.v2-media-mode):not(.auth-mode):not(.landing-mode) main>*{max-width:636px!important}
+}
+/* PC: non-feed tabs start at the same left edge as the feed post column. */
+@media(min-width:900px){
+ #kn .app[data-device=pc]:not([data-screen=feed]):not(.v2-inbox-mode):not(.v2-media-mode):not(.auth-mode):not(.landing-mode) main>*{margin-left:max(0px,calc((100% - 900px) / 2))!important;margin-right:auto!important}
+}
+@media(min-width:900px){html{scrollbar-gutter:stable}}
+@media(min-width:900px){#kn .app[data-device=pc][data-screen=profile]:not(.v2-inbox-mode):not(.v2-media-mode) main>*{max-width:780px!important}}
+/* PC profile: same frame as the inbox — full content width, 24px padding. */
+@media(min-width:900px){
+ #kn .app[data-device=pc][data-screen=profile]:not(.v2-inbox-mode):not(.v2-media-mode) main{padding:24px!important}
+ #kn .app[data-device=pc][data-screen=profile]:not(.v2-inbox-mode):not(.v2-media-mode) main>*{max-width:none!important;margin-left:0!important;margin-right:0!important}
+}
+@media(min-width:900px){
+ #kn .app[data-device=pc][data-screen=profile]:not([data-screen=feed]):not(.v2-inbox-mode):not(.v2-media-mode):not(.auth-mode):not(.landing-mode) main{padding:28px 32px 40px!important}
+ #kn .app[data-device=pc][data-screen=profile]:not([data-screen=feed]):not(.v2-inbox-mode):not(.v2-media-mode):not(.auth-mode):not(.landing-mode) main>*{max-width:none!important;margin-left:0!important;margin-right:0!important}
+}
+/* PC profile header: cover, identity, bio and stats as one card. */
+@media(min-width:900px){
+ #kn .app[data-device=pc][data-screen=profile] main{gap:0!important}
+ #kn .app[data-device=pc][data-screen=profile] main>.profile-cover{height:240px;border-radius:18px 18px 0 0;overflow:hidden;margin-bottom:0!important}
+ #kn .app[data-device=pc][data-screen=profile] main>.profile-cover img,#kn .app[data-device=pc][data-screen=profile] main>.profile-cover svg{width:100%;height:100%;object-fit:cover;display:block}
+ #kn .app[data-device=pc][data-screen=profile] main>:is(.profile-intro,.profile-bio,.profile-stats){background:var(--k-card);border:1px solid var(--k-line);border-top:0;border-bottom:0;margin:0!important;padding-left:32px!important;padding-right:32px!important}
+ #kn .app[data-device=pc][data-screen=profile] main>.profile-intro{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;padding-top:0!important;padding-bottom:8px!important}
+ #kn .app[data-device=pc][data-screen=profile] .profile-identity{display:flex;align-items:flex-end;gap:20px;min-width:0}
+ #kn .app[data-device=pc][data-screen=profile] .profile-identity>.av{width:132px!important;height:132px!important;font-size:42px!important;margin-top:-56px;border:5px solid var(--k-card);box-shadow:0 6px 20px #1f1d2b1a;flex:0 0 auto}
+ #kn .app[data-device=pc][data-screen=profile] .profile-identity h1{font-size:28px!important;line-height:1.2;margin:0 0 4px}
+ #kn .app[data-device=pc][data-screen=profile] .profile-identity p{font-size:14px;color:var(--k-muted);margin:0 0 6px}
+ #kn .app[data-device=pc][data-screen=profile] .profile-actions{display:flex;gap:8px;padding-bottom:6px}
+ #kn .app[data-device=pc][data-screen=profile] main>.profile-bio{padding-top:10px!important;padding-bottom:6px!important;font-size:15px;color:var(--k-text)}
+ #kn .app[data-device=pc][data-screen=profile] main>.profile-stats{display:flex!important;justify-content:flex-start!important;gap:36px!important;padding-top:14px!important;padding-bottom:20px!important;border-bottom:1px solid var(--k-line)!important;border-radius:0 0 18px 18px}
+ #kn .app[data-device=pc][data-screen=profile] main>.profile-stats>*{display:flex!important;flex-direction:row!important;align-items:baseline;gap:6px;text-align:left!important;flex:0 0 auto!important;width:auto!important}
+ #kn .app[data-device=pc][data-screen=profile] main>.profile-stats strong{font-size:18px;font-weight:700}
+ #kn .app[data-device=pc][data-screen=profile] main>.profile-stats small,#kn .app[data-device=pc][data-screen=profile] main>.profile-stats span{font-size:14px;color:var(--k-muted)}
+ #kn .app[data-device=pc][data-screen=profile] main>.profile-layout{display:grid!important;grid-template-columns:320px minmax(0,1fr)!important;gap:20px!important;margin-top:20px!important;align-items:start}
+ #kn .app[data-device=pc][data-screen=profile] .profile-layout>:first-child{position:sticky;top:84px;border-radius:16px}
+}
+@media(min-width:900px){
+ #kn .app[data-device=pc][data-screen=profile]:not([data-screen=feed]):not(.v2-inbox-mode):not(.v2-media-mode):not(.auth-mode):not(.landing-mode) main>*{max-width:1040px!important;margin-left:auto!important;margin-right:auto!important}
+}
+/* PC width system (final): every standard tab centred on one axis.
+   Wide tabs 900px, list/settings tabs 680px. #kn#kn outranks earlier rules. */
+@media(min-width:900px){
+ #kn#kn .app[data-device=pc]:not(.v2-inbox-mode):not(.v2-media-mode):not(.auth-mode):not(.landing-mode) main{padding:28px 32px 48px!important}
+ #kn#kn .app[data-device=pc]:not(.v2-inbox-mode):not(.v2-media-mode):not(.auth-mode):not(.landing-mode) main>*{width:100%;max-width:680px!important;margin-left:auto!important;margin-right:auto!important}
+ #kn#kn .app[data-device=pc]:is([data-screen=feed],[data-screen=profile],[data-screen=discover],[data-screen=friends]):not(.v2-inbox-mode):not(.v2-media-mode) main>*{max-width:900px!important}
+ #kn#kn .app[data-device=pc][data-screen=profile] main>.profile-layout{grid-template-columns:290px minmax(0,1fr)!important}
+ #kn#kn .app[data-device=pc][data-screen=profile] main>.profile-cover{height:220px}
+}
+@media(min-width:900px){#kn#kn .app[data-device=pc]:is([data-screen=feed],[data-screen=profile],[data-screen=discover],[data-screen=friends]):not(.v2-inbox-mode):not(.v2-media-mode):not(.auth-mode):not(.landing-mode) main>*{max-width:900px!important}}
+/* @mention suggestions (comments + group chat) and highlighted mentions. */
+#kn .mention{color:var(--k-purple);font-weight:600}
+#kn .v2-chat .v2-bubble.outgoing .mention{color:inherit;text-decoration:underline;text-underline-offset:2px}
+#kn form:has(>.v2-comment-mentions){position:relative}
+#kn .v2-comment-mentions,#kn .v2-group-mentions{display:flex;flex-direction:column;gap:2px;max-height:240px;overflow:auto;padding:6px;background:var(--k-card);border:1px solid var(--k-line);border-radius:14px;box-shadow:0 12px 32px #1f1d2b26;z-index:40}
+#kn .v2-comment-mentions{position:absolute;left:0;right:0;bottom:calc(100% + 6px)}
+#kn .v2-group-mentions{margin:0 12px 6px}
+#kn .v2-comment-mentions>button,#kn .v2-group-mentions>button{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;min-height:44px;border-radius:10px;background:transparent;justify-content:flex-start;text-align:left;font-size:14px}
+#kn .v2-comment-mentions>button:hover,#kn .v2-comment-mentions>button:focus-visible,#kn .v2-group-mentions>button:hover{background:var(--k-wash)}
+#kn .v2-comment-mentions .av{width:32px;height:32px;font-size:12px;flex:0 0 32px}
+#kn .v2-comment-mentions span{display:flex;flex-direction:column;min-width:0}
+#kn .v2-comment-mentions small{color:var(--k-muted);font-size:12px}
+/* Who reacted — Facebook-style sheet. */
+#kn .reaction-summary[data-do=post-reactors]{cursor:pointer;border-radius:8px}
+#kn .reaction-summary[data-do=post-reactors]:hover{text-decoration:underline}
+#kn .reactors-sheet{position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:16px}
+#kn .reactors-backdrop{position:absolute;inset:0;background:#0f0d1a73;border:0;border-radius:0;padding:0}
+#kn .reactors-sheet>section{position:relative;width:min(480px,100%);max-height:min(560px,80dvh);display:flex;flex-direction:column;background:var(--k-card);border-radius:18px;box-shadow:0 24px 60px #0f0d1a40;overflow:hidden}
+#kn .reactors-sheet .heading{display:flex;align-items:center;gap:8px;padding:10px 10px 0 14px;border-bottom:1px solid var(--k-line);margin:0}
+#kn .reactors-tabs{display:flex;gap:2px;flex:1;overflow-x:auto;scrollbar-width:none}
+#kn .reactors-tabs>button{padding:12px 14px;min-height:46px;border-radius:0;background:transparent;font-size:14px;font-weight:600;color:var(--k-muted);white-space:nowrap;box-shadow:none}
+#kn .reactors-tabs>button.active{color:var(--k-purple);box-shadow:inset 0 -3px var(--k-purple)}
+#kn .reactors-list{overflow:auto;padding:6px}
+#kn .reactor-row{display:flex;align-items:center;gap:12px;width:100%;padding:8px 10px;min-height:56px;border-radius:12px;background:transparent;justify-content:flex-start;text-align:left}
+#kn .reactor-row:hover{background:var(--k-wash)}
+#kn .reactor-row>span:last-child{display:flex;flex-direction:column;min-width:0}
+#kn .reactor-row small{color:var(--k-muted);font-size:12px}
+#kn .reactor-av{position:relative;flex:0 0 auto}
+#kn .reactor-av>.av{width:42px;height:42px;font-size:14px}
+#kn .reactor-av>i{position:absolute;right:-4px;bottom:-4px;font-style:normal;font-size:14px;line-height:1;background:var(--k-card);border-radius:50%;padding:2px}
+@media(max-width:899px){#kn .reactors-sheet{place-items:end center;padding:0}#kn .reactors-sheet>section{width:100%;max-height:75dvh;border-radius:18px 18px 0 0}}
+#kn .reactors-sheet .reactor-row{justify-content:flex-start!important;width:100%!important;margin:0!important}
+#kn .reactors-sheet .reactors-tabs>button{background:transparent!important}
+/* Comment totals share the existing comment list and keep the compact stats style. */
+#kn .app .stats>.post-comment-count{display:inline-flex;align-items:center;justify-content:flex-end;min-height:32px;min-width:44px;margin:-6px 0;padding:6px 0;border:0;border-radius:4px;background:transparent;color:var(--k-muted);font:inherit;line-height:inherit;box-shadow:none;cursor:pointer}
+#kn .app .stats>.post-comment-count:hover{color:var(--k-purple);text-decoration:underline;text-underline-offset:3px}
+#kn .app .stats>.post-comment-count:focus-visible{outline:2px solid var(--k-purple);outline-offset:3px}
+/* Multiline comments share the same compact composer in feed and video. */
+#kn .app .comment-form{align-items:flex-end;gap:6px}
+#kn .app .comment-form>textarea{flex:1;min-width:0;min-height:40px;max-height:132px;field-sizing:content;resize:none;padding:10px 12px;margin:0;border:1px solid var(--k-line);border-radius:18px;background:var(--k-wash);color:var(--k-ink);font-family:inherit;font-size:16px;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere}
+#kn .app .comment-form>.comment-emoji{width:36px;min-width:36px;height:40px;min-height:40px;padding:8px;border:0;background:transparent;color:var(--k-muted);box-shadow:none}
+#kn .app .comment-form>.comment-emoji:hover{background:var(--k-soft);color:var(--k-purple)}
+#kn .app .post-comment .comment-content>p{white-space:pre-wrap;overflow-wrap:anywhere}
+#kn .app .v2-emoji-sheet{z-index:300;max-height:50dvh;overflow-y:auto;overscroll-behavior:contain}
+/* Keep the insertion point clear of controls and the mobile keyboard. */
+#kn .app .comment-form>textarea{width:0;flex:1 1 0;caret-color:var(--k-purple,#7853e7);scroll-padding:10px;scroll-margin-block:80px 100px;box-sizing:border-box}
+#kn .app [data-composer-text],#kn .app [data-media-caption]{caret-color:var(--k-purple,#7853e7);scroll-margin-block:80px 110px}
+#kn .app .v2-story-canvas>[data-story-text]{position:relative;z-index:2;box-sizing:border-box;color:#fff;-webkit-text-fill-color:#fff;caret-color:#fff;line-height:1.5;padding:18px 16px;scroll-padding:18px;scroll-margin-block:80px 100px}
+#kn .app .v2-camera-bottom>[data-media-caption]{color:#fff;-webkit-text-fill-color:#fff;caret-color:#fff}
+@media(max-width:899px){
+ #kn .app.keyboard-editing{height:var(--editor-viewport-height);min-height:0}
+ #kn .app.keyboard-editing>.bottom{display:none}
+ #kn .app.keyboard-editing .shell{min-height:0;overflow-y:auto;scroll-padding-bottom:24px}
+ #kn .app.keyboard-editing .v2-story-canvas{min-height:180px;max-height:calc(var(--editor-viewport-height) - 150px)}
+ #kn .app.keyboard-editing .v2-story-canvas>[data-story-text]{min-height:100px;max-height:100%;overflow-y:auto}
+ #kn .app.keyboard-editing .v2-emoji-sheet{bottom:calc(var(--editor-keyboard-inset,0px) + 8px)}
+}
+/* Inset the writing caret so the textarea edge never clips it. */
+#kn .app .approved-composer>[data-composer-text]{position:relative;z-index:1;display:block;box-sizing:border-box;width:100%;max-width:100%;padding:14px 16px;min-height:180px;border:1px solid transparent;border-radius:12px;background:var(--k-card,#fff);color:var(--k-ink,#191526);-webkit-text-fill-color:var(--k-ink,#191526);caret-color:var(--k-ink,#191526);cursor:text;line-height:1.6;text-indent:0;overflow:auto;scroll-padding:14px 16px}
+#kn .app .approved-composer>[data-composer-text]:focus{border-color:var(--k-line,#e6e0ef);outline:2px solid var(--k-soft,#f3efff);outline-offset:2px}
+#kn .app .approved-composer>[data-composer-text]::placeholder{color:var(--k-muted,#81788e);-webkit-text-fill-color:var(--k-muted,#81788e)}
+
+
+.kinnect-boot{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:22px;background:#f6f5fa;color:#7853e7;font:600 14px/1.4 system-ui,sans-serif}.kinnect-boot-mark{display:grid;place-items:center;width:88px;height:88px;border-radius:26px;background:linear-gradient(145deg,#9572ff,#6840dc);color:#fff;font:bold 62px/1 system-ui,sans-serif;box-shadow:0 16px 48px #7853e72b}.kinnect-boot-name{font-size:24px;font-weight:750;letter-spacing:-.8px}.kinnect-boot-loader{width:28px;height:3px;border-radius:4px;background:#d9cdfb;overflow:hidden}.kinnect-boot-loader:after{content:'';display:block;width:14px;height:3px;border-radius:4px;background:#7853e7;animation:kinnect-boot-progress 1s ease-in-out infinite alternate}@keyframes kinnect-boot-progress{to{transform:translateX(14px)}}@media(prefers-color-scheme:dark){.kinnect-boot{background:#151419;color:#bc9fff}}@media(prefers-reduced-motion:reduce){.kinnect-boot-loader:after{animation:none}}

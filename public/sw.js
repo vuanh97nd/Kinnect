@@ -1,36 +1,6 @@
-const CACHE = 'kinnect-static-v26';
+const CACHE = 'kinnect-static-v30-call-27b';
 self.addEventListener('message', event => { if(event.data === 'SKIP_WAITING') self.skipWaiting(); });
-const STATIC = [
-  '/tokens.css',
-  '/style.css',
-  '/social.css',
-  '/ios.css',
-  '/theme.css',
-  '/app-ui.css',
-  '/studio.css',
-  '/compact.css',
-  '/desktop.css',
-  '/live.css',
-  '/polish.css',
-  '/social.js',
-  '/social-feed.js',
-  '/social-discover.js',
-  '/social-profile.js',
-  '/social-messenger.js',
-  '/app.js',
-  '/calls.js',
-  '/camera.js',
-  '/ios.js',
-  '/onboarding.js',
-  '/live-ui.js',
-  '/auth-preview.jpg',
-  '/kinnect-icon.png',
-  '/kinnect-icon-192.png',
-  '/apple-touch-icon.png',
-  '/apple-touch-icon-v6.png',
-  '/kinnect-mark.svg',
-  '/offline.html',
-];
+const STATIC = ['/v2.css','/v2.js','/v2-icons.js','/camera.js','/kinnect-icon-192.png','/apple-touch-icon.png','/offline.html'];
 // Cài đặt từng tệp riêng để một tệp lỗi không làm hỏng toàn bộ việc đăng ký SW.
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(async cache => {

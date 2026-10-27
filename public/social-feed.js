@@ -49,7 +49,7 @@ function composer(panel) {
   const form = context.node("form", undefined, "social-card composer");
   const row = context.node("div", undefined, "composer-row");
   const input = context.node("textarea");
-  input.placeholder = context.feedSection==="confessions"?"Bạn muốn chia sẻ điều gì hôm nay?":context.feedSection==="questions"?"Bạn đang cần lời khuyên về điều gì?":context.me.name + " ơi, bạn đang nghĩ gì?";
+  input.placeholder = context.feedSection==="confessions"?"Bạn muốn chia sẻ điều gì hôm nay?":context.feedSection==="questions"?"Bạn đang cần lời khuyên về điều gì?":"Bạn đang nghĩ gì?";
   input.maxLength = 2000;
   input.required = false;
   input.rows = 1;

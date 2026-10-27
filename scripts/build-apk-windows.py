@@ -14,7 +14,7 @@ for folder in ['android/build/classes','android/build/dex']:
  target.mkdir(parents=True)
 Path('dist').mkdir(exist_ok=True)
 run(build/'aapt2.exe','compile','--dir','android/app/src/main/res','-o','android/build/resources.zip')
-run(build/'aapt2.exe','link','-R','android/build/resources.zip','-I',platform,'--manifest','android/app/src/main/AndroidManifest.xml','-o','android/build/unsigned.apk')
+run(build/'aapt2.exe','link','--auto-add-overlay','-R','android/build/resources.zip','-I',platform,'--manifest','android/app/src/main/AndroidManifest.xml','-o','android/build/unsigned.apk')
 jars=[deps/'webrtc/classes.jar',deps/'okhttp.jar',deps/'okio.jar']
 run(jdk/'java.exe','-jar',tools/'ecj.jar','-1.8','-proc:none','-warn:none','-bootclasspath',str(platform)+';'+str(build/'core-lambda-stubs.jar'),'-classpath',';'.join(map(str,jars)),'-d','android/build/classes',*Path('android/app/src/main/java/app/kinnect/live').glob('*.java'))
 classes=Path('android/build/classes.list');classes.write_text('\n'.join(str(p.resolve()) for p in Path('android/build/classes').rglob('*.class')))

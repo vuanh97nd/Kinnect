@@ -1,12 +1,14 @@
+import { publishedApk } from './lib/apk-releases.js';
 import {createTyping} from './lib/typing.js';
 import {createCalls} from "./lib/calls.js";
 import http from "node:http";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, createReadStream } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { openSocial } from "./lib/social.js";
 import { loadMailEnv, mailConfigured, smtpConfigured, sendMail } from "./lib/mailer.js";
 import { readFile, readdir, stat, writeFile, unlink } from "node:fs/promises";
 import { createHash } from "node:crypto";
+import { brotliCompressSync, gzipSync, constants as zlibConstants } from "node:zlib";
 import { randomUUID } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { fileURLToPath } from "node:url";
@@ -46,6 +48,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
   const rooms = new Map();
   // Mã phiên bản chung của giao diện: đổi khi bất kỳ file trong public/ thay đổi.
   let versionCache = { at: 0, value: "" };
+  const compressedStatic = new Map();
   async function buildVersion() {
     if (Date.now() - versionCache.at < 5000) return versionCache.value;
     const dir = new URL("./public/", import.meta.url);
@@ -202,20 +205,30 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         return res.end();
       }
     }
+    // Bản APK thử nghiệm chưa phát hành: chỉ ai có link mới tải được, nút cập nhật trong app không thấy.
+    if (path === "/download/android-test") {
+      try {
+        const dir = new URL("./dist/", import.meta.url);
+        const builds = [];
+        for (const entry of await readdir(dir)) if (/^Kinnect-[\d.]+-native\.apk$/.test(entry)) builds.push({ entry, at: (await stat(new URL(entry, dir))).mtimeMs });
+        if (!builds.length) throw Error("Chưa có APK");
+        const name = builds.sort((a, b) => b.at - a.at)[0].entry;
+        const file = new URL(name, dir);
+        const info = await stat(file);
+        res.writeHead(200, { "Content-Type": "application/vnd.android.package-archive", "Content-Length": info.size, "Content-Disposition": 'attachment; filename="' + name + '"', "Cache-Control": "no-store" });
+        return createReadStream(file).pipe(res);
+      } catch {
+        res.writeHead(404);
+        return res.end();
+      }
+    }
     // Nút "Tải app": tự tìm APK của bản phát hành mới nhất trên GitHub và chuyển thẳng tới file để tải.
     if (path === "/download/android") {
       const fallback = "https://github.com/vuanh97nd/Kinnect/releases/latest";
       try {
         if (!latestApk || latestApk.expires < Date.now()) {
-          const r = await fetch("https://api.github.com/repos/vuanh97nd/Kinnect/releases?per_page=10", {
-            headers: { Accept: "application/vnd.github+json", "User-Agent": "Kinnect-Server" },
-            signal: AbortSignal.timeout(8000),
-          });
-          if (!r.ok) throw Error("GitHub " + r.status);
-          const release = (await r.json()).find((x) => !x.draft && x.assets?.some((a) => a.name.endsWith(".apk")));
-          const asset = release?.assets.find((a) => a.name.endsWith(".apk"));
-          if (!asset || !asset.browser_download_url.startsWith("https://github.com/vuanh97nd/Kinnect/releases/download/")) throw Error("Không có APK");
-          latestApk = { url: asset.browser_download_url, expires: Date.now() + 10 * 60000 };
+          const asset = await publishedApk(fetchImpl || fetch);
+          latestApk = { url: asset.url, expires: Date.now() + 60000 };
         }
         res.writeHead(302, { Location: latestApk.url, "Cache-Control": "no-store" });
       } catch {
@@ -231,7 +244,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     }
     if (path === "/health") {
       res.writeHead(200, { "Content-Type": "application/json" });
-      return res.end(JSON.stringify({ ok: true, version: "0.3.1" }));
+      return res.end(JSON.stringify({ ok: true, version: "0.3.1", uiVersion: "2026-10-26-new-ui", liveChatHistory: true, storyViewers: true }));
     }
     const files = {
       "/website/support.html": ["website/support.html", "text/html"],
@@ -312,6 +325,10 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
       "/style.css": ["style.css", "text/css"],
       "/tokens.css": ["tokens.css", "text/css"],
       "/polish.css": ["polish.css", "text/css"],
+      "/v2": ["v2.html", "text/html"],
+      "/v2.css": ["v2.css", "text/css"],
+      "/v2.js": ["v2.js", "text/javascript"],
+      "/v2-icons.js": ["v2-icons.js", "text/javascript"],
     };
     if (!files[path]) {
       res.writeHead(404);
@@ -334,10 +351,27 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
             ),
         );
       }
+      const textual = /^(text\/|application\/(?:json|manifest\+json)|image\/svg\+xml)/.test(type);
+      const requestedVersion = new URL(req.url, "http://localhost").searchParams.get("v");
+      const immutable = /\.(?:js|css)$/.test(path) && path !== "/sw.js" && requestedVersion && requestedVersion === (await buildVersion());
+      const accepts = String(req.headers["accept-encoding"] || "");
+      const encoding = textual && body.length > 1024 ? (/\bbr\b/.test(accepts) ? "br" : /\bgzip\b/.test(accepts) ? "gzip" : "") : "";
+      if (encoding) {
+        const key = path + "|" + encoding + "|" + createHash("sha1").update(body).digest("hex");
+        let packed = compressedStatic.get(key);
+        if (!packed) {
+          packed = encoding === "br" ? brotliCompressSync(body, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 9 } }) : gzipSync(body, { level: 9 });
+          if (compressedStatic.size > 200) compressedStatic.clear();
+          compressedStatic.set(key, packed);
+        }
+        body = packed;
+      }
       res.writeHead(200, {
         "Content-Length": body.length,
-        "Content-Type": /^(text\/|application\/(?:json|manifest\+json)|image\/svg\+xml)/.test(type) ? type + "; charset=utf-8" : type,
-        "Cache-Control": path === "/Kinnect.mobileconfig" ? "no-store" : "no-cache",
+        ...(encoding ? { "Content-Encoding": encoding } : {}),
+        ...(textual ? { Vary: "Accept-Encoding" } : {}),
+        "Content-Type": textual ? type + "; charset=utf-8" : type,
+        "Cache-Control": path === "/Kinnect.mobileconfig" ? "no-store" : immutable ? "public, max-age=31536000, immutable" : "no-cache",
         ...(path === "/Kinnect.mobileconfig" ? {"Content-Disposition": 'attachment; filename="Kinnect.mobileconfig"'} : {}),
         "X-Content-Type-Options": "nosniff",
         "Referrer-Policy": "no-referrer",
@@ -452,7 +486,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     ws.name = account.name;
     ws.window = Date.now();
     ws.messages = 0;
-    send(ws, { type: "welcome", id: ws.id });
+    send(ws, { type: "welcome", id: ws.id, callResume: true });
     listing();
     ws.on("message", (raw) => {
       const account = social.authenticate(req);
@@ -487,6 +521,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
             .slice(0, 100),
           host: ws,
           members: new Map([[ws.id, ws]]),
+          chatHistory: [],
           created: Date.now(),
         };
         rooms.set(room.id, room);
@@ -494,6 +529,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         send(ws, {
           type: "joined",
           role: "host",
+          history: [],
           room: { id: room.id, title: room.title },
         });
         listing();
@@ -520,6 +556,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
           room: { id: room.id, title: room.title },
           host: room.host.id,
           hostUserId: room.host.userId,
+          history: (room.chatHistory || []).filter(message => !social.blocked(ws.userId, message.senderId) && social.user(message.senderId)?.suspended === 0),
         });
         send(room.host, { type: "peer", id: ws.id });
         broadcast(room, { type: "count", viewers: room.members.size - 1 });
@@ -554,13 +591,13 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
       if (m.type === "chat") {
         const text =
           typeof m.text === "string" ? m.text.trim().slice(0, 500) : "";
-        if (text)
-          broadcast(room, {
-            type: "chat",
-            name: ws.name,
-            senderId: ws.userId,
-            text,
-          });
+        if (text) {
+          const message = {type:"chat",id:randomUUID(),roomId:room.id,name:ws.name,senderId:ws.userId,text,created:Date.now()};
+          room.chatHistory ||= [];
+          room.chatHistory.push(message);
+          if(room.chatHistory.length>200)room.chatHistory.splice(0,room.chatHistory.length-200);
+          broadcast(room,message);
+        }
       }
       if (m.type === "signal") {
         const target = room.members.get(m.to);

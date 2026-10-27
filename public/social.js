@@ -299,6 +299,7 @@ function authMode(value) {
   sw.querySelector("button").dataset.mode = register ? "login" : "register";
   $("forgot-link").hidden = register;
   $("auth-status").textContent = "";
+  if ($("auth-notice")) $("auth-notice").hidden = true;
 }
 $("login-mode").onclick = () => authMode("login");
 $("register-mode").onclick = () => authMode("register");
@@ -554,6 +555,8 @@ $("logout").onclick = async () => {
     me = null;
     disconnectLive();
     showAuth();
+    const notice = $("auth-notice");
+    if (notice) { notice.textContent = "Bạn đã đăng xuất. Hẹn gặp lại!"; notice.hidden = false; }
   } catch (e) {
     status(e.message);
   }
@@ -813,12 +816,29 @@ async function liveGrid(reel, isCurrent) {
   const box = node("div", undefined, "live-grid");
   reel.append(box);
   // Trang được dựng ngoài màn rồi mới gắn vào, nên lần vẽ đầu không đòi box đã nằm trên trang.
-  let first = true;
+  let first = true, refreshTimer, loading = false;
   const draw = async () => {
+    if (loading) return;
+    clearTimeout(refreshTimer);
     if (!isCurrent() || (!first && !box.isConnected)) return;
     first = false;
-    let rooms = [];
-    try { rooms = (await api("/live/rooms")).rooms || []; } catch {}
+    loading = true;
+    box.setAttribute('aria-busy', 'true');
+    if (!box.children.length) box.append(node('p', 'Đang tải danh sách live…', 'live-grid-loading'));
+    let rooms;
+    try { rooms = (await api("/live/rooms")).rooms || []; }
+    catch {
+      if (!isCurrent()) return;
+      for (const el of box.querySelectorAll('.live-grid-error,.live-grid-loading,.live-grid-empty')) el.remove();
+      const error = node('div', undefined, 'live-grid-error');
+      error.setAttribute('role', 'status');
+      error.append(node('p', 'Chưa tải được danh sách live. Kiểm tra mạng rồi thử lại.'));
+      error.append(action('Thử lại', draw, 'secondary'));
+      box.prepend(error);
+      refreshTimer = setTimeout(draw, 8000);
+      return;
+    } finally { loading = false; box.setAttribute('aria-busy', 'false'); }
+    if (!isCurrent()) return;
     box.replaceChildren();
     if (!rooms.length) {
       const e = node("div", undefined, "live-grid-empty");
@@ -843,7 +863,7 @@ async function liveGrid(reel, isCurrent) {
       }
       box.append(grid);
     }
-    setTimeout(draw, 8000);
+    refreshTimer = setTimeout(draw, 8000);
   };
   await draw();
 }
@@ -1270,6 +1290,12 @@ function renderNotificationCenter() {
   list.scrollTop=scrollTop;
   if(focusKey){const target=[...notificationPanel.querySelectorAll('button')].find(button=>focusKey.id?button.dataset.notificationId===focusKey.id:focusKey.label?button.getAttribute('aria-label')===focusKey.label:button.textContent===focusKey.text);target?.focus({preventScroll:true});}
 }
+// Chấm trên chuông chỉ báo thông báo chưa xem mới đến kể từ lần mở khung gần nhất.
+// Số chưa đọc (#unread) và trạng thái "seen" phía máy chủ giữ nguyên.
+const bellOpenedKey = "kinnect-bell-opened";
+function bellOpenedIds() { try { return new Set(JSON.parse(localStorage.getItem(bellOpenedKey) || "[]")); } catch { return new Set(); } }
+function updateBellDot() { const opened = bellOpenedIds(); $("notification-bell")?.classList.toggle("bell-fresh", notificationCache.some(n => !n.seen && !opened.has(n.id))); }
+function markBellOpened() { try { localStorage.setItem(bellOpenedKey, JSON.stringify(notificationCache.filter(n => !n.seen).map(n => n.id).slice(-500))); } catch {} updateBellDot(); }
 function initializeNotificationCenter() {
   const bell = $("notification-bell");
   if (!notificationPanel) {
@@ -1287,6 +1313,7 @@ function openNotificationCenter() {
   notificationPanel.hidden = false;
   positionHeaderPopup(notificationPanel);
   $("notification-bell").setAttribute("aria-expanded", "true");
+  markBellOpened();
   renderNotificationCenter();
   syncHeaderPanelState();
   // Chuyển focus vào nút Đóng để truy cập bằng bàn phím/trình đọc màn hình.
@@ -1321,6 +1348,7 @@ async function refreshUnread(realtime = false) {
     if (knownNotificationIds.size > 500) knownNotificationIds = new Set(notifications.map(n => n.id));
     const count = notifications.filter(n => !n.seen).length;
     $("unread").textContent = count ? (count > 99 ? "99+" : String(count)) : "";
+    if ($("notification-bell")?.getAttribute("aria-expanded") === "true") markBellOpened(); else updateBellDot();
     const inbox = document.querySelector('#app [data-tab="inbox"]'); inbox.setAttribute("aria-label", "Tin nhắn");
     let badge = inbox.querySelector(".nav-count"); if (!badge) { badge = node("span", "", "nav-count"); badge.setAttribute("aria-hidden", "true"); inbox.append(badge); }
     const messages = notifications.filter(n => !n.seen && ["message","group_message"].includes(n.kind)).length;

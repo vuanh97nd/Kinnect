@@ -8,7 +8,8 @@
     "test": "node --test",
     "moderate": "node scripts/moderate.js",
     "test:e2e": "playwright test",
-    "admin": "node scripts/admin.js"
+    "admin": "node scripts/admin.js",
+    "test:e2e:v2": "playwright test --config=playwright.v2.config.js"
   },
   "dependencies": {
     "ws": "8.22.0"
