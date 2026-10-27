@@ -288,7 +288,7 @@ public class MainActivity extends Activity {
     logo.setClipToOutline(true);
     logo.setBackground(background(CARD, 10));
     toolbar.addView(logo, new LinearLayout.LayoutParams(dp(34), dp(34)));
-    TextView brand = label("Kinnect", 22, ACCENT);
+    TextView brand = label("Kinnect", 20, ACCENT);
     brand.setTypeface(Typeface.create("sans-serif-black", Typeface.NORMAL));
     brand.setLetterSpacing(-0.03f);
     brand.setTextColor(ACCENT);
@@ -338,7 +338,7 @@ public class MainActivity extends Activity {
     headActions = null;
     if (navigation && me != null && !title.isEmpty()) {
       LinearLayout head = row();
-      TextView heading = label(title, WebDesign.TITLE, TEXT);
+      TextView heading = label(title, 19, TEXT);
       heading.setTypeface(null, Typeface.BOLD);
       head.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
       headActions = row();
@@ -353,8 +353,7 @@ public class MainActivity extends Activity {
       root.addView(top, new LinearLayout.LayoutParams(-1, 1));
       bottom = row();
       bottom.setBackgroundColor(CARD);
-      String[][] items = { { "feed", "feed", "Bảng tin" }, { "discover", "discover", "Khám phá" }, { "create", "plus", "Quay video" }, { "shorts", "shorts", "Video" }, { "live", "live", "Live" } };
-      boolean iconFirst = !tab.equals("live");
+      String[][] items = { { "feed", "house", "Bảng tin" }, { "discover", "compass", "Khám phá" }, { "create", "plus", "Tạo" }, { "shorts", "clapperboard", "Video" }, { "live", "radio", "Live" } };
       for (final String[] it : items) {
         if (it[0].equals("create")) {
           FrameLayout holder = new FrameLayout(this);
@@ -364,8 +363,8 @@ public class MainActivity extends Activity {
           plus.setBackground(plusBg);
           plus.setElevation(dp(4));
           plus.addView(icon("plus", 24, WHITE), new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
-          plus.setContentDescription(iconFirst ? "Tạo nội dung" : it[2]);
-          if (iconFirst) plus.setTooltipText("Tạo nội dung");
+          plus.setContentDescription("Tạo nội dung");
+          plus.setTooltipText("Tạo nội dung");
           plus.setOnClickListener(v -> chooseVideo());
           holder.addView(plus, new FrameLayout.LayoutParams(dp(44), dp(44), Gravity.CENTER));
           bottom.addView(holder, new LinearLayout.LayoutParams(0, dp(62), 1));
@@ -378,16 +377,17 @@ public class MainActivity extends Activity {
         if (active) pill.setBackground(background(PRIMARY_SOFT, 99));
         pill.addView(icon(it[1], 22, active ? ACCENT : MUTED), new FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER));
         b.addView(pill, new LinearLayout.LayoutParams(dp(54), dp(30)));
-        if (!iconFirst || active) {
-          TextView t = label(it[2], 11, active ? ACCENT : MUTED);
-          t.setPadding(0, dp(2), 0, 0);
-          t.setGravity(Gravity.CENTER);
-          t.setTypeface(null, active ? Typeface.BOLD : Typeface.NORMAL);
-          b.addView(t);
-        }
+        TextView t = label(it[2], 11, active ? ACCENT : MUTED);
+        t.setPadding(0, dp(2), 0, 0);
+        t.setGravity(Gravity.CENTER);
+        t.setSingleLine(true);
+        t.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        t.setTypeface(null, active ? Typeface.BOLD : Typeface.NORMAL);
+        b.addView(t);
         b.setContentDescription(it[2]);
-        if (iconFirst) { b.setSelected(active); b.setFocusable(true); }
-        if (iconFirst) b.setTooltipText(it[2]);
+        b.setSelected(active);
+        b.setFocusable(true);
+        b.setTooltipText(it[2]);
         b.setBackground(pressable(CARD, 14));
         b.setOnClickListener(v -> navigate(it[0]));
         bottom.addView(b, new LinearLayout.LayoutParams(0, dp(62), 1));
@@ -533,7 +533,7 @@ public class MainActivity extends Activity {
     arrow.setContentDescription("Quay lại");
     arrow.setOnClickListener(v -> back.run());
     heading.addView(arrow, new LinearLayout.LayoutParams(dp(36), dp(44)));
-    TextView text = label(title, WebDesign.TITLE, TEXT);
+    TextView text = label(title, 19, TEXT);
     text.setTypeface(null, Typeface.BOLD);
     heading.addView(text, new LinearLayout.LayoutParams(0, -2, 1));
     content.addView(heading);
@@ -1756,7 +1756,7 @@ public class MainActivity extends Activity {
     identity.addView(holder, new LinearLayout.LayoutParams(dp(80), dp(80)));
     LinearLayout name = column();
     name.setPadding(dp(10), dp(28), 0, dp(3));
-    TextView title = label(user.optString("name"), 21, TEXT);
+    TextView title = label(user.optString("name"), 19, TEXT);
     title.setTypeface(null, Typeface.BOLD);
     name.addView(title);
     name.addView(label("@" + user.optString("username"), 12, MUTED));
@@ -2099,7 +2099,7 @@ public class MainActivity extends Activity {
           value = age + " tuổi";
         } catch (Exception ignored) { continue; }
       } else if (!key.equals("name") && !visibility.optBoolean(key, true)) continue;
-      if (!value.isEmpty()) preview.addView(label(value, key.equals("name") ? 20 : 14, key.equals("name") ? TEXT : MUTED));
+      if (!value.isEmpty()) preview.addView(label(value, key.equals("name") ? 18 : 14, key.equals("name") ? TEXT : MUTED));
     }
     ScrollView scroll = new ScrollView(this); scroll.addView(preview);
     scroll.setLayoutParams(new LinearLayout.LayoutParams(-1, Math.min(dp(420), getResources().getDisplayMetrics().heightPixels / 2)));
@@ -2220,7 +2220,7 @@ public class MainActivity extends Activity {
 
   private void admin() {
     shell("Quản trị Kinnect", true);
-    content.addView(label("Báo cáo và tài khoản", 22, TEXT));
+    content.addView(label("Báo cáo và tài khoản", 19, TEXT));
     adminResets();
     adminMusic();
     request("GET", "/api/admin/reports", null, data -> {
@@ -2281,7 +2281,7 @@ public class MainActivity extends Activity {
     });
     request("GET", "/api/admin/users", null, data -> {
       JSONArray users = data.optJSONArray("users");
-      content.addView(label("Thành viên gần đây", 22, TEXT));
+      content.addView(label("Thành viên gần đây", 19, TEXT));
       for (int i = 0; users != null && i < users.length(); i++) {
         JSONObject u = users.optJSONObject(i);
         LinearLayout c = card();
@@ -4575,7 +4575,7 @@ public class MainActivity extends Activity {
     content.addView(box);
     request("GET", "/api/admin/password-resets", null, d -> {
       JSONArray rows = d.optJSONArray("requests");
-      box.addView(label("Yêu cầu quên mật khẩu", 20, TEXT));
+      box.addView(label("Yêu cầu quên mật khẩu", 18, TEXT));
       int open = 0;
       for (int i = 0; rows != null && i < rows.length(); i++) {
         final JSONObject r = rows.optJSONObject(i);
@@ -4607,7 +4607,7 @@ public class MainActivity extends Activity {
     content.addView(box);
     api.call("GET", "/api/music", null, (d, e, s) -> {
       if (isDestroyed()) return;
-      box.addView(label("Thư viện nhạc", 20, TEXT));
+      box.addView(label("Thư viện nhạc", 18, TEXT));
       JSONArray tracks = d == null ? null : d.optJSONArray("tracks");
       if (tracks == null || tracks.length() == 0) box.addView(label("Chưa có bài nào.", 14, MUTED));
       for (int i = 0; tracks != null && i < tracks.length(); i++) {
