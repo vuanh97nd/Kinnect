@@ -30,7 +30,7 @@ import org.json.*;
 public final class StudioActivity extends Activity implements Choreographer.FrameCallback {
   static final String EXTRA_VIDEO = "video", EXTRA_STORY = "story", EXTRA_PHOTO = "photo", EXTRA_IMAGE = "image", EXTRA_ACTION = "action", EXTRA_MODE = "mode";
   private static final int W = 720, H = 1280, FW = 540, FH = 960, PW = 1080, PH = 1920;
-  private static final int ACCENT = 0xff8b6dff, PINK = 0xffff4f9a;
+  private static final int ACCENT = 0xff7652e8, PINK = 0xffff4f9a;
 
   private final FxEngine fx = new FxEngine();
   private FrameLayout root, stage, panelHost, reviewLayer;
@@ -864,7 +864,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     bar.addView(storyBtn, mid);
     TextView post = text("Đăng bài", 15, 0xffffffff, true);
     post.setGravity(Gravity.CENTER);
-    GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { 0xff6d4aff, PINK });
+    GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { 0xff6c47e0, PINK });
     g.setCornerRadius(dp(999));
     post.setBackground(g);
     post.setOnClickListener(v -> deliverPhoto("post"));
@@ -1011,7 +1011,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     final android.app.Dialog dialog = new android.app.Dialog(this);
     dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
     final boolean dark = (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
-    final int bg = dark ? 0xff242526 : 0xffffffff, ink = dark ? 0xffe4e6eb : 0xff1c1e21, muted = dark ? 0xffb0b3b8 : 0xff65676b, soft = dark ? 0xff3a3b3c : 0xfff0f2f5, on = dark ? 0xff2e2752 : 0xfff1edff;
+    final int bg = dark ? 0xff222128 : 0xffffffff, ink = dark ? 0xffeeeaf7 : 0xff1f1d2b, muted = dark ? 0xffaaa4b8 : 0xff6a6478, soft = dark ? 0xff302d39 : 0xfff6f5fa, on = dark ? 0xff302642 : 0xfff1edff;
     LinearLayout sheet = new LinearLayout(this);
     sheet.setOrientation(LinearLayout.VERTICAL);
     GradientDrawable shape = new GradientDrawable();
@@ -1079,7 +1079,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     TextView use = plain("Dùng bài này", 15, 0xffffffff, true);
     use.setGravity(Gravity.CENTER);
     use.setPadding(dp(20), 0, dp(20), 0);
-    GradientDrawable ug = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { 0xff6d4aff, PINK });
+    GradientDrawable ug = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { 0xff6c47e0, PINK });
     ug.setCornerRadius(dp(999));
     use.setBackground(ug);
     bar.addView(use, new LinearLayout.LayoutParams(-2, dp(44)));
@@ -1093,9 +1093,9 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         tabs.removeAllViews();
         for (final String[] t : new String[][] { { "lib", "Thư viện" }, { "own", "Nhạc của bạn" } }) {
           boolean active = t[0].equals(tab[0]);
-          TextView b = plain(t[1], 14, active ? 0xff6d4aff : ink, true);
+          TextView b = plain(t[1], 14, active ? 0xff6c47e0 : ink, true);
           b.setPadding(dp(14), dp(7), dp(14), dp(7));
-          b.setBackground(round(active ? (dark ? 0xff2e2752 : 0xffe7e1ff) : soft, 999));
+          b.setBackground(round(active ? (dark ? 0xff302642 : 0xffe7e1ff) : soft, 999));
           b.setOnClickListener(v -> { tab[0] = t[0]; shown[0] = 60; run(); render[0].run(); });
           LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
           lp.rightMargin = dp(6);
@@ -1116,9 +1116,9 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         LinearLayout up = new LinearLayout(this);
         up.setGravity(Gravity.CENTER_VERTICAL);
         up.setPadding(dp(8), dp(8), dp(8), dp(8));
-        TextView art = plain("＋", 26, 0xff6d4aff, true);
+        TextView art = plain("＋", 26, 0xff6c47e0, true);
         art.setGravity(Gravity.CENTER);
-        art.setBackground(round(dark ? 0xff2e2752 : 0xffe7e1ff, 10));
+        art.setBackground(round(dark ? 0xff302642 : 0xffe7e1ff, 10));
         up.addView(art, new LinearLayout.LayoutParams(dp(52), dp(52)));
         LinearLayout meta = new LinearLayout(this);
         meta.setOrientation(LinearLayout.VERTICAL);
@@ -1170,7 +1170,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         meta.addView(st);
         row.addView(meta, new LinearLayout.LayoutParams(0, -2, 1));
         FrameLayout play = new FrameLayout(this);
-        play.setBackground(round(sel ? 0xff6d4aff : soft, 999));
+        play.setBackground(round(sel ? 0xff6c47e0 : soft, 999));
         TextView glyph = plain(url.equals(playing[0]) ? "❚❚" : "▶", 13, sel ? 0xffffffff : ink, true);
         glyph.setGravity(Gravity.CENTER);
         play.addView(glyph, new FrameLayout.LayoutParams(-1, -1));
@@ -1323,7 +1323,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
       p.setColor(0x66ffffff);
       c.drawCircle(cx, cy, r - stroke / 2, p);
       if (rec) {
-        p.setShader(new SweepGradient(cx, cy, new int[] { 0xff8b6dff, 0xffff4f9a, 0xff8b6dff }, null));
+        p.setShader(new SweepGradient(cx, cy, new int[] { 0xff7652e8, 0xffff4f9a, 0xff7652e8 }, null));
         c.drawArc(new RectF(stroke / 2, stroke / 2, w - stroke / 2, h - stroke / 2), -90, 360 * progress, false, p);
         p.setShader(null);
       } else if (mode.equals("photo")) {

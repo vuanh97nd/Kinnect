@@ -1,13 +1,18 @@
 """Build the native Android APK with verified toolchain prepared in work/android-tools."""
 from pathlib import Path
-import subprocess,zipfile,os,hashlib
+import subprocess,zipfile,os,hashlib,shutil
 root=Path(__file__).resolve().parent.parent
 os.chdir(root)
 tools=root/'work/android-tools';jdk=next((tools/'jdk').glob('jdk-*'))/'bin';build=tools/'build-tools/android-15';platform=tools/'platform/android-35-ext15/android.jar';deps=tools/'deps'
 import re
 version=re.search(r'versionName="([^"]+)"',Path('android/app/src/main/AndroidManifest.xml').read_text(encoding='utf-8')).group(1)
 def run(*args):subprocess.run([str(a) for a in args],check=True)
-for p in ['android/build/classes','android/build/dex','dist']:Path(p).mkdir(parents=True,exist_ok=True)
+for folder in ['android/build/classes','android/build/dex']:
+ target=(root/folder).resolve()
+ if not target.is_relative_to((root/'android/build').resolve()):raise ValueError('Build path escapes android/build')
+ if target.exists():shutil.rmtree(target)
+ target.mkdir(parents=True)
+Path('dist').mkdir(exist_ok=True)
 run(build/'aapt2.exe','compile','--dir','android/app/src/main/res','-o','android/build/resources.zip')
 run(build/'aapt2.exe','link','-R','android/build/resources.zip','-I',platform,'--manifest','android/app/src/main/AndroidManifest.xml','-o','android/build/unsigned.apk')
 jars=[deps/'webrtc/classes.jar',deps/'okhttp.jar',deps/'okio.jar']

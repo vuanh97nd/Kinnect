@@ -36,7 +36,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
 
   private GradientDrawable round(int color, int r) { GradientDrawable d = new GradientDrawable(); d.setColor(color); d.setCornerRadius(dp(r)); return d; }
 
-  private GradientDrawable gradient(int r) { GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { 0xff6d4aff, 0xffff4f9a }); d.setCornerRadius(dp(r)); return d; }
+  private GradientDrawable gradient(int r) { GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { 0xff6c47e0, 0xff6c47e0 }); d.setCornerRadius(dp(r)); return d; }
 
   private TextView text(String s, int size, int color) { TextView v = new TextView(this); v.setText(s); v.setTextSize(size); v.setTextColor(color); return v; }
 
@@ -74,8 +74,8 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     boolean dark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
     setTheme(dark ? android.R.style.Theme_Material_NoActionBar : android.R.style.Theme_Material_Light_NoActionBar);
     super.onCreate(state);
-    BG = dark ? 0xff18191a : 0xfff0f2f5; CARD = dark ? 0xff242526 : 0xffffffff; TEXT = dark ? 0xffe4e6eb : 0xff1c1e21;
-    MUTED = dark ? 0xffb0b3b8 : 0xff65676b; ACCENT = dark ? 0xff8b6dff : 0xff6d4aff; SOFT = dark ? 0xff3a3b3c : 0xfff2f3f5; LINE = dark ? 0xff3a3b3c : 0xffe4e6eb;
+    BG = dark ? 0xff151419 : 0xfff6f5fa; CARD = dark ? 0xff222128 : 0xffffffff; TEXT = dark ? 0xffeeeaf7 : 0xff1f1d2b;
+    MUTED = dark ? 0xffaaa4b8 : 0xff6a6478; ACCENT = dark ? 0xff7652e8 : 0xff6c47e0; SOFT = dark ? 0xff302d39 : 0xffefedf5; LINE = dark ? 0xff302d39 : 0xffeeeaf7;
     getWindow().setStatusBarColor(CARD);
     getWindow().setNavigationBarColor(CARD);
     if (!dark) getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);

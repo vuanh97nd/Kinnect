@@ -42,18 +42,18 @@ public class MainActivity extends Activity {
 
   private void palette() {
     boolean dark = (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
-    BG = dark ? 0xff18191a : 0xfff0f2f5;
-    CARD = dark ? 0xff242526 : 0xffffffff;
-    TEXT = dark ? 0xffe4e6eb : 0xff1c1e21;
-    MUTED = dark ? 0xffb0b3b8 : 0xff65676b;
-    ACCENT = dark ? 0xff8b6dff : 0xff6d4aff;
-    SOFT = dark ? 0xff3a3b3c : 0xfff2f3f5;
-    LINE = dark ? 0xff3a3b3c : 0xffe4e6eb;
-    PRIMARY_SOFT = dark ? 0xff2e2752 : 0xffece8ff;
+    BG = dark ? 0xff151419 : 0xfff6f5fa;
+    CARD = dark ? 0xff222128 : 0xffffffff;
+    TEXT = dark ? 0xffeeeaf7 : 0xff1f1d2b;
+    MUTED = dark ? 0xffaaa4b8 : 0xff6a6478;
+    ACCENT = dark ? 0xff7652e8 : 0xff6c47e0;
+    SOFT = dark ? 0xff302d39 : 0xffefedf5;
+    LINE = dark ? 0xff302d39 : 0xffeeeaf7;
+    PRIMARY_SOFT = dark ? 0xff302642 : 0xffeee8fc;
   }
 
   private GradientDrawable gradient(int radius) {
-    GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { 0xff6d4aff, PINK });
+    GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { ACCENT, ACCENT });
     d.setCornerRadius(dp(radius));
     return d;
   }
@@ -220,7 +220,7 @@ public class MainActivity extends Activity {
     toolbar.addView(logo, new LinearLayout.LayoutParams(dp(34), dp(34)));
     TextView brand = label("Kinnect", 21, ACCENT);
     brand.setTypeface(null, Typeface.BOLD);
-    brand.getPaint().setShader(new LinearGradient(0, 0, dp(90), 0, 0xff6d4aff, PINK, Shader.TileMode.CLAMP));
+    brand.setTextColor(ACCENT);
     brand.setPadding(dp(8), 0, 0, 0);
     toolbar.addView(brand, new LinearLayout.LayoutParams(0, -2, 1));
     if (me != null && navigation) {
@@ -260,7 +260,9 @@ public class MainActivity extends Activity {
     content = column();
     content.setPadding(dp(12), dp(10), dp(12), dp(18));
     scroll.addView(content);
-    root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+    LinearLayout.LayoutParams viewport = new LinearLayout.LayoutParams(Math.min(getResources().getDisplayMetrics().widthPixels, dp(720)), 0, 1);
+    viewport.gravity = Gravity.CENTER_HORIZONTAL;
+    root.addView(scroll, viewport);
     headActions = null;
     if (navigation && me != null && !title.isEmpty()) {
       LinearLayout head = row();
@@ -279,7 +281,7 @@ public class MainActivity extends Activity {
       root.addView(top, new LinearLayout.LayoutParams(-1, 1));
       bottom = row();
       bottom.setBackgroundColor(CARD);
-      String[][] items = { { "feed", "feed", "Bảng tin" }, { "discover", "discover", "Khám phá" }, { "create", "plus", "Quay video" }, { "shorts", "shorts", "Video" }, { "profile", "profile", "Hồ sơ" } };
+      String[][] items = { { "feed", "feed", "Bảng tin" }, { "discover", "discover", "Khám phá" }, { "create", "plus", "Quay video" }, { "shorts", "shorts", "Video" }, { "live", "live", "Trực tiếp" } };
       for (final String[] it : items) {
         if (it[0].equals("create")) {
           FrameLayout holder = new FrameLayout(this);
@@ -357,7 +359,8 @@ public class MainActivity extends Activity {
     if (me == null || System.currentTimeMillis() - badgesAt < 20000) return;
     badgesAt = System.currentTimeMillis();
     api.call("GET", "/api/notifications", null, (d, e, s) -> {
-      JSONArray rows = d == null ? null : d.optJSONArray("notifications");
+      if (e != null || d == null) return;
+      JSONArray rows = d.optJSONArray("notifications");
       int inbox = 0, bell = 0;
       for (int i = 0; rows != null && i < rows.length(); i++) {
         JSONObject n = rows.optJSONObject(i);
@@ -422,13 +425,14 @@ public class MainActivity extends Activity {
 
 
   private void meMenu() {
-    final List<String> labels = new ArrayList<>(Arrays.asList("Trang cá nhân", "Cài đặt tài khoản", "Đổi mật khẩu", "Kiểm tra cập nhật APK"));
+    final List<String> labels = new ArrayList<>(Arrays.asList("Trang cá nhân", "Bạn bè", "Cài đặt tài khoản", "Đổi mật khẩu", "Kiểm tra cập nhật APK"));
     final boolean admin = me != null && me.optString("role").equals("admin");
     if (admin) labels.add("Quản trị");
     labels.add("Đăng xuất");
     new Sheet(this).setTitle(me.optString("name") + " · @" + me.optString("username")).setItems(labels.toArray(new String[0]), (d, w) -> {
       String pick = labels.get(w);
       if (pick.equals("Trang cá nhân")) navigate("profile");
+      else if (pick.equals("Bạn bè")) friendsScreen("friends");
       else if (pick.equals("Cài đặt tài khoản")) settings();
       else if (pick.equals("Đổi mật khẩu")) changePassword();
       else if (pick.equals("Kiểm tra cập nhật APK")) ApkUpdates.check(this);
@@ -682,7 +686,7 @@ public class MainActivity extends Activity {
     LinearLayout box = card();
     box.setPadding(dp(12), dp(10), dp(12), dp(12));
     LinearLayout chipsRow = row();
-    String[][] sorts = { { "near", "Gần đây" }, { "new", "Mới" }, { "active", "Đang online" }, { "interests", "Hợp gu" } };
+    String[][] sorts = { { "interests", "Dành cho bạn" }, { "near", "Quanh đây" }, { "following", "Đang theo dõi" }, { "new", "Mới" }, { "active", "Đang online" } };
     for (final String[] item : sorts) chipsRow.addView(webChip(item[1], discoverSort.equals(item[0]), false, () -> {
       discoverSort = item[0];
       if (item[0].equals("near") && !hasLocation) { silentLocate = false; say("Đang lấy vị trí gần đúng…"); requestLocation(); return; }
@@ -728,7 +732,7 @@ public class MainActivity extends Activity {
     LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
     lp.topMargin = dp(10);
     box.addView(loc, lp);
-    content.addView(sectionLabel(discoverSort.equals("near") ? "Quanh bạn" : discoverSort.equals("active") ? "Đang online" : discoverSort.equals("interests") ? "Hợp gu với bạn" : "Mới tham gia"));
+    content.addView(sectionLabel(discoverSort.equals("near") ? "Quanh bạn" : discoverSort.equals("active") ? "Đang online" : discoverSort.equals("interests") ? "Dành cho bạn" : discoverSort.equals("following") ? "Đang theo dõi" : "Mới tham gia"));
     loadPeople("", nearby);
   }
 
@@ -739,10 +743,10 @@ public class MainActivity extends Activity {
     people = column();
     content.addView(people);
     final LinearLayout list = people;
-    request("GET", "/api/discover?q=" + encode(query) + (nearby ? "&nearby=1" : "") + "&sort=" + (discoverSort.equals("near") ? "new" : discoverSort), null, data -> {
+    request("GET", "/api/discover?q=" + encode(query) + (nearby ? "&nearby=1" : "") + "&sort=" + (discoverSort.equals("near") ? "new" : discoverSort.equals("following") ? "interests&following=1" : discoverSort), null, data -> {
       JSONArray users = data.optJSONArray("users");
       if (users == null || users.length() == 0) {
-        TextView empty = label("🔎\nChưa tìm thấy ai\nThử từ khoá khác hoặc bổ sung sở thích cho hồ sơ.", 14, MUTED);
+        TextView empty = label("🔎\nChưa tìm thấy ai\nThử tìm theo tên hoặc tên tài khoản.", 14, MUTED);
         empty.setGravity(Gravity.CENTER);
         empty.setPadding(0, dp(40), 0, 0);
         list.addView(empty);
@@ -750,73 +754,49 @@ public class MainActivity extends Activity {
       }
       LinearLayout line = null;
       for (int i = 0; i < users.length(); i++) {
-        if (i % 2 == 0) { line = row(); line.setGravity(Gravity.TOP); list.addView(line); }
+        if (i % 3 == 0) { line = row(); line.setGravity(Gravity.TOP); list.addView(line); }
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, -2, 1);
-        p.setMargins(i % 2 == 0 ? 0 : dp(5), 0, i % 2 == 0 ? dp(5) : 0, dp(10));
+        p.setMargins(i % 3 == 0 ? 0 : dp(3), 0, i % 3 == 2 ? 0 : dp(3), dp(8));
         line.addView(personTile(users.optJSONObject(i)), p);
       }
-      if (users.length() % 2 == 1) line.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
+      for (int pad = users.length() % 3; pad > 0 && pad < 3; pad++) line.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
     });
   }
 
-  // Thẻ người dùng như web: ảnh/nền màu, nhãn Online/Mới, tên đè lên ảnh, hai nút theo dõi · nhắn tin.
+  // Compact three-column discovery, with accessible icon-only actions.
   private LinearLayout personTile(final JSONObject u) {
     LinearLayout c = column();
-    GradientDrawable g = background(CARD, 16);
-    g.setStroke(1, LINE);
-    c.setBackground(g);
-    c.setClipToOutline(true);
-    FrameLayout photo = new FrameLayout(this);
-    float hue = Math.abs(u.optString("id").hashCode()) % 360;
-    photo.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { Color.HSVToColor(new float[] { hue, 0.7f, 0.75f }), Color.HSVToColor(new float[] { (hue + 40) % 360, 0.8f, 0.55f }) }));
-    TextView letter = label(u.optString("name", "?").isEmpty() ? "?" : u.optString("name").substring(0, 1).toUpperCase(Locale.ROOT), 40, 0xddffffff);
-    letter.setTypeface(null, Typeface.BOLD);
-    letter.setGravity(Gravity.CENTER);
-    photo.addView(letter, new FrameLayout.LayoutParams(-1, -1));
-    final ImageView img = new ImageView(this);
-    img.setScaleType(ImageView.ScaleType.CENTER_CROP);
-    photo.addView(img, new FrameLayout.LayoutParams(-1, -1));
-    loadAvatarInto(u, img);
-    View shade = new View(this);
-    shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x00000000, 0x99000000 }));
-    photo.addView(shade, new FrameLayout.LayoutParams(-1, dp(70), Gravity.BOTTOM));
-    LinearLayout badges = row();
-    if (u.optBoolean("isActive")) badges.addView(tag("● Online", 0xff16a34a));
-    if (u.optBoolean("isNew")) badges.addView(tag("Mới", ACCENT));
-    FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.START);
-    bp.setMargins(dp(8), dp(8), 0, 0);
-    photo.addView(badges, bp);
-    LinearLayout who = column();
-    TextView n = label(u.optString("name"), 15, WHITE);
-    n.setTypeface(null, Typeface.BOLD);
-    n.setSingleLine(true);
-    n.setPadding(0, 0, 0, 0);
-    who.addView(n);
-    TextView h = label(u.optString("distanceBand", "@" + u.optString("username")), 11, 0xddffffff);
-    h.setPadding(0, 0, 0, 0);
-    who.addView(h);
-    FrameLayout.LayoutParams wp = new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
-    wp.setMargins(dp(10), 0, dp(10), dp(8));
-    photo.addView(who, wp);
+    c.setGravity(Gravity.CENTER_HORIZONTAL);
+    c.setPadding(dp(6), dp(12), dp(6), dp(8));
+    GradientDrawable shape = background(CARD, 14);
+    shape.setStroke(1, LINE);
+    c.setBackground(shape);
+    LinearLayout photo = row();
+    photo.setGravity(Gravity.CENTER);
+    avatar(u, photo, 36);
+    photo.setContentDescription("Xem hồ sơ " + u.optString("name"));
     photo.setOnClickListener(v -> person(u));
-    c.addView(photo, new LinearLayout.LayoutParams(-1, dp(150)));
-    LinearLayout acts = row();
-    acts.setPadding(dp(6), dp(6), dp(6), dp(6));
-    FrameLayout follow = new FrameLayout(this);
-    follow.setBackground(background(u.optBoolean("following") ? SOFT : ACCENT, 10));
-    follow.addView(icon("person_add", 20, u.optBoolean("following") ? TEXT : WHITE), new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
-    follow.setContentDescription(u.optBoolean("following") ? "Bỏ theo dõi" : "Theo dõi");
-    follow.setOnClickListener(v -> request(u.optBoolean("following") ? "DELETE" : "POST", "/api/users/" + u.optString("id") + "/follow", json(), d -> { say(u.optBoolean("following") ? "Đã bỏ theo dõi." : "Đã theo dõi " + u.optString("name") + "."); navigate("discover"); }));
-    acts.addView(follow, new LinearLayout.LayoutParams(0, dp(40), 1));
-    FrameLayout msg = new FrameLayout(this);
-    msg.setBackground(background(SOFT, 10));
-    msg.addView(icon("comment", 20, TEXT), new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
-    msg.setContentDescription("Nhắn tin");
-    msg.setOnClickListener(v -> chat(u));
-    LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(0, dp(40), 1);
-    mp.leftMargin = dp(6);
-    acts.addView(msg, mp);
-    c.addView(acts);
+    c.addView(photo, new LinearLayout.LayoutParams(-1, dp(44)));
+    TextView name = label(u.optString("name"), 11, TEXT);
+    name.setTypeface(null, Typeface.BOLD);
+    name.setGravity(Gravity.CENTER);
+    name.setMaxLines(2);
+    name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+    c.addView(name, new LinearLayout.LayoutParams(-1, dp(38)));
+    TextView username = label("@" + u.optString("username"), 10, MUTED);
+    username.setSingleLine(true);
+    username.setEllipsize(android.text.TextUtils.TruncateAt.END);
+    username.setGravity(Gravity.CENTER);
+    c.addView(username, new LinearLayout.LayoutParams(-1, dp(24)));
+    LinearLayout actions = row();
+    actions.setGravity(Gravity.CENTER);
+    String state = u.optString("friendship");
+    if (state.equals("friends")) actions.addView(softIconButton("message", "Nhắn tin", () -> chat(u)));
+    else if (state.equals("incoming")) actions.addView(softIconButton("check", "Chấp nhận kết bạn", () -> request("POST", "/api/users/" + u.optString("id") + "/friend-request/respond", json("action", "accept"), d -> navigate("discover"))));
+    else actions.addView(softIconButton(state.equals("outgoing") ? "close" : "person_add", state.equals("outgoing") ? "Huỷ lời mời" : "Kết bạn", () -> request(state.equals("outgoing") ? "DELETE" : "POST", "/api/users/" + u.optString("id") + "/friend-request", json(), d -> navigate("discover"))));
+    actions.addView(softIconButton("profile", "Xem hồ sơ", () -> person(u)));
+    for (int i = 0; i < actions.getChildCount(); i++) actions.getChildAt(i).setLayoutParams(new LinearLayout.LayoutParams(0, dp(44), 1));
+    c.addView(actions, new LinearLayout.LayoutParams(-1, dp(44)));
     return c;
   }
 
@@ -1132,7 +1112,7 @@ public class MainActivity extends Activity {
       face.addView(h);
     } else {
       FrameLayout g = new FrameLayout(this);
-      GradientDrawable o = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { 0xff6d4aff, PINK });
+      GradientDrawable o = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { ACCENT, ACCENT });
       o.setShape(GradientDrawable.OVAL);
       g.setBackground(o);
       g.addView(icon("profile", 24, WHITE), new FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER));
@@ -1202,7 +1182,7 @@ public class MainActivity extends Activity {
     FrameLayout top = new FrameLayout(this);
     final ImageView cover = new ImageView(this);
     cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
-    cover.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[] { PRIMARY_SOFT, BG == 0xfff0f2f5 ? 0xfff6e9f6 : 0xff3a2742 }));
+    cover.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[] { PRIMARY_SOFT, BG == 0xfff6f5fa ? 0xfff6e9f6 : 0xff3a2742 }));
     top.addView(cover, new FrameLayout.LayoutParams(-1, dp(100)));
     if (!u.isNull("cover") && !u.optString("cover").isEmpty()) api.image(u.optString("cover"), bytes -> {
       if (bytes == null || isDestroyed()) return;
@@ -1447,7 +1427,7 @@ public class MainActivity extends Activity {
         empty.setPadding(0, dp(60), 0, 0);
         content.addView(empty);
       }
-      request("POST", "/api/notifications", json(), d -> {});
+      request("POST", "/api/notifications", json(), d -> { badgesAt = 0; refreshBadges(); });
     });
   }
 
@@ -1551,7 +1531,44 @@ public class MainActivity extends Activity {
   }
 
   private void settings() {
-    new Sheet(this).setTitle("Cài đặt tài khoản").setItems(new String[]{"Kiểm tra cập nhật APK", "Đổi mật khẩu", "Thông báo", "Người đã chặn", "Đổi máy chủ", "Đóng"},(d,w)->{if(w==0)ApkUpdates.check(this);if(w==1)changePassword();if(w==2&&me!=null)notifications();if(w==3&&me!=null)blocks();if(w==4)serverSettings();}).show();
+    if (me == null) { serverSettings(); return; }
+    shell("", true);
+    content.addView(button("‹  Quay lại", () -> navigate("profile")));
+    content.addView(sectionLabel("Cài đặt và quyền riêng tư"));
+    LinearLayout account = card();
+    account.addView(button("Bảo mật và đăng nhập", () -> changePassword()));
+    account.addView(button("Thông báo", () -> notifications()));
+    account.addView(button("Người đã chặn", () -> blocks()));
+    account.addView(button("Kiểm tra cập nhật APK", () -> ApkUpdates.check(this)));
+    account.addView(button("Đổi máy chủ", () -> serverSettings()));
+  }
+
+  private void friendsScreen(final String selected) {
+    shell("Bạn bè", true);
+    LinearLayout tabs = row();
+    String[][] options = { { "friends", "Bạn bè" }, { "incoming", "Lời mời" }, { "outgoing", "Đã gửi" } };
+    for (String[] option : options) tabs.addView(webChip(option[1], selected.equals(option[0]), false, () -> friendsScreen(option[0])));
+    content.addView(hscroll(tabs));
+    request("GET", selected.equals("friends") ? "/api/friends" : "/api/friend-requests", null, data -> {
+      JSONArray users = data.optJSONArray(selected.equals("friends") ? "users" : selected);
+      if (users == null || users.length() == 0) content.addView(label("Chưa có " + (selected.equals("friends") ? "bạn bè" : selected.equals("incoming") ? "lời mời kết bạn" : "lời mời đã gửi") + ".", 14, MUTED));
+      for (int i = 0; users != null && i < users.length(); i++) {
+        final JSONObject user = users.optJSONObject(i);
+        LinearLayout card = card(), identity = row();
+        avatar(user, identity, 40);
+        TextView name = label(user.optString("name"), 14, TEXT);
+        name.setPadding(dp(10), 0, dp(6), 0);
+        name.setMaxLines(2);
+        identity.addView(name, new LinearLayout.LayoutParams(0, -2, 1));
+        identity.setOnClickListener(v -> person(user));
+        card.addView(identity);
+        LinearLayout actions = row();
+        if (selected.equals("friends")) actions.addView(button("Nhắn tin", () -> chat(user)));
+        else if (selected.equals("outgoing")) actions.addView(button("Huỷ lời mời", () -> request("DELETE", "/api/users/" + user.optString("id") + "/friend-request", json(), d -> friendsScreen(selected))));
+        else for (String action : new String[] { "accept", "decline" }) actions.addView(button(action.equals("accept") ? "Chấp nhận" : "Từ chối", () -> request("POST", "/api/users/" + user.optString("id") + "/friend-request/respond", json("action", action), d -> friendsScreen(selected))));
+        card.addView(actions);
+      }
+    });
   }
 
   private void serverSettings() {
@@ -1615,6 +1632,24 @@ public class MainActivity extends Activity {
     return stage;
   }
 
+  private int findShort(String id) {
+    for (int i = 0; shortRows != null && i < shortRows.length(); i++) if (shortRows.optJSONObject(i).optString("id").equals(id)) return i;
+    return shortIndex;
+  }
+
+  private JSONArray orderedShorts(JSONArray source) {
+    if (source == null || shortsFollowing) return source;
+    List<JSONObject> rows = new ArrayList<>();
+    for (int i = 0; i < source.length(); i++) if (source.optJSONObject(i) != null) rows.add(source.optJSONObject(i));
+    Collections.sort(rows, (a, b) -> {
+      int score = Long.compare(VideoFeedPolicy.score(b.optLong("likes"), b.optLong("comments")), VideoFeedPolicy.score(a.optLong("likes"), a.optLong("comments")));
+      if (score != 0) return score;
+      int date = Long.compare(b.optLong("created"), a.optLong("created"));
+      return date != 0 ? date : a.optString("id").compareTo(b.optString("id"));
+    });
+    return new JSONArray(rows);
+  }
+
   private void shorts() {
     shortsFollowing = shortsTab.equals("following");
     final FrameLayout stage = reelStage();
@@ -1623,7 +1658,7 @@ public class MainActivity extends Activity {
     stage.addView(loading, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
     stage.addView(reelTabs(), new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
     request("GET", shortsFollowing ? "/api/shorts?feed=following" : "/api/shorts", null, data -> {
-      shortRows = data.optJSONArray("shorts");
+      shortRows = orderedShorts(data.optJSONArray("shorts"));
       if (shortRows == null || shortRows.length() == 0) {
         stage.removeView(loading);
         LinearLayout empty = column();
@@ -1682,9 +1717,9 @@ public class MainActivity extends Activity {
         list.addView(head);
         LinearLayout line = null;
         for (int i = 0; i < rooms.length(); i++) {
-          if (i % 2 == 0) { line = row(); list.addView(line); }
+          if (i % 3 == 0) { line = row(); list.addView(line); }
           LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(250), 1);
-          lp.setMargins(i % 2 == 0 ? 0 : dp(5), 0, i % 2 == 0 ? dp(5) : 0, dp(10));
+          lp.setMargins(i % 3 == 0 ? 0 : dp(3), 0, i % 3 == 2 ? 0 : dp(3), dp(8));
           line.addView(liveCard(rooms.optJSONObject(i)), lp);
         }
         if (rooms.length() % 2 == 1) line.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
@@ -1750,7 +1785,7 @@ public class MainActivity extends Activity {
 
   private void showShort(int index) {
     if (shortRows == null || shortRows.length() == 0) return;
-    shortIndex = Math.max(0, Math.min(index, shortRows.length() - 1));
+    shortIndex = VideoFeedPolicy.index(index, shortRows.length(), !shortsFollowing);
     shell("Video ngắn", true);
     final JSONObject item = shortRows.optJSONObject(shortIndex), author = item.optJSONObject("author");
     // Video dọc toàn màn hình như web: nền đen, nút bên phải, tên + chú thích ở dưới.
@@ -1790,7 +1825,7 @@ public class MainActivity extends Activity {
     face.setOnClickListener(v -> person(author));
     side.addView(reelButton("heart", String.valueOf(item.optInt("likes")), item.optBoolean("liked") ? PINK : WHITE, () ->
       request(item.optBoolean("liked") ? "DELETE" : "POST", "/api/shorts/" + item.optString("id") + "/like", json(), d ->
-        request("GET", shortsFollowing ? "/api/shorts?feed=following" : "/api/shorts", null, result -> { shortRows = result.optJSONArray("shorts"); showShort(shortIndex); }))));
+        request("GET", shortsFollowing ? "/api/shorts?feed=following" : "/api/shorts", null, result -> { shortRows = orderedShorts(result.optJSONArray("shorts")); showShort(findShort(item.optString("id"))); }))));
     side.addView(reelButton("comment", item.has("comments") ? String.valueOf(item.optInt("comments")) : "0", WHITE, () -> shortComments(item)));
     side.addView(reelButton("share", "Chia sẻ", WHITE, () -> {
       Intent send = new Intent(Intent.ACTION_SEND);
@@ -2018,7 +2053,7 @@ public class MainActivity extends Activity {
       w.setDimAmount(0.25f);
       w.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
     }
-    dialog.setOnDismissListener(x -> request("GET", shortsFollowing ? "/api/shorts?feed=following" : "/api/shorts", null, res -> { if (res.optJSONArray("shorts") != null) shortRows = res.optJSONArray("shorts"); }));
+    dialog.setOnDismissListener(x -> request("GET", shortsFollowing ? "/api/shorts?feed=following" : "/api/shorts", null, res -> { if (res.optJSONArray("shorts") != null) shortRows = orderedShorts(res.optJSONArray("shorts")); }));
     dialog.show();
     load[0].run();
   }
@@ -2443,7 +2478,7 @@ public class MainActivity extends Activity {
 
 
   // ===================== Bổ sung cho bản Android đầy đủ =====================
-  private String discoverSort = "new", feedCategory = "community", attachTarget = "";
+  private String discoverSort = "interests", feedCategory = "community", attachTarget = "";
   private String pendingMedia;
   private Button attachButton;
   private JSONArray conversationUsers;
@@ -2920,7 +2955,7 @@ public class MainActivity extends Activity {
     LinearLayout b = column();
     b.setGravity(Gravity.CENTER_HORIZONTAL);
     FrameLayout ring = new FrameLayout(this);
-    GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { 0xff6d4aff, PINK });
+    GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { ACCENT, ACCENT });
     g.setShape(GradientDrawable.OVAL);
     ring.setBackground(g);
     ring.setPadding(dp(3), dp(3), dp(3), dp(3));
@@ -2978,7 +3013,7 @@ public class MainActivity extends Activity {
       stage.addView(img, new FrameLayout.LayoutParams(-1, -1));
       api.image(media.optString("url"), bytes -> { if (bytes != null && generation == screen) { Bitmap b = BitmapFactory.decodeByteArray(bytes, 0, bytes.length); if (b != null) img.setImageBitmap(b); } });
     } else {
-      stage.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { 0xff6d4aff, PINK }));
+      stage.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { ACCENT, ACCENT }));
     }
     if (!st.optString("body").isEmpty()) {
       TextView body = label(st.optString("body"), media == null ? 26 : 17, WHITE);
@@ -3054,7 +3089,7 @@ public class MainActivity extends Activity {
     }
     LinearLayout t = column();
     t.setPadding(dp(12), 0, 0, 0);
-    TextView n = label(title, 16, TEXT);
+    TextView n = label(title, 14, TEXT);
     n.setTypeface(null, unread > 0 ? Typeface.BOLD : Typeface.NORMAL);
     n.setSingleLine(true);
     TextView s2 = label(subtitle, 13, unread > 0 ? TEXT : MUTED);
@@ -3276,8 +3311,56 @@ public class MainActivity extends Activity {
     return names;
   }
 
+  private void forwardMessage(final String source, final JSONObject message) {
+    request("GET", "/api/conversations", null, conversations -> request("GET", "/api/groups", null, groups -> request("GET", "/api/friends", null, friends -> {
+      final List<String> names = new ArrayList<>(), paths = new ArrayList<>();
+      final Set<String> seen = new HashSet<>();
+      JSONArray[] sets = { conversations.optJSONArray("users"), groups.optJSONArray("groups"), friends.optJSONArray("users") };
+      for (int k = 0; k < sets.length; k++) for (int i = 0; sets[k] != null && i < sets[k].length(); i++) {
+        JSONObject target = sets[k].optJSONObject(i);
+        if (target == null) continue;
+        String path = k == 1 ? "/api/groups/" + target.optString("id") + "/messages" : "/api/users/" + target.optString("id") + "/messages";
+        if (seen.add(path)) { names.add((k == 1 ? "Nhóm · " : "") + target.optString("name")); paths.add(path); }
+      }
+      if (names.isEmpty()) { say("Chưa có bạn bè hoặc hội thoại để chuyển tiếp."); return; }
+      new Sheet(this).setTitle("Chuyển tiếp tin nhắn").setItems(names.toArray(new String[0]), (dialog, index) -> {
+        // Re-read the source so recalled/deleted messages cannot be forwarded from stale UI.
+        request("GET", source, null, data -> {
+          JSONArray rows = data.optJSONArray("messages");
+          JSONObject current = null;
+          for (int i = 0; rows != null && i < rows.length(); i++) if (rows.optJSONObject(i).optString("id").equals(message.optString("id"))) current = rows.optJSONObject(i);
+          if (current == null || current.optBoolean("recalled")) { say("Tin nhắn không còn khả dụng để chuyển tiếp."); return; }
+          final JSONObject payload = json("body", current.optString("body"));
+          final JSONObject file = current.optJSONObject("attachment");
+          Runnable send = () -> request("POST", paths.get(index), payload, sent -> say("Đã chuyển tiếp đến " + names.get(index)));
+          if (file == null) { send.run(); return; }
+          final int generation = screen;
+          api.image(file.optString("url"), bytes -> {
+            if (generation != screen || isDestroyed()) return;
+            if (bytes == null || bytes.length > 20 * 1024 * 1024) { say("Không tải được tệp hoặc tệp vượt quá 20 MB."); return; }
+            try { payload.put("attachment", json("name", file.optString("name"), "data", "data:" + file.optString("type", "application/octet-stream") + ";base64," + android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP))); }
+            catch (JSONException error) { say("Không thể chuẩn bị tệp đính kèm."); return; }
+            send.run();
+          });
+        });
+      }).setNegativeButton("Đóng", null).show();
+    })));
+  }
+
+  private View messageTool(String iconName, String description, int color, Runnable action) {
+    FrameLayout control = new FrameLayout(this);
+    control.addView(icon(iconName, 16, color), new FrameLayout.LayoutParams(dp(16), dp(16), Gravity.CENTER));
+    control.setContentDescription(description);
+    control.setOnClickListener(v -> action.run());
+    control.setLayoutParams(new LinearLayout.LayoutParams(dp(44), dp(44)));
+    return control;
+  }
+
   private void messageMenu(final String kind, final JSONObject m, boolean own, final Runnable refresh) {
-    if (m.optBoolean("recalled")) return;
+    if (m.optBoolean("recalled")) {
+      new Sheet(this).setItems(new String[] { "Xoá ở phía bạn" }, (d, w) -> request("DELETE", "/api/chat-messages/" + kind + "/" + m.optString("id"), json(), r -> refresh.run())).show();
+      return;
+    }
     final String base = "/api/chat-messages/" + kind + "/" + m.optString("id");
     final List<String> labels = new ArrayList<>();
     final List<Runnable> actions = new ArrayList<>();
@@ -3461,6 +3544,8 @@ public class MainActivity extends Activity {
   private void chatScreen(final JSONObject u, String title, String subtitle, final String path, final boolean group, final Runnable more, final Runnable reopen) {
     shell("", true);
     chatReload = reopen;
+    toolbar.setVisibility(View.GONE);
+    if (bottom != null) bottom.setVisibility(View.GONE);
     ScrollView scroll = (ScrollView) content.getParent();
     int at = root.indexOfChild(scroll);
     root.removeView(scroll);
@@ -3474,10 +3559,10 @@ public class MainActivity extends Activity {
     back.setContentDescription("Quay lại");
     back.setOnClickListener(v -> navigate("inbox"));
     head.addView(back, new LinearLayout.LayoutParams(dp(42), dp(42)));
-    if (u != null) avatar(u, head, 42);
+    if (u != null) avatar(u, head, 36);
     else {
       FrameLayout g = new FrameLayout(this);
-      GradientDrawable o = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { 0xff6d4aff, PINK });
+      GradientDrawable o = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { ACCENT, ACCENT });
       o.setShape(GradientDrawable.OVAL);
       g.setBackground(o);
       g.addView(icon("profile", 20, WHITE), new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
@@ -3485,12 +3570,12 @@ public class MainActivity extends Activity {
     }
     LinearLayout who = column();
     who.setPadding(dp(10), 0, 0, 0);
-    TextView n = label(title, 16, TEXT);
+    TextView n = label(title, 14, TEXT);
     n.setTypeface(null, Typeface.BOLD);
     n.setSingleLine(true);
     n.setPadding(0, 0, 0, 0);
     who.addView(n);
-    TextView st = label(subtitle, 12, MUTED);
+    TextView st = label(subtitle, 11, MUTED);
     st.setPadding(0, 0, 0, 0);
     who.addView(st);
     if (u != null) who.setOnClickListener(v -> person(u));
@@ -3506,7 +3591,7 @@ public class MainActivity extends Activity {
     box.addView(head);
     box.addView(divider());
     final ScrollView msgScroll = new ScrollView(this);
-    msgScroll.setBackgroundColor(BG == 0xfff0f2f5 ? 0xfff7f8fa : BG);
+    msgScroll.setBackgroundColor(BG == 0xfff6f5fa ? 0xfff7f8fa : BG);
     final LinearLayout list = column();
     list.setPadding(dp(12), dp(10), dp(12), dp(10));
     msgScroll.addView(list);
@@ -3610,8 +3695,8 @@ public class MainActivity extends Activity {
           bubble.addView(author);
         }
         final JSONObject file = m.optJSONObject("attachment");
-        if (file != null && file.optString("kind").equals("image")) mediaView(file, bubble);
-        else if (file != null) {
+        if (!m.optBoolean("recalled") && file != null && file.optString("kind").equals("image")) mediaView(file, bubble);
+        else if (!m.optBoolean("recalled") && file != null) {
           TextView f = label("📎 " + file.optString("name"), 15, own ? WHITE : TEXT);
           f.setOnClickListener(v -> openAttachment(file));
           bubble.addView(f);
@@ -3629,6 +3714,17 @@ public class MainActivity extends Activity {
         TextView time = label(clock.format(at) + (m.optBoolean("pinned") ? "  📌" : "") + (rx.length() > 0 ? "  " + rx : ""), 10, own ? 0xccffffff : MUTED);
         time.setPadding(0, dp(2), 0, 0);
         bubble.addView(time);
+        final String base = "/api/chat-messages/" + (group ? "group" : "direct") + "/" + m.optString("id");
+        final Runnable refresh = () -> { lastMessages = ""; loadChat(path, list, scroll, group, other); };
+        LinearLayout tools = row();
+        int toolColor = own ? 0xddffffff : MUTED;
+        if (!m.optBoolean("recalled")) {
+          tools.addView(messageTool("smile", "Cảm xúc tin nhắn", toolColor, () -> new Sheet(this).setItems(reactionGlyphs(), (d2, w) -> request("POST", base + "/reaction", json("reaction", REACTIONS[w][0]), result -> refresh.run())).show()));
+          tools.addView(messageTool("forward", "Chuyển tiếp tin nhắn", toolColor, () -> forwardMessage(path, m)));
+          if (own) tools.addView(messageTool("recall", "Thu hồi với mọi người", toolColor, () -> confirm("Thu hồi tin nhắn này?", () -> request("POST", base + "/recall", json(), result -> refresh.run()))));
+        }
+        tools.addView(messageTool("trash", "Xoá tin nhắn ở phía bạn", toolColor, () -> request("DELETE", base, json(), result -> refresh.run())));
+        bubble.addView(tools);
         bubble.setOnLongClickListener(v -> { messageMenu(group ? "group" : "direct", m, own, () -> { lastMessages = ""; loadChat(path, list, scroll, group, other); }); return true; });
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-2, -2);
         p.gravity = own ? Gravity.END : Gravity.START;
