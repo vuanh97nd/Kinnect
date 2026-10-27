@@ -84,7 +84,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   private ImageView icon(String name, int color) {
     ImageView v = new ImageView(this);
     int id = WebIcons.resolve(this, name);
-    if (id != 0) { android.graphics.drawable.Drawable d = getDrawable(id).mutate(); d.setTint(color); v.setImageDrawable(d); }
+    if (id != 0) { android.graphics.drawable.Drawable d = WebIcons.load(this, name); d.setTint(color); v.setImageDrawable(d); }
     return v;
   }
 
@@ -874,7 +874,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
 
   private android.graphics.drawable.Drawable tinted(String name) {
     int id = WebIcons.resolve(this, name);
-    android.graphics.drawable.Drawable d = getDrawable(id).mutate();
+    android.graphics.drawable.Drawable d = WebIcons.load(this, name);
     d.setTint(0xffffffff);
     d.setBounds(0, 0, dp(18), dp(18));
     return d;

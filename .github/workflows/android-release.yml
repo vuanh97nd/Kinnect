@@ -48,6 +48,9 @@ jobs:
             exit 1
           fi
           printf '%s' "$KEYSTORE_B64" | base64 -d > android/debug.keystore
+      - name: Parse all vectors with the AndroidX parser
+        if: steps.existing.outputs.prebuilt != 'true'
+        run: python3 scripts/test-native-vector-parser.py
       - name: Build and verify signed testing APK
         if: steps.existing.outputs.prebuilt != 'true'
         run: |

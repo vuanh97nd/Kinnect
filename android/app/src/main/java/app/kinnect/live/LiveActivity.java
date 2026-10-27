@@ -43,7 +43,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
   private ImageView icon(String name, int color) {
     ImageView v = new ImageView(this);
     int id = WebIcons.resolve(this, name);
-    if (id != 0) { android.graphics.drawable.Drawable d = getDrawable(id).mutate(); d.setTint(color); v.setImageDrawable(d); }
+    if (id != 0) { android.graphics.drawable.Drawable d = WebIcons.load(this, name); d.setTint(color); v.setImageDrawable(d); }
     return v;
   }
 

@@ -1,7 +1,7 @@
 name: Validate native Android
 on:
   pull_request:
-    paths: ['android/**', 'scripts/*android*', 'scripts/test-native-design.py', 'scripts/build-apk*', '.github/workflows/android-validation.yml']
+    paths: ['android/**', 'scripts/*android*', 'scripts/test-native-design.py', 'scripts/test-native-vector-parser.py', 'scripts/build-apk*', '.github/workflows/android-validation.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -23,6 +23,8 @@ jobs:
         run: bash scripts/prepare-android-tools.sh
       - name: Test native policies
         run: bash scripts/test-android-config.sh
+      - name: Parse all vectors with the AndroidX parser
+        run: python3 scripts/test-native-vector-parser.py
       - name: Build testing APK
         run: bash scripts/build-apk.sh
       - name: Check web design export and native-only APK

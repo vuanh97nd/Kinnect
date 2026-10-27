@@ -322,7 +322,7 @@ public class MainActivity extends Activity {
     ImageView v = new ImageView(this);
     int id = WebIcons.resolve(this, name);
     if (id != 0) {
-      android.graphics.drawable.Drawable d = getDrawable(id).mutate();
+      android.graphics.drawable.Drawable d = WebIcons.load(this, name);
       d.setTint(color);
       v.setImageDrawable(d);
     }

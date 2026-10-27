@@ -2,6 +2,13 @@ package app.kinnect.live;
 
 /** Native vector assets exported from the same SVG paths as the web. */
 final class WebIcons {
+  static android.graphics.drawable.Drawable load(android.content.Context context, String name) {
+    int preferred = resolve(context, name);
+    if (preferred != 0) try { return context.getDrawable(preferred).mutate(); } catch (RuntimeException invalidVector) { }
+    int legacy = context.getResources().getIdentifier("ic_" + name, "drawable", context.getPackageName());
+    if (legacy != 0 && legacy != preferred) try { return context.getDrawable(legacy).mutate(); } catch (RuntimeException invalidVector) { }
+    return new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT);
+  }
   static int resolve(android.content.Context context, String name) {
     String web = name;
     switch (name) {
