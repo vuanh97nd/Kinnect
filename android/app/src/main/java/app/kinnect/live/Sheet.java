@@ -26,12 +26,10 @@ final class Sheet {
 
   Sheet(Context context) {
     this.context = context;
-    boolean dark = (context.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
-    bg = dark ? 0xff222128 : 0xffffffff;
-    ink = dark ? 0xffeeeaf7 : 0xff1f1d2b;
-    muted = dark ? 0xffaaa4b8 : 0xff6a6478;
-    soft = dark ? 0xff302d39 : 0xffefedf5;
-    line = dark ? 0xff302d39 : 0xffeeeaf7;
+    boolean dark = WebTheme.isDark(context);
+    int variant = dark ? 1 : 0;
+    bg = WebDesign.CARD[variant]; ink = WebDesign.INK[variant]; muted = WebDesign.MUTED[variant];
+    soft = WebDesign.WASH[variant]; line = WebDesign.LINE[variant];
   }
 
   Sheet setTitle(CharSequence t) { title = t; return this; }
@@ -57,6 +55,7 @@ final class Sheet {
     TextView t = new TextView(context);
     t.setText(s);
     t.setTextSize(size);
+    t.setIncludeFontPadding(false);
     t.setTextColor(color);
     if (bold) t.setTypeface(null, Typeface.BOLD);
     return t;

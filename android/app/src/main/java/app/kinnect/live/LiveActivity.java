@@ -42,7 +42,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
 
   private ImageView icon(String name, int color) {
     ImageView v = new ImageView(this);
-    int id = getResources().getIdentifier("ic_" + name, "drawable", getPackageName());
+    int id = WebIcons.resolve(this, name);
     if (id != 0) { android.graphics.drawable.Drawable d = getDrawable(id).mutate(); d.setTint(color); v.setImageDrawable(d); }
     return v;
   }
@@ -71,11 +71,12 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
 
   @Override
   public void onCreate(Bundle state) {
-    boolean dark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+    boolean dark = WebTheme.isDark(this);
     setTheme(dark ? android.R.style.Theme_Material_NoActionBar : android.R.style.Theme_Material_Light_NoActionBar);
     super.onCreate(state);
-    BG = dark ? 0xff151419 : 0xfff6f5fa; CARD = dark ? 0xff222128 : 0xffffffff; TEXT = dark ? 0xffeeeaf7 : 0xff1f1d2b;
-    MUTED = dark ? 0xffaaa4b8 : 0xff6a6478; ACCENT = dark ? 0xff7652e8 : 0xff6c47e0; SOFT = dark ? 0xff302d39 : 0xffefedf5; LINE = dark ? 0xff302d39 : 0xffeeeaf7;
+    int variant = dark ? 1 : 0;
+    BG = WebDesign.BG[variant]; CARD = WebDesign.CARD[variant]; TEXT = WebDesign.INK[variant];
+    MUTED = WebDesign.MUTED[variant]; ACCENT = WebDesign.PURPLE[variant]; SOFT = WebDesign.WASH[variant]; LINE = WebDesign.LINE[variant];
     getWindow().setStatusBarColor(CARD);
     getWindow().setNavigationBarColor(CARD);
     if (!dark) getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);

@@ -1,0 +1,58 @@
+{
+  "reference": "https://app.kinnect.io.vn/",
+  "reviewed": "2026-10-27",
+  "css_sha256": "93902291a61b629fd166e966957ddcf8d6908aff7723b57e3a60eb899dffd42d",
+  "icons_sha256": "5f4c926b50da14054c4e91135aa0f51816ddf4508807d48e197b6c3d37b7361d",
+  "colors": {
+    "purple": [
+      "#6c47e0",
+      "#7652e8"
+    ],
+    "purple-ink": [
+      "#5b3fd6",
+      "#b9a4ff"
+    ],
+    "soft": [
+      "#f1ecff",
+      "#332a48"
+    ],
+    "bg": [
+      "#f6f5fa",
+      "#151419"
+    ],
+    "card": [
+      "#fff",
+      "#222128"
+    ],
+    "ink": [
+      "#1f1d2b",
+      "#f1eff7"
+    ],
+    "muted": [
+      "#6a6478",
+      "#b1aabd"
+    ],
+    "line": [
+      "#e4e0ec",
+      "#38333f"
+    ],
+    "wash": [
+      "#f4f1fa",
+      "#2c2833"
+    ],
+    "danger": [
+      "#c2365a",
+      "#d56579"
+    ],
+    "success": [
+      "#1f7a4d",
+      "#75c89c"
+    ],
+    "online": [
+      "#2e9e66",
+      "#40ae78"
+    ]
+  },
+  "native_icons": 83,
+  "implementation": "Android Views; no WebView"
+}

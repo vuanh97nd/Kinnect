@@ -83,7 +83,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
 
   private ImageView icon(String name, int color) {
     ImageView v = new ImageView(this);
-    int id = getResources().getIdentifier("ic_" + name, "drawable", getPackageName());
+    int id = WebIcons.resolve(this, name);
     if (id != 0) { android.graphics.drawable.Drawable d = getDrawable(id).mutate(); d.setTint(color); v.setImageDrawable(d); }
     return v;
   }
@@ -873,7 +873,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   }
 
   private android.graphics.drawable.Drawable tinted(String name) {
-    int id = getResources().getIdentifier("ic_" + name, "drawable", getPackageName());
+    int id = WebIcons.resolve(this, name);
     android.graphics.drawable.Drawable d = getDrawable(id).mutate();
     d.setTint(0xffffffff);
     d.setBounds(0, 0, dp(18), dp(18));
@@ -1010,8 +1010,9 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     if (recording) return;
     final android.app.Dialog dialog = new android.app.Dialog(this);
     dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-    final boolean dark = (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
-    final int bg = dark ? 0xff222128 : 0xffffffff, ink = dark ? 0xffeeeaf7 : 0xff1f1d2b, muted = dark ? 0xffaaa4b8 : 0xff6a6478, soft = dark ? 0xff302d39 : 0xfff6f5fa, on = dark ? 0xff302642 : 0xfff1edff;
+    final boolean dark = WebTheme.isDark(this);
+    final int variant = dark ? 1 : 0;
+    final int bg = WebDesign.CARD[variant], ink = WebDesign.INK[variant], muted = WebDesign.MUTED[variant], soft = WebDesign.WASH[variant], on = WebDesign.SOFT[variant];
     LinearLayout sheet = new LinearLayout(this);
     sheet.setOrientation(LinearLayout.VERTICAL);
     GradientDrawable shape = new GradientDrawable();
@@ -1095,7 +1096,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
           boolean active = t[0].equals(tab[0]);
           TextView b = plain(t[1], 14, active ? 0xff6c47e0 : ink, true);
           b.setPadding(dp(14), dp(7), dp(14), dp(7));
-          b.setBackground(round(active ? (dark ? 0xff302642 : 0xffe7e1ff) : soft, 999));
+          b.setBackground(round(active ? (dark ? 0xff332a48 : 0xffe7e1ff) : soft, 999));
           b.setOnClickListener(v -> { tab[0] = t[0]; shown[0] = 60; run(); render[0].run(); });
           LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
           lp.rightMargin = dp(6);
@@ -1118,7 +1119,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         up.setPadding(dp(8), dp(8), dp(8), dp(8));
         TextView art = plain("＋", 26, 0xff6c47e0, true);
         art.setGravity(Gravity.CENTER);
-        art.setBackground(round(dark ? 0xff302642 : 0xffe7e1ff, 10));
+        art.setBackground(round(dark ? 0xff332a48 : 0xffe7e1ff, 10));
         up.addView(art, new LinearLayout.LayoutParams(dp(52), dp(52)));
         LinearLayout meta = new LinearLayout(this);
         meta.setOrientation(LinearLayout.VERTICAL);

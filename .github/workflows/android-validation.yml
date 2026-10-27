@@ -1,7 +1,7 @@
 name: Validate native Android
 on:
   pull_request:
-    paths: ['android/**', 'scripts/*android*', 'scripts/build-apk*', '.github/workflows/android-validation.yml']
+    paths: ['android/**', 'scripts/*android*', 'scripts/test-native-design.py', 'scripts/build-apk*', '.github/workflows/android-validation.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -25,3 +25,5 @@ jobs:
         run: bash scripts/test-android-config.sh
       - name: Build testing APK
         run: bash scripts/build-apk.sh
+      - name: Check web design export and native-only APK
+        run: python3 scripts/test-native-design.py --apk dist/kinnect-live-debug.apk

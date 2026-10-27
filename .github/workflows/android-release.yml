@@ -36,6 +36,8 @@ jobs:
           test "$GITHUB_REF_NAME" = "v$version"
           cp dist/kinnect-live-debug.apk "dist/Kinnect-$version-debug.apk"
           (cd dist && sha256sum "Kinnect-$version-debug.apk" > "Kinnect-$version-debug.apk.sha256")
+      - name: Enforce native-only app and web design assets
+        run: python3 scripts/test-native-design.py --apk dist/kinnect-live-debug.apk
       - name: Publish browser-downloadable release
         env:
           GH_TOKEN: ${{ github.token }}
