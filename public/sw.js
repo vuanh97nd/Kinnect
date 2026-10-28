@@ -1,6 +1,6 @@
-const CACHE = 'kinnect-static-v31-push';
+const CACHE = 'kinnect-static-v32-editor';
 self.addEventListener('message', event => { if(event.data === 'SKIP_WAITING') self.skipWaiting(); });
-const STATIC = ['/v2.css','/v2.js','/v2-icons.js','/camera.js','/kinnect-icon-192.png','/apple-touch-icon.png','/offline.html'];
+const STATIC = ['/v2.css','/v2.js','/v2-icons.js','/camera.js','/media-editor.js','/media-editor.css','/kinnect-icon-192.png','/apple-touch-icon.png','/offline.html'];
 // Cài đặt từng tệp riêng để một tệp lỗi không làm hỏng toàn bộ việc đăng ký SW.
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(async cache => {

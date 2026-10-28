@@ -52,10 +52,13 @@ public final class NativeApi {
     epoch++;
   }
 
+  public interface Progress { void sent(long bytes,long total); }
+  public void call(String method,String path,JSONObject data,Result callback){call(method,path,data,null,callback);}
   public void call(
     String method,
     String path,
     JSONObject data,
+    Progress progress,
     Result callback
   ) {
     final String server = origin,
@@ -90,7 +93,9 @@ public final class NativeApi {
           byte[] payload = data.toString().getBytes("UTF-8");
           connection.setFixedLengthStreamingMode(payload.length);
           try (OutputStream out = connection.getOutputStream()) {
-            out.write(payload);
+            long last=0;
+            for(int offset=0;offset<payload.length;){int count=Math.min(65536,payload.length-offset);out.write(payload,offset,count);offset+=count;long now=System.currentTimeMillis();if(progress!=null&&(now-last>=100||offset==payload.length)){final int sent=offset;main.post(()->progress.sent(sent,payload.length));last=now;}}
+            out.flush();
           }
         }
         status = connection.getResponseCode();

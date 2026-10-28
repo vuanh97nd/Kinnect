@@ -2647,3 +2647,7 @@ html, body { margin: 0; min-height: 100%; background: #f6f5fa; }
 #kn .app.postlogin-polish[data-device="pc"] .approved-video .v2-video-actions [data-do="media-delete"]{color:#c72e52;background:#fff1f4;border-color:#ffe0e7}
 
 
+
+.v2-camera-stage>.approved-media-edit{position:absolute;left:14px;bottom:82px;z-index:8;display:flex;align-items:center;gap:6px;border:1px solid #ffffff40;border-radius:24px;padding:9px 14px;background:#18122199;color:#fff;backdrop-filter:blur(12px);font-size:12px}.composer-preview>[data-do="composer-edit-media"]{margin:9px;border-radius:20px;font-size:12px}
+
+.kn-upload-progress{position:fixed;z-index:2147483500;bottom:max(24px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);display:flex;gap:14px;align-items:center;width:min(310px,88vw);padding:18px;border-radius:20px;background:#211a30;color:#fff;box-shadow:0 10px 50px #0008;font:12px system-ui}.kn-upload-progress>div{flex:1}.kn-upload-progress strong{display:block;font-size:20px}.kn-upload-progress progress{width:100%;height:5px;accent-color:#b58aff}.kn-upload-progress small{display:block;color:#d2bfeb;margin-top:5px}.kn-upload-symbol{font-size:28px;color:#c8a4ff}

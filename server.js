@@ -310,6 +310,8 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
       "/social-messenger.js": ["social-messenger.js", "text/javascript"],
       "/calls.js": ["calls.js", "text/javascript"],
       "/camera.js": ["camera.js", "text/javascript"],
+      "/media-editor.js": ["media-editor.js", "text/javascript"],
+      "/media-editor.css": ["media-editor.css", "text/css"],
       "/vendor/vision/face_landmarker.task": ["vendor/vision/face_landmarker.task", "application/octet-stream"],
       "/vendor/vision/vision_bundle.mjs": ["vendor/vision/vision_bundle.mjs", "text/javascript"],
       "/vendor/vision/wasm/vision_wasm_internal.js": ["vendor/vision/wasm/vision_wasm_internal.js", "text/javascript"],

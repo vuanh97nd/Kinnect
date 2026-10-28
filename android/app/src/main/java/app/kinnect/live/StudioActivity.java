@@ -694,7 +694,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
       camera.getBitmap(frame);
     }
     frameCount++;
-    boolean needFace = !fx.sticker.equals("none") || (fx.beautyOn && (fx.smooth > 0 || fx.slim > 0 || fx.eyes > 0 || fx.blush > 0));
+    boolean needFace = fx.needsFace();
     if (needFace && frameCount % 4 == 0 && !detecting) detectFace();
     if (panel.equals("filter") && frameCount % 45 == 0) refreshThumb();
     if (fx.auto && frameCount % 30 == 0) fx.analyze(frame, face);

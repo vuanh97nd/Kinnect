@@ -820,7 +820,9 @@ public class MainActivity extends Activity {
 
   private void request(String method, String path, JSONObject data, Done done, Runnable finished) {
     final int generation = screen;
-    api.call(method, path, data, (answer, error, status) -> {
+    final UploadProgress upload=data!=null&&(data.optString("media").startsWith("data:")||data.optString("data").startsWith("data:"))?new UploadProgress(this):null;
+    api.call(method, path, data, upload, (answer, error, status) -> {
+      if(upload!=null)upload.close();
       if (isFinishing() || isDestroyed() || generation != screen) return;
       try {
         if (error != null) {
@@ -3027,7 +3029,11 @@ public class MainActivity extends Activity {
     }
   }
 
-  private void uploadVideo(android.net.Uri uri) {
+  private void reviewMedia(android.net.Uri uri,int requestCode) {
+    Intent editor=new Intent(this,MediaEditActivity.class).setData(uri);editor.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);editor.setClipData(android.content.ClipData.newRawUri("media",uri));startActivityForResult(editor,requestCode);
+  }
+  private void uploadVideo(android.net.Uri uri) { reviewMedia(uri,212); }
+  private void uploadVideoNow(android.net.Uri uri) {
     EditText caption = new EditText(this);
     caption.setHint("Viết chú thích cho video");
     new Sheet(this)
@@ -3047,11 +3053,14 @@ public class MainActivity extends Activity {
               "caption",
               text
             );
+            final UploadProgress upload=new UploadProgress(this);
             api.call(
               "POST",
               "/api/shorts",
               payload,
+              upload,
               (result, error, status) -> {
+                upload.close();
                 postingVideo = false;
                 if (isDestroyed() || generation != screen) return;
                 if (error != null) say(error);
@@ -3097,6 +3106,10 @@ public class MainActivity extends Activity {
       catch (SecurityException ignored) {}
     }
 
+    if (request >= 210 && request <= 212) {
+      if(result==RESULT_OK && data!=null && data.getData()!=null){if(request==212)uploadVideoNow(data.getData());else preparePostMedia(request==211?304:300,data.getData());}
+      return;
+    }
     if (request == 309) {
       final String path = pendingDownload; pendingDownload = "";
       if (result != RESULT_OK || data == null || data.getData() == null || path.isEmpty()) return;
@@ -3116,19 +3129,16 @@ public class MainActivity extends Activity {
     if ((request == 203 || request == 204) && result == RESULT_OK && data != null && data.getStringExtra(StudioActivity.EXTRA_IMAGE) != null) {
       final java.io.File file = new java.io.File(data.getStringExtra(StudioActivity.EXTRA_IMAGE));
       final String action = data.getStringExtra(StudioActivity.EXTRA_ACTION);
-      try {
-        String media = "data:image/jpeg;base64," + android.util.Base64.encodeToString(NativeApi.readAll(new java.io.FileInputStream(file)), android.util.Base64.NO_WRAP);
-        if ("story".equals(action)) { say("Đang đăng tin…"); request("POST", "/api/stories", json("body", "", "media", media), r -> { say("Đã đăng tin, hiển thị 24 giờ."); navigate("feed"); }); }
-        else { composePost(); pendingMedia = media; showComposePreview(file); }
-      } catch (Exception e) { say("Không đọc được ảnh. Vui lòng chọn tệp khác."); }
+      if ("story".equals(action)) reviewMedia(android.net.Uri.fromFile(file),211);
+      else { composePost(); reviewMedia(android.net.Uri.fromFile(file),210); }
       return;
     }
     if ((request == 203 || request == 204) && result == RESULT_FIRST_USER && data != null && data.getData() != null) {
-      if (request == 204) preparePostMedia(304, data.getData()); else uploadVideo(data.getData());
+      if (request == 204) reviewMedia(data.getData(),211); else uploadVideo(data.getData());
       return;
     }
     if ((request == 203 || request == 204) && result == RESULT_OK && data != null && data.getBooleanExtra(StudioActivity.EXTRA_STORY, false)) {
-      postStoryVideo(new java.io.File(data.getStringExtra(StudioActivity.EXTRA_VIDEO)));
+      reviewMedia(android.net.Uri.fromFile(new java.io.File(data.getStringExtra(StudioActivity.EXTRA_VIDEO))),211);
       return;
     }
     if (request == 307 && result == RESULT_OK && data != null && data.getData() != null) {
@@ -4565,7 +4575,7 @@ public class MainActivity extends Activity {
     String type = getContentResolver().getType(uri);
     boolean video = "video/mp4".equals(type);
     try {
-      if (code == 300 || code == 304) { preparePostMedia(code, uri); return; }
+      if (code == 300 || code == 304) { reviewMedia(uri,code==304?211:210); return; }
       if (code == 303) {
         JSONObject file = json("name", fileName(uri), "data", dataUrl(uri, 20 * 1024 * 1024, null));
         say("Đang gửi tệp…");

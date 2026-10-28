@@ -19,14 +19,30 @@ export const FILTERS = [
   ["dream", "Mộng mơ", "saturate(0.85) brightness(1.1) contrast(0.9) hue-rotate(8deg)"],
   ["retro", "Retro", "sepia(0.25) contrast(1.1) saturate(0.9) hue-rotate(-6deg)"],
   ["city", "Thành phố", "saturate(0.7) contrast(1.15) brightness(0.98)"],
+  ["cinema", "Cinema", "contrast(1.15) saturate(0.82) sepia(0.12)"],
+  ["rose", "Rose", "brightness(1.08) saturate(1.12) sepia(0.16) hue-rotate(320deg)"],
+  ["golden", "Golden", "sepia(0.25) saturate(1.2) brightness(1.08)"],
+  ["ice", "Ice", "saturate(0.75) hue-rotate(12deg) brightness(1.1)"],
+  ["lavender", "Lavender", "hue-rotate(18deg) saturate(0.8) brightness(1.1)"],
+  ["choco", "Choco", "sepia(0.4) contrast(1.1) saturate(0.72)"],
+  ["polaroid", "Polaroid", "sepia(0.18) contrast(0.9) brightness(1.12) saturate(0.8)"],
+  ["teal", "Teal", "hue-rotate(12deg) contrast(1.12) saturate(1.16)"],
 ];
 export const STICKERS = [
-  ["none", "Không", ""],
-  ["glasses", "Kính", "😎"],
-  ["hearts", "Tim", "😍"],
-  ["crown", "Vương miện", "👑"],
-  ["cat", "Mèo", "🐱"],
-  ["sparkle", "Lấp lánh", "✨"],
+  ["none", "Gốc", "○"], ["glasses", "Kính đen", "🕶️"],
+  ["round_glasses", "Kính tròn", "👓"], ["heart_glasses", "Kính tim", "💗"], ["neon_glasses", "Kính neon", "⚡"],
+  ["hearts", "Tim bay", "💕"], ["crown", "Vương miện", "👑"], ["cat", "Mèo", "🐱"],
+  ["bunny", "Thỏ", "🐰"], ["dog", "Cún", "🐶"], ["flowers", "Hoa", "🌸"], ["bow", "Nơ", "🎀"],
+  ["sparkle", "Lấp lánh", "✨"], ["stars", "Sao", "⭐"], ["butterfly", "Bướm", "🦋"],
+  ["halo", "Thiên thần", "😇"], ["devil", "Sừng xinh", "😈"], ["rainbow", "Cầu vồng", "🌈"],
+  ["bubbles", "Bong bóng", "🫧"], ["snow", "Tuyết", "❄️"], ["confetti", "Lễ hội", "🎉"],
+];
+export const BEAUTY_PRESETS = [
+  {id:'natural',name:'Tự nhiên',icon:'✧',patch:{soft:true,smooth:.48,blemish:.4,whiten:.12,blush:.08,eyes:.06,lips:.03}},
+  {id:'glass',name:'Da căng',icon:'✨',patch:{soft:true,smooth:.78,blemish:.85,whiten:.18,blush:.12,eyes:.08,lips:.05}},
+  {id:'peach',name:'Đào',icon:'🌸',patch:{soft:true,smooth:.62,blemish:.65,whiten:.14,blush:.38,eyes:.14,lips:.13}},
+  {id:'doll',name:'Búp bê',icon:'🎀',patch:{soft:true,smooth:.68,blemish:.7,whiten:.12,blush:.24,eyes:.72,lips:.27}},
+  {id:'eyes',name:'Mắt to',icon:'👀',patch:{eyes:.9}}, {id:'lips',name:'Môi đầy',icon:'💋',patch:{lips:.78}},
 ];
 
 let faceEnginePromise = null;
@@ -40,19 +56,19 @@ function faceEngine() {
   return faceEnginePromise;
 }
 // Bộ xử lý: video gốc → canvas có hiệu ứng → MediaStream mới (giữ nguyên âm thanh).
-export function createEffects(rawStream, { width = 540, height = 960, portrait = false, fit = "cover" } = {}) {
-  const video = document.createElement("video");
-  video.muted = true;
-  video.playsInline = true;
-  video.srcObject = rawStream;
+export function createEffects(rawStream, { width = 540, height = 960, portrait = false, fit = "cover", sourceElement = null } = {}) {
+  const video = sourceElement || document.createElement("video");
+  if(!sourceElement){video.muted = true;video.playsInline = true;video.srcObject = rawStream;}
+  const ready=()=>video.tagName==='IMG'?video.complete&&video.naturalWidth>0:video.readyState>=2;
+  const sourceSize=()=>[video.videoWidth||video.naturalWidth||canvas.width,video.videoHeight||video.naturalHeight||canvas.height];
   const canvas = document.createElement("canvas");
-  const settings = rawStream.getVideoTracks()[0]?.getSettings?.() || {};
+  const settings = rawStream?.getVideoTracks?.()[0]?.getSettings?.() || {};
   // Giữ đúng hướng camera: dọc trên điện thoại, ngang trên máy tính.
   const landscape = !portrait && (settings.width || 0) > (settings.height || 0);
   canvas.width = landscape ? height : width;
   canvas.height = landscape ? width : height;
   const ctx = canvas.getContext("2d");
-  const state = { fit, filter: "none", soft: false, smooth: 0.5, whiten: 0, blush: 0, auto: false, sticker: "none", mirror: true };
+  const state = { fit, filter: "none", soft: false, smooth: 0.5, blemish:0, whiten: 0, blush: 0, eyes:0, lips:0, auto: false, sticker: "none", mirror: !sourceElement, compare:false, text:"",textY:.8 };
   let autoBright = 1, autoContrast = 1, autoTick = 0;
   const probe = document.createElement("canvas");
   probe.width = 24; probe.height = 32;
@@ -65,7 +81,7 @@ export function createEffects(rawStream, { width = 540, height = 960, portrait =
   let statusText="";const statusListeners=new Set();
   const publish=text=>{if(text!==statusText){statusText=text;for(const callback of statusListeners)callback(text);}};
   async function detect() {
-    if(stopped || detecting || trackingFailed || (!state.soft && !state.blush && state.sticker==="none") || video.readyState<2 || performance.now()-lastDetection<120)return;
+    if(stopped || detecting || trackingFailed || (!state.soft && !state.blush && !state.eyes && !state.lips && state.sticker==="none") || !ready() || performance.now()-lastDetection<120)return;
     detecting=true;lastDetection=performance.now();
     try {
       if(!detector){publish("Đang tải nhận diện khuôn mặt…");detector=await faceEngine();}
@@ -80,13 +96,16 @@ export function createEffects(rawStream, { width = 540, height = 960, portrait =
       let left=project(points[33]),right=project(points[263]);if(left.x>right.x)[left,right]=[right,left];
       const next={x:Math.min(...xs),y:Math.min(...ys),width:Math.max(...xs)-Math.min(...xs),height:Math.max(...ys)-Math.min(...ys),eyeY:(left.y+right.y)/2,angle:Math.atan2(right.y-left.y,right.x-left.x)};
       if(face)for(const key of ["x","y","width","height","eyeY","angle"])next[key]=face[key]*0.45+next[key]*0.55;
+      next.leftEye=project({x:(points[33].x+points[133].x)/2,y:(points[33].y+points[133].y)/2});
+      next.rightEye=project({x:(points[263].x+points[362].x)/2,y:(points[263].y+points[362].y)/2});
+      next.mouth=project({x:(points[13].x+points[14].x)/2,y:(points[13].y+points[14].y)/2});
+      if(face)for(const key of ['leftEye','rightEye','mouth'])if(face[key])for(const axis of ['x','y'])next[key][axis]=face[key][axis]*.45+next[key][axis]*.55;
       face=next;publish("Đã nhận diện khuôn mặt");
     }catch(e){face=null;trackingFailed=true;publish("Chưa tải được nhận diện. Chọn lại hiệu ứng để thử lại.");}
     finally{detecting=false;}
   }
   function cover() {
-    const vw = video.videoWidth || canvas.width;
-    const vh = video.videoHeight || canvas.height;
+    const [vw,vh] = sourceSize();
     // Phủ kín khung đầu ra, cắt đều hai bên nếu camera trả hình ngang.
     const scale = (state.fit === "contain" ? Math.min : Math.max)(canvas.width / vw, canvas.height / vh);
     const w = vw * scale;
@@ -94,6 +113,7 @@ export function createEffects(rawStream, { width = 540, height = 960, portrait =
     return [(canvas.width - w) / 2, (canvas.height - h) / 2, w, h];
   }
   function drawSticker() {
+    if(state.sticker==="none")return;
     const emoji = STICKERS.find((s) => s[0] === state.sticker)?.[2];
     if (!emoji) return;
     if(!face)return;
@@ -103,40 +123,38 @@ export function createEffects(rawStream, { width = 540, height = 960, portrait =
     ctx.filter = "none";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    if (state.sticker === "glasses") {
-      ctx.font = Math.round(box.width * 0.9) + "px serif";
-      ctx.translate(cx,box.eyeY);ctx.rotate(box.angle);
-      ctx.fillText("🕶️", 0, 0);
-    } else if (state.sticker === "crown") {
-      ctx.font = Math.round(box.width * 0.75) + "px serif";
-      ctx.fillText("👑", cx, box.y - box.height * 0.18);
-    } else if (state.sticker === "cat") {
-      ctx.font = Math.round(box.width * 0.38) + "px serif";
-      ctx.fillText("🐱", box.x + box.width * 0.12, box.y - box.height * 0.1);
-      ctx.fillText("🐱", box.x + box.width * 0.88, box.y - box.height * 0.1);
-    } else if (state.sticker === "hearts") {
-      const t = performance.now() / 600;
-      ctx.font = Math.round(box.width * 0.28) + "px serif";
-      for (let i = 0; i < 5; i++) {
-        const a = t + (i * Math.PI * 2) / 5;
-        ctx.fillText("❤️", cx + Math.cos(a) * box.width * 0.75, box.y + box.height * 0.5 + Math.sin(a) * box.height * 0.75);
-      }
-    } else if (state.sticker === "sparkle") {
-      const t = performance.now() / 400;
-      ctx.font = Math.round(box.width * 0.22) + "px serif";
-      for (let i = 0; i < 7; i++) {
-        ctx.globalAlpha = 0.5 + 0.5 * Math.sin(t + i * 1.7);
-        ctx.fillText("✨", box.x + ((i * 37) % 100) / 100 * box.width * 1.6 - box.width * 0.3, box.y - box.height * 0.2 + ((i * 53) % 100) / 100 * box.height * 1.4);
-      }
+    const eyeSpan=Math.abs((box.rightEye?.x||cx+box.width*.2)-(box.leftEye?.x||cx-box.width*.2));
+    if (['glasses','round_glasses','neon_glasses','heart_glasses'].includes(state.sticker)) {
+      ctx.translate(cx,box.eyeY);ctx.rotate(box.angle);ctx.lineWidth=Math.max(2,box.width*.022);ctx.strokeStyle=state.sticker==='neon_glasses'?'#80ffeb':state.sticker==='heart_glasses'?'#ff78ad':'#24212f';ctx.fillStyle=state.sticker==='glasses'?'#10121be8':'#ffbce026';
+      if(state.sticker==='neon_glasses'){ctx.shadowBlur=16;ctx.shadowColor='#27ffe8';}
+      for(const side of [-1,1]){ctx.beginPath();const ex=side*eyeSpan*.5,ew=box.width*.22,eh=box.height*.085;
+        if(state.sticker==='heart_glasses'){ctx.moveTo(ex,eh);ctx.bezierCurveTo(ex-ew*2,-eh*.1,ex-ew,-eh*2,ex,-eh*.6);ctx.bezierCurveTo(ex+ew,-eh*2,ex+ew*2,-eh*.1,ex,eh);}
+        else ctx.ellipse(ex,0,ew,state.sticker==='round_glasses'?ew:eh,0,0,Math.PI*2);ctx.fill();ctx.stroke();}
+      ctx.beginPath();ctx.moveTo(-eyeSpan*.12,0);ctx.quadraticCurveTo(0,-box.height*.045,eyeSpan*.12,0);ctx.stroke();
+    } else if(['cat','bunny','dog','devil'].includes(state.sticker)){
+      ctx.translate(cx,box.y+box.height*.1);ctx.rotate(box.angle);for(const side of [-1,1]){ctx.fillStyle=state.sticker==='devil'?'#ff466f':state.sticker==='cat'?'#49374a':'#ffecf4';ctx.beginPath();if(state.sticker==='cat'||state.sticker==='devil'){ctx.moveTo(side*box.width*.2,0);ctx.lineTo(side*box.width*.46,-box.height*.27);ctx.lineTo(side*box.width*.5,box.height*.07);ctx.closePath();}else ctx.ellipse(side*box.width*.28,-box.height*.12,box.width*.1,box.height*(state.sticker==='bunny'?.29:.18),side*.2,0,Math.PI*2);ctx.fill();}
+    } else if(['crown','halo','flowers','bow','rainbow'].includes(state.sticker)){
+      ctx.font=Math.round(box.width*.65)+'px serif';ctx.fillText(emoji,cx,box.y-box.height*.13);
+    } else {
+      const count=state.sticker==='confetti'?12:state.sticker==='snow'?9:6,t=performance.now()/700;ctx.font=Math.round(box.width*.25)+'px serif';
+      for(let i=0;i<count;i++){const a=t+i*Math.PI*2/count;ctx.globalAlpha=.55+.45*Math.sin(t*1.3+i)**2;ctx.fillText(emoji,cx+Math.cos(a)*box.width*(state.sticker==='bubbles'?.7:.82),box.y+box.height*.42+Math.sin(a)*box.height*.7);}
     }
     ctx.restore();
+  }
+  const warp=document.createElement('canvas');
+  function magnify(point,rx,ry,amount){
+    warp.width=Math.ceil(rx*2);warp.height=Math.ceil(ry*2);const g=warp.getContext('2d');g.clearRect(0,0,warp.width,warp.height);
+    const zoom=1+Math.min(1,amount)*.48;
+    g.drawImage(canvas,point.x-rx/zoom,point.y-ry/zoom,rx*2/zoom,ry*2/zoom,0,0,warp.width,warp.height);
+    g.globalCompositeOperation='destination-in';g.save();g.scale(warp.width/2,warp.height/2);g.translate(1,1);const mask=g.createRadialGradient(0,0,0,0,0,1);mask.addColorStop(0,'#000');mask.addColorStop(.55,'#000');mask.addColorStop(1,'#0000');g.fillStyle=mask;g.fillRect(-1,-1,2,2);g.restore();
+    ctx.drawImage(warp,point.x-rx,point.y-ry,rx*2,ry*2);
   }
   let frame = 0;
   function draw() {
     if (stopped) return;
-    if (video.readyState >= 2) {
+    if (ready()) {
       // iPhone hay báo sai hướng trong getSettings(): lấy theo khung hình thật để không bị cắt phóng to.
-      const vw = video.videoWidth, vh = video.videoHeight;
+      const [vw,vh] = sourceSize();
       if (!portrait && vw && vh && (vw > vh) !== (canvas.width > canvas.height)) { const t = canvas.width; canvas.width = canvas.height; canvas.height = t; }
       const [x, y, w, h] = cover();
       let base = FILTERS.find((f) => f[0] === state.filter)?.[2] || "none";
@@ -148,9 +166,10 @@ export function createEffects(rawStream, { width = 540, height = 960, portrait =
         ctx.translate(canvas.width, 0);
         ctx.scale(-1, 1);
       }
-      ctx.filter = base;
+      ctx.filter = state.compare?'none':base;
       ctx.drawImage(video, x, y, w, h);
       ctx.restore();
+      if(state.compare){detect();raf=requestAnimationFrame(draw);return;}
       if (state.soft && face) {
         // Mịn da: lớp mờ trong vùng mặt, mờ dần ra viền (mặt nạ chuyển sắc) để không lộ ranh giới.
         if (layer.width !== canvas.width || layer.height !== canvas.height) { layer.width = canvas.width; layer.height = canvas.height; }
@@ -159,7 +178,7 @@ export function createEffects(rawStream, { width = 540, height = 960, portrait =
         l.clearRect(0, 0, layer.width, layer.height);
         l.save();
         if (state.mirror) { l.translate(layer.width, 0); l.scale(-1, 1); }
-        l.filter = (base === "none" ? "" : base + " ") + "blur(" + (2 + state.smooth * 5).toFixed(1) + "px)";
+        l.filter = (base === "none" ? "" : base + " ") + "blur(" + (2 + state.smooth * 4 + state.blemish * 2).toFixed(1) + "px)";
         l.drawImage(video, x, y, w, h);
         l.restore();
         const cxF = face.x + face.width / 2, cyF = face.y + face.height * 0.55, r = Math.max(face.width, face.height) * 0.62;
@@ -168,8 +187,13 @@ export function createEffects(rawStream, { width = 540, height = 960, portrait =
         l.globalCompositeOperation = "destination-in";
         l.fillStyle = g;
         l.fillRect(0, 0, layer.width, layer.height);
+        // Keep eyes, lips and their sharp edges out of the skin-smoothing layer.
+        l.globalCompositeOperation='destination-out';l.filter='none';
+        for(const [point,rx,ry] of [[face.leftEye,face.width*.16,face.height*.07],[face.rightEye,face.width*.16,face.height*.07],[face.mouth,face.width*.2,face.height*.09]])if(point){
+          l.save();l.translate(point.x,point.y);l.rotate(face.angle);l.scale(rx,ry);const hole=l.createRadialGradient(0,0,0,0,0,1);hole.addColorStop(0,'#000');hole.addColorStop(.65,'#000');hole.addColorStop(1,'#0000');l.fillStyle=hole;l.fillRect(-1,-1,2,2);l.restore();
+        }
         ctx.save();
-        ctx.globalAlpha = 0.25 + state.smooth * 0.55;
+        ctx.globalAlpha = Math.min(.92,0.25 + state.smooth * 0.48 + state.blemish*.15);
         ctx.drawImage(layer, 0, 0);
         ctx.restore();
       }
@@ -191,12 +215,16 @@ export function createEffects(rawStream, { width = 540, height = 960, portrait =
         autoBright = Math.min(1.25, Math.max(0.88, 1 + (125 - mean) / 400));
         autoContrast = Math.min(1.2, Math.max(0.92, 1 + (55 - std) / 300));
       }
+      if(face){
+        for(const [point,rx,ry,strength] of [[face.leftEye,face.width*.19,face.height*.11,state.eyes],[face.rightEye,face.width*.19,face.height*.11,state.eyes],[face.mouth,face.width*.24,face.height*.14,state.lips]])if(point&&strength>.01)magnify(point,rx,ry,strength);
+      }
       detect();
       drawSticker();
+      if(state.text){ctx.save();ctx.filter='none';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='700 '+Math.round(canvas.width*.052)+'px sans-serif';ctx.lineJoin='round';ctx.lineWidth=canvas.width*.01;ctx.strokeStyle='#0008';ctx.fillStyle='#fff';for(const [i,line] of state.text.split('\n').slice(0,4).entries()){const ty=canvas.height*state.textY+i*canvas.width*.064;ctx.strokeText(line.slice(0,45),canvas.width/2,ty,canvas.width*.9);ctx.fillText(line.slice(0,45),canvas.width/2,ty,canvas.width*.9);}ctx.restore();}
     }
     raf = requestAnimationFrame(draw);
   }
-  video.play().catch(() => {});
+  video.play?.().catch(() => {});
   draw();
   // requestAnimationFrame dừng khi tab ẩn; dùng thêm hẹn giờ để livestream không bị đứng hình.
   const keepAlive = setInterval(() => {
@@ -206,7 +234,7 @@ export function createEffects(rawStream, { width = 540, height = 960, portrait =
     }
   }, 66);
   const output = canvas.captureStream(30);
-  for (const track of rawStream.getAudioTracks()) output.addTrack(track);
+  for (const track of rawStream?.getAudioTracks?.()||[]) output.addTrack(track);
   return {
     stream: output,
     canvas,
@@ -217,7 +245,7 @@ export function createEffects(rawStream, { width = 540, height = 960, portrait =
     set(patch) {
       Object.assign(state, patch);
       trackingFailed=false;
-      if(!state.soft && !state.blush && state.sticker==="none"){face=null;publish("");}else detect();
+      if(!state.soft && !state.blush && !state.eyes && !state.lips && state.sticker==="none"){face=null;publish("");}else detect();
     },
     stop() {
       stopped = true;
@@ -225,7 +253,7 @@ export function createEffects(rawStream, { width = 540, height = 960, portrait =
       cancelAnimationFrame(raf);
       clearInterval(keepAlive);
       output.getVideoTracks().forEach((t) => t.stop());
-      video.srcObject = null;
+      if(!sourceElement)video.srcObject = null;
     },
   };
 }
@@ -261,14 +289,22 @@ export function effectPicker(fx, { dark = true } = {}) {
   soft.className = "fx-chip" + (fx.state.soft ? " on" : "");
   soft.textContent = "✨ Làm mịn da";
   soft.setAttribute("aria-pressed", String(fx.state.soft));
+  const sliders=new Map();
+  const syncBeauty=()=>{soft.classList.toggle("on",fx.state.soft);soft.setAttribute("aria-pressed",String(fx.state.soft));for(const [key,slider] of sliders)slider.value=fx.state[key];};
   soft.onclick = () => {
-    fx.set({ soft: !fx.state.soft });
+    fx.set(fx.state.soft?{soft:false,eyes:0,lips:0,whiten:0,blush:0}:BEAUTY_PRESETS[1].patch);
     soft.classList.toggle("on", fx.state.soft);
     soft.setAttribute("aria-pressed", String(fx.state.soft));
+    syncBeauty();
   };
   const filters = row(FILTERS, "filter");
   filters.prepend(soft);
   box.append(filters, row(STICKERS, "sticker"));
+  const beauty=document.createElement('div');beauty.className='fx-row';beauty.setAttribute('aria-label','Làm đẹp khuôn mặt');
+  for(const item of BEAUTY_PRESETS){const b=document.createElement('button');b.type='button';b.className='fx-chip';b.textContent=item.icon+' '+item.name;b.onclick=()=>{fx.set(item.patch);syncBeauty();};beauty.append(b);}
+  box.append(beauty);
+  for(const [key,label] of [['smooth','Mịn da'],['blemish','Giảm đốm'],['eyes','Mắt to'],['lips','Môi đầy']]){const line=document.createElement('label');line.className='fx-slider';line.textContent=label;const range=document.createElement('input');range.type='range';range.min='0';range.max='1';range.step='.01';range.value=fx.state[key];range.setAttribute('aria-label',label);range.oninput=()=>fx.set({[key]:Number(range.value),...(key==='smooth'||key==='blemish'?{soft:true}:{})});sliders.set(key,range);line.append(range);box.append(line);}
+
   const note=document.createElement("p");note.className="fx-note";
   fx.onStatus(text=>{note.textContent=text;note.hidden=!text;});box.append(note);
   return box;

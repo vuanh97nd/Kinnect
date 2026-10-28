@@ -584,14 +584,12 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
   private void effectsMenu() {
     final LiveEffects fx = rtc == null ? null : rtc.effects();
     if (fx == null) return;
-    String[] items = new String[LiveEffects.FILTERS.length + LiveEffects.STICKERS.length];
-    int k = 0;
-    for (String[] f : LiveEffects.FILTERS) items[k++] = (fx.filter.equals(f[0]) ? "✓ " : "") + "Bộ lọc: " + f[1];
-    for (String[] s : LiveEffects.STICKERS) items[k++] = (fx.sticker.equals(s[0]) ? "✓ " : "") + (s[2].isEmpty() ? "" : s[2] + " ") + s[1];
-    new Sheet(this).setTitle("Hiệu ứng live").setItems(items, (d, w) -> {
-      if (w < LiveEffects.FILTERS.length) fx.filter = LiveEffects.FILTERS[w][0];
-      else fx.sticker = LiveEffects.STICKERS[w - LiveEffects.FILTERS.length][0];
-      status.setText(fx.sticker.equals("none") ? "Đã áp dụng hiệu ứng" : "Đưa khuôn mặt vào khung hình");
-    }).show();
+    LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);
+    LinearLayout tabs=new LinearLayout(this);FrameLayout host=new FrameLayout(this);android.widget.ScrollView scroll=new android.widget.ScrollView(this);scroll.addView(host);
+    Runnable changed=()->{};
+    EffectControls.Target target=EffectControls.forLive(fx);
+    for(String[] tab:new String[][]{{"beauty","✨ Làm đẹp"},{"sticker","🕶 Hiệu ứng"},{"filter","◈ Màu"}}){TextView button=new TextView(this);button.setText(tab[1]);button.setTextSize(12);button.setGravity(Gravity.CENTER);button.setPadding(0,dp(14),0,dp(14));button.setTextColor(WebTheme.isDark(this)?0xfff6f1ff:0xff271f38);button.setOnClickListener(v->{host.removeAllViews();host.addView(EffectControls.panel(this,tab[0],target,changed));});tabs.addView(button,new LinearLayout.LayoutParams(0,-2,1));}
+    body.addView(tabs);body.addView(scroll,new LinearLayout.LayoutParams(-1,Math.min(dp(360),getResources().getDisplayMetrics().heightPixels/2)));host.addView(EffectControls.panel(this,"beauty",target,changed));
+    new Sheet(this).setTitle("Hiệu ứng Live").setView(body).setPositiveButton("Xong",null).show();
   }
 }

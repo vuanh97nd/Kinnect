@@ -247,3 +247,6 @@ body.studio-open { overflow: hidden; }
 .tt-post-body { justify-content: flex-start; }
 .tt-preview { order: 0; height: min(58dvh, 520px); }
 .tt-caption { order: 1; min-height: 56px; max-height: 120px; }
+
+/* Shared Live retouch controls. */
+.fx-slider{display:flex;align-items:center;gap:12px;padding:7px 10px;font-size:12px}.fx-slider input{flex:1;min-width:100px;accent-color:#a67aee}.fx-note{font-size:11px;line-height:1.4}.fx-picker.dark .fx-slider{color:#f1e8ff}
