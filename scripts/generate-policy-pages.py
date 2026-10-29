@@ -9,11 +9,11 @@ for key in ['privacy','community','child-safety']:
  (r/'website/src/pages'/f'{key}.html').write_text(json.dumps(meta,ensure_ascii=False)+'\n'+body+'\n',encoding='utf8')
 # Android renders the same canonical policy text, rather than keeping divergent copies.
 source='package app.kinnect.live;\nfinal class PolicyText {\nstatic String title(String key){switch(key){\n'
-for key in ['privacy','community','child-safety']:source+='case '+json.dumps(key)+':return '+json.dumps(data[key]['title'],ensure_ascii=False)+';\n'
+for key in ['privacy','community','child-safety']:source+='case '+json.dumps(key)+':return '+'I18n.t('+json.dumps(data[key]['title'],ensure_ascii=False)+');\n'
 source+='default:return "Kinnect";}}\nstatic String[][] rows(String key){switch(key){\n'
 for key in ['privacy','community','child-safety']:
  rows=[]
  for heading,text in data[key]['sections']:rows += [['h2',heading],['p',text]]
- source+='case '+json.dumps(key)+':return new String[][]{'+','.join('{'+','.join(json.dumps(v,ensure_ascii=False)for v in row)+'}'for row in rows)+'};\n'
+ source+='case '+json.dumps(key)+':return new String[][]{'+','.join('{'+','.join(json.dumps(v,ensure_ascii=False) if i==0 else 'I18n.t('+json.dumps(v,ensure_ascii=False)+')' for i,v in enumerate(row))+'}'for row in rows)+'};\n'
 source+='default:return new String[][]{};}}\n}\n';(r/'android/app/src/main/java/app/kinnect/live/PolicyText.java').write_text(source,encoding='utf8')
 print('Generated canonical privacy, community and child safety pages plus Android policy text')

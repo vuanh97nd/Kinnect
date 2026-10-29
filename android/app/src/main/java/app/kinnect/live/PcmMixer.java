@@ -7,7 +7,7 @@ final class PcmMixer implements Closeable {
   private final long frames;private final byte[] block;private long start=-1;private int loaded;
   PcmMixer(File path,int sampleRate,int channelCount,boolean pcmFloat,boolean looping)throws IOException{
     channels=channelCount;rate=sampleRate;floating=pcmFloat;bytes=pcmFloat?4:2;loop=looping;
-    if(channels<1||channels>8||rate<=0)throw new IOException("Thông số âm thanh không hợp lệ.");file=new RandomAccessFile(path,"r");frames=file.length()/(channels*bytes);block=new byte[2048*channels*bytes];
+    if(channels<1||channels>8||rate<=0)throw new IOException(I18n.t("Thông số âm thanh không hợp lệ."));file=new RandomAccessFile(path,"r");frames=file.length()/(channels*bytes);block=new byte[2048*channels*bytes];
   }
   private float sample(long frame,int channel)throws IOException{
     if(frames==0)return 0;if(loop)frame=((frame%frames)+frames)%frames;else if(frame<0||frame>=frames)return 0;

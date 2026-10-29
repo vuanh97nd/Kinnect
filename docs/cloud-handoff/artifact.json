@@ -1,94 +1,16 @@
 {
-  "version": "1.0.8",
-  "versionCode": 73,
-  "filename": "Kinnect-1.0.8-native.apk",
-  "sha256": "de8e0450b7762660dff0666b6b234aab974335152fa3381169d85b33d7c5c4df",
-  "signingCertificateSHA256": "d8809c1e21f00ccf96984b37123d3d916d2e103bfa1dc2032043f47bb3b9988d",
-  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.8",
-  "testedBaseline": "full source build; same website signing certificate; updated JVM dependencies",
-  "currentChecks": {
-    "aiFocusedPassed": 21,
-    "webStreaming": "passed: incremental text, safe DOM, survives reload, one final message",
-    "androidProfileAndStreaming": "passed: Android 14 emulator normal and font scale 1.3",
-    "liveAI": {
-      "chunks": 102,
-      "firstTextMs": 1170,
-      "totalMs": 8309
-    },
+  "version": "1.0.9",
+  "filename": "Kinnect-1.0.9-native.apk",
+  "sha256": "fa66f6751b1d250d6f9fd28e8b703b8a9d4a736216db02ccb148d817945b3d99",
+  "playVersion": "1.1.1",
+  "languages": [
+    "vi",
+    "en"
+  ],
+  "validation": {
+    "android16PageSize": 16384,
+    "languageAudit": "work/play-language-audit-result.log",
+    "policyAudit": "work/play-policy-111-result.log",
     "physicalDeviceVerified": false
-  },
-  "previousLayoutChecks": {
-    "android": {
-      "screensOrStates": 13,
-      "configurations": [
-        "1080x2400 density 420 font scale 1.0",
-        "840x1920 density 420 font scale 1.3"
-      ],
-      "execution": "Android 14 emulator; discovery empty component rendered from the actual installed APK; account screens use in-memory mock user data",
-      "physicalDeviceVerified": false
-    },
-    "web": {
-      "combinations": 42,
-      "widths": [
-        320,
-        390,
-        768,
-        900,
-        1366,
-        1920
-      ],
-      "screens": [
-        "feed",
-        "discover",
-        "inbox",
-        "friends",
-        "notifications",
-        "settings",
-        "profile"
-      ],
-      "scope": "horizontal overflow, heading text fit, <=144px discovery cards in rows, centered following empty state"
-    }
-  },
-  "brandingChecks": {
-    "roundedLogoSizesPx": [
-      34,
-      96,
-      192
-    ],
-    "whiteK": true,
-    "applicationIconRounded": true,
-    "startupTaglineRemoved": true,
-    "execution": "Android 14 emulator; actual packaged drawable/application icon and splash UI",
-    "physicalDeviceVerified": false
-  },
-  "profileAboutChecks": {
-    "tabOrder": [
-      "Giới thiệu",
-      "Bài viết",
-      "Album ảnh",
-      "Video"
-    ],
-    "defaultTab": "Bài viết",
-    "webWidths": [
-      320,
-      390,
-      768,
-      1366
-    ],
-    "privateFieldsExcluded": true,
-    "apk": "Android 14 emulator; font scale 1.0 and 1.3",
-    "physicalDeviceVerified": false,
-    "focusedTestsPassed": 26,
-    "httpsApkDownloads": "full bytes and SHA-256 verified on mobile and PC browser widths"
-  },
-  "googlePlayCandidate": {
-    "version": "1.1.0",
-    "versionCode": 100,
-    "targetSdk": 36,
-    "format": "AAB",
-    "googleApproved": false,
-    "backendTestsPassed": 97,
-    "androidRuntime": "Android 16 emulator; PAGE_SIZE=16384; normal and font scale 1.3",
-    "reviewerConsoleSetup": "pending owner identity/account/Play signing/declarations/testing"
   }
 }

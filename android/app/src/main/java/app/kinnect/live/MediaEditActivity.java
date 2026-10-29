@@ -68,12 +68,12 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); getWindow().setStatusBarColor(BG); getWindow().setNavigationBarColor(BG);
     build();
     Uri uri = getIntent().getData(); if (uri == null) { finish(); return; }
-    showHint("Đang mở…", 0);
+    showHint(I18n.t("Đang mở…"), 0);
     loader.execute(() -> {
       try {
         File f = copyIn(uri, "kinnect-edit-input-"); input = f; EditorProject.Clip clip = probe(f);
-        runOnUiThread(() -> { if (closed) return; project.clips.add(clip); afterClipsChanged(); thumbnails(clip); showHint(clip.video ? "Video · " + TimelineView.clock(clip.length()) : "Ảnh · " + clip.width + "×" + clip.height, 1600); });
-      } catch (Exception | OutOfMemoryError error) { runOnUiThread(() -> failure("Không mở được nội dung: " + error.getMessage())); }
+        runOnUiThread(() -> { if (closed) return; project.clips.add(clip); afterClipsChanged(); thumbnails(clip); showHint(clip.video ? "Video · " + TimelineView.clock(clip.length()) : I18n.t("Ảnh · ") + clip.width + I18n.t("×") + clip.height, 1600); });
+      } catch (Exception | OutOfMemoryError error) { runOnUiThread(() -> failure(I18n.t("Không mở được nội dung: ") + error.getMessage())); }
     });
     Choreographer.getInstance().postFrameCallback(this);
   }
@@ -82,7 +82,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
   private File copyIn(Uri uri, String prefix) throws IOException {
     File f = File.createTempFile(prefix, ".media", getCacheDir());
     try (InputStream in = getContentResolver().openInputStream(uri); OutputStream out = new FileOutputStream(f)) {
-      if (in == null) throw new IOException("Không đọc được tệp."); byte[] b = new byte[65536]; int n;
+      if (in == null) throw new IOException(I18n.t("Không đọc được tệp.")); byte[] b = new byte[65536]; int n;
       while ((n = in.read(b)) != -1) { if (Thread.currentThread().isInterrupted()) throw new InterruptedIOException(); out.write(b, 0, n); }
     }
     return f;
@@ -92,7 +92,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     BitmapFactory.Options o = new BitmapFactory.Options(); o.inJustDecodeBounds = true; BitmapFactory.decodeFile(f.getPath(), o);
     if (o.outWidth <= 0 || o.outHeight <= 0) return null;
     o.inJustDecodeBounds = false; o.inSampleSize = 1; while (Math.max(o.outWidth, o.outHeight) / o.inSampleSize > maxSide) o.inSampleSize *= 2;
-    Bitmap bmp = BitmapFactory.decodeFile(f.getPath(), o); if (bmp == null) throw new IOException("Không mở được ảnh.");
+    Bitmap bmp = BitmapFactory.decodeFile(f.getPath(), o); if (bmp == null) throw new IOException(I18n.t("Không mở được ảnh."));
     int orientation = new ExifInterface(f.getPath()).getAttributeInt(ExifInterface.TAG_ORIENTATION, 1); Matrix m = new Matrix();
     if (orientation == 3) m.postRotate(180); else if (orientation == 6) m.postRotate(90); else if (orientation == 8) m.postRotate(270);
     else if (orientation == 2) m.postScale(-1, 1); else if (orientation == 4) m.postScale(1, -1);
@@ -111,7 +111,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
       r.setDataSource(f.getPath());
       int w = parse(r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)), h = parse(r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT));
       int rot = parse(r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)); long ms = parse(r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION));
-      if (w <= 0 || h <= 0 || ms <= 0) throw new IOException("Tệp không phải ảnh hoặc video được hỗ trợ.");
+      if (w <= 0 || h <= 0 || ms <= 0) throw new IOException(I18n.t("Tệp không phải ảnh hoặc video được hỗ trợ."));
       if (rot % 180 != 0) { int t = w; w = h; h = t; }
       c.video = true; c.width = w; c.height = h; c.source = ms / 1000f; c.in = 0; c.out = c.source;
       c.hasAudio = "yes".equals(r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO));
@@ -145,7 +145,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
 
   private void failure(String message) {
     if (closed) return; busy = false;
-    new AlertDialog.Builder(this).setMessage(message).setPositiveButton("Dùng bản gốc", (d, w) -> { if (input != null) deliver(input); else finish(); }).setNegativeButton("Đóng", (d, w) -> finish()).show();
+    new AlertDialog.Builder(this).setMessage(message).setPositiveButton(I18n.t("Dùng bản gốc"), (d, w) -> { if (input != null) deliver(input); else finish(); }).setNegativeButton(I18n.t("Đóng"), (d, w) -> finish()).show();
   }
 
   // ---------- Layout ----------
@@ -171,14 +171,14 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     root.requestApplyInsets();
 
     LinearLayout top = new LinearLayout(this); top.setGravity(Gravity.CENTER_VERTICAL); top.setPadding(dp(4), 0, dp(10), 0);
-    top.addView(iconButton("close", "Đóng", this::onBackPressed), new LinearLayout.LayoutParams(dp(46), dp(46)));
+    top.addView(iconButton("close", I18n.t("Đóng"), this::onBackPressed), new LinearLayout.LayoutParams(dp(46), dp(46)));
     top.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
     qualityChip = label("1080p", 13, INK); qualityChip.setTypeface(Typeface.DEFAULT_BOLD); qualityChip.setGravity(Gravity.CENTER); qualityChip.setPadding(dp(12), 0, dp(12), 0);
     qualityChip.setCompoundDrawablesRelative(null, null, small(editorIcon("chevron_down", MUTED), 14), null); qualityChip.setCompoundDrawablePadding(dp(4));
     qualityChip.setBackground(rounded(CARD, 16)); qualityChip.setOnClickListener(v -> { if (!busy) qualitySheet(); });
     top.addView(qualityChip, new LinearLayout.LayoutParams(-2, dp(32)));
-    top.addView(iconButton("save", "Lưu về máy", () -> export(true)), new LinearLayout.LayoutParams(dp(46), dp(46)));
-    TextView post = label("Đăng", 14, Color.WHITE); post.setTypeface(Typeface.DEFAULT_BOLD); post.setGravity(Gravity.CENTER); post.setPadding(dp(16), 0, dp(16), 0);
+    top.addView(iconButton("save", I18n.t("Lưu về máy"), () -> export(true)), new LinearLayout.LayoutParams(dp(46), dp(46)));
+    TextView post = label(I18n.t("Đăng"), 14, Color.WHITE); post.setTypeface(Typeface.DEFAULT_BOLD); post.setGravity(Gravity.CENTER); post.setPadding(dp(16), 0, dp(16), 0);
     post.setBackground(new RippleDrawable(ColorStateList.valueOf(0x44ffffff), rounded(ACCENT, 17), null)); post.setOnClickListener(v -> { if (!busy) export(false); });
     LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(-2, dp(34)); pp.leftMargin = dp(4); top.addView(post, pp);
     root.addView(top, new LinearLayout.LayoutParams(-1, dp(52)));
@@ -198,22 +198,22 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     FrameLayout.LayoutParams hp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL); hp.topMargin = dp(10); stage.addView(hint, hp);
     exportCover = new FrameLayout(this); exportCover.setBackgroundColor(0xcc0f0d15); exportCover.setVisibility(View.GONE); exportCover.setClickable(true);
     LinearLayout ex = new LinearLayout(this); ex.setOrientation(LinearLayout.VERTICAL); ex.setGravity(Gravity.CENTER);
-    exportText = label("Đang xuất…", 15, INK); exportText.setTypeface(Typeface.DEFAULT_BOLD); exportText.setGravity(Gravity.CENTER); ex.addView(exportText);
+    exportText = label(I18n.t("Đang xuất…"), 15, INK); exportText.setTypeface(Typeface.DEFAULT_BOLD); exportText.setGravity(Gravity.CENTER); ex.addView(exportText);
     exportBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal); exportBar.setMax(100); exportBar.setProgressTintList(ColorStateList.valueOf(ACCENT));
     LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(dp(220), dp(10)); bp.topMargin = dp(12); ex.addView(exportBar, bp);
-    TextView keep = label("Giữ màn hình mở cho đến khi xong", 12, MUTED); keep.setPadding(0, dp(10), 0, dp(14)); ex.addView(keep);
-    TextView cancel = label("Hủy", 14, INK); cancel.setGravity(Gravity.CENTER); cancel.setBackground(rounded(CARD, 18)); cancel.setOnClickListener(v -> cancelExport("Đã hủy xuất."));
+    TextView keep = label(I18n.t("Giữ màn hình mở cho đến khi xong"), 12, MUTED); keep.setPadding(0, dp(10), 0, dp(14)); ex.addView(keep);
+    TextView cancel = label(I18n.t("Hủy"), 14, INK); cancel.setGravity(Gravity.CENTER); cancel.setBackground(rounded(CARD, 18)); cancel.setOnClickListener(v -> cancelExport(I18n.t("Đã hủy xuất.")));
     ex.addView(cancel, new LinearLayout.LayoutParams(dp(110), dp(38)));
     exportCover.addView(ex, new FrameLayout.LayoutParams(-1, -1)); stage.addView(exportCover, new FrameLayout.LayoutParams(-1, -1));
 
     LinearLayout controls = new LinearLayout(this); controls.setGravity(Gravity.CENTER_VERTICAL); controls.setPadding(dp(12), 0, dp(6), 0);
     timeText = label("00:00 / 00:00", 12, INK); timeText.setTypeface(Typeface.MONOSPACE); controls.addView(timeText, new LinearLayout.LayoutParams(0, -2, 1));
-    playButton = iconButton("play", "Phát hoặc tạm dừng", this::togglePlay); controls.addView(playButton, new LinearLayout.LayoutParams(dp(44), dp(44)));
+    playButton = iconButton("play", I18n.t("Phát hoặc tạm dừng"), this::togglePlay); controls.addView(playButton, new LinearLayout.LayoutParams(dp(44), dp(44)));
     LinearLayout right = new LinearLayout(this); right.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-    keyButton = iconButton("keyframe", "Thêm hoặc xóa khung hình chính", this::toggleKey); right.addView(keyButton, new LinearLayout.LayoutParams(dp(40), dp(40)));
-    undoButton = iconButton("undo", "Hoàn tác", () -> history(false)); right.addView(undoButton, new LinearLayout.LayoutParams(dp(40), dp(40)));
-    redoButton = iconButton("redo", "Làm lại", () -> history(true)); right.addView(redoButton, new LinearLayout.LayoutParams(dp(40), dp(40)));
-    ImageView compare = iconButton("compare", "Giữ để xem bản gốc", () -> {});
+    keyButton = iconButton("keyframe", I18n.t("Thêm hoặc xóa khung hình chính"), this::toggleKey); right.addView(keyButton, new LinearLayout.LayoutParams(dp(40), dp(40)));
+    undoButton = iconButton("undo", I18n.t("Hoàn tác"), () -> history(false)); right.addView(undoButton, new LinearLayout.LayoutParams(dp(40), dp(40)));
+    redoButton = iconButton("redo", I18n.t("Làm lại"), () -> history(true)); right.addView(redoButton, new LinearLayout.LayoutParams(dp(40), dp(40)));
+    ImageView compare = iconButton("compare", I18n.t("Giữ để xem bản gốc"), () -> {});
     compare.setOnTouchListener((v, e) -> { boolean down = e.getActionMasked() == MotionEvent.ACTION_DOWN || e.getActionMasked() == MotionEvent.ACTION_MOVE; for (EditorProject.Clip c : project.clips) c.fx.compare = down && !busy; if (e.getActionMasked() == MotionEvent.ACTION_UP) v.performClick(); return true; });
     right.addView(compare, new LinearLayout.LayoutParams(dp(40), dp(40)));
     controls.addView(right, new LinearLayout.LayoutParams(0, -2, 1));
@@ -269,50 +269,50 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     if (tools == null) return; tools.removeAllViews();
     EditorProject.Clip clip = "clip".equals(selKind) ? project.clip(selId) : null; EditorProject.Layer layer = "layer".equals(selKind) ? project.layer(selId) : null; EditorProject.Track track = "track".equals(selKind) ? project.track(selId) : null;
     if (clip == null && layer == null && track == null) { selKind = null;
-      tool("cut", "Chỉnh sửa", false, () -> { int i = project.clipAt(playhead); if (i >= 0) select("clip", project.clips.get(i).id); });
-      tool("music", "Âm thanh", false, this::audioSheet);
-      tool("text", "Chữ", false, this::addText);
-      tool("sticker", "Nhãn dán", false, this::stickerSheet);
-      tool("layer", "Lớp phủ", false, () -> pick(PICK_IMAGE, "image/*", false));
-      tool("caption", "Phụ đề tự động", false, this::captionSheet);
-      tool("filter", "Bộ lọc", false, () -> onCurrentClip(() -> fxSheet("filter")));
-      tool("color", "Điều chỉnh", false, () -> onCurrentClip(this::adjustSheet));
-      tool("beauty", "Làm đẹp", false, () -> onCurrentClip(() -> fxSheet("beauty")));
-      tool("format", "Tỉ lệ", false, this::formatSheet);
-      tool("background", "Nền", false, this::backgroundSheet);
-      tool("add", "Thêm clip", false, this::addClip);
+      tool("cut", I18n.t("Chỉnh sửa"), false, () -> { int i = project.clipAt(playhead); if (i >= 0) select("clip", project.clips.get(i).id); });
+      tool("music", I18n.t("Âm thanh"), false, this::audioSheet);
+      tool("text", I18n.t("Chữ"), false, this::addText);
+      tool("sticker", I18n.t("Nhãn dán"), false, this::stickerSheet);
+      tool("layer", I18n.t("Lớp phủ"), false, () -> pick(PICK_IMAGE, "image/*", false));
+      tool("caption", I18n.t("Phụ đề tự động"), false, this::captionSheet);
+      tool("filter", I18n.t("Bộ lọc"), false, () -> onCurrentClip(() -> fxSheet("filter")));
+      tool("color", I18n.t("Điều chỉnh"), false, () -> onCurrentClip(this::adjustSheet));
+      tool("beauty", I18n.t("Làm đẹp"), false, () -> onCurrentClip(() -> fxSheet("beauty")));
+      tool("format", I18n.t("Tỉ lệ"), false, this::formatSheet);
+      tool("background", I18n.t("Nền"), false, this::backgroundSheet);
+      tool("add", I18n.t("Thêm clip"), false, this::addClip);
     } else {
-      tool("back", "Quay lại", false, () -> select(null, 0)); divider();
+      tool("back", I18n.t("Quay lại"), false, () -> select(null, 0)); divider();
       if (clip != null) {
-        tool("split", "Tách", false, this::split);
-        tool("speed", "Tốc độ", clip.speed != 1, this::speedSheet);
-        tool("volume", "Âm lượng", clip.volume != 1, this::volumeSheet);
-        tool("move", "Vị trí", !clip.keys.isEmpty(), this::transformSheet);
+        tool("split", I18n.t("Tách"), false, this::split);
+        tool("speed", I18n.t("Tốc độ"), clip.speed != 1, this::speedSheet);
+        tool("volume", I18n.t("Âm lượng"), clip.volume != 1, this::volumeSheet);
+        tool("move", I18n.t("Vị trí"), !clip.keys.isEmpty(), this::transformSheet);
         tool("rotate", "Xoay", clip.turn != 0, () -> { remember(); clip.turn = (clip.turn + 90) % 360; showHint("Xoay " + clip.turn + "°", 1000); });
-        tool("flip", "Lật", clip.fx.flipImage, () -> { remember(); clip.fx.flipImage = !clip.fx.flipImage; refreshTools(); });
-        tool("filter", "Bộ lọc", !clip.fx.filter.equals("none"), () -> fxSheet("filter"));
-        tool("color", "Điều chỉnh", false, this::adjustSheet);
-        tool("beauty", "Làm đẹp", clip.fx.beautyOn, () -> fxSheet("beauty"));
-        tool("sticker", "Hiệu ứng mặt", !clip.fx.sticker.equals("none"), () -> fxSheet("sticker"));
-        tool("transition", "Chuyển cảnh", false, () -> { int i = project.indexOf(clip.id); transitionSheet(i + 1 < project.clips.size() ? i + 1 : i); });
-        tool("move_left", "Dời trước", false, () -> reorder(-1));
-        tool("move_right", "Dời sau", false, () -> reorder(1));
-        tool("duplicate", "Nhân bản", false, this::duplicate);
-        tool("delete", "Xóa", false, this::delete);
+        tool("flip", I18n.t("Lật"), clip.fx.flipImage, () -> { remember(); clip.fx.flipImage = !clip.fx.flipImage; refreshTools(); });
+        tool("filter", I18n.t("Bộ lọc"), !clip.fx.filter.equals("none"), () -> fxSheet("filter"));
+        tool("color", I18n.t("Điều chỉnh"), false, this::adjustSheet);
+        tool("beauty", I18n.t("Làm đẹp"), clip.fx.beautyOn, () -> fxSheet("beauty"));
+        tool("sticker", I18n.t("Hiệu ứng mặt"), !clip.fx.sticker.equals("none"), () -> fxSheet("sticker"));
+        tool("transition", I18n.t("Chuyển cảnh"), false, () -> { int i = project.indexOf(clip.id); transitionSheet(i + 1 < project.clips.size() ? i + 1 : i); });
+        tool("move_left", I18n.t("Dời trước"), false, () -> reorder(-1));
+        tool("move_right", I18n.t("Dời sau"), false, () -> reorder(1));
+        tool("duplicate", I18n.t("Nhân bản"), false, this::duplicate);
+        tool("delete", I18n.t("Xóa"), false, this::delete);
       } else if (layer != null) {
         boolean words = layer.kind.equals("text") || layer.kind.equals("caption");
-        if (words) { tool("text", "Sửa chữ", false, () -> editText(layer, false)); tool("font", "Kiểu chữ", false, this::styleSheet); }
-        tool("animation", "Hoạt ảnh", !layer.animIn.equals("none") || !layer.animOut.equals("none"), this::animationSheet);
-        tool("move", "Vị trí", !layer.keys.isEmpty(), this::transformSheet);
-        tool("split", "Tách", false, this::split);
-        tool("duplicate", "Nhân bản", false, this::duplicate);
-        tool("delete", "Xóa", false, this::delete);
+        if (words) { tool("text", I18n.t("Sửa chữ"), false, () -> editText(layer, false)); tool("font", I18n.t("Kiểu chữ"), false, this::styleSheet); }
+        tool("animation", I18n.t("Hoạt ảnh"), !layer.animIn.equals("none") || !layer.animOut.equals("none"), this::animationSheet);
+        tool("move", I18n.t("Vị trí"), !layer.keys.isEmpty(), this::transformSheet);
+        tool("split", I18n.t("Tách"), false, this::split);
+        tool("duplicate", I18n.t("Nhân bản"), false, this::duplicate);
+        tool("delete", I18n.t("Xóa"), false, this::delete);
       } else {
-        tool("volume", "Âm lượng", track.gain != 1, this::volumeSheet);
-        tool("fade", "Mờ dần", track.fadeIn > 0 || track.fadeOut > 0, this::fadeSheet);
-        tool("split", "Tách", false, this::split);
-        tool("duplicate", "Nhân bản", false, this::duplicate);
-        tool("delete", "Xóa", false, this::delete);
+        tool("volume", I18n.t("Âm lượng"), track.gain != 1, this::volumeSheet);
+        tool("fade", I18n.t("Mờ dần"), track.fadeIn > 0 || track.fadeOut > 0, this::fadeSheet);
+        tool("split", I18n.t("Tách"), false, this::split);
+        tool("duplicate", I18n.t("Nhân bản"), false, this::duplicate);
+        tool("delete", I18n.t("Xóa"), false, this::delete);
       }
     }
     updateButtons();
@@ -363,7 +363,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     ArrayDeque<EditorProject> from = forward ? redo : undo, to = forward ? undo : redo; if (from.isEmpty()) return;
     to.addLast(project.copy()); project = from.removeLast(); dirty = true;
     if (selectedItem() == null && !("track".equals(selKind) && project.track(selId) != null)) selKind = null;
-    playhead = Math.min(playhead, project.duration()); closeSheet(); afterClipsChanged(); showHint(forward ? "Làm lại" : "Hoàn tác", 800);
+    playhead = Math.min(playhead, project.duration()); closeSheet(); afterClipsChanged(); showHint(forward ? I18n.t("Làm lại") : I18n.t("Hoàn tác"), 800);
   }
 
   private void afterClipsChanged() { fit(); refreshTools(); timeline.requestLayout(); timeline.invalidate(); updateTime(); }
@@ -378,8 +378,8 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
 
   private void toggleKey() {
     EditorProject.Item item = selectedItem(); if (item == null) return; remember(); float local = localTime(); EditorProject.Key k = item.keyAt(local);
-    if (k != null) { item.keys.remove(k); showHint("Đã xóa khung hình chính", 1000); }
-    else { item.addKey(local); showHint(item.keys.size() == 1 ? "Đã thêm khung hình chính. Dời đầu phát rồi chỉnh vị trí/kích thước để tạo chuyển động" : "Đã thêm khung hình chính", item.keys.size() == 1 ? 3200 : 1000); }
+    if (k != null) { item.keys.remove(k); showHint(I18n.t("Đã xóa khung hình chính"), 1000); }
+    else { item.addKey(local); showHint(item.keys.size() == 1 ? I18n.t("Đã thêm khung hình chính. Dời đầu phát rồi chỉnh vị trí/kích thước để tạo chuyển động") : I18n.t("Đã thêm khung hình chính"), item.keys.size() == 1 ? 3200 : 1000); }
     refreshTools(); timeline.invalidate();
   }
 
@@ -421,7 +421,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     if (title != null) section(box, title);
     HorizontalScrollView scroll = new HorizontalScrollView(this); scroll.setHorizontalScrollBarEnabled(false); LinearLayout row = new LinearLayout(this);
     for (String[] item : items) {
-      TextView chip = label(item[1], 13, INK); chip.setGravity(Gravity.CENTER); chip.setPadding(dp(14), 0, dp(14), 0); chip.setTag(item[0]);
+      TextView chip = label(I18n.t(item[1]), 13, INK); chip.setGravity(Gravity.CENTER); chip.setPadding(dp(14), 0, dp(14), 0); chip.setTag(item[0]);
       chip.setBackground(rounded(item[0].equals(current) ? ACCENT : CARD, 16));
       chip.setOnClickListener(v -> { remember(); pick.pick(item[0]); for (int i = 0; i < row.getChildCount(); i++) row.getChildAt(i).setBackground(rounded(row.getChildAt(i) == v ? ACCENT : CARD, 16)); timeline.invalidate(); });
       LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, dp(34)); lp.rightMargin = dp(8); row.addView(chip, lp);
@@ -434,7 +434,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     HorizontalScrollView scroll = new HorizontalScrollView(this); scroll.setHorizontalScrollBarEnabled(false); LinearLayout row = new LinearLayout(this);
     for (int color : colors) {
       View dot = new View(this); GradientDrawable g = new GradientDrawable(); g.setShape(GradientDrawable.OVAL); g.setColor(color); g.setStroke(dp(color == current ? 3 : 1), color == current ? ACCENT : 0x55ffffff); dot.setBackground(g);
-      dot.setContentDescription("Màu"); dot.setOnClickListener(v -> { remember(); pick.set(color); for (int i = 0; i < row.getChildCount(); i++) { GradientDrawable d = (GradientDrawable) row.getChildAt(i).getBackground(); d.setStroke(dp(row.getChildAt(i) == v ? 3 : 1), row.getChildAt(i) == v ? ACCENT : 0x55ffffff); } timeline.invalidate(); });
+      dot.setContentDescription(I18n.t("Màu")); dot.setOnClickListener(v -> { remember(); pick.set(color); for (int i = 0; i < row.getChildCount(); i++) { GradientDrawable d = (GradientDrawable) row.getChildAt(i).getBackground(); d.setStroke(dp(row.getChildAt(i) == v ? 3 : 1), row.getChildAt(i) == v ? ACCENT : 0x55ffffff); } timeline.invalidate(); });
       LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(32), dp(32)); lp.rightMargin = dp(10); row.addView(dot, lp);
     }
     scroll.addView(row); box.addView(scroll);
@@ -447,82 +447,82 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
   }
 
   private void qualitySheet() {
-    LinearLayout box = openSheet("Chất lượng xuất");
-    chips(box, "Độ phân giải", new String[][] { { "480", "480p" }, { "720", "720p" }, { "1080", "1080p" } }, String.valueOf(project.exportSide), id -> { project.exportSide = Integer.parseInt(id); updateButtons(); });
-    note(box, "Video xuất ở 30 khung hình/giây, H.264 + âm thanh AAC. 1080p sắc nét nhất nhưng tệp lớn hơn.");
+    LinearLayout box = openSheet(I18n.t("Chất lượng xuất"));
+    chips(box, I18n.t("Độ phân giải"), new String[][] { { "480", "480p" }, { "720", "720p" }, { "1080", "1080p" } }, String.valueOf(project.exportSide), id -> { project.exportSide = Integer.parseInt(id); updateButtons(); });
+    note(box, I18n.t("Video xuất ở 30 khung hình/giây, H.264 + âm thanh AAC. 1080p sắc nét nhất nhưng tệp lớn hơn."));
   }
 
   private void formatSheet() {
-    LinearLayout box = openSheet("Tỉ lệ khung hình");
-    chips(box, null, new String[][] { { "0", "Gốc" }, { "0.5625", "9:16" }, { "1", "1:1" }, { "0.8", "4:5" }, { "0.75", "3:4" }, { "1.777778", "16:9" }, { "1.333333", "4:3" }, { "2.35", "2.35:1" } },
+    LinearLayout box = openSheet(I18n.t("Tỉ lệ khung hình"));
+    chips(box, null, new String[][] { { "0", I18n.t("Gốc") }, { "0.5625", "9:16" }, { "1", "1:1" }, { "0.8", "4:5" }, { "0.75", "3:4" }, { "1.777778", "16:9" }, { "1.333333", "4:3" }, { "2.35", "2.35:1" } },
       project.aspect == 0 ? "0" : trim(project.aspect), id -> { project.aspect = Float.parseFloat(id); fit(); });
-    note(box, "9:16 cho Shorts/Story, 1:1 và 4:5 cho bảng tin. Phần trống được lấp bằng nền (xem mục Nền).");
+    note(box, I18n.t("9:16 cho Shorts/Story, 1:1 và 4:5 cho bảng tin. Phần trống được lấp bằng nền (xem mục Nền)."));
   }
   private static String trim(float v) { for (String s : new String[] { "0.5625", "1", "0.8", "0.75", "1.777778", "1.333333", "2.35" }) if (Math.abs(Float.parseFloat(s) - v) < .001f) return s; return String.valueOf(v); }
 
   private void backgroundSheet() {
-    LinearLayout box = openSheet("Nền");
-    chips(box, "Kiểu nền", new String[][] { { "blur", "Mờ ảo" }, { "black", "Đen" }, { "white", "Trắng" } }, project.background.startsWith("#") ? "" : project.background, id -> project.background = id);
-    section(box, "Màu nền"); swatches(box, project.background.startsWith("#") ? Color.parseColor(project.background) : 0, v -> project.background = String.format("#%06X", ((int) v) & 0xffffff));
-    note(box, "Nền hiện ra khi khung hình khác tỉ lệ video hoặc khi thu nhỏ clip.");
+    LinearLayout box = openSheet(I18n.t("Nền"));
+    chips(box, I18n.t("Kiểu nền"), new String[][] { { "blur", I18n.t("Mờ ảo") }, { "black", I18n.t("Đen") }, { "white", I18n.t("Trắng") } }, project.background.startsWith("#") ? "" : project.background, id -> project.background = id);
+    section(box, I18n.t("Màu nền")); swatches(box, project.background.startsWith("#") ? Color.parseColor(project.background) : 0, v -> project.background = String.format("#%06X", ((int) v) & 0xffffff));
+    note(box, I18n.t("Nền hiện ra khi khung hình khác tỉ lệ video hoặc khi thu nhỏ clip."));
   }
 
   private void speedSheet() {
-    EditorProject.Clip c = project.clip(selId); if (c == null) return; LinearLayout box = openSheet("Tốc độ");
-    chips(box, null, new String[][] { { "0.25", "0.25×" }, { "0.5", "0.5×" }, { "0.75", "0.75×" }, { "1", "1×" }, { "1.5", "1.5×" }, { "2", "2×" }, { "3", "3×" }, { "4", "4×" } }, String.valueOf(c.speed).replaceAll("\\.0$", ""), id -> { c.speed = Float.parseFloat(id); afterClipsChanged(); });
-    slider(box, "Tùy chỉnh", .1f, 4, c.speed, v -> String.format(Locale.US, "%.2f×", v), v -> { c.speed = Math.round(v * 20) / 20f; updateTime(); });
-    note(box, c.video ? "Thời lượng clip: " + TimelineView.clock(c.length()) + ". Âm thanh gốc đổi cao độ theo tốc độ." : "Với ảnh, kéo hai đầu clip trên dòng thời gian để đổi thời lượng.");
+    EditorProject.Clip c = project.clip(selId); if (c == null) return; LinearLayout box = openSheet(I18n.t("Tốc độ"));
+    chips(box, null, new String[][] { { "0.25", I18n.t("0.25×") }, { "0.5", I18n.t("0.5×") }, { "0.75", I18n.t("0.75×") }, { "1", I18n.t("1×") }, { "1.5", I18n.t("1.5×") }, { "2", I18n.t("2×") }, { "3", I18n.t("3×") }, { "4", I18n.t("4×") } }, String.valueOf(c.speed).replaceAll("\\.0$", ""), id -> { c.speed = Float.parseFloat(id); afterClipsChanged(); });
+    slider(box, I18n.t("Tùy chỉnh"), .1f, 4, c.speed, v -> String.format(Locale.US, "%.2f×", v), v -> { c.speed = Math.round(v * 20) / 20f; updateTime(); });
+    note(box, c.video ? I18n.t("Thời lượng clip: ") + TimelineView.clock(c.length()) + I18n.t(". Âm thanh gốc đổi cao độ theo tốc độ.") : I18n.t("Với ảnh, kéo hai đầu clip trên dòng thời gian để đổi thời lượng."));
   }
 
   private void volumeSheet() {
-    if ("track".equals(selKind)) { EditorProject.Track t = project.track(selId); if (t == null) return; LinearLayout box = openSheet("Âm lượng");
-      slider(box, "Âm lượng", 0, 2, t.gain, percent(), v -> t.gain = v); return; }
-    EditorProject.Clip c = project.clip(selId); if (c == null) return; LinearLayout box = openSheet("Âm lượng clip");
-    if (!c.video || !c.hasAudio) { note(box, "Clip này không có âm thanh."); return; }
-    slider(box, "Âm lượng", 0, 2, c.volume, percent(), v -> c.volume = v);
-    action(box, c.volume == 0 ? "volume" : "mute", c.volume == 0 ? "Bật tiếng clip" : "Tắt tiếng clip", () -> { remember(); c.volume = c.volume == 0 ? 1 : 0; volumeSheet(); });
-    note(box, "Trên 100% chỉ nghe rõ trong video đã xuất.");
+    if ("track".equals(selKind)) { EditorProject.Track t = project.track(selId); if (t == null) return; LinearLayout box = openSheet(I18n.t("Âm lượng"));
+      slider(box, I18n.t("Âm lượng"), 0, 2, t.gain, percent(), v -> t.gain = v); return; }
+    EditorProject.Clip c = project.clip(selId); if (c == null) return; LinearLayout box = openSheet(I18n.t("Âm lượng clip"));
+    if (!c.video || !c.hasAudio) { note(box, I18n.t("Clip này không có âm thanh.")); return; }
+    slider(box, I18n.t("Âm lượng"), 0, 2, c.volume, percent(), v -> c.volume = v);
+    action(box, c.volume == 0 ? "volume" : "mute", c.volume == 0 ? I18n.t("Bật tiếng clip") : I18n.t("Tắt tiếng clip"), () -> { remember(); c.volume = c.volume == 0 ? 1 : 0; volumeSheet(); });
+    note(box, I18n.t("Trên 100% chỉ nghe rõ trong video đã xuất."));
   }
 
   private void fadeSheet() {
-    EditorProject.Track t = project.track(selId); if (t == null) return; LinearLayout box = openSheet("Mờ dần");
-    slider(box, "Mờ vào", 0, Math.min(5, t.length / 2), t.fadeIn, seconds(), v -> t.fadeIn = v);
-    slider(box, "Mờ ra", 0, Math.min(5, t.length / 2), t.fadeOut, seconds(), v -> t.fadeOut = v);
+    EditorProject.Track t = project.track(selId); if (t == null) return; LinearLayout box = openSheet(I18n.t("Mờ dần"));
+    slider(box, I18n.t("Mờ vào"), 0, Math.min(5, t.length / 2), t.fadeIn, seconds(), v -> t.fadeIn = v);
+    slider(box, I18n.t("Mờ ra"), 0, Math.min(5, t.length / 2), t.fadeOut, seconds(), v -> t.fadeOut = v);
   }
 
   private void transformSheet() {
     EditorProject.Item item = selectedItem(); if (item == null) return; boolean isClip = item instanceof EditorProject.Clip;
-    LinearLayout box = openSheet(isClip ? "Vị trí clip" : "Vị trí lớp"); float[] pose = item.pose(localTime());
-    slider(box, "Kích thước", isClip ? .3f : .1f, 4, pose[EditorProject.SCALE], percent(), v -> item.edit(localTime(), EditorProject.SCALE, v));
+    LinearLayout box = openSheet(isClip ? I18n.t("Vị trí clip") : I18n.t("Vị trí lớp")); float[] pose = item.pose(localTime());
+    slider(box, I18n.t("Kích thước"), isClip ? .3f : .1f, 4, pose[EditorProject.SCALE], percent(), v -> item.edit(localTime(), EditorProject.SCALE, v));
     slider(box, "Ngang", 0, 1, pose[EditorProject.X], v -> Math.round((v - .5f) * 200) + "", v -> item.edit(localTime(), EditorProject.X, v));
-    slider(box, "Dọc", 0, 1, pose[EditorProject.Y], v -> Math.round((v - .5f) * 200) + "", v -> item.edit(localTime(), EditorProject.Y, v));
+    slider(box, I18n.t("Dọc"), 0, 1, pose[EditorProject.Y], v -> Math.round((v - .5f) * 200) + "", v -> item.edit(localTime(), EditorProject.Y, v));
     slider(box, "Xoay", -180, 180, pose[EditorProject.ROTATION], degrees(), v -> item.edit(localTime(), EditorProject.ROTATION, Math.round(v)));
-    slider(box, "Độ mờ", 0, 1, pose[EditorProject.OPACITY], percent(), v -> item.edit(localTime(), EditorProject.OPACITY, v));
+    slider(box, I18n.t("Độ mờ"), 0, 1, pose[EditorProject.OPACITY], percent(), v -> item.edit(localTime(), EditorProject.OPACITY, v));
     boolean smooth = item.keys.isEmpty() || item.keys.get(0).smooth;
-    chips(box, "Chuyển động giữa khung hình chính", new String[][] { { "smooth", "Mượt (ease)" }, { "linear", "Đều" } }, smooth ? "smooth" : "linear", id -> { for (EditorProject.Key k : item.keys) k.smooth = id.equals("smooth"); });
-    action(box, "reset", "Đặt lại vị trí và xóa khung hình chính", () -> { remember(); item.keys.clear(); item.x = item.y = .5f; if (!isClip) item.y = ((EditorProject.Layer) item).kind.equals("caption") ? .82f : .5f; item.scale = 1; item.rotation = 0; item.opacity = 1; transformSheet(); });
-    note(box, item.keys.isEmpty() ? "Mẹo: bấm ◆ ở thanh phát để thêm khung hình chính, dời đầu phát, rồi chỉnh để tạo chuyển động. Có thể kéo/chụm trực tiếp trên khung xem trước." : "Đã có " + item.keys.size() + " khung hình chính: mọi thay đổi được ghi vào khung hình chính tại đầu phát.");
+    chips(box, I18n.t("Chuyển động giữa khung hình chính"), new String[][] { { "smooth", I18n.t("Mượt (ease)") }, { "linear", I18n.t("Đều") } }, smooth ? "smooth" : "linear", id -> { for (EditorProject.Key k : item.keys) k.smooth = id.equals("smooth"); });
+    action(box, "reset", I18n.t("Đặt lại vị trí và xóa khung hình chính"), () -> { remember(); item.keys.clear(); item.x = item.y = .5f; if (!isClip) item.y = ((EditorProject.Layer) item).kind.equals("caption") ? .82f : .5f; item.scale = 1; item.rotation = 0; item.opacity = 1; transformSheet(); });
+    note(box, item.keys.isEmpty() ? I18n.t("Mẹo: bấm ◆ ở thanh phát để thêm khung hình chính, dời đầu phát, rồi chỉnh để tạo chuyển động. Có thể kéo/chụm trực tiếp trên khung xem trước.") : I18n.t("Đã có ") + item.keys.size() + I18n.t(" khung hình chính: mọi thay đổi được ghi vào khung hình chính tại đầu phát."));
   }
 
   private void adjustSheet() {
-    EditorProject.Clip c = project.clip(selId); if (c == null) return; LinearLayout box = openSheet("Điều chỉnh");
-    slider(box, "Độ sáng", -1, 1, c.fx.exposure, v -> Math.round(v * 100) + "", v -> c.fx.exposure = v);
-    slider(box, "Tương phản", .5f, 2, c.fx.contrastLevel, percent(), v -> c.fx.contrastLevel = v);
-    slider(box, "Bão hòa", 0, 2, c.fx.saturation, percent(), v -> c.fx.saturation = v);
-    slider(box, "Nhiệt độ", -1, 1, c.fx.temperature, v -> Math.round(v * 100) + "", v -> c.fx.temperature = v);
-    slider(box, "Độ đậm lọc", 0, 1, c.fx.intensity, percent(), v -> c.fx.intensity = v);
-    action(box, "reset", "Đặt lại", () -> { remember(); c.fx.exposure = 0; c.fx.contrastLevel = 1; c.fx.saturation = 1; c.fx.temperature = 0; c.fx.intensity = 1; adjustSheet(); });
+    EditorProject.Clip c = project.clip(selId); if (c == null) return; LinearLayout box = openSheet(I18n.t("Điều chỉnh"));
+    slider(box, I18n.t("Độ sáng"), -1, 1, c.fx.exposure, v -> Math.round(v * 100) + "", v -> c.fx.exposure = v);
+    slider(box, I18n.t("Tương phản"), .5f, 2, c.fx.contrastLevel, percent(), v -> c.fx.contrastLevel = v);
+    slider(box, I18n.t("Bão hòa"), 0, 2, c.fx.saturation, percent(), v -> c.fx.saturation = v);
+    slider(box, I18n.t("Nhiệt độ"), -1, 1, c.fx.temperature, v -> Math.round(v * 100) + "", v -> c.fx.temperature = v);
+    slider(box, I18n.t("Độ đậm lọc"), 0, 1, c.fx.intensity, percent(), v -> c.fx.intensity = v);
+    action(box, "reset", I18n.t("Đặt lại"), () -> { remember(); c.fx.exposure = 0; c.fx.contrastLevel = 1; c.fx.saturation = 1; c.fx.temperature = 0; c.fx.intensity = 1; adjustSheet(); });
     applyAll(box, c);
   }
 
   private void applyAll(LinearLayout box, EditorProject.Clip c) {
     if (project.clips.size() < 2) return;
-    action(box, "duplicate", "Áp dụng cho tất cả clip", () -> { remember(); for (EditorProject.Clip o : project.clips) if (o != c) { boolean flip = o.fx.flipImage; o.fx = c.fx.copy(); o.fx.flipImage = flip; } showHint("Đã áp dụng cho " + project.clips.size() + " clip", 1200); });
+    action(box, "duplicate", I18n.t("Áp dụng cho tất cả clip"), () -> { remember(); for (EditorProject.Clip o : project.clips) if (o != c) { boolean flip = o.fx.flipImage; o.fx = c.fx.copy(); o.fx.flipImage = flip; } showHint(I18n.t("Đã áp dụng cho ") + project.clips.size() + " clip", 1200); });
   }
 
   private void fxSheet(String kind) {
     EditorProject.Clip c = project.clip(selId); if (c == null) return;
-    LinearLayout box = openSheet(kind.equals("beauty") ? "Làm đẹp" : kind.equals("filter") ? "Bộ lọc" : "Hiệu ứng khuôn mặt");
+    LinearLayout box = openSheet(kind.equals("beauty") ? I18n.t("Làm đẹp") : kind.equals("filter") ? I18n.t("Bộ lọc") : I18n.t("Hiệu ứng khuôn mặt"));
     EffectControls.Target base = EffectControls.forEditor(c.fx);
     EffectControls.Target target = new EffectControls.Target() {
       public String filter() { return base.filter(); } public String sticker() { return base.sticker(); } public boolean beauty() { return base.beauty(); }
@@ -531,26 +531,26 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
       public void beginEdit() { remember(); } public void value(String k, float v) { base.value(k, v); dirty = true; }
     };
     box.addView(EffectControls.panel(this, kind, target, () -> {}));
-    if (kind.equals("beauty")) action(box, c.fx.beautyOn ? "none" : "beauty", c.fx.beautyOn ? "Tắt làm đẹp" : "Bật làm đẹp", () -> { remember(); c.fx.beautyOn = !c.fx.beautyOn; fxSheet(kind); });
-    if (kind.equals("beauty") || kind.equals("sticker")) note(box, "Làm đẹp và hiệu ứng mặt cần nhìn rõ khuôn mặt; xử lý ngay trên máy.");
+    if (kind.equals("beauty")) action(box, c.fx.beautyOn ? "none" : "beauty", c.fx.beautyOn ? I18n.t("Tắt làm đẹp") : I18n.t("Bật làm đẹp"), () -> { remember(); c.fx.beautyOn = !c.fx.beautyOn; fxSheet(kind); });
+    if (kind.equals("beauty") || kind.equals("sticker")) note(box, I18n.t("Làm đẹp và hiệu ứng mặt cần nhìn rõ khuôn mặt; xử lý ngay trên máy."));
     applyAll(box, c);
   }
 
   private void transitionSheet(int index) {
-    if (index <= 0 || index >= project.clips.size()) { showHint("Cần ít nhất 2 clip để thêm chuyển cảnh", 1600); return; }
-    EditorProject.Clip c = project.clips.get(index); LinearLayout box = openSheet("Chuyển cảnh · clip " + index + " → " + (index + 1));
+    if (index <= 0 || index >= project.clips.size()) { showHint(I18n.t("Cần ít nhất 2 clip để thêm chuyển cảnh"), 1600); return; }
+    EditorProject.Clip c = project.clips.get(index); LinearLayout box = openSheet(I18n.t("Chuyển cảnh · clip ") + index + " → " + (index + 1));
     GridLayout grid = new GridLayout(this); grid.setColumnCount(4); int cell = (getResources().getDisplayMetrics().widthPixels - dp(32)) / 4;
     for (String[] item : EditorRender.TRANSITIONS) {
       LinearLayout tile = new LinearLayout(this); tile.setOrientation(LinearLayout.VERTICAL); tile.setGravity(Gravity.CENTER_HORIZONTAL); tile.setPadding(dp(4), dp(6), dp(4), dp(6));
       TransitionPreview demo = new TransitionPreview(this, item[0]); GradientDrawable frame = rounded(CARD, 10); if (item[0].equals(c.transition)) frame.setStroke(dp(2), ACCENT); demo.setBackground(frame); demo.setClipToOutline(true);
       tile.addView(demo, new LinearLayout.LayoutParams(cell - dp(14), (cell - dp(14)) * 3 / 4));
-      TextView name = label(item[1], 11, item[0].equals(c.transition) ? ACCENT : INK); name.setGravity(Gravity.CENTER); name.setPadding(0, dp(4), 0, 0); tile.addView(name);
+      TextView name = label(I18n.t(item[1]), 11, item[0].equals(c.transition) ? ACCENT : INK); name.setGravity(Gravity.CENTER); name.setPadding(0, dp(4), 0, 0); tile.addView(name);
       tile.setOnClickListener(v -> { remember(); c.transition = item[0]; afterClipsChanged(); scrub(project.starts()[index] - .3f, true); playing = true; transitionSheet(index); });
       grid.addView(tile, new GridLayout.LayoutParams(new ViewGroup.LayoutParams(cell, -2)));
     }
     box.addView(grid);
-    if (!c.transition.equals("none")) slider(box, "Thời lượng", .2f, 2, c.transitionLength, seconds(), v -> { c.transitionLength = v; updateTime(); });
-    action(box, "duplicate", "Áp dụng cho tất cả chỗ nối", () -> { remember(); for (int i = 1; i < project.clips.size(); i++) { project.clips.get(i).transition = c.transition; project.clips.get(i).transitionLength = c.transitionLength; } afterClipsChanged(); showHint("Đã áp dụng cho mọi chỗ nối", 1200); });
+    if (!c.transition.equals("none")) slider(box, I18n.t("Thời lượng"), .2f, 2, c.transitionLength, seconds(), v -> { c.transitionLength = v; updateTime(); });
+    action(box, "duplicate", I18n.t("Áp dụng cho tất cả chỗ nối"), () -> { remember(); for (int i = 1; i < project.clips.size(); i++) { project.clips.get(i).transition = c.transition; project.clips.get(i).transitionLength = c.transitionLength; } afterClipsChanged(); showHint(I18n.t("Đã áp dụng cho mọi chỗ nối"), 1200); });
   }
 
   /** Small looping demo of a transition, drawn with the real renderer. */
@@ -579,36 +579,36 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
   private void addText() { EditorProject.Layer l = newLayer("text", 3); l.text = ""; l.style = "stroke"; editText(l, true); }
 
   private void editText(EditorProject.Layer layer, boolean adding) {
-    EditText field = new EditText(this); field.setText(layer.text); field.setHint("Nhập chữ"); field.setSelection(field.getText().length()); field.setMinLines(2); field.setMaxLines(6);
+    EditText field = new EditText(this); field.setText(layer.text); field.setHint(I18n.t("Nhập chữ")); field.setSelection(field.getText().length()); field.setMinLines(2); field.setMaxLines(6);
     FrameLayout wrap = new FrameLayout(this); wrap.setPadding(dp(20), dp(8), dp(20), 0); wrap.addView(field);
-    AlertDialog dialog = new AlertDialog.Builder(this).setTitle(adding ? "Thêm chữ" : "Sửa chữ").setView(wrap)
+    AlertDialog dialog = new AlertDialog.Builder(this).setTitle(adding ? I18n.t("Thêm chữ") : I18n.t("Sửa chữ")).setView(wrap)
       .setPositiveButton("Xong", (d, w) -> {
         String value = field.getText().toString().trim(); if (value.isEmpty()) return;
         remember(); layer.text = value; if (adding) { project.layers.add(layer); select("layer", layer.id); } else refreshTools(); timeline.requestLayout(); timeline.invalidate();
-      }).setNegativeButton("Hủy", null).create();
+      }).setNegativeButton(I18n.t("Hủy"), null).create();
     dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE); dialog.show(); field.requestFocus();
   }
 
   private void styleSheet() {
-    EditorProject.Layer l = project.layer(selId); if (l == null) return; LinearLayout box = openSheet(l.kind.equals("caption") ? "Kiểu phụ đề" : "Kiểu chữ");
+    EditorProject.Layer l = project.layer(selId); if (l == null) return; LinearLayout box = openSheet(l.kind.equals("caption") ? I18n.t("Kiểu phụ đề") : I18n.t("Kiểu chữ"));
     boolean caption = l.kind.equals("caption");
     final List<EditorProject.Layer> targets = new ArrayList<>(); if (caption) { for (EditorProject.Layer o : project.layers) if (o.kind.equals("caption")) targets.add(o); } else targets.add(l);
-    chips(box, "Kiểu", EditorRender.STYLES, l.style, id -> { for (EditorProject.Layer o : targets) o.style = id; });
-    section(box, "Màu"); swatches(box, l.color, v -> { for (EditorProject.Layer o : targets) o.color = (int) v; });
-    chips(box, "Phông chữ", EditorRender.FONTS, l.font, id -> { for (EditorProject.Layer o : targets) o.font = id; });
-    chips(box, "Căn lề", new String[][] { { "left", "Trái" }, { "center", "Giữa" }, { "right", "Phải" } }, l.align, id -> { for (EditorProject.Layer o : targets) o.align = id; });
-    slider(box, "Cỡ chữ", .025f, .16f, l.size, v -> Math.round(v * 1000) + "", v -> { for (EditorProject.Layer o : targets) o.size = v; });
-    if (caption) note(box, "Thay đổi áp dụng cho tất cả " + targets.size() + " dòng phụ đề.");
+    chips(box, I18n.t("Kiểu"), EditorRender.STYLES, l.style, id -> { for (EditorProject.Layer o : targets) o.style = id; });
+    section(box, I18n.t("Màu")); swatches(box, l.color, v -> { for (EditorProject.Layer o : targets) o.color = (int) v; });
+    chips(box, I18n.t("Phông chữ"), EditorRender.FONTS, l.font, id -> { for (EditorProject.Layer o : targets) o.font = id; });
+    chips(box, I18n.t("Căn lề"), new String[][] { { "left", I18n.t("Trái") }, { "center", I18n.t("Giữa") }, { "right", I18n.t("Phải") } }, l.align, id -> { for (EditorProject.Layer o : targets) o.align = id; });
+    slider(box, I18n.t("Cỡ chữ"), .025f, .16f, l.size, v -> Math.round(v * 1000) + "", v -> { for (EditorProject.Layer o : targets) o.size = v; });
+    if (caption) note(box, I18n.t("Thay đổi áp dụng cho tất cả ") + targets.size() + I18n.t(" dòng phụ đề."));
   }
 
   private void animationSheet() {
-    EditorProject.Layer l = project.layer(selId); if (l == null) return; LinearLayout box = openSheet("Hoạt ảnh");
+    EditorProject.Layer l = project.layer(selId); if (l == null) return; LinearLayout box = openSheet(I18n.t("Hoạt ảnh"));
     boolean words = !l.kind.equals("image");
     List<String[]> ins = new ArrayList<>(); for (String[] a : EditorRender.ANIMATIONS) if (words || !a[0].equals("type")) ins.add(a);
     List<String[]> outs = new ArrayList<>(); for (String[] a : EditorRender.ANIMATIONS) if (!a[0].equals("type")) outs.add(a);
-    chips(box, "Vào", ins.toArray(new String[0][]), l.animIn, id -> l.animIn = id);
+    chips(box, I18n.t("Vào"), ins.toArray(new String[0][]), l.animIn, id -> l.animIn = id);
     chips(box, "Ra", outs.toArray(new String[0][]), l.animOut, id -> l.animOut = id);
-    slider(box, "Thời lượng", .1f, 1.5f, l.animLength, seconds(), v -> l.animLength = v);
+    slider(box, I18n.t("Thời lượng"), .1f, 1.5f, l.animLength, seconds(), v -> l.animLength = v);
   }
 
   private static final String[][] STICKERS = {
@@ -620,13 +620,13 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     { "Động vật", "🐶 🐱 🐰 🐻 🐼 🦊 🐥 🦋 🐠 🦄" } };
 
   private void stickerSheet() {
-    LinearLayout box = openSheet("Nhãn dán");
+    LinearLayout box = openSheet(I18n.t("Nhãn dán"));
     int cell = (getResources().getDisplayMetrics().widthPixels - dp(32)) / 6;
     for (String[] group : STICKERS) {
       section(box, group[0]); GridLayout grid = new GridLayout(this); grid.setColumnCount(6);
       for (String emoji : group[1].split(" ")) {
         TextView t = label(emoji, 26, Color.WHITE); t.setGravity(Gravity.CENTER); t.setBackground(new RippleDrawable(ColorStateList.valueOf(0x33ffffff), null, rounded(Color.WHITE, 10)));
-        t.setOnClickListener(v -> { remember(); EditorProject.Layer l = newLayer("sticker", 3); l.text = emoji; l.animIn = "pop"; project.layers.add(l); select("layer", l.id); showHint("Kéo nhãn dán trên khung xem trước để đặt vị trí", 1800); });
+        t.setOnClickListener(v -> { remember(); EditorProject.Layer l = newLayer("sticker", 3); l.text = emoji; l.animIn = "pop"; project.layers.add(l); select("layer", l.id); showHint(I18n.t("Kéo nhãn dán trên khung xem trước để đặt vị trí"), 1800); });
         grid.addView(t, new GridLayout.LayoutParams(new ViewGroup.LayoutParams(cell, dp(48))));
       }
       box.addView(grid);
@@ -635,24 +635,24 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
 
   // ---------- Audio ----------
   private void audioSheet() {
-    LinearLayout box = openSheet("Âm thanh");
-    action(box, "music", "Thêm nhạc từ máy", () -> pick(PICK_MUSIC, "audio/*", false));
-    action(box, "voice", "Ghi âm lồng tiếng", this::voiceSheet);
+    LinearLayout box = openSheet(I18n.t("Âm thanh"));
+    action(box, "music", I18n.t("Thêm nhạc từ máy"), () -> pick(PICK_MUSIC, "audio/*", false));
+    action(box, "voice", I18n.t("Ghi âm lồng tiếng"), this::voiceSheet);
     boolean muted = true; for (EditorProject.Clip c : project.clips) if (c.video && c.hasAudio && c.volume > 0) muted = false;
     final boolean allMuted = muted;
-    action(box, allMuted ? "volume" : "mute", allMuted ? "Bật tiếng gốc mọi clip" : "Tắt tiếng gốc mọi clip", () -> { remember(); for (EditorProject.Clip c : project.clips) c.volume = allMuted ? 1 : 0; audioSheet(); timeline.invalidate(); });
-    note(box, "Chạm vào dải nhạc trên dòng thời gian để chỉnh âm lượng, mờ dần, tách; giữ để kéo đổi vị trí.");
+    action(box, allMuted ? "volume" : "mute", allMuted ? I18n.t("Bật tiếng gốc mọi clip") : I18n.t("Tắt tiếng gốc mọi clip"), () -> { remember(); for (EditorProject.Clip c : project.clips) c.volume = allMuted ? 1 : 0; audioSheet(); timeline.invalidate(); });
+    note(box, I18n.t("Chạm vào dải nhạc trên dòng thời gian để chỉnh âm lượng, mờ dần, tách; giữ để kéo đổi vị trí."));
   }
 
   private void voiceSheet() {
-    LinearLayout box = openSheet("Ghi âm lồng tiếng"); box.setGravity(Gravity.CENTER_HORIZONTAL);
-    micTimer = label("Bấm để ghi âm từ " + TimelineView.clock(playhead), 13, MUTED); micTimer.setGravity(Gravity.CENTER); micTimer.setPadding(0, dp(12), 0, dp(14)); box.addView(micTimer, new LinearLayout.LayoutParams(-1, -2));
+    LinearLayout box = openSheet(I18n.t("Ghi âm lồng tiếng")); box.setGravity(Gravity.CENTER_HORIZONTAL);
+    micTimer = label(I18n.t("Bấm để ghi âm từ ") + TimelineView.clock(playhead), 13, MUTED); micTimer.setGravity(Gravity.CENTER); micTimer.setPadding(0, dp(12), 0, dp(14)); box.addView(micTimer, new LinearLayout.LayoutParams(-1, -2));
     FrameLayout ring = new FrameLayout(this); GradientDrawable outer = new GradientDrawable(); outer.setShape(GradientDrawable.OVAL); outer.setStroke(dp(3), Color.WHITE); ring.setBackground(outer);
     View dot = new View(this); GradientDrawable inner = new GradientDrawable(); inner.setShape(GradientDrawable.OVAL); inner.setColor(0xffff3b55); dot.setBackground(inner);
-    ring.addView(dot, new FrameLayout.LayoutParams(dp(54), dp(54), Gravity.CENTER)); micButton = dot; ring.setContentDescription("Bắt đầu hoặc dừng ghi âm");
+    ring.addView(dot, new FrameLayout.LayoutParams(dp(54), dp(54), Gravity.CENTER)); micButton = dot; ring.setContentDescription(I18n.t("Bắt đầu hoặc dừng ghi âm"));
     ring.setOnClickListener(v -> { if (micRecording) stopMic(); else startMic(); });
     box.addView(ring, new LinearLayout.LayoutParams(dp(72), dp(72)));
-    note(box, "Video phát (tắt tiếng gốc) trong lúc bạn nói để khớp lời. Nên dùng tai nghe.").setGravity(Gravity.CENTER);
+    note(box, I18n.t("Video phát (tắt tiếng gốc) trong lúc bạn nói để khớp lời. Nên dùng tai nghe.")).setGravity(Gravity.CENTER);
   }
 
   private void startMic() {
@@ -663,53 +663,53 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
       mic.setAudioSamplingRate(44100); mic.setAudioEncodingBitRate(128000); mic.setAudioChannels(1); mic.setOutputFile(micFile.getPath()); mic.prepare(); mic.start();
       micRecording = true; micStart = playhead; micStarted = SystemClock.elapsedRealtime(); if (playhead >= project.duration() - .05f) micStart = playhead; playing = playhead < project.duration() - .05f; updateButtons();
       if (micButton != null) { micButton.animate().scaleX(.55f).scaleY(.55f).setDuration(160); ((GradientDrawable) micButton.getBackground()).setCornerRadius(dp(8)); ((GradientDrawable) micButton.getBackground()).setShape(GradientDrawable.RECTANGLE); }
-    } catch (Exception e) { if (mic != null) { mic.release(); mic = null; } micRecording = false; showHint("Không mở được micro.", 1800); }
+    } catch (Exception e) { if (mic != null) { mic.release(); mic = null; } micRecording = false; showHint(I18n.t("Không mở được micro."), 1800); }
   }
 
   private void stopMic() {
     if (!micRecording) return; micRecording = false; playing = false; updateButtons(); long ms = SystemClock.elapsedRealtime() - micStarted;
     try { mic.stop(); } catch (Exception e) { ms = 0; } mic.release(); mic = null;
     if (micButton != null) { GradientDrawable g = (GradientDrawable) micButton.getBackground(); g.setShape(GradientDrawable.OVAL); micButton.animate().scaleX(1).scaleY(1).setDuration(160); }
-    if (ms < 400) { if (micFile != null) micFile.delete(); showHint("Bản ghi quá ngắn.", 1400); return; }
+    if (ms < 400) { if (micFile != null) micFile.delete(); showHint(I18n.t("Bản ghi quá ngắn."), 1400); return; }
     remember(); EditorProject.Track t = new EditorProject.Track(); t.kind = "voice"; t.file = micFile; t.start = micStart; t.length = t.source = ms / 1000f;
     int n = 0; for (EditorProject.Track o : project.tracks) if (o.kind.equals("voice")) n++; t.name = String.valueOf(n + 1);
-    project.tracks.add(t); timeline.requestLayout(); timeline.invalidate(); showHint("Đã thêm bản ghi âm " + TimelineView.clock(t.length), 1500);
-    if (micTimer != null) micTimer.setText("Bấm để ghi tiếp từ " + TimelineView.clock(playhead));
+    project.tracks.add(t); timeline.requestLayout(); timeline.invalidate(); showHint(I18n.t("Đã thêm bản ghi âm ") + TimelineView.clock(t.length), 1500);
+    if (micTimer != null) micTimer.setText(I18n.t("Bấm để ghi tiếp từ ") + TimelineView.clock(playhead));
   }
 
   @Override public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
     super.onRequestPermissionsResult(request, permissions, results);
-    if (request == MIC) { if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) startMic(); else showHint("Cần quyền micro để ghi âm.", 2000); }
+    if (request == MIC) { if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) startMic(); else showHint(I18n.t("Cần quyền micro để ghi âm."), 2000); }
   }
 
   // ---------- Captions ----------
   private String captionLanguage = "vi-VN"; private boolean replaceCaptions = true;
 
   private void captionSheet() {
-    LinearLayout box = openSheet("Phụ đề tự động");
+    LinearLayout box = openSheet(I18n.t("Phụ đề tự động"));
     if (!AutoCaptions.supported(this)) {
-      note(box, Build.VERSION.SDK_INT < 33 ? "Phụ đề tự động trên máy cần Android 13 trở lên." : "Máy chưa có dịch vụ nhận dạng giọng nói ngoại tuyến. Hãy cài/ cập nhật ứng dụng Google và gói Nhận dạng giọng nói (Cài đặt › Hệ thống › Ngôn ngữ › Nhận dạng giọng nói trên thiết bị).");
+      note(box, Build.VERSION.SDK_INT < 33 ? I18n.t("Phụ đề tự động trên máy cần Android 13 trở lên.") : I18n.t("Máy chưa có dịch vụ nhận dạng giọng nói ngoại tuyến. Hãy cài/ cập nhật ứng dụng Google và gói Nhận dạng giọng nói (Cài đặt › Hệ thống › Ngôn ngữ › Nhận dạng giọng nói trên thiết bị)."));
       return;
     }
-    chips(box, "Ngôn ngữ trong video", new String[][] { { "vi-VN", "Tiếng Việt" }, { "en-US", "English" } }, captionLanguage, id -> captionLanguage = id);
-    chips(box, "Phụ đề cũ", new String[][] { { "replace", "Thay thế" }, { "keep", "Giữ lại" } }, replaceCaptions ? "replace" : "keep", id -> replaceCaptions = id.equals("replace"));
-    final TextView status = note(box, "Nhận dạng chạy hoàn toàn trên máy, không gửi âm thanh đi đâu, không tốn phí. Lần đầu Android có thể cần tải gói ngôn ngữ.");
-    action(box, "caption", "Tạo phụ đề", () -> makeCaptions(status));
+    chips(box, I18n.t("Ngôn ngữ trong video"), new String[][] { { "vi-VN", I18n.t("Tiếng Việt") }, { "en-US", "English" } }, captionLanguage, id -> captionLanguage = id);
+    chips(box, I18n.t("Phụ đề cũ"), new String[][] { { "replace", I18n.t("Thay thế") }, { "keep", I18n.t("Giữ lại") } }, replaceCaptions ? "replace" : "keep", id -> replaceCaptions = id.equals("replace"));
+    final TextView status = note(box, I18n.t("Nhận dạng chạy hoàn toàn trên máy, không gửi âm thanh đi đâu, không tốn phí. Lần đầu Android có thể cần tải gói ngôn ngữ."));
+    action(box, "caption", I18n.t("Tạo phụ đề"), () -> makeCaptions(status));
   }
 
   private void makeCaptions(TextView status) {
     final List<EditorAudio.Source> sources = new ArrayList<>(); float[] starts = project.starts();
     for (int i = 0; i < project.clips.size(); i++) { EditorProject.Clip c = project.clips.get(i); if (!c.video || !c.hasAudio || c.volume <= 0) continue; EditorAudio.Source s = new EditorAudio.Source(); s.file = c.file; s.start = starts[i]; s.length = c.length(); s.in = c.in; s.rate = c.speed; sources.add(s); }
     for (EditorProject.Track t : project.tracks) if (t.kind.equals("voice")) { EditorAudio.Source s = new EditorAudio.Source(); s.file = t.file; s.start = t.start; s.length = t.length; s.in = t.in; s.gain = 1; sources.add(s); }
-    if (sources.isEmpty()) { status.setText("Không có giọng nói: các clip đều tắt tiếng hoặc không có âm thanh."); return; }
-    busy = true; playing = false; status.setText("Đang chuẩn bị âm thanh…"); final long ms = (long) (project.duration() * 1000); final String language = captionLanguage;
+    if (sources.isEmpty()) { status.setText(I18n.t("Không có giọng nói: các clip đều tắt tiếng hoặc không có âm thanh.")); return; }
+    busy = true; playing = false; status.setText(I18n.t("Đang chuẩn bị âm thanh…")); final long ms = (long) (project.duration() * 1000); final String language = captionLanguage;
     task = worker.submit(() -> {
       try {
         short[] pcm = EditorAudio.speech(this, sources, ms, AutoCaptions.RATE);
         runOnUiThread(() -> {
           if (closed) return; captions = new AutoCaptions();
           captions.run(this, pcm, language, new AutoCaptions.Listener() {
-            public void progress(int done, int total) { status.setText("Đang nhận dạng giọng nói… " + done + "/" + total); }
+            public void progress(int done, int total) { status.setText(I18n.t("Đang nhận dạng giọng nói… ") + done + "/" + total); }
             public void finished(List<float[]> times, List<String> lines, String error) {
               busy = false; captions = null;
               if (lines.isEmpty()) { status.setText(error); return; }
@@ -722,11 +722,11 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
                 project.layers.add(l);
               }
               timeline.requestLayout(); timeline.invalidate();
-              status.setText("Đã tạo " + lines.size() + " dòng phụ đề." + (error != null ? " " + error : "") + " Chạm vào một dòng để sửa chữ hoặc kiểu.");
+              status.setText(I18n.t("Đã tạo ") + lines.size() + I18n.t(" dòng phụ đề.") + (error != null ? " " + error : "") + I18n.t(" Chạm vào một dòng để sửa chữ hoặc kiểu."));
             }
           });
         });
-      } catch (Exception | OutOfMemoryError e) { runOnUiThread(() -> { busy = false; status.setText("Không đọc được âm thanh của video."); }); }
+      } catch (Exception | OutOfMemoryError e) { runOnUiThread(() -> { busy = false; status.setText(I18n.t("Không đọc được âm thanh của video.")); }); }
     });
   }
 
@@ -734,21 +734,21 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
   private void split() {
     if ("clip".equals(selKind)) {
       int i = project.indexOf(selId); if (i < 0) return; EditorProject.Clip c = project.clips.get(i); float local = playhead - project.starts()[i];
-      if (local < .1f || local > c.length() - .1f) { showHint("Đặt đầu phát vào giữa clip để tách", 1500); return; }
+      if (local < .1f || local > c.length() - .1f) { showHint(I18n.t("Đặt đầu phát vào giữa clip để tách"), 1500); return; }
       remember(); EditorProject.Clip b = c.copy(); b.id = EditorProject.newId(); float cut = c.in + local * c.speed;
       c.out = cut; b.in = cut; b.transition = "none"; trimKeys(c, b, local); project.clips.add(i + 1, b); select("clip", b.id);
     } else if ("layer".equals(selKind)) {
       EditorProject.Layer l = project.layer(selId); if (l == null) return; float local = playhead - l.start;
-      if (local < .1f || local > l.length - .1f) { showHint("Đặt đầu phát vào giữa lớp để tách", 1500); return; }
+      if (local < .1f || local > l.length - .1f) { showHint(I18n.t("Đặt đầu phát vào giữa lớp để tách"), 1500); return; }
       remember(); EditorProject.Layer b = l.copy(); b.id = EditorProject.newId(); b.start = playhead; b.length = l.length - local; l.length = local; trimKeys(l, b, local);
       project.layers.add(project.layers.indexOf(l) + 1, b); select("layer", b.id);
     } else if ("track".equals(selKind)) {
       EditorProject.Track t = project.track(selId); if (t == null) return; float local = playhead - t.start;
-      if (local < .1f || local > t.length - .1f) { showHint("Đặt đầu phát vào giữa đoạn âm thanh để tách", 1500); return; }
+      if (local < .1f || local > t.length - .1f) { showHint(I18n.t("Đặt đầu phát vào giữa đoạn âm thanh để tách"), 1500); return; }
       remember(); EditorProject.Track b = t.copy(); b.id = EditorProject.newId(); b.start = playhead; b.in = t.in + local; b.length = t.length - local; b.fadeIn = 0; t.length = local; t.fadeOut = 0;
       project.tracks.add(b); select("track", b.id);
     }
-    timeline.requestLayout(); showHint("Đã tách", 900);
+    timeline.requestLayout(); showHint(I18n.t("Đã tách"), 900);
   }
 
   private static void trimKeys(EditorProject.Item a, EditorProject.Item b, float local) {
@@ -761,14 +761,14 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     if ("clip".equals(selKind)) { int i = project.indexOf(selId); if (i < 0) return; EditorProject.Clip b = project.clips.get(i).copy(); b.id = EditorProject.newId(); project.clips.add(i + 1, b); select("clip", b.id); }
     else if ("layer".equals(selKind)) { EditorProject.Layer l = project.layer(selId); if (l == null) return; EditorProject.Layer b = l.copy(); b.id = EditorProject.newId(); b.start = l.start + l.length; project.layers.add(b); select("layer", b.id); }
     else if ("track".equals(selKind)) { EditorProject.Track t = project.track(selId); if (t == null) return; EditorProject.Track b = t.copy(); b.id = EditorProject.newId(); b.start = t.start + t.length; project.tracks.add(b); select("track", b.id); }
-    afterClipsChanged(); showHint("Đã nhân bản", 900);
+    afterClipsChanged(); showHint(I18n.t("Đã nhân bản"), 900);
   }
 
   private void delete() {
-    if ("clip".equals(selKind)) { if (project.clips.size() == 1) { showHint("Video cần ít nhất một clip", 1500); return; } remember(); project.clips.remove(project.clip(selId)); }
+    if ("clip".equals(selKind)) { if (project.clips.size() == 1) { showHint(I18n.t("Video cần ít nhất một clip"), 1500); return; } remember(); project.clips.remove(project.clip(selId)); }
     else if ("layer".equals(selKind)) { remember(); project.layers.remove(project.layer(selId)); }
     else if ("track".equals(selKind)) { remember(); project.tracks.remove(project.track(selId)); }
-    selKind = null; playhead = Math.min(playhead, project.duration()); afterClipsChanged(); showHint("Đã xóa", 900);
+    selKind = null; playhead = Math.min(playhead, project.duration()); afterClipsChanged(); showHint(I18n.t("Đã xóa"), 900);
   }
 
   private void reorder(int by) {
@@ -792,27 +792,27 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     if (data.getClipData() != null) for (int i = 0; i < data.getClipData().getItemCount(); i++) uris.add(data.getClipData().getItemAt(i).getUri());
     else if (data.getData() != null) uris.add(data.getData());
     if (uris.isEmpty()) return;
-    showHint("Đang thêm…", 0);
+    showHint(I18n.t("Đang thêm…"), 0);
     loader.execute(() -> {
       try {
         if (request == PICK_CLIPS) {
           List<EditorProject.Clip> added = new ArrayList<>(); for (Uri u : uris) added.add(probe(copyIn(u, "kinnect-edit-clip-")));
           runOnUiThread(() -> { if (closed) return; remember(); int at = Math.max(0, project.clipAt(playhead)) + 1; at = Math.min(at, project.clips.size()); project.clips.addAll(at, added);
-            for (EditorProject.Clip c : added) thumbnails(c); afterClipsChanged(); scrub(project.starts()[at] + .01f, true); showHint("Đã thêm " + added.size() + " clip", 1300); });
+            for (EditorProject.Clip c : added) thumbnails(c); afterClipsChanged(); scrub(project.starts()[at] + .01f, true); showHint(I18n.t("Đã thêm ") + added.size() + " clip", 1300); });
         } else if (request == PICK_MUSIC) {
           File f = copyIn(uris.get(0), "kinnect-music-"); MediaMetadataRetriever r = new MediaMetadataRetriever(); long ms; String title;
           try { r.setDataSource(f.getPath()); ms = parse(r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)); title = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE); } finally { try { r.release(); } catch (Exception ignored) {} }
-          if (ms <= 0) throw new IOException("Tệp không có âm thanh.");
+          if (ms <= 0) throw new IOException(I18n.t("Tệp không có âm thanh."));
           final String name = title != null && !title.trim().isEmpty() ? title.trim() : displayName(uris.get(0)); final long length = ms;
           runOnUiThread(() -> { if (closed) return; remember(); EditorProject.Track t = new EditorProject.Track(); t.kind = "music"; t.file = f; t.name = name; t.source = length / 1000f;
             t.start = Math.max(0, Math.min(playhead, project.duration() - .5f)); t.length = Math.min(t.source, Math.max(1, project.duration() - t.start)); t.gain = .7f; t.fadeOut = Math.min(1.5f, t.length / 4);
-            project.tracks.add(t); select("track", t.id); timeline.requestLayout(); showHint("Đã thêm nhạc", 1200); });
+            project.tracks.add(t); select("track", t.id); timeline.requestLayout(); showHint(I18n.t("Đã thêm nhạc"), 1200); });
         } else if (request == PICK_IMAGE) {
-          File f = copyIn(uris.get(0), "kinnect-overlay-"); Bitmap b = decodePhoto(f, 1280); if (b == null) throw new IOException("Không phải ảnh.");
+          File f = copyIn(uris.get(0), "kinnect-overlay-"); Bitmap b = decodePhoto(f, 1280); if (b == null) throw new IOException(I18n.t("Không phải ảnh."));
           images.put(f.getAbsolutePath(), b);
-          runOnUiThread(() -> { if (closed) return; remember(); EditorProject.Layer l = newLayer("image", 5); l.image = f; l.scale = .8f; project.layers.add(l); select("layer", l.id); showHint("Kéo, chụm hai ngón để đặt lớp phủ", 1600); });
+          runOnUiThread(() -> { if (closed) return; remember(); EditorProject.Layer l = newLayer("image", 5); l.image = f; l.scale = .8f; project.layers.add(l); select("layer", l.id); showHint(I18n.t("Kéo, chụm hai ngón để đặt lớp phủ"), 1600); });
         }
-      } catch (Exception | OutOfMemoryError e) { runOnUiThread(() -> showHint("Không thêm được: " + e.getMessage(), 2200)); }
+      } catch (Exception | OutOfMemoryError e) { runOnUiThread(() -> showHint(I18n.t("Không thêm được: ") + e.getMessage(), 2200)); }
     });
   }
 
@@ -981,7 +981,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     if (closed) return; Choreographer.getInstance().postFrameCallback(this); tick++;
     float dt = lastNanos == 0 ? 0 : Math.min(.1f, (now - lastNanos) / 1e9f); lastNanos = now;
     if (project.clips.isEmpty()) return; float duration = project.duration();
-    if (micRecording && micTimer != null && tick % 6 == 0) micTimer.setText("● Đang ghi " + TimelineView.clock((SystemClock.elapsedRealtime() - micStarted) / 1000f) + " · bấm để dừng");
+    if (micRecording && micTimer != null && tick % 6 == 0) micTimer.setText(I18n.t("● Đang ghi ") + TimelineView.clock((SystemClock.elapsedRealtime() - micStarted) / 1000f) + I18n.t(" · bấm để dừng"));
     if (exporting) { exportFrame(duration); return; }
     if (playing) { playhead += dt; if (playhead >= duration) { playhead = duration; playing = false; updateButtons(); } }
     syncDecks(playhead, playing); syncTracks(playhead, playing);
@@ -1009,11 +1009,11 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
   }
 
   @Override public void onBackPressed() {
-    if (exporting) { cancelExport("Đã hủy xuất."); return; }
+    if (exporting) { cancelExport(I18n.t("Đã hủy xuất.")); return; }
     if (captions != null) { captions.cancel(); captions = null; busy = false; }
     if (sheet.getVisibility() == View.VISIBLE) { closeSheet(); return; }
     if (selKind != null) { select(null, 0); return; }
-    if (dirty) { new AlertDialog.Builder(this).setMessage("Bỏ chỉnh sửa?").setPositiveButton("Bỏ", (d, w) -> finish()).setNegativeButton("Giữ lại", null).show(); return; }
+    if (dirty) { new AlertDialog.Builder(this).setMessage(I18n.t("Bỏ chỉnh sửa?")).setPositiveButton(I18n.t("Bỏ"), (d, w) -> finish()).setNegativeButton(I18n.t("Giữ lại"), null).show(); return; }
     super.onBackPressed();
   }
 
@@ -1029,7 +1029,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
   private void exportStill() {
     busy = true;
     try {
-      EditorProject.Clip c = project.clips.get(0); Bitmap photo = photos.get(c.file.getAbsolutePath()); if (photo == null) throw new IOException("Ảnh chưa sẵn sàng.");
+      EditorProject.Clip c = project.clips.get(0); Bitmap photo = photos.get(c.file.getAbsolutePath()); if (photo == null) throw new IOException(I18n.t("Ảnh chưa sẵn sàng."));
       EditorProject copy = project.copy(); float t = c.length() / 2; for (EditorProject.Layer l : copy.layers) { l.start = 0; l.length = c.length(); l.animIn = l.animOut = "none"; }
       float ratio = project.outputAspect(); int side = Math.max(photo.getWidth(), photo.getHeight()); int w = ratio >= 1 ? side : Math.round(side * ratio), h = ratio >= 1 ? Math.round(side / ratio) : side;
       Bitmap output = Bitmap.createBitmap(Math.max(2, w), Math.max(2, h), Bitmap.Config.ARGB_8888);
@@ -1037,7 +1037,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
       new EditorRender().draw(new Canvas(output), copy, t, frames, images, tick, false);
       File file = File.createTempFile("kinnect-edited-", ".jpg", getCacheDir()); try (OutputStream out = new FileOutputStream(file)) { output.compress(Bitmap.CompressFormat.JPEG, 94, out); } output.recycle();
       deliver(file);
-    } catch (Exception | OutOfMemoryError error) { busy = false; showHint("Không xuất được ảnh. Hãy thử lại.", 2000); }
+    } catch (Exception | OutOfMemoryError error) { busy = false; showHint(I18n.t("Không xuất được ảnh. Hãy thử lại."), 2000); }
   }
 
   private void startExport() {
@@ -1051,8 +1051,8 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
       recorder.setOutputFile(rendered.getPath()); recorder.prepare(); recordSurface = recorder.getSurface();
       if (exportFrame != null) exportFrame.recycle(); exportFrame = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
       exporting = true; armed = false; armWait = SystemClock.elapsedRealtime(); playhead = 0; exportGeneration++;
-      exportCover.setVisibility(View.VISIBLE); exportBar.setProgress(0); exportText.setText("Đang chuẩn bị…");
-    } catch (Exception error) { cancelExport("Không xuất được video: " + error.getMessage()); }
+      exportCover.setVisibility(View.VISIBLE); exportBar.setProgress(0); exportText.setText(I18n.t("Đang chuẩn bị…"));
+    } catch (Exception error) { cancelExport(I18n.t("Không xuất được video: ") + error.getMessage()); }
   }
 
   private void exportFrame(float duration) {
@@ -1060,7 +1060,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
       syncDecks(0, false); EditorProject.Clip first = project.clips.get(0); Deck d = first.video ? deckFor(first, false, Collections.emptySet()) : null;
       boolean ready = !first.video || d != null && d.prepared && !d.seeking;
       if (!ready && SystemClock.elapsedRealtime() - armWait < 5000) return;
-      try { recorder.start(); } catch (Exception e) { cancelExport("Không khởi động được bộ xuất video."); return; }
+      try { recorder.start(); } catch (Exception e) { cancelExport(I18n.t("Không khởi động được bộ xuất video.")); return; }
       armed = true; exportStart = SystemClock.elapsedRealtime(); lastPost = 0;
     }
     playhead = Math.min(duration, (SystemClock.elapsedRealtime() - exportStart) / 1000f);
@@ -1069,17 +1069,17 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     if (ms - lastPost >= 33 || playhead >= duration) {
       lastPost = ms; render.draw(new Canvas(exportFrame), project, playhead, frames(playhead, Math.min(1920, Math.max(exportFrame.getWidth(), exportFrame.getHeight()))), images, tick, false);
       try { Canvas c = recordSurface.lockHardwareCanvas(); try { c.drawBitmap(exportFrame, 0, 0, null); } finally { recordSurface.unlockCanvasAndPost(c); } }
-      catch (Exception error) { cancelExport("Không xuất được hiệu ứng trên thiết bị này."); return; }
+      catch (Exception error) { cancelExport(I18n.t("Không xuất được hiệu ứng trên thiết bị này.")); return; }
       if (preview.getHolder().getSurface().isValid()) { Canvas c = null; try { c = preview.getHolder().lockCanvas(); if (c != null) c.drawBitmap(exportFrame, null, new Rect(0, 0, c.getWidth(), c.getHeight()), null); } catch (Exception ignored) {} finally { if (c != null) preview.getHolder().unlockCanvasAndPost(c); } }
-      int pct = Math.round(playhead / Math.max(.01f, duration) * 90); exportBar.setProgress(pct); exportText.setText("Đang xuất " + pct + "%"); timeline.invalidate(); updateTime();
+      int pct = Math.round(playhead / Math.max(.01f, duration) * 90); exportBar.setProgress(pct); exportText.setText(I18n.t("Đang xuất ") + pct + "%"); timeline.invalidate(); updateTime();
     }
     if (playhead >= duration) finishExport();
   }
 
   private void finishExport() {
     exporting = false; armed = false;
-    try { recorder.stop(); recorder.release(); recorder = null; recordSurface.release(); recordSurface = null; } catch (Exception e) { cancelExport("Video chưa hoàn tất. Hãy thử lại."); return; }
-    syncDecks(playhead, false); exportText.setText("Đang ghép âm thanh…"); exportBar.setProgress(92);
+    try { recorder.stop(); recorder.release(); recorder = null; recordSurface.release(); recordSurface = null; } catch (Exception e) { cancelExport(I18n.t("Video chưa hoàn tất. Hãy thử lại.")); return; }
+    syncDecks(playhead, false); exportText.setText(I18n.t("Đang ghép âm thanh…")); exportBar.setProgress(92);
     final List<EditorAudio.Source> sources = new ArrayList<>(); float[] starts = project.starts();
     for (int i = 0; i < project.clips.size(); i++) {
       EditorProject.Clip c = project.clips.get(i); if (!c.video || !c.hasAudio || c.volume <= 0) continue;
@@ -1092,7 +1092,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
       try {
         File output = File.createTempFile("kinnect-edited-", ".mp4", getCacheDir()); EditorAudio.timeline(this, video, sources, ms, output);
         runOnUiThread(() -> { if (!closed && generation == exportGeneration) { exportCover.setVisibility(View.GONE); deliver(output); } else output.delete(); });
-      } catch (Exception e) { runOnUiThread(() -> { if (!closed && generation == exportGeneration) cancelExport("Không ghép được âm thanh: " + e.getMessage()); }); }
+      } catch (Exception e) { runOnUiThread(() -> { if (!closed && generation == exportGeneration) cancelExport(I18n.t("Không ghép được âm thanh: ") + e.getMessage()); }); }
     });
   }
 
@@ -1110,7 +1110,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
         byte[] header = new byte[32]; try (InputStream in = new FileInputStream(file)) { in.read(header); } String mime = MediaType.sniff(header); if (mime == null) mime = project.still() ? "image/jpeg" : "video/mp4";
         Intent save = new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(mime).putExtra(Intent.EXTRA_TITLE, "Kinnect-" + System.currentTimeMillis() + (mime.equals("video/mp4") ? ".mp4" : mime.equals("image/png") ? ".png" : mime.equals("image/webp") ? ".webp" : ".jpg"));
         startActivityForResult(save, SAVE);
-      } catch (Exception error) { showHint("Không mở được nơi lưu tệp.", 1800); saveRequested = false; }
+      } catch (Exception error) { showHint(I18n.t("Không mở được nơi lưu tệp."), 1800); saveRequested = false; }
       return;
     }
     delivered = file == input; Intent result = new Intent().setData(Uri.fromFile(file)); result.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION); setResult(RESULT_OK, result); finish();
@@ -1118,18 +1118,18 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
 
   private void saved(int result, Intent data) {
     saveRequested = false;
-    if (result != RESULT_OK || data == null || data.getData() == null || saveFile == null) { showHint("Đã hủy lưu. Bạn có thể chỉnh tiếp.", 1600); return; }
-    final Uri destination = data.getData(); final File file = saveFile; busy = true; showHint("Đang lưu…", 0);
+    if (result != RESULT_OK || data == null || data.getData() == null || saveFile == null) { showHint(I18n.t("Đã hủy lưu. Bạn có thể chỉnh tiếp."), 1600); return; }
+    final Uri destination = data.getData(); final File file = saveFile; busy = true; showHint(I18n.t("Đang lưu…"), 0);
     task = worker.submit(() -> {
       try (InputStream in = new FileInputStream(file); OutputStream out = getContentResolver().openOutputStream(destination)) {
-        if (out == null) throw new IOException("Không mở được nơi lưu."); byte[] buffer = new byte[65536]; int n; while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
-        runOnUiThread(() -> { busy = false; showHint("✓ Đã lưu về máy", 1600); });
-      } catch (Exception error) { runOnUiThread(() -> { busy = false; showHint("Không lưu được tệp. Hãy thử lại.", 1800); }); }
+        if (out == null) throw new IOException(I18n.t("Không mở được nơi lưu.")); byte[] buffer = new byte[65536]; int n; while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
+        runOnUiThread(() -> { busy = false; showHint(I18n.t("✓ Đã lưu về máy"), 1600); });
+      } catch (Exception error) { runOnUiThread(() -> { busy = false; showHint(I18n.t("Không lưu được tệp. Hãy thử lại."), 1800); }); }
     });
   }
 
   @Override protected void onPause() {
-    super.onPause(); if (exporting) cancelExport("Xuất bị gián đoạn. Hãy giữ màn hình mở và thử lại."); if (micRecording) stopMic();
+    super.onPause(); if (exporting) cancelExport(I18n.t("Xuất bị gián đoạn. Hãy giữ màn hình mở và thử lại.")); if (micRecording) stopMic();
     playing = false; updateButtons(); syncDecks(playhead, false); syncTracks(playhead, false);
   }
 

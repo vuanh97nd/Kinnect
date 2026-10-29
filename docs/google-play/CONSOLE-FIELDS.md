@@ -34,3 +34,7 @@ Không cho phép nội dung khiêu dâm, quấy rối, lừa đảo hoặc xâm 
 ## Lưu ý hình ảnh cửa hàng
 
 Dùng ảnh chụp đúng bản Play hiện hành. Nếu dùng tài khoản/ảnh minh họa, ghi rõ minh họa. Không đưa số liệu “10K lượt tải”, “4.8 sao”, “500 người đang online” hoặc cam kết bảo mật/mã hóa đầu cuối không có bằng chứng vào mô tả hay screenshot. Không dùng ảnh/nhạc thiếu quyền, hình gợi dục hoặc dữ liệu cá nhân thật của thành viên khác.
+
+## Ngôn ngữ ứng dụng
+
+Tiếng Việt và English đã có trong bản Play 1.1.1. Trang cửa hàng chưa được tạo trên Console; lựa chọn mua hàng trong ứng dụng là kế hoạch chủ tài khoản đã khai, không có nghĩa bản hiện tại đã tích hợp Play Billing.

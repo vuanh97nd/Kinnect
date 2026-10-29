@@ -116,7 +116,7 @@ final class Sheet {
         row.setMinimumHeight(dp(54));
         row.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x226c47e0), round(bg, 12), round(0xff000000, 12)));
         String label = String.valueOf(items[i]);
-        boolean danger = label.startsWith("Xoá") || label.startsWith("Xóa") || label.startsWith("Chặn") || label.startsWith("Đăng xuất") || label.startsWith("Thu hồi") || label.startsWith("Rời");
+        boolean danger = label.startsWith("Delete") || label.startsWith("Block") || label.startsWith("Log out") || label.startsWith("Unsend") || label.startsWith("Leave") || label.startsWith("Xoá") || label.startsWith("Xóa") || label.startsWith("Chặn") || label.startsWith("Đăng xuất") || label.startsWith("Thu hồi") || label.startsWith("Rời");
         if (checked != null) {
           final CheckBox box2 = new CheckBox(context);
           box2.setChecked(checked[i]);
@@ -199,7 +199,7 @@ final class Sheet {
     b.setTypeface(ApprovedTypography.font(context,Typeface.BOLD));
     b.setStateListAnimator(null);
     android.content.res.ColorStateList ripple = android.content.res.ColorStateList.valueOf(primary ? 0x33ffffff : 0x226c47e0);
-    boolean danger = label.toString().startsWith("Xoá") || label.toString().startsWith("Xóa") || label.toString().startsWith("Chặn") || label.toString().startsWith("Đăng xuất") || label.toString().startsWith("Thu hồi");
+    boolean danger = label.toString().startsWith("Delete") || label.toString().startsWith("Block") || label.toString().startsWith("Log out") || label.toString().startsWith("Unsend") || label.toString().startsWith("Xoá") || label.toString().startsWith("Xóa") || label.toString().startsWith("Chặn") || label.toString().startsWith("Đăng xuất") || label.toString().startsWith("Thu hồi");
     if (primary) {
       b.setBackground(new android.graphics.drawable.RippleDrawable(ripple, round(danger ? 0xffe0245e : 0xff6c47e0, 14), null));
       b.setTextColor(0xffffffff);

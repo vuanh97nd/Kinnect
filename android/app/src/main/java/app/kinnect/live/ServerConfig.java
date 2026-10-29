@@ -30,7 +30,7 @@ public final class ServerConfig {
       return "https://" + host + (port == -1 || port == 443 ? "" : ":" + port);
     } catch (Exception error) {
       throw new IllegalArgumentException(
-        "Nhập địa chỉ HTTPS hợp lệ, không kèm đường dẫn hoặc mật khẩu."
+        I18n.t("Nhập địa chỉ HTTPS hợp lệ, không kèm đường dẫn hoặc mật khẩu.")
       );
     }
   }

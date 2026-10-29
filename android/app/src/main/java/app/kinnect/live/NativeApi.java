@@ -72,7 +72,7 @@ public final class NativeApi {
       try {
         if (
           !path.startsWith("/api/") || path.contains("..")
-        ) throw new IOException("API không hợp lệ.");
+        ) throw new IOException(I18n.t("API không hợp lệ."));
         connection = (HttpURLConnection) new URL(
           server + path
         ).openConnection();
@@ -115,16 +115,16 @@ public final class NativeApi {
         String response = input == null ? "{}" : new String(read(input, 2000000), "UTF-8");
         try { result = new JSONObject(response); }
         catch (org.json.JSONException invalid) {
-          if (status >= 200 && status < 300) throw new IOException("Máy chủ trả về dữ liệu không hợp lệ.");
+          if (status >= 200 && status < 300) throw new IOException(I18n.t("Máy chủ trả về dữ liệu không hợp lệ."));
           result = new JSONObject();
         }
         if (status < 200 || status >= 300) error = result.optString("error", httpFailure(status));
       } catch (OutOfMemoryError failure) {
-        error = "Thiết bị không đủ bộ nhớ để chuẩn bị tệp tải lên.";
+        error = I18n.t("Thiết bị không đủ bộ nhớ để chuẩn bị tệp tải lên.");
       } catch (java.net.SocketTimeoutException failure) {
-        error = "Kết nối tải lên hết thời gian chờ. Kiểm tra mạng rồi thử lại.";
+        error = I18n.t("Kết nối tải lên hết thời gian chờ. Kiểm tra mạng rồi thử lại.");
       } catch (Exception failure) {
-        error = status >= 200 && status < 300 ? "Máy chủ trả về dữ liệu không hợp lệ." : status > 0 ? httpFailure(status) : "Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.";
+        error = status >= 200 && status < 300 ? I18n.t("Máy chủ trả về dữ liệu không hợp lệ.") : status > 0 ? httpFailure(status) : I18n.t("Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.");
       } finally {
         if (connection != null) connection.disconnect();
       }
@@ -136,10 +136,10 @@ public final class NativeApi {
   }
 
   private static String httpFailure(int status) {
-    if (status == 413) return "Máy chủ hoặc đường truyền từ chối kích thước tải lên (HTTP 413).";
-    if (status == 401) return "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.";
-    if (status == 429) return "Máy chủ đang bận hoặc cần chờ trước lần đăng tiếp theo (HTTP 429).";
-    return "Máy chủ chưa nhận được yêu cầu (HTTP " + status + ").";
+    if (status == 413) return I18n.t("Máy chủ hoặc đường truyền từ chối kích thước tải lên (HTTP 413).");
+    if (status == 401) return I18n.t("Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.");
+    if (status == 429) return I18n.t("Máy chủ đang bận hoặc cần chờ trước lần đăng tiếp theo (HTTP 429).");
+    return I18n.t("Máy chủ chưa nhận được yêu cầu (HTTP ") + status + ").";
   }
 
   public void image(String path, Bytes callback) {
@@ -210,7 +210,7 @@ public final class NativeApi {
       int count;
       while ((count = in.read(buffer)) != -1) {
         if (out.size() + count > maximum) throw new IOException(
-          "Dữ liệu quá lớn."
+          I18n.t("Dữ liệu quá lớn.")
         );
         out.write(buffer, 0, count);
       }

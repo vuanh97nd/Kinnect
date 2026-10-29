@@ -24,7 +24,7 @@ final class IntroArt extends View {
     super(context);
     this.page = Math.max(0, Math.min(page, CHIPS.length - 1));
     logo = getResources().getDrawable(getResources().getIdentifier("kinnect_logo", "drawable", context.getPackageName()));
-    setContentDescription("Minh hoạ Kinnect");
+    setContentDescription(I18n.t("Minh hoạ Kinnect"));
   }
 
   private float dp(float v) {

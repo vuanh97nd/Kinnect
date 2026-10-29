@@ -37,7 +37,7 @@ final class EffectControls {
       }
       scroll.addView(choices);box.addView(scroll);
       for(String[] item:new String[][]{{"smooth","Mịn da"},{"blemish","Giảm đốm"},{"eyes","Mắt to"},{"lips","Môi đầy"}}){
-        LinearLayout line=new LinearLayout(c);line.setGravity(Gravity.CENTER_VERTICAL);line.setPadding(dp(c,4),dp(c,5),0,0);TextView name=new TextView(c);name.setText(item[1]);name.setTextColor(ink);name.setTextSize(12);line.addView(name,new LinearLayout.LayoutParams(dp(c,82),-2));
+        LinearLayout line=new LinearLayout(c);line.setGravity(Gravity.CENTER_VERTICAL);line.setPadding(dp(c,4),dp(c,5),0,0);TextView name=new TextView(c);name.setText(I18n.t(item[1]));name.setTextColor(ink);name.setTextSize(12);line.addView(name,new LinearLayout.LayoutParams(dp(c,82),-2));
         SeekBar slider=new SeekBar(c);slider.setMax(100);slider.setProgress(Math.round(target.value(item[0])*100));slider.setContentDescription(item[1]);slider.setThumbTintList(android.content.res.ColorStateList.valueOf(0xff8b5cf6));slider.setProgressTintList(android.content.res.ColorStateList.valueOf(0xff8b5cf6));
         slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(SeekBar s,int p,boolean user){if(user){target.value(item[0],p/100f);changed.run();}}public void onStartTrackingTouch(SeekBar s){target.beginEdit();}public void onStopTrackingTouch(SeekBar s){}});
         line.addView(slider,new LinearLayout.LayoutParams(0,dp(c,38),1));box.addView(line);
@@ -58,13 +58,13 @@ final class EffectControls {
   }
   /** Square swatch (vector icon centred, or a real filter preview) with a centred one-line label. */
   private static View tile(Context c,String icon,String filter,String name,int ink,int soft,boolean selected){
-    LinearLayout t=new LinearLayout(c);t.setOrientation(LinearLayout.VERTICAL);t.setGravity(Gravity.CENTER_HORIZONTAL);t.setPadding(dp(c,3),dp(c,6),dp(c,3),dp(c,6));t.setContentDescription(name);
+    LinearLayout t=new LinearLayout(c);t.setOrientation(LinearLayout.VERTICAL);t.setGravity(Gravity.CENTER_HORIZONTAL);t.setPadding(dp(c,3),dp(c,6),dp(c,3),dp(c,6));t.setContentDescription(I18n.t(name));
     FrameLayout frame=new FrameLayout(c);GradientDrawable g=new GradientDrawable();g.setColor(filter!=null?soft:Color.TRANSPARENT);if(filter==null&&!selected)g.setStroke(dp(c,1),(ink&0x00ffffff)|0x33000000);g.setCornerRadius(dp(c,14));if(selected)g.setStroke(dp(c,2),0xff8b5cf6);frame.setBackground(g);frame.setClipToOutline(true);frame.setPadding(selected?dp(c,2):0,selected?dp(c,2):0,selected?dp(c,2):0,selected?dp(c,2):0);
     ImageView image=new ImageView(c);
     if(filter!=null){image.setImageBitmap(filterPreview(c,filter));image.setScaleType(ImageView.ScaleType.CENTER_CROP);image.setClipToOutline(true);GradientDrawable clip=new GradientDrawable();clip.setCornerRadius(dp(c,12));image.setBackground(clip);frame.addView(image,new FrameLayout.LayoutParams(-1,-1));}
     else{image.setImageDrawable(EditorIcons.drawable(c,icon,selected?0xff8b5cf6:ink));frame.addView(image,new FrameLayout.LayoutParams(dp(c,20),dp(c,20),Gravity.CENTER));}
     int side=filter!=null?52:38;t.addView(frame,new LinearLayout.LayoutParams(dp(c,side),dp(c,side)));
-    TextView label=new TextView(c);label.setText(name);label.setTextSize(10.5f);label.setTextColor(selected?0xff8b5cf6:ink);label.setGravity(Gravity.CENTER);label.setSingleLine(true);label.setEllipsize(android.text.TextUtils.TruncateAt.END);label.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));label.setPadding(0,dp(c,5),0,0);
+    TextView label=new TextView(c);label.setText(I18n.t(name));label.setTextSize(10.5f);label.setTextColor(selected?0xff8b5cf6:ink);label.setGravity(Gravity.CENTER);label.setSingleLine(true);label.setEllipsize(android.text.TextUtils.TruncateAt.END);label.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));label.setPadding(0,dp(c,5),0,0);
     t.addView(label,new LinearLayout.LayoutParams(-1,-2));return t;}
   private static android.graphics.Bitmap scene;
   private static final java.util.Map<String,android.graphics.Bitmap> previews=new java.util.HashMap<>();

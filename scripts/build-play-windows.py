@@ -6,6 +6,7 @@ import subprocess,json,os,zipfile,shutil,hashlib,secrets,argparse,xml.etree.Elem
 args=argparse.ArgumentParser();args.add_argument('--initialize-upload-key',action='store_true');options=args.parse_args()
 r=Path(__file__).resolve().parents[1];os.chdir(r);tools=r/'work/android-tools';jdk=next((tools/'jdk').glob('jdk-*'))/'bin';cfg=json.loads((r/'work/play-tools/tools.json').read_text());aapt=Path(cfg['aapt2']);bt=Path(cfg['buildTools']);platform=Path(cfg['platform']);bundle=Path(cfg['bundletool']);w=r/'android/build/play';w.mkdir(exist_ok=True);out=r/'dist/google-play';out.mkdir(parents=True,exist_ok=True)
 def run(*args,env=None):subprocess.run([str(a) for a in args],check=True,env=env,cwd=r)
+run('python',r/'scripts/sync-android-languages.py')
 ns='{http://schemas.android.com/apk/res/android}';E.register_namespace('android',ns[1:-1]);m=E.parse(r/'android/app/src/main/AndroidManifest.xml');root=m.getroot();overlay=E.parse(r/'android/app/src/play/AndroidManifest.xml').getroot();root.set(ns+'versionCode',overlay.get(ns+'versionCode'));root.set(ns+'versionName',overlay.get(ns+'versionName'));root.find('uses-sdk').set(ns+'targetSdkVersion',overlay.find('uses-sdk').get(ns+'targetSdkVersion'))
 remove={'REQUEST_INSTALL_PACKAGES','REQUEST_IGNORE_BATTERY_OPTIMIZATIONS','READ_MEDIA_IMAGES','READ_MEDIA_VIDEO','READ_MEDIA_VISUAL_USER_SELECTED','READ_EXTERNAL_STORAGE','ACCESS_NOTIFICATION_POLICY','DISABLE_KEYGUARD','TURN_SCREEN_ON','RECEIVE_BOOT_COMPLETED','FOREGROUND_SERVICE_PHONE_CALL','FOREGROUND_SERVICE_MICROPHONE','FOREGROUND_SERVICE_CAMERA'}
 for p in list(root.findall('uses-permission')):
@@ -52,14 +53,14 @@ if not key.exists():
  if not options.initialize_upload_key:raise RuntimeError('Upload key absent. Restore the existing key, or explicitly initialize once with --initialize-upload-key.')
  password.write_text(secrets.token_urlsafe(40),encoding='utf8');env=os.environ.copy();env['KINNECT_PLAY_PASS']=password.read_text()
  run(jdk/'keytool.exe','-genkeypair','-keystore',key,'-storetype','JKS','-storepass:env','KINNECT_PLAY_PASS','-keypass:env','KINNECT_PLAY_PASS','-alias','kinnect-upload','-keyalg','RSA','-keysize','3072','-validity','10000','-dname','CN=Mr Anh,OU=Kinnect,O=Kinnect',env=env)
-env=os.environ.copy();env['KINNECT_PLAY_PASS']=password.read_text();aab=out/'Kinnect-1.1.0-play.aab';shutil.copy2(unsigned,aab)
+env=os.environ.copy();env['KINNECT_PLAY_PASS']=password.read_text();aab=out/'Kinnect-1.1.1-play.aab';shutil.copy2(unsigned,aab)
 run(jdk/'jarsigner.exe','-keystore',key,'-storepass:env','KINNECT_PLAY_PASS','-keypass:env','KINNECT_PLAY_PASS',aab,'kinnect-upload',env=env)
 run(jdk/'java.exe','-jar',bundle,'validate','--bundle='+str(aab));run(jdk/'jarsigner.exe','-verify',aab)
 apks=w/'universal.apks'
 if apks.exists():apks.unlink()
 run(jdk/'java.exe','-jar',bundle,'build-apks','--bundle='+str(aab),'--output='+str(apks),'--mode=universal','--ks='+str(key),'--ks-key-alias=kinnect-upload','--ks-pass=file:'+str(password),'--key-pass=file:'+str(password))
-with zipfile.ZipFile(apks) as z:(out/'Kinnect-1.1.0-play-test.apk').write_bytes(z.read('universal.apk'))
-run(bt/'zipalign.exe','-c','-P','16','4',out/'Kinnect-1.1.0-play-test.apk')
-for p in [aab,out/'Kinnect-1.1.0-play-test.apk']:p.with_suffix(p.suffix+'.sha256').write_text(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name+'\n')
+with zipfile.ZipFile(apks) as z:(out/'Kinnect-1.1.1-play-test.apk').write_bytes(z.read('universal.apk'))
+run(bt/'zipalign.exe','-c','-P','16','4',out/'Kinnect-1.1.1-play-test.apk')
+for p in [aab,out/'Kinnect-1.1.1-play-test.apk']:p.with_suffix(p.suffix+'.sha256').write_text(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name+'\n')
 run(jdk/'keytool.exe','-exportcert','-rfc','-keystore',key,'-storepass:env','KINNECT_PLAY_PASS','-alias','kinnect-upload','-file',out/'upload-certificate.pem',env=env)
 print('Play bundle built and validated. Store-private signing material remains in work/play-signing.')

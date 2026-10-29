@@ -12,6 +12,6 @@ public final class ApkUpdatePolicy {
     if(releaseUrl(value))return true;
     try { URL u=new URL(value);return "https".equals(u.getProtocol())&&u.getPort()==-1&&u.getUserInfo()==null&&"release-assets.githubusercontent.com".equals(u.getHost()); }catch(Exception e){return false;}
   }
-  public static String digest(String value){String s=value==null?"":value.toLowerCase(Locale.ROOT);if(s.startsWith("sha256:"))s=s.substring(7);if(!s.matches("[a-f0-9]{64}"))throw new IllegalArgumentException("Bản cập nhật chưa có mã SHA-256 hợp lệ.");return s;}
+  public static String digest(String value){String s=value==null?"":value.toLowerCase(Locale.ROOT);if(s.startsWith("sha256:"))s=s.substring(7);if(!s.matches("[a-f0-9]{64}"))throw new IllegalArgumentException(I18n.t("Bản cập nhật chưa có mã SHA-256 hợp lệ."));return s;}
   public static boolean validSize(long size){return size>0&&size<=300L*1024*1024;}
 }

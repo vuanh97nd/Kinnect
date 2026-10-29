@@ -26,7 +26,7 @@ public final class IncomingCallActivity extends Activity {
   LinearLayout col=new LinearLayout(this);col.setOrientation(LinearLayout.VERTICAL);col.setGravity(Gravity.CENTER_HORIZONTAL);col.setPadding(dp(24),dp(56),dp(24),dp(48));
   root.setOnApplyWindowInsetsListener((v,i)->{col.setPadding(dp(24),i.getSystemWindowInsetTop()+dp(40),dp(24),i.getSystemWindowInsetBottom()+dp(40));return i;});
   TextView brand=text("KINNECT",13,0xffb9a8ff);brand.setLetterSpacing(.3f);brand.setTypeface(Typeface.DEFAULT_BOLD);col.addView(brand);
-  TextView kind=text(video?"Cuộc gọi video đến…":"Cuộc gọi thoại đến…",16,0xffd8d0ff);kind.setPadding(0,dp(8),0,0);col.addView(kind);
+  TextView kind=text(video?I18n.t("Cuộc gọi video đến…"):I18n.t("Cuộc gọi thoại đến…"),16,0xffd8d0ff);kind.setPadding(0,dp(8),0,0);col.addView(kind);
   FrameLayout halo=new FrameLayout(this);int size=dp(220);
   for(int k=0;k<3;k++){View ring=new View(this);GradientDrawable g=new GradientDrawable();g.setShape(GradientDrawable.OVAL);g.setColor(0x337c5cff);ring.setBackground(g);halo.addView(ring,new FrameLayout.LayoutParams(size,size,Gravity.CENTER));
    ObjectAnimator sx=ObjectAnimator.ofFloat(ring,"scaleX",.55f,1f),sy=ObjectAnimator.ofFloat(ring,"scaleY",.55f,1f),a=ObjectAnimator.ofFloat(ring,"alpha",.9f,0f);
@@ -38,8 +38,8 @@ public final class IncomingCallActivity extends Activity {
   TextView who=text(name,30,0xffffffff);who.setTypeface(Typeface.DEFAULT_BOLD);who.setGravity(Gravity.CENTER);who.setPadding(0,dp(20),0,0);col.addView(who);
   col.addView(new View(this),new LinearLayout.LayoutParams(1,0,1));
   LinearLayout actions=new LinearLayout(this);actions.setGravity(Gravity.CENTER);actions.setClipChildren(false);actions.setClipToPadding(false);col.setClipChildren(false);
-  actions.addView(action("Từ chối",0xffff4d5e,"phone_off","phone",true,this::decline),new LinearLayout.LayoutParams(0,-2,1));
-  actions.addView(action(video?"Trả lời video":"Trả lời",0xff22c55e,video?"video":"phone",null,false,this::accept),new LinearLayout.LayoutParams(0,-2,1));
+  actions.addView(action(I18n.t("Từ chối"),0xffff4d5e,"phone_off","phone",true,this::decline),new LinearLayout.LayoutParams(0,-2,1));
+  actions.addView(action(video?I18n.t("Trả lời video"):I18n.t("Trả lời"),0xff22c55e,video?"video":"phone",null,false,this::accept),new LinearLayout.LayoutParams(0,-2,1));
   col.addView(actions,new LinearLayout.LayoutParams(-1,-2));
   root.addView(col,new FrameLayout.LayoutParams(-1,-1));setContentView(root);}
  private TextView text(String v,float sp,int color){TextView t=new TextView(this);t.setText(v);t.setTextSize(sp);t.setTextColor(color);t.setGravity(Gravity.CENTER);t.setLayoutParams(new LinearLayout.LayoutParams(-1,-2));return t;}

@@ -1,0 +1,2 @@
+INSTRUMENTATION_RESULT: result=PASS: English/Vietnamese login, settings, deletion, persistence, system fallback, unchanged user text and canonical profile values
+INSTRUMENTATION_CODE: -1

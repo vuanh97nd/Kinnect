@@ -13,6 +13,7 @@ for folder in ['android/build/classes','android/build/dex']:
  if target.exists():shutil.rmtree(target)
  target.mkdir(parents=True)
 Path('dist').mkdir(exist_ok=True)
+run('python','scripts/sync-android-languages.py')
 run(build/'aapt2.exe','compile','--dir','android/app/src/main/res','-o','android/build/resources.zip')
 run(build/'aapt2.exe','link','--auto-add-overlay','-R','android/build/resources.zip','-I',platform,'--manifest','android/app/src/main/AndroidManifest.xml','-o','android/build/unsigned.apk')
 jars=[deps/'webrtc/classes.jar']+[Path(d['file']) for d in __import__('json').loads((root/'work/play-tools/dependencies/dependencies.json').read_text())]

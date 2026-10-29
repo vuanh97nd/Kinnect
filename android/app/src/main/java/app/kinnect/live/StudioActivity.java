@@ -153,11 +153,11 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     top.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x88000000, 0x00000000 }));
     ImageView close = icon("close", 0xffffffff);
     close.setPadding(dp(9), dp(9), dp(9), dp(9));
-    close.setContentDescription("Đóng");
+    close.setContentDescription(I18n.t("Đóng"));
     close.setOnClickListener(v -> finishCancelled());
     top.addView(close, new LinearLayout.LayoutParams(dp(42), dp(42)));
     top.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
-    musicLabel = text("🎵  Thêm nhạc", 14, 0xffffffff, true);
+    musicLabel = text(I18n.t("🎵  Thêm nhạc"), 14, 0xffffffff, true);
     musicLabel.setGravity(Gravity.CENTER);
     musicLabel.setPadding(dp(16), 0, dp(16), 0);
     musicLabel.setBackground(round(0x55000000, 999));
@@ -210,14 +210,14 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     LinearLayout actions = new LinearLayout(this);
     actions.setGravity(Gravity.CENTER);
     actions.setPadding(dp(8), dp(8), dp(8), dp(4));
-    actions.addView(roundAction("image", "Thư viện", this::openGallery), new LinearLayout.LayoutParams(0, -2, 1));
+    actions.addView(roundAction("image", I18n.t("Thư viện"), this::openGallery), new LinearLayout.LayoutParams(0, -2, 1));
     actions.addView(roundAction("smile", "Sticker", () -> showPanel(panel.equals("sticker") ? "" : "sticker")), new LinearLayout.LayoutParams(0, -2, 1));
     shutter = new ShutterView(this);
-    shutter.setContentDescription("Chụp hoặc quay");
+    shutter.setContentDescription(I18n.t("Chụp hoặc quay"));
     shutter.setOnClickListener(v -> onShutter());
     actions.addView(shutter, new LinearLayout.LayoutParams(dp(84), dp(84)));
-    actions.addView(roundAction("wand", "Làm đẹp", () -> showPanel(panel.equals("beauty") ? "" : "beauty")), new LinearLayout.LayoutParams(0, -2, 1));
-    actions.addView(roundAction("palette", "Bộ lọc", () -> showPanel(panel.equals("filter") ? "" : "filter")), new LinearLayout.LayoutParams(0, -2, 1));
+    actions.addView(roundAction("wand", I18n.t("Làm đẹp"), () -> showPanel(panel.equals("beauty") ? "" : "beauty")), new LinearLayout.LayoutParams(0, -2, 1));
+    actions.addView(roundAction("palette", I18n.t("Bộ lọc"), () -> showPanel(panel.equals("filter") ? "" : "filter")), new LinearLayout.LayoutParams(0, -2, 1));
     modeTabs = new LinearLayout(this);
     modeTabs.setGravity(Gravity.CENTER);
     modeTabs.setPadding(0, dp(2), 0, dp(4));
@@ -264,10 +264,10 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
 
   private void buildRail() {
     rail.removeAllViews();
-    rail.addView(railButton("flip", "Lật", this::flip));
-    if (still == null) rail.addView(railButton(torch ? "flash" : "flash_off", torch ? "Đèn: bật" : "Đèn", () -> { torch = !torch; applyTorch(); buildRail(); }));
-    rail.addView(railButton("timer", timerSeconds == 0 ? "Hẹn giờ" : timerSeconds + " giây", () -> { timerSeconds = timerSeconds == 0 ? 3 : timerSeconds == 3 ? 10 : 0; buildRail(); }));
-    rail.addView(railButton("grid", grid ? "Lưới: bật" : "Lưới", () -> { grid = !grid; gridOverlay.setGrid(grid); buildRail(); }));
+    rail.addView(railButton("flip", I18n.t("Lật"), this::flip));
+    if (still == null) rail.addView(railButton(torch ? "flash" : "flash_off", torch ? I18n.t("Đèn: bật") : I18n.t("Đèn"), () -> { torch = !torch; applyTorch(); buildRail(); }));
+    rail.addView(railButton("timer", timerSeconds == 0 ? I18n.t("Hẹn giờ") : timerSeconds + I18n.t(" giây"), () -> { timerSeconds = timerSeconds == 0 ? 3 : timerSeconds == 3 ? 10 : 0; buildRail(); }));
+    rail.addView(railButton("grid", grid ? I18n.t("Lưới: bật") : I18n.t("Lưới"), () -> { grid = !grid; gridOverlay.setGrid(grid); buildRail(); }));
     if (mode.equals("photo")) rail.addView(railButton("ratio", ratio == 0 ? "9:16" : ratio == 1 ? "3:4" : "1:1", () -> { ratio = (ratio + 1) % 3; gridOverlay.setRatio(ratio); buildRail(); }));
     if (mode.equals("video") && !story) rail.addView(railButton("timer", (limitSeconds == 0 ? "∞" : limitSeconds + "s"), () -> { limitSeconds = limitSeconds == 0 ? 15 : limitSeconds == 15 ? 30 : limitSeconds == 30 ? 60 : 0; buildRail(); }));
   }
@@ -346,7 +346,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     LinearLayout sl = new LinearLayout(this);
     sl.setGravity(Gravity.CENTER_VERTICAL);
     sl.setPadding(dp(20), 0, dp(20), 0);
-    sl.addView(text("Độ đậm", 12, 0xffffffff, true));
+    sl.addView(text(I18n.t("Độ đậm"), 12, 0xffffffff, true));
     sl.addView(slider(Math.round(fx.intensity * 100), new Slide() {
       public void onProgressChanged(SeekBar s, int v, boolean u) { fx.intensity = v / 100f; pct.setText(String.valueOf(v)); }
     }), new LinearLayout.LayoutParams(0, -2, 1));
@@ -407,12 +407,12 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     LinearLayout row = new LinearLayout(this);
     row.setGravity(Gravity.CENTER);
     row.setPadding(dp(6), dp(8), dp(6), dp(6));
-    row.addView(beautyChip("beauty", fx.auto ? "AI: bật" : "AI", fx.auto, () -> {
+    row.addView(beautyChip("beauty", fx.auto ? I18n.t("AI: bật") : "AI", fx.auto, () -> {
       fx.auto = !fx.auto;
-      if (fx.auto) { fx.beautyOn = true; fx.analyze(frame, face); showFilterName(face == null ? "AI: tự cân sáng" : "AI làm đẹp"); }
+      if (fx.auto) { fx.beautyOn = true; fx.analyze(frame, face); showFilterName(face == null ? I18n.t("AI: tự cân sáng") : I18n.t("AI làm đẹp")); }
       showPanel("beauty");
     }), new LinearLayout.LayoutParams(0, -2, 1));
-    final LinearLayout off = beautyChip("none", fx.beautyOn ? "Tắt" : "Đã tắt", !fx.beautyOn, () -> { fx.beautyOn = !fx.beautyOn; showPanel("beauty"); });
+    final LinearLayout off = beautyChip("none", fx.beautyOn ? I18n.t("Tắt") : I18n.t("Đã tắt"), !fx.beautyOn, () -> { fx.beautyOn = !fx.beautyOn; showPanel("beauty"); });
     row.addView(off, new LinearLayout.LayoutParams(0, -2, 1));
     for (final String[] item : BeautyCatalog.ITEMS) {
       final String key = item[0];
@@ -420,7 +420,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     }
     for(int i=0;i<row.getChildCount();i++)row.getChildAt(i).setLayoutParams(new LinearLayout.LayoutParams(dp(68),-2));
     HorizontalScrollView beautyScroll=new HorizontalScrollView(this);beautyScroll.setHorizontalScrollBarEnabled(false);beautyScroll.addView(row);box.addView(beautyScroll);
-    TextView reset = text("Khôi phục mặc định", 11, 0xccffffff, false);
+    TextView reset = text(I18n.t("Khôi phục mặc định"), 11, 0xccffffff, false);
     reset.setGravity(Gravity.CENTER);
     reset.setPadding(0, 0, 0, dp(4));
     reset.setOnClickListener(v -> { fx.smooth = 0.5f; fx.whiten = 0.3f; fx.slim = 0.2f; fx.eyes = 0.2f; fx.blush = 0f; fx.lips=0; fx.blemish=.4f; fx.beautyOn = true; showPanel("beauty"); });
@@ -468,7 +468,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
       cell.addView(t, new LinearLayout.LayoutParams(-1, -2));
       cell.setOnClickListener(v -> {
         fx.sticker = s[0];
-        if (!s[0].equals("none") && face == null) faceStatus.setText("Đưa khuôn mặt vào khung hình");
+        if (!s[0].equals("none") && face == null) faceStatus.setText(I18n.t("Đưa khuôn mặt vào khung hình"));
         showPanel("sticker");
       });
       GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
@@ -511,7 +511,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     super.onRequestPermissionsResult(code, p, r);
     if (code == 401 && checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) openCamera();
     else if (code == 401 && still == null) {
-      Toast.makeText(this, "Cần quyền camera để chụp và quay.", Toast.LENGTH_LONG).show();
+      Toast.makeText(this, I18n.t("Cần quyền camera để chụp và quay."), Toast.LENGTH_LONG).show();
       finishCancelled();
     }
   }
@@ -580,10 +580,10 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
       manager.openCamera(chosen, new CameraDevice.StateCallback() {
         public void onOpened(CameraDevice d) { device = d; startPreview(); }
         public void onDisconnected(CameraDevice d) { d.close(); device = null; }
-        public void onError(CameraDevice d, int e) { d.close(); device = null; ui.post(() -> faceStatus.setText("Không mở được camera.")); }
+        public void onError(CameraDevice d, int e) { d.close(); device = null; ui.post(() -> faceStatus.setText(I18n.t("Không mở được camera."))); }
       }, cameraHandler);
     } catch (Exception e) {
-      faceStatus.setText("Không mở được camera.");
+      faceStatus.setText(I18n.t("Không mở được camera."));
     }
   }
 
@@ -604,7 +604,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         public void onConfigureFailed(CameraCaptureSession s) {}
       }, cameraHandler);
     } catch (Exception e) {
-      ui.post(() -> faceStatus.setText("Không mở được camera."));
+      ui.post(() -> faceStatus.setText(I18n.t("Không mở được camera.")));
     }
   }
 
@@ -629,7 +629,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
       applyZoomTo(previewRequest);
       try { session.setRepeatingRequest(previewRequest.build(), null, cameraHandler); } catch (Exception ignored) {}
     }
-    showFilterName(String.format(java.util.Locale.US, "%.1f×", zoom));
+    showFilterName(String.format(java.util.Locale.US, I18n.t("%.1f×"), zoom));
   }
 
   private void applyTorch() {
@@ -669,17 +669,17 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
       buildRail();
       face = null;
     } catch (Exception e) {
-      Toast.makeText(this, "Không mở được ảnh.", Toast.LENGTH_LONG).show();
+      Toast.makeText(this, I18n.t("Không mở được ảnh."), Toast.LENGTH_LONG).show();
     }
   }
 
   private void openGallery() {
     if (recording) return;
-    new Sheet(this).setTitle("Thư viện").setItems(new String[] { "🖼  Chỉnh ảnh từ máy", "🎬  Đăng video có sẵn" }, (d, w) -> {
+    new Sheet(this).setTitle(I18n.t("Thư viện")).setItems(new String[] { I18n.t("🖼  Chỉnh ảnh từ máy"), I18n.t("🎬  Đăng video có sẵn") }, (d, w) -> {
       Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
       pick.addCategory(Intent.CATEGORY_OPENABLE);
       pick.setType(w == 0 ? "image/*" : "video/*");
-      try { startActivityForResult(pick, w == 0 ? 403 : 404); } catch (Exception e) { Toast.makeText(this, "Không mở được thư viện.", Toast.LENGTH_SHORT).show(); }
+      try { startActivityForResult(pick, w == 0 ? 403 : 404); } catch (Exception e) { Toast.makeText(this, I18n.t("Không mở được thư viện."), Toast.LENGTH_SHORT).show(); }
     }).show();
   }
 
@@ -740,7 +740,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         final float[] result = next;
         ui.post(() -> {
           if (result == null) {
-            if (++missed >= 5) { face = null; if (!fx.sticker.equals("none")) faceStatus.setText("Đưa khuôn mặt vào khung hình"); }
+            if (++missed >= 5) { face = null; if (!fx.sticker.equals("none")) faceStatus.setText(I18n.t("Đưa khuôn mặt vào khung hình")); }
             return;
           }
           missed = 0;
@@ -815,7 +815,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         final Bitmap shown = cropped;
         ui.post(() -> { busy = false; capturedPhoto = file; showReview(shown); });
       } catch (Exception e) {
-        ui.post(() -> { busy = false; Toast.makeText(this, "Không chụp được ảnh.", Toast.LENGTH_SHORT).show(); });
+        ui.post(() -> { busy = false; Toast.makeText(this, I18n.t("Không chụp được ảnh."), Toast.LENGTH_SHORT).show(); });
       }
     });
   }
@@ -839,17 +839,17 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     top.setPadding(dp(10), dp(14), dp(14), dp(10));
     ImageView back = icon("back", 0xffffffff);
     back.setPadding(dp(9), dp(9), dp(9), dp(9));
-    back.setContentDescription("Chụp lại");
+    back.setContentDescription(I18n.t("Chụp lại"));
     back.setOnClickListener(v -> reviewLayer.setVisibility(View.GONE));
     top.addView(back, new LinearLayout.LayoutParams(dp(42), dp(42)));
     top.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
-    final TextView save = text("  Lưu vào máy", 14, 0xffffffff, true);
+    final TextView save = text(I18n.t("  Lưu vào máy"), 14, 0xffffffff, true);
     save.setGravity(Gravity.CENTER);
     save.setPadding(dp(14), 0, dp(16), 0);
     save.setBackground(round(0x55000000, 999));
     save.setCompoundDrawablesRelativeWithIntrinsicBounds(tinted("download"), null, null, null);
     save.setOnClickListener(v -> {
-      if (saveToGallery(capturedPhoto)) { save.setText("  Đã lưu"); save.setCompoundDrawablesRelativeWithIntrinsicBounds(tinted("check"), null, null, null); }
+      if (saveToGallery(capturedPhoto)) { save.setText(I18n.t("  Đã lưu")); save.setCompoundDrawablesRelativeWithIntrinsicBounds(tinted("check"), null, null, null); }
     });
     top.addView(save, new LinearLayout.LayoutParams(-2, dp(40)));
     reviewLayer.addView(top, new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
@@ -857,19 +857,19 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     bar.setGravity(Gravity.CENTER);
     bar.setPadding(dp(16), dp(12), dp(16), dp(22));
     bar.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, new int[] { 0xcc000000, 0x00000000 }));
-    TextView again = text("Chụp lại", 15, 0xffffffff, true);
+    TextView again = text(I18n.t("Chụp lại"), 15, 0xffffffff, true);
     again.setGravity(Gravity.CENTER);
     again.setBackground(round(0x33ffffff, 999));
     again.setOnClickListener(v -> reviewLayer.setVisibility(View.GONE));
     bar.addView(again, new LinearLayout.LayoutParams(0, dp(50), 1));
-    TextView storyBtn = text("Đăng tin", 15, 0xffffffff, true);
+    TextView storyBtn = text(I18n.t("Đăng tin"), 15, 0xffffffff, true);
     storyBtn.setGravity(Gravity.CENTER);
     storyBtn.setBackground(round(0x33ffffff, 999));
     storyBtn.setOnClickListener(v -> deliverPhoto("story"));
     LinearLayout.LayoutParams mid = new LinearLayout.LayoutParams(0, dp(50), 1);
     mid.setMargins(dp(10), 0, dp(10), 0);
     bar.addView(storyBtn, mid);
-    TextView post = text("Đăng bài", 15, 0xffffffff, true);
+    TextView post = text(I18n.t("Đăng bài"), 15, 0xffffffff, true);
     post.setGravity(Gravity.CENTER);
     GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { 0xff6c47e0, PINK });
     g.setCornerRadius(dp(999));
@@ -899,10 +899,10 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         int n;
         while ((n = in.read(buf)) > 0) os.write(buf, 0, n);
       }
-      Toast.makeText(this, "Đã lưu vào Ảnh › Kinnect", Toast.LENGTH_SHORT).show();
+      Toast.makeText(this, I18n.t("Đã lưu vào Ảnh › Kinnect"), Toast.LENGTH_SHORT).show();
       return true;
     } catch (Exception e) {
-      Toast.makeText(this, "Không lưu được ảnh vào máy.", Toast.LENGTH_SHORT).show();
+      Toast.makeText(this, I18n.t("Không lưu được ảnh vào máy."), Toast.LENGTH_SHORT).show();
       return false;
     }
   }
@@ -949,7 +949,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
       if (music != null) { music.seekTo(0); music.start(); }
     } catch (Exception e) {
       releaseRecorder();
-      Toast.makeText(this, "Không bắt đầu quay được trên máy này.", Toast.LENGTH_LONG).show();
+      Toast.makeText(this, I18n.t("Không bắt đầu quay được trên máy này."), Toast.LENGTH_LONG).show();
     }
   }
 
@@ -961,7 +961,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     try { recorder.stop(); } catch (Exception e) { ok = false; }
     releaseRecorder();
     if (music != null) music.pause();
-    if (!ok || length < 1000) { Toast.makeText(this, "Video quá ngắn, hãy quay lâu hơn.", Toast.LENGTH_SHORT).show(); return; }
+    if (!ok || length < 1000) { Toast.makeText(this, I18n.t("Video quá ngắn, hãy quay lâu hơn."), Toast.LENGTH_SHORT).show(); return; }
     if (musicUrl == null && musicLocal == null) { done(output); return; }
     final ProgressDialog progress = ProgressDialog.show(this, "Kinnect", "Đang ghép nhạc nền…", true, false);
     final File video = output;
@@ -1040,10 +1040,10 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     close.setBackground(round(soft, 999));
     close.setOnClickListener(v -> dialog.dismiss());
     head.addView(close, new LinearLayout.LayoutParams(dp(38), dp(38)));
-    TextView title = plain("Âm nhạc", 17, ink, true);
+    TextView title = plain(I18n.t("Âm nhạc"), 17, ink, true);
     title.setGravity(Gravity.CENTER);
     head.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
-    TextView off = plain(musicUrl != null || musicLocal != null ? "Bỏ nhạc" : "", 13, 0xffe0245e, true);
+    TextView off = plain(musicUrl != null || musicLocal != null ? I18n.t("Bỏ nhạc") : "", 13, 0xffe0245e, true);
     off.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
     off.setOnClickListener(v -> { setMusic(null, null, null); dialog.dismiss(); });
     head.addView(off, new LinearLayout.LayoutParams(dp(60), -2));
@@ -1054,7 +1054,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     search.setBackground(round(soft, 999));
     search.addView(icon("search", muted), new LinearLayout.LayoutParams(dp(18), dp(18)));
     final EditText query = new EditText(this);
-    query.setHint("Tìm bài hát hoặc nghệ sĩ");
+    query.setHint(I18n.t("Tìm bài hát hoặc nghệ sĩ"));
     query.setHintTextColor(muted);
     query.setTextColor(ink);
     query.setTextSize(15);
@@ -1083,7 +1083,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     now.addView(nowTitle);
     now.addView(nowSub);
     bar.addView(now, new LinearLayout.LayoutParams(0, -2, 1));
-    TextView use = plain("Dùng bài này", 15, 0xffffffff, true);
+    TextView use = plain(I18n.t("Dùng bài này"), 15, 0xffffffff, true);
     use.setGravity(Gravity.CENTER);
     use.setPadding(dp(20), 0, dp(20), 0);
     GradientDrawable ug = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { 0xff6c47e0, PINK });
@@ -1113,7 +1113,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     final java.util.function.Consumer<String[]> choose = t -> {
       picked[0] = t[0]; picked[1] = t[1]; picked[2] = t[2];
       nowTitle.setText(t[1]);
-      nowSub.setText(t[2].isEmpty() ? "Nhạc của bạn" : t[2]);
+      nowSub.setText(t[2].isEmpty() ? I18n.t("Nhạc của bạn") : t[2]);
       bar.setVisibility(View.VISIBLE);
     };
     render[0] = () -> {
@@ -1130,15 +1130,15 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         LinearLayout meta = new LinearLayout(this);
         meta.setOrientation(LinearLayout.VERTICAL);
         meta.setPadding(dp(12), 0, 0, 0);
-        meta.addView(plain("Chọn nhạc trong máy", 15, ink, true));
-        meta.addView(plain("MP3, M4A… chỉ dùng cho video của bạn", 12, muted, false));
+        meta.addView(plain(I18n.t("Chọn nhạc trong máy"), 15, ink, true));
+        meta.addView(plain(I18n.t("MP3, M4A… chỉ dùng cho video của bạn"), 12, muted, false));
         up.addView(meta);
         up.setOnClickListener(v -> {
           dialog.dismiss();
           Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
           pick.addCategory(Intent.CATEGORY_OPENABLE);
           pick.setType("audio/*");
-          try { startActivityForResult(pick, 402); } catch (Exception e) { Toast.makeText(this, "Không mở được trình chọn nhạc.", Toast.LENGTH_SHORT).show(); }
+          try { startActivityForResult(pick, 402); } catch (Exception e) { Toast.makeText(this, I18n.t("Không mở được trình chọn nhạc."), Toast.LENGTH_SHORT).show(); }
         });
         list.addView(up);
         return;
@@ -1171,7 +1171,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         tt.setSingleLine(true);
         tt.setEllipsize(android.text.TextUtils.TruncateAt.END);
         meta.addView(tt);
-        TextView st = plain(artist.isEmpty() ? "Thư viện Kinnect" : artist, 12, muted, false);
+        TextView st = plain(artist.isEmpty() ? I18n.t("Thư viện Kinnect") : artist, 12, muted, false);
         st.setSingleLine(true);
         st.setEllipsize(android.text.TextUtils.TruncateAt.END);
         meta.addView(st);
@@ -1195,13 +1195,13 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         list.addView(row);
       }
       if (total == 0) {
-        TextView e = plain(q.isEmpty() ? "Thư viện chưa có bài nào." : "Không tìm thấy bài phù hợp.", 14, muted, false);
+        TextView e = plain(q.isEmpty() ? I18n.t("Thư viện chưa có bài nào.") : I18n.t("Không tìm thấy bài phù hợp."), 14, muted, false);
         e.setGravity(Gravity.CENTER);
         e.setPadding(0, dp(30), 0, dp(30));
         list.addView(e, new LinearLayout.LayoutParams(-1, -2));
       }
       if (total > shown[0]) {
-        TextView more = plain("Xem thêm (" + (total - shown[0]) + " bài)", 14, ink, true);
+        TextView more = plain(I18n.t("Xem thêm (") + (total - shown[0]) + I18n.t(" bài)"), 14, ink, true);
         more.setGravity(Gravity.CENTER);
         more.setPadding(dp(18), dp(8), dp(18), dp(8));
         more.setBackground(round(soft, 999));
@@ -1288,7 +1288,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     if (music != null) { music.release(); music = null; }
     musicUrl = url;
     musicLocal = local;
-    musicLabel.setText(title == null ? "🎵  Thêm nhạc" : "🎵  " + title.replaceAll("\\s+", " ").trim());
+    musicLabel.setText(title == null ? I18n.t("🎵  Thêm nhạc") : "🎵  " + title.replaceAll("\\s+", " ").trim());
     if (url == null && local == null) return;
     try {
       music = new MediaPlayer();
@@ -1300,10 +1300,10 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
       } else music.setDataSource(this, local);
       music.setLooping(true);
       music.setOnPreparedListener(p -> { if (!recording) p.start(); });
-      music.setOnErrorListener((p, w, e) -> { Toast.makeText(this, "Không phát được bài nhạc này.", Toast.LENGTH_SHORT).show(); return true; });
+      music.setOnErrorListener((p, w, e) -> { Toast.makeText(this, I18n.t("Không phát được bài nhạc này."), Toast.LENGTH_SHORT).show(); return true; });
       music.prepareAsync();
     } catch (Exception e) {
-      Toast.makeText(this, "Không phát được bài nhạc này.", Toast.LENGTH_SHORT).show();
+      Toast.makeText(this, I18n.t("Không phát được bài nhạc này."), Toast.LENGTH_SHORT).show();
       musicUrl = null;
       musicLocal = null;
     }

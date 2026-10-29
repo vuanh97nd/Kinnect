@@ -1,11 +1,11 @@
-# Kinnect Google Play — bản chuẩn bị 1.1.0 / build 100
+# Kinnect Google Play — bản chuẩn bị 1.1.1 / build 101
 
 Đơn vị hiển thị/liên hệ do chủ ứng dụng cung cấp: **Mr Ánh — anhvn53@wru.vn**.
 
 ## Tệp và quy trình
 
-- AAB để tải lên **Internal testing**: `dist/google-play/Kinnect-1.1.0-play.aab`.
-- APK sinh từ AAB dành cho QA: `dist/google-play/Kinnect-1.1.0-play-test.apk`. Không đưa APK này lên nút tải website; chữ ký upload khác chữ ký APK website.
+- AAB để tải lên **Internal testing**: `dist/google-play/Kinnect-1.1.1-play.aab`.
+- APK sinh từ AAB dành cho QA: `dist/google-play/Kinnect-1.1.1-play-test.apk`. Không đưa APK này lên nút tải website; chữ ký upload khác chữ ký APK website.
 - Kiểm tra máy: `dist/google-play/artifact-checks.json` và các tệp SHA-256 bên cạnh.
 - Play overlay: `android/app/src/play/AndroidManifest.xml`; package `app.kinnect.live`, target API 36, min API 26. Manifest chính vẫn phục vụ kênh APK website.
 - Công cụ: `python scripts/prepare-play-tools.py`, `python scripts/prepare-play-dependencies.py`, `python scripts/build-play-windows.py`, `python scripts/check-play-artifact.py`.
@@ -52,4 +52,10 @@ Trang xóa ngoài app cung cấp kênh email riêng. Chủ vận hành xác minh
 
 ## Bộ bàn giao cuối
 
-AAB 1.1.0 (100), target API 36; kiểm tra runtime Android 16 với PAGE_SIZE=16384. 97 kiểm thử Node đạt. Đã tạo tài khoản reviewer thường; thông tin riêng tại work/play-reviewer/APP-ACCESS-PRIVATE.txt, không nằm trong Git hoặc ZIP công khai. Ảnh chụp thật 1080×1920: hồ sơ, cài đặt và quyền riêng tư. Chưa tải lên Play Console, chưa có Pre-launch report hoặc kiểm thử máy thật.
+AAB 1.1.1 (101), target API 36; kiểm tra runtime Android 16 với PAGE_SIZE=16384. 97 kiểm thử Node đạt. Đã tạo tài khoản reviewer thường; thông tin riêng tại work/play-reviewer/APP-ACCESS-PRIVATE.txt, không nằm trong Git hoặc ZIP công khai. Ảnh chụp thật 1080×1920: hồ sơ, cài đặt và quyền riêng tư. Chưa tải lên Play Console, chưa có Pre-launch report hoặc kiểm thử máy thật.
+
+## English trong ứng dụng
+
+Bản Play 1.1.1 / 101 và APK 1.0.9 / 74 có Tiếng Việt, English và Theo hệ thống. Đổi ở màn chào (VI / EN), đăng nhập hoặc Cài đặt & riêng tư → Ngôn ngữ. Lựa chọn lưu trên thiết bị; ngôn ngữ hệ thống ngoài tiếng Việt dùng English. Bộ dịch 1.332 mục nằm tại android/i18n/en.json; chạy scripts/sync-android-languages.py để kiểm tra và tạo asset. Không dịch nội dung bài viết/tin nhắn/tên tự nhập. Giá trị hồ sơ/bộ lọc được giữ nguyên khi dịch nhãn.
+
+Đã kiểm tra hai ngôn ngữ trên Android 16 16KB: đăng nhập, cài đặt, xóa tài khoản, lưu lựa chọn, dữ liệu người dùng và giá trị hồ sơ. Play policy audit tiếp tục đạt. Chưa kiểm thử điện thoại thật hoặc nộp Play Console; tài khoản nhà phát triển đang chờ Google hỗ trợ đối soát phí đăng ký.

@@ -7,6 +7,7 @@ public class PlayPolicyAudit extends Instrumentation {
  private static void require(String value,String needle){if(!value.contains(needle))throw new AssertionError("Missing UI text: "+needle);}
  public void onCreate(Bundle b){super.onCreate(b);start();}
  public void onStart(){Bundle result=new Bundle();try{
+  Class<?> language=getTargetContext().getClassLoader().loadClass("app.kinnect.live.I18n");Method select=language.getDeclaredMethod("select",Context.class,String.class);select.setAccessible(true);select.invoke(null,getTargetContext(),"vi");
   Activity a=startActivitySync(new Intent().setClassName("app.kinnect.live","app.kinnect.live.MainActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));Thread.sleep(1300);
   if(a.getApplicationInfo().targetSdkVersion!=36)throw new AssertionError("Target is not API 36");if((a.getApplicationInfo().flags&ApplicationInfo.FLAG_DEBUGGABLE)!=0)throw new AssertionError("Release is debuggable");
   PackageInfo info=a.getPackageManager().getPackageInfo(a.getPackageName(),PackageManager.GET_PERMISSIONS);for(String permission:info.requestedPermissions)if(permission.endsWith("REQUEST_INSTALL_PACKAGES")||permission.endsWith("READ_MEDIA_IMAGES")||permission.endsWith("READ_MEDIA_VIDEO")||permission.endsWith("REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"))throw new AssertionError("Forbidden Play permission: "+permission);

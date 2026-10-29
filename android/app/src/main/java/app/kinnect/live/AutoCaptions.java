@@ -57,7 +57,7 @@ final class AutoCaptions {
   void run(Context context, short[] pcm, String language, Listener listener) {
     final List<int[]> parts = segments(pcm);
     final List<float[]> times = new ArrayList<>(); final List<String> lines = new ArrayList<>();
-    if (parts.isEmpty()) { listener.finished(times, lines, "Không tìm thấy giọng nói trong video."); return; }
+    if (parts.isEmpty()) { listener.finished(times, lines, I18n.t("Không tìm thấy giọng nói trong video.")); return; }
     recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(context);
     final int[] index = { 0 };
     final Runnable[] next = new Runnable[1];
@@ -75,7 +75,7 @@ final class AutoCaptions {
         .putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
         .putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_SAMPLING_RATE, RATE);
       ParcelFileDescriptor[] pipe;
-      try { pipe = ParcelFileDescriptor.createPipe(); } catch (IOException e) { finish(listener, times, lines, "Không mở được luồng âm thanh."); return; }
+      try { pipe = ParcelFileDescriptor.createPipe(); } catch (IOException e) { finish(listener, times, lines, I18n.t("Không mở được luồng âm thanh.")); return; }
       intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE, pipe[0]);
       final ParcelFileDescriptor writeEnd = pipe[1];
       new Thread(() -> {
@@ -103,11 +103,11 @@ final class AutoCaptions {
           if (error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE || error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED) {
             answered[0] = true;
             try { recognizer.triggerModelDownload(intent); } catch (Exception ignored) {}
-            finish(listener, times, lines, "Máy chưa có gói nhận dạng giọng nói ngoại tuyến cho ngôn ngữ này. Android đang tải gói (cần Wi-Fi); hãy thử lại sau vài phút.");
+            finish(listener, times, lines, I18n.t("Máy chưa có gói nhận dạng giọng nói ngoại tuyến cho ngôn ngữ này. Android đang tải gói (cần Wi-Fi); hãy thử lại sau vài phút."));
             return;
           }
           if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY && index[0] == 0) {
-            answered[0] = true; finish(listener, times, lines, "Bộ nhận dạng giọng nói trên máy đang bận hoặc chưa được cấp quyền."); return;
+            answered[0] = true; finish(listener, times, lines, I18n.t("Bộ nhận dạng giọng nói trên máy đang bận hoặc chưa được cấp quyền.")); return;
           }
           advance.run();  // no speech in this part: move on
         }
@@ -119,7 +119,7 @@ final class AutoCaptions {
 
   private void finish(Listener listener, List<float[]> times, List<String> lines, String error) {
     if (recognizer != null) { recognizer.destroy(); recognizer = null; }
-    if (!cancelled) listener.finished(times, lines, error != null ? error : lines.isEmpty() ? "Không nhận ra lời nói nào. Hãy thử video có giọng nói rõ hơn." : null);
+    if (!cancelled) listener.finished(times, lines, error != null ? error : lines.isEmpty() ? I18n.t("Không nhận ra lời nói nào. Hãy thử video có giọng nói rõ hơn.") : null);
   }
 
   /** Splits a recognised sentence into short caption lines spread over the segment by word count. */

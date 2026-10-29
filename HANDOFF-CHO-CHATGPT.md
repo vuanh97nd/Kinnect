@@ -1,3 +1,7 @@
+## Cập nhật ngôn ngữ 29/10/2026
+
+APK 1.0.9 / 74, Play 1.1.1 / 101: Tiếng Việt / English / Theo hệ thống. Nguồn dịch android/i18n/en.json; kiểm tra scripts/sync-android-languages.py; kiểm thử android/test/LanguageAudit.java. Xem docs/google-play/READINESS.md. Chưa nộp Play Console.
+
 # Chuẩn bị Google Play — 29/10/2026
 
 - APK website 1.0.8/build 73 được build đầy đủ từ source, dùng OkHttp/Okio mới và giữ chứng chỉ ký cũ. Bản Play riêng 1.1.0/build 100 dùng `android/app/src/play/AndroidManifest.xml`, AAB target 36, khóa upload riêng và không đóng gói trình cài APK ngoài.

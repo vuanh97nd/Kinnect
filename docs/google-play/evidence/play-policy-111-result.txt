@@ -1,0 +1,2 @@
+INSTRUMENTATION_RESULT: result=PASS: API36 release, no external installer/broad-media permissions, canonical policy/deletion/settings UI, all intro assets decode, WebRTC native factory loads on the device
+INSTRUMENTATION_CODE: -1

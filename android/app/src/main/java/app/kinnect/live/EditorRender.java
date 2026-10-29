@@ -7,11 +7,11 @@ import java.util.*;
 /** Draws one frame of an EditorProject: background, clips with transitions, then layers. */
 final class EditorRender {
   static final String[][] TRANSITIONS = {
-    {"none","Không"},{"fade","Mờ dần"},{"black","Qua đen"},{"white","Lóe sáng"},{"slideLeft","Trượt trái"},{"slideRight","Trượt phải"},
-    {"push","Đẩy lên"},{"zoomIn","Phóng to"},{"zoomOut","Thu nhỏ"},{"wipe","Quét ngang"},{"circle","Vòng tròn"},{"blur","Nhòe"},{"spin","Xoay"}};
-  static final String[][] ANIMATIONS = {{"none","Không"},{"fade","Mờ dần"},{"pop","Bật lên"},{"slide","Trượt lên"},{"zoom","Thu phóng"},{"wipe","Quét"},{"type","Đánh máy"}};
-  static final String[][] STYLES = {{"stroke","Viền đen"},{"plain","Bóng đổ"},{"box","Nền tối"},{"label","Nhãn màu"},{"neon","Neon"}};
-  static final String[][] FONTS = {{"sans-serif","Mặc định"},{"sans-serif-black","Đậm"},{"sans-serif-condensed","Hẹp"},{"serif","Có chân"},{"monospace","Máy chữ"},{"casual","Viết tay"},{"cursive","Nghệ thuật"}};
+    {"none",I18n.t("Không")},{"fade",I18n.t("Mờ dần")},{"black",I18n.t("Qua đen")},{"white",I18n.t("Lóe sáng")},{"slideLeft",I18n.t("Trượt trái")},{"slideRight",I18n.t("Trượt phải")},
+    {"push",I18n.t("Đẩy lên")},{"zoomIn",I18n.t("Phóng to")},{"zoomOut",I18n.t("Thu nhỏ")},{"wipe",I18n.t("Quét ngang")},{"circle",I18n.t("Vòng tròn")},{"blur",I18n.t("Nhòe")},{"spin","Xoay"}};
+  static final String[][] ANIMATIONS = {{"none",I18n.t("Không")},{"fade",I18n.t("Mờ dần")},{"pop",I18n.t("Bật lên")},{"slide",I18n.t("Trượt lên")},{"zoom",I18n.t("Thu phóng")},{"wipe",I18n.t("Quét")},{"type",I18n.t("Đánh máy")}};
+  static final String[][] STYLES = {{"stroke",I18n.t("Viền đen")},{"plain",I18n.t("Bóng đổ")},{"box",I18n.t("Nền tối")},{"label",I18n.t("Nhãn màu")},{"neon","Neon"}};
+  static final String[][] FONTS = {{"sans-serif",I18n.t("Mặc định")},{"sans-serif-black",I18n.t("Đậm")},{"sans-serif-condensed",I18n.t("Hẹp")},{"serif",I18n.t("Có chân")},{"monospace",I18n.t("Máy chữ")},{"casual",I18n.t("Viết tay")},{"cursive",I18n.t("Nghệ thuật")}};
 
   /** A clip frame ready to draw: the decoded picture plus face info for beauty effects. */
   static final class Frame { Bitmap bitmap; float[] face; }

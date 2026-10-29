@@ -40,12 +40,12 @@ final class CrashLog {
     final String text = activity.getSharedPreferences("kinnect_crash", 0).getString("last", null);
     if (text == null) return;
     activity.getSharedPreferences("kinnect_crash", 0).edit().remove("last").apply();
-    new Sheet(activity).setTitle("Kinnect vừa gặp lỗi").setMessage(text.length() > 900 ? text.substring(0, 900) + "…" : text)
-      .setPositiveButton("Sao chép lỗi", (d, w) -> {
+    new Sheet(activity).setTitle(I18n.t("Kinnect vừa gặp lỗi")).setMessage(text.length() > 900 ? text.substring(0, 900) + "…" : text)
+      .setPositiveButton(I18n.t("Sao chép lỗi"), (d, w) -> {
         ClipboardManager clip = (ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
         if (clip != null) clip.setPrimaryClip(ClipData.newPlainText("Lỗi Kinnect", text));
-        android.widget.Toast.makeText(activity, "Đã sao chép, hãy dán gửi cho đội Kinnect.", android.widget.Toast.LENGTH_LONG).show();
+        android.widget.Toast.makeText(activity, I18n.t("Đã sao chép, hãy dán gửi cho đội Kinnect."), android.widget.Toast.LENGTH_LONG).show();
       })
-      .setNegativeButton("Đóng", null).show();
+      .setNegativeButton(I18n.t("Đóng"), null).show();
   }
 }
