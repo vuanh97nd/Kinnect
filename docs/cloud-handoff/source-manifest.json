@@ -1,6 +1,7 @@
 {
   "version": "1.0.4",
-  "fileCount": 699,
+  "fileCount": 701,
+  "hashScope": "source ZIP bytes; Git may normalize line endings; manifest excludes itself",
   "files": {
     ".github/workflows/android-release.yml": "50752178a7e8e52e3b505c3e6436936f77ac362f65e5d9f714734a4318273a7f",
     ".github/workflows/android-validation.yml": "65603826c485b6febe23d614d99b83c14b52f9a7e4a46363a9ae1828e68b6b9d",
@@ -361,6 +362,7 @@
     "docs/cloud-handoff/android-account-screens.jpg": "3f31779576d92d43e43b32a120201a20459ceda0bf7bc0369c6e14705e5f52c7",
     "docs/cloud-handoff/android-small-large-font.jpg": "138087fa1d360a16365276a3198766441529389b1e3277c9463720341c0d4b56",
     "docs/cloud-handoff/artifact.json": "601de96f5e84d85dfded869a803464ddc640461c241121b9b749796fdae5b498",
+    "docs/cloud-handoff/CLOUD-IMPORT.txt": "3ebcb547739ff4386df7cdc689e25db0596fed02040602293efbc08d93f8a0ba",
     "docs/cloud-handoff/unit-test-summary.txt": "b6b30ccd5580324b00e66d92c70bfdd51ccdbd9ff3bf0925287011f2ea12a2eb",
     "docs/cloud-handoff/web-discovery-pc.png": "1b127c93ef3a5fe713db0e3910ed6d09ed947d7933b6229fda3d103a3e1bb374",
     "docs/cloud-handoff/web-following-empty.png": "684a44181933d4ec18fc18226e94fc56d9b8eeef3ab1e1b45c6f7800c1830083",
@@ -474,7 +476,7 @@
     "e2e/video-call.spec.js": "5050024762839ffee61f711e5f19a5499f2e466144b5dd50fee8e5b2cec353fd",
     "e2e/video-upload.spec.js": "2dd6d8ce1fad4e445c1d49ff5810ec6ca43701bda499c1bd2622120972b37347",
     "e2e/web-app-parity.spec.js": "18c012b7ec5e3f30c819ad7fd4eee887e4fa7d521e10683534a585489f1d3897",
-    "HANDOFF-CHO-CHATGPT.md": "a19fd8c910398a8c5a2506cde6e283d74f1cd7c951053c28a57c005447f9a519",
+    "HANDOFF-CHO-CHATGPT.md": "55f05905a5faea19f3805895c8aa462c5c89f49ff05c521e3c0af99eb0345693",
     "lib/apk-releases.js": "fec18a772396e3b13392b44035b8dbbcb3cc71226ee3d8eb40733c6b8bc050ef",
     "lib/call-config.js": "c0fcc0003d1524cdf899dddffdf1b9ea981dfc94ac418345e11515b5ea417967",
     "lib/calls.js": "ad4c26f4e7b6f9e5976c60aa722a0af30f9e1456a9964daa841d9fe736aacd22",
@@ -610,6 +612,7 @@
     "scripts/handoff-checks/web-layout-audit.mjs": "b31689153db77a1074748b5c5077d60ba861728153b43d660011efd3366dc31c",
     "scripts/moderate.js": "75aea8725b1259038344e631b18f85f307ff8194e020840871d731c39ceb821e",
     "scripts/prepare-android-tools.sh": "b4f45d7567df2d98725da6f0e57c050c6f7370c3fbbec8fcec8feb9f33ce9d1c",
+    "scripts/publish-cloud-handoff.py": "c14d76f3a4d844a09b2ffbb0f44bbf13908c246fd5877ec97f33edaf14a40eb1",
     "scripts/reset-data.js": "b8c8ee3e8d264eb41df194141ba5bf66215cf42035b8c12f930aa2e84a4177f3",
     "scripts/review-reporter.cjs": "90b48192f875b6b6530dd0a656117f3e330cb2c4c96b5b0eb6bff4a47d2f5046",
     "scripts/server-manager.mjs": "0a96846ec5fe282e2fb8fcdfa03d28e0b565d4800602601c58073a475f36c439",
