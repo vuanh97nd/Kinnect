@@ -21,9 +21,10 @@ final class LiveKaraoke {
  void publish(){LiveAudioMix mix=room.mix();if(!room.joined()||!turn()||mix==null||mix!=loadedMix||mix.durationMs()<1000||importing)return;mix.playing=false;room.send("sing-track","title",title,"durationMs",mix.durationMs(),"lines",lines);published=false;publishedRevision=-1;}
  void open(){if(closed)return;if(controls!=null)controls.dismiss();LinearLayout body=column();caption=text(title.isEmpty()?"Chưa chọn nhạc nền":title,14);caption.setTextColor(WebTheme.isDark(activity)?0xfff6f1ff:0xff271f38);body.addView(caption);
   if(!room.joined()||turn()){
+   action(body,"music","Chọn nhạc nền từ máy",()->pick(321,"audio/*"));action(body,"type","Nhập lời LRC có mốc thời gian",()->pick(322,"*/*"));
+
    action(body,"search","Tìm bài trên YouTube",()->{LiveAudioMix active=room.mix();if(active!=null&&active.playing){active.playing=false;transport();}closeSheet();if(youtube!=null)youtube.close();youtube=new YouTubeSongSearch(activity,(name,url)->{youtubeReference=name;room.toast("Đã chọn bài tham khảo. Chọn nhạc có quyền sử dụng để phát vào Live.");});youtube.show();});
    if(!youtubeReference.isEmpty()){TextView reference=text(youtubeReference,12);reference.setTextColor(0xff9877ef);reference.setMaxLines(2);body.addView(reference);}
-   action(body,"music","Chọn nhạc nền từ máy",()->pick(321,"audio/*"));action(body,"type","Nhập lời LRC có mốc thời gian",()->pick(322,"*/*"));
    action(body,"pencil","Đổi tên bài hát",this::rename);
    if(room.joined()){action(body,"play",room.mix()!=null&&room.mix().playing?"Tạm dừng bài hát":"Phát / tiếp tục bài hát",()->{LiveAudioMix mix=room.mix();if(mix==null||mix!=loadedMix){room.toast("Chọn nhạc nền trước.");return;}if(!published){publish();room.toast("Đang chuẩn bị bài hát, bấm phát lại sau giây lát.");return;}mix.playing=!mix.playing;transport();open();});action(body,"rotate_ccw","Hát lại từ đầu",()->{LiveAudioMix mix=room.mix();if(mix!=null){mix.playing=false;mix.seek(0);transport();}open();});}
    LiveAudioMix mix=room.mix();if(mix!=null){slider(body,"Giọng hát",Math.round(mix.voiceGain*100),150,n->mix.voiceGain=n/100f);slider(body,"Nhạc nền",Math.round(mix.musicGain*100),100,n->mix.musicGain=n/100f);slider(body,"Độ vang",Math.round(mix.echo*100),45,n->mix.echo=n/100f);}

@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {createApp} from '../server.js';
 import {storeAccountId} from '../lib/store.js';
 
-async function setup(t){
+async function setup(t,free=true){
  const receipts=new Map(),acks=[],verifier={enabled:()=>true,verify:async token=>{if(!receipts.has(token))throw Object.assign(Error('invalid receipt'),{status:422});return receipts.get(token);},acknowledge:async(id,token)=>acks.push({id,token})};
- const app=createApp({storeVerifier:verifier,storeEnv:{PLAY_PURCHASE_TOKEN_KEY:'ab'.repeat(32)},authLimit:1000});await new Promise(r=>app.server.listen(0,'127.0.0.1',r));
+ const app=createApp({storeVerifier:verifier,storeEnv:{PLAY_PURCHASE_TOKEN_KEY:'ab'.repeat(32),...(free?{}:{KINNECT_STUDIO_PRO_FREE:'false'})},authLimit:1000});await new Promise(r=>app.server.listen(0,'127.0.0.1',r));
  t.after(async()=>{for(const ws of app.wss.clients)ws.terminate();app.wss.close();app.server.closeAllConnections();await new Promise(r=>app.server.close(r));app.social.close();});
  const request=async(path,{cookie,method='GET',data,origin}={})=>{const response=await fetch('http://127.0.0.1:'+app.server.address().port+'/api'+path,{method,headers:{...(cookie?{Cookie:cookie}:{}),...(data?{'Content-Type':'application/json'}:{}),...(origin?{Origin:origin}:{})},body:data?JSON.stringify(data):undefined});return {status:response.status,body:await response.json(),cookie:response.headers.get('set-cookie')?.split(';')[0]};};
  const register=async username=>{const r=await request('/register',{method:'POST',data:{username,name:username,password:'strong-password',agree18:true,acceptPrivacyNotice:true}});return {id:r.body.user.id,username,cookie:r.cookie};};
@@ -36,4 +36,9 @@ test('pending transactions grant nothing; deletion erases receipts and preferenc
  const a=await setup(t),u=await a.register('store_pending'),token='pending-token-123';a.receipts.set(token,a.receipt(u.id,'kinnect_studio_pro','PENDING'));
  const r=await a.request('/store/verify',{cookie:u.cookie,method:'POST',data:{productId:'kinnect_studio_pro',purchaseToken:token}});assert.equal(r.body.state,'PENDING');assert.deepEqual(r.body.owned,[]);assert.equal(a.acks.length,0);
  assert.equal((await a.request('/me/account-deletion',{cookie:u.cookie,method:'DELETE',data:{confirmUsername:u.username,confirmDelete:true}})).status,200);assert.equal(a.social.db.prepare('SELECT COUNT(*) n FROM store_purchases').get().n,0);
+});
+
+test('temporary free Studio Pro is server controlled and never fabricates a purchase',async t=>{
+ const a=await setup(t),u=await a.register('studio_free');let response=await a.request('/store',{cookie:u.cookie});assert.equal(response.body.studioProFree,true);assert.deepEqual(response.body.owned,[]);assert.equal(a.social.db.prepare('SELECT COUNT(*) n FROM store_purchases').get().n,0);
+ const paid=await setup(t,false),other=await paid.register('studio_paid');response=await paid.request('/store',{cookie:other.cookie});assert.equal(response.body.studioProFree,false);assert.deepEqual(response.body.owned,[]);
 });
