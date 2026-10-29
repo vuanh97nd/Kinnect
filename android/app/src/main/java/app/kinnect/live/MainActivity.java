@@ -134,14 +134,13 @@ public class MainActivity extends Activity {
     LinearLayout c = column();
     c.setGravity(Gravity.CENTER_HORIZONTAL);
     ImageView logo = new ImageView(this);
-    logo.setImageResource(getResources().getIdentifier("kinnect_icon", "drawable", getPackageName()));
+    logo.setImageResource(getResources().getIdentifier("kinnect_logo", "drawable", getPackageName()));
     logo.setElevation(dp(10));
     c.addView(logo, new LinearLayout.LayoutParams(dp(96), dp(96)));
     TextView name = label("Kinnect", 26, ACCENT);
     name.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
     name.setPadding(0, dp(18), 0, dp(18));
     c.addView(name);
-    TextView tagline=label("Kết nối theo cách của bạn.",14,MUTED);tagline.setGravity(Gravity.CENTER);c.addView(tagline);
     FrameLayout rings=new FrameLayout(this);for(int i=0;i<2;i++){View ring=new View(this);GradientDrawable outline=background(0x00000000,99);outline.setStroke(dp(2),i==0?ACCENT:PINK);ring.setBackground(outline);FrameLayout.LayoutParams rp=new FrameLayout.LayoutParams(dp(20),dp(20),Gravity.CENTER);rings.addView(ring,rp);ring.setTranslationX(dp(i==0?-16:16));ring.animate().translationX(dp(i==0?-5:5)).setDuration(400).start();}LinearLayout.LayoutParams space=new LinearLayout.LayoutParams(-1,dp(42));space.topMargin=dp(18);c.addView(rings,space);
     s.addView(c, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
     setContentView(s);
@@ -310,7 +309,7 @@ public class MainActivity extends Activity {
     toolbar.setBackgroundColor(CARD);
     toolbar.setElevation(dp(1));
     ImageView logo = new ImageView(this);
-    logo.setImageResource(getResources().getIdentifier("kinnect_icon", "drawable", getPackageName()));
+    logo.setImageResource(getResources().getIdentifier("kinnect_logo", "drawable", getPackageName()));
     logo.setClipToOutline(true);
     logo.setBackground(background(CARD, 10));
     toolbar.addView(logo, new LinearLayout.LayoutParams(dp(34), dp(34)));
@@ -3778,7 +3777,7 @@ public class MainActivity extends Activity {
 
 
   private TextView welcomeText(String text,int size,int color,boolean bold){TextView v=label(text,size,color);v.setPadding(0,0,0,0);v.setLineSpacing(dp(3),1f);if(bold)v.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));return v;}
-  private LinearLayout welcomeBrand(){LinearLayout brand=row();ImageView logo=new ImageView(this);logo.setImageResource(getResources().getIdentifier("kinnect_icon","drawable",getPackageName()));logo.setScaleType(ImageView.ScaleType.FIT_CENTER);brand.addView(logo,new LinearLayout.LayoutParams(dp(34),dp(34)));TextView name=welcomeText("Kinnect",19,ACCENT,true);name.setPadding(dp(9),0,0,0);brand.addView(name,new LinearLayout.LayoutParams(0,-2,1));return brand;}
+  private LinearLayout welcomeBrand(){LinearLayout brand=row();ImageView logo=new ImageView(this);logo.setImageResource(getResources().getIdentifier("kinnect_logo","drawable",getPackageName()));logo.setScaleType(ImageView.ScaleType.FIT_CENTER);brand.addView(logo,new LinearLayout.LayoutParams(dp(34),dp(34)));TextView name=welcomeText("Kinnect",19,ACCENT,true);name.setPadding(dp(9),0,0,0);brand.addView(name,new LinearLayout.LayoutParams(0,-2,1));return brand;}
   private void welcomeFeature(String glyph,String title,String description,int color){
     LinearLayout panel=column();panel.setPadding(dp(18),dp(19),dp(18),dp(19));panel.setBackground(outlined(CARD,20));LinearLayout line=row();FrameLayout bubble=new FrameLayout(this);bubble.setBackground(background((color&0x00ffffff)|0x18000000,14));bubble.addView(icon(glyph,23,color),new FrameLayout.LayoutParams(dp(23),dp(23),Gravity.CENTER));line.addView(bubble,new LinearLayout.LayoutParams(dp(46),dp(46)));LinearLayout words=column();words.setPadding(dp(13),0,0,0);words.addView(welcomeText(title,17,TEXT,true));TextView detail=welcomeText(description,14,MUTED,false);detail.setPadding(0,dp(6),0,0);words.addView(detail);line.addView(words,new LinearLayout.LayoutParams(0,-2,1));panel.addView(line);LinearLayout.LayoutParams space=new LinearLayout.LayoutParams(-1,-2);space.topMargin=dp(10);content.addView(panel,space);
   }
@@ -3792,7 +3791,7 @@ public class MainActivity extends Activity {
   }
   private final class PhoneFeatureShowcase extends WelcomeScene {
     final android.graphics.drawable.Drawable[] glyphs={WebIcons.load(MainActivity.this,"newspaper"),WebIcons.load(MainActivity.this,"compass"),WebIcons.load(MainActivity.this,"clapperboard"),WebIcons.load(MainActivity.this,"radio")};
-    final android.graphics.drawable.Drawable miniLogo=getResources().getDrawable(getResources().getIdentifier("kinnect_icon","drawable",getPackageName()));
+    final android.graphics.drawable.Drawable miniLogo=getResources().getDrawable(getResources().getIdentifier("kinnect_logo","drawable",getPackageName()));
     final String[] tabs={"Bảng tin","Khám phá","Video","Live"};long clock=android.os.SystemClock.uptimeMillis();int manual=0;
     PhoneFeatureShowcase(){super();setClickable(true);setContentDescription("Xem trước Bảng tin, Khám phá, Tạo nội dung, Video và Live");}
     void selectPreview(int index){manual=index;clock=android.os.SystemClock.uptimeMillis();invalidate();}

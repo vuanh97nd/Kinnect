@@ -1,4 +1,12 @@
-# Cập nhật 29/10 — Kinnect 1.0.5 / build 70
+# Cập nhật logo 29/10 — Kinnect 1.0.6 / build 71
++
++- Logo bo góc dạng vector `android/app/src/main/res/drawable/kinnect_logo.xml`: chữ K trắng, nền tím–hồng, tỷ lệ góc giữ nguyên ở mọi kích thước.
++- Thay logo tại launcher, splash, đăng nhập, giới thiệu, cập nhật và IntroArt. Bỏ dòng “Kết nối theo cách của bạn.” tại splash theo yêu cầu người dùng.
++- APK SHA-256: `01142b3694f0a70da51787e931c6d2f968abf1384e1a08626539dd8ac38da838`; giữ chứng chỉ ký cũ. Baseline 1.0.5; chỉ thay MainActivity, IntroArt, ApkUpdateActivity cùng tài nguyên logo/launch và tham chiếu icon manifest.
++- Kiểm tra logo 34/96/192px, chữ K trắng, icon ứng dụng và không còn tagline startup đều đạt trên Android 14 giả lập. Chưa kiểm trên thiết bị thật. Bằng chứng: `docs/cloud-handoff/brand-splash.png`; instrumentation: `scripts/handoff-checks/BrandAudit.java`.
++- Đóng gói: `scripts/handoff-checks/package-logo-update-windows.py`, cần APK baseline 1.0.5, toolchain và khóa ký được cấp riêng.
++
++# Cập nhật 29/10 — Kinnect 1.0.5 / build 70
 
 - APK: `dist/Kinnect-1.0.5-native.apk`; SHA-256: `6eb639dda99f521c28aa35961c75adaccbb6f3eb5cfe9e6853f075656160f8b6`.
 - Bỏ minimum height của profileSections; giữ nguyên tab controls để tránh mất focus khi chuyển tab.

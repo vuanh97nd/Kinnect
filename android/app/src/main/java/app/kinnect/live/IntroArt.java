@@ -7,7 +7,7 @@ import android.view.View;
 /** Hình minh hoạ màn chào mừng giống bản web: logo K giữa hai vòng quỹ đạo, avatar và nhãn nổi. */
 final class IntroArt extends View {
   private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-  private final Bitmap logo;
+  private final android.graphics.drawable.Drawable logo;
   private final int page;
   private static final String[] LETTERS = { "M", "T", "Q", "H", "L" };
   private static final int[][] COLORS = { { 0xffb04cff, 0xffe055c8 }, { 0xffff5f6d, 0xffd9466f }, { 0xff4f7dff, 0xff6d4aff }, { 0xfff7b733, 0xffef6f6c }, { 0xffff5fb0, 0xffb04cff } };
@@ -23,7 +23,7 @@ final class IntroArt extends View {
   IntroArt(Context context, int page) {
     super(context);
     this.page = Math.max(0, Math.min(page, CHIPS.length - 1));
-    logo = BitmapFactory.decodeResource(getResources(), getResources().getIdentifier("kinnect_icon", "drawable", context.getPackageName()));
+    logo = getResources().getDrawable(getResources().getIdentifier("kinnect_logo", "drawable", context.getPackageName()));
     setContentDescription("Minh hoạ Kinnect");
   }
 
@@ -49,13 +49,8 @@ final class IntroArt extends View {
     paint.setColor(0x55ffffff);
     c.drawRoundRect(new RectF(box.left - dp(5), box.top - dp(5), box.right + dp(5), box.bottom + dp(5)), s * 0.27f, s * 0.27f, paint);
     if (logo != null) {
-      Path clip = new Path();
-      clip.addRoundRect(box, s * 0.24f, s * 0.24f, Path.Direction.CW);
-      c.save();
-      c.clipPath(clip);
-      paint.setColor(0xffffffff);
-      c.drawBitmap(logo, null, box, paint);
-      c.restore();
+      logo.setBounds(Math.round(box.left), Math.round(box.top), Math.round(box.right), Math.round(box.bottom));
+      logo.draw(c);
     }
     // Avatar trên quỹ đạo
     float a = r * 0.2f;

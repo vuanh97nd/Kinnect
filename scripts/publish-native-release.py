@@ -2,7 +2,7 @@
 import argparse,hashlib,json,os,subprocess
 from pathlib import Path
 root=Path(__file__).resolve().parents[1]
-p=argparse.ArgumentParser();p.add_argument('--apk',required=True,type=Path);p.add_argument('--source-zip',required=True,type=Path);p.add_argument('--branch',required=True);args=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--apk',required=True,type=Path);p.add_argument('--source-zip',required=True,type=Path);p.add_argument('--branch',required=True);p.add_argument('--title');args=p.parse_args()
 metadata=json.loads((root/'docs/cloud-handoff/artifact.json').read_text(encoding='utf8'));version=metadata['version'];tag='v'+version;repo='vuanh97nd/Kinnect'
 if args.apk.name!=metadata['filename'] or hashlib.sha256(args.apk.read_bytes()).hexdigest()!=metadata['sha256']:raise RuntimeError('APK differs from verified artifact')
 env=os.environ.copy();env['GIT_TERMINAL_PROMPT']='0'
@@ -29,7 +29,7 @@ if release:
  run('gh','release','edit',tag,'--repo',repo,'--target',sha,'--notes-file',root/('docs/releases/'+tag+'.md'))
  run('gh','release','upload',tag,'--repo',repo,'--clobber',args.source_zip)
 else:
- run('gh','release','create',tag,'--repo',repo,'--draft','--target',sha,'--title','Kinnect '+version+' — Hồ sơ và AI trực tiếp','--notes-file',root/('docs/releases/'+tag+'.md'),args.apk,args.apk.with_suffix('.apk.sha256'),args.source_zip)
+ run('gh','release','create',tag,'--repo',repo,'--draft','--target',sha,'--title',args.title or 'Kinnect '+version,'--notes-file',root/('docs/releases/'+tag+'.md'),args.apk,args.apk.with_suffix('.apk.sha256'),args.source_zip)
  releases=json.loads(run('gh','api','repos/'+repo+'/releases?per_page=100'))
  release=next(item for item in releases if item['tag_name']==tag)
 release=json.loads(run('gh','api','repos/'+repo+'/releases/'+str(release['id'])));asset=next(a for a in release['assets'] if a['name']==args.apk.name)

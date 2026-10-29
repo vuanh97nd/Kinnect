@@ -25,7 +25,7 @@ public final class ApkUpdateActivity extends Activity {
  private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
  @Override public void onCreate(Bundle state){super.onCreate(state);setTitle("Cập nhật Kinnect");
   LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(24),dp(40),dp(24),dp(24));root.setGravity(Gravity.CENTER);root.setBackgroundColor(0xfff6f5fa);
-  ImageView logo=new ImageView(this);logo.setImageResource(getResources().getIdentifier("kinnect_icon","drawable",getPackageName()));root.addView(logo,new LinearLayout.LayoutParams(dp(72),dp(72)));
+  ImageView logo=new ImageView(this);logo.setImageResource(getResources().getIdentifier("kinnect_logo","drawable",getPackageName()));root.addView(logo,new LinearLayout.LayoutParams(dp(72),dp(72)));
   TextView title=new TextView(this);title.setText("Cập nhật Kinnect "+getIntent().getStringExtra("version"));title.setTextSize(22);title.setTextColor(0xff271b3d);title.setGravity(Gravity.CENTER);title.setPadding(0,dp(20),0,dp(20));root.addView(title);
   status=new TextView(this);status.setGravity(Gravity.CENTER);status.setTextColor(0xff625674);status.setText("Đang chuẩn bị tải…");root.addView(status);
   bar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);bar.setMax(100);LinearLayout.LayoutParams row=new LinearLayout.LayoutParams(-1,dp(24));row.topMargin=dp(20);root.addView(bar,row);

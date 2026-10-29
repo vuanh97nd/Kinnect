@@ -1,11 +1,11 @@
 {
-  "version": "1.0.5",
-  "versionCode": 70,
-  "filename": "Kinnect-1.0.5-native.apk",
-  "sha256": "6eb639dda99f521c28aa35961c75adaccbb6f3eb5cfe9e6853f075656160f8b6",
+  "version": "1.0.6",
+  "versionCode": 71,
+  "filename": "Kinnect-1.0.6-native.apk",
+  "sha256": "01142b3694f0a70da51787e931c6d2f968abf1384e1a08626539dd8ac38da838",
   "signingCertificateSHA256": "d8809c1e21f00ccf96984b37123d3d916d2e103bfa1dc2032043f47bb3b9988d",
   "publishedRelease": "pending",
-  "testedBaseline": "1.0.4",
+  "testedBaseline": "1.0.5",
   "currentChecks": {
     "aiFocusedPassed": 21,
     "webStreaming": "passed: incremental text, safe DOM, survives reload, one final message",
@@ -48,5 +48,17 @@
       ],
       "scope": "horizontal overflow, heading text fit, <=144px discovery cards in rows, centered following empty state"
     }
+  },
+  "brandingChecks": {
+    "roundedLogoSizesPx": [
+      34,
+      96,
+      192
+    ],
+    "whiteK": true,
+    "applicationIconRounded": true,
+    "startupTaglineRemoved": true,
+    "execution": "Android 14 emulator; actual packaged drawable/application icon and splash UI",
+    "physicalDeviceVerified": false
   }
 }
