@@ -8,6 +8,7 @@ p=argparse.ArgumentParser();p.add_argument('--apk',required=True,type=Path);p.ad
 branch='handoff/kinnect-1.0.4-cloud';repo='vuanh97nd/Kinnect';tag='v1.0.4'
 env=os.environ.copy();env['GIT_TERMINAL_PROMPT']='0'
 def run(*cmd,stdin=None):
+ if cmd[0]=='git':cmd=('git','-c','safe.directory='+str(root),*cmd[1:])
  out=subprocess.run(list(map(str,cmd)),cwd=root,env=env,input=stdin,text=True,capture_output=True)
  if out.returncode:raise RuntimeError((out.stderr or out.stdout or 'Command failed').strip())
  return out.stdout.strip()
