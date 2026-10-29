@@ -2949,7 +2949,7 @@ public class MainActivity extends Activity {
     title.setMaxLines(2);
     title.setEllipsize(android.text.TextUtils.TruncateAt.END);
     info.addView(title);
-    String mode=room.optString("liveMode","chat");info.addView(label(I18n.t(mode.equals("karaoke")?"Hát karaoke":mode.equals("game")?"Chơi game":"Trò chuyện"),11,0xffdacbff));
+    String mode=room.optString("liveMode","chat");info.addView(label(I18n.t(mode.equals("game")?"Chơi game":"Trò chuyện"),11,0xffdacbff));
     info.addView(label(room.optString("host"), 12, 0xccffffff));
     c.addView(info, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
     c.setOnClickListener(v -> {

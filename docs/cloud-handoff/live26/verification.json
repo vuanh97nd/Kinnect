@@ -1,16 +1,15 @@
 {
   "version": "1.0.26",
   "versionCode": 91,
-  "sha256": "823c22138495d348481afb9fae8a9ff9aa2f04fc056bbc549fba16df4dd9b63d",
+  "sha256": "6fa9e25cc755d4a9066237229d0748e00b542435929615117d2c69ecbece05f6",
   "temporaryFree": "API studioProFree defaults true; set KINNECT_STUDIO_PRO_FREE=false to return to paid access. Purchased ownership/receipts are unchanged; no fake purchases.",
   "native": "Photo export and video Pro templates/export accept effective server access; Store shows currently free and opens image/video picker.",
-  "liveFilters": "Four tabs first/top child above Live stage; filter determines viewer autojoin/swipe rooms. Host creation remains separate.",
-  "karaoke": "Local rights-cleared backing file + timed LRC is primary menu route. Sender PCM mixes voice/music; same encoded track sent to room peers. YouTube remains reference only; VietKTV not integrated without provider interface.",
+  "liveFilters": "Top row: All / Chat / Game; available swipe rooms filtered. Creation: Chat / Game only.",
+  "karaoke": "Removed native entry, UI, source helpers and backend song controls. Legacy karaoke room mode normalizes to chat.",
   "checks": {
-    "backendFocused": 10,
+    "backend": 113,
     "freePhotoPixelsAndActualExportSave": 33,
-    "liveTopFilterLayoutAndSelection": 10,
-    "realLocalWebRtcAudio": "PASS: muted microphone, backing WAV received via Opus; mean4834 over17440 samples",
+    "liveTopFilterLayoutAndSelection": 9,
     "qaVersionCode": 116,
     "qaPayloadMatchesReleaseExceptManifestAndSignature": true
   },

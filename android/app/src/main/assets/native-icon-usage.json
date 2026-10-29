@@ -37,53 +37,48 @@
     },
     {
       "file": "LiveActivity.java",
-      "line": 125,
+      "line": 124,
       "name": "back"
     },
     {
       "file": "LiveActivity.java",
-      "line": 138,
+      "line": 137,
       "name": "rotate_ccw"
     },
     {
       "file": "LiveActivity.java",
-      "line": 167,
+      "line": 166,
       "name": "radio"
     },
     {
       "file": "LiveActivity.java",
-      "line": 199,
+      "line": 198,
       "name": "radio"
     },
     {
       "file": "LiveActivity.java",
-      "line": 229,
+      "line": 227,
       "name": "flip"
     },
     {
       "file": "LiveActivity.java",
-      "line": 229,
+      "line": 227,
       "name": "wand"
     },
     {
       "file": "LiveActivity.java",
-      "line": 229,
+      "line": 227,
       "name": "mic"
     },
     {
       "file": "LiveActivity.java",
-      "line": 239,
+      "line": 237,
       "name": "gamepad"
     },
     {
       "file": "LiveActivity.java",
-      "line": 449,
+      "line": 447,
       "name": "eye"
-    },
-    {
-      "file": "LiveKaraoke.java",
-      "line": 15,
-      "name": "mic"
     },
     {
       "file": "MainActivity.java",

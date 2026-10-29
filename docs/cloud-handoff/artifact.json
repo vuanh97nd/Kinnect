@@ -1,7 +1,7 @@
 {
   "version": "1.0.26",
   "filename": "Kinnect-1.0.26-native.apk",
-  "sha256": "823c22138495d348481afb9fae8a9ff9aa2f04fc056bbc549fba16df4dd9b63d",
+  "sha256": "6fa9e25cc755d4a9066237229d0748e00b542435929615117d2c69ecbece05f6",
   "playVersion": "1.2.4",
   "languages": [
     "vi",
@@ -43,7 +43,7 @@
     "camera23": "Direct + camera; Save/Studio Pro nonoverlap; full-text dialog buttons; native17 camera/review and9 editor exit checks; see camera23/verification.json",
     "exit24": "Close icon in both Studio Pro editors;9 native exit checks; see exit24/verification.json",
     "live25": "Floating game comments/viewers/reply; official YouTube search reference; viewer/creation routes separated; see live25/verification.json",
-    "live26": "Temporary free Studio Pro, actual photo export/save33; top Live filters10; backend10 and local WebRTC audio; see live26/verification.json"
+    "live26": "Karaoke removed; temporary free Studio Pro photo export/save33; top3 Live filters9; backend113; see live26/verification.json"
   },
   "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.26"
 }
