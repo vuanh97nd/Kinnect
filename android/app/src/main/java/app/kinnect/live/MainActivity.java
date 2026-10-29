@@ -3277,11 +3277,8 @@ public class MainActivity extends Activity {
   }
 
   private void chooseVideo() {
-    if (postingVideo) {
-      say(I18n.t("Đang tải video, vui lòng chờ."));
-      return;
-    }
-    startActivityForResult(new Intent(this, StudioActivity.class), 203);
+    if(postingVideo){say(I18n.t("Đang tải video, vui lòng chờ."));return;}
+    new Sheet(this).setTitle(I18n.t("Studio")).setItemIcons(new String[]{"camera","sparkles","clapperboard"}).setItems(new String[]{I18n.t("Chụp ảnh / quay video"),I18n.t("Studio Pro · Sửa ảnh nâng cao"),I18n.t("Đăng video có sẵn")},(d,w)->{if(w==0)startActivityForResult(new Intent(this,StudioActivity.class),203);else pickFile(w==1?213:200,w==1?"image/*":"video/*");}).setNegativeButton(I18n.t("Đóng"),null).show();
   }
 
   private void captureVideo() {
@@ -3383,6 +3380,8 @@ public class MainActivity extends Activity {
       catch (SecurityException ignored) {}
     }
 
+    if(request==213){if(result==RESULT_OK&&data!=null&&data.getData()!=null){android.net.Uri uri=data.getData();Intent editor=new Intent(this,PhotoEditActivity.class).setData(uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);editor.setClipData(android.content.ClipData.newRawUri("photo",uri));startActivityForResult(editor,214);}return;}
+    if(request==214){if(result==RESULT_OK&&data!=null&&data.getData()!=null){composePost();preparePostMedia(300,data.getData());}return;}
     if (request >= 210 && request <= 212) {
       if(result==RESULT_OK && data!=null && data.getData()!=null){if(request==212)uploadVideoNow(data.getData());else preparePostMedia(request==211?304:300,data.getData());}
       return;
@@ -3407,7 +3406,7 @@ public class MainActivity extends Activity {
       final java.io.File file = new java.io.File(data.getStringExtra(StudioActivity.EXTRA_IMAGE));
       final String action = data.getStringExtra(StudioActivity.EXTRA_ACTION);
       if ("story".equals(action)) reviewMedia(android.net.Uri.fromFile(file),211);
-      else { composePost(); reviewMedia(android.net.Uri.fromFile(file),210); }
+      else { composePost(); if(data.getBooleanExtra("photoProEdited",false))preparePostMedia(300,android.net.Uri.fromFile(file));else reviewMedia(android.net.Uri.fromFile(file),210); }
       return;
     }
     if ((request == 203 || request == 204) && result == RESULT_FIRST_USER && data != null && data.getData() != null) {

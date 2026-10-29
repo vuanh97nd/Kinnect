@@ -24,6 +24,12 @@
       "category": "interface"
     },
     {
+      "resource": "ic_flow_brush",
+      "source": "ic_brush",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
       "resource": "ic_flow_call",
       "source": "ic_call",
       "redrawn": false,

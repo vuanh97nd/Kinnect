@@ -1,0 +1,40 @@
+{
+  "version": "1.0.21",
+  "versionCode": 86,
+  "sha256": "d8d71ec262023b27d268df18a3aa45a90688e7f6631c70755161d1f830d84cee",
+  "certificateSha256": "d8809c1e21f00ccf96984b37123d3d916d2e103bfa1dc2032043f47bb3b9988d",
+  "checks": {
+    "nativeRendererAndActivity": 33,
+    "nativeLayoutVIENFont130": 130,
+    "nativeImagePickerEntry": "passed",
+    "backendStoreAndMailIsolation": 4,
+    "fontScales": [
+      1,
+      1.3
+    ],
+    "androidVersion": 16,
+    "qaPayloadMatchesRelease": true,
+    "qaManifestVersionCode": 111
+  },
+  "features": [
+    "crop/rotate/flip",
+    "color/Curves/HSL",
+    "whole-photo smoothing",
+    "manual soft erase/restore masks",
+    "image/text layers",
+    "undo/redo and per-account private drafts",
+    "JPEG/PNG export up to 3072 px without upsampling"
+  ],
+  "entitlement": "Editing preview allowed; export requires existing kinnect_studio_pro ownership verified against current API session. No production test bypass.",
+  "physicalDeviceVerified": false,
+  "realBillingPurchaseVerified": false,
+  "limitations": [
+    "No AI object removal",
+    "No PSD interchange",
+    "Smoothing affects whole photo",
+    "SAF save callback tested using isolated real MediaStore destination; not full system picker navigation"
+  ],
+  "webClientChanged": false,
+  "playCandidateChanged": false,
+  "publication": "See GitHub v1.0.21 and dist/published-apk.json for current publication state."
+}

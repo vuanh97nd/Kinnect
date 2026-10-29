@@ -102,7 +102,7 @@ final class Sheet {
         else if (c instanceof TextView) ((TextView) c).setTextColor(ink);
       }
       if (view.getParent() != null) ((ViewGroup) view.getParent()).removeView(view);
-      view.setPadding(0, view.getPaddingTop(), 0, view.getPaddingBottom());
+      if(!(view instanceof EditText))view.setPadding(0, view.getPaddingTop(), 0, view.getPaddingBottom());
       box.addView(view);
     }
     if (items != null) {
@@ -130,9 +130,10 @@ final class Sheet {
         if (checked == null || itemIcons != null || itemIcon != null) {
           String glyph=itemIcons!=null&&i<itemIcons.length?itemIcons[i]:itemIcon!=null?itemIcon:"circle_check";
           int iconId = WebIcons.resolve(context,glyph);
-          if (iconId != 0) {
+          android.graphics.drawable.Drawable artwork=iconId!=0?WebIcons.load(context,glyph):EditorIcons.drawable(context,glyph,ink);
+          if (artwork != null) {
             ImageView icon = new ImageView(context);
-            icon.setImageDrawable(WebIcons.load(context,glyph));
+            icon.setImageDrawable(artwork);
             icon.setColorFilter(danger ? 0xffe0245e : ink);
             LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(dp(21), dp(21));
             ip.rightMargin = dp(14);

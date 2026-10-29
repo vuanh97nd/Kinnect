@@ -66,6 +66,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   private Bitmap thumb;
   private final List<ImageView> filterThumbs = new ArrayList<>();
   private File capturedPhoto;
+  private boolean photoProEdited;
 
   private int dp(float n) { return Math.round(n * getResources().getDisplayMetrics().density); }
 
@@ -674,14 +675,14 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   }
 
   private void openGallery() {
-    if (recording) return;
-    new Sheet(this).setTitle(I18n.t("Thư viện")).setItemIcons(new String[]{"image","clapperboard"}).setItems(new String[] { I18n.t("Chỉnh ảnh từ máy"), I18n.t("Đăng video có sẵn") }, (d, w) -> {
-      Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-      pick.addCategory(Intent.CATEGORY_OPENABLE);
-      pick.setType(w == 0 ? "image/*" : "video/*");
-      try { startActivityForResult(pick, w == 0 ? 403 : 404); } catch (Exception e) { Toast.makeText(this, I18n.t("Không mở được thư viện."), Toast.LENGTH_SHORT).show(); }
+    if(recording)return;
+    new Sheet(this).setTitle(I18n.t("Thư viện")).setItemIcons(new String[]{"image","sparkles","clapperboard"}).setItems(new String[]{I18n.t("Chỉnh ảnh từ máy"),I18n.t("Studio Pro · Sửa ảnh nâng cao"),I18n.t("Đăng video có sẵn")},(d,w)->{
+      Intent pick=new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(w==2?"video/*":"image/*");
+      try{startActivityForResult(pick,w==2?404:w==1?405:403);}catch(Exception e){Toast.makeText(this,I18n.t("Không mở được thư viện."),Toast.LENGTH_SHORT).show();}
     }).show();
   }
+
+  private void openPhotoPro(Uri uri){Intent intent=new Intent(this,PhotoEditActivity.class).setData(uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);intent.setClipData(android.content.ClipData.newRawUri("photo",uri));startActivityForResult(intent,406);}
 
   // ======================= Vẽ từng khung hình =======================
   private boolean hardwarePreview = true;
@@ -834,6 +835,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     img.setScaleType(ImageView.ScaleType.FIT_CENTER);
     img.setImageBitmap(photo);
     reviewLayer.addView(img, new FrameLayout.LayoutParams(-1, -1));
+    TextView pro=text(I18n.t("Studio Pro"),13,0xffffffff,true);pro.setPadding(dp(14),0,dp(14),0);pro.setGravity(Gravity.CENTER);pro.setBackground(round(0xcc1a1724,16));pro.setCompoundDrawablesRelativeWithIntrinsicBounds(tinted("sparkles"),null,null,null);pro.setCompoundDrawablePadding(dp(6));pro.setOnClickListener(v->{if(capturedPhoto!=null)openPhotoPro(Uri.fromFile(capturedPhoto));});FrameLayout.LayoutParams pp=new FrameLayout.LayoutParams(-2,dp(44),Gravity.TOP|Gravity.END);pp.setMargins(0,dp(52),dp(14),0);reviewLayer.addView(pro,pp);
     LinearLayout top = new LinearLayout(this);
     top.setGravity(Gravity.CENTER_VERTICAL);
     top.setPadding(dp(10), dp(14), dp(14), dp(10));
@@ -910,6 +912,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   private void deliverPhoto(String action) {
     Intent result = new Intent();
     result.putExtra(EXTRA_IMAGE, capturedPhoto.getAbsolutePath());
+    result.putExtra("photoProEdited",photoProEdited);
     result.putExtra(EXTRA_ACTION, action);
     setResult(RESULT_OK, result);
     finish();
@@ -1269,6 +1272,9 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   protected void onActivityResult(int request, int result, Intent data) {
     super.onActivityResult(request, result, data);
     if (result != RESULT_OK || data == null || data.getData() == null) return;
+    if(request==405){openPhotoPro(data.getData());return;}
+    if(request==406){final String path=data.getStringExtra(EXTRA_IMAGE);if(path==null)return;final File edited=new File(path);worker.execute(()->{try{Bitmap shown=PhotoRenderer.decode(edited,1280);ui.post(()->{capturedPhoto=edited;photoProEdited=true;showReview(shown);});}catch(Exception|OutOfMemoryError e){ui.post(()->Toast.makeText(this,I18n.t("Không mở được ảnh."),Toast.LENGTH_SHORT).show());}});return;}
+    if(request==403)photoProEdited=false;
     if (request == 402) setMusic(null, data.getData(), "Nhạc của bạn");
     if (request == 403) loadStill(data.getData(), "photo");
     if (request == 404) {
