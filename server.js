@@ -19,11 +19,13 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
   loadMailEnv("oauth.env");
   loadMailEnv("turn.env");
   loadMailEnv("ai.env");
+  let notifyAIStream = () => {};
   let notifyNotifications = () => {};
   let pushNotification = () => {};
   let notifyCallMessage = () => {};
   const social = openSocial(dbPath, {
     onNotification: ({ userId, id }) => { notifyNotifications(userId); if (id) pushNotification(userId, id); },
+    onAIStream: event => notifyAIStream(event),
     onCallMessage: ({ userIds }) => notifyCallMessage(userIds),
     fetchImpl,authLimit,
     sendEmail:emailSender||sendMail,mailReady:emailReady||smtpConfigured,
@@ -407,6 +409,9 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
   const wss = new WebSocketServer({ server, maxPayload: 32768 });
   const send = (ws, data) => {
     if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data));
+  };
+  notifyAIStream = ({userId,...event}) => {
+    for(const client of wss.clients)if(client.userId===userId&&social.authenticate(client.authRequest))send(client,{type:'ai-stream',...event});
   };
   const webPush = createWebPush({ social, fetchImpl: fetchImpl || fetch });
   pushNotification = (userId, id) => { if (!visible(userId)) webPush.notification(userId, id); };

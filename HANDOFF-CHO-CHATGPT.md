@@ -1,3 +1,15 @@
+# Cập nhật 29/10 — Kinnect 1.0.5 / build 70
+
+- APK: `dist/Kinnect-1.0.5-native.apk`; SHA-256: `6eb639dda99f521c28aa35961c75adaccbb6f3eb5cfe9e6853f075656160f8b6`.
+- Bỏ minimum height của profileSections; giữ nguyên tab controls để tránh mất focus khi chuyển tab.
+- Thêm `lib/ai-stream.js` (SSE UTF-8), truyền sự kiện AI chỉ tới phiên đăng nhập của người nhận; web và APK dựng bản nháp riêng, chỉ lưu tin nhắn đầy đủ.
+- Worker nguồn nằm trong `ai-worker/`; triển khai bằng `wrangler deploy --config ai-worker/wrangler.jsonc`. Cần secret KINNECT_API_TOKEN đã cấp; không đưa vào repo.
+- Máy chủ và Worker đã triển khai; APK được kiểm trên giả lập ở font 1.0/1.3, chưa kiểm trên thiết bị thật. 20 bài AI/Worker và kiểm tra streaming web đạt. `node --test` trước lần thêm kiểm thử Worker cuối: 87/87 đạt.
+- Kiểm tra lại trên thiết bị thật: hồ sơ ít nội dung, chuyển tab bài/ảnh/video, câu AI dài, rớt mạng khi đang nhận chữ và thao tác yêu cầu quản trị viên.
+- APK được đóng gói trên baseline 1.0.4, chỉ thay MainActivity; giữ logo/tài nguyên/lớp khác và chứng chỉ ký cũ. Xem script đóng gói `scripts/handoff-checks/package-profile-stream-windows.py`.
+
+Các mục bên dưới là lịch sử bàn giao 1.0.4 và cũ hơn.
+
 # Bàn giao Kinnect 1.0.4 cho phiên đám mây — 29/10/2026
 
 Đọc phần này trước. Các ghi chú từ 26/10 ở phía dưới là lịch sử, không phải trạng thái hiện tại.

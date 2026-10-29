@@ -62,6 +62,19 @@ const as = (app, u, path, method = "GET", body) =>
 
 
 import {createKinnectAI} from '../lib/kinnect-ai.js';
+test('AI emits real provider deltas before saving exactly one complete message',async t=>{
+ const app=await start(),admin=await register(app,'stream_admin'),member=await register(app,'stream_member');
+ app.social.db.prepare("UPDATE users SET role='admin' WHERE id=?").run(admin.id);
+ let release,first;const gate=new Promise(r=>release=r),started=new Promise(r=>first=r),events=[];
+ const ai=createKinnectAI({db:app.social.db,user:id=>app.social.user(id),blocked:()=>false,notice:()=>{},messageState:{reveal(){}},env:{KINNECT_AI_URL:'https://example.com',KINNECT_API_TOKEN:'secret'},onStream:e=>{events.push(e);if(e.body)first();},send:async(url,options)=>{
+  assert.equal(JSON.parse(options.body).stream,true);
+  return new Response(new ReadableStream({async start(c){const enc=new TextEncoder();c.enqueue(enc.encode('data: {"response":"Chào "}\n\n'));await gate;c.enqueue(enc.encode('data: {"response":"bạn"}\n\ndata: [DONE]\n\n'));c.close();}}),{headers:{'Content-Type':'text/event-stream'}});
+ }});t.after(async()=>{release();ai.close();await app.stop();});ai.configure({adminId:admin.id,support:true});
+ app.social.db.prepare('INSERT INTO messages VALUES(?,?,?,?,?)').run('stream-question',member.id,admin.id,'Xin chào',1);
+ ai.support({id:'stream-question',sender:member.id,recipient:admin.id,body:'Xin chào'});const draining=ai.drain();await started;
+ assert.equal(events[0].userId,member.id);assert.match(events[0].body,/Chào /);assert.equal(app.social.db.prepare('SELECT COUNT(*) n FROM messages WHERE sender=?').get(admin.id).n,0);
+ release();await draining;const messages=app.social.db.prepare('SELECT * FROM messages WHERE sender=?').all(admin.id);assert.equal(messages.length,1);assert.match(messages[0].body,/Chào bạn$/);assert.equal(events.at(-1).done,true);
+});
 test('AI replies are durable, labelled, per conversation, and pause for human handoff',async t=>{
  const app=await start(),a=await register(app,'ai_admin'),b=await register(app,'ai_member');app.social.db.prepare("UPDATE users SET role='admin' WHERE id=?").run(a.id);let sent=0;
  const ai=createKinnectAI({db:app.social.db,user:id=>app.social.db.prepare('SELECT * FROM users WHERE id=?').get(id),blocked:()=>false,notice:()=>{},messageState:{reveal(){}},env:{KINNECT_AI_URL:'https://example.com',KINNECT_API_TOKEN:'secret'},send:async()=>{sent++;return Response.json({answer:'[Trợ lý AI của Quản trị Kinnect] Xin chào',automated:true,provider:'cloudflare'});}});t.after(async()=>{ai.close();await app.stop();});ai.configure({adminId:a.id,support:true,moderation:true});

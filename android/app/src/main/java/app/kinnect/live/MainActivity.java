@@ -60,8 +60,8 @@ public class MainActivity extends Activity {
   private final CallPlaybackGate mediaCallGate=new CallPlaybackGate();
   private boolean mediaCallBlocked,mediaCallListening;
   private final NativeSocket.Events mediaCallEvents=new NativeSocket.Events(){
-    public void event(JSONObject event){String type=event.optString("type");mediaCallGate.update(type,event.optString("callId"));mediaCallBlocked=mediaCallGate.blocked();if(mediaCallBlocked)pauseForCall();}
-    public void closed(){mediaCallGate.clear();mediaCallBlocked=false;}
+    public void event(JSONObject event){String type=event.optString("type");if(type.equals("ai-stream")){receiveAIStream(event);return;}mediaCallGate.update(type,event.optString("callId"));mediaCallBlocked=mediaCallGate.blocked();if(mediaCallBlocked)pauseForCall();}
+    public void closed(){aiDrafts.clear();paintAIStream();mediaCallGate.clear();mediaCallBlocked=false;}
   };
   private void pauseForCall(){
     if(shortVideo!=null)try{shortVideo.pause();}catch(RuntimeException ignored){}
@@ -1918,6 +1918,22 @@ public class MainActivity extends Activity {
 
 
   private String lastMessages = "";
+  private LinearLayout aiChatList; private ScrollView aiChatScroll; private String aiChatSender=""; private Runnable aiChatReload;
+  private final java.util.Map<String,JSONObject> aiDrafts=new java.util.HashMap<>();
+  private void receiveAIStream(JSONObject event){
+    String id=event.optString("id");if(event.optBoolean("done"))aiDrafts.remove(id);else aiDrafts.put(id,event);
+    paintAIStream();if(event.optBoolean("done")&&aiChatSender.equals(event.optString("sender"))&&aiChatList!=null&&aiChatList.isAttachedToWindow()&&aiChatReload!=null)aiChatReload.run();
+  }
+  private void paintAIStream(){
+    if(aiChatList==null||!aiChatList.isAttachedToWindow())return;
+    boolean bottom=aiChatList.getHeight()-aiChatScroll.getScrollY()-aiChatScroll.getHeight()<dp(64);
+    for(int i=aiChatList.getChildCount()-1;i>=0;i--)if("ai-stream".equals(aiChatList.getChildAt(i).getTag()))aiChatList.removeViewAt(i);
+    for(JSONObject draft:aiDrafts.values())if(aiChatSender.equals(draft.optString("sender"))){
+      TextView text=label(draft.optString("body"),15,TEXT);text.setTag("ai-stream");text.setPadding(dp(12),dp(10),dp(12),dp(10));text.setBackground(background(CARD,14));
+      LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,-2);lp.rightMargin=dp(48);lp.topMargin=dp(4);aiChatList.addView(text,lp);
+    }
+    if(bottom)aiChatScroll.post(()->aiChatScroll.fullScroll(View.FOCUS_DOWN));
+  }
 
 
   private void profile() {
@@ -2060,8 +2076,8 @@ public class MainActivity extends Activity {
     render[0] = () -> {
       final int revision = ++generation[0];
       // Keep the tab views mounted: removing the focused tab resets ScrollView focus/position.
-      final ScrollView viewport = content.getParent() instanceof ScrollView ? (ScrollView) content.getParent() : null;
-      if (viewport != null) list.setMinimumHeight(Math.max(dp(160), viewport.getHeight() - dp(64)));
+      // Size to actual posts/empty state; a full viewport here adds a blank screen below the profile.
+      list.setMinimumHeight(0);
       list.removeAllViews();
       for(int i=0;i<controls.getChildCount();i++) {
         TextView item=(TextView)controls.getChildAt(i);boolean active=i==selected[0];
@@ -5208,6 +5224,7 @@ public class MainActivity extends Activity {
     final LinearLayout list = column();
     list.setPadding(dp(12), dp(10), dp(12), dp(10));
     msgScroll.addView(list);
+    aiChatList=list;aiChatScroll=msgScroll;aiChatSender=!group&&u!=null?u.optString("id"):"";ensureCalls();
     box.addView(msgScroll, new LinearLayout.LayoutParams(-1, 0, 1));
     box.addView(divider());
     LinearLayout bar = row();
@@ -5245,6 +5262,7 @@ public class MainActivity extends Activity {
     bar.addView(send, new LinearLayout.LayoutParams(dp(46), dp(46)));
     box.addView(bar);
     lastMessages = "";
+    aiChatReload=load;
     load.run();
     final int generation = screen;
     poll = () -> {
@@ -5390,6 +5408,7 @@ public class MainActivity extends Activity {
         p.setMargins(own ? dp(48) : 0, dp(3), own ? 0 : dp(48), dp(3));
         list.addView(bubble, p);
       }
+      paintAIStream();
       scroll.post(() -> { if (followBottom) scroll.fullScroll(View.FOCUS_DOWN); else scroll.scrollTo(0, previousY); });
     }, () -> list.setTag(Boolean.FALSE));
   }
