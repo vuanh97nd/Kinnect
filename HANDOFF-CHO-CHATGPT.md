@@ -1,3 +1,7 @@
+## Cập nhật mới nhất — APK 1.0.16 / Play candidate 1.2.3
+
+220 vector icon đồng bộ theo hướng bo mềm, ô màu; giữ K trắng và thanh điều hướng. Kéo xuống đầu feed/video đầu để làm mới, double tap Bảng tin trong 550 ms; giữ thẻ/dữ liệu không đổi. Sửa nhãn tab/bộ lọc bị cắt ở font130. Chi tiết và kiểm tra: docs/releases/v1.0.16.md, docs/cloud-handoff/artifact.json. Google Play chưa nộp; chưa kiểm tra điện thoại thật. Không đưa work/private reviewer/signing keys vào Git hoặc gói nguồn.
+
 ## Cập nhật ngôn ngữ 29/10/2026
 
 APK 1.0.9 / 74, Play 1.1.1 / 101: Tiếng Việt / English / Theo hệ thống. Nguồn dịch android/i18n/en.json; kiểm tra scripts/sync-android-languages.py; kiểm thử android/test/LanguageAudit.java. Xem docs/google-play/READINESS.md. Chưa nộp Play Console.

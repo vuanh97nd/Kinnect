@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="app.kinnect.live" android:versionCode="104" android:versionName="1.2.2">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="app.kinnect.live" android:versionCode="105" android:versionName="1.2.3">
   <!-- Merged by scripts/build-play-windows.py, independently of the website APK. -->
   <uses-sdk android:targetSdkVersion="36" />
   <application android:debuggable="false" android:usesCleartextTraffic="false" android:allowBackup="false" />

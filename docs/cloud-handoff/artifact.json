@@ -1,16 +1,16 @@
 {
-  "version": "1.0.15",
-  "filename": "Kinnect-1.0.15-native.apk",
-  "sha256": "09dfbf26fca6909484c9b3e7a52dc2a1328e97437874ef708342e9b86f1ed9b7",
-  "playVersion": "1.2.2",
+  "version": "1.0.16",
+  "filename": "Kinnect-1.0.16-native.apk",
+  "sha256": "6c43d936bbe35ff580a1968ee29d1ec9c9b7dd4e42164931fbf1d8ebf4ff965d",
+  "playVersion": "1.2.3",
   "languages": [
     "vi",
     "en"
   ],
   "validation": {
     "android16PageSize": 16384,
-    "languageAudit": "work/play-language-audit-result.log",
-    "policyAudit": "work/play-policy-111-result.log",
+    "languageAudit": "work/flow-final-language-result.log",
+    "policyAudit": "work/flow-final-policy-result.log",
     "physicalDeviceVerified": false,
     "backendTests": 104,
     "languageLayout": "320 dp; font 130%; centered VI/EN",
@@ -20,7 +20,14 @@
     "separateWalletShop": "Web 320/390/768/1024/1366: no section overlap; independent account menu entries. Native 320dp font130: layout audit passed.",
     "callNavigation": "Two browser video call connected; feed/account/wallet/store preserve connected peer and live audio; return/end cleanup. Native emulator minimize/restore passes; no physical phone audio verification.",
     "reconnect": "socket loss resumed connected two-browser call",
-    "androidFeatures": "System PiP; real IME chat and inline comment visibility; unchanged row identity retained"
+    "androidFeatures": "System PiP; real IME chat and inline comment visibility; unchanged row identity retained",
+    "nativeIcons": "220 vectors, 660 actual Android renders at 24/32/48 px; all literal icon calls resolved; AndroidX parser 580 paths, zero failures; deterministic regeneration",
+    "refreshGestures": "Real ScrollView: top-only pull, busy guard, no refresh when scrolled, second Feed tap refresh; real first-video stage pull and duplicate guard",
+    "iconScreenAudit": "13 server-backed screens, ordinary account; 320dp / font130; discovery tabs and filters assert full text bounds",
+    "iconAudit": "work/flow-final-icons-result.log",
+    "refreshAudit": "work/flow-final-refresh-result.log",
+    "featureAudit": "work/flow-final-features-result.log",
+    "screenAudit": "work/flow-final-screens-result.log"
   },
-  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.15"
+  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.16"
 }

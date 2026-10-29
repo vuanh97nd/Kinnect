@@ -126,10 +126,10 @@ final class Sheet {
         } else row.setOnClickListener(v -> { dialog.dismiss(); if (onItem != null) onItem.onClick(dialog, index); });
         TextView t = text(label, 16, danger ? 0xffe0245e : ink, false);
         if (itemIcons != null && i < itemIcons.length) {
-          int iconId = context.getResources().getIdentifier("ic_web_" + itemIcons[i].replace('-', '_'), "drawable", context.getPackageName());
+          int iconId = WebIcons.resolve(context,itemIcons[i]);
           if (iconId != 0) {
             ImageView icon = new ImageView(context);
-            icon.setImageResource(iconId);
+            icon.setImageDrawable(WebIcons.load(context,itemIcons[i]));
             icon.setColorFilter(danger ? 0xffe0245e : ink);
             LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(dp(21), dp(21));
             ip.rightMargin = dp(14);

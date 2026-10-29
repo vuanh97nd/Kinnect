@@ -42,8 +42,7 @@ final class TimelineView extends View {
   }
 
   private static Drawable icon(Context c, String name, int tint) {
-    int id = c.getResources().getIdentifier("ic_editor_" + name, "drawable", c.getPackageName());
-    if (id == 0) return null; Drawable d = c.getDrawable(id).mutate(); d.setTint(tint); return d;
+    return EditorIcons.drawable(c,name,tint);
   }
 
   private float x(float t) { return getWidth() / 2f + (t - host.playhead()) * pps; }

@@ -1,0 +1,1329 @@
+{
+  "style": "Kinnect Flow — original ColorOS-inspired soft contours",
+  "grid": 24,
+  "stroke": 1.9,
+  "opticalInset": 0.96,
+  "brandAssetsUnchanged": true,
+  "icons": [
+    {
+      "resource": "ic_flow_attach",
+      "source": "ic_attach",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_back",
+      "source": "ic_back",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_bell",
+      "source": "ic_bell",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_call",
+      "source": "ic_call",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_call_flip",
+      "source": "ic_call_flip",
+      "redrawn": false,
+      "category": "call"
+    },
+    {
+      "resource": "ic_flow_call_phone",
+      "source": "ic_call_phone",
+      "redrawn": false,
+      "category": "call"
+    },
+    {
+      "resource": "ic_flow_call_phone_off",
+      "source": "ic_call_phone_off",
+      "redrawn": false,
+      "category": "call"
+    },
+    {
+      "resource": "ic_flow_check",
+      "source": "ic_check",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_close",
+      "source": "ic_close",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_comment",
+      "source": "ic_comment",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_discover",
+      "source": "ic_discover",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_download",
+      "source": "ic_download",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_editor_add",
+      "source": "ic_editor_add",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_animation",
+      "source": "ic_editor_animation",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_audio",
+      "source": "ic_editor_audio",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_back",
+      "source": "ic_editor_back",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_background",
+      "source": "ic_editor_background",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_beauty",
+      "source": "ic_editor_beauty",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_blemish",
+      "source": "ic_editor_blemish",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_blush",
+      "source": "ic_editor_blush",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_caption",
+      "source": "ic_editor_caption",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_check",
+      "source": "ic_editor_check",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_chevron_down",
+      "source": "ic_editor_chevron_down",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_close",
+      "source": "ic_editor_close",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_color",
+      "source": "ic_editor_color",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_compare",
+      "source": "ic_editor_compare",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_crop",
+      "source": "ic_editor_crop",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_cut",
+      "source": "ic_editor_cut",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_delete",
+      "source": "ic_editor_delete",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_duplicate",
+      "source": "ic_editor_duplicate",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_export",
+      "source": "ic_editor_export",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_eyes",
+      "source": "ic_editor_eyes",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_fade",
+      "source": "ic_editor_fade",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_filter",
+      "source": "ic_editor_filter",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_flip",
+      "source": "ic_editor_flip",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_font",
+      "source": "ic_editor_font",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_format",
+      "source": "ic_editor_format",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_fx_bow",
+      "source": "ic_editor_fx_bow",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_fx_bubbles",
+      "source": "ic_editor_fx_bubbles",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_fx_bunny",
+      "source": "ic_editor_fx_bunny",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_fx_butterfly",
+      "source": "ic_editor_fx_butterfly",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_fx_cat",
+      "source": "ic_editor_fx_cat",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_fx_confetti",
+      "source": "ic_editor_fx_confetti",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_fx_crown",
+      "source": "ic_editor_fx_crown",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_fx_devil",
+      "source": "ic_editor_fx_devil",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_fx_dog",
+      "source": "ic_editor_fx_dog",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_fx_flowers",
+      "source": "ic_editor_fx_flowers",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_fx_freckles",
+      "source": "ic_editor_fx_freckles",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_fx_glasses",
+      "source": "ic_editor_fx_glasses",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_fx_halo",
+      "source": "ic_editor_fx_halo",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_fx_heart_glasses",
+      "source": "ic_editor_fx_heart_glasses",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_fx_hearts",
+      "source": "ic_editor_fx_hearts",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_fx_neon_glasses",
+      "source": "ic_editor_fx_neon_glasses",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_fx_rainbow",
+      "source": "ic_editor_fx_rainbow",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_fx_round_glasses",
+      "source": "ic_editor_fx_round_glasses",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_fx_snow",
+      "source": "ic_editor_fx_snow",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_fx_sparkle",
+      "source": "ic_editor_fx_sparkle",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_fx_stars",
+      "source": "ic_editor_fx_stars",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_keyframe",
+      "source": "ic_editor_keyframe",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_layer",
+      "source": "ic_editor_layer",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_lips",
+      "source": "ic_editor_lips",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_look_glass",
+      "source": "ic_editor_look_glass",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_look_natural",
+      "source": "ic_editor_look_natural",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_look_peach",
+      "source": "ic_editor_look_peach",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_move",
+      "source": "ic_editor_move",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_move_left",
+      "source": "ic_editor_move_left",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_move_right",
+      "source": "ic_editor_move_right",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_music",
+      "source": "ic_editor_music",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_mute",
+      "source": "ic_editor_mute",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_none",
+      "source": "ic_editor_none",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_pause",
+      "source": "ic_editor_pause",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_play",
+      "source": "ic_editor_play",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_post",
+      "source": "ic_editor_post",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_quality",
+      "source": "ic_editor_quality",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_redo",
+      "source": "ic_editor_redo",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_reset",
+      "source": "ic_editor_reset",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_rotate",
+      "source": "ic_editor_rotate",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_save",
+      "source": "ic_editor_save",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_slim",
+      "source": "ic_editor_slim",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_smooth",
+      "source": "ic_editor_smooth",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_speed",
+      "source": "ic_editor_speed",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_split",
+      "source": "ic_editor_split",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_sticker",
+      "source": "ic_editor_sticker",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_text",
+      "source": "ic_editor_text",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_transition",
+      "source": "ic_editor_transition",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_undo",
+      "source": "ic_editor_undo",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_voice",
+      "source": "ic_editor_voice",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_volume",
+      "source": "ic_editor_volume",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_editor_whiten",
+      "source": "ic_editor_whiten",
+      "redrawn": false,
+      "category": "editor"
+    },
+    {
+      "resource": "ic_flow_feed",
+      "source": "ic_feed",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_flash",
+      "source": "ic_flash",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_flash_off",
+      "source": "ic_flash_off",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_flip",
+      "source": "ic_flip",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_forward",
+      "source": "ic_forward",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_globe",
+      "source": "ic_globe",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_grid",
+      "source": "ic_grid",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_heart",
+      "source": "ic_heart",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_image",
+      "source": "ic_image",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_inbox",
+      "source": "ic_inbox",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_like",
+      "source": "ic_like",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_live",
+      "source": "ic_live",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_message",
+      "source": "ic_message",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_more",
+      "source": "ic_more",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_music",
+      "source": "ic_music",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_mute",
+      "source": "ic_mute",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_palette",
+      "source": "ic_palette",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_person_add",
+      "source": "ic_person_add",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_pin",
+      "source": "ic_pin",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_plus",
+      "source": "ic_plus",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_profile",
+      "source": "ic_profile",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_ratio",
+      "source": "ic_ratio",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_recall",
+      "source": "ic_recall",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_search",
+      "source": "ic_search",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_send",
+      "source": "ic_send",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_settings",
+      "source": "ic_settings",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_share",
+      "source": "ic_share",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_shorts",
+      "source": "ic_shorts",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_smile",
+      "source": "ic_smile",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_sound",
+      "source": "ic_sound",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_sun",
+      "source": "ic_sun",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_timer",
+      "source": "ic_timer",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_trash",
+      "source": "ic_trash",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_video",
+      "source": "ic_video",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_wand",
+      "source": "ic_wand",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_arrow_left",
+      "source": "ic_web_arrow_left",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_arrow_right",
+      "source": "ic_web_arrow_right",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_arrow_up_right",
+      "source": "ic_web_arrow_up_right",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_at_sign",
+      "source": "ic_web_at_sign",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_bell",
+      "source": "ic_web_bell",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_bell_off",
+      "source": "ic_web_bell_off",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_bookmark",
+      "source": "ic_web_bookmark",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_calendar_days",
+      "source": "ic_web_calendar_days",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_camera",
+      "source": "ic_web_camera",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_camera_off",
+      "source": "ic_web_camera_off",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_check",
+      "source": "ic_web_check",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_chevron_down",
+      "source": "ic_web_chevron_down",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_chevron_left",
+      "source": "ic_web_chevron_left",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_chevron_right",
+      "source": "ic_web_chevron_right",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_chevron_up",
+      "source": "ic_web_chevron_up",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_circle_check",
+      "source": "ic_web_circle_check",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_circle_help",
+      "source": "ic_web_circle_help",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_clapperboard",
+      "source": "ic_web_clapperboard",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_compass",
+      "source": "ic_web_compass",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_copy",
+      "source": "ic_web_copy",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_download",
+      "source": "ic_web_download",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_ellipsis",
+      "source": "ic_web_ellipsis",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_eye",
+      "source": "ic_web_eye",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_eye_off",
+      "source": "ic_web_eye_off",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_flag",
+      "source": "ic_web_flag",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_forward",
+      "source": "ic_web_forward",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_gift",
+      "source": "ic_web_gift",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_globe",
+      "source": "ic_web_globe",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_hammer",
+      "source": "ic_web_hammer",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_headphones",
+      "source": "ic_web_headphones",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_heart",
+      "source": "ic_web_heart",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_house",
+      "source": "ic_web_house",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_image",
+      "source": "ic_web_image",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_image_plus",
+      "source": "ic_web_image_plus",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_key",
+      "source": "ic_web_key",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_key_round",
+      "source": "ic_web_key_round",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_list_plus",
+      "source": "ic_web_list_plus",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_locate_fixed",
+      "source": "ic_web_locate_fixed",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_lock_keyhole",
+      "source": "ic_web_lock_keyhole",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_log_in",
+      "source": "ic_web_log_in",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_log_out",
+      "source": "ic_web_log_out",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_mail",
+      "source": "ic_web_mail",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_map_pin",
+      "source": "ic_web_map_pin",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_map_pin_off",
+      "source": "ic_web_map_pin_off",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_maximize",
+      "source": "ic_web_maximize",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_message_circle",
+      "source": "ic_web_message_circle",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_message_square",
+      "source": "ic_web_message_square",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_message_square_plus",
+      "source": "ic_web_message_square_plus",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_mic",
+      "source": "ic_web_mic",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_monitor",
+      "source": "ic_web_monitor",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_moon",
+      "source": "ic_web_moon",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_music_2",
+      "source": "ic_web_music_2",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_newspaper",
+      "source": "ic_web_newspaper",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_palette",
+      "source": "ic_web_palette",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_paperclip",
+      "source": "ic_web_paperclip",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_pen_line",
+      "source": "ic_web_pen_line",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_pencil",
+      "source": "ic_web_pencil",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_phone",
+      "source": "ic_web_phone",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_phone_off",
+      "source": "ic_web_phone_off",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_pin",
+      "source": "ic_web_pin",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_play",
+      "source": "ic_web_play",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_plus",
+      "source": "ic_web_plus",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_radio",
+      "source": "ic_web_radio",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_refresh_cw",
+      "source": "ic_web_refresh_cw",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_rotate_ccw",
+      "source": "ic_web_rotate_ccw",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_search",
+      "source": "ic_web_search",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_send",
+      "source": "ic_web_send",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_send_horizontal",
+      "source": "ic_web_send_horizontal",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_settings",
+      "source": "ic_web_settings",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_shield_check",
+      "source": "ic_web_shield_check",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_shopping_bag",
+      "source": "ic_web_shopping_bag",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_sliders_horizontal",
+      "source": "ic_web_sliders_horizontal",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_smile",
+      "source": "ic_web_smile",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_sparkles",
+      "source": "ic_web_sparkles",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_square",
+      "source": "ic_web_square",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_switch_camera",
+      "source": "ic_web_switch_camera",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_timer",
+      "source": "ic_web_timer",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_trash_2",
+      "source": "ic_web_trash_2",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_type",
+      "source": "ic_web_type",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_undo_2",
+      "source": "ic_web_undo_2",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_upload",
+      "source": "ic_web_upload",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_user_check",
+      "source": "ic_web_user_check",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_user_plus",
+      "source": "ic_web_user_plus",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_user_round",
+      "source": "ic_web_user_round",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_users_round",
+      "source": "ic_web_users_round",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_video",
+      "source": "ic_web_video",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_volume_2",
+      "source": "ic_web_volume_2",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_wallet",
+      "source": "ic_web_wallet",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_wand_sparkles",
+      "source": "ic_web_wand_sparkles",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_x",
+      "source": "ic_web_x",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_menu",
+      "source": null,
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_pause",
+      "source": null,
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_info",
+      "source": null,
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_file_text",
+      "source": null,
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_share_2",
+      "source": null,
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_user_round_x",
+      "source": null,
+      "redrawn": true,
+      "category": "interface"
+    }
+  ]
+}

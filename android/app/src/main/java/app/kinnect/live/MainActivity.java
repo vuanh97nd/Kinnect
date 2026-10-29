@@ -283,7 +283,10 @@ public class MainActivity extends Activity {
 
   private void installChatKeyboard(EditText input,ScrollView messages){input.setTag("chat-compose");input.setOnFocusChangeListener((v,has)->{if(has)messages.post(()->messages.fullScroll(View.FOCUS_DOWN));});messages.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,oright,ob)->{if(input.hasFocus()&&b-t<ob-ot)messages.post(()->messages.fullScroll(View.FOCUS_DOWN));});}
   private void revealKeyboardFocus(){View focused=getCurrentFocus();if(!(focused instanceof EditText))return;if("chat-compose".equals(focused.getTag())&&aiChatScroll!=null&&aiChatScroll.isAttachedToWindow())aiChatScroll.post(()->aiChatScroll.fullScroll(View.FOCUS_DOWN));else focused.requestRectangleOnScreen(new android.graphics.Rect(0,-dp(90),focused.getWidth(),focused.getHeight()+dp(12)),true);}
+  private interface RefreshLoader{void run(Runnable complete);}
+  private RefreshLoader feedRefresh;private boolean shortRefreshing;
   private void shell(String title, boolean navigation) {
+    feedRefresh=null;shortRefreshing=false;
     onTabRoot = false;
     if (splashAnimator != null) { splashAnimator.cancel(); splashAnimator = null; }
     for (VideoView video : mediaVideos) { try { video.stopPlayback(); } catch (RuntimeException ignored) {} }
@@ -359,7 +362,8 @@ public class MainActivity extends Activity {
     notice.setPadding(dp(16), 0, dp(16), 0);
     notice.setVisibility(View.GONE);
     root.addView(notice);
-    ScrollView scroll = new ScrollView(this);
+    PullRefreshScrollView scroll = new PullRefreshScrollView(this);
+    scroll.setRefreshListener(new PullRefreshScrollView.Listener(){public boolean enabled(){return feedRefresh!=null;}public void refresh(Runnable complete){if(feedRefresh!=null)feedRefresh.run(complete);else complete.run();}});
     scroll.setFillViewport(true);
     content = column();
     content.setPadding(dp(16), dp(14), dp(16), dp(24));
@@ -421,7 +425,7 @@ public class MainActivity extends Activity {
         b.setFocusable(true);
         b.setTooltipText(I18n.t(it[2]));
         b.setBackground(pressable(CARD, 14));
-        b.setOnClickListener(v -> navigate(it[0]));
+        b.setOnClickListener(v -> selectNavigation(it[0]));
         bottom.addView(b, new LinearLayout.LayoutParams(0, dp(62), 1));
       }
       root.addView(bottom);
@@ -653,42 +657,17 @@ public class MainActivity extends Activity {
     return g;
   }
 
-  private FrameLayout settingsIcon(String name, int tint) {
-    FrameLayout tile = new FrameLayout(this);
-    tile.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-    tile.setBackground(background((tint & 0x00ffffff) | 0x1f000000, 12));
-    ImageView image = new ImageView(this);
-    if (name.equals("group_three") || name.equals("menu_lines") || name.equals("about_info") || name.equals("bell_ring") || name.equals("user_search") || name.equals("distance_pins") || name.equals("activity_status") || name.equals("image_lock") || name.equals("user_block") || name.equals("post_heart") || name.equals("location_off")) {
-      image.setImageDrawable(new SettingsGlyph(name, tint, Color.rgb((Color.red(tint)*31+Color.red(CARD)*224)/255,(Color.green(tint)*31+Color.green(CARD)*224)/255,(Color.blue(tint)*31+Color.blue(CARD)*224)/255)));
-    } else { android.graphics.drawable.Drawable drawable=WebIcons.load(this,name); drawable.setTint(tint); image.setImageDrawable(drawable); }
-    tile.addView(image,new FrameLayout.LayoutParams(dp(24),dp(24),Gravity.CENTER));
-    return tile;
-  }
+  private FrameLayout settingsIcon(String name,int tint){FrameLayout tile=new FrameLayout(this);tile.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);ImageView image=new ImageView(this);image.setImageDrawable(new FlowIconDrawable(WebIcons.load(this,name),name));tile.addView(image,new FrameLayout.LayoutParams(-1,-1));return tile;}
 
   /** Crisp scalable paths: no emoji fonts or bitmap scaling. Same 24-unit grid and rounded 1.8-unit stroke. */
-  private static final class SettingsGlyph extends android.graphics.drawable.Drawable {
+  private final class SettingsGlyph extends android.graphics.drawable.Drawable {
     private final String kind; private final Paint pen=new Paint(Paint.ANTI_ALIAS_FLAG); private final int tint, back;
     SettingsGlyph(String kind,int tint,int back){this.kind=kind;this.tint=tint;this.back=back;}
     private void line(Canvas c,float x,float y,float ex,float ey){c.drawLine(x,y,ex,ey,pen);}
     private void pin(Canvas c,float x,float y){Path p=new Path();p.moveTo(x,y+7);p.cubicTo(x-1,y+5,x-3,y+3,x-3,y+1);p.cubicTo(x-3,y-3,x+3,y-3,x+3,y+1);p.cubicTo(x+3,y+3,x+1,y+5,x,y+7);c.drawPath(p,pen);c.drawCircle(x,y+.5f,.65f,pen);}
     private void person(Canvas c){c.drawCircle(9,6,3,pen);Path p=new Path();p.moveTo(3,19);p.cubicTo(3,11,15,11,15,19);c.drawPath(p,pen);}
     private void badge(Canvas c){pen.setStyle(Paint.Style.FILL);pen.setColor(back);c.drawCircle(17.5f,17.5f,6,pen);pen.setStyle(Paint.Style.STROKE);pen.setColor(tint);}
-    public void draw(Canvas canvas){
-      Rect b=getBounds();int save=canvas.save();canvas.translate(b.left,b.top);canvas.scale(b.width()/24f,b.height()/24f);
-      pen.setColor(tint);pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth(1.8f);pen.setStrokeCap(Paint.Cap.ROUND);pen.setStrokeJoin(Paint.Join.ROUND);
-      if(kind.equals("group_three")){pen.setStrokeWidth(1.65f);canvas.drawCircle(12,6.5f,2.6f,pen);canvas.drawCircle(4.5f,9,2,pen);canvas.drawCircle(19.5f,9,2,pen);Path bodies=new Path();bodies.moveTo(1.5f,19);bodies.lineTo(1.5f,17);bodies.cubicTo(1.5f,13,5,12.5f,7,15);bodies.moveTo(22.5f,19);bodies.lineTo(22.5f,17);bodies.cubicTo(22.5f,13,19,12.5f,17,15);bodies.moveTo(7.5f,21);bodies.lineTo(7.5f,17);bodies.cubicTo(7.5f,11.5f,16.5f,11.5f,16.5f,17);bodies.lineTo(16.5f,21);canvas.drawPath(bodies,pen);}
-      else if(kind.equals("menu_lines")){line(canvas,4,6,20,6);line(canvas,4,12,20,12);line(canvas,4,18,20,18);}
-      else if(kind.equals("about_info")){canvas.drawCircle(12,12,9,pen);line(canvas,12,10.5f,12,17);pen.setStyle(Paint.Style.FILL);canvas.drawCircle(12,7,1,pen);}
-      else if(kind.equals("bell_ring")){Path bell=new Path();bell.moveTo(5,17);bell.lineTo(7,14);bell.lineTo(7,9);bell.cubicTo(7,2,17,2,17,9);bell.lineTo(17,14);bell.lineTo(19,17);bell.close();canvas.drawPath(bell,pen);Path clapper=new Path();clapper.moveTo(10,20);clapper.quadTo(12,22,14,20);canvas.drawPath(clapper,pen);line(canvas,3,6,2,9);line(canvas,21,6,22,9);}
-      else if(kind.equals("user_search")){person(canvas);badge(canvas);canvas.drawCircle(16.5f,16.5f,3.5f,pen);line(canvas,19,19,22,22);}
-      else if(kind.equals("distance_pins")){pin(canvas,5,5);pin(canvas,19,5);line(canvas,4,19,6,19);line(canvas,10,19,12,19);line(canvas,16,19,18,19);line(canvas,3,17,3,21);line(canvas,21,17,21,21);}
-      else if(kind.equals("activity_status")){canvas.drawCircle(12,12,8,pen);pen.setStyle(Paint.Style.FILL);canvas.drawCircle(12,12,3,pen);pen.setColor(back);canvas.drawCircle(18,6,4,pen);pen.setColor(tint);canvas.drawCircle(18,6,2.5f,pen);}
-      else if(kind.equals("image_lock")){canvas.drawRoundRect(3,3,21,21,3,3,pen);canvas.drawCircle(8,8,1.5f,pen);Path p=new Path();p.moveTo(4,17);p.lineTo(10,11);p.lineTo(14,15);canvas.drawPath(p,pen);badge(canvas);canvas.drawRoundRect(13,16,22,22,1.3f,1.3f,pen);Path lock=new Path();lock.moveTo(15,16);lock.lineTo(15,14);lock.cubicTo(15,10.5f,20,10.5f,20,14);lock.lineTo(20,16);canvas.drawPath(lock,pen);}
-      else if(kind.equals("user_block")){person(canvas);badge(canvas);canvas.drawCircle(17.5f,17.5f,4.5f,pen);line(canvas,14.3f,20.7f,20.7f,14.3f);}
-      else if(kind.equals("post_heart")){canvas.drawRoundRect(3,3,21,21,2,2,pen);line(canvas,7,8,17,8);line(canvas,7,12,12,12);badge(canvas);Path heart=new Path();heart.moveTo(17.5f,21.5f);heart.cubicTo(9,16,14,11,17.5f,15);heart.cubicTo(21,11,26,16,17.5f,21.5f);canvas.drawPath(heart,pen);}
-      else if(kind.equals("location_off")){Path p=new Path();p.moveTo(12,22);p.cubicTo(9,18,5,14,5,9);p.cubicTo(5,-.5f,19,-.5f,19,9);p.cubicTo(19,14,15,18,12,22);canvas.drawPath(p,pen);canvas.drawCircle(12,9,2.5f,pen);line(canvas,2,2,22,22);}
-      canvas.restoreToCount(save);
-    }
+    public void draw(Canvas canvas){android.graphics.drawable.Drawable d=WebIcons.load(MainActivity.this,kind);d.setTint(tint);d.setBounds(getBounds());d.draw(canvas);}
     public void setAlpha(int alpha){pen.setAlpha(alpha);invalidateSelf();}
     public void setColorFilter(ColorFilter filter){pen.setColorFilter(filter);invalidateSelf();}
     public int getOpacity(){return PixelFormat.TRANSLUCENT;}
@@ -1228,6 +1207,8 @@ public class MainActivity extends Activity {
 
   private String headerActive = "";
 
+  private long lastFeedTap;
+  private void selectNavigation(String next){long now=android.os.SystemClock.uptimeMillis();if(next.equals("feed")&&tab.equals("feed")&&onTabRoot&&feedRefresh!=null){if(content.getParent()instanceof PullRefreshScrollView){PullRefreshScrollView scroll=(PullRefreshScrollView)content.getParent();scroll.smoothScrollTo(0,0);if(now-lastFeedTap<550){lastFeedTap=0;scroll.refreshNow();}else lastFeedTap=now;}return;}lastFeedTap=next.equals("feed")?now:0;navigate(next);}
   private void navigate(String next) {
     headerActive = next.equals("inbox") ? "inbox" : "";
     history.clear();
@@ -1321,7 +1302,7 @@ public class MainActivity extends Activity {
       TextView t = label(I18n.t(item[1]), 13, active ? ACCENT : TEXT);
       t.setTypeface(Typeface.create(active ? "sans-serif-medium" : "sans-serif", Typeface.NORMAL));
       t.setGravity(Gravity.CENTER);
-      t.setSingleLine(true);
+      t.setSingleLine(false);t.setMaxLines(2);t.setIncludeFontPadding(false);t.setPadding(dp(3),0,dp(3),0);
       if (active) { t.setBackground(background(CARD, 11)); t.setElevation(dp(1)); }
       else t.setBackground(pressable(SOFT, 11));
       t.setOnClickListener(v -> {
@@ -1329,7 +1310,7 @@ public class MainActivity extends Activity {
         if (item[0].equals("near") && !hasLocation) { silentLocate = false; requestLocation(); return; }
         navigate("discover");
       });
-      seg.addView(t, new LinearLayout.LayoutParams(0, dp(38), 1));
+      seg.addView(t, new LinearLayout.LayoutParams(0, dp(48), 1));
     }
     content.addView(seg, new LinearLayout.LayoutParams(-1, -2));
 
@@ -1362,7 +1343,7 @@ public class MainActivity extends Activity {
     for(int i=0;i<5;i++){
       final String key=keys[i];boolean selected=i==0?nearMinAge>0||nearMaxAge>0:i==1?nearMinWeight>0||nearMaxWeight>0:i==2?nearMinHeight>0||nearMaxHeight>0:i==3?!nearGender.isEmpty():nearOnline||nearRecent||!nearOrientation.isEmpty()||!nearCommunityRole.isEmpty()||!nearIntent.isEmpty();
       LinearLayout button=row();button.setGravity(Gravity.CENTER);button.setPadding(dp(3),0,dp(3),0);button.setBackground(pressable(selected?PRIMARY_SOFT:SOFT,10));
-      if(i==4){button.addView(icon("sliders_horizontal",20,selected?ACCENT:MUTED),new LinearLayout.LayoutParams(dp(20),dp(20)));}else{TextView caption=label(I18n.t(titles[i]),12,selected?ACCENT:TEXT);caption.setGravity(Gravity.CENTER);caption.setPadding(0,0,0,0);caption.setSingleLine(true);caption.setAutoSizeTextTypeUniformWithConfiguration(9,12,1,android.util.TypedValue.COMPLEX_UNIT_SP);button.addView(caption,new LinearLayout.LayoutParams(-1,-1));}
+      if(i==4){button.addView(icon("sliders_horizontal",20,selected?ACCENT:MUTED),new LinearLayout.LayoutParams(dp(20),dp(20)));}else{TextView caption=label(I18n.t(titles[i]),12,selected?ACCENT:TEXT);caption.setGravity(Gravity.CENTER);caption.setPadding(0,0,0,0);caption.setSingleLine(false);caption.setMaxLines(2);caption.setIncludeFontPadding(false);caption.setAutoSizeTextTypeUniformWithConfiguration(9,12,1,android.util.TypedValue.COMPLEX_UNIT_SP);button.addView(caption,new LinearLayout.LayoutParams(-1,-1));}
       button.setContentDescription((i==4?I18n.t("Bộ lọc tổng hợp"):titles[i])+(selected?I18n.t(" · Đang chọn"):""));button.setSelected(selected);button.setOnClickListener(v->nearFilters(key));LinearLayout.LayoutParams bp=i==4?new LinearLayout.LayoutParams(dp(44),dp(44)):new LinearLayout.LayoutParams(0,dp(44),weights[i]);if(i>0)bp.leftMargin=dp(4);quick.addView(button,bp);
     }
     content.addView(quick,new LinearLayout.LayoutParams(-1,-2));
@@ -1616,13 +1597,9 @@ public class MainActivity extends Activity {
     pill.setOnClickListener(v -> composePost());
     final LinearLayout list = column();
     content.addView(list);
-    request("GET", "/api/posts", null, data -> {
-      LinearLayout saved = content;
-      content = list;
-      posts(data.optJSONArray("posts"), "Chưa có bài viết. Hãy là người đầu tiên chia sẻ.");
-      content = saved;
-
-    });
+    final String[] signature={""};final boolean[] fetching={false};
+    feedRefresh=complete->{if(fetching[0]){complete.run();return;}fetching[0]=true;request("GET","/api/posts",null,data->{JSONArray posts=data.optJSONArray("posts");if(posts==null||posts.toString().equals(signature[0]))return;signature[0]=posts.toString();LinearLayout next=column();java.util.Set<String> existing=new java.util.HashSet<>();for(int i=0;i<list.getChildCount();i++)if(list.getChildAt(i).getTag()instanceof String)existing.add((String)list.getChildAt(i).getTag());LinearLayout saved=content;content=next;try{if(posts.length()==0)posts(posts,"Chưa có bài viết.");for(int i=0;i<posts.length();i++){JSONObject post=posts.optJSONObject(i);String key="post:"+post.optString("id")+":"+post.toString();if(existing.contains(key)){View placeholder=new View(this);placeholder.setTag(key);next.addView(placeholder);}else postCard(post);}}finally{content=saved;}reconcileChatRows(list,next);},()->{fetching[0]=false;complete.run();});};
+    feedRefresh.run(()->{});
   }
 
   private void composePost() {
@@ -1752,11 +1729,11 @@ public class MainActivity extends Activity {
       TextView tab = label(I18n.t(labels[i]), 13, on ? ACCENT : TEXT);
       tab.setTypeface(Typeface.create(on ? "sans-serif-medium" : "sans-serif", Typeface.NORMAL));
       tab.setGravity(Gravity.CENTER);
-      tab.setSingleLine(true);
+      tab.setSingleLine(false);tab.setMaxLines(2);tab.setIncludeFontPadding(false);tab.setPadding(dp(3),0,dp(3),0);
       if (on) { tab.setBackground(background(CARD, 11)); tab.setElevation(dp(1)); }
       else tab.setBackground(pressable(SOFT, 11));
       tab.setOnClickListener(v -> pick.pick(index));
-      into.addView(tab, new LinearLayout.LayoutParams(0, dp(38), 1));
+      into.addView(tab, new LinearLayout.LayoutParams(0, dp(48), 1));
     }
   }
 
@@ -2273,7 +2250,7 @@ public class MainActivity extends Activity {
     LinearLayout group = card();
     LinearLayout head = row(), body = column();
     head.addView(icon(iconName, 20, ACCENT), new LinearLayout.LayoutParams(dp(20), dp(20)));
-    TextView caption = label(title, 15, TEXT); caption.setTypeface(null, Typeface.BOLD); caption.setPadding(dp(10), 0, 0, 0); caption.setGravity(Gravity.CENTER_VERTICAL); caption.setSingleLine(true); caption.setEllipsize(android.text.TextUtils.TruncateAt.END);
+    TextView caption = label(title, 15, TEXT); caption.setTypeface(null, Typeface.BOLD); caption.setPadding(dp(10), 0, 0, 0); caption.setGravity(Gravity.CENTER_VERTICAL); caption.setSingleLine(false);caption.setMaxLines(2);caption.setIncludeFontPadding(false); caption.setEllipsize(android.text.TextUtils.TruncateAt.END);
     head.addView(caption, new LinearLayout.LayoutParams(0, dp(44), 1));
     final ImageView arrow = icon(expanded ? "chevron_up" : "chevron_down", 18, MUTED);
     head.addView(arrow, new LinearLayout.LayoutParams(dp(18), dp(18)));
@@ -2865,9 +2842,11 @@ public class MainActivity extends Activity {
     return new JSONArray(rows);
   }
 
+  private void refreshVideos(FrameLayout stage){if(shortRefreshing)return;shortRefreshing=true;ProgressBar progress=new ProgressBar(this);FrameLayout.LayoutParams at=new FrameLayout.LayoutParams(dp(36),dp(36),Gravity.TOP|Gravity.CENTER_HORIZONTAL);at.topMargin=dp(64);stage.addView(progress,at);request("GET",shortsFollowing?"/api/shorts?feed=following":"/api/shorts",null,data->{JSONArray updated=orderedShorts(data.optJSONArray("shorts"));if(updated==null)return;if(shortRows!=null&&shortRows.toString().equals(updated.toString()))return;shortRows=updated;if(updated.length()>0)showShort(0);else shorts();},()->{shortRefreshing=false;stage.removeView(progress);});}
   private void shorts() {
     shortsFollowing = shortsTab.equals("following");
     final FrameLayout stage = reelStage();
+    final float[] refreshY={0};stage.setOnTouchListener((v,event)->{if(event.getActionMasked()==MotionEvent.ACTION_DOWN)refreshY[0]=event.getY();if(event.getActionMasked()==MotionEvent.ACTION_UP&&event.getY()-refreshY[0]>dp(90))refreshVideos(stage);return true;});
     final TextView loading = label(I18n.t("Đang tải video…"), 14, 0x99ffffff);
     stage.addView(loading, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
     stage.addView(reelTabs(), new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
@@ -2997,6 +2976,8 @@ public class MainActivity extends Activity {
           break;
         case MotionEvent.ACTION_UP:
         case MotionEvent.ACTION_CANCEL:
+          if(event.getActionMasked()==MotionEvent.ACTION_CANCEL){stage.setTranslationY(0);return true;}
+          if(dragging[0]&&dy>dp(90)&&shortIndex==0){stage.setTranslationY(0);refreshVideos(stage);return true;}
           if (dragging[0] && Math.abs(dy) > dp(90)) {
             final int dir = dy < 0 ? 1 : -1;
             stage.animate().translationY(-dir * stage.getHeight()).setDuration(200).setInterpolator(new android.view.animation.AccelerateInterpolator()).withEndAction(() -> { shortEnter = dir; showShort(shortIndex + dir); }).start();
@@ -4134,7 +4115,7 @@ public class MainActivity extends Activity {
     }
     final JSONObject author = p.optJSONObject("author");
     final boolean mine = p.optString("user_id").equals(me.optString("id"));
-    LinearLayout c = card();
+    LinearLayout c = card();c.setTag("post:"+p.optString("id")+":"+p.toString());
     c.setPadding(dp(14), dp(12), dp(14), dp(4));
     LinearLayout head = row();
     avatar(author, head, 40);
@@ -5348,7 +5329,7 @@ public class MainActivity extends Activity {
     return f;
   }
 
-  private void reconcileChatRows(LinearLayout current,LinearLayout next){java.util.Map<String,View> reusable=new java.util.HashMap<>();for(int i=0;i<current.getChildCount();i++){View child=current.getChildAt(i);Object key=child.getTag();if(key instanceof String&&((String)key).startsWith("message:"))reusable.put((String)key,child);}java.util.ArrayList<View> wanted=new java.util.ArrayList<>();while(next.getChildCount()>0){View child=next.getChildAt(0);next.removeViewAt(0);View retained=child.getTag()instanceof String?reusable.get((String)child.getTag()):null;wanted.add(retained==null?child:retained);}for(int i=current.getChildCount()-1;i>=0;i--)if(!wanted.contains(current.getChildAt(i)))current.removeViewAt(i);for(int i=0;i<wanted.size();i++){View child=wanted.get(i);if(i<current.getChildCount()&&current.getChildAt(i)==child)continue;if(child.getParent()==current)current.removeView(child);current.addView(child,i);}}
+  private void reconcileChatRows(LinearLayout current,LinearLayout next){java.util.Map<String,View> reusable=new java.util.HashMap<>();for(int i=0;i<current.getChildCount();i++){View child=current.getChildAt(i);Object key=child.getTag();if(key instanceof String&&(((String)key).startsWith("message:")||((String)key).startsWith("post:")))reusable.put((String)key,child);}java.util.ArrayList<View> wanted=new java.util.ArrayList<>();while(next.getChildCount()>0){View child=next.getChildAt(0);next.removeViewAt(0);View retained=child.getTag()instanceof String?reusable.get((String)child.getTag()):null;wanted.add(retained==null?child:retained);}for(int i=current.getChildCount()-1;i>=0;i--)if(!wanted.contains(current.getChildAt(i)))current.removeViewAt(i);for(int i=0;i<wanted.size();i++){View child=wanted.get(i);if(i<current.getChildCount()&&current.getChildAt(i)==child)continue;if(child.getParent()==current)current.removeView(child);current.addView(child,i);}}
   private void loadChat(final String path, final LinearLayout list, final ScrollView scroll, final boolean group, final JSONObject other) {
     if (Boolean.TRUE.equals(list.getTag())) return;
     list.setTag(Boolean.TRUE);

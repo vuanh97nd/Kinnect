@@ -150,8 +150,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
 
   // ---------- Layout ----------
   private Drawable editorIcon(String name, int tint) {
-    int id = getResources().getIdentifier("ic_editor_" + name, "drawable", getPackageName()); if (id == 0) return null;
-    Drawable d = getDrawable(id).mutate(); d.setTint(tint); return d;
+    return EditorIcons.drawable(this,name,tint);
   }
 
   private ImageView iconButton(String name, String description, Runnable action) {

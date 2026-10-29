@@ -1,0 +1,719 @@
+{
+  "references": [
+    {
+      "file": "LiveActivity.java",
+      "line": 111,
+      "name": "back"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 124,
+      "name": "rotate_ccw"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 153,
+      "name": "radio"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 185,
+      "name": "radio"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 212,
+      "name": "flip"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 212,
+      "name": "wand"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 212,
+      "name": "mic"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 383,
+      "name": "radio"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 419,
+      "name": "eye"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 428,
+      "name": "close"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 483,
+      "name": "flag"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 484,
+      "name": "shield_check"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 486,
+      "name": "send"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 491,
+      "name": "settings"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 494,
+      "name": "sound"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 500,
+      "name": "heart"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 501,
+      "name": "gift"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 529,
+      "name": "send_horizontal"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 349,
+      "name": "settings"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 401,
+      "name": "plus"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 569,
+      "name": "back"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 591,
+      "name": "chevron-right"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 615,
+      "name": "chevron_right"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 624,
+      "name": "shield_check"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 627,
+      "name": "wallet"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 628,
+      "name": "shopping_bag"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 629,
+      "name": "settings"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 630,
+      "name": "shield_check"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 631,
+      "name": "bell"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 632,
+      "name": "moon"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 633,
+      "name": "circle_help"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 634,
+      "name": "about_info"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 636,
+      "name": "key_round"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 637,
+      "name": "log_out"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 693,
+      "name": "chevron_right"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 716,
+      "name": "key_round"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 717,
+      "name": "mail"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 718,
+      "name": "monitor"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 719,
+      "name": "circle_help"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 831,
+      "name": "globe"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 886,
+      "name": "flag"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 887,
+      "name": "message_square"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 888,
+      "name": "shield_check"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 889,
+      "name": "users_round"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 890,
+      "name": "shield_check"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 891,
+      "name": "file_text"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1024,
+      "name": "arrow_left"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1142,
+      "name": "eye"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1322,
+      "name": "search"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1346,
+      "name": "sliders_horizontal"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1396,
+      "name": "users_round"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1419,
+      "name": "user_round"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1482,
+      "name": "map_pin"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1495,
+      "name": "message"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1496,
+      "name": "check"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1498,
+      "name": "arrow_up_right"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1620,
+      "name": "close"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1648,
+      "name": "globe"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1653,
+      "name": "chevron_down"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1746,
+      "name": "search"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1762,
+      "name": "message_square_plus"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1880,
+      "name": "more"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1930,
+      "name": "camera"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1974,
+      "name": "ellipsis"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2044,
+      "name": "globe"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2089,
+      "name": "play"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2111,
+      "name": "lock_keyhole"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2117,
+      "name": "chevron_right"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2201,
+      "name": "camera"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2202,
+      "name": "image"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2203,
+      "name": "eye"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2279,
+      "name": "chevron_down"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2382,
+      "name": "check"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2582,
+      "name": "globe"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2585,
+      "name": "pencil"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2591,
+      "name": "message_square"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2597,
+      "name": "image_lock"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2598,
+      "name": "user_block"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2599,
+      "name": "location_off"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2603,
+      "name": "trash"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2768,
+      "name": "message_square"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2770,
+      "name": "check"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2771,
+      "name": "x"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2772,
+      "name": "user_check"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2773,
+      "name": "user_plus"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2861,
+      "name": "clapperboard"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3122,
+      "name": "close"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3165,
+      "name": "send"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3269,
+      "name": "heart"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3817,
+      "name": "newspaper"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3817,
+      "name": "compass"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3817,
+      "name": "clapperboard"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3817,
+      "name": "radio"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3836,
+      "name": "bell"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3837,
+      "name": "plus"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3837,
+      "name": "heart"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3837,
+      "name": "message_circle"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3837,
+      "name": "share_2"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3838,
+      "name": "search"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3838,
+      "name": "sliders_horizontal"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3839,
+      "name": "heart"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3839,
+      "name": "message_circle"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3839,
+      "name": "share_2"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3840,
+      "name": "heart"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3842,
+      "name": "plus"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3889,
+      "name": "log_in"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3892,
+      "name": "x"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4135,
+      "name": "more"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4434,
+      "name": "x"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4506,
+      "name": "plus"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4605,
+      "name": "close"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4623,
+      "name": "eye"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4670,
+      "name": "users_round"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 5067,
+      "name": "close"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 5212,
+      "name": "back"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 5239,
+      "name": "call"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 5240,
+      "name": "video"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 5255,
+      "name": "attach"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 5277,
+      "name": "send"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 5357,
+      "name": "message_circle"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 5477,
+      "name": "send"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 5726,
+      "name": "video"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 5734,
+      "name": "x"
+    },
+    {
+      "file": "StoreActivity.java",
+      "line": 20,
+      "name": "arrow-left"
+    },
+    {
+      "file": "StoreActivity.java",
+      "line": 20,
+      "name": "shopping-bag"
+    },
+    {
+      "file": "StoreActivity.java",
+      "line": 22,
+      "name": "shopping-bag"
+    },
+    {
+      "file": "StudioActivity.java",
+      "line": 154,
+      "name": "close"
+    },
+    {
+      "file": "StudioActivity.java",
+      "line": 213,
+      "name": "image"
+    },
+    {
+      "file": "StudioActivity.java",
+      "line": 214,
+      "name": "smile"
+    },
+    {
+      "file": "StudioActivity.java",
+      "line": 219,
+      "name": "wand"
+    },
+    {
+      "file": "StudioActivity.java",
+      "line": 220,
+      "name": "palette"
+    },
+    {
+      "file": "StudioActivity.java",
+      "line": 840,
+      "name": "back"
+    },
+    {
+      "file": "StudioActivity.java",
+      "line": 1038,
+      "name": "close"
+    },
+    {
+      "file": "StudioActivity.java",
+      "line": 1055,
+      "name": "search"
+    },
+    {
+      "file": "WalletActivity.java",
+      "line": 10,
+      "name": "back"
+    }
+  ],
+  "legacyRasters": [
+    "ic_approved_bell.png",
+    "ic_approved_bookmark.png",
+    "ic_approved_camera.png",
+    "ic_approved_circle_help.png",
+    "ic_approved_clapperboard.png",
+    "ic_approved_compass.png",
+    "ic_approved_download.png",
+    "ic_approved_eye.png",
+    "ic_approved_eye_off.png",
+    "ic_approved_flag.png",
+    "ic_approved_heart.png",
+    "ic_approved_house.png",
+    "ic_approved_image.png",
+    "ic_approved_lock_keyhole.png",
+    "ic_approved_log_out.png",
+    "ic_approved_map_pin.png",
+    "ic_approved_message_circle.png",
+    "ic_approved_message_square.png",
+    "ic_approved_mic.png",
+    "ic_approved_moon.png",
+    "ic_approved_music_2.png",
+    "ic_approved_paperclip.png",
+    "ic_approved_phone.png",
+    "ic_approved_radio.png",
+    "ic_approved_search.png",
+    "ic_approved_send.png",
+    "ic_approved_settings.png",
+    "ic_approved_shield_check.png",
+    "ic_approved_sliders_horizontal.png",
+    "ic_approved_smile.png",
+    "ic_approved_switch_camera.png",
+    "ic_approved_trash_2.png",
+    "ic_approved_upload.png",
+    "ic_approved_users_round.png",
+    "ic_approved_user_plus.png",
+    "ic_approved_user_round.png",
+    "ic_approved_video.png"
+  ],
+  "brandAssetsUnchanged": true
+}
