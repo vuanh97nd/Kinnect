@@ -171,7 +171,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     root.requestApplyInsets();
 
     LinearLayout top = new LinearLayout(this); top.setGravity(Gravity.CENTER_VERTICAL); top.setPadding(dp(4), 0, dp(10), 0);
-    TextView leave=label(I18n.t("Thoát"),13,INK);leave.setGravity(Gravity.CENTER);leave.setPadding(dp(8),0,dp(8),0);leave.setOnClickListener(v->requestExit());top.addView(leave,new LinearLayout.LayoutParams(-2,dp(46)));
+    top.addView(iconButton("close",I18n.t("Thoát"),this::requestExit),new LinearLayout.LayoutParams(dp(46),dp(46)));
     top.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
     qualityChip = label("1080p", 13, INK); qualityChip.setTypeface(Typeface.DEFAULT_BOLD); qualityChip.setGravity(Gravity.CENTER); qualityChip.setPadding(dp(12), 0, dp(12), 0);
     qualityChip.setCompoundDrawablesRelative(null, null, small(editorIcon("chevron_down", MUTED), 14), null); qualityChip.setCompoundDrawablePadding(dp(4));

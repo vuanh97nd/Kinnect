@@ -1,0 +1,13 @@
+{
+  "version": "1.0.24",
+  "versionCode": 89,
+  "sha256": "61e03e7b50c13c29e712491bd14e848443dc89ede6cf22dcd24b1584bca1f133",
+  "nativeExitChecks": 9,
+  "fontScale": 1.3,
+  "screenDp": 320,
+  "qaVersionCode": 114,
+  "qaPayloadMatchesReleaseExceptManifestAndSignature": true,
+  "behavior": "Close icon top-left in photo/video, accessible Exit label, unchanged discard confirmation and original-file preservation",
+  "physicalDeviceVerified": false,
+  "webAndPlayChanged": false
+}

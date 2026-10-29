@@ -578,6 +578,11 @@
     {
       "file": "PhotoEditActivity.java",
       "line": 24,
+      "name": "close"
+    },
+    {
+      "file": "PhotoEditActivity.java",
+      "line": 24,
       "name": "export"
     },
     {
