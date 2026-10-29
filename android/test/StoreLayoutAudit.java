@@ -4,6 +4,7 @@ public class StoreLayoutAudit extends Instrumentation {
   private Object call(Activity a,String name)throws Exception{Method m=a.getClass().getDeclaredMethod(name);m.setAccessible(true);return m.invoke(a);}
   private TextView find(View v,String text){if(v instanceof TextView&&((TextView)v).getText().toString().equals(text))return(TextView)v;if(v instanceof ViewGroup)for(int i=0;i<((ViewGroup)v).getChildCount();i++){TextView t=find(((ViewGroup)v).getChildAt(i),text);if(t!=null)return t;}return null;}
   private void check(boolean value,String message){if(!value)throw new AssertionError(message);}
+  private void checkNoOverlap(View v){if(v instanceof LinearLayout){LinearLayout l=(LinearLayout)v;if(l.getOrientation()==LinearLayout.VERTICAL){int bottom=-1;for(int i=0;i<l.getChildCount();i++){View child=l.getChildAt(i);if(child.getVisibility()!=View.VISIBLE)continue;check(child.getTop()>=bottom,"Overlapping vertical store items");bottom=child.getBottom();}}}if(v instanceof ViewGroup)for(int i=0;i<((ViewGroup)v).getChildCount();i++)checkNoOverlap(((ViewGroup)v).getChildAt(i));}
   public void onCreate(Bundle b){super.onCreate(b);start();}
   public void onStart(){Bundle out=new Bundle();try{
     Activity a=startActivitySync(new Intent().setClassName("app.kinnect.live","app.kinnect.live.MainActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));Thread.sleep(1400);
@@ -23,7 +24,7 @@ public class StoreLayoutAudit extends Instrumentation {
     runOnMainSync(()->live.finish());
     Activity store=startActivitySync(new Intent().setClassName("app.kinnect.live","app.kinnect.live.StoreActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));Thread.sleep(900);
     runOnMainSync(()->{try{Field catalog=store.getClass().getDeclaredField("catalog");catalog.setAccessible(true);catalog.set(store,new org.json.JSONObject("{\"products\":[{\"id\":\"kinnect_style_aurora\",\"kind\":\"style\",\"name\":\"Aurora\",\"description\":\"Khung ảnh tím hồng\",\"colors\":[\"#8b5cf6\",\"#ec4899\"],\"referenceVnd\":29000}],\"owned\":[],\"billingReady\":false}"));call(store,"draw");check(store.getResources().getIdentifier("ic_web_shopping_bag","drawable",store.getPackageName())!=0,"Missing store icon");check(store.getResources().getIdentifier("ic_web_gift","drawable",store.getPackageName())!=0,"Missing gift icon");}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();
-    Thread.sleep(500);waitForIdleSync();try(FileOutputStream f=new FileOutputStream(new File(store.getExternalFilesDir(null),"shop-redesign.jpg"))){getUiAutomation().takeScreenshot().compress(android.graphics.Bitmap.CompressFormat.JPEG,95,f);}
+    Thread.sleep(500);waitForIdleSync();runOnMainSync(()->{ViewGroup decor=(ViewGroup)store.getWindow().getDecorView();check(find(decor,"Ví Kinnect")==null,"Wallet still nested inside store");checkNoOverlap(decor);});try(FileOutputStream f=new FileOutputStream(new File(store.getExternalFilesDir(null),"shop-redesign.jpg"))){getUiAutomation().takeScreenshot().compress(android.graphics.Bitmap.CompressFormat.JPEG,95,f);}
     runOnMainSync(()->store.finish());out.putString("result","PASS: VI/EN centered and contained; empty Live centered; preview badge wraps without clipping");finish(Activity.RESULT_OK,out);
   }catch(Throwable e){out.putString("error",e.toString());finish(Activity.RESULT_CANCELED,out);}}
 }

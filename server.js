@@ -580,7 +580,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         ws.name = account.name;
         const room = {
           id: randomUUID(),
-          title: String(m.title || "Cùng trò chuyện")
+          title: String(m.title || "")
             .trim()
             .slice(0, 100),
           host: ws,
