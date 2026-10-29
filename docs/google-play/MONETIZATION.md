@@ -17,3 +17,9 @@ Bản Google Play dùng Billing Library 9.1.0 và không có trình cài APK bê
 ## Bằng chứng
 
 101 kiểm thử backend đạt; kiểm tra manifest, chữ ký và thư viện 16 KB đạt; LanguageAudit và PlayPolicyAudit đạt trên Android 16 giả lập. VI/EN đạt kiểm tra căn giữa ở 320 dp với font 130%. Web cửa hàng không tràn ở 320/390/1366 px. Chưa xác minh trên điện thoại thật và chưa được Google phê duyệt.
+
+
+## Ví Kinnect — 1.2.1 (103)
+Tỷ lệ được chủ sản phẩm chốt: nền tảng 25%, người live 75% trên giá trị ròng sau phí thanh toán và hoàn tiền. Hai số dư xu và thu nhập riêng; sổ giao dịch có mã tham chiếu chống ghi trùng. Hàm ghi nhận thu nhập chỉ dùng nội bộ, không có API cộng tiền từ client.
+
+CHƯA MỞ: nạp xu, mua bằng xu, quà trả phí, rút tự động. Còn cần đơn vị thanh toán/chi trả, điều kiện xác minh người nhận, mức rút, thời gian giữ tiền, quản lý hoàn tiền/chargeback, cơ chế đối soát, xử lý thuế và thông báo quyền riêng tư phù hợp. Quà hiệu ứng miễn phí không sinh tiền. Không quảng cáo khả năng kiếm/rút tiền đang hoạt động.

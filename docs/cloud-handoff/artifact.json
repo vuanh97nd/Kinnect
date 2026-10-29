@@ -1,8 +1,8 @@
 {
-  "version": "1.0.10",
-  "filename": "Kinnect-1.0.10-native.apk",
-  "sha256": "b0acff04821e94b4187566c1f342255ec76427057da23ac2c1bb4d66c4ca50ac",
-  "playVersion": "1.2.0",
+  "version": "1.0.11",
+  "filename": "Kinnect-1.0.11-native.apk",
+  "sha256": "ce785c57c50bc7952649543b4a9cb7d341e99786e59504af1de39fa31781a805",
+  "playVersion": "1.2.1",
   "languages": [
     "vi",
     "en"
@@ -12,10 +12,11 @@
     "languageAudit": "work/play-language-audit-result.log",
     "policyAudit": "work/play-policy-111-result.log",
     "physicalDeviceVerified": false,
-    "backendTests": 101,
+    "backendTests": 102,
     "languageLayout": "320 dp; font 130%; centered VI/EN",
     "storeWeb": "320/390/1366 px; no overflow",
-    "realBillingPurchaseVerified": false
+    "realBillingPurchaseVerified": false,
+    "realPayoutVerified": false
   },
-  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.10"
+  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.11"
 }

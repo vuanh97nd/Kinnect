@@ -498,6 +498,15 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     }
     listing();
   }
+  function liveAudience(room, viewerId) {
+    return [...new Map([...room.members.values()].filter(peer=>peer!==room.host&&social.user(peer.userId)?.suspended===0&&!social.blocked(viewerId,peer.userId)).map(peer=>{const u=social.user(peer.userId);return [u.id,{id:u.id,name:u.name,avatar:u.avatar?'/api/users/'+u.id+'/avatar':null}];})).values()];
+  }
+  function livePresence(room, entrant) {
+    for(const peer of room.members.values()) {
+      const users=liveAudience(room,peer.userId);send(peer,{type:'count',room:room.id,viewers:users.length,users});
+      if(entrant&&entrant!==peer&&!social.blocked(peer.userId,entrant.userId))send(peer,{type:'viewer-joined',room:room.id,user:users.find(u=>u.id===entrant.userId)});
+    }
+  }
   function leave(ws) {
     const room = rooms.get(ws.room);
     ws.room = null;
@@ -509,7 +518,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
       rooms.delete(room.id);
     } else {
       send(room.host, { type: "peer-left", id: ws.id });
-      broadcast(room, { type: "count", viewers: room.members.size - 1 });
+      livePresence(room);
     }
     listing();
   }
@@ -586,7 +595,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
           role: "host",
           history: [],
           aiModeration:!!social.ai.status().moderation,
-          room: { id: room.id, title: room.title },
+          room: { id: room.id, title: room.title, host: room.host.name, hostId: room.host.userId, avatar: social.user(room.host.userId)?.avatar ? "/api/users/"+room.host.userId+"/avatar":null, viewers:liveAudience(room,ws.userId).length },
         });
         listing();
         return;
@@ -605,17 +614,18 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
           return error("Bản thử nghiệm giới hạn 6 người xem mỗi phòng.");
         ws.name = account.name;
         ws.room = room.id;
+        const firstVisit=![...room.members.values()].some(peer=>peer.userId===ws.userId);
         room.members.set(ws.id, ws);
         send(ws, {
           type: "joined",
           role: "viewer",
-          room: { id: room.id, title: room.title },
+          room: { id: room.id, title: room.title, host: room.host.name, hostId: room.host.userId, avatar: social.user(room.host.userId)?.avatar ? "/api/users/"+room.host.userId+"/avatar":null, viewers:liveAudience(room,ws.userId).length },
           host: room.host.id,
           hostUserId: room.host.userId,
           history: (room.chatHistory || []).filter(message => !social.blocked(ws.userId, message.senderId) && social.user(message.senderId)?.suspended === 0),
         });
         send(room.host, { type: "peer", id: ws.id });
-        broadcast(room, { type: "count", viewers: room.members.size - 1 });
+        livePresence(room,firstVisit?ws:null);
         listing();
         return;
       }
@@ -631,6 +641,12 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         social.ai.enqueue('live',room.id,ws.userId,{text:'Kiểm tra khung hình livestream lấy mẫu. Phòng '+room.id,image});return;
       }
       if(m.type==='viewers'){const users=[...new Map([...room.members.values()].filter(peer=>peer!==room.host&&social.user(peer.userId)?.suspended===0&&!social.blocked(ws.userId,peer.userId)).map(peer=>[peer.userId,social.publicUser(social.user(peer.userId),ws.userId)])).values()];send(ws,{type:'viewers',room:room.id,users});return;}
+      if(m.type==='live-reaction') {
+        if(!['heart','rose','star','crown'].includes(m.kind)||Date.now()-(ws.reactionAt||0)<350)return;
+        ws.reactionAt=Date.now();
+        for(const peer of room.members.values())if(!social.blocked(peer.userId,ws.userId))send(peer,{type:'live-reaction',room:room.id,kind:m.kind,name:account.name,senderId:ws.userId,free:true});
+        return;
+      }
       if (m.type === "gift") {
         try {
           const gift = social.gift(

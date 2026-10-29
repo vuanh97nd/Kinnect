@@ -253,13 +253,25 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     if (type.equals("peer") && rtc != null) rtc.offer(m.optString("id"));
     if (type.equals("signal") && rtc != null) rtc.signal(m.optString("from"), m);
     if (type.equals("peer-left") && rtc != null) rtc.remove(m.optString("id"));
-    if (type.equals("count") && viewers != null) viewers.setText(m.optInt("viewers") + I18n.t(" đang xem"));
+    if(type.equals("count")&&viewers!=null){viewers.setText(String.valueOf(m.optInt("viewers")));renderAudience(m.optJSONArray("users"));}
+    if(type.equals("viewer-joined")&&m.optJSONObject("user")!=null)showArrival(m.optJSONObject("user").optString("name"));
+    if(type.equals("live-reaction"))showReaction(m.optString("kind"),m.optString("name"));
     if (type.equals("chat") && chat != null) addChat(m.optString("name"), m.optString("text"));
     if (type.equals("room-ended") || type.equals("ended")) { if (host) { Toast.makeText(this, I18n.t("Buổi trực tiếp đã kết thúc."), Toast.LENGTH_LONG).show(); finish(); } else roomEnded(); }
     if (type.equals("error")) { if(host&&!joined){host=false;joining=false;previewing=false;showHostPreview();status.setText(m.optString("message",I18n.t("Chưa bắt đầu được Live. Hãy thử lại.")));return;}joining=false;if(liveStage!=null){liveStage.setTranslationY(0);liveStage.setAlpha(1);}status.setText(m.optString("message")); status.setVisibility(View.VISIBLE); }
   }
 
-  private TextView viewers;
+  private TextView viewers,arrival;
+  private LinearLayout audience;
+  private FrameLayout reactionLayer;
+  private long lastReaction;private boolean fullFrame=true;
+  private void renderAudience(JSONArray users){if(audience==null)return;audience.removeAllViews();if(users==null)return;for(int n=0;n<users.length();n++){JSONObject u=users.optJSONObject(n);if(u==null)continue;String name=u.optString("name","K");FrameLayout avatar=new FrameLayout(this);avatar.setBackground(round(0xaa6c47e0,99));avatar.setClipToOutline(true);TextView initial=text(name.isEmpty()?"K":name.substring(0,1).toUpperCase(),11,0xffffffff);initial.setGravity(Gravity.CENTER);avatar.addView(initial,new FrameLayout.LayoutParams(-1,-1));String url=u.optString("avatar");if(url.startsWith("/api/users/"))NativeApi.shared.image(url,bytes->{if(isDestroyed()||bytes==null)return;android.graphics.Bitmap bitmap=android.graphics.BitmapFactory.decodeByteArray(bytes,0,bytes.length);if(bitmap!=null){ImageView image=new ImageView(this);image.setScaleType(ImageView.ScaleType.CENTER_CROP);image.setImageBitmap(bitmap);avatar.addView(image,new FrameLayout.LayoutParams(-1,-1));}});avatar.setContentDescription(name);avatar.setOnClickListener(v->Toast.makeText(this,name,Toast.LENGTH_SHORT).show());LinearLayout.LayoutParams at=new LinearLayout.LayoutParams(dp(28),dp(28));at.leftMargin=dp(5);audience.addView(avatar,at);}}
+  private void showArrival(String name){if(arrival==null)return;arrival.removeCallbacks(clearArrival);arrival.setText(name+" "+I18n.t("vừa tham gia"));arrival.setVisibility(View.VISIBLE);arrival.setAlpha(0);arrival.animate().alpha(1).setDuration(180).start();arrival.postDelayed(clearArrival,3500);}
+  private final Runnable clearArrival=()->{if(arrival!=null)arrival.setVisibility(View.GONE);};
+  private void sendReaction(String kind){if(socket==null||System.currentTimeMillis()-lastReaction<400)return;lastReaction=System.currentTimeMillis();socket.send(NativeSocket.json("type","live-reaction","kind",kind));}
+  private void gifts(){new Sheet(this).setTitle(I18n.t("Quà tặng miễn phí")).setItems(new String[]{"🌹 "+I18n.t("Hoa hồng"),"⭐ "+I18n.t("Ngôi sao"),"👑 "+I18n.t("Vương miện")},(d,n)->sendReaction(new String[]{"rose","star","crown"}[n])).setNegativeButton(I18n.t("Đóng"),null).show();}
+  private void showReaction(String kind,String name){if(reactionLayer==null||reactionLayer.getChildCount()>20)return;String glyph=kind.equals("rose")?"🌹":kind.equals("star")?"⭐":kind.equals("crown")?"👑":"♥";TextView heart=text(glyph,kind.equals("heart")?30:42,0xffff4f91);heart.setGravity(Gravity.CENTER);FrameLayout layer=reactionLayer;FrameLayout.LayoutParams at=new FrameLayout.LayoutParams(dp(64),dp(72),Gravity.RIGHT|Gravity.BOTTOM);at.rightMargin=dp(10+(int)(Math.random()*55));at.bottomMargin=dp(90);layer.addView(heart,at);heart.animate().translationY(-dp(210+(int)(Math.random()*120))).translationX(-dp((int)(Math.random()*70))).rotation((float)(Math.random()*35-17)).alpha(0).setDuration(2000).withEndAction(()->layer.removeView(heart)).start();if(!kind.equals("heart")&&chat!=null)addChat(name,I18n.t("đã gửi")+" "+glyph);}
+
   private ScrollView chatScroll;
   private boolean joining;
   private String currentRoom = "";
@@ -364,6 +376,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     View shade = new View(this);
     shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x66000000, 0x00000000, 0x00000000, 0x88000000 }));
     stage.addView(shade, new FrameLayout.LayoutParams(-1, -1));
+    reactionLayer=new FrameLayout(this);stage.addView(reactionLayer,new FrameLayout.LayoutParams(-1,-1));
 
     LinearLayout center = column();
     center.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -400,33 +413,38 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     pillTag.setPadding(dp(4), dp(1), dp(4), dp(1));
     pillTag.setBackground(round(0xfffe2c55, 3));
     meta.addView(pillTag);
-    viewers = text(room.optInt("viewers") + I18n.t(" đang xem"), 12, 0xffffffff);
+    viewers = text(String.valueOf(room.optInt("viewers")), 11, 0xffffffff);
+    viewers.setGravity(Gravity.CENTER);viewers.setIncludeFontPadding(false);viewers.setSingleLine(true);
     viewers.setPadding(dp(7), 0, 0, 0);
-    meta.addView(viewers);
+    meta.setBaselineAligned(false);meta.addView(icon("eye",0xffffffff),new LinearLayout.LayoutParams(dp(12),dp(12)));meta.addView(viewers);
     LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(-2, -2);
     mp.topMargin = dp(3);
     who.addView(meta, mp);
-    chip.addView(who);
-    heading.addView(chip, new LinearLayout.LayoutParams(-2, dp(46)));
-    heading.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
+    chip.addView(who,new LinearLayout.LayoutParams(0,-2,1));
+    heading.addView(chip, new LinearLayout.LayoutParams(0, -2,1));
+    heading.addView(new View(this),new LinearLayout.LayoutParams(dp(12),1));
     FrameLayout close = new FrameLayout(this);
     close.setBackground(round(0x7016121e, 99));
     close.addView(icon("close", 0xffffffff), new FrameLayout.LayoutParams(dp(18), dp(18), Gravity.CENTER));
     close.setContentDescription(host ? I18n.t("Kết thúc live") : I18n.t("Rời live"));
     close.setOnClickListener(v -> { if (socket != null) socket.send(NativeSocket.json("type", "leave")); finish(); });
-    heading.addView(close, new LinearLayout.LayoutParams(dp(34), dp(34)));
+    heading.addView(close, new LinearLayout.LayoutParams(dp(40), dp(40)));
     FrameLayout.LayoutParams hp = new FrameLayout.LayoutParams(-1, -2, Gravity.TOP);
     hp.setMargins(dp(12), dp(12), dp(12), 0);
     stage.addView(heading, hp);
+    HorizontalScrollView audienceScroll=new HorizontalScrollView(this);audienceScroll.setHorizontalScrollBarEnabled(false);audience=row();audienceScroll.addView(audience);FrameLayout.LayoutParams audienceAt=new FrameLayout.LayoutParams(-1,dp(30),Gravity.TOP);audienceAt.setMargins(dp(12),dp(68),dp(56),0);stage.addView(audienceScroll,audienceAt);
+    arrival=text("",12,0xffffffff);arrival.setPadding(dp(12),dp(7),dp(12),dp(7));arrival.setBackground(round(0xbb6c47e0,18));arrival.setSingleLine(true);arrival.setEllipsize(android.text.TextUtils.TruncateAt.END);arrival.setVisibility(View.GONE);FrameLayout.LayoutParams arrivalAt=new FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM|Gravity.LEFT);arrivalAt.setMargins(dp(14),0,dp(90),dp(235));stage.addView(arrival,arrivalAt);
+
     TextView title = text(room.optString("title"), 13, 0xffffffff);
     title.setShadowLayer(4, 0, 1, 0xff000000);
     title.setLineSpacing(0, 1.2f);
     FrameLayout.LayoutParams tp = new FrameLayout.LayoutParams(-1, -2, Gravity.TOP);
-    tp.setMargins(dp(16), dp(70), dp(70), 0);
+    tp.setMargins(dp(16), dp(108), dp(24), 0);title.setMaxLines(2);title.setEllipsize(android.text.TextUtils.TruncateAt.END);
     stage.addView(title, tp);
 
     LinearLayout side = column();
     side.setGravity(Gravity.CENTER_HORIZONTAL);
+    side.setBackground(round(0x6616121e,24));
     final String hostId = m.optString("hostUserId",room.optString("hostId"));
     if (!host && !hostId.isEmpty()) {
       FrameLayout author = new FrameLayout(this);
@@ -470,10 +488,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     }));
     if (host) {
       final boolean[] mic = { true }, cam = { true };
-      side.addView(sideButton("mic", I18n.t("Tắt mic"), () -> { mic[0] = !mic[0]; rtc.microphone(mic[0]); status.setText(mic[0] ? I18n.t("Micro đang bật") : I18n.t("Micro đã tắt")); }));
-      side.addView(sideButton("camera", I18n.t("Tắt camera"), () -> { cam[0] = !cam[0]; rtc.camera(cam[0]); status.setText(cam[0] ? I18n.t("Camera đang bật") : I18n.t("Camera đã tắt")); }));
-      side.addView(sideButton("flip", I18n.t("Đổi cam"), () -> rtc.flip()));
-      side.addView(sideButton("wand", I18n.t("Hiệu ứng"), this::effectsMenu));
+      side.addView(sideButton("settings",I18n.t("Công cụ"),()->new Sheet(this).setTitle(I18n.t("Công cụ Live")).setItems(new String[]{I18n.t("Bật / tắt micro"),I18n.t("Bật / tắt camera"),I18n.t("Đổi camera"),I18n.t("Hiệu ứng Live"),I18n.t("Khung hình: toàn cảnh / lấp đầy")},(d,n)->{if(rtc==null)return;if(n==0){mic[0]=!mic[0];rtc.microphone(mic[0]);}if(n==1){cam[0]=!cam[0];rtc.camera(cam[0]);}if(n==2)rtc.flip();if(n==3)effectsMenu();if(n==4){fullFrame=!fullFrame;rtc.framing(fullFrame);}}).show()));
     } else {
       final boolean[] muted = { false };
       side.addView(sideButton("sound", I18n.t("Âm thanh"), () -> {
@@ -482,7 +497,9 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
         Toast.makeText(this, muted[0] ? I18n.t("Đã tắt tiếng") : I18n.t("Đã bật tiếng"), Toast.LENGTH_SHORT).show();
       }));
     }
-    FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(dp(60), -2, Gravity.END | Gravity.BOTTOM);
+    side.addView(sideButton("heart",I18n.t("Thả tim"),()->sendReaction("heart")));
+    side.addView(sideButton("gift",I18n.t("Tặng quà"),this::gifts));
+    FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(dp(56), -2, Gravity.END | Gravity.BOTTOM);
     sp.setMargins(0, 0, dp(6), dp(76));
     stage.addView(side, sp);
 
@@ -556,15 +573,15 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
   private LinearLayout sideButton(String iconName, String label, Runnable click) {
     LinearLayout b = column();
     b.setGravity(Gravity.CENTER_HORIZONTAL);
-    b.setPadding(0, dp(4), 0, dp(8));
+    b.setPadding(0,dp(6),0,dp(6));
     ImageView i = icon(iconName, 0xffffffff);
     i.setElevation(dp(2));
-    b.addView(i, new LinearLayout.LayoutParams(dp(26), dp(26)));
+    b.addView(i,new LinearLayout.LayoutParams(dp(22),dp(22)));
     TextView t = text(label, 12, 0xffffffff);
     t.setShadowLayer(4, 0, 1, 0xff000000);
     t.setGravity(Gravity.CENTER);
-    t.setSingleLine(true);
-    t.setPadding(0, dp(5), 0, 0);
+    t.setMaxLines(2);t.setTextSize(10);t.setIncludeFontPadding(false);
+    t.setPadding(dp(2),dp(3),dp(2),0);
     b.addView(t);
     b.setContentDescription(label);
     b.setOnClickListener(v -> click.run());

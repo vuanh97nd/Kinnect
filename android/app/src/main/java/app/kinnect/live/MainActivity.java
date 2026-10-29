@@ -617,7 +617,7 @@ public class MainActivity extends Activity {
       groupRow(admin, "shield_check", I18n.t("Bảng quản trị"), false, () -> admin());
     }
     LinearLayout main = settingsGroup();
-    groupRow(main,"gift",I18n.t("Cửa hàng Kinnect"),false,()->openStore());
+    groupRow(main,"shopping_bag",I18n.t("Cửa hàng Kinnect"),false,()->openStore());
     groupRow(main, "settings", I18n.t("Cài đặt và quyền riêng tư"), false, () -> settings());
     groupRow(main, "shield_check", I18n.t("Bảo mật và đăng nhập"), false, () -> securityScreen());
     groupRow(main, "bell", I18n.t("Cài đặt thông báo"), false, () -> nativeNotificationSettings());
