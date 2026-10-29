@@ -1,0 +1,32 @@
+{
+  "queries": [
+    {
+      "package": {
+        "ecosystem": "Maven",
+        "name": "com.squareup.okhttp3:okhttp"
+      },
+      "version": "4.12.0"
+    },
+    {
+      "package": {
+        "ecosystem": "Maven",
+        "name": "com.squareup.okio:okio-jvm"
+      },
+      "version": "3.6.0"
+    },
+    {
+      "package": {
+        "ecosystem": "Maven",
+        "name": "org.jetbrains.kotlin:kotlin-stdlib"
+      },
+      "version": "1.9.10"
+    }
+  ],
+  "results": {
+    "results": [
+      {},
+      {},
+      {}
+    ]
+  }
+}

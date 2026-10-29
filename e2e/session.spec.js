@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test';
 async function account(page,name){
  await page.goto('/');
- const r = await page.request.post('/api/register',{data:{username:name.slice(0,15)+'_'+Date.now(),password:'abcdef',name,agree18:true}}); expect(r.status(), await r.text()).toBe(200);
+ const r = await page.request.post('/api/register',{data:{username:name.slice(0,15)+'_'+Date.now(),password:'abcdef',name,agree18:true,acceptPrivacyNotice:true}}); expect(r.status(), await r.text()).toBe(200);
  expect((await page.request.get('/api/me')).status()).toBe(200);
  await page.reload();
  const skip=page.getByRole('button',{name:'Bỏ qua',exact:true});

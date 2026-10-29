@@ -50,7 +50,7 @@ async function register(app, username, extra = {}) {
       password: "very-strong-test-password",
       name: username,
       birthDate: "1994-05-10",
-      agree18: true,
+      agree18: true, acceptPrivacyNotice: true,
       ...extra,
     },
   });

@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 function tone(){const rate=8000,seconds=4,size=rate*seconds*2,b=Buffer.alloc(44+size);b.write('RIFF');b.writeUInt32LE(36+size,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(rate,24);b.writeUInt32LE(rate*2,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(size,40);for(let i=0;i<rate*seconds;i++)b.writeInt16LE(Math.round(Math.sin(i*2*Math.PI*440/rate)*4000),44+i*2);return b;}
 test('photo with music records and publishes as a story without requesting camera',async({page})=>{
- const r=await page.request.post('/api/register',{data:{username:'music_'+Date.now(),password:'abcdef',name:'Tin âm nhạc',agree18:true}});expect(r.status()).toBe(200);
+ const r=await page.request.post('/api/register',{data:{username:'music_'+Date.now(),password:'abcdef',name:'Tin âm nhạc',agree18:true,acceptPrivacyNotice:true}});expect(r.status()).toBe(200);
  await page.addInitScript(()=>{navigator.mediaDevices.getUserMedia=()=>{throw Error('Photo stories must not request the camera');};});
  await page.goto('/');await expect(page.locator('#app')).toBeVisible();await page.locator('[data-tab="feed"]').first().click();
  await page.getByRole('button',{name:'+ Tạo tin',exact:true}).click();

@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 for(const width of [320,390,1440])test('v2 polish survives legacy CSS at '+width,async({browser})=>{
  const c=await browser.newContext({viewport:{width,height:900}});
  try{
-  const registration=await c.request.post('/api/register',{data:{username:'polish'+width+Date.now(),name:'Quân',password:'abcdef',agree18:true}});expect(registration.ok()).toBeTruthy();const {user}=await registration.json();
+  const registration=await c.request.post('/api/register',{data:{username:'polish'+width+Date.now(),name:'Quân',password:'abcdef',agree18:true,acceptPrivacyNotice:true}});expect(registration.ok()).toBeTruthy();const {user}=await registration.json();
   const posted=await c.request.post('/api/posts',{data:{body:'Một ngày mới trên Kinnect. Chia sẻ khoảnh khắc và kết nối bạn bè.'}});
   const postId=(await posted.json()).id;
   await c.addInitScript(id=>localStorage.setItem('kinnect-profile-prompt:'+id,'pending'),user.id);

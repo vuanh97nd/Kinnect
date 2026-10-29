@@ -6,8 +6,8 @@ test('phone focus preserves readable fields and chat composer stays aligned',asy
  try{
  const p=await c.newPage();
  for(const width of [320,390,430,768]){await p.setViewportSize({width,height:844});await p.goto('/');const input=p.locator('[data-auth-input=username]');await expect(input).toBeVisible();await input.focus();expect(await input.evaluate(e=>parseFloat(getComputedStyle(e).fontSize))).toBeGreaterThanOrEqual(16);expect(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(await p.evaluate(()=>visualViewport.scale)).toBe(1);}
- await c.request.post('/api/register',{data:{username:'compose_self',name:'Self',password:'abcdef',agree18:true}});
- const u=(await(await other.request.post('/api/register',{data:{username:'compose_other',name:'Other',password:'abcdef',agree18:true}})).json()).user;
+ await c.request.post('/api/register',{data:{username:'compose_self',name:'Self',password:'abcdef',agree18:true,acceptPrivacyNotice:true}});
+ const u=(await(await other.request.post('/api/register',{data:{username:'compose_other',name:'Other',password:'abcdef',agree18:true,acceptPrivacyNotice:true}})).json()).user;
  await c.request.post('/api/users/'+u.id+'/messages',{data:{body:'Hello'}});
  for(const width of [320,390,430,460,768,900,1280]){
  await p.setViewportSize({width,height:844});await p.goto('/?s=inbox');await p.locator('.v2-conversation').first().click();const form=p.locator('form[data-community-send]'),field=form.locator('textarea');await expect(form).toBeVisible();await expect(field).toBeVisible();

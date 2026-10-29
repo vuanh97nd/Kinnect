@@ -1,3 +1,12 @@
+# Chuẩn bị Google Play — 29/10/2026
+
+- APK website 1.0.8/build 73 được build đầy đủ từ source, dùng OkHttp/Okio mới và giữ chứng chỉ ký cũ. Bản Play riêng 1.1.0/build 100 dùng `android/app/src/play/AndroidManifest.xml`, AAB target 36, khóa upload riêng và không đóng gói trình cài APK ngoài.
+- Tài liệu và các việc Console còn phải làm: `docs/google-play/READINESS.md`, `CONSOLE-FIELDS.md`, `DATA-SAFETY-WORKSHEET.md`, `SIGNING.md`.
+- Xóa thật dữ liệu, xác nhận sử dụng dữ liệu, AI opt-in/withdrawal, nguồn policy chung, báo cáo livestream/tin nhóm và công cụ kiểm duyệt đã thêm. Không dùng khóa tài khoản thay cho xóa.
+- 97 bài backend/AI/Worker đạt. Native Play chạy trên Android 16, page size 16384 và font scale 1.3, nạp được WebRTC JNI. Các bằng chứng công khai nằm ở `docs/google-play/evidence/`.
+- KHÔNG có private signing key/mật khẩu/reviewer credentials trong Git hoặc gói nguồn. Những dữ liệu này chỉ ở thư mục work cục bộ bị ignore. Không tự tạo lại khóa upload trên máy khác, không tự đổi khóa app-signing vì sẽ hỏng cập nhật từ APK cũ.
+- AAB là ứng viên Internal testing, chưa được Google duyệt. Không tuyên bố đã hoàn tất Play Console, 12 người/14 ngày hoặc kiểm thử điện thoại thật.
+
 # Cập nhật 29/10 — Kinnect 1.0.7 / build 72
 
 - Thêm tab Giới thiệu ở trái Bài viết cho cả web và APK; mặc định vẫn mở Bài viết. Nội dung public và trường ẩn được lọc, gồm cả identityPublic khi APK dùng dữ liệu chủ hồ sơ.

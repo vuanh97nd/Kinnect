@@ -15,7 +15,7 @@ for folder in ['android/build/classes','android/build/dex']:
 Path('dist').mkdir(exist_ok=True)
 run(build/'aapt2.exe','compile','--dir','android/app/src/main/res','-o','android/build/resources.zip')
 run(build/'aapt2.exe','link','--auto-add-overlay','-R','android/build/resources.zip','-I',platform,'--manifest','android/app/src/main/AndroidManifest.xml','-o','android/build/unsigned.apk')
-jars=[deps/'webrtc/classes.jar',deps/'okhttp.jar',deps/'okio.jar']
+jars=[deps/'webrtc/classes.jar']+[Path(d['file']) for d in __import__('json').loads((root/'work/play-tools/dependencies/dependencies.json').read_text())]
 run(jdk/'java.exe','-jar',tools/'ecj.jar','-1.8','-encoding','UTF-8','-proc:none','-warn:none','-bootclasspath',str(platform)+';'+str(build/'core-lambda-stubs.jar'),'-classpath',';'.join(map(str,jars)),'-d','android/build/classes',*Path('android/app/src/main/java/app/kinnect/live').glob('*.java'))
 classes=Path('android/build/classes.list');classes.write_text('\n'.join(str(p.resolve()) for p in Path('android/build/classes').rglob('*.class')))
 run(jdk/'java.exe','-cp',build/'lib/d8.jar','com.android.tools.r8.D8','--min-api','26','--lib',platform,'--output','android/build/dex','@'+str(classes),*jars)
@@ -24,6 +24,8 @@ with zipfile.ZipFile('android/build/unsigned.apk','a') as out:
   source=root/'public'/name
   if not source.is_file():raise FileNotFoundError('Missing intro image: '+name)
   out.write(source,'assets/'+name)
+ for p in Path('android/app/src/main/assets').rglob('*'):
+  if p.is_file():out.write(p,'assets/'+p.relative_to('android/app/src/main/assets').as_posix())
  for p in Path('android/build/dex').glob('*.dex'):out.write(p,p.name)
  for p in (deps/'webrtc/jni').rglob('*.so'):out.write(p,'lib/'+p.relative_to(deps/'webrtc/jni').as_posix(),compress_type=zipfile.ZIP_STORED)
 run(build/'zipalign.exe','-P','16','-f','4','android/build/unsigned.apk','android/build/aligned.apk')

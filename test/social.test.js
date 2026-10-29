@@ -50,7 +50,7 @@ async function register(app, username, extra = {}) {
       password: "very-strong-test-password",
       name: username,
       birthDate: "1994-05-10",
-      agree18: true,
+      agree18: true, acceptPrivacyNotice: true,
       ...extra,
     },
   });
@@ -77,7 +77,7 @@ test("18+ confirmation, six-character passwords, session privacy and logout", as
     (
       await request(app, "/register", {
         method: "POST",
-        body: { username: "shortpw", password: "abcde", agree18: true },
+        body: { username: "shortpw", password: "abcde", agree18: true, acceptPrivacyNotice: true },
       })
     ).status,
     400,
@@ -778,7 +778,7 @@ test("Google login: state check, first-login 18+ confirmation, then direct login
         body: JSON.stringify(body),
       });
     assert.equal((await post({ ticket, username: "minhanh", agree18: false })).status, 400);
-    const done = await post({ ticket, username: "minhanh", name: "Minh Anh", agree18: true });
+    const done = await post({ ticket, username: "minhanh", name: "Minh Anh", agree18: true, acceptPrivacyNotice: true });
     assert.equal(done.status, 200);
     const session = done.headers.get("set-cookie").split(";")[0];
     const me = await (await fetch(url + "/api/me", { headers: { Cookie: session } })).json();

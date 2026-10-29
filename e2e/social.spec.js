@@ -252,7 +252,7 @@ test("nearby consent, optional Les identity and notification permission/bell wor
   await p.getByRole("button",{name:"Xong",exact:true}).click();
   await expect(p.getByRole("region",{name:"Thông tin cá nhân"}).getByRole("definition").filter({hasText:"Les / Đồng tính nữ"})).toBeVisible();
   const other=await browser.newContext();
-  await other.request.post("/api/register",{data:{username:"notification_browser",password:"abcdef",name:"Bạn mới",agree18:true}});
+  await other.request.post("/api/register",{data:{username:"notification_browser",password:"abcdef",name:"Bạn mới",agree18:true,acceptPrivacyNotice:true}});
   const own=(await (await ctx.request.get("/api/me")).json()).user;
   await other.request.post("/api/users/"+own.id+"/follow",{data:{}});
   await expect(p.locator("#unread")).toHaveText("1");

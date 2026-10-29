@@ -14,7 +14,7 @@ test('uploads accept media beyond former size and 60-second limits',async t=>{
  const app=createApp();await new Promise(r=>app.server.listen(0,'127.0.0.1',r));
  t.after(async()=>{for(const ws of app.wss.clients)ws.terminate();await new Promise(r=>app.wss.close(r));app.server.closeAllConnections();await new Promise(r=>app.server.close(r));app.social.close();});
  const origin='http://127.0.0.1:'+app.server.address().port;
- const r=await fetch(origin+'/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'media_regression',name:'Media',password:'test-password-strong',birthDate:'1994-05-10',agree18:true})});
+ const r=await fetch(origin+'/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'media_regression',name:'Media',password:'test-password-strong',birthDate:'1994-05-10',agree18:true,acceptPrivacyNotice:true})});
  assert.equal(r.status,200);const cookie=r.headers.get('set-cookie').split(';')[0];
  const clip=video(125);assert.equal(mp4Duration(clip),125);assert.throws(()=>mp4Duration(Buffer.alloc(100)),/MP4/);
  const png=Buffer.alloc(13*1024*1024);Buffer.from('89504e470d0a1a0a','hex').copy(png);

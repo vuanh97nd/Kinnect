@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test';import {createApp} from '../server.js';
 for(const width of [390,1280])test('v2 friends, direct and group messages at '+width,async({browser})=>{
  const instance=createApp({authLimit:200});await new Promise(r=>instance.server.listen(0,'127.0.0.1',r));const baseURL='http://127.0.0.1:'+instance.server.address().port;
- const contexts=[];const make=async(name)=>{const c=await browser.newContext({baseURL,viewport:{width,height:844}});contexts.push(c);const r=await c.request.post('/api/register',{data:{username:'v2_'+contexts.length+'_'+Date.now(),name,password:'abcdef',agree18:true}});expect(r.ok()).toBeTruthy();return {c,u:(await r.json()).user};};
+ const contexts=[];const make=async(name)=>{const c=await browser.newContext({baseURL,viewport:{width,height:844}});contexts.push(c);const r=await c.request.post('/api/register',{data:{username:'v2_'+contexts.length+'_'+Date.now(),name,password:'abcdef',agree18:true,acceptPrivacyNotice:true}});expect(r.ok()).toBeTruthy();return {c,u:(await r.json()).user};};
  try{
  const a=await make('Bạn chính'),b=await make('Bạn thứ hai'),h=await make('Bạn ẩn'),stranger=await make('Người mới tìm kiếm');await h.c.request.patch('/api/me',{data:{showActivity:false}});
  await b.c.request.post('/api/users/'+a.u.id+'/friend-request',{data:{}});await a.c.request.post('/api/users/'+h.u.id+'/friend-request',{data:{}});await h.c.request.post('/api/users/'+a.u.id+'/friend-request/respond',{data:{action:'accept'}});

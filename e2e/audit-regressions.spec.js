@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 async function member(browser,name,viewport={width:390,height:844}){
  const context=await browser.newContext({viewport,permissions:['camera','microphone']});
  await context.addInitScript(()=>{window.callTracks=[];const original=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);navigator.mediaDevices.getUserMedia=async options=>{const stream=await original(options);window.callTracks.push(...stream.getTracks());return stream;};});
- const r=await context.request.post('/api/register',{data:{username:name+Date.now(),name,password:'abcdef',agree18:true}});expect(r.status()).toBe(200);return {context,user:(await r.json()).user};
+ const r=await context.request.post('/api/register',{data:{username:name+Date.now(),name,password:'abcdef',agree18:true,acceptPrivacyNotice:true}});expect(r.status()).toBe(200);return {context,user:(await r.json()).user};
 }
 for(const mode of ['video','audio'])test('ending accepted '+mode+' call while TURN config is pending ends both peers',async({browser})=>{
  const a=await member(browser,'callera'+mode),b=await member(browser,'receiverb'+mode);let release;const gate=new Promise(r=>release=r);

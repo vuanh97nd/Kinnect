@@ -93,12 +93,14 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
       if (isFinishing() || isDestroyed()) return;
       if (error != null) { status.setText(error); return; }
       config = data;
-      socket = new NativeSocket(origin, this);
+      ensurePrivacy(()->socket = new NativeSocket(origin, this));
     });
     audio = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
     previousMode = audio.getMode();
     previousSpeaker = audio.isSpeakerphoneOn();
   }
+
+  private void ensurePrivacy(Runnable ready){NativeApi.shared.call("GET","/api/me/privacy-consent",null,(data,error,statusCode)->{if(isFinishing()||isDestroyed())return;if(error!=null){status.setText(error);return;}if(data.optBoolean("accepted")){ready.run();return;}new Sheet(this).setTitle("Thông báo sử dụng dữ liệu").setMessage(data.optString("notice")).setPositiveButton("Tôi đồng ý",(d,w)->NativeApi.shared.call("POST","/api/me/privacy-consent",NativeSocket.json("accepted",true,"version",data.optString("version")),(accepted,failure,code)->{if(failure==null)ready.run();else status.setText(failure);})).setNegativeButton("Để sau",(d,w)->finish()).show();});}
 
   // Sảnh giống web: danh sách buổi live dạng thẻ dọc; phát live bằng nút nổi.
   private void lobby() {
@@ -415,7 +417,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
 
     LinearLayout side = column();
     side.setGravity(Gravity.CENTER_HORIZONTAL);
-    final String hostId = room.optString("hostId");
+    final String hostId = m.optString("hostUserId",room.optString("hostId"));
     if (!host && !hostId.isEmpty()) {
       FrameLayout author = new FrameLayout(this);
       TextView big = text(hostName.isEmpty() ? "K" : hostName.substring(0, 1).toUpperCase(), 18, 0xffffffff);
@@ -449,6 +451,10 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
       side.addView(author, ap);
     }
     final String roomId = room.optString("id");
+    if(!host&&!hostId.isEmpty()){
+      side.addView(sideButton("flag","Báo cáo buổi live",()->{EditText reason=field("Mô tả vi phạm; không gửi lại ảnh CSAM");new Sheet(this).setTitle("Báo cáo buổi live").setMessage("Có nguy cơ trẻ em? Ghi rõ CSAE/CSAM và nơi xảy ra. Không tải lại hoặc phát tán nội dung vi phạm.").setView(reason).setPositiveButton("Gửi báo cáo",(d,w)->{String details=reason.getText().toString().trim();if(details.length()<5){Toast.makeText(this,"Mô tả ít nhất 5 ký tự.",Toast.LENGTH_SHORT).show();return;}NativeApi.shared.call("POST","/api/reports",NativeSocket.json("targetType","user","targetId",hostId,"reason","[Livestream "+roomId+"] "+details),(answer,error,code)->Toast.makeText(this,error==null?"Đã gửi báo cáo.":error,Toast.LENGTH_SHORT).show());}).setNegativeButton("Hủy",null).show();}));
+      side.addView(sideButton("shield_check","Chặn người phát",()->new Sheet(this).setTitle("Chặn người phát?").setMessage("Bạn sẽ rời buổi live và không còn thấy người này trong nội dung được hỗ trợ.").setPositiveButton("Chặn",(d,w)->NativeApi.shared.call("POST","/api/users/"+hostId+"/block",new JSONObject(),(answer,error,code)->{if(error==null)finish();else Toast.makeText(this,error,Toast.LENGTH_SHORT).show();})).setNegativeButton("Hủy",null).show()));
+    }
     side.addView(sideButton("send", "Chia sẻ", () -> {
       try { startActivity(android.content.Intent.createChooser(new android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, ServerConfig.DEFAULT_ORIGIN + "/?s=live&room=" + roomId), "Chia sẻ buổi live")); } catch (Exception ignored) {}
     }));

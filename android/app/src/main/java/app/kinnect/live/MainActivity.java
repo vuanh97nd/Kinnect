@@ -71,8 +71,8 @@ public class MainActivity extends Activity {
   private NativeCalls calls;
   private void ensureCalls(){if(me!=null&&!mediaCallListening){mediaCallListening=true;KinnectService.listen(mediaCallEvents);}if(KinnectService.pendingIncoming!=null){mediaCallGate.update("call-incoming",KinnectService.pendingIncoming.optString("callId"));mediaCallBlocked=mediaCallGate.blocked();pauseForCall();}if(me!=null&&calls==null){calls=new NativeCalls(this,server());setupBackground();}}
   // Một lần: xin đủ quyền thông báo/cuộc gọi, cho phép toàn màn hình và chạy nền.
-  private void setupBackground(){android.content.SharedPreferences p=getSharedPreferences("native_setup",0);if(p.getBoolean("asked_v1",false)){backgroundExtras(false);return;}p.edit().putBoolean("asked_v1",true).apply();java.util.ArrayList<String> want=new java.util.ArrayList<>();if(Build.VERSION.SDK_INT>=33)want.add("android.permission.POST_NOTIFICATIONS");want.add(Manifest.permission.RECORD_AUDIO);want.add(Manifest.permission.CAMERA);if(Build.VERSION.SDK_INT>=31)want.add("android.permission.BLUETOOTH_CONNECT");java.util.ArrayList<String> missing=new java.util.ArrayList<>();for(String w:want)if(checkSelfPermission(w)!=PackageManager.PERMISSION_GRANTED)missing.add(w);if(missing.isEmpty())backgroundExtras(true);else requestPermissions(missing.toArray(new String[0]),950);}
-  private void backgroundExtras(boolean prompt){try{if(Build.VERSION.SDK_INT>=34&&!getSystemService(android.app.NotificationManager.class).canUseFullScreenIntent()){if(prompt)new AlertDialog.Builder(this).setTitle("Cuộc gọi toàn màn hình").setMessage("Cho phép Kinnect hiện cuộc gọi đến toàn màn hình, kể cả khi khóa máy.").setPositiveButton("Cho phép",(d,w)->{try{startActivity(new Intent("android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT",android.net.Uri.parse("package:"+getPackageName())));}catch(RuntimeException ignored){}}).setNegativeButton("Để sau",(d,w)->battery()).show();else battery();return;}}catch(RuntimeException ignored){}if(prompt)battery();}
+  private void setupBackground(){if(Distribution.PLAY){if(Build.VERSION.SDK_INT>=33&&checkSelfPermission("android.permission.POST_NOTIFICATIONS")!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"},950);return;}android.content.SharedPreferences p=getSharedPreferences("native_setup",0);if(p.getBoolean("asked_v1",false)){backgroundExtras(false);return;}p.edit().putBoolean("asked_v1",true).apply();java.util.ArrayList<String> want=new java.util.ArrayList<>();if(Build.VERSION.SDK_INT>=33)want.add("android.permission.POST_NOTIFICATIONS");want.add(Manifest.permission.RECORD_AUDIO);want.add(Manifest.permission.CAMERA);if(Build.VERSION.SDK_INT>=31)want.add("android.permission.BLUETOOTH_CONNECT");java.util.ArrayList<String> missing=new java.util.ArrayList<>();for(String w:want)if(checkSelfPermission(w)!=PackageManager.PERMISSION_GRANTED)missing.add(w);if(missing.isEmpty())backgroundExtras(true);else requestPermissions(missing.toArray(new String[0]),950);}
+  private void backgroundExtras(boolean prompt){if(Distribution.PLAY)return;try{if(Build.VERSION.SDK_INT>=34&&!getSystemService(android.app.NotificationManager.class).canUseFullScreenIntent()){if(prompt)new AlertDialog.Builder(this).setTitle("Cuộc gọi toàn màn hình").setMessage("Cho phép Kinnect hiện cuộc gọi đến toàn màn hình, kể cả khi khóa máy.").setPositiveButton("Cho phép",(d,w)->{try{startActivity(new Intent("android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT",android.net.Uri.parse("package:"+getPackageName())));}catch(RuntimeException ignored){}}).setNegativeButton("Để sau",(d,w)->battery()).show();else battery();return;}}catch(RuntimeException ignored){}if(prompt)battery();}
   private void battery(){android.os.PowerManager pm=(android.os.PowerManager)getSystemService(POWER_SERVICE);if(pm!=null&&!pm.isIgnoringBatteryOptimizations(getPackageName()))try{startActivity(new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,android.net.Uri.parse("package:"+getPackageName())));}catch(RuntimeException ignored){}}
   private void handleExtras(Intent intent){if(intent==null||me==null)return;if(intent.getBooleanExtra("accept_call",false)){intent.removeExtra("accept_call");ensureCalls();if(calls!=null)calls.checkPending();}String n=intent.getStringExtra("notification");if(n!=null){intent.removeExtra("notification");try{openNotification(new JSONObject(n));}catch(JSONException ignored){}}}
   private LocationListener locationListener;
@@ -879,38 +879,7 @@ public class MainActivity extends Activity {
       {"p","Mang theo sự tò mò. Còn lời chào, để mình bắt đầu."},
       {"p","Bản thử nghiệm · Android, iPhone và máy tính · Dành cho người từ 18 tuổi"}
     };}
-    if(page.equals("privacy")){title="Chính sách quyền riêng tư";rows=new String[][]{
-      {"h1","Thông tin quyền riêng tư"},
-      {"p","Hiểu dữ liệu của bạn, trước khi bắt đầu kết nối."},
-      {"p","Cập nhật: 24/10/2026 · Áp dụng cho cấu hình thử nghiệm đang vận hành"},
-      {"h2","Dữ liệu ứng dụng sử dụng"},
-      {"p","Máy chủ lưu thông tin tài khoản, mã băm mật khẩu, phiên đăng nhập, hồ sơ và ảnh, sở thích, theo dõi, bài viết, tin nhắn riêng, thông báo, báo cáo và dữ liệu video được hỗ trợ. Dữ liệu hiện được lưu trong cơ sở dữ liệu trên máy chủ do chủ dự án vận hành."},
-      {"p","Tính năng xung quanh chỉ sử dụng vị trí khi bạn đồng ý. Quyền camera, micro hoặc thư viện ảnh được hỏi khi dùng tính năng liên quan. Không phải mọi chức năng Android đều đã có hoặc đã được kiểm thử trên iOS."},
-      {"h2","Ai có thể xem thông tin?"},
-      {"p","Các thành viên thấy những thông tin hồ sơ và nội dung bạn chia sẻ theo quyền hiển thị của ứng dụng. Tin nhắn riêng dành cho người gửi và người nhận trong giao diện, nhưng hệ thống hiện chưa có mã hóa đầu cuối; chủ máy chủ có khả năng truy cập dữ liệu lưu trữ khi vận hành và xử lý báo cáo."},
-      {"h2","Cookie và bộ nhớ trên thiết bị"},
-      {"p","Ứng dụng web dùng cookie phiên để duy trì đăng nhập. Bản web iOS có thể lưu tệp giao diện và trang thông báo ngoại tuyến để tải nhanh hơn. API, nội dung hồ sơ và tin nhắn không được đưa vào Cache Storage của service worker."},
-      {"p","Website giới thiệu này không cài công cụ phân tích hoặc quảng cáo. Font web có thể tải từ Google Fonts; khi đó trình duyệt gửi yêu cầu tới nhà cung cấp font. Hosting, GitHub và các dịch vụ mạng có thể xử lý nhật ký truy cập theo cấu hình và chính sách riêng."},
-      {"h2","Kiểm soát của bạn"},
-      {"p","Bạn có thể sửa hồ sơ, điều chỉnh quyền xuất hiện trong Khám phá, quyền nhận tin nhắn, chặn người khác và đăng xuất. Với phiên bản hỗ trợ vị trí, bạn có thể tắt và xóa vị trí đã chia sẻ trong Hồ sơ."},
-      {"p","Chưa có công cụ tự phục vụ đầy đủ để xuất hoặc xóa toàn bộ dữ liệu tài khoản. Không có cam kết thời hạn lưu/xóa tự động được thiết lập cho bản thử nghiệm. Không nên dùng GitHub issue công khai để gửi yêu cầu có dữ liệu nhạy cảm."},
-      {"h2","Phạm vi hiện tại"},
-      {"p","Kinnect dành cho người từ 18 tuổi. Xác nhận độ tuổi trong bản hiện tại là tự khai, không phải xác minh danh tính. Trang này mô tả cách vận hành hiện có; thông tin pháp nhân, kênh liên hệ riêng tư và quy trình xử lý yêu cầu dữ liệu cần được chủ dự án bổ sung trước khi phát hành rộng rãi."}
-    };}
-    if(page.equals("community")){title="Quy tắc cộng đồng";rows=new String[][]{
-      {"h1","Quy tắc cộng đồng"},
-      {"p","Mọi sắc màu, cùng một sự tôn trọng."},
-      {"h2","Được là mình. Tôn trọng người khác."},
-      {"p","Tôn trọng danh tính, cách xưng hô và ranh giới của mỗi người. Không quấy rối, kỳ thị, đe dọa hoặc nhắm mục tiêu vào người khác vì xu hướng tính dục hay bản dạng giới."},
-      {"h2","Kết nối có sự đồng thuận"},
-      {"p","Không ép buộc trò chuyện, gửi nội dung nhạy cảm khi người nhận không đồng ý, giả mạo danh tính hoặc tiếp tục liên hệ sau khi bị từ chối."},
-      {"h2","Bảo vệ quyền riêng tư"},
-      {"p","Không công khai tin nhắn, ảnh riêng tư, vị trí chính xác, số điện thoại hoặc thông tin cá nhân của người khác khi chưa được đồng ý."},
-      {"h2","Chia sẻ có trách nhiệm"},
-      {"p","Chỉ đăng nội dung bạn có quyền sử dụng. Không đăng nội dung bất hợp pháp, bóc lột tình dục, lừa đảo hoặc liên quan đến xâm hại trẻ em. Kinnect là không gian dành cho người từ 18 tuổi."},
-      {"h2","Khi có vấn đề"},
-      {"p","Dùng tính năng Chặn và Báo cáo trong ứng dụng. Chủ máy chủ sẽ xem xét báo cáo và có thể ẩn nội dung hoặc đình chỉ tài khoản theo công cụ hiện có. Báo cáo được xử lý thủ công; chưa có giám sát liên tục 24/7."}
-    };}
+    if(page.equals("privacy")||page.equals("community")||page.equals("child-safety")){title=PolicyText.title(page);rows=PolicyText.rows(page);}
     accountHeader(title,back);
     LinearLayout panel=null;
     for(String[] part:rows){
@@ -927,11 +896,16 @@ public class MainActivity extends Activity {
     accountHeader("Trợ giúp và hỗ trợ", () -> meMenu());
     LinearLayout panel = settingsGroup();
     groupRow(panel, "flag", "Báo sự cố", false, () -> report("app", me.optString("id")));
-    groupRow(panel, "message_square", "Trung tâm hỗ trợ", false, () -> request("GET","/api/users/4745d8c7-8941-4c80-a037-e27faba27608",null,data->chat(data.optJSONObject("user"))));
+    groupRow(panel, "message_square", "Trung tâm hỗ trợ", false, () -> request("GET","/api/support",null,data->{JSONObject contact=data.optJSONObject("user");if(contact!=null)chat(contact);else new Sheet(this).setTitle("Hỗ trợ Kinnect").setMessage("Liên hệ riêng Mr Ánh: anhvn53@wru.vn. Không gửi mật khẩu hoặc OTP.").setPositiveButton("Đóng",null).show();}));
     groupRow(panel, "shield_check", "Chính sách quyền riêng tư", false, () -> nativeDocument("privacy",this::helpScreen));
     groupRow(panel, "users_round", "Quy tắc cộng đồng", false, () -> nativeDocument("community",this::helpScreen));
+    groupRow(panel,"shield_check","An toàn trẻ em",false,()->nativeDocument("child-safety",this::helpScreen));
+    groupRow(panel,"file_text","Giấy phép phần mềm",false,()->showSoftwareLicenses());
+    panel.addView(label("Mr Ánh · Hỗ trợ và quyền riêng tư: anhvn53@wru.vn",12,MUTED));
   }
 
+
+  private void showSoftwareLicenses(){accountHeader("Giấy phép phần mềm",()->helpScreen());LinearLayout panel=card();try{java.io.InputStream stream=getAssets().open("THIRD_PARTY_NOTICES.txt");String licenses=new String(NativeApi.read(stream,300000),"UTF-8");stream.close();TextView content=label(licenses,12,TEXT);content.setTextIsSelectable(true);panel.addView(content);}catch(Exception error){panel.addView(label("Xem https://app.kinnect.io.vn/third-party-notices.txt",14,TEXT));}}
 
   // Thông báo ngắn dạng "toast" nổi giống web (không chiếm chỗ trên màn).
   private void say(String text) {
@@ -1009,6 +983,9 @@ public class MainActivity extends Activity {
       if (isFinishing() || isDestroyed() || generation != screen) return;
       try {
         if (error != null) {
+          if(status==428&&answer!=null&&!answer.optString("version").isEmpty()){
+            new Sheet(this).setTitle("Thông báo sử dụng dữ liệu").setMessage(error).setPositiveButton("Tôi đồng ý",(dialog,which)->request("POST","/api/me/privacy-consent",json("accepted",true,"version",answer.optString("version")),accepted->request(method,path,data,done,finished))).setNegativeButton("Để sau",null).show();return;
+          }
           if (status == 401 && me != null) {
             me = null;
             api.clear();
@@ -1574,8 +1551,8 @@ public class MainActivity extends Activity {
   }
 
   private void report(String type,String id){
-    String[] reasons={"Quấy rối hoặc bắt nạt","Thù ghét hoặc phân biệt đối xử","Giả mạo tài khoản","Lừa đảo hoặc spam","Nội dung tình dục không phù hợp","Bạo lực hoặc nguy hiểm","Vấn đề khác"};
-    new Sheet(this).setTitle("Báo cáo").setItemIcons(new String[]{"flag","shield_check","user_round","mail","eye_off","flag","circle_help"}).setItems(reasons,(d,index)->reportDetails(type,id,reasons[index])).setNegativeButton("Hủy",null).show();
+    String[] reasons={"An toàn trẻ em · CSAE/CSAM","Quấy rối hoặc bắt nạt","Thù ghét hoặc phân biệt đối xử","Giả mạo tài khoản","Lừa đảo hoặc spam","Nội dung tình dục không phù hợp","Bạo lực hoặc nguy hiểm","Vấn đề khác"};
+    new Sheet(this).setTitle("Báo cáo").setItemIcons(new String[]{"shield_check","flag","shield_check","user_round","mail","eye_off","flag","circle_help"}).setItems(reasons,(d,index)->reportDetails(type,id,reasons[index])).setNegativeButton("Hủy",null).show();
   }
   private void reportDetails(String type, String id,String category) {
     EditText reason = new EditText(this);
@@ -2544,6 +2521,7 @@ public class MainActivity extends Activity {
               )
             )
           );
+          if(r.optString("target_type").equals("message")||r.optString("target_type").equals("group_message"))c.addView(button("Gỡ nội dung tin nhắn",()->moderate("hide-"+r.optString("target_type"),r.optString("target_id"))));
           c.addView(
             button("Đình chỉ tài khoản", () ->
               moderate("suspend-user", subject.optString("userId"))
@@ -2607,6 +2585,9 @@ public class MainActivity extends Activity {
     privacyToggle(privacy, "showDistance", "Hiển thị khoảng cách", "Chỉ hiện khoảng cách gần đúng");
     privacyToggle(privacy, "showActivity", "Trạng thái hoạt động", "Cho người khác biết khi bạn đang online");
     groupRow(privacy, "message_square", "Ai có thể nhắn tin · " + (me.optString("dmMode").equals("everyone") ? "Mọi thành viên" : "Bạn bè"), false, () -> new Sheet(this).setTitle("Ai có thể nhắn tin").setItems(new String[] { "Mọi thành viên", "Bạn bè" }, (d, w) -> request("PATCH", "/api/me", json("dmMode", w == 0 ? "everyone" : "friends"), r -> { me = r.optJSONObject("user"); settings(); })).show());
+    if(Distribution.PLAY){
+      groupTitle("message_square","Đồng bộ giữa các thiết bị");LinearLayout sync=settingsGroup();android.content.SharedPreferences preferences=getSharedPreferences("play_privacy",0);Switch toggle=new Switch(this);toggle.setText("Đồng bộ tin nhắn nền");toggle.setTextSize(14);toggle.setTextColor(TEXT);toggle.setChecked(preferences.getBoolean("background_messages",false));sync.addView(toggle);sync.addView(label("Tùy chọn giữ thông báo đang hoạt động để tiếp tục đồng bộ tin nhắn giữa web và điện thoại. Có thể tắt bất cứ lúc nào; khi tắt, Android có thể ngừng kết nối nền.",12,MUTED));toggle.setOnCheckedChangeListener((button,enabled)->{preferences.edit().putBoolean("background_messages",enabled).apply();KinnectService.stop(this);KinnectService.start(this);});
+    }
     groupTitle("lock_keyhole", "Quyền truy cập");
     LinearLayout access = settingsGroup();
     groupRow(access, "image_lock", "Ảnh riêng tư", false, () -> privateAlbum(me));
@@ -2615,6 +2596,15 @@ public class MainActivity extends Activity {
     TextView note = label("Vị trí chỉ cập nhật khi bạn chọn tìm quanh đây.", 12, MUTED);
     note.setPadding(dp(6), 0, dp(6), 0);
     content.addView(note);
+    groupTitle("user_round", "Quản lý tài khoản");LinearLayout account=settingsGroup();groupRow(account,"trash","Xóa tài khoản và dữ liệu",false,()->deleteAccountScreen());
+  }
+
+  private void deleteAccountScreen(){
+    accountHeader("Xóa tài khoản",()->settings());LinearLayout panel=card();panel.addView(label("Xóa vĩnh viễn",20,TEXT));panel.addView(label("Hồ sơ, ảnh, bài viết, video, tin nhắn và dữ liệu gắn với tài khoản sẽ bị xóa khỏi hệ thống đang hoạt động. Tất cả phiên đăng nhập bị thu hồi. Nội dung của bạn trong nhóm cũng bị xóa; nhóm có thành viên khác được chuyển chủ sở hữu. Không thể khôi phục sau khi hoàn tất.",14,MUTED));
+    panel.addView(label("Nhập lại tên đăng nhập: @"+me.optString("username"),13,TEXT));EditText username=new EditText(this);username.setSingleLine(true);username.setTextSize(16);panel.addView(username,new LinearLayout.LayoutParams(-1,dp(52)));
+    panel.addView(label("Mật khẩu (nếu phiên đăng nhập đã cũ)",13,TEXT));EditText password=new EditText(this);password.setSingleLine(true);password.setTextSize(16);password.setInputType(129);panel.addView(password,new LinearLayout.LayoutParams(-1,dp(52)));
+    Button remove=primary("Xóa vĩnh viễn tài khoản và dữ liệu",()->{if(!username.getText().toString().equals(me.optString("username"))){say("Nhập đúng tên đăng nhập để xác nhận.");return;}confirm("Bạn chắc chắn xóa vĩnh viễn? Không thể khôi phục dữ liệu.",()->request("DELETE","/api/me/account-deletion",json("confirmUsername",username.getText().toString(),"password",password.getText().toString(),"confirmDelete",true),result->{KinnectService.stop(this);if(calls!=null){calls=null;}api.clear();me=null;auth(false);say("Đã xóa tài khoản và dữ liệu.");}));});panel.addView(remove);
+    panel.addView(label("Hỗ trợ riêng tư: anhvn53@wru.vn · Không gửi mật khẩu hoặc OTP.",12,MUTED));
   }
 
   private void groupTitle(String iconName, String title) {
@@ -5009,7 +4999,7 @@ public class MainActivity extends Activity {
     actions.add(() -> request("DELETE", base, json(), r -> refresh.run()));
     if (!own) {
       labels.add("Báo cáo tin nhắn");
-      actions.add(() -> report("message", m.optString("id")));
+      actions.add(() -> report(kind.equals("group")?"group_message":"message", m.optString("id")));
     }
     JSONObject reactions = m.optJSONObject("reactions");
     String title = null;
@@ -5332,12 +5322,16 @@ public class MainActivity extends Activity {
     list.setTag(Boolean.TRUE);
     request("GET", path, null, data -> {
       JSONArray messages = data.optJSONArray("messages");
-      String signature = messages == null ? "" : messages.toString();
+      String signature = (messages == null ? "" : messages.toString())+data.optString("aiSupport");
       if (signature.equals(lastMessages) && list.getChildCount() > 0) return;
       final boolean followBottom = lastMessages.isEmpty() || list.getHeight() - scroll.getScrollY() - scroll.getHeight() < dp(64);
       final int previousY = scroll.getScrollY();
       lastMessages = signature;
       list.removeAllViews();
+      JSONObject aiInfo=data.optJSONObject("aiSupport");if(!group&&aiInfo!=null&&aiInfo.optBoolean("available")){
+        boolean enabled=aiInfo.optString("consent").equals("enabled");TextView info=label(enabled?"Trợ lý AI đã bật.":"Trợ lý AI đang tắt. Bạn vẫn có thể nhắn quản trị viên.",12,MUTED);list.addView(info);
+        list.addView(button(enabled?"Tắt AI":"Bật trợ lý AI",()->{Runnable apply=()->request("POST","/api/me/ai-consent",json("enabled",!enabled),r->{lastMessages="";loadChat(path,list,scroll,group,other);});if(enabled)apply.run();else confirm("Bật trợ lý AI? Nội dung bạn gửi và tối đa 6 tin nhắn liên quan được gửi tới Cloudflare, hoặc NVIDIA khi dự phòng, để tạo câu trả lời. Không gửi mật khẩu, OTP hoặc dữ liệu nhạy cảm. Bạn có thể tắt AI bất cứ lúc nào và tiếp tục nhắn quản trị viên.",apply);}));
+      }
       String lastDay = "";
       java.text.SimpleDateFormat day = new java.text.SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()), clock = new java.text.SimpleDateFormat("HH:mm", Locale.getDefault());
       String today = day.format(new Date());

@@ -2,8 +2,8 @@ import {test,expect} from '@playwright/test';
 for(const width of [1440,1024,390])test('messenger layout and delivery '+width,async({browser,baseURL})=>{
  const sender=await browser.newContext({viewport:{width,height:844}}),receiver=await browser.newContext();
  try{
-  const stamp=Date.now();await sender.request.post('/api/register',{data:{username:'layouta'+stamp,name:'Hoàng Nam',password:'abcdef',agree18:true}});
-  const r=await receiver.request.post('/api/register',{data:{username:'layoutb'+stamp,name:'Minh Anh',password:'abcdef',agree18:true}});const user=(await r.json()).user;
+  const stamp=Date.now();await sender.request.post('/api/register',{data:{username:'layouta'+stamp,name:'Hoàng Nam',password:'abcdef',agree18:true,acceptPrivacyNotice:true}});
+  const r=await receiver.request.post('/api/register',{data:{username:'layoutb'+stamp,name:'Minh Anh',password:'abcdef',agree18:true,acceptPrivacyNotice:true}});const user=(await r.json()).user;
   await sender.request.post('/api/users/'+user.id+'/messages',{data:{body:'Cuối tuần mình đi cà phê nhé? ☕'}});
   const page=await sender.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/?chat='+user.id);
   const side=page.locator('.messenger-sidebar');await expect(page.locator('.chat-identity b')).toHaveText('Minh Anh');

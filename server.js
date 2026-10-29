@@ -34,7 +34,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     // Báo về email quản trị khi có người gửi yêu cầu quên mật khẩu.
     onResetRequest: (r) => {
       const when = new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
-      console.log(`[quen-mat-khau] ${when} @${r.username} (${r.exists ? "có tài khoản" : "không có tài khoản"})`);
+      console.log(`[quen-mat-khau] ${when} Đã tiếp nhận yêu cầu khôi phục.`);
       if (!mailConfigured()) return;
       sendMail({
         subject: `Kinnect: yêu cầu quên mật khẩu @${r.username}`,
@@ -270,6 +270,11 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
       return res.end(JSON.stringify({ ok: true, version: "0.3.1", uiVersion: "2026-10-26-new-ui", liveChatHistory: true, storyViewers: true }));
     }
     const files = {
+      "/third-party-notices.txt": ["third-party-notices.txt", "text/plain"],
+      "/delete-account": ["delete-account.html", "text/html"],
+      "/delete-account/": ["delete-account.html", "text/html"],
+      "/account-deletion.js": ["account-deletion.js", "text/javascript"],
+      "/account-deletion.css": ["account-deletion.css", "text/css"],
       "/kinnect-logo-v106.svg": ["kinnect-logo-v106.svg", "image/svg+xml"],
       "/kinnect-logo-v106-32.png": ["kinnect-logo-v106-32.png", "image/png"],
       "/kinnect-logo-v106-120.png": ["kinnect-logo-v106-120.png", "image/png"],
@@ -401,6 +406,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         body = packed;
       }
       res.writeHead(200, {
+        ...((path==='/delete-account'||path==='/delete-account/')?{'X-Frame-Options':'DENY','Content-Security-Policy':"default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'",'Referrer-Policy':'no-referrer'}:{}),
         "Content-Length": body.length,
         ...(encoding ? { "Content-Encoding": encoding } : {}),
         ...(textual ? { Vary: "Accept-Encoding" } : {}),
@@ -557,6 +563,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
       if(typing.handle(ws,m,account))return;
       if(m.type==="visibility"){ws.visible=m.visible===true;return;}
       if(calls.handle(ws,m))return;
+      if (["create","chat"].includes(m.type)&&!social.hasPrivacyConsent(account.id))return error("Vui lòng đồng ý thông báo dữ liệu trước khi phát live hoặc bình luận.");
       if (m.type === "create") {
         if (ws.room) return error("Hãy rời phòng hiện tại trước.");
         if (rooms.size >= 100) return error("Máy chủ đã đầy.");

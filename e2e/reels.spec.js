@@ -4,7 +4,7 @@ for(const width of [320,390,1440])test('video comments, sound and share at '+wid
  const context=await browser.newContext({viewport:{width,height:900},permissions:['clipboard-read','clipboard-write']});
  const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
  try{
-  const r=await context.request.post('/api/register',{data:{username:'reel_'+width+'_'+Date.now(),password:'abcdef',name:'Bạn Kinnect',agree18:true}});expect(r.status()).toBe(200);
+  const r=await context.request.post('/api/register',{data:{username:'reel_'+width+'_'+Date.now(),password:'abcdef',name:'Bạn Kinnect',agree18:true,acceptPrivacyNotice:true}});expect(r.status()).toBe(200);
   const bytes=await readFile(new URL('../test/fixtures/short.mp4',import.meta.url));
   const uploaded=await context.request.post('/api/shorts',{data:{caption:'Một khoảnh khắc trên Kinnect',data:'data:video/mp4;base64,'+bytes.toString('base64')}});expect(uploaded.status()).toBe(201);const {id}=await uploaded.json();
   await page.goto('/?video='+id);await expect(page.locator('.reel-item').first()).toBeVisible();

@@ -50,11 +50,12 @@ async function register(app, username, extra = {}) {
       password: "very-strong-test-password",
       name: username,
       birthDate: "1994-05-10",
-      agree18: true,
+      agree18: true, acceptPrivacyNotice: true,
       ...extra,
     },
   });
   assert.equal(r.status, 200, JSON.stringify(r.body));
+  app.social.ai.consent(r.body.user.id,true);
   return { id: r.body.user.id, cookie: r.cookie, user: r.body.user };
 }
 const as = (app, u, path, method = "GET", body) =>
@@ -62,6 +63,10 @@ const as = (app, u, path, method = "GET", body) =>
 
 
 import {createKinnectAI} from '../lib/kinnect-ai.js';
+test('withdrawing AI consent while primary is pending prevents sending the prompt to a fallback provider',async t=>{
+ const app=await start(),admin=await register(app,'withdraw_admin'),member=await register(app,'withdraw_member');app.social.db.prepare("UPDATE users SET role='admin' WHERE id=?").run(admin.id);let rejectPrimary,started,backup=0;const entered=new Promise(r=>started=r),pending=new Promise((r,reject)=>rejectPrimary=reject);
+ const ai=createKinnectAI({db:app.social.db,user:id=>app.social.user(id),blocked:()=>false,notice:()=>{},messageState:{reveal(){}},env:{KINNECT_AI_URL:'https://example.com',KINNECT_API_TOKEN:'secret',KINNECT_NVIDIA_ENABLED:'1',KINNECT_NVIDIA_API_KEY:'secret',KINNECT_NVIDIA_MODEL:'model'},send:async url=>{if(String(url).includes('nvidia')){backup++;throw Error('must not call');}started();return pending;}});t.after(async()=>{rejectPrimary(Error('closed'));ai.close();await app.stop();});ai.configure({adminId:admin.id,support:true});app.social.db.prepare('INSERT INTO messages VALUES(?,?,?,?,?)').run('withdraw-question',member.id,admin.id,'Nội dung riêng',1);ai.support({id:'withdraw-question',sender:member.id,recipient:admin.id,body:'Nội dung riêng'});const task=ai.drain();await entered;ai.consent(member.id,false);rejectPrimary(Error('primary unavailable'));await task;assert.equal(backup,0);assert.equal(app.social.db.prepare('SELECT COUNT(*) n FROM messages WHERE sender=?').get(admin.id).n,0);
+});
 test('AI emits real provider deltas before saving exactly one complete message',async t=>{
  const app=await start(),admin=await register(app,'stream_admin'),member=await register(app,'stream_member');
  app.social.db.prepare("UPDATE users SET role='admin' WHERE id=?").run(admin.id);

@@ -4,7 +4,7 @@ async function start(){const a=createApp({authLimit:200});await new Promise(r=>a
 async function stop(a){for(const ws of a.wss.clients)ws.terminate();a.wss.close();a.server.closeAllConnections();await new Promise(r=>a.server.close(r));a.social.close();}
 test('cold mobile startup reveals only the ready layout and discovery photos keep square bounds',async({browser})=>{
  const {a,baseURL}=await start(),c=await browser.newContext({baseURL,isMobile:true,viewport:{width:390,height:844}});
- try{await c.request.post('/api/register',{data:{username:'photo_owner',name:'Owner',password:'abcdef',agree18:true}});
+ try{await c.request.post('/api/register',{data:{username:'photo_owner',name:'Owner',password:'abcdef',agree18:true,acceptPrivacyNotice:true}});
  for(let i=0;i<6;i++)a.social.db.prepare('INSERT INTO users(id,username,password,salt,name,birth_date,created,avatar) SELECT ?,?,password,salt,?,birth_date,?,? FROM users LIMIT 1').run('photo-'+i,'photo_peer_'+i,'Person '+i,Date.now(),'/test-avatar-'+i+'.svg');
  const p=await c.newPage();let release;const ready=new Promise(r=>release=r);await p.route('**/health',async r=>{await ready;await r.continue();});
  await p.goto('/');await expect(p.locator('#kinnect-boot')).toBeVisible();await expect(p.locator('#kn')).toBeHidden();expect(await p.evaluate(()=>visualViewport.scale)).toBe(1);release();await expect(p.locator('#kinnect-boot')).toHaveCount(0);await expect(p.locator('#kn')).toBeVisible();

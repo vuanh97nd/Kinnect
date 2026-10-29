@@ -5,7 +5,7 @@ test('v2 mobile 360x640 popups, toasts, long text and camera errors',async({brow
   const baseURL='http://127.0.0.1:'+app.server.address().port;
   const ctx=await browser.newContext({baseURL,viewport:{width:360,height:640}}),other=await browser.newContext({baseURL});
   try{
-    const reg=async(c,u,n)=>(await (await c.request.post('/api/register',{data:{username:u,password:'abcdef',name:n,agree18:true}})).json()).user;
+    const reg=async(c,u,n)=>(await (await c.request.post('/api/register',{data:{username:u,password:'abcdef',name:n,agree18:true,acceptPrivacyNotice:true}})).json()).user;
     const me=await reg(ctx,'mobile_'+Date.now(),'Ngọc Linh Trần Thị Phương'),friend=await reg(other,'friend_'+Date.now(),'Minh Anh');
     const long='Linkdaithatdaikhongcokhoangtrang'+'x'.repeat(120);
     await other.request.post('/api/posts',{data:{body:long}});

@@ -14,7 +14,7 @@ public final class KinnectService extends Service implements NativeSocket.Events
  private static KinnectService instance;private static final List<NativeSocket.Events> listeners=new ArrayList<>();
  static JSONObject pendingIncoming;static boolean pendingAccept;static volatile boolean appVisible;
  private NativeSocket socket;private boolean ready;private final Handler main=new Handler(Looper.getMainLooper());private long retry=3000;
- static void start(Context c){try{Intent i=new Intent(c,KinnectService.class);if(Build.VERSION.SDK_INT>=26)c.startForegroundService(i);else c.startService(i);}catch(RuntimeException blocked){}}
+ static void start(Context c){try{Intent i=new Intent(c,KinnectService.class);if(Build.VERSION.SDK_INT>=26&&(!Distribution.PLAY||c.getSharedPreferences("play_privacy",0).getBoolean("background_messages",false)))c.startForegroundService(i);else c.startService(i);}catch(RuntimeException blocked){}}
  static void stop(Context c){c.stopService(new Intent(c,KinnectService.class));}
  static void listen(NativeSocket.Events e){if(!listeners.contains(e))listeners.add(e);if(instance!=null&&instance.ready)e.event(NativeSocket.json("type","welcome"));}
  static void unlisten(NativeSocket.Events e){listeners.remove(e);}
@@ -22,13 +22,16 @@ public final class KinnectService extends Service implements NativeSocket.Events
  static int res(Context c,String type,String name){return c.getResources().getIdentifier(name,type,c.getPackageName());}
  static Uri sound(Context c,String name){return Uri.parse("android.resource://"+c.getPackageName()+"/raw/"+name);}
  static void channels(Context c){NotificationManager nm=c.getSystemService(NotificationManager.class);
-  NotificationChannel call=new NotificationChannel(CH_CALL,"Cuộc gọi đến",NotificationManager.IMPORTANCE_HIGH);call.setDescription("Cuộc gọi thoại và video Kinnect");call.setSound(sound(c,"kinnect_ring"),new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());call.enableVibration(true);call.setVibrationPattern(CALL_VIBRATE);call.enableLights(true);call.setLightColor(0xff7c5cff);call.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);call.setBypassDnd(true);nm.createNotificationChannel(call);
+  NotificationChannel call=new NotificationChannel(CH_CALL,"Cuộc gọi đến",NotificationManager.IMPORTANCE_HIGH);call.setDescription("Cuộc gọi thoại và video Kinnect");call.setSound(sound(c,"kinnect_ring"),new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());call.enableVibration(true);call.setVibrationPattern(CALL_VIBRATE);call.enableLights(true);call.setLightColor(0xff7c5cff);call.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);call.setBypassDnd(!Distribution.PLAY);nm.createNotificationChannel(call);
   NotificationChannel msg=new NotificationChannel(CH_MSG,"Tin nhắn và thông báo",NotificationManager.IMPORTANCE_HIGH);msg.setSound(sound(c,"kinnect_notify"),new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());msg.enableVibration(true);msg.setVibrationPattern(MSG_VIBRATE);msg.enableLights(true);msg.setLightColor(0xff7c5cff);msg.setShowBadge(true);nm.createNotificationChannel(msg);
   NotificationChannel bg=new NotificationChannel(CH_BG,"Hoạt động nền",NotificationManager.IMPORTANCE_MIN);bg.setDescription("Giữ kết nối để nhận cuộc gọi và tin nhắn");bg.setShowBadge(false);bg.setSound(null,null);nm.createNotificationChannel(bg);}
  @Override public void onCreate(){super.onCreate();instance=this;channels(this);NativeApi.shared.initialize(this,ServerConfig.DEFAULT_ORIGIN);main.postDelayed(poll,45000);}
  @Override public int onStartCommand(Intent intent,int flags,int id){
   Intent open=new Intent(this,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-  Notification n=new Notification.Builder(this,CH_BG).setSmallIcon(res(this,"drawable","ic_web_bell")).setContentTitle("Kinnect đang hoạt động").setContentText("Sẵn sàng nhận cuộc gọi và tin nhắn").setOngoing(true).setColor(0xff7c5cff).setContentIntent(PendingIntent.getActivity(this,0,open,PendingIntent.FLAG_IMMUTABLE)).build();
+  Notification.Builder backgroundBuilder=new Notification.Builder(this,CH_BG).setSmallIcon(res(this,"drawable","ic_web_bell")).setContentTitle("Kinnect đang hoạt động").setContentText(Distribution.PLAY?"Đồng bộ tin nhắn giữa web và điện thoại":"Sẵn sàng nhận cuộc gọi và tin nhắn").setOngoing(true).setColor(0xff7c5cff).setContentIntent(PendingIntent.getActivity(this,0,open,PendingIntent.FLAG_IMMUTABLE));
+  if(Distribution.PLAY)backgroundBuilder.addAction(android.R.drawable.ic_media_pause,"Dừng đồng bộ",PendingIntent.getBroadcast(this,8,new Intent(this,CallActionReceiver.class).setAction("stop-sync"),PendingIntent.FLAG_IMMUTABLE));
+  Notification n=backgroundBuilder.build();
+  if(Distribution.PLAY&&!getSharedPreferences("play_privacy",0).getBoolean("background_messages",false)){if(socket==null)connect();return START_NOT_STICKY;}
   try{if(Build.VERSION.SDK_INT>=34)startForeground(ID_BG,n,android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING);else startForeground(ID_BG,n);}catch(RuntimeException blocked){stopSelf();return START_NOT_STICKY;}
   if(NativeApi.shared.cookieFor(ServerConfig.DEFAULT_ORIGIN).isEmpty()){stopSelf();return START_NOT_STICKY;}
   if(socket==null)connect();return START_STICKY;}

@@ -1507,3 +1507,5 @@ html[data-platform=android] .download-choice[data-ios-download] .download-recomm
 @media (max-width:380px) { .download-pair { grid-template-columns:1fr; } }
 
 .canonical-k{width:34px;height:34px;object-fit:contain;border-radius:10px;vertical-align:middle;flex-shrink:0}.fp-logo .canonical-k{width:18px;height:18px;border-radius:5px}
+
+.legal-page{max-width:880px;margin:0 auto;padding:48px 24px;line-height:1.75;overflow-wrap:anywhere}.legal-page h1{font-size:32px;line-height:1.3;margin-bottom:24px}.legal-page h2{font-size:21px;margin:28px 0 10px}.legal-page section{margin-bottom:26px}.policy-links{max-width:1200px;margin:0 auto;padding:16px 24px;font-size:13px;line-height:1.8;overflow-wrap:anywhere}@media(max-width:600px){.legal-page{padding:28px 20px}.legal-page h1{font-size:26px}}

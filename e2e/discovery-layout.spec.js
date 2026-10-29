@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test';
 for(const width of [320,390])test('compact discovery badges and menu never cover each other at '+width,async({browser})=>{
  const context=await browser.newContext({viewport:{width,height:844}}),page=await context.newPage();try{
- await context.request.post('/api/register',{data:{username:'badge_'+width+'_'+Date.now(),password:'abcdef',name:'Người kiểm tra',agree18:true}});
+ await context.request.post('/api/register',{data:{username:'badge_'+width+'_'+Date.now(),password:'abcdef',name:'Người kiểm tra',agree18:true,acceptPrivacyNotice:true}});
  await page.route('**/api/discover?*',r=>r.fulfill({json:{users:[{id:'test-profile',username:'ho_so_kiem_tra',name:'Thành viên mới',interests:[],isActive:true,isNew:true,distanceBand:'100 m',distanceLabel:'100 m',distanceMeters:100,following:false}]}}));
  await page.goto('/');await expect(page.locator('.person-tile')).toBeVisible();
  const tile=page.locator('.person-tile'),badge=await tile.locator('.new-member').boundingBox(),menu=await tile.locator('.more summary').boundingBox(),name=await tile.locator('.tile-name').boundingBox(),distance=await tile.locator('.tile-chip').boundingBox();

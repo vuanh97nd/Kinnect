@@ -112,7 +112,8 @@ final class Sheet {
         final int index = i;
         LinearLayout row = new LinearLayout(context);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(14), 0, dp(14), 0);
+        row.setPadding(dp(14), dp(12), dp(14), dp(12));
+        row.setMinimumHeight(dp(54));
         row.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x226c47e0), round(bg, 12), round(0xff000000, 12)));
         String label = String.valueOf(items[i]);
         boolean danger = label.startsWith("Xoá") || label.startsWith("Xóa") || label.startsWith("Chặn") || label.startsWith("Đăng xuất") || label.startsWith("Thu hồi") || label.startsWith("Rời");
@@ -144,7 +145,7 @@ final class Sheet {
           sp.setMargins(dp(14), 0, dp(14), 0);
           list.addView(sep, sp);
         }
-        list.addView(row, new LinearLayout.LayoutParams(-1, dp(54)));
+        list.addView(row, new LinearLayout.LayoutParams(-1, -2));
       }
       int max = context.getResources().getDisplayMetrics().heightPixels * 6 / 10;
       box.addView(scroll, new LinearLayout.LayoutParams(-1, Math.min(max, items.length * dp(56))));
@@ -155,7 +156,7 @@ final class Sheet {
     if (negative != null) buttons.addView(button(dialog, negative, onNegative, DialogInterface.BUTTON_NEGATIVE, false), weight());
     if (positive != null) buttons.addView(button(dialog, positive, onPositive, DialogInterface.BUTTON_POSITIVE, true), weight());
     if (buttons.getChildCount() > 0) box.addView(buttons);
-    dialog.setContentView(box);
+    ScrollView outer=new ScrollView(context);outer.setFillViewport(false);outer.addView(box);dialog.setContentView(outer);
     dialog.show();
     Window w = dialog.getWindow();
     if (w != null) {

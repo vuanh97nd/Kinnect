@@ -4,8 +4,8 @@ test('discovery search, filters, profiles and responsive cards',async({browser})
  const app=createApp({authLimit:300});await new Promise(r=>app.server.listen(0,'127.0.0.1',r));
  const baseURL='http://127.0.0.1:'+app.server.address().port,c=await browser.newContext({baseURL}),peer=await browser.newContext({baseURL});
  try{
- await c.request.post('/api/register',{data:{username:'discover_owner',name:'Chủ thử',password:'abcdef',agree18:true}});
- await peer.request.post('/api/register',{data:{username:'discover_linh',name:'Ngọc Linh',password:'abcdef',agree18:true}});
+ await c.request.post('/api/register',{data:{username:'discover_owner',name:'Chủ thử',password:'abcdef',agree18:true,acceptPrivacyNotice:true}});
+ await peer.request.post('/api/register',{data:{username:'discover_linh',name:'Ngọc Linh',password:'abcdef',agree18:true,acceptPrivacyNotice:true}});
  const p=await c.newPage(),errors=[];p.on('pageerror',e=>errors.push(e.message));await p.goto('/?s=discover');
  await expect(p.locator('.discover-person')).toHaveCount(1);
  await p.getByLabel('Tìm người theo tên hoặc username').fill('khongtontai');await p.getByRole('button',{name:'Tìm kiếm',exact:true}).click();await expect(p.locator('.discover-person')).toHaveCount(0);

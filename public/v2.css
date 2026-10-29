@@ -2831,3 +2831,8 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 #kn .profile-with-about-tab .tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:3px}
 #kn .profile-with-about-tab .tabs>button{flex:1;white-space:nowrap;padding-left:8px;padding-right:8px}
 @media(max-width:519px){#kn .profile-about-details{padding:16px}#kn .profile-about-details .profile-fact-grid{grid-template-columns:minmax(0,1fr)}#kn .profile-with-about-tab .tabs>button{font-size:12px}}
+
+/* Policy consent remains readable and actionable on small screens. */
+#kn .kn-confirm{display:flex;flex-direction:column;max-height:calc(100dvh - 32px - env(safe-area-inset-bottom));min-height:0}
+#kn .kn-confirm p{overflow-y:auto;min-height:0;overscroll-behavior:contain}
+#kn .kn-confirm-actions{flex-shrink:0}

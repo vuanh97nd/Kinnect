@@ -1,11 +1,11 @@
 {
-  "version": "1.0.7",
-  "versionCode": 72,
-  "filename": "Kinnect-1.0.7-native.apk",
-  "sha256": "ba304c12393dcf60c22c73f7ae00913c30da1245980df3ad63f29e32d25d2685",
+  "version": "1.0.8",
+  "versionCode": 73,
+  "filename": "Kinnect-1.0.8-native.apk",
+  "sha256": "de8e0450b7762660dff0666b6b234aab974335152fa3381169d85b33d7c5c4df",
   "signingCertificateSHA256": "d8809c1e21f00ccf96984b37123d3d916d2e103bfa1dc2032043f47bb3b9988d",
   "publishedRelease": "pending",
-  "testedBaseline": "1.0.6",
+  "testedBaseline": "full source build; same website signing certificate; updated JVM dependencies",
   "currentChecks": {
     "aiFocusedPassed": 21,
     "webStreaming": "passed: incremental text, safe DOM, survives reload, one final message",
@@ -80,5 +80,15 @@
     "physicalDeviceVerified": false,
     "focusedTestsPassed": 26,
     "httpsApkDownloads": "full bytes and SHA-256 verified on mobile and PC browser widths"
+  },
+  "googlePlayCandidate": {
+    "version": "1.1.0",
+    "versionCode": 100,
+    "targetSdk": 36,
+    "format": "AAB",
+    "googleApproved": false,
+    "backendTestsPassed": 97,
+    "androidRuntime": "Android 16 emulator; PAGE_SIZE=16384; normal and font scale 1.3",
+    "reviewerConsoleSetup": "pending owner identity/account/Play signing/declarations/testing"
   }
 }

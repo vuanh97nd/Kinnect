@@ -4,12 +4,15 @@ cd "$(dirname "$0")/.."
 KINNECT_TOOLS="${KINNECT_TOOLS:-/workspace/toolchains}"
 TOOLS="$KINNECT_TOOLS/android/android-15"
 PLATFORM="$KINNECT_TOOLS/android/android-35-ext15/android.jar"
+python3 scripts/prepare-play-dependencies.py
+mapfile -t NETWORK_JARS < <(python3 -c 'import json; print("\n".join(d["file"] for d in json.load(open("work/play-tools/dependencies/dependencies.json"))))')
+NETWORK_CLASSPATH="$(IFS=:; echo "${NETWORK_JARS[*]}")"
 mkdir -p android/build/classes android/build/dex dist
 "$TOOLS/aapt2" compile --dir android/app/src/main/res -o android/build/resources.zip
 "$TOOLS/aapt2" link -R android/build/resources.zip -I "$PLATFORM" --manifest android/app/src/main/AndroidManifest.xml -o android/build/unsigned.apk
-java -jar "$KINNECT_TOOLS/ecj.jar" -1.8 -encoding UTF-8 -proc:none -bootclasspath "$PLATFORM:$TOOLS/core-lambda-stubs.jar" -classpath "$KINNECT_TOOLS/deps/webrtc/classes.jar:$KINNECT_TOOLS/deps/okhttp.jar:$KINNECT_TOOLS/deps/okio.jar" -d android/build/classes android/app/src/main/java/app/kinnect/live/*.java
+java -jar "$KINNECT_TOOLS/ecj.jar" -1.8 -encoding UTF-8 -proc:none -bootclasspath "$PLATFORM:$TOOLS/core-lambda-stubs.jar" -classpath "$KINNECT_TOOLS/deps/webrtc/classes.jar:$NETWORK_CLASSPATH" -d android/build/classes android/app/src/main/java/app/kinnect/live/*.java
 find android/build/classes -name '*.class' -print > android/build/classes.list
-"$TOOLS/d8" --min-api 26 --lib "$PLATFORM" --output android/build/dex @android/build/classes.list "$KINNECT_TOOLS/deps/webrtc/classes.jar" "$KINNECT_TOOLS/deps/okhttp.jar" "$KINNECT_TOOLS/deps/okio.jar"
+"$TOOLS/d8" --min-api 26 --lib "$PLATFORM" --output android/build/dex @android/build/classes.list "$KINNECT_TOOLS/deps/webrtc/classes.jar" "${NETWORK_JARS[@]}"
 (cd android/build/dex && zip -q -u ../unsigned.apk classes*.dex)
 python3 - "$KINNECT_TOOLS/deps/webrtc" <<'PY'
 import sys,zipfile,pathlib
@@ -19,6 +22,8 @@ with zipfile.ZipFile('android/build/unsigned.apk','a') as out:
   photo=pathlib.Path('public')/name
   if not photo.is_file(): raise FileNotFoundError('Missing intro image: '+name)
   out.write(photo,'assets/'+name)
+ for path in pathlib.Path('android/app/src/main/assets').rglob('*'):
+  if path.is_file():out.write(path,'assets/'+path.relative_to('android/app/src/main/assets').as_posix())
  for path in (root/'jni').rglob('*.so'):
   out.write(path,'lib/'+str(path.relative_to(root/'jni')),compress_type=zipfile.ZIP_STORED)
 PY

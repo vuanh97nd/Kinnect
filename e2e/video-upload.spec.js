@@ -4,7 +4,7 @@ test('Studio uploads an MP4 and publishes it to the video feed',async({browser})
  const context=await browser.newContext({viewport:{width:1280,height:900},permissions:['camera','microphone']});
  const page=await context.newPage();
  try{
-  const reg=await context.request.post('/api/register',{data:{username:'upload_ui_'+Date.now(),password:'abcdef',name:'Upload UI',agree18:true}});
+  const reg=await context.request.post('/api/register',{data:{username:'upload_ui_'+Date.now(),password:'abcdef',name:'Upload UI',agree18:true,acceptPrivacyNotice:true}});
   expect(reg.status()).toBe(200);
   await page.goto('/');
   await page.getByRole('button',{name:'Quay video',exact:true}).click();
