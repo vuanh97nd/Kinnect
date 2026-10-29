@@ -2061,7 +2061,7 @@ public class MainActivity extends Activity {
   private void profileSections(final JSONObject user) {
     final LinearLayout controls = row(), list = column();
     final String[] tabs = { "Giới thiệu", "Bài viết", "Album ảnh", "Video" };
-    final int[] selected = { 1 }, generation = { 0 };
+    final int[] selected = { 0 }, generation = { 0 };
     final int ownerScreen = screen;
     final Runnable[] render = new Runnable[1];
     render[0] = () -> {
@@ -3274,12 +3274,15 @@ public class MainActivity extends Activity {
     TextView hint=label(I18n.t("Studio Pro để chỉnh sửa · Tiếp tục để đăng cơ bản"),12,MUTED);hint.setGravity(Gravity.CENTER);hint.setPadding(0,dp(10),0,0);view.addView(hint);
     android.app.Dialog choice=new Sheet(this).setTitle(I18n.t("Hoàn thiện video")).setView(view).setPositiveButton("Studio Pro",(dialog,which)->reviewMedia(uri,212)).setNegativeButton(I18n.t("Tiếp tục"),(dialog,which)->uploadVideoNow(uri)).show();choice.setOnDismissListener(dialog->preview.stopPlayback());return choice;
   }
-  private void uploadVideoNow(android.net.Uri uri) {
+  private android.app.Dialog uploadVideoNow(android.net.Uri uri) {
     EditText caption = new KinnectInput(this);
     caption.setHint(I18n.t("Viết chú thích cho video"));
-    new Sheet(this)
+    LinearLayout captionBox = column();
+    captionBox.setPadding(0, dp(8), 0, dp(4));
+    captionBox.addView(caption);
+    return new Sheet(this)
       .setTitle(I18n.t("Đăng video"))
-      .setView(caption)
+      .setView(captionBox)
       .setPositiveButton(I18n.t("Đăng"), (dialog, which) -> {
         postingVideo = true;
         say(I18n.t("Đang đọc và tải video…"));
@@ -5300,6 +5303,39 @@ public class MainActivity extends Activity {
     return f;
   }
 
+  private LinearLayout messageFooter(final JSONObject m, final boolean own, String clock, final boolean group, final String path, final Runnable refresh) {
+    LinearLayout footer = row();
+    footer.setTag("message:footer");
+    String status = "";
+    JSONObject receipt = m.optJSONObject("receipt");
+    boolean seen = receipt != null && (receipt.optLong("seenAt") > 0 || receipt.optInt("seenCount") > 0);
+    boolean delivered = seen || (receipt != null && (receipt.optLong("deliveredAt") > 0 || receipt.optInt("deliveredCount") > 0));
+    if (own && !m.optBoolean("recalled")) status = seen ? I18n.t("Đã xem") : delivered ? I18n.t("Đã nhận") : I18n.t("Đã gửi");
+    JSONObject reactions = m.optJSONObject("reactions");
+    StringBuilder rx = new StringBuilder();
+    for (String[] reaction : REACTIONS) if (reactions != null && reactions.optInt(reaction[0]) > 0) rx.append(reaction[1]);
+    String caption = clock + (status.isEmpty() ? "" : delivered ? "  ✓✓" : "  ✓") + (m.optBoolean("pinned") ? "  📌" : "") + (rx.length() > 0 ? "  " + rx : "");
+    TextView time = label(caption, 10, own ? 0xccffffff : MUTED);
+    time.setPadding(0, 0, dp(4), 0);
+    time.setSingleLine(true);
+    time.setMaxWidth(dp(80));
+    time.setEllipsize(android.text.TextUtils.TruncateAt.END);
+    time.setContentDescription(caption + (status.isEmpty() ? "" : " · " + status));
+    time.setTooltipText(String.valueOf(time.getContentDescription()));
+    footer.addView(time);
+    final String base = "/api/chat-messages/" + (group ? "group" : "direct") + "/" + m.optString("id");
+    LinearLayout tools = row();
+    int toolColor = own ? 0xddffffff : MUTED;
+    if (!m.optBoolean("recalled")) {
+      tools.addView(messageTool("smile", I18n.t("Cảm xúc tin nhắn"), toolColor, () -> reactionBar(null, w -> request("POST", base + "/reaction", json("reaction", REACTIONS[w][0]), result -> refresh.run()))));
+      tools.addView(messageTool("forward", I18n.t("Chuyển tiếp tin nhắn"), toolColor, () -> forwardMessage(path, m)));
+      if (own) tools.addView(messageTool("recall", I18n.t("Thu hồi với mọi người"), toolColor, () -> confirm(I18n.t("Thu hồi tin nhắn này?"), () -> request("POST", base + "/recall", json(), result -> refresh.run()))));
+    }
+    tools.addView(messageTool("trash", I18n.t("Xoá tin nhắn ở phía bạn"), toolColor, () -> request("DELETE", base, json(), result -> refresh.run())));
+    footer.addView(tools);
+    return footer;
+  }
+
   private void reconcileChatRows(LinearLayout current,LinearLayout next){java.util.Map<String,View> reusable=new java.util.HashMap<>();for(int i=0;i<current.getChildCount();i++){View child=current.getChildAt(i);Object key=child.getTag();if(key instanceof String&&(((String)key).startsWith("message:")||((String)key).startsWith("post:")))reusable.put((String)key,child);}java.util.ArrayList<View> wanted=new java.util.ArrayList<>();while(next.getChildCount()>0){View child=next.getChildAt(0);next.removeViewAt(0);View retained=child.getTag()instanceof String?reusable.get((String)child.getTag()):null;wanted.add(retained==null?child:retained);}for(int i=current.getChildCount()-1;i>=0;i--)if(!wanted.contains(current.getChildAt(i)))current.removeViewAt(i);for(int i=0;i<wanted.size();i++){View child=wanted.get(i);if(i<current.getChildCount()&&current.getChildAt(i)==child)continue;if(child.getParent()==current)current.removeView(child);current.addView(child,i);}}
   private void loadChat(final String path, final LinearLayout list, final ScrollView scroll, final boolean group, final JSONObject other) {
     if (Boolean.TRUE.equals(list.getTag())) return;
@@ -5375,32 +5411,8 @@ public class MainActivity extends Activity {
           if (m.optBoolean("recalled")) t.setTypeface(null, Typeface.ITALIC);
           bubble.addView(t);
         }
-        JSONObject reactions = m.optJSONObject("reactions");
-        StringBuilder rx = new StringBuilder();
-        for (String[] r : REACTIONS) if (reactions != null && reactions.optInt(r[0]) > 0) rx.append(r[1]);
-        TextView time = label(clock.format(at) + (m.optBoolean("pinned") ? "  📌" : "") + (rx.length() > 0 ? "  " + rx : ""), 10, own ? 0xccffffff : MUTED);
-        time.setPadding(0, dp(2), 0, 0);
-        bubble.addView(time);
-        JSONObject receipt = m.optJSONObject("receipt");
-        if (own && !m.optBoolean("recalled")) {
-          boolean seen = receipt != null && (receipt.optLong("seenAt") > 0 || receipt.optInt("seenCount") > 0);
-          boolean delivered = seen || (receipt != null && (receipt.optLong("deliveredAt") > 0 || receipt.optInt("deliveredCount") > 0));
-          TextView state = label(seen ? "✓✓" : delivered ? "✓✓" : "✓", 11, own ? WHITE : ACCENT);
-          state.setAlpha(seen ? 1f : 0.55f);
-          state.setContentDescription(seen ? I18n.t("Đã xem") : delivered ? I18n.t("Đã nhận") : I18n.t("Đã gửi")); state.setTooltipText(String.valueOf(state.getContentDescription()));
-          bubble.addView(state);
-        }
-        final String base = "/api/chat-messages/" + (group ? "group" : "direct") + "/" + m.optString("id");
         final Runnable refresh = () -> { lastMessages = ""; loadChat(path, list, scroll, group, other); };
-        LinearLayout tools = row();
-        int toolColor = own ? 0xddffffff : MUTED;
-        if (!m.optBoolean("recalled")) {
-          tools.addView(messageTool("smile", I18n.t("Cảm xúc tin nhắn"), toolColor, () -> reactionBar(null, w -> request("POST", base + "/reaction", json("reaction", REACTIONS[w][0]), result -> refresh.run()))));
-          tools.addView(messageTool("forward", I18n.t("Chuyển tiếp tin nhắn"), toolColor, () -> forwardMessage(path, m)));
-          if (own) tools.addView(messageTool("recall", I18n.t("Thu hồi với mọi người"), toolColor, () -> confirm(I18n.t("Thu hồi tin nhắn này?"), () -> request("POST", base + "/recall", json(), result -> refresh.run()))));
-        }
-        tools.addView(messageTool("trash", I18n.t("Xoá tin nhắn ở phía bạn"), toolColor, () -> request("DELETE", base, json(), result -> refresh.run())));
-        bubble.addView(tools);
+        bubble.addView(messageFooter(m, own, clock.format(at), group, path, refresh));
         bubble.setOnLongClickListener(v -> { messageMenu(group ? "group" : "direct", m, own, () -> { lastMessages = ""; loadChat(path, list, scroll, group, other); }); return true; });
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-2, -2);
         p.gravity = own ? Gravity.END : Gravity.START;
