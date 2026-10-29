@@ -1,8 +1,8 @@
 {
-  "version": "1.0.16",
-  "filename": "Kinnect-1.0.16-native.apk",
-  "sha256": "6c43d936bbe35ff580a1968ee29d1ec9c9b7dd4e42164931fbf1d8ebf4ff965d",
-  "playVersion": "1.2.3",
+  "version": "1.0.17",
+  "filename": "Kinnect-1.0.17-native.apk",
+  "sha256": "1a3fdfe9e7d5f9df2afdfcf41159a8830515191f2d242f0a75192a2603762522",
+  "playVersion": "1.2.4",
   "languages": [
     "vi",
     "en"
@@ -12,7 +12,7 @@
     "languageAudit": "work/flow-final-language-result.log",
     "policyAudit": "work/flow-final-policy-result.log",
     "physicalDeviceVerified": false,
-    "backendTests": 104,
+    "backendTests": 109,
     "languageLayout": "320 dp; font 130%; centered VI/EN",
     "storeWeb": "320/390/1366 px; no overflow",
     "realBillingPurchaseVerified": false,
@@ -27,7 +27,14 @@
     "iconAudit": "work/flow-final-icons-result.log",
     "refreshAudit": "work/flow-final-refresh-result.log",
     "featureAudit": "work/flow-final-features-result.log",
-    "screenAudit": "work/flow-final-screens-result.log"
+    "screenAudit": "work/flow-final-screens-result.log",
+    "liveGuests": "3-session browser WebRTC video; audio/video guests, invite/approve/remove; native emulator layout/typography; physical multi-device Android media not verified",
+    "callTermination": "Two-browser accepted call: end offline, local closes immediately, remote ends after network returns, no resumed call; native late-event regression passed",
+    "nativeLayout": "work/live17-native-audit-result.log",
+    "nativeFeatures": "work/live17-features-result.log",
+    "feedPosition": "ordinary reviewer on emulator and browser: return preserves scroll, active feed tap scrolls top/refreshes",
+    "mediaSwipe": "shared controller; no duplicate root handler; web gesture/cancel/comments and native retained reel stage tests pass",
+    "playChecks": "dist/google-play/artifact-checks.json"
   },
-  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.16"
+  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.17"
 }

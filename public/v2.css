@@ -2919,3 +2919,86 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 #kn .app .v2-call-stage{background:linear-gradient(160deg,#32353d,#111216);border-radius:24px}#kn .app .v2-call-controls>button{border:0;border-radius:50%;width:66px;min-height:66px;background:#ffffff24;color:white;box-shadow:none}#kn .app .v2-call-controls>button.danger-action{background:#ff3b30}#kn .app .v2-call-controls>button svg{width:26px;height:26px;stroke-width:2}#kn .app .v2-call-controls{gap:16px;padding:16px;border-radius:30px;background:#1b1d224d;backdrop-filter:blur(18px)}
 
 #kn .app .v2-call-identity h1{font-size:clamp(18px,4.5vw,28px);line-height:1.25;overflow-wrap:anywhere;max-width:100%;padding-inline:12px}#kn .app .v2-call-identity p{font-size:13px}#kn .app .v2-call-controls>button{font-size:11px;line-height:1.3;white-space:normal;overflow-wrap:anywhere}
+
+/* LIVE studio: compact identity, a clear media stage and horizontal action shelves. */
+#kn .app .live-studio{background:#100d19;isolation:isolate;overflow:hidden;min-width:0}
+#kn .live-studio:after{content:"";position:absolute;inset:0;background:linear-gradient(#08061088,transparent 25%,transparent 52%,#0c0916db);pointer-events:none;z-index:1}
+#kn .live-board{position:absolute;inset:0;display:grid;gap:4px;z-index:0;background:#100d19}
+#kn .live-board.multi{inset:92px 8px 226px;border-radius:15px;overflow:hidden;grid-template-columns:62% 1fr;grid-template-rows:repeat(3,minmax(0,1fr))}
+#kn .live-board.multi.layout-panel .live-tile:first-child{grid-row:1/-1}
+#kn .live-board.multi.layout-panel[data-count="2"]{grid-template-rows:1fr}
+#kn .live-board.multi.layout-panel[data-count="3"]{grid-template-rows:repeat(2,minmax(0,1fr))}
+#kn .live-board.multi.layout-grid{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr))}
+#kn .live-board.multi.layout-grid[data-count="2"]{grid-template-rows:1fr}
+#kn .live-tile{position:relative;overflow:hidden;min-width:0;min-height:0;background:radial-gradient(at 30% 20%,#35244d,#17111f);border-radius:12px}
+#kn .live-board.solo .live-tile{border-radius:0}
+#kn .live-tile video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain!important;background:transparent}
+#kn .live-tile-name{position:absolute;bottom:6px;left:6px;right:6px;padding:4px 7px;background:#16102099;color:white;border-radius:7px;font-size:10px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#kn .live-board.solo .live-tile-name{display:none}
+#kn .live-audio-avatar{height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:#c9b5f0}
+#kn .live-audio-avatar .av{width:56px;height:56px;font-size:23px}
+#kn .app .live-studio .v2-live-heading{inset:10px 10px auto;gap:6px;z-index:4;align-items:center}
+#kn .app .live-studio .live-host-chip{flex:1;max-width:none;min-width:0;padding:4px 8px 4px 4px;border:0;border-radius:24px;gap:7px}
+#kn .live-studio .live-host-chip .av{width:32px;height:32px;min-width:32px}
+#kn .live-studio .live-host-chip strong{font-size:12px;max-width:100%;display:block}
+#kn .live-studio .live-host-chip small{margin-top:2px}
+#kn .live-studio .live-pill{font-size:8px;letter-spacing:.7px;padding:2px 5px;line-height:1.1}
+#kn .app .live-studio .live-audience-strip{position:static;display:flex;flex:0 0 70px;width:70px;height:30px;gap:2px;overflow:auto;padding:0;margin:0;scrollbar-width:none}
+#kn .live-studio .live-audience-strip button{flex:0 0 26px;width:26px;height:26px;padding:0}
+#kn .live-studio .live-audience-strip .av{width:26px;height:26px;min-width:26px;border:1px solid #ffffff77}
+#kn .app .live-studio .live-count{display:flex;align-items:center;justify-content:center;gap:3px;min-width:30px;padding:0;color:white;background:none;border:0;font-size:11px;white-space:nowrap}
+#kn .live-count svg{width:13px;height:13px}
+#kn .app .live-studio .v2-live-heading>.icon{height:36px;width:36px;min-width:36px;padding:8px;background:#231c3266}
+#kn .live-studio .live-stream-title{top:64px;left:14px;right:14px;font-size:11px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;z-index:3}
+#kn .app .live-studio .live-side-actions{right:10px;bottom:86px;top:auto;background:none;border:0;gap:10px;padding:0;z-index:4}
+#kn .app .live-studio .live-side-actions>button{width:44px;height:44px;min-height:44px;min-width:44px;border-radius:50%;background:#231c3266;font-size:0;padding:10px}
+#kn .live-studio .live-side-actions svg{width:23px;height:23px}
+#kn .live-studio .v2-live-chat{position:absolute;inset:auto 0 10px;z-index:3;display:block;padding:0;background:none;pointer-events:none}
+#kn .live-studio .v2-live-chat-log{position:absolute;left:10px;right:66px;bottom:58px;height:142px;max-height:142px;overflow:auto;pointer-events:auto;mask-image:linear-gradient(transparent,#000 12%)}
+#kn .live-studio .v2-live-chat-log p{font-size:12px;line-height:1.45;padding:5px 8px;border-radius:10px;background:#16102055;width:fit-content;max-width:100%;margin:4px 0;color:white}
+#kn .app .live-studio .v2-chat-compose{position:relative;margin:0 146px 0 10px;height:44px;min-height:44px;border-radius:24px;background:#ffffff20;padding:0 4px 0 12px;pointer-events:auto;display:flex;gap:0;border:0}
+#kn .live-studio .v2-chat-compose input{background:none;min-width:0;width:100%;font-size:13px;color:white;padding:0;height:44px;border:0}
+#kn .live-studio .v2-chat-compose input::placeholder{color:#ffffffbb}
+#kn .app .live-studio .v2-chat-compose button{width:30px;height:40px;min-width:30px;min-height:40px;padding:5px;color:white;background:none;border:0}
+#kn .live-studio .v2-chat-compose button svg{width:18px;height:18px}
+#kn .live-bottom-actions{position:absolute;right:10px;bottom:10px;height:44px;display:flex;gap:4px;z-index:5}
+#kn .app .live-bottom-actions>button{width:40px;height:44px;min-height:44px;min-width:40px;border:0;border-radius:22px;padding:9px;background:#ffffff12;color:white;font-size:0}
+#kn .live-bottom-actions svg{width:22px;height:22px}
+#kn .live-horizontal-tray{position:absolute;bottom:66px;left:10px;right:10px;min-height:92px;display:flex;align-items:center;gap:4px;padding:8px;overflow-x:auto;z-index:6;border-radius:22px;background:#231c31f2;scrollbar-width:none;animation:live-shelf .18s ease-out}
+#kn .app .live-horizontal-tray>button{display:flex;flex:0 0 72px;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:76px;padding:6px 3px;background:none;color:white;border:0;font:inherit;font-size:11px;border-radius:14px;white-space:normal}
+#kn .live-horizontal-tray>button:hover{background:#ffffff14}#kn .live-horizontal-tray svg{width:24px;height:24px}#kn .live-horizontal-tray .live-gift-art{font-size:30px}#kn .live-horizontal-tray small{font-size:10px;color:#c6b4ec}
+#kn .live-studio .live-arrival{bottom:218px;left:12px;max-width:calc(100% - 80px);font-size:11px;z-index:4}
+#kn .live-studio .live-reactions{z-index:2;pointer-events:none}
+#kn .live-guest-dialog{font:inherit;max-height:75dvh;width:min(100% - 20px,480px);border-radius:22px 22px 0 0;padding:18px;font-size:13px;overflow:auto}
+#kn .live-guest-dialog h2{font-size:17px}#kn .live-guest-dialog p{font-size:13px;line-height:1.5;color:var(--k-muted)}
+#kn .live-guest-row{display:flex;gap:8px;align-items:center;padding:9px 0;min-width:0}#kn .live-guest-row>span{flex:1;min-width:0;overflow-wrap:anywhere;font-size:13px}#kn .live-guest-row .av{width:36px;height:36px;min-width:36px}
+#kn .live-guest-row>button,#kn .live-join-modes>button{font:inherit;font-size:13px;padding:9px 13px;border-radius:14px;border:0;color:white;background:#7652dc;display:flex;align-items:center;gap:8px}
+#kn .live-join-modes{display:flex;gap:10px;margin:18px 0}#kn .live-join-modes svg{width:20px;height:20px}
+@keyframes live-shelf{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){#kn .live-horizontal-tray{animation:none}}
+
+#kn .app .live-studio .live-stream-title{top:64px;font-size:11px}
+
+#kn .video-route-preview{display:block;width:100%;height:min(36dvh,270px);object-fit:contain;background:#100d19;border-radius:16px}
+#kn .video-route-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+#kn .video-route-options>button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:14px 6px;border-radius:16px;background:var(--k-soft,#f1ecfa);color:var(--k-ink,#271f38);border:1px solid var(--k-line,#e8e2ef);font:inherit;font-size:13px}
+#kn .video-route-options>button:first-child{background:linear-gradient(120deg,#7652dc,#a83bc0);color:white;border:0}#kn .video-route-options svg{width:24px;height:24px}#kn .video-route-options small{font-size:11px}
+
+#kn#kn .app.postlogin-polish[data-device=pc][data-screen=live].v2-media-mode main{height:calc(100dvh - 70px);min-height:0;overflow:hidden;display:block;padding:12px 18px}
+#kn .live-layout-shell{height:100%;min-height:0;width:min(100%,1100px);margin:auto;display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:20px;align-items:stretch}
+#kn .live-video-column{display:flex;align-items:stretch;justify-content:center;min-width:0;min-height:0;height:100%;overflow:hidden}
+#kn#kn .app .live-layout-shell .live-studio{height:100%;width:100%;max-width:470px;min-height:0;aspect-ratio:auto;border-radius:20px;margin:0;box-shadow:0 12px 34px #21172e26}
+#kn .live-chat-panel{height:100%;min-height:0;display:flex;flex-direction:column;border:1px solid var(--k-line);background:var(--k-card);border-radius:20px;padding:16px;gap:14px;overflow:hidden}
+#kn .live-chat-panel h2{font-size:16px;margin:0}
+#kn .live-chat-panel .v2-live-chat{position:static;display:flex;flex-direction:column;flex:1;min-height:0;padding:0;gap:12px;background:none}
+#kn .live-chat-panel .v2-live-chat-log{position:static;flex:1;min-height:0;max-height:none;overflow:auto;height:auto;color:var(--k-ink)}
+#kn .live-chat-panel .v2-live-chat-log p{background:var(--k-wash);color:var(--k-ink);border-radius:12px;padding:8px;font-size:13px;line-height:1.5}
+#kn .live-chat-panel .v2-chat-compose{position:static;display:flex;min-width:0;flex-shrink:0;gap:4px;border-radius:20px;background:var(--k-wash);padding:5px;height:auto}
+#kn .live-chat-panel .v2-chat-compose input{min-width:0;width:0;flex:1;height:38px;background:none;font:inherit;font-size:13px;border:0;color:var(--k-ink);padding:0 7px}
+#kn .live-chat-panel .v2-chat-compose button{height:38px;width:34px;min-width:34px;min-height:38px;padding:6px;color:var(--k-purple);background:none;border:0}
+#kn .live-layout-shell .live-studio .v2-live-chat{display:none}
+@media(min-width:960px) and (max-width:1150px){#kn .live-layout-shell{grid-template-columns:minmax(0,1fr) 250px;gap:12px}}
+
+#kn#kn .app .live-studio .v2-live-heading>.live-count{font-size:11px;min-width:34px;width:auto;height:36px;padding:0 2px;background:none;border-radius:0}#kn .live-count [data-live-viewers]{display:inline;font-size:11px;color:white}
+
+#kn .live-studio .v2-live-chat-log{height:118px;max-height:118px}#kn .live-studio .live-arrival{bottom:194px}#kn .live-studio:has(.live-horizontal-tray) .live-side-actions,#kn .live-studio:has(.live-horizontal-tray) .v2-live-chat-log,#kn .live-studio:has(.live-horizontal-tray) .live-arrival{visibility:hidden}

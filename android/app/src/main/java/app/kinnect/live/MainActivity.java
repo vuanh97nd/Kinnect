@@ -171,7 +171,7 @@ public class MainActivity extends Activity {
   }
 
   private TextView label(String text, int size, int color) {
-    TextView v = new TextView(this);
+    TextView v = new KinnectText(this);
     v.setText(text);
     v.setTextColor(color);
     v.setTextSize(size);
@@ -197,7 +197,7 @@ public class MainActivity extends Activity {
   }
 
   private Button button(String text, Runnable action) {
-    Button b = new Button(this);
+    Button b = new KinnectButton(this);
     b.setText(text);
     b.setTextColor(TEXT);
     b.setTextSize(WebDesign.LABEL);
@@ -230,7 +230,7 @@ public class MainActivity extends Activity {
     String value,
     boolean multiline
   ) {
-    EditText v = new EditText(this);
+    EditText v = new KinnectInput(this);
     v.setHint(hint);
     v.setContentDescription(hint);
     v.setText(value);
@@ -286,7 +286,8 @@ public class MainActivity extends Activity {
   private interface RefreshLoader{void run(Runnable complete);}
   private RefreshLoader feedRefresh;private boolean shortRefreshing;
   private void shell(String title, boolean navigation) {
-    feedRefresh=null;shortRefreshing=false;
+    if(feedRefresh!=null&&content!=null&&content.getParent()instanceof ScrollView)feedScrollY=((ScrollView)content.getParent()).getScrollY();
+    feedRefresh=null;shortRefreshing=false;reelViewport=null;
     onTabRoot = false;
     if (splashAnimator != null) { splashAnimator.cancel(); splashAnimator = null; }
     for (VideoView video : mediaVideos) { try { video.stopPlayback(); } catch (RuntimeException ignored) {} }
@@ -1007,6 +1008,7 @@ public class MainActivity extends Activity {
   }
 
   private void auth(boolean register) {
+    feedRows=null;feedScrollY=0;
     subBack = null;
     shell("", false);
     toolbar.setVisibility(View.GONE);
@@ -1124,7 +1126,7 @@ public class MainActivity extends Activity {
     idle.setStroke(dp(1), LINE);
     box.setBackground(idle);
     box.addView(icon(iconName, 18, MUTED), new LinearLayout.LayoutParams(dp(18), dp(18)));
-    final EditText e = new EditText(this);
+    final EditText e = new KinnectInput(this);
     e.setHint(hint);
     e.setContentDescription(hint);
     e.setHintTextColor(MUTED);
@@ -1208,7 +1210,8 @@ public class MainActivity extends Activity {
   private String headerActive = "";
 
   private long lastFeedTap;
-  private void selectNavigation(String next){long now=android.os.SystemClock.uptimeMillis();if(next.equals("feed")&&tab.equals("feed")&&onTabRoot&&feedRefresh!=null){if(content.getParent()instanceof PullRefreshScrollView){PullRefreshScrollView scroll=(PullRefreshScrollView)content.getParent();scroll.smoothScrollTo(0,0);if(now-lastFeedTap<550){lastFeedTap=0;scroll.refreshNow();}else lastFeedTap=now;}return;}lastFeedTap=next.equals("feed")?now:0;navigate(next);}
+  private JSONArray feedRows;private int feedScrollY;
+  private void selectNavigation(String next){if(next.equals("feed")&&tab.equals("feed")&&onTabRoot&&feedRefresh!=null){if(content.getParent()instanceof PullRefreshScrollView){PullRefreshScrollView scroll=(PullRefreshScrollView)content.getParent();feedScrollY=0;scroll.smoothScrollTo(0,0);scroll.refreshNow();}return;}navigate(next);}
   private void navigate(String next) {
     headerActive = next.equals("inbox") ? "inbox" : "";
     history.clear();
@@ -1279,7 +1282,7 @@ public class MainActivity extends Activity {
     c.drawOval(0, 0, px, px, p);
     p.setColor(you ? (dark ? 0xffefc39f : 0xff9a562b) : ACCENT);
     p.setTextAlign(Paint.Align.CENTER);
-    p.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+    p.setTypeface(ApprovedTypography.font(this,Typeface.BOLD));
     String name = u == null ? "?" : u.optString("name", u.optString("username", "?")).trim();
     StringBuilder letters = new StringBuilder();
     for (String w : name.split("\\s+")) if (!w.isEmpty()) letters.append(w.substring(0, 1));
@@ -1320,7 +1323,7 @@ public class MainActivity extends Activity {
     sb.setStroke(dp(1), LINE);
     searchBox.setBackground(sb);
     searchBox.addView(icon("search", 18, MUTED), new LinearLayout.LayoutParams(dp(18), dp(18)));
-    final EditText search = new EditText(this);
+    final EditText search = new KinnectInput(this);
     search.setHint(I18n.t("Tên hoặc @username"));search.setText(nearQuery);
     search.setContentDescription(I18n.t("Tìm thành viên"));
     search.setTextColor(TEXT);
@@ -1551,7 +1554,7 @@ public class MainActivity extends Activity {
     new Sheet(this).setTitle(I18n.t("Báo cáo")).setItemIcons(new String[]{"shield_check","flag","shield_check","user_round","mail","eye_off","flag","circle_help"}).setItems(I18n.items(reasons),(d,index)->reportDetails(type,id,reasons[index])).setNegativeButton(I18n.t("Hủy"),null).show();
   }
   private void reportDetails(String type, String id,String category) {
-    EditText reason = new EditText(this);
+    EditText reason = new KinnectInput(this);
     reason.setHint(I18n.t("Bổ sung chi tiết (tùy chọn)"));
     new Sheet(this)
       .setTitle(category)
@@ -1597,9 +1600,10 @@ public class MainActivity extends Activity {
     pill.setOnClickListener(v -> composePost());
     final LinearLayout list = column();
     content.addView(list);
-    final String[] signature={""};final boolean[] fetching={false};
-    feedRefresh=complete->{if(fetching[0]){complete.run();return;}fetching[0]=true;request("GET","/api/posts",null,data->{JSONArray posts=data.optJSONArray("posts");if(posts==null||posts.toString().equals(signature[0]))return;signature[0]=posts.toString();LinearLayout next=column();java.util.Set<String> existing=new java.util.HashSet<>();for(int i=0;i<list.getChildCount();i++)if(list.getChildAt(i).getTag()instanceof String)existing.add((String)list.getChildAt(i).getTag());LinearLayout saved=content;content=next;try{if(posts.length()==0)posts(posts,"Chưa có bài viết.");for(int i=0;i<posts.length();i++){JSONObject post=posts.optJSONObject(i);String key="post:"+post.optString("id")+":"+post.toString();if(existing.contains(key)){View placeholder=new View(this);placeholder.setTag(key);next.addView(placeholder);}else postCard(post);}}finally{content=saved;}reconcileChatRows(list,next);},()->{fetching[0]=false;complete.run();});};
-    feedRefresh.run(()->{});
+    if(feedRows!=null){LinearLayout saved=content;content=list;try{posts(feedRows,"Chưa có bài viết.");}finally{content=saved;}final ScrollView scroll=(ScrollView)content.getParent();scroll.post(()->scroll.scrollTo(0,feedScrollY));}
+    final String[] signature={feedRows==null?"":feedRows.toString()};final boolean[] fetching={false};
+    feedRefresh=complete->{if(fetching[0]){complete.run();return;}fetching[0]=true;request("GET","/api/posts",null,data->{JSONArray posts=data.optJSONArray("posts");if(posts==null||posts.toString().equals(signature[0]))return;signature[0]=posts.toString();feedRows=posts;LinearLayout next=column();java.util.Set<String> existing=new java.util.HashSet<>();for(int i=0;i<list.getChildCount();i++)if(list.getChildAt(i).getTag()instanceof String)existing.add((String)list.getChildAt(i).getTag());LinearLayout saved=content;content=next;try{if(posts.length()==0)posts(posts,"Chưa có bài viết.");for(int i=0;i<posts.length();i++){JSONObject post=posts.optJSONObject(i);String key="post:"+post.optString("id")+":"+post.toString();if(existing.contains(key)){View placeholder=new View(this);placeholder.setTag(key);next.addView(placeholder);}else postCard(post);}}finally{content=saved;}reconcileChatRows(list,next);},()->{fetching[0]=false;complete.run();});};
+    if(feedRows==null)feedRefresh.run(()->{});
   }
 
   private void composePost() {
@@ -1665,7 +1669,7 @@ public class MainActivity extends Activity {
     who.addView(t, new LinearLayout.LayoutParams(0, -2, 1));
     body.addView(who);body.addView(vis,vp);
 
-    final EditText text = new EditText(this);
+    final EditText text = new KinnectInput(this);
     text.setHint(I18n.t("Bạn đang nghĩ gì?"));
     text.setTextSize(18);
     text.setFilters(new android.text.InputFilter[] { new android.text.InputFilter.LengthFilter(2000) });
@@ -1700,7 +1704,7 @@ public class MainActivity extends Activity {
       if (pendingMedia != null) say(I18n.t("Đang tải lên…"));
       JSONObject payload = json("body", text.getText().toString(), "visibility", visibility[0]);
       if (pendingMedia != null) try { payload.put("media", pendingMedia); } catch (JSONException ignored) {}
-      request("POST", "/api/posts", payload, d -> { pendingMedia = null; say(I18n.t("Đã đăng bài viết")); navigate("feed"); }, () -> { post.setEnabled(true); post.setAlpha(1f); });
+      request("POST", "/api/posts", payload, d -> { pendingMedia = null;feedRows=null;feedScrollY=0; say(I18n.t("Đã đăng bài viết")); navigate("feed"); }, () -> { post.setEnabled(true); post.setAlpha(1f); });
     });
     text.requestFocus();
   }
@@ -1744,7 +1748,7 @@ public class MainActivity extends Activity {
     sb.setStroke(dp(1), LINE);
     box.setBackground(sb);
     box.addView(icon("search", 18, MUTED), new LinearLayout.LayoutParams(dp(18), dp(18)));
-    EditText e = new EditText(this);
+    EditText e = new KinnectInput(this);
     e.setHint(hint);
     e.setContentDescription(hint);
     e.setTextColor(TEXT);
@@ -2051,7 +2055,7 @@ public class MainActivity extends Activity {
     boolean own=me!=null&&user.optString("id").equals(me.optString("id"));
     if(!filled)panel.addView(emptyBlock("user",I18n.t("Chưa có thông tin công khai"),own?I18n.t("Cập nhật hồ sơ để mọi người hiểu bạn hơn."):I18n.t("Thành viên này chưa chia sẻ thông tin giới thiệu.")));
     if(user.optLong("joinedAt")>0){TextView joined=label(I18n.t("Tham gia Kinnect từ ")+new java.text.SimpleDateFormat("MM/yyyy",java.util.Locale.getDefault()).format(new java.util.Date(user.optLong("joinedAt"))),12,MUTED);joined.setPadding(0,dp(18),0,dp(12));panel.addView(joined);}
-    if(own)panel.addView(button(I18n.t("Chỉnh sửa hồ sơ"),()->editProfile()));return panel;
+    return panel;
   }
 
   private void profileSections(final JSONObject user) {
@@ -2391,7 +2395,7 @@ public class MainActivity extends Activity {
         avatar(u, r, 46);
         LinearLayout t = column();
         t.setPadding(dp(12), 0, dp(8), 0);
-        TextView line = new TextView(this);
+        TextView line = new KinnectText(this);
         android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder(u.optString("name"));
         sb.setSpan(new android.text.style.StyleSpan(Typeface.BOLD), 0, sb.length(), 0);
         sb.append(noticeText(n.optString("kind")));
@@ -2605,8 +2609,8 @@ public class MainActivity extends Activity {
 
   private void deleteAccountScreen(){
     accountHeader(I18n.t("Xóa tài khoản"),()->settings());LinearLayout panel=card();panel.addView(label(I18n.t("Xóa vĩnh viễn"),20,TEXT));panel.addView(label(I18n.t("Hồ sơ, ảnh, bài viết, video, tin nhắn và dữ liệu gắn với tài khoản sẽ bị xóa khỏi hệ thống đang hoạt động. Tất cả phiên đăng nhập bị thu hồi. Nội dung của bạn trong nhóm cũng bị xóa; nhóm có thành viên khác được chuyển chủ sở hữu. Không thể khôi phục sau khi hoàn tất."),14,MUTED));
-    panel.addView(label(I18n.t("Nhập lại tên đăng nhập: @")+me.optString("username"),13,TEXT));EditText username=new EditText(this);username.setSingleLine(true);username.setTextSize(16);panel.addView(username,new LinearLayout.LayoutParams(-1,dp(52)));
-    panel.addView(label(I18n.t("Mật khẩu (nếu phiên đăng nhập đã cũ)"),13,TEXT));EditText password=new EditText(this);password.setSingleLine(true);password.setTextSize(16);password.setInputType(129);panel.addView(password,new LinearLayout.LayoutParams(-1,dp(52)));
+    panel.addView(label(I18n.t("Nhập lại tên đăng nhập: @")+me.optString("username"),13,TEXT));EditText username=new KinnectInput(this);username.setSingleLine(true);username.setTextSize(16);panel.addView(username,new LinearLayout.LayoutParams(-1,dp(52)));
+    panel.addView(label(I18n.t("Mật khẩu (nếu phiên đăng nhập đã cũ)"),13,TEXT));EditText password=new KinnectInput(this);password.setSingleLine(true);password.setTextSize(16);password.setInputType(129);panel.addView(password,new LinearLayout.LayoutParams(-1,dp(52)));
     Button remove=primary(I18n.t("Xóa vĩnh viễn tài khoản và dữ liệu"),()->{if(!username.getText().toString().equals(me.optString("username"))){say(I18n.t("Nhập đúng tên đăng nhập để xác nhận."));return;}confirm(I18n.t("Bạn chắc chắn xóa vĩnh viễn? Không thể khôi phục dữ liệu."),()->request("DELETE","/api/me/account-deletion",json("confirmUsername",username.getText().toString(),"password",password.getText().toString(),"confirmDelete",true),result->{KinnectService.stop(this);if(calls!=null){calls=null;}api.clear();me=null;auth(false);say(I18n.t("Đã xóa tài khoản và dữ liệu."));}));});panel.addView(remove);
     panel.addView(label(I18n.t("Hỗ trợ riêng tư: anhvn53@wru.vn · Không gửi mật khẩu hoặc OTP."),12,MUTED));
   }
@@ -2812,13 +2816,10 @@ public class MainActivity extends Activity {
 
   // Trang Video: nền đen toàn màn, thanh tab trong suốt nổi phía trên (Trực tiếp · Đề xuất · Đang theo dõi).
   private FrameLayout reelStage() {
-    ScrollView scroll = (ScrollView) content.getParent();
-    int at = root.indexOfChild(scroll);
-    root.removeView(scroll);
-    FrameLayout stage = new FrameLayout(this);
-    stage.setBackgroundColor(0xff000000);
-    root.addView(stage, at, new LinearLayout.LayoutParams(-1, 0, 1));
-    return stage;
+    stopShort();if(reelViewport!=null&&reelViewport.getParent()==root){reelViewport.prepare();reelViewport.removeAllViews();return reelViewport;}
+    ScrollView scroll=(ScrollView)content.getParent();int at=root.indexOfChild(scroll);root.removeView(scroll);
+    reelViewport=new VerticalMediaStage(this,direction->{if(direction<0&&shortIndex==0){reelViewport.settle();refreshVideos(reelViewport);return true;}if(shortRows==null||shortRows.length()==0)return false;final int next=VideoFeedPolicy.index(shortIndex+direction,shortRows.length(),!shortsFollowing);if(next==shortIndex)return false;reelViewport.exit(direction,()->{shortEnter=direction;showShort(next);});return true;});
+    reelViewport.setBackgroundColor(0xff000000);root.addView(reelViewport,at,new LinearLayout.LayoutParams(-1,0,1));return reelViewport;
   }
 
   private void downloadShort(JSONObject video) {
@@ -2846,7 +2847,7 @@ public class MainActivity extends Activity {
   private void shorts() {
     shortsFollowing = shortsTab.equals("following");
     final FrameLayout stage = reelStage();
-    final float[] refreshY={0};stage.setOnTouchListener((v,event)->{if(event.getActionMasked()==MotionEvent.ACTION_DOWN)refreshY[0]=event.getY();if(event.getActionMasked()==MotionEvent.ACTION_UP&&event.getY()-refreshY[0]>dp(90))refreshVideos(stage);return true;});
+
     final TextView loading = label(I18n.t("Đang tải video…"), 14, 0x99ffffff);
     stage.addView(loading, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
     stage.addView(reelTabs(), new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
@@ -2931,20 +2932,15 @@ public class MainActivity extends Activity {
     return c;
   }
 
-  private int shortEnter = 0;
+  private int shortEnter = 0;private VerticalMediaStage reelViewport;
 
   private void showShort(int index) {
     if (shortRows == null || shortRows.length() == 0) return;
     shortIndex = VideoFeedPolicy.index(index, shortRows.length(), !shortsFollowing);
-    shell(I18n.t("Video ngắn"), true);
+    if(reelViewport==null||reelViewport.getParent()!=root)shell(I18n.t("Video ngắn"), true);
     final JSONObject item = shortRows.optJSONObject(shortIndex), author = item.optJSONObject("author");
-    // Video dọc toàn màn hình như web: nền đen, nút bên phải, tên + chú thích ở dưới.
-    ScrollView scroll = (ScrollView) content.getParent();
-    int at = root.indexOfChild(scroll);
-    root.removeView(scroll);
-    FrameLayout stage = new FrameLayout(this);
-    stage.setBackgroundColor(0xff000000);
-    root.addView(stage, at, new LinearLayout.LayoutParams(-1, 0, 1));
+    // Keep the app shell stable while changing only the media stage.
+    FrameLayout stage=reelStage();
     shortVideo = new VideoView(this);
     final VideoView playerView = shortVideo;
     stage.addView(shortVideo, new FrameLayout.LayoutParams(-1, -1, Gravity.CENTER));
@@ -2959,37 +2955,8 @@ public class MainActivity extends Activity {
       if(!mediaCallBlocked)shortVideo.start();
     });
     shortVideo.setOnErrorListener((player, what, extra) -> { say(I18n.t("Không phát được video.")); return true; });
-    if (shortEnter != 0) {
-      final int from = shortEnter;
-      shortEnter = 0;
-      stage.post(() -> { stage.setTranslationY(from * stage.getHeight()); stage.animate().translationY(0).setDuration(260).setInterpolator(new android.view.animation.DecelerateInterpolator()).start(); });
-    }
-    final float[] y = { 0 };
-    final boolean[] dragging = { false };
-    stage.setOnTouchListener((view, event) -> {
-      float dy = event.getRawY() - y[0];
-      switch (event.getActionMasked()) {
-        case MotionEvent.ACTION_DOWN: y[0] = event.getRawY(); dragging[0] = false; stage.animate().cancel(); break;
-        case MotionEvent.ACTION_MOVE:
-          if (Math.abs(dy) > dp(8)) dragging[0] = true;
-          if (dragging[0]) stage.setTranslationY(dy);
-          break;
-        case MotionEvent.ACTION_UP:
-        case MotionEvent.ACTION_CANCEL:
-          if(event.getActionMasked()==MotionEvent.ACTION_CANCEL){stage.setTranslationY(0);return true;}
-          if(dragging[0]&&dy>dp(90)&&shortIndex==0){stage.setTranslationY(0);refreshVideos(stage);return true;}
-          if (dragging[0] && Math.abs(dy) > dp(90)) {
-            final int dir = dy < 0 ? 1 : -1;
-            stage.animate().translationY(-dir * stage.getHeight()).setDuration(200).setInterpolator(new android.view.animation.AccelerateInterpolator()).withEndAction(() -> { shortEnter = dir; showShort(shortIndex + dir); }).start();
-          } else if (dragging[0]) {
-            stage.animate().translationY(0).setDuration(180).start();
-          } else if (event.getActionMasked() == MotionEvent.ACTION_UP && shortVideo != null) {
-            if (shortVideo.isPlaying()) shortVideo.pause(); else if(!mediaCallBlocked)shortVideo.start();
-          }
-          break;
-      }
-      return true;
-    });
+    if(shortEnter!=0){int direction=shortEnter;shortEnter=0;VerticalMediaStage.enter(stage,direction);}
+    stage.setOnClickListener(v->{if(shortVideo!=null){if(shortVideo.isPlaying())shortVideo.pause();else if(!mediaCallBlocked)shortVideo.start();}});
     // Cột nút bên phải
     LinearLayout side = column();
     side.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -3131,7 +3098,7 @@ public class MainActivity extends Activity {
     scroll.addView(list);
     sheet.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
     sheet.addView(divider());
-    final EditText input = new EditText(this);
+    final EditText input = new KinnectInput(this);
     LinearLayout emojis = row();
     emojis.setPadding(dp(8), dp(6), dp(8), 0);
     for (final String e : new String[] { "😍", "😂", "🔥", "👏", "🥰", "😮", "😢", "💜" }) {
@@ -3229,7 +3196,7 @@ public class MainActivity extends Activity {
     if (w != null) {
       w.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0));
       w.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, Math.round(getResources().getDisplayMetrics().heightPixels * 0.62f));
-      w.setGravity(Gravity.BOTTOM);
+      ApprovedTypography.sheet(w.getDecorView());w.setGravity(Gravity.BOTTOM);
       w.setDimAmount(0.25f);
       w.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
     }
@@ -3302,9 +3269,13 @@ public class MainActivity extends Activity {
   private void reviewMedia(android.net.Uri uri,int requestCode) {
     Intent editor=new Intent(this,MediaEditActivity.class).setData(uri);editor.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);editor.setClipData(android.content.ClipData.newRawUri("media",uri));startActivityForResult(editor,requestCode);
   }
-  private void uploadVideo(android.net.Uri uri) { reviewMedia(uri,212); }
+  private android.app.Dialog uploadVideo(android.net.Uri uri) {
+    LinearLayout view=column();VideoView preview=new VideoView(this);preview.setVideoURI(uri);preview.setOnPreparedListener(player->{player.setLooping(true);player.setVolume(0,0);preview.start();});FrameLayout previewBox=new FrameLayout(this);previewBox.setBackground(background(0xff100d19,14));previewBox.setClipToOutline(true);previewBox.addView(preview,new FrameLayout.LayoutParams(-1,-1,Gravity.CENTER));view.addView(previewBox,new LinearLayout.LayoutParams(-1,dp(200)));
+    TextView hint=label(I18n.t("Studio Pro để chỉnh sửa · Tiếp tục để đăng cơ bản"),12,MUTED);hint.setGravity(Gravity.CENTER);hint.setPadding(0,dp(10),0,0);view.addView(hint);
+    android.app.Dialog choice=new Sheet(this).setTitle(I18n.t("Hoàn thiện video")).setView(view).setPositiveButton("Studio Pro",(dialog,which)->reviewMedia(uri,212)).setNegativeButton(I18n.t("Tiếp tục"),(dialog,which)->uploadVideoNow(uri)).show();choice.setOnDismissListener(dialog->preview.stopPlayback());return choice;
+  }
   private void uploadVideoNow(android.net.Uri uri) {
-    EditText caption = new EditText(this);
+    EditText caption = new KinnectInput(this);
     caption.setHint(I18n.t("Viết chú thích cho video"));
     new Sheet(this)
       .setTitle(I18n.t("Đăng video"))
@@ -3721,7 +3692,7 @@ public class MainActivity extends Activity {
     popup.setElevation(dp(10));
     for (int i = 0; i < REACTIONS.length; i++) {
       final int index = i;
-      TextView e = new TextView(this);
+      TextView e = new KinnectText(this);
       e.setText(REACTIONS[i][1]);
       e.setTextSize(28);
       e.setGravity(Gravity.CENTER);
@@ -3749,7 +3720,7 @@ public class MainActivity extends Activity {
   }
 
   private Button chip(String text, boolean active, Runnable action) {
-    Button b = new Button(this);
+    Button b = new KinnectButton(this);
     b.setText(text);
     b.setAllCaps(false);
     b.setTextSize(13);
@@ -3827,7 +3798,7 @@ public class MainActivity extends Activity {
     @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused)invalidate();}
     @Override protected void onAttachedToWindow(){super.onAttachedToWindow();invalidate();}
     void glyph(android.graphics.drawable.Drawable icon,float x,float y,int size,int color){if(icon!=miniLogo)icon.setTint(color);icon.setBounds((int)x,(int)y,(int)x+size,(int)y+size);icon.draw(canvas);}
-    void centered(String text,float y,float size,int color,boolean bold){pen.setTextSize(size);pen.setTypeface(Typeface.create("sans-serif",bold?Typeface.BOLD:Typeface.NORMAL));word(text,(380-pen.measureText(text))/2,y,size,color,bold);}
+    void centered(String text,float y,float size,int color,boolean bold){pen.setTextSize(size);pen.setTypeface(ApprovedTypography.font(MainActivity.this,bold?Typeface.BOLD:Typeface.NORMAL));word(text,(380-pen.measureText(text))/2,y,size,color,bold);}
     android.graphics.Bitmap demoPhoto;
     void photo(float x,float y,float w,float h,float radius){if(demoPhoto==null){try(java.io.InputStream stream=getAssets().open("welcome-profile.png")){demoPhoto=android.graphics.BitmapFactory.decodeStream(stream);}catch(Exception ignored){return;}}if(demoPhoto==null)return;int saved=canvas.save();Path clip=new Path();clip.addRoundRect(new RectF(x,y,x+w,y+h),radius,radius,Path.Direction.CW);canvas.clipPath(clip);box(x,y,w,h,radius,SOFT);float ratio=w>100?Math.min(w/demoPhoto.getWidth(),h/demoPhoto.getHeight()):Math.max(w/demoPhoto.getWidth(),h/demoPhoto.getHeight());float rw=demoPhoto.getWidth()*ratio,rh=demoPhoto.getHeight()*ratio;float offset=w<=100?0:(h-rh)/2;canvas.drawBitmap(demoPhoto,null,new RectF(x+(w-rw)/2,y+offset,x+(w+rw)/2,y+offset+rh),pen);canvas.restoreToCount(saved);}
     final android.graphics.Bitmap[] demoPeople=new android.graphics.Bitmap[4];
@@ -3849,7 +3820,7 @@ public class MainActivity extends Activity {
     final Paint pen=new Paint(Paint.ANTI_ALIAS_FLAG);final RectF rect=new RectF();Canvas canvas;
     WelcomeScene(){super(MainActivity.this);setLayerType(View.LAYER_TYPE_SOFTWARE,null);}
     void box(float x,float y,float w,float h,float radius,int color){pen.setStyle(Paint.Style.FILL);pen.setShader(null);pen.setColor(color);rect.set(x,y,x+w,y+h);canvas.drawRoundRect(rect,radius,radius,pen);}
-    void word(String text,float x,float y,float size,int color,boolean bold){pen.setShader(null);pen.setColor(color);pen.setTypeface(Typeface.create("sans-serif",bold?Typeface.BOLD:Typeface.NORMAL));pen.setTextSize(size);canvas.drawText(text,x,y,pen);}
+    void word(String text,float x,float y,float size,int color,boolean bold){pen.setShader(null);pen.setColor(color);pen.setTypeface(ApprovedTypography.font(MainActivity.this,bold?Typeface.BOLD:Typeface.NORMAL));pen.setTextSize(size);canvas.drawText(text,x,y,pen);}
     void circle(float x,float y,float r,int color){pen.setShader(null);pen.setColor(color);canvas.drawCircle(x,y,r,pen);}
     @Override protected void onDraw(Canvas c){super.onDraw(c);canvas=c;float scale=Math.min(getWidth()/380f,getHeight()/310f);int saved=c.save();c.translate((getWidth()-380*scale)/2,(getHeight()-310*scale)/2);c.scale(scale,scale);
       circle(198,150,132,PRIMARY_SOFT);circle(312,73,25,(PINK&0xffffff)|0x18000000);circle(56,235,20,PRIMARY_SOFT);
@@ -4039,7 +4010,7 @@ public class MainActivity extends Activity {
     if (me == null) return;
     LinearLayout box = column();
     box.setPadding(dp(20), dp(8), dp(20), 0);
-    EditText current = new EditText(this), next = new EditText(this);
+    EditText current = new KinnectInput(this), next = new KinnectInput(this);
     current.setHint(I18n.t("Mật khẩu hiện tại"));
     next.setHint(I18n.t("Mật khẩu mới (tối thiểu 6 ký tự)"));
     current.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
@@ -4713,7 +4684,7 @@ public class MainActivity extends Activity {
     final String[] names = new String[users.length()];
     final boolean[] chosen = new boolean[users.length()];
     for (int i = 0; i < names.length; i++) names[i] = users.optJSONObject(i).optString("name");
-    final EditText name = new EditText(this);
+    final EditText name = new KinnectInput(this);
     styleChatName(name);name.setHint(I18n.t("Tên nhóm"));
     new Sheet(this).setTitle(I18n.t("Chọn thành viên")).setMultiChoiceItems(names, chosen, (d, w, c) -> chosen[w] = c)
       .setPositiveButton(I18n.t("Tiếp"), (d, w) -> new Sheet(this).setTitle(I18n.t("Tên nhóm")).setView(chatNameWrap(name)).setPositiveButton(I18n.t("Tạo nhóm"), (d2, w2) -> {
@@ -4771,7 +4742,7 @@ public class MainActivity extends Activity {
             if (attachButton != null) attachButton.setText(selected.video() ? I18n.t("✓ Đã chọn video") : I18n.t("✓ Đã chọn ảnh"));
             composeAttached(preview, selected.video());
           } else {
-            EditText caption = new EditText(this); caption.setHint(I18n.t("Viết gì đó cho tin (không bắt buộc)"));
+            EditText caption = new KinnectInput(this); caption.setHint(I18n.t("Viết gì đó cho tin (không bắt buộc)"));
             new Sheet(this).setTitle(I18n.t("Đăng tin 24 giờ")).setView(caption).setPositiveButton(I18n.t("Đăng"), (d,w) -> {
               say(I18n.t("Đang đăng tin…"));
               request("POST", "/api/stories", json("body", caption.getText().toString(), "media", media), r -> { say(I18n.t("Đã đăng tin.")); navigate("feed"); });
@@ -4909,7 +4880,7 @@ public class MainActivity extends Activity {
     final String data = dataUrl(uri, 15 * 1024 * 1024, m4a ? "audio/mp4" : "audio/mpeg");
     LinearLayout box = column();
     box.setPadding(dp(20), dp(8), dp(20), 0);
-    final EditText title = new EditText(this), artist = new EditText(this), license = new EditText(this), source = new EditText(this);
+    final EditText title = new KinnectInput(this), artist = new KinnectInput(this), license = new KinnectInput(this), source = new KinnectInput(this);
     title.setHint(I18n.t("Tên bài"));
     title.setText(name.replaceAll("\\.[^.]+$", ""));
     artist.setHint(I18n.t("Nghệ sĩ"));
@@ -5093,7 +5064,7 @@ public class MainActivity extends Activity {
     icons.add("group_three");labels.add(I18n.t("Thành viên và vai trò"));actions.add(()->groupMembers(g));
     if(groupManager(g)){
       icons.add("camera");labels.add(I18n.t("Đổi ảnh nhóm"));actions.add(()->groupPhotoOptions(g));
-      icons.add("pencil");labels.add(I18n.t("Đổi tên nhóm"));actions.add(()->{EditText name=new EditText(this);styleChatName(name);name.setText(g.optString("name"));new Sheet(this).setTitle(I18n.t("Tên nhóm")).setView(chatNameWrap(name)).setPositiveButton(I18n.t("Lưu"),(d,w)->request("PATCH","/api/groups/"+id,json("name",name.getText().toString()),r->groupChat(r.optJSONObject("group")))).setNegativeButton(I18n.t("Hủy"),null).show();});
+      icons.add("pencil");labels.add(I18n.t("Đổi tên nhóm"));actions.add(()->{EditText name=new KinnectInput(this);styleChatName(name);name.setText(g.optString("name"));new Sheet(this).setTitle(I18n.t("Tên nhóm")).setView(chatNameWrap(name)).setPositiveButton(I18n.t("Lưu"),(d,w)->request("PATCH","/api/groups/"+id,json("name",name.getText().toString()),r->groupChat(r.optJSONObject("group")))).setNegativeButton(I18n.t("Hủy"),null).show();});
       icons.add("user_plus");labels.add(I18n.t("Thêm thành viên"));actions.add(()->request("GET","/api/friends",null,d->{JSONArray users=d.optJSONArray("users");if(users==null||users.length()==0){say(I18n.t("Chưa có bạn bè để thêm."));return;}String[] names=new String[users.length()];boolean[] chosen=new boolean[users.length()];for(int i=0;i<names.length;i++)names[i]=users.optJSONObject(i).optString("name");new Sheet(this).setTitle(I18n.t("Thêm thành viên")).setMultiChoiceItems(names,chosen,(dialog,index,checked)->chosen[index]=checked).setPositiveButton(I18n.t("Thêm"),(dialog,index)->{JSONArray ids=new JSONArray();for(int i=0;i<chosen.length;i++)if(chosen[i])ids.put(users.optJSONObject(i).optString("id"));request("POST","/api/groups/"+id+"/members",json("members",ids),r->groupChat(r.optJSONObject("group")));}).setNegativeButton(I18n.t("Hủy"),null).show();}));
     }
     icons.add("settings");labels.add(I18n.t("Cài đặt hội thoại"));actions.add(()->conversationMenu("group",id,g.optString("name")));
@@ -5257,7 +5228,7 @@ public class MainActivity extends Activity {
     clip.setContentDescription(I18n.t("Đính kèm"));
     clip.setOnClickListener(v -> { attachTarget = path; pickFile(303, "*/*"); });
     bar.addView(clip, new LinearLayout.LayoutParams(dp(42), dp(42)));
-    final EditText input = new EditText(this);
+    final EditText input = new KinnectInput(this);
     input.setHint(I18n.t("Nhắn tin..."));
     input.setContentDescription(I18n.t("Tin nhắn"));installChatKeyboard(input,msgScroll);
     input.setFilters(new android.text.InputFilter[] { new android.text.InputFilter.LengthFilter(2000) });
@@ -5461,7 +5432,7 @@ public class MainActivity extends Activity {
     LinearLayout bar = row();
     bar.setPadding(0, dp(6), 0, dp(10));
     avatar(me, bar, 32);
-    final EditText input = new EditText(this);
+    final EditText input = new KinnectInput(this);
     input.setHint(I18n.t("Viết bình luận..."));
     input.setContentDescription(I18n.t("Viết bình luận"));
     input.setFilters(new android.text.InputFilter[] { new android.text.InputFilter.LengthFilter(1000) });
@@ -5643,7 +5614,7 @@ public class MainActivity extends Activity {
     if (w != null) {
       w.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0));
       w.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-      w.setGravity(Gravity.BOTTOM);
+      ApprovedTypography.sheet(w.getDecorView());w.setGravity(Gravity.BOTTOM);
       w.setDimAmount(0.45f);
     }
     dialog.show();
@@ -5673,7 +5644,7 @@ public class MainActivity extends Activity {
   }
 
   private void postStoryVideo(final java.io.File video) {
-    final EditText caption = new EditText(this);
+    final EditText caption = new KinnectInput(this);
     caption.setHint(I18n.t("Viết gì đó cho tin (không bắt buộc)"));
     new Sheet(this).setTitle(I18n.t("Đăng tin 24 giờ")).setView(caption).setPositiveButton(I18n.t("Chia sẻ tin"), (d, w) -> {
       say(I18n.t("Đang đăng tin…"));

@@ -42,7 +42,7 @@ public final class IncomingCallActivity extends Activity {
   actions.addView(action(video?I18n.t("Trả lời video"):I18n.t("Trả lời"),0xff22c55e,video?"video":"phone",null,false,this::accept),new LinearLayout.LayoutParams(0,-2,1));
   col.addView(actions,new LinearLayout.LayoutParams(-1,-2));
   root.addView(col,new FrameLayout.LayoutParams(-1,-1));setContentView(root);}
- private TextView text(String v,float sp,int color){TextView t=new TextView(this);t.setText(v);t.setTextSize(sp);t.setTextColor(color);t.setGravity(Gravity.CENTER);t.setLayoutParams(new LinearLayout.LayoutParams(-1,-2));return t;}
+ private TextView text(String v,float sp,int color){TextView t=new KinnectText(this);t.setText(v);t.setTextSize(sp);t.setTextColor(color);t.setGravity(Gravity.CENTER);t.setLayoutParams(new LinearLayout.LayoutParams(-1,-2));return t;}
  private View action(String label,int color,String icon,String fallback,boolean tilt,Runnable task){LinearLayout c=new LinearLayout(this);c.setOrientation(LinearLayout.VERTICAL);c.setGravity(Gravity.CENTER_HORIZONTAL);c.setClipChildren(false);c.setClipToPadding(false);c.setPadding(0,dp(16),0,0);
   FrameLayout b=new FrameLayout(this);GradientDrawable g=new GradientDrawable();g.setShape(GradientDrawable.OVAL);g.setColor(color);b.setBackground(new RippleDrawable(ColorStateList(),g,null));b.setElevation(dp(8));
   ImageView i=new ImageView(this);int id=WebIcons.resolve(this,icon);if(id==0&&fallback!=null)id=WebIcons.resolve(this,fallback);if(id!=0)i.setImageDrawable(getDrawable(id).mutate());i.setColorFilter(0xffffffff);if(tilt&&WebIcons.resolve(this,icon)==0)i.setRotation(135);

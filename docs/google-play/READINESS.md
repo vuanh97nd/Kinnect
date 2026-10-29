@@ -1,3 +1,7 @@
+## Bản dựng mới nhất: 1.2.4 / code106
+
+AAB: dist/google-play/Kinnect-1.2.4-play.aab; APK website riêng 1.0.17/code82. Chưa nộp Google Play. Tính năng/kiểm tra mới: docs/releases/v1.0.17.md. Các hướng dẫn dưới đây giữ lịch sử chuẩn bị; khi tải bản mới dùng tệp 1.2.4 và artifact-checks.json tương ứng.
+
 # Kinnect Google Play — bản chuẩn bị 1.1.1 / build 101
 
 Đơn vị hiển thị/liên hệ do chủ ứng dụng cung cấp: **Mr Ánh — anhvn53@wru.vn**.

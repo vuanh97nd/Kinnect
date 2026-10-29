@@ -60,7 +60,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
   }
 
   private EditText field(String hint) {
-    EditText e = new EditText(this);
+    EditText e = new KinnectInput(this);
     e.setHint(hint);
     e.setTextColor(TEXT);
     e.setHintTextColor(MUTED);
@@ -204,21 +204,19 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
   }
   private void showHostPreview(){
     if(previewing||joined)return;previewing=true;host=false;if(rtc!=null){rtc.close();rtc=null;}
-    root.removeAllViews();root.setBackgroundColor(0xff111017);FrameLayout stage=new FrameLayout(this);root.addView(stage,new LinearLayout.LayoutParams(-1,0,1));SurfaceViewRenderer display=new SurfaceViewRenderer(this);stage.addView(display,new FrameLayout.LayoutParams(-1,-1));
+    root.removeAllViews();root.setBackgroundColor(0xff111017);FrameLayout stage=new FrameLayout(this);root.addView(stage,new LinearLayout.LayoutParams(-1,0,1));SurfaceViewRenderer display=new SurfaceViewRenderer(this);localLive=display;stage.addView(display,new FrameLayout.LayoutParams(-1,-1));
     TextView close=text(I18n.t("×"),30,0xffffffff);close.setGravity(Gravity.CENTER);close.setContentDescription(I18n.t("Đóng camera chuẩn bị Live"));close.setOnClickListener(v->finish());FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.START);cp.setMargins(dp(12),dp(8),0,0);stage.addView(close,cp);
     TextView badge=previewBadge();FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(-1,-2,Gravity.TOP|Gravity.CENTER_HORIZONTAL);bp.setMargins(dp(64),dp(16),dp(64),0);stage.addView(badge,bp);
     LinearLayout controls=column();controls.setPadding(dp(16),dp(10),dp(16),dp(16));controls.setBackgroundColor(0xff18151f);root.addView(controls,new LinearLayout.LayoutParams(-1,-2));
     EditText title=field(I18n.t("Tiêu đề buổi Live"));title.setText(topicText);title.setTextColor(0xffffffff);title.setHintTextColor(0xffaaa3b7);title.setBackground(round(0xff302a3d,14));title.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(80)});controls.addView(title,new LinearLayout.LayoutParams(-1,dp(48)));
     LinearLayout actions=row();final boolean[] mic={true};actions.addView(sideButton("flip",I18n.t("Lật camera"),()->{if(rtc!=null)rtc.flip();}),new LinearLayout.LayoutParams(0,-2,1));actions.addView(sideButton("wand",I18n.t("Làm đẹp"),this::effectsMenu),new LinearLayout.LayoutParams(0,-2,1));actions.addView(sideButton("mic","Micro",()->{mic[0]=!mic[0];badge.setText(mic[0]?I18n.t("Xem trước · Mic sẽ bật khi phát"):I18n.t("Xem trước · Mic sẽ tắt khi phát"));}),new LinearLayout.LayoutParams(0,-2,1));controls.addView(actions);
     TextView start=pill(I18n.t("Bắt đầu Live"),true,()->{});start.setEnabled(false);start.setAlpha(.45f);controls.addView(start,new LinearLayout.LayoutParams(-1,dp(52)));status=text(I18n.t("Đang mở camera…"),12,0xffc9bfd7);status.setGravity(Gravity.CENTER);status.setPadding(0,dp(10),0,dp(4));controls.addView(status,new LinearLayout.LayoutParams(-1,-2));
-    try{rtc=new NativeRtc(this,config,display,null,new NativeRtc.Events(){public void signal(String peer,JSONObject payload){}public void status(String text){status.setText(text);}});final NativeRtc previewRtc=rtc;display.addFrameListener(new org.webrtc.EglRenderer.FrameListener(){private boolean received;public void onFrame(android.graphics.Bitmap bitmap){if(bitmap!=null)bitmap.recycle();if(received)return;received=true;runOnUiThread(()->{if(!previewing||rtc!=previewRtc||isFinishing()||isDestroyed())return;status.setText(I18n.t("Camera đã sẵn sàng · Chưa phát sóng"));start.setEnabled(true);start.setAlpha(1);});}},0f);rtc.media(this,true);rtc.microphone(false);start.setOnClickListener(v->{if(!previewing||!ready||joining)return;topicText=title.getText().toString().trim();start.setEnabled(false);previewLook=rtc.effects();rtc.close();rtc=null;previewing=false;host=true;joining=true;pendingHostMic=mic[0];socket.send(NativeSocket.json("type","create","title",topicText));});}
+    try{rtc=new NativeRtc(this,config,display,null,new NativeRtc.Events(){public void signal(String peer,JSONObject payload){}public void status(String text){status.setText(text);}});final NativeRtc previewRtc=rtc;display.addFrameListener(new org.webrtc.EglRenderer.FrameListener(){private boolean received;public void onFrame(android.graphics.Bitmap bitmap){if(bitmap!=null)bitmap.recycle();if(received)return;received=true;runOnUiThread(()->{if(!previewing||rtc!=previewRtc||isFinishing()||isDestroyed())return;status.setText(I18n.t("Camera đã sẵn sàng · Chưa phát sóng"));start.setEnabled(true);start.setAlpha(1);});}},0f);rtc.media(this,true);rtc.microphone(false);start.setOnClickListener(v->{if(!previewing||!ready||joining)return;topicText=title.getText().toString().trim();start.setEnabled(false);previewLook=rtc.effects();carryPreview=true;previewing=false;host=true;joining=true;pendingHostMic=mic[0];rtc.microphone(pendingHostMic);socket.send(NativeSocket.json("type","create","multiGuest",true,"title",topicText));});}
     catch(Exception error){if(rtc!=null){rtc.close();rtc=null;}status.setText(I18n.t("Không mở được camera. Kiểm tra quyền camera/micro rồi mở lại."));}
   }
   private boolean pendingHostMic=true;
-  private final class ViewerStage extends FrameLayout {
-    float downX,downY;boolean eligible,drag;ViewerStage(){super(LiveActivity.this);}
-    @Override public boolean onInterceptTouchEvent(MotionEvent e){if(e.getActionMasked()==MotionEvent.ACTION_DOWN){downX=e.getX();downY=e.getY();eligible=downY>dp(100)&&downY<getHeight()-dp(160);drag=false;if(chatScroll!=null){android.graphics.Rect bounds=new android.graphics.Rect();chatScroll.getGlobalVisibleRect(bounds);if(bounds.contains((int)e.getRawX(),(int)e.getRawY()))eligible=false;}}if(e.getActionMasked()==MotionEvent.ACTION_MOVE&&LiveSwipePolicy.direction(e.getX()-downX,e.getY()-downY,dp(60),eligible)!=0){drag=true;return true;}return super.onInterceptTouchEvent(e);}
-    @Override public boolean onTouchEvent(MotionEvent e){if(e.getActionMasked()==MotionEvent.ACTION_UP&&drag){int direction=LiveSwipePolicy.direction(e.getX()-downX,e.getY()-downY,dp(60),eligible);if(direction!=0)switchLive(direction);drag=false;return true;}if(e.getActionMasked()==MotionEvent.ACTION_CANCEL)drag=false;return eligible||super.onTouchEvent(e);}
+  private final class ViewerStage extends VerticalMediaStage {
+    ViewerStage(){super(LiveActivity.this,direction->{if(host||!liveRole.equals("viewer"))return false;return switchLive(direction);});}
   }
 
   private void prepareHost() {
@@ -232,6 +230,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
 
   public void onRequestPermissionsResult(int code, String[] p, int[] grants) {
     super.onRequestPermissionsResult(code, p, grants);
+    if(code==302){boolean allowed=grants.length>0;for(int grant:grants)allowed&=grant==0;if(allowed)acceptGuest();else liveToast("Cần quyền micro/camera để lên Live.");return;}
     if (code == 301) {
       if (grants.length == 2 && grants[0] == 0 && grants[1] == 0) prepareHost();
       else { status.setText(I18n.t("Cần quyền camera và micro để phát trực tiếp.")); status.setVisibility(View.VISIBLE); }
@@ -241,17 +240,25 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
   public void event(JSONObject m) {
     String type = m.optString("type");
     if (type.equals("welcome")) {
-      ready = true;
+      ready = true;socketId=m.optString("id");
       renderRooms();
       // Mở từ tab "Trực tiếp": vào thẳng phòng đã chọn.
       String room = getIntent().getStringExtra(EXTRA_ROOM);
-      if (room != null && !joined) { host = false; socket.send(NativeSocket.json("type", "join", "room", room)); getIntent().removeExtra(EXTRA_ROOM); }
+      if (room != null && !joined) { host = false; socket.send(NativeSocket.json("type", "join", "multiGuest", true, "room", room)); getIntent().removeExtra(EXTRA_ROOM); }
       if (getIntent().getBooleanExtra(EXTRA_HOST, false) && !joined) { getIntent().removeExtra(EXTRA_HOST); askTitleAndHost(); }
     }
     if (type.equals("rooms")) { lastRooms = m.optJSONArray("rooms"); if (!joined && !previewing) { renderRooms(); autoJoin(); } }
     if (type.equals("joined")) { joined = true; joining = false; showRoom(m); }
+    if(type.equals("viewers")){JSONArray users=m.optJSONArray("users");String[] names=new String[users==null?0:users.length()];for(int i=0;i<names.length;i++)names[i]=users.optJSONObject(i).optString("name");Sheet sheet=new Sheet(this).setTitle(I18n.t("Người đang xem")).setNegativeButton(I18n.t("Đóng"),null);if(names.length>0)sheet.setItems(names,(d,n)->{});else sheet.setMessage(I18n.t("Chưa có người xem"));sheet.show();return;}
+    if(type.equals("live-stage")){applyLiveStage(m);return;}
+    if(type.equals("live-guest-invitation")){invitation(m);return;}
+    if(type.equals("live-guest-state")){guestRequests=m.optJSONArray("requests")==null?new JSONArray():m.optJSONArray("requests");if(guestAction!=null){guestAction.setText(String.valueOf(guestRequests.length()));guestAction.setVisibility(guestRequests.length()>0?View.VISIBLE:View.GONE);}return;}
+    if(type.equals("live-guest-list")){guestUsers=m.optJSONArray("users")==null?new JSONArray():m.optJSONArray("users");guestManagement();return;}
+    if(type.equals("live-guest-requested")){guestRequested=true;liveToast("Đã gửi yêu cầu lên Live");return;}
+    if(type.equals("live-guest-cancelled")||type.equals("live-guest-declined")){guestRequested=false;liveToast(type.equals("live-guest-declined")?"Chủ phòng đã từ chối yêu cầu":"Đã hủy yêu cầu");return;}
+    if(type.equals("live-guest-error")){clearPendingGuest();liveToast(m.optString("message"));return;}
     if (type.equals("peer") && rtc != null) rtc.offer(m.optString("id"));
-    if (type.equals("signal") && rtc != null) rtc.signal(m.optString("from"), m);
+    if (type.equals("signal") && rtc != null && (liveState==null||m.optInt("revision")==0||m.optInt("revision")==liveState.optInt("revision"))) rtc.signal(m.optString("from"), m);
     if (type.equals("peer-left") && rtc != null) rtc.remove(m.optString("id"));
     if(type.equals("count")&&viewers!=null){viewers.setText(String.valueOf(m.optInt("viewers")));renderAudience(m.optJSONArray("users"));}
     if(type.equals("viewer-joined")&&m.optJSONObject("user")!=null)showArrival(m.optJSONObject("user").optString("name"));
@@ -269,7 +276,8 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
   private void showArrival(String name){if(arrival==null)return;arrival.removeCallbacks(clearArrival);arrival.setText(name+" "+I18n.t("vừa tham gia"));arrival.setVisibility(View.VISIBLE);arrival.setAlpha(0);arrival.animate().alpha(1).setDuration(180).start();arrival.postDelayed(clearArrival,3500);}
   private final Runnable clearArrival=()->{if(arrival!=null)arrival.setVisibility(View.GONE);};
   private void sendReaction(String kind){if(socket==null||System.currentTimeMillis()-lastReaction<400)return;lastReaction=System.currentTimeMillis();socket.send(NativeSocket.json("type","live-reaction","kind",kind));}
-  private void gifts(){new Sheet(this).setTitle(I18n.t("Quà tặng miễn phí")).setItems(new String[]{"🌹 "+I18n.t("Hoa hồng"),"⭐ "+I18n.t("Ngôi sao"),"👑 "+I18n.t("Vương miện")},(d,n)->sendReaction(new String[]{"rose","star","crown"}[n])).setNegativeButton(I18n.t("Đóng"),null).show();}
+  private void gifts(){toggleLiveTray("gifts");}
+
   private void showReaction(String kind,String name){if(reactionLayer==null||reactionLayer.getChildCount()>20)return;String glyph=kind.equals("rose")?"🌹":kind.equals("star")?"⭐":kind.equals("crown")?"👑":"♥";TextView heart=text(glyph,kind.equals("heart")?30:42,0xffff4f91);heart.setGravity(Gravity.CENTER);FrameLayout layer=reactionLayer;FrameLayout.LayoutParams at=new FrameLayout.LayoutParams(dp(64),dp(72),Gravity.RIGHT|Gravity.BOTTOM);at.rightMargin=dp(10+(int)(Math.random()*55));at.bottomMargin=dp(90);layer.addView(heart,at);heart.animate().translationY(-dp(210+(int)(Math.random()*120))).translationX(-dp((int)(Math.random()*70))).rotation((float)(Math.random()*35-17)).alpha(0).setDuration(2000).withEndAction(()->layer.removeView(heart)).start();if(!kind.equals("heart")&&chat!=null)addChat(name,I18n.t("đã gửi")+" "+glyph);}
 
   private ScrollView chatScroll;
@@ -284,7 +292,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     JSONObject first = lastRooms.optJSONObject(0);
     if (first == null) return;
     joining = true;
-    socket.send(NativeSocket.json("type", "join", "room", first.optString("id")));
+    socket.send(NativeSocket.json("type", "join", "multiGuest", true, "room", first.optString("id")));
   }
 
   private int roomIndex(String id) {
@@ -292,11 +300,12 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     return -1;
   }
 
-  private void switchLive(final int direction) {
-    if (host || previewing || socket==null || !ready || System.currentTimeMillis() - swipeAt < 900 || joining) return;
+  private int liveEnter;
+  private boolean switchLive(final int direction) {
+    if (host || liveRole.equals("guest") || previewing || socket==null || !ready || System.currentTimeMillis() - swipeAt < 400 || joining) return false;
     int index = roomIndex(currentRoom);
     final JSONObject next = lastRooms == null ? null : lastRooms.optJSONObject(index + direction);
-    if (index < 0 || next == null) { Toast.makeText(this, direction > 0 ? I18n.t("Bạn đã xem đến buổi live cuối.") : I18n.t("Đây là buổi live đầu tiên."), Toast.LENGTH_SHORT).show(); return; }
+    if (index < 0 || next == null) { Toast.makeText(this, direction > 0 ? I18n.t("Bạn đã xem đến buổi live cuối.") : I18n.t("Đây là buổi live đầu tiên."), Toast.LENGTH_SHORT).show(); return false; }
     swipeAt = System.currentTimeMillis();
     joining = true;
     final View stage = liveStage;
@@ -305,13 +314,13 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
       socket.send(NativeSocket.json("type", "leave"));
       if (rtc != null) { rtc.close(); rtc = null; }
       joined = false;
-      socket.send(NativeSocket.json("type", "join", "room", next.optString("id")));
+      socket.send(NativeSocket.json("type", "join", "multiGuest", true, "room", next.optString("id")));
     };
-    if (stage == null) { go.run(); return; }
-    stage.animate().translationY(-direction * stage.getHeight()).alpha(0.4f).setDuration(220).withEndAction(go).start();
+    liveEnter=direction;if(stage instanceof VerticalMediaStage)((VerticalMediaStage)stage).exit(direction,go);else go.run();return true;
   }
 
   private void roomEnded() {
+    clearPendingGuest();pendingInvitation=null;
     if (rtc != null) { rtc.close(); rtc = null; }
     joined = false;
     int index = roomIndex(currentRoom);
@@ -352,206 +361,92 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
   }
 
   // Phòng live giống web (live-immersive): video toàn màn, thẻ chủ live, cột thao tác bên phải, chat nổi.
-  private void showRoom(JSONObject m) {
-    root.removeAllViews();
-    root.setBackgroundColor(0xff000000);
-    getWindow().setStatusBarColor(0xff000000);
-    getWindow().setNavigationBarColor(0xff000000);
-    getWindow().getDecorView().setSystemUiVisibility(0);
-    final JSONObject room = m.optJSONObject("room") == null ? new JSONObject() : m.optJSONObject("room");
-    FrameLayout stage = new FrameLayout(this);
-    root.addView(stage, new LinearLayout.LayoutParams(-1, 0, 1));
-    currentRoom = m.optJSONObject("room") == null ? "" : m.optJSONObject("room").optString("id");
-    liveStage = stage;
-    if (!host) {
-      TextView hint = text(I18n.t("Vuốt lên để xem live khác"), 12, 0xccffffff);
-      hint.setShadowLayer(4, 0, 1, 0xcc000000);
-      hint.setGravity(Gravity.CENTER);
-      FrameLayout.LayoutParams hp = new FrameLayout.LayoutParams(-1, -2, Gravity.CENTER);
-      stage.addView(hint, hp);
-      hint.animate().alpha(0f).setStartDelay(2500).setDuration(600).start();
-    }
-    SurfaceViewRenderer display = new SurfaceViewRenderer(this);
-    stage.addView(display, new FrameLayout.LayoutParams(-1, -1));
-    View shade = new View(this);
-    shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x66000000, 0x00000000, 0x00000000, 0x88000000 }));
-    stage.addView(shade, new FrameLayout.LayoutParams(-1, -1));
-    reactionLayer=new FrameLayout(this);stage.addView(reactionLayer,new FrameLayout.LayoutParams(-1,-1));
 
-    LinearLayout center = column();
-    center.setGravity(Gravity.CENTER_HORIZONTAL);
-    center.addView(icon("radio", 0xa6ffffff), new LinearLayout.LayoutParams(dp(34), dp(34)));
-    status = text(host ? I18n.t("Bạn đang phát trực tiếp") : I18n.t("Đang kết nối buổi live…"), 12, 0xa6ffffff);
-    status.setGravity(Gravity.CENTER);
-    status.setPadding(0, dp(12), 0, 0);
-    center.addView(status);
-    final LinearLayout statusBox = center;
-    stage.addView(center, new FrameLayout.LayoutParams(-1, -2, Gravity.CENTER));
+  private JSONObject roomInfo=new JSONObject(),liveState,pendingInvitation;
+  private JSONArray guestUsers=new JSONArray(),guestRequests=new JSONArray();
+  private String liveRole="viewer",inviteMode="video",socketId="";private boolean liveGuestsSupported;
+  private SurfaceViewRenderer localLive,pendingGuestLocal;private NativeRtc pendingGuestRtc;private boolean carryPreview;
+  private LiveBoard liveBoard;
+  private TextView guestAction;private LinearLayout liveSide;
+  private boolean guestRequested,liveMic=true,liveCam=true,livePlaybackMuted;
+  private Dialog guestSheet,invitationSheet;
 
-    String hostName = room.optString("host", host ? "Bạn" : "Chủ buổi live");
-    LinearLayout heading = row();
-    LinearLayout chip = row();
-    chip.setPadding(dp(5), dp(5), dp(12), dp(5));
-    chip.setBackground(round(0x7016121e, 28));
-    TextView hav = text(hostName.isEmpty() ? "K" : hostName.substring(0, 1).toUpperCase(), 13, 0xffffffff);
-    hav.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-    hav.setGravity(Gravity.CENTER);
-    GradientDrawable ring = round(0xff6c47e0, 99);
-    ring.setStroke(dp(1), 0x88ffffff);
-    hav.setBackground(ring);
-    chip.addView(hav, new LinearLayout.LayoutParams(dp(35), dp(35)));
-    LinearLayout who = column();
-    who.setPadding(dp(8), 0, 0, 0);
-    TextView hn = text(hostName, 12, 0xffffffff);
-    hn.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-    hn.setSingleLine(true);
-    hn.setEllipsize(android.text.TextUtils.TruncateAt.END);
-    who.addView(hn);
-    LinearLayout meta = row();
-    TextView pillTag = text("LIVE", 8, 0xffffffff);
-    pillTag.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
-    pillTag.setPadding(dp(4), dp(1), dp(4), dp(1));
-    pillTag.setBackground(round(0xfffe2c55, 3));
-    meta.addView(pillTag);
-    viewers = text(String.valueOf(room.optInt("viewers")), 11, 0xffffffff);
-    viewers.setGravity(Gravity.CENTER);viewers.setIncludeFontPadding(false);viewers.setSingleLine(true);
-    viewers.setPadding(dp(7), 0, 0, 0);
-    meta.setBaselineAligned(false);meta.addView(icon("eye",0xffffffff),new LinearLayout.LayoutParams(dp(12),dp(12)));meta.addView(viewers);
-    LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(-2, -2);
-    mp.topMargin = dp(3);
-    who.addView(meta, mp);
-    chip.addView(who,new LinearLayout.LayoutParams(0,-2,1));
-    heading.addView(chip, new LinearLayout.LayoutParams(0, -2,1));
-    heading.addView(new View(this),new LinearLayout.LayoutParams(dp(12),1));
-    FrameLayout close = new FrameLayout(this);
-    close.setBackground(round(0x7016121e, 99));
-    close.addView(icon("close", 0xffffffff), new FrameLayout.LayoutParams(dp(18), dp(18), Gravity.CENTER));
-    close.setContentDescription(host ? I18n.t("Kết thúc live") : I18n.t("Rời live"));
-    close.setOnClickListener(v -> { if (socket != null) socket.send(NativeSocket.json("type", "leave")); finish(); });
-    heading.addView(close, new LinearLayout.LayoutParams(dp(40), dp(40)));
-    FrameLayout.LayoutParams hp = new FrameLayout.LayoutParams(-1, -2, Gravity.TOP);
-    hp.setMargins(dp(12), dp(12), dp(12), 0);
-    stage.addView(heading, hp);
-    HorizontalScrollView audienceScroll=new HorizontalScrollView(this);audienceScroll.setHorizontalScrollBarEnabled(false);audience=row();audienceScroll.addView(audience);FrameLayout.LayoutParams audienceAt=new FrameLayout.LayoutParams(-1,dp(30),Gravity.TOP);audienceAt.setMargins(dp(12),dp(68),dp(56),0);stage.addView(audienceScroll,audienceAt);
-    arrival=text("",12,0xffffffff);arrival.setPadding(dp(12),dp(7),dp(12),dp(7));arrival.setBackground(round(0xbb6c47e0,18));arrival.setSingleLine(true);arrival.setEllipsize(android.text.TextUtils.TruncateAt.END);arrival.setVisibility(View.GONE);FrameLayout.LayoutParams arrivalAt=new FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM|Gravity.LEFT);arrivalAt.setMargins(dp(14),0,dp(90),dp(235));stage.addView(arrival,arrivalAt);
-
-    TextView title = text(room.optString("title"), 13, 0xffffffff);
-    title.setShadowLayer(4, 0, 1, 0xff000000);
-    title.setLineSpacing(0, 1.2f);
-    FrameLayout.LayoutParams tp = new FrameLayout.LayoutParams(-1, -2, Gravity.TOP);
-    tp.setMargins(dp(16), dp(108), dp(24), 0);title.setMaxLines(2);title.setEllipsize(android.text.TextUtils.TruncateAt.END);
-    if(!room.optString("title").isEmpty()&&!room.optString("title").equals("Trò chuyện cùng Kinnect"))stage.addView(title,tp);
-
-    LinearLayout side = column();
-    side.setGravity(Gravity.CENTER_HORIZONTAL);
-    side.setBackground(round(0x6616121e,24));
-    final String hostId = m.optString("hostUserId",room.optString("hostId"));
-    if (!host && !hostId.isEmpty()) {
-      FrameLayout author = new FrameLayout(this);
-      TextView big = text(hostName.isEmpty() ? "K" : hostName.substring(0, 1).toUpperCase(), 18, 0xffffffff);
-      big.setGravity(Gravity.CENTER);
-      GradientDrawable br = round(0xff6c47e0, 99);
-      br.setStroke(dp(2), 0xffffffff);
-      big.setBackground(br);
-      author.addView(big, new FrameLayout.LayoutParams(dp(50), dp(50), Gravity.TOP | Gravity.CENTER_HORIZONTAL));
-      final boolean[] following = { room.optBoolean("following") };
-      final FrameLayout badge = new FrameLayout(this);
-      GradientDrawable bb = round(following[0] ? ACCENT : 0xfffe2c55, 99);
-      bb.setStroke(dp(2), 0xffffffff);
-      badge.setBackground(bb);
-      final ImageView plus = icon(following[0] ? "check" : "plus", 0xffffffff);
-      badge.addView(plus, new FrameLayout.LayoutParams(dp(12), dp(12), Gravity.CENTER));
-      badge.setContentDescription(following[0] ? I18n.t("Huỷ theo dõi") : I18n.t("Theo dõi"));
-      badge.setOnClickListener(v -> NativeApi.shared.call(following[0] ? "DELETE" : "POST", "/api/users/" + hostId + "/follow", new JSONObject(), (d, e, s) -> {
-        if (e != null || isDestroyed()) return;
-        following[0] = !following[0];
-        GradientDrawable nb = round(following[0] ? ACCENT : 0xfffe2c55, 99);
-        nb.setStroke(dp(2), 0xffffffff);
-        badge.setBackground(nb);
-        android.graphics.drawable.Drawable di = WebIcons.load(this, following[0] ? "check" : "plus");
-        di.setTint(0xffffffff);
-        plus.setImageDrawable(di);
-        badge.setContentDescription(following[0] ? I18n.t("Huỷ theo dõi") : I18n.t("Theo dõi"));
-      }));
-      author.addView(badge, new FrameLayout.LayoutParams(dp(22), dp(22), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL));
-      LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(dp(52), dp(63));
-      ap.bottomMargin = dp(6);
-      side.addView(author, ap);
-    }
-    final String roomId = room.optString("id");
-    if(!host&&!hostId.isEmpty()){
-      side.addView(sideButton("flag",I18n.t("Báo cáo buổi live"),()->{EditText reason=field(I18n.t("Mô tả vi phạm; không gửi lại ảnh CSAM"));new Sheet(this).setTitle(I18n.t("Báo cáo buổi live")).setMessage(I18n.t("Có nguy cơ trẻ em? Ghi rõ CSAE/CSAM và nơi xảy ra. Không tải lại hoặc phát tán nội dung vi phạm.")).setView(reason).setPositiveButton(I18n.t("Gửi báo cáo"),(d,w)->{String details=reason.getText().toString().trim();if(details.length()<5){Toast.makeText(this,I18n.t("Mô tả ít nhất 5 ký tự."),Toast.LENGTH_SHORT).show();return;}NativeApi.shared.call("POST","/api/reports",NativeSocket.json("targetType","user","targetId",hostId,"reason","[Livestream "+roomId+"] "+details),(answer,error,code)->Toast.makeText(this,error==null?I18n.t("Đã gửi báo cáo."):error,Toast.LENGTH_SHORT).show());}).setNegativeButton(I18n.t("Hủy"),null).show();}));
-      side.addView(sideButton("shield_check",I18n.t("Chặn người phát"),()->new Sheet(this).setTitle(I18n.t("Chặn người phát?")).setMessage(I18n.t("Bạn sẽ rời buổi live và không còn thấy người này trong nội dung được hỗ trợ.")).setPositiveButton(I18n.t("Chặn"),(d,w)->NativeApi.shared.call("POST","/api/users/"+hostId+"/block",new JSONObject(),(answer,error,code)->{if(error==null)finish();else Toast.makeText(this,error,Toast.LENGTH_SHORT).show();})).setNegativeButton(I18n.t("Hủy"),null).show()));
-    }
-    side.addView(sideButton("send", I18n.t("Chia sẻ"), () -> {
-      try { startActivity(android.content.Intent.createChooser(new android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, ServerConfig.DEFAULT_ORIGIN + "/?s=live&room=" + roomId), I18n.t("Chia sẻ buổi live"))); } catch (Exception ignored) {}
-    }));
-    if (host) {
-      final boolean[] mic = { true }, cam = { true };
-      side.addView(sideButton("settings",I18n.t("Công cụ"),()->new Sheet(this).setTitle(I18n.t("Công cụ Live")).setItems(new String[]{I18n.t("Bật / tắt micro"),I18n.t("Bật / tắt camera"),I18n.t("Đổi camera"),I18n.t("Hiệu ứng Live"),I18n.t("Khung hình: toàn cảnh / lấp đầy")},(d,n)->{if(rtc==null)return;if(n==0){mic[0]=!mic[0];rtc.microphone(mic[0]);}if(n==1){cam[0]=!cam[0];rtc.camera(cam[0]);}if(n==2)rtc.flip();if(n==3)effectsMenu();if(n==4){fullFrame=!fullFrame;rtc.framing(fullFrame);}}).show()));
-    } else {
-      final boolean[] muted = { false };
-      side.addView(sideButton("sound", I18n.t("Âm thanh"), () -> {
-        muted[0] = !muted[0];
-        audio.adjustStreamVolume(android.media.AudioManager.STREAM_VOICE_CALL, muted[0] ? android.media.AudioManager.ADJUST_MUTE : android.media.AudioManager.ADJUST_UNMUTE, 0);
-        Toast.makeText(this, muted[0] ? I18n.t("Đã tắt tiếng") : I18n.t("Đã bật tiếng"), Toast.LENGTH_SHORT).show();
-      }));
-    }
-    side.addView(sideButton("heart",I18n.t("Thả tim"),()->sendReaction("heart")));
-    side.addView(sideButton("gift",I18n.t("Tặng quà"),this::gifts));
-    FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(dp(56), -2, Gravity.END | Gravity.BOTTOM);
-    sp.setMargins(0, 0, dp(6), dp(76));
-    stage.addView(side, sp);
-
-    chatScroll = new ScrollView(this);
-    chatScroll.setVerticalScrollBarEnabled(false);
-    chatScroll.setVerticalFadingEdgeEnabled(true);
-    chatScroll.setFadingEdgeLength(dp(24));
-    chat = column();
-    chatScroll.addView(chat);
-    FrameLayout.LayoutParams cp = new FrameLayout.LayoutParams(-1, dp(130), Gravity.BOTTOM);
-    cp.setMargins(dp(14), 0, dp(74), dp(72));
-    stage.addView(chatScroll, cp);
-
-    LinearLayout bar = row();
-    bar.setPadding(dp(14), 0, dp(10), 0);
-    bar.setBackground(round(0x33ffffff, 999));
-    final EditText input = new EditText(this);
-    input.setHint(I18n.t("Nói điều gì đó…"));
-    input.setTextColor(0xffffffff);
-    input.setHintTextColor(0xaaffffff);
-    input.setTextSize(14);
-    input.setSingleLine(true);
-    input.setBackground(null);
-    input.setPadding(0, 0, dp(8), 0);
-    bar.addView(input, new LinearLayout.LayoutParams(0, -1, 1));
-    FrameLayout send = new FrameLayout(this);
-    send.addView(icon("send_horizontal", 0xffffffff), new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
-    send.setContentDescription(I18n.t("Gửi bình luận live"));
-    Runnable post = () -> { String value = input.getText().toString().trim(); if (value.isEmpty()) return; socket.send(NativeSocket.json("type", "chat", "text", value)); input.setText(""); };
-    send.setOnClickListener(v -> post.run());
-    input.setOnEditorActionListener((v, a, e) -> { post.run(); return true; });
-    bar.addView(send, new LinearLayout.LayoutParams(dp(40), dp(40)));
-    FrameLayout.LayoutParams barp = new FrameLayout.LayoutParams(-1, dp(46), Gravity.BOTTOM);
-    barp.setMargins(dp(14), 0, dp(14), dp(14));
-    stage.addView(bar, barp);
-
-    rtc = new NativeRtc(this, config, host ? display : null, host ? null : display, new NativeRtc.Events() {
-      public void status(String s) {
-        status.setText(s);
-        statusBox.setVisibility(View.VISIBLE);
-        statusBox.removeCallbacks(hideStatus);
-        statusBox.postDelayed(hideStatus, 3000);
-      }
-      public void signal(String peer, JSONObject payload) { try { payload.put("type", "signal"); payload.put("to", peer); socket.send(payload); } catch (JSONException ignored) {} }
-    });
-    hideStatus = () -> statusBox.setVisibility(View.GONE);
-    audio.setMode(android.media.AudioManager.MODE_IN_COMMUNICATION);
-    audio.setSpeakerphoneOn(true);
-    if (host) {
-      startHostMedia(0);
-    }
+  private FrameLayout liveAction(String glyph,String label,Runnable action){
+    FrameLayout button=new FrameLayout(this);button.setBackground(round(0x38231e35,99));
+    button.addView(icon(glyph,0xffffffff),new FrameLayout.LayoutParams(dp(22),dp(22),Gravity.CENTER));
+    button.setContentDescription(I18n.t(label));button.setOnClickListener(v->action.run());return button;
   }
+  private void liveToast(String value){Toast.makeText(this,I18n.t(value),Toast.LENGTH_SHORT).show();}
+  private void sendLive(String type,Object... values){if(socket==null)return;JSONObject message=NativeSocket.json("type",type);try{for(int i=0;i<values.length;i+=2)message.put(values[i].toString(),values[i+1]);}catch(JSONException ignored){}socket.send(message);}
+  private void confirmLeave(){if(host)new Sheet(this).setTitle(I18n.t("Kết thúc Live?")).setPositiveButton(I18n.t("Kết thúc"),(d,w)->{sendLive("leave");finish();}).setNegativeButton(I18n.t("Ở lại"),null).show();else{sendLive("leave");finish();}}
+  private void showRoom(JSONObject m){
+    if(!carryPreview||!host){if(rtc!=null){rtc.close();rtc=null;}localLive=null;}carryPreview=false;liveState=null;liveTray=null;openTray="";guestRequested=false;guestUsers=new JSONArray();guestRequests=new JSONArray();
+    liveGuestsSupported=m.optBoolean("multiGuest");roomInfo=m.optJSONObject("room")==null?new JSONObject():m.optJSONObject("room");currentRoom=roomInfo.optString("id");liveRole=host?"host":"viewer";
+    root.removeAllViews();root.setBackgroundColor(0xff0d0b13);getWindow().setStatusBarColor(0xff0d0b13);getWindow().setNavigationBarColor(0xff0d0b13);getWindow().getDecorView().setSystemUiVisibility(0);
+    FrameLayout stage=host?new FrameLayout(this):new ViewerStage();liveStage=stage;root.addView(stage,new LinearLayout.LayoutParams(-1,0,1));if(liveEnter!=0){VerticalMediaStage.enter(stage,liveEnter);liveEnter=0;}
+    liveBoard=new LiveBoard();stage.addView(liveBoard,new FrameLayout.LayoutParams(-1,-1));
+    View shade=new View(this);shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0x8807060d,0x00000000,0x00000000,0xc90b0812}));stage.addView(shade,new FrameLayout.LayoutParams(-1,-1));
+    reactionLayer=new FrameLayout(this);stage.addView(reactionLayer,new FrameLayout.LayoutParams(-1,-1));
+    LinearLayout heading=row();heading.setGravity(Gravity.CENTER_VERTICAL);
+    LinearLayout identity=row();identity.setPadding(dp(4),dp(4),dp(10),dp(4));identity.setBackground(round(0x66231c32,28));
+    FrameLayout face=liveAvatar(roomInfo.optString("host",I18n.t("Bạn")),roomInfo.optString("avatar"),30);identity.addView(face,new LinearLayout.LayoutParams(dp(30),dp(30)));
+    LinearLayout copy=column();copy.setPadding(dp(7),0,0,0);TextView name=text(roomInfo.optString("host",I18n.t("Bạn")),12,0xffffffff);name.setSingleLine(true);name.setEllipsize(android.text.TextUtils.TruncateAt.END);name.setTypeface(null,Typeface.BOLD);copy.addView(name,new LinearLayout.LayoutParams(-1,-2));
+    TextView tag=text("LIVE",8,0xffffffff);tag.setTypeface(null,Typeface.BOLD);tag.setPadding(dp(5),dp(1),dp(5),dp(1));tag.setBackground(round(0xfff33667,4));copy.addView(tag,new LinearLayout.LayoutParams(-2,-2));identity.addView(copy,new LinearLayout.LayoutParams(0,-2,1));heading.addView(identity,new LinearLayout.LayoutParams(0,-2,1));
+    HorizontalScrollView avs=new HorizontalScrollView(this);avs.setHorizontalScrollBarEnabled(false);audience=row();avs.addView(audience);LinearLayout.LayoutParams avp=new LinearLayout.LayoutParams(dp(70),dp(30));avp.leftMargin=dp(4);heading.addView(avs,avp);
+    LinearLayout count=row();count.setGravity(Gravity.CENTER);count.addView(icon("eye",0xffffffff),new LinearLayout.LayoutParams(dp(12),dp(12)));viewers=text(String.valueOf(roomInfo.optInt("viewers")),10,0xffffffff);viewers.setSingleLine(true);viewers.setIncludeFontPadding(false);viewers.setPadding(dp(3),0,dp(3),0);count.addView(viewers);count.setOnClickListener(v->sendLive("viewers"));heading.addView(count,new LinearLayout.LayoutParams(-2,dp(36)));
+    heading.addView(liveAction("x",host?"Kết thúc Live":"Rời Live",this::confirmLeave),new LinearLayout.LayoutParams(dp(36),dp(36)));
+    FrameLayout.LayoutParams hp=new FrameLayout.LayoutParams(-1,dp(46),Gravity.TOP);hp.setMargins(dp(10),dp(8),dp(10),0);stage.addView(heading,hp);
+    if(!roomInfo.optString("title").isEmpty()){TextView title=text(roomInfo.optString("title"),11,0xeeffffff);title.setMaxLines(1);title.setEllipsize(android.text.TextUtils.TruncateAt.END);FrameLayout.LayoutParams at=new FrameLayout.LayoutParams(-1,-2,Gravity.TOP);at.setMargins(dp(14),dp(62),dp(14),0);stage.addView(title,at);}
+    status=text(I18n.t("Đang kết nối…"),11,0xffd8cfea);status.setGravity(Gravity.CENTER);status.setBackground(round(0x66231c32,12));status.setPadding(dp(10),dp(7),dp(10),dp(7));FrameLayout.LayoutParams st=new FrameLayout.LayoutParams(-2,-2,Gravity.CENTER);stage.addView(status,st);hideStatus=()->status.setVisibility(View.GONE);
+    arrival=text("",11,0xffffffff);arrival.setPadding(dp(10),dp(6),dp(10),dp(6));arrival.setBackground(round(0xaa6c47e0,18));arrival.setMaxLines(1);arrival.setEllipsize(android.text.TextUtils.TruncateAt.END);arrival.setVisibility(View.GONE);FrameLayout.LayoutParams arrivalAt=new FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM|Gravity.START);arrivalAt.setMargins(dp(12),0,dp(70),dp(194));stage.addView(arrival,arrivalAt);
+    chatScroll=new ScrollView(this);chatScroll.setVerticalScrollBarEnabled(false);chatScroll.setVerticalFadingEdgeEnabled(true);chatScroll.setFadingEdgeLength(dp(18));chat=column();chatScroll.addView(chat);FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(-1,dp(118),Gravity.BOTTOM);cp.setMargins(dp(10),0,dp(66),dp(68));stage.addView(chatScroll,cp);
+    JSONArray history=m.optJSONArray("history");for(int i=0;history!=null&&i<history.length();i++){JSONObject item=history.optJSONObject(i);if(item!=null)addChat(item.optString("name"),item.optString("text"));}
+    LinearLayout side=column();liveSide=side;side.setGravity(Gravity.CENTER_HORIZONTAL);side.addView(liveAction("heart","Thả tim",()->sendReaction("heart")),new LinearLayout.LayoutParams(dp(44),dp(44)));LinearLayout.LayoutParams gap=new LinearLayout.LayoutParams(dp(44),dp(44));gap.topMargin=dp(10);side.addView(liveAction("send","Chia sẻ",this::shareLive),gap);FrameLayout.LayoutParams sp=new FrameLayout.LayoutParams(dp(44),-2,Gravity.BOTTOM|Gravity.END);sp.setMargins(0,0,dp(10),dp(86));stage.addView(side,sp);
+    LinearLayout dock=row();dock.setGravity(Gravity.CENTER_VERTICAL);final EditText input=new KinnectInput(this);input.setHint(I18n.t("Bình luận…"));input.setTextSize(13);input.setTextColor(0xffffffff);input.setHintTextColor(0xbbffffff);input.setSingleLine(true);input.setPadding(dp(12),0,dp(8),0);input.setBackground(round(0x352f283d,24));input.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEND);dock.addView(input,new LinearLayout.LayoutParams(0,dp(42),1));input.setOnEditorActionListener((v,a,e)->{String value=input.getText().toString().trim();if(!value.isEmpty()){sendLive("chat","text",value);input.setText("");}return true;});
+    FrameLayout guests=liveAction("users_round",host?"Khách mời":"Lên Live",this::openGuests);guestAction=text("",8,0xffffffff);guestAction.setGravity(Gravity.CENTER);guestAction.setBackground(round(0xfff33667,99));guestAction.setVisibility(View.GONE);FrameLayout.LayoutParams badgeAt=new FrameLayout.LayoutParams(dp(15),dp(15),Gravity.TOP|Gravity.END);guests.addView(guestAction,badgeAt);
+    for(FrameLayout action:new FrameLayout[]{guests,liveAction("gift","Tặng quà",this::gifts),liveAction("sliders_horizontal","Công cụ",this::liveTools)}){LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(42),dp(44));lp.leftMargin=dp(4);dock.addView(action,lp);}
+    FrameLayout.LayoutParams dp=new FrameLayout.LayoutParams(-1,dp(48),Gravity.BOTTOM);dp.setMargins(dp(10),0,dp(10),dp(10));stage.addView(dock,dp);
+    audio.setMode(android.media.AudioManager.MODE_IN_COMMUNICATION);audio.setSpeakerphoneOn(true);
+    if(!liveGuestsSupported&&config!=null){String publisher=host?socketId:m.optString("host","legacy-host");JSONObject person=NativeSocket.json("id",publisher,"name",roomInfo.optString("host"),"userId",roomInfo.optString("hostId"),"role","host","mode","video");applyLiveStage(NativeSocket.json("room",currentRoom,"selfId",socketId,"role",host?"host":"viewer","revision",0,"layout","panel","participants",new JSONArray().put(person),"peers",new JSONArray()));}
+  }
+  private FrameLayout liveAvatar(String name,String path,int size){FrameLayout frame=new FrameLayout(this);frame.setBackground(round(0xff7353ba,99));frame.setClipToOutline(true);TextView initial=text(name.isEmpty()?"K":name.substring(0,1).toUpperCase(),Math.max(10,size/3),0xffffffff);initial.setGravity(Gravity.CENTER);frame.addView(initial,new FrameLayout.LayoutParams(-1,-1));if(path.startsWith("/api/users/"))NativeApi.shared.image(path,bytes->{if(isDestroyed()||bytes==null)return;android.graphics.Bitmap bitmap=android.graphics.BitmapFactory.decodeByteArray(bytes,0,bytes.length);if(bitmap!=null){ImageView image=new ImageView(this);image.setScaleType(ImageView.ScaleType.CENTER_CROP);image.setImageBitmap(bitmap);frame.addView(image,new FrameLayout.LayoutParams(-1,-1));}});return frame;}
+  private final class LiveBoard extends ViewGroup {
+    String layout="panel";LiveBoard(){super(LiveActivity.this);setBackgroundColor(0xff100d19);}
+    protected void onMeasure(int w,int h){int width=MeasureSpec.getSize(w),height=MeasureSpec.getSize(h);setMeasuredDimension(width,height);for(int i=0;i<getChildCount();i++){android.graphics.Rect r=tile(i,width,height);getChildAt(i).measure(MeasureSpec.makeMeasureSpec(r.width(),MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(r.height(),MeasureSpec.EXACTLY));}}
+    private android.graphics.Rect tile(int i,int w,int h){int n=getChildCount();if(n<=1)return new android.graphics.Rect(0,0,w,h);int top=dp(92),bottom=Math.max(top+dp(120),h-dp(226)),gap=dp(4),left=dp(8),width=w-dp(16);if(layout.equals("panel")){int main=width*62/100;if(i==0)return new android.graphics.Rect(left,top,left+main-gap,bottom);int slot=(bottom-top)/(n-1),y=top+(i-1)*slot;return new android.graphics.Rect(left+main, y,w-left, i==n-1?bottom:y+slot-gap);}int columns=2,rows=(n+1)/2,cw=(width-gap)/columns,ch=(bottom-top-gap*(rows-1))/rows,x=left+(i%2)*(cw+gap),y=top+(i/2)*(ch+gap);return new android.graphics.Rect(x,y,x+cw,y+ch);}
+    protected void onLayout(boolean c,int l,int t,int r,int b){for(int i=0;i<getChildCount();i++){android.graphics.Rect at=tile(i,r-l,b-t);getChildAt(i).layout(at.left,at.top,at.right,at.bottom);}}
+  }
+  private void applyLiveStage(JSONObject state){
+    if(!currentRoom.equals(state.optString("room"))||liveBoard==null)return;
+    if(liveState!=null&&state.optInt("revision")==liveState.optInt("revision")){liveState=state;guestRequested=state.optBoolean("requested");liveBoard.layout=state.optString("layout","panel");liveBoard.requestLayout();return;}
+    String role=state.optString("role","viewer");boolean publishing=!role.equals("viewer"),changed=!role.equals(liveRole);liveRole=role;host=role.equals("host");liveState=state;guestRequested=state.optBoolean("requested");
+    if(rtc!=null&&(changed||!publishing&&localLive!=null)){rtc.close();rtc=null;localLive=null;}else if(rtc!=null)rtc.resetLivePeers();
+    if(publishing&&pendingGuestRtc!=null){rtc=pendingGuestRtc;localLive=pendingGuestLocal;pendingGuestRtc=null;pendingGuestLocal=null;}
+    liveBoard.removeAllViews();liveBoard.layout=state.optString("layout","panel");if(rtc==null){localLive=publishing?new SurfaceViewRenderer(this):null;rtc=new NativeRtc(this,config,localLive,null,new NativeRtc.Events(){public void status(String value){status.setText(value);status.setVisibility(View.VISIBLE);status.removeCallbacks(hideStatus);status.postDelayed(hideStatus,2500);}public void signal(String peer,JSONObject value){try{value.put("type","signal");value.put("to",peer);if(liveState!=null)value.put("revision",liveState.optInt("revision"));socket.send(value);}catch(JSONException ignored){}}});if(publishing)try{rtc.media(this,!state.optString("mode").equals("audio"));rtc.microphone(host?pendingHostMic:true);liveMic=host?pendingHostMic:true;liveCam=true;if(previewLook!=null&&rtc.effects()!=null){LiveEffects fx=rtc.effects();fx.filter=previewLook.filter;fx.sticker=previewLook.sticker;fx.beautyOn=previewLook.beautyOn;fx.smooth=previewLook.smooth;fx.blemish=previewLook.blemish;fx.eyes=previewLook.eyes;fx.lips=previewLook.lips;previewLook=null;}}catch(Exception error){liveToast("Không mở được camera/micro.");if(host){sendLive("leave");finish();}else sendLive("live-guest-leave");return;}}
+    rtc.events(new NativeRtc.Events(){public void status(String value){status.setText(value);status.setVisibility(View.VISIBLE);status.removeCallbacks(hideStatus);status.postDelayed(hideStatus,2500);}public void signal(String peer,JSONObject value){try{value.put("type","signal");value.put("to",peer);if(liveState!=null)value.put("revision",liveState.optInt("revision"));socket.send(value);}catch(JSONException ignored){}}});
+    JSONArray people=state.optJSONArray("participants");for(int i=0;people!=null&&i<people.length();i++){JSONObject person=people.optJSONObject(i);if(person==null)continue;FrameLayout tile=new FrameLayout(this);tile.setBackground(round(0xff221b33,14));tile.setClipToOutline(true);String id=person.optString("id");boolean self=id.equals(state.optString("selfId"));boolean video=!person.optString("mode").equals("audio");if(video){SurfaceViewRenderer display=self?localLive:new SurfaceViewRenderer(this);if(display!=null){if(display.getParent()instanceof ViewGroup)((ViewGroup)display.getParent()).removeView(display);tile.addView(display,new FrameLayout.LayoutParams(-1,-1));if(!self)rtc.bindLive(id,display);}}else{FrameLayout avatar=liveAvatar(person.optString("name"),person.optString("avatar"),56);tile.addView(avatar,new FrameLayout.LayoutParams(dp(56),dp(56),Gravity.CENTER));}
+      TextView label=text(person.optString("name")+(self?" · "+I18n.t("Bạn"):""),10,0xffffffff);label.setSingleLine(true);label.setEllipsize(android.text.TextUtils.TruncateAt.END);label.setPadding(dp(7),dp(4),dp(7),dp(4));label.setBackground(round(0x88201a2c,9));FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM);lp.setMargins(dp(5),0,dp(5),dp(5));tile.addView(label,lp);liveBoard.addView(tile);}
+    rtc.playback(!livePlaybackMuted);liveBoard.requestLayout();JSONArray peers=state.optJSONArray("peers");for(int i=0;peers!=null&&i<peers.length();i++){JSONObject peer=peers.optJSONObject(i);if(peer!=null&&peer.optBoolean("offer"))rtc.offer(peer.optString("id"));}status.setVisibility(View.GONE);
+  }
+  private void shareLive(){try{startActivity(android.content.Intent.createChooser(new android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT,ServerConfig.DEFAULT_ORIGIN+"/?s=live&room="+currentRoom),I18n.t("Chia sẻ buổi live")));}catch(Exception ignored){}}
+  private HorizontalScrollView liveTray;private String openTray="";
+  private void liveTools(){toggleLiveTray("tools");}
+  private void toggleLiveTray(String value){if(liveStage==null)return;if(liveTray!=null){liveStage.removeView(liveTray);liveTray=null;}if(openTray.equals(value)){openTray="";if(chatScroll!=null)chatScroll.setVisibility(View.VISIBLE);if(liveSide!=null)liveSide.setVisibility(View.VISIBLE);return;}openTray=value;if(chatScroll!=null)chatScroll.setVisibility(View.INVISIBLE);if(liveSide!=null)liveSide.setVisibility(View.INVISIBLE);if(arrival!=null)arrival.setVisibility(View.GONE);android.view.inputmethod.InputMethodManager keyboard=(android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);keyboard.hideSoftInputFromWindow(root.getWindowToken(),0);liveTray=new HorizontalScrollView(this);liveTray.setHorizontalScrollBarEnabled(false);liveTray.setBackground(round(0xf2231c31,22));LinearLayout items=row();items.setPadding(dp(8),dp(8),dp(8),dp(8));liveTray.addView(items);
+    if(value.equals("gifts")){for(String[] gift:new String[][]{{"rose","🌹","Hoa hồng"},{"star","⭐","Ngôi sao"},{"crown","👑","Vương miện"}}){LinearLayout tile=column();tile.setGravity(Gravity.CENTER);TextView art=text(gift[1],30,0xffffffff);art.setGravity(Gravity.CENTER);tile.addView(art);TextView name=text(I18n.t(gift[2]),10,0xffffffff);name.setGravity(Gravity.CENTER);tile.addView(name);TextView free=text(I18n.t("Miễn phí"),9,0xffc6b4ec);free.setGravity(Gravity.CENTER);tile.addView(free);tile.setOnClickListener(v->sendReaction(gift[0]));items.addView(tile,new LinearLayout.LayoutParams(dp(86),dp(84)));}}
+    else{if(!liveRole.equals("viewer")){trayTool(items,liveMic?"mic":"mic",liveMic?"Tắt mic":"Bật mic",()->{liveMic=!liveMic;rtc.microphone(liveMic);refreshTools();});if(host||liveState==null||!liveState.optString("mode").equals("audio")){trayTool(items,liveCam?"camera":"camera_off",liveCam?"Tắt camera":"Bật camera",()->{liveCam=!liveCam;rtc.camera(liveCam);refreshTools();});trayTool(items,"switch_camera","Đổi camera",()->rtc.flip());trayTool(items,"sparkles","Hiệu ứng",this::effectsMenu);}}if(host){trayTool(items,"grid","Lưới",()->sendLive("live-layout","layout","grid"));trayTool(items,"users_round","Chủ phòng lớn",()->sendLive("live-layout","layout","panel"));}else{trayTool(items,"flag","Báo cáo",this::reportLive);trayTool(items,"shield_check","Chặn",this::blockLive);trayTool(items,"user_plus",roomInfo.optBoolean("following")?"Bỏ theo dõi":"Theo dõi",this::followLive);trayTool(items,"volume_2",livePlaybackMuted?"Bật tiếng":"Tắt tiếng",()->{livePlaybackMuted=!livePlaybackMuted;if(rtc!=null)rtc.playback(!livePlaybackMuted);refreshTools();});}trayTool(items,"send","Chia sẻ",this::shareLive);}
+    FrameLayout.LayoutParams at=new FrameLayout.LayoutParams(-1,dp(value.equals("gifts")?104:96),Gravity.BOTTOM);at.setMargins(dp(10),0,dp(10),dp(66));liveStage.addView(liveTray,at);liveTray.setAlpha(0);liveTray.setTranslationY(dp(12));liveTray.animate().alpha(1).translationY(0).setDuration(180).start();
+  }
+  private void refreshTools(){openTray="";toggleLiveTray("tools");}
+  private void trayTool(LinearLayout row,String glyph,String name,Runnable action){LinearLayout tile=column();tile.setGravity(Gravity.CENTER);tile.addView(icon(glyph,0xffffffff),new LinearLayout.LayoutParams(dp(24),dp(24)));TextView label=text(I18n.t(name),10,0xffffffff);label.setGravity(Gravity.CENTER);label.setMaxLines(2);label.setPadding(dp(2),dp(6),dp(2),0);tile.addView(label,new LinearLayout.LayoutParams(-1,-2));tile.setContentDescription(I18n.t(name));tile.setOnClickListener(v->action.run());row.addView(tile,new LinearLayout.LayoutParams(dp(70),dp(76)));}
+  private void blockLive(){new Sheet(this).setTitle(I18n.t("Chặn người phát?")).setPositiveButton(I18n.t("Chặn"),(d,w)->NativeApi.shared.call("POST","/api/users/"+roomInfo.optString("hostId")+"/block",new JSONObject(),(data,error,code)->{if(error==null)finish();else liveToast(error);})).setNegativeButton(I18n.t("Hủy"),null).show();}
+  private void followLive(){boolean following=roomInfo.optBoolean("following");NativeApi.shared.call(following?"DELETE":"POST","/api/users/"+roomInfo.optString("hostId")+"/follow",new JSONObject(),(data,error,code)->{if(isDestroyed())return;if(error!=null){liveToast(error);return;}try{roomInfo.put("following",!following);}catch(JSONException ignored){}refreshTools();});}
+  private void reportLive(){EditText reason=field(I18n.t("Mô tả vi phạm; không gửi lại ảnh CSAM"));new Sheet(this).setTitle(I18n.t("Báo cáo buổi live")).setView(reason).setPositiveButton(I18n.t("Gửi báo cáo"),(d,w)->{String value=reason.getText().toString().trim();if(value.length()<5){liveToast("Mô tả ít nhất 5 ký tự.");return;}NativeApi.shared.call("POST","/api/reports",NativeSocket.json("targetType","user","targetId",roomInfo.optString("hostId"),"reason","[Live "+currentRoom+"] "+value),(data,error,code)->liveToast(error==null?"Đã gửi báo cáo.":error));}).setNegativeButton(I18n.t("Hủy"),null).show();}
+  private void openGuests(){if(!liveGuestsSupported){liveToast("Cần cập nhật máy chủ để dùng khách mời.");return;}if(host){sendLive("live-guest-list");return;}if(liveRole.equals("guest")){new Sheet(this).setTitle(I18n.t("Bạn đang lên Live")).setItems(new String[]{I18n.t("Rời ghế khách")},(d,n)->sendLive("live-guest-leave")).show();return;}if(guestRequested){new Sheet(this).setTitle(I18n.t("Đang chờ chủ phòng duyệt")).setPositiveButton(I18n.t("Hủy yêu cầu"),(d,w)->sendLive("live-guest-cancel")).setNegativeButton(I18n.t("Đóng"),null).show();return;}new Sheet(this).setTitle(I18n.t("Xin lên Live")).setMessage(I18n.t("Camera và micro chỉ bật sau khi bạn đồng ý lên Live.")).setItems(new String[]{I18n.t("Tham gia bằng video"),I18n.t("Chỉ âm thanh")},(d,n)->sendLive("live-guest-request","mode",n==0?"video":"audio")).show();}
+  private void guestManagement(){if(!host)return;if(guestSheet!=null)guestSheet.dismiss();LinearLayout body=column();body.setPadding(dp(4),0,dp(4),0);TextView hint=text(I18n.t("Mời người đang xem · Tối đa 3 khách"),12,MUTED);hint.setGravity(Gravity.CENTER);body.addView(hint);for(int i=0;i<guestRequests.length();i++){JSONObject u=guestRequests.optJSONObject(i);if(u!=null)guestRow(body,u,true);}for(int i=0;i<guestUsers.length();i++){JSONObject u=guestUsers.optJSONObject(i);if(u!=null)guestRow(body,u,false);}if(guestUsers.length()==0&&guestRequests.length()==0){TextView empty=text(I18n.t("Chưa có người xem để mời"),14,MUTED);empty.setPadding(dp(8),dp(24),dp(8),dp(24));empty.setGravity(Gravity.CENTER);body.addView(empty);}ScrollView scroll=new ScrollView(this);scroll.addView(body);guestSheet=new Sheet(this).setTitle(I18n.t("Khách mời")).setView(scroll).setNegativeButton(I18n.t("Đóng"),null).show();}
+  private void guestRow(LinearLayout body,JSONObject u,boolean request){LinearLayout line=row();line.setPadding(0,dp(8),0,dp(8));line.addView(liveAvatar(u.optString("name"),u.optString("avatar"),36),new LinearLayout.LayoutParams(dp(36),dp(36)));TextView name=text(u.optString("name"),13,TEXT);name.setMaxLines(2);name.setPadding(dp(8),0,dp(4),0);line.addView(name,new LinearLayout.LayoutParams(0,-2,1));String label=request?"Duyệt":u.optBoolean("onStage")?"Gỡ":"Mời";TextView action=pill(I18n.t(label),true,()->{sendLive(request?"live-guest-approve":u.optBoolean("onStage")?"live-guest-remove":"live-guest-invite","to",u.optString("id"));if(guestSheet!=null)guestSheet.dismiss();});action.setTextSize(12);line.addView(action,new LinearLayout.LayoutParams(dp(66),dp(40)));if(request){TextView no=text("×",24,MUTED);no.setGravity(Gravity.CENTER);no.setContentDescription(I18n.t("Từ chối"));no.setOnClickListener(v->{sendLive("live-guest-decline","to",u.optString("id"));if(guestSheet!=null)guestSheet.dismiss();});line.addView(no,new LinearLayout.LayoutParams(dp(36),dp(40)));}body.addView(line);}
+  private void invitation(JSONObject message){if(!currentRoom.equals(message.optString("room")))return;pendingInvitation=message;if(invitationSheet!=null)invitationSheet.dismiss();invitationSheet=new Sheet(this).setTitle(I18n.t("Mời lên Live")).setMessage(message.optJSONObject("from").optString("name")+" · "+I18n.t("Mời bạn trò chuyện cùng")).setItems(new String[]{I18n.t("Tham gia bằng video"),I18n.t("Chỉ âm thanh")},(d,n)->{inviteMode=n==0?"video":"audio";acceptGuest();}).setNegativeButton(I18n.t("Từ chối"),(d,w)->{if(pendingInvitation!=null)sendLive("live-guest-answer","token",pendingInvitation.optString("token"),"accept",false);pendingInvitation=null;}).show();}
+  private void clearPendingGuest(){if(pendingGuestRtc!=null){pendingGuestRtc.close();pendingGuestRtc=null;pendingGuestLocal=null;}}
+  private void acceptGuest(){if(!joined||socket==null||!ready){clearPendingGuest();return;}if(pendingInvitation==null||pendingInvitation.optLong("expiresAt")<System.currentTimeMillis()){pendingInvitation=null;liveToast("Lời mời đã hết hạn.");return;}if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED||inviteMode.equals("video")&&checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED){requestPermissions(inviteMode.equals("video")?new String[]{Manifest.permission.CAMERA,Manifest.permission.RECORD_AUDIO}:new String[]{Manifest.permission.RECORD_AUDIO},302);return;}try{clearPendingGuest();pendingGuestLocal=new SurfaceViewRenderer(this);pendingGuestRtc=new NativeRtc(this,config,pendingGuestLocal,null,new NativeRtc.Events(){public void signal(String peer,JSONObject value){}public void status(String value){}});pendingGuestRtc.media(this,inviteMode.equals("video"));}catch(Exception error){clearPendingGuest();sendLive("live-guest-answer","token",pendingInvitation.optString("token"),"accept",false);pendingInvitation=null;liveToast("Không mở được camera/micro.");return;}sendLive("live-guest-answer","token",pendingInvitation.optString("token"),"accept",true,"mode",inviteMode);pendingInvitation=null;}
 
   private Runnable hideStatus = () -> {};
 
@@ -590,15 +485,16 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
 
   public void closed() {
     if (isFinishing()) return;
-    ready = false;
+    ready = false;clearPendingGuest();pendingInvitation=null;
     status.setText(I18n.t("Đã mất kết nối. Hãy mở lại mục Trực tiếp."));
     status.setVisibility(View.VISIBLE);
     if (rtc != null) { rtc.close(); rtc = null; }
   }
 
-  protected void onStop() { super.onStop(); if (joined || previewing) finish(); }
+  protected void onStop() { super.onStop(); if ((joined || previewing) && !isChangingConfigurations()) finish(); }
 
   protected void onDestroy() {
+    clearPendingGuest();
     if (socket != null) socket.close();
     if (rtc != null) rtc.close();
     if (audio != null) { audio.setMode(previousMode); audio.setSpeakerphoneOn(previousSpeaker); }

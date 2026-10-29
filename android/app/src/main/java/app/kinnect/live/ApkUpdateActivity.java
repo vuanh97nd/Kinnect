@@ -26,10 +26,10 @@ public final class ApkUpdateActivity extends Activity {
  @Override public void onCreate(Bundle state){super.onCreate(state);setTitle(I18n.t("Cập nhật Kinnect"));
   LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(24),dp(40),dp(24),dp(24));root.setGravity(Gravity.CENTER);root.setBackgroundColor(0xfff6f5fa);
   ImageView logo=new ImageView(this);logo.setImageResource(getResources().getIdentifier("kinnect_logo","drawable",getPackageName()));root.addView(logo,new LinearLayout.LayoutParams(dp(72),dp(72)));
-  TextView title=new TextView(this);title.setText(I18n.t("Cập nhật Kinnect ")+getIntent().getStringExtra("version"));title.setTextSize(22);title.setTextColor(0xff271b3d);title.setGravity(Gravity.CENTER);title.setPadding(0,dp(20),0,dp(20));root.addView(title);
-  status=new TextView(this);status.setGravity(Gravity.CENTER);status.setTextColor(0xff625674);status.setText(I18n.t("Đang chuẩn bị tải…"));root.addView(status);
+  TextView title=new KinnectText(this);title.setText(I18n.t("Cập nhật Kinnect ")+getIntent().getStringExtra("version"));title.setTextSize(22);title.setTextColor(0xff271b3d);title.setGravity(Gravity.CENTER);title.setPadding(0,dp(20),0,dp(20));root.addView(title);
+  status=new KinnectText(this);status.setGravity(Gravity.CENTER);status.setTextColor(0xff625674);status.setText(I18n.t("Đang chuẩn bị tải…"));root.addView(status);
   bar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);bar.setMax(100);LinearLayout.LayoutParams row=new LinearLayout.LayoutParams(-1,dp(24));row.topMargin=dp(20);root.addView(bar,row);
-  Button cancel=new Button(this);cancel.setText(I18n.t("Huỷ cập nhật"));cancel.setOnClickListener(v->finish());root.addView(cancel);setContentView(root);
+  Button cancel=new KinnectButton(this);cancel.setText(I18n.t("Huỷ cập nhật"));cancel.setOnClickListener(v->finish());root.addView(cancel);setContentView(root);
   new Thread(this::download,"kinnect-apk-download").start();
  }
  private HttpURLConnection connect(String url)throws Exception{

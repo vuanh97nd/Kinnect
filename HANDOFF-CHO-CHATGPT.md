@@ -1,3 +1,7 @@
+## Cập nhật mới nhất — APK 1.0.17 / Play candidate 1.2.4
+
+Live thiết kế lại, khách mời video/audio tối đa 3 người; công cụ/quà xổ ngang. Giữ vị trí feed khi trở về; tap lại về đầu/tải mới. Hai nhánh Studio Pro/Tiếp tục sau chọn/quay video. Đồng bộ phông và popup chữ gọn; bỏ nút sửa ở Giới thiệu. Vuốt media dùng chung controller, loại bỏ handler video bị trùng. Tắt cuộc gọi phải hủy nối lại, kể cả khi offline. Xem docs/releases/v1.0.17.md và artifact.json về kiểm tra, giới hạn và việc chưa xác minh trên máy thật. Khởi động lại riêng Node bằng scripts/server-manager.mjs restart-server để áp dụng backend, giữ tunnel. Không đưa work/private reviewer/signing keys vào nguồn.
+
 ## Cập nhật mới nhất — APK 1.0.16 / Play candidate 1.2.3
 
 220 vector icon đồng bộ theo hướng bo mềm, ô màu; giữ K trắng và thanh điều hướng. Kéo xuống đầu feed/video đầu để làm mới, double tap Bảng tin trong 550 ms; giữ thẻ/dữ liệu không đổi. Sửa nhãn tab/bộ lọc bị cắt ở font130. Chi tiết và kiểm tra: docs/releases/v1.0.16.md, docs/cloud-handoff/artifact.json. Google Play chưa nộp; chưa kiểm tra điện thoại thật. Không đưa work/private reviewer/signing keys vào Git hoặc gói nguồn.

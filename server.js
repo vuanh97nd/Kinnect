@@ -1,3 +1,4 @@
+import {createLiveGuests} from './lib/live-guests.js';
 import {createApkDownload} from './lib/apk-download.js';
 import { publishedApk } from './lib/apk-releases.js';
 import {createTyping} from './lib/typing.js';
@@ -268,7 +269,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     }
     if (path === "/health") {
       res.writeHead(200, { "Content-Type": "application/json" });
-      return res.end(JSON.stringify({ ok: true, version: "0.3.1", uiVersion: "2026-10-26-new-ui", liveChatHistory: true, storyViewers: true }));
+      return res.end(JSON.stringify({ ok: true, version: "0.3.1", uiVersion: "2026-10-26-new-ui", liveChatHistory: true, storyViewers: true,liveGuests:true,liveMaxGuests:3 }));
     }
     const files = {
       "/third-party-notices.txt": ["third-party-notices.txt", "text/plain"],
@@ -496,6 +497,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         send(ws, { type: "ended" });
       }
     }
+    for(const room of rooms.values())liveGuests.access(room);
     listing();
   }
   function liveAudience(room, viewerId) {
@@ -507,9 +509,10 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
       if(entrant&&entrant!==peer&&!social.blocked(peer.userId,entrant.userId))send(peer,{type:'viewer-joined',room:room.id,user:users.find(u=>u.id===entrant.userId)});
     }
   }
+  const liveGuests=createLiveGuests({send,social});
   function leave(ws) {
     const room = rooms.get(ws.room);
-    ws.room = null;
+    ws.room = null;ws.legacyLiveRoom=null;
     if (!room) return;
     room.members.delete(ws.id);
     if (room.host === ws) {
@@ -519,6 +522,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     } else {
       send(room.host, { type: "peer-left", id: ws.id });
       livePresence(room);
+      liveGuests.left(room,ws);
     }
     listing();
   }
@@ -588,15 +592,17 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
           chatHistory: [],
           created: Date.now(),
         };
+        ws.liveV2=m.multiGuest===true;liveGuests.init(room);
         rooms.set(room.id, room);
         ws.room = room.id;
         send(ws, {
-          type: "joined",
+          type: "joined",multiGuest:true,
           role: "host",
           history: [],
           aiModeration:!!social.ai.status().moderation,
           room: { id: room.id, title: room.title, host: room.host.name, hostId: room.host.userId, avatar: social.user(room.host.userId)?.avatar ? "/api/users/"+room.host.userId+"/avatar":null, viewers:liveAudience(room,ws.userId).length },
         });
+        liveGuests.state(room);
         listing();
         return;
       }
@@ -615,16 +621,18 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         ws.name = account.name;
         ws.room = room.id;
         const firstVisit=![...room.members.values()].some(peer=>peer.userId===ws.userId);
+        ws.liveV2=m.multiGuest===true;
         room.members.set(ws.id, ws);
         send(ws, {
-          type: "joined",
+          type: "joined",multiGuest:true,
           role: "viewer",
           room: { id: room.id, title: room.title, host: room.host.name, hostId: room.host.userId, avatar: social.user(room.host.userId)?.avatar ? "/api/users/"+room.host.userId+"/avatar":null, viewers:liveAudience(room,ws.userId).length },
           host: room.host.id,
           hostUserId: room.host.userId,
           history: (room.chatHistory || []).filter(message => !social.blocked(ws.userId, message.senderId) && social.user(message.senderId)?.suspended === 0),
         });
-        send(room.host, { type: "peer", id: ws.id });
+        if(!room.host.liveV2)send(room.host, { type: "peer", id: ws.id });
+        liveGuests.state(room);
         livePresence(room,firstVisit?ws:null);
         listing();
         return;
@@ -635,6 +643,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
       }
       const room = rooms.get(ws.room);
       if (!room) return error("Bạn chưa tham gia phòng.");
+      if(liveGuests.handle(room,ws,m))return;
       if(m.type==='live-frame'){
         if(ws!==room.host||!social.ai.status().moderation||Date.now()-(ws.aiFrameAt||0)<15000)return;
         ws.aiFrameAt=Date.now();const image=m.image;if(!image||image.mime!=='image/jpeg'||typeof image.data!=='string'||image.data.length>200000||!/^[A-Za-z0-9+/]+={0,2}$/.test(image.data))return;
@@ -679,13 +688,15 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         }
       }
       if (m.type === "signal") {
+        if(m.description&&!liveGuests.isPublisher(room,ws)&&(m.description.type==='offer'||/^a=send(?:recv|only)\r?$/m.test(m.description.sdp||'')))return;
+        if(ws.liveV2&&room.host.liveV2&&m.revision!==room.stageRevision)return;
         const target = room.members.get(m.to);
         if (
           !target ||
           !target.authRequest ||
           !social.authenticate(target.authRequest) ||
           target === ws ||
-          (ws !== room.host && target !== room.host)
+          !liveGuests.canSignal(room,ws,target)
         )
           return;
         if (
@@ -696,10 +707,11 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
           send(target, {
             type: "signal",
             from: ws.id,
+            revision:room.host.liveV2?room.stageRevision:0,
             description: m.description,
           });
         else if (m.candidate && typeof m.candidate === "object")
-          send(target, { type: "signal", from: ws.id, candidate: m.candidate });
+          send(target, { type: "signal", from: ws.id, revision:room.host.liveV2?room.stageRevision:0,candidate: m.candidate });
       }
     });
     ws.on("close", () => {typing.disconnect(ws);calls.disconnect(ws);leave(ws);});

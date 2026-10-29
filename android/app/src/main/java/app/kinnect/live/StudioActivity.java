@@ -72,7 +72,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   private GradientDrawable round(int color, float radius) { GradientDrawable g = new GradientDrawable(); g.setColor(color); g.setCornerRadius(dp(radius)); return g; }
 
   private TextView text(String s, float size, int color, boolean bold) {
-    TextView t = new TextView(this);
+    TextView t = new KinnectText(this);
     t.setText(s);
     t.setTextSize(size);
     t.setTextColor(color);
@@ -1053,7 +1053,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     search.setPadding(dp(14), 0, dp(14), 0);
     search.setBackground(round(soft, 999));
     search.addView(icon("search", muted), new LinearLayout.LayoutParams(dp(18), dp(18)));
-    final EditText query = new EditText(this);
+    final EditText query = new KinnectInput(this);
     query.setHint(I18n.t("Tìm bài hát hoặc nghệ sĩ"));
     query.setHintTextColor(muted);
     query.setTextColor(ink);
@@ -1226,7 +1226,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     if (w != null) {
       w.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0));
       w.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, Math.round(getResources().getDisplayMetrics().heightPixels * 0.86f));
-      w.setGravity(Gravity.BOTTOM);
+      ApprovedTypography.sheet(w.getDecorView());w.setGravity(Gravity.BOTTOM);
       w.setDimAmount(0.5f);
       w.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
     }
@@ -1241,7 +1241,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   }
 
   private TextView plain(String s, float size, int color, boolean bold) {
-    TextView t = new TextView(this);
+    TextView t = new KinnectText(this);
     t.setText(s);
     t.setTextSize(size);
     t.setTextColor(color);

@@ -54,7 +54,7 @@ final class Sheet {
   }
 
   private TextView text(CharSequence s, int size, int color, boolean bold) {
-    TextView t = new TextView(context);
+    TextView t = new KinnectText(context);
     t.setText(s);
     t.setTextSize(size);
     t.setIncludeFontPadding(false);
@@ -82,12 +82,12 @@ final class Sheet {
     gp.bottomMargin = dp(14);
     box.addView(grip, gp);
     if (title != null && title.length() > 0) {
-      TextView t = text(title, 19, ink, true);
-      t.setPadding(0, dp(2), 0, dp(8));
+      TextView t = text(title, 16, ink, true);
+      t.setTag("sheet:title");t.setPadding(0, dp(2), 0, dp(8));
       box.addView(t);
     }
     if (message != null) {
-      TextView m = text(message, 14, muted, false);
+      TextView m = text(message, 13, muted, false);
       m.setPadding(0, 0, 0, dp(14));
       m.setLineSpacing(0, 1.3f);
       box.addView(m);
@@ -124,7 +124,7 @@ final class Sheet {
           row.addView(box2);
           row.setOnClickListener(v -> { checked[index] = !checked[index]; box2.setChecked(checked[index]); if (onCheck != null) onCheck.onClick(dialog, index, checked[index]); });
         } else row.setOnClickListener(v -> { dialog.dismiss(); if (onItem != null) onItem.onClick(dialog, index); });
-        TextView t = text(label, 16, danger ? 0xffe0245e : ink, false);
+        TextView t = text(label, 13, danger ? 0xffe0245e : ink, false);
         if (itemIcons != null && i < itemIcons.length) {
           int iconId = WebIcons.resolve(context,itemIcons[i]);
           if (iconId != 0) {
@@ -136,7 +136,7 @@ final class Sheet {
             row.addView(icon, ip);
           }
         }
-        t.setTypeface(ApprovedTypography.font(context,Typeface.BOLD));
+        t.setTypeface(ApprovedTypography.font(context,Typeface.NORMAL));
         row.addView(t, new LinearLayout.LayoutParams(0, -2, 1));
         if (i > 0) {
           View sep = new View(context);
@@ -162,7 +162,7 @@ final class Sheet {
     if (w != null) {
       w.setBackgroundDrawable(new ColorDrawable(0));
       w.setLayout(Math.min(context.getResources().getDisplayMetrics().widthPixels, dp(560)), ViewGroup.LayoutParams.WRAP_CONTENT);
-      w.setGravity(Gravity.BOTTOM);
+      ApprovedTypography.sheet(w.getDecorView());w.setGravity(Gravity.BOTTOM);
       w.setDimAmount(0.5f);
       w.setWindowAnimations(android.R.style.Animation_InputMethod);
       w.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
@@ -182,7 +182,7 @@ final class Sheet {
     GradientDrawable field = round(bg, 14);
     field.setStroke(dp(1), line);
     e.setBackground(field);
-    e.setTextSize(15);
+    e.setTextSize(14);
     e.setPadding(dp(14), dp(13), dp(14), dp(13));
     if (e.getParent() == null || e.getParent() instanceof LinearLayout) {
       LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
@@ -192,7 +192,7 @@ final class Sheet {
   }
 
   private Button button(Dialog dialog, CharSequence label, DialogInterface.OnClickListener l, int which, boolean primary) {
-    Button b = new Button(context);
+    Button b = new KinnectButton(context);
     b.setText(label);
     b.setAllCaps(false);
     b.setTextSize(15);

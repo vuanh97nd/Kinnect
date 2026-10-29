@@ -15,17 +15,17 @@ public final class KinnectService extends Service implements NativeSocket.Events
  static JSONObject pendingIncoming;static boolean pendingAccept;static volatile boolean appVisible;
  private NativeSocket socket;private boolean ready;private final Handler main=new Handler(Looper.getMainLooper());private long retry=1000;private android.net.ConnectivityManager.NetworkCallback networkCallback;
  static void start(Context c){try{Intent i=new Intent(c,KinnectService.class);if(Build.VERSION.SDK_INT>=26&&(!Distribution.PLAY||c.getSharedPreferences("play_privacy",0).getBoolean("background_messages",false)))c.startForegroundService(i);else c.startService(i);}catch(RuntimeException blocked){}}
- static void stop(Context c){c.stopService(new Intent(c,KinnectService.class));}
+ static void stop(Context c){if(NativeApi.shared.cookieFor(ServerConfig.DEFAULT_ORIGIN).isEmpty())NativeCallEnds.clear();c.stopService(new Intent(c,KinnectService.class));}
  static void listen(NativeSocket.Events e){if(!listeners.contains(e))listeners.add(e);if(instance!=null&&instance.ready)e.event(NativeSocket.json("type","welcome"));}
  static void unlisten(NativeSocket.Events e){listeners.remove(e);}
- static void send(JSONObject m){if(instance!=null&&instance.socket!=null)instance.socket.send(m);}
+ static void send(JSONObject m){String type=m.optString("type");boolean terminal=type.equals("call-end")||type.equals("call-decline")||type.equals("call-cancel");if(terminal)NativeCallEnds.mark(m);if(instance!=null&&instance.socket!=null&&(!terminal||instance.ready))instance.socket.send(m);}
  static int res(Context c,String type,String name){return c.getResources().getIdentifier(name,type,c.getPackageName());}
  static Uri sound(Context c,String name){return Uri.parse("android.resource://"+c.getPackageName()+"/raw/"+name);}
  static void channels(Context c){NotificationManager nm=c.getSystemService(NotificationManager.class);
   NotificationChannel call=new NotificationChannel(CH_CALL,I18n.t("Cuộc gọi đến"),NotificationManager.IMPORTANCE_HIGH);call.setDescription(I18n.t("Cuộc gọi thoại và video Kinnect"));call.setSound(sound(c,"kinnect_ring"),new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());call.enableVibration(true);call.setVibrationPattern(CALL_VIBRATE);call.enableLights(true);call.setLightColor(0xff7c5cff);call.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);call.setBypassDnd(!Distribution.PLAY);nm.createNotificationChannel(call);
   NotificationChannel msg=new NotificationChannel(CH_MSG,I18n.t("Tin nhắn và thông báo"),NotificationManager.IMPORTANCE_HIGH);msg.setSound(sound(c,"kinnect_notify"),new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());msg.enableVibration(true);msg.setVibrationPattern(MSG_VIBRATE);msg.enableLights(true);msg.setLightColor(0xff7c5cff);msg.setShowBadge(true);nm.createNotificationChannel(msg);
   NotificationChannel bg=new NotificationChannel(CH_BG,I18n.t("Hoạt động nền"),NotificationManager.IMPORTANCE_MIN);bg.setDescription(I18n.t("Giữ kết nối để nhận cuộc gọi và tin nhắn"));bg.setShowBadge(false);bg.setSound(null,null);nm.createNotificationChannel(bg);}
- @Override public void onCreate(){super.onCreate();instance=this;channels(this);NativeApi.shared.initialize(this,ServerConfig.DEFAULT_ORIGIN);main.postDelayed(poll,45000);try{networkCallback=new android.net.ConnectivityManager.NetworkCallback(){public void onAvailable(android.net.Network network){main.post(()->{if(instance==KinnectService.this&&!ready){if(socket!=null){socket.close();socket=null;}connect();}});}};getSystemService(android.net.ConnectivityManager.class).registerDefaultNetworkCallback(networkCallback);}catch(RuntimeException ignored){} }
+ @Override public void onCreate(){super.onCreate();instance=this;channels(this);NativeApi.shared.initialize(this,ServerConfig.DEFAULT_ORIGIN);NativeCallEnds.initialize(this);main.postDelayed(poll,45000);try{networkCallback=new android.net.ConnectivityManager.NetworkCallback(){public void onAvailable(android.net.Network network){main.post(()->{if(instance==KinnectService.this&&!ready){if(socket!=null){socket.close();socket=null;}connect();}});}};getSystemService(android.net.ConnectivityManager.class).registerDefaultNetworkCallback(networkCallback);}catch(RuntimeException ignored){} }
  @Override public int onStartCommand(Intent intent,int flags,int id){
   Intent open=new Intent(this,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
   Notification.Builder backgroundBuilder=new Notification.Builder(this,CH_BG).setSmallIcon(res(this,"drawable","ic_web_bell")).setContentTitle(I18n.t("Kinnect đang hoạt động")).setContentText(Distribution.PLAY?I18n.t("Đồng bộ tin nhắn giữa web và điện thoại"):I18n.t("Sẵn sàng nhận cuộc gọi và tin nhắn")).setOngoing(true).setColor(0xff7c5cff).setContentIntent(PendingIntent.getActivity(this,0,open,PendingIntent.FLAG_IMMUTABLE));
@@ -39,7 +39,9 @@ public final class KinnectService extends Service implements NativeSocket.Events
  // Dự phòng khi socket lỡ sự kiện (mạng chập chờn, Doze): hỏi lại máy chủ mỗi 45 giây.
  private final Runnable poll=new Runnable(){public void run(){if(instance!=KinnectService.this)return;fetchNotifications();main.postDelayed(this,45000);}};
  @Override public void event(JSONObject m){String type=m.optString("type");
-  if(type.equals("welcome")){ready=true;retry=1000;fetchNotifications();}
+  if(type.equals("welcome")){ready=true;retry=1000;for(JSONObject terminal:NativeCallEnds.pending())socket.send(terminal);fetchNotifications();}
+  if(type.equals("call-ended"))NativeCallEnds.acknowledged(m);
+  if(type.equals("call-incoming")&&NativeCallEnds.contains(m.optString("callId")))return;
   if(type.equals("call-incoming")){pendingIncoming=m;pendingAccept=false;if(!appVisible)ringNotification(m);}
   if(type.equals("call-ended")&&pendingIncoming!=null&&pendingIncoming.optString("callId").equals(m.optString("callId")))clearCall();
   if(type.equals("call-accepted")&&pendingIncoming!=null&&pendingIncoming.optString("callId").equals(m.optString("callId"))){pendingIncoming=null;cancelCallNotification(this);}

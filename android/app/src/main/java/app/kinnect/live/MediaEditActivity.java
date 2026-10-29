@@ -162,7 +162,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
   private static ShapeDrawable oval() { return new ShapeDrawable(new android.graphics.drawable.shapes.OvalShape()); }
   private GradientDrawable rounded(int color, float radius) { GradientDrawable g = new GradientDrawable(); g.setColor(color); g.setCornerRadius(dp(radius)); return g; }
 
-  private TextView label(String text, float size, int color) { TextView t = new TextView(this); t.setText(text); t.setTextSize(size); t.setTextColor(color); return t; }
+  private TextView label(String text, float size, int color) { TextView t = new KinnectText(this); t.setText(text); t.setTextSize(size); t.setTextColor(color); return t; }
 
   private boolean proApplied;private EditorProject proBefore;
   private void build() {
@@ -587,7 +587,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
   private void addText() { EditorProject.Layer l = newLayer("text", 3); l.text = ""; l.style = "stroke"; editText(l, true); }
 
   private void editText(EditorProject.Layer layer, boolean adding) {
-    EditText field = new EditText(this); field.setText(layer.text); field.setHint(I18n.t("Nhập chữ")); field.setSelection(field.getText().length()); field.setMinLines(2); field.setMaxLines(6);
+    EditText field = new KinnectInput(this); field.setText(layer.text); field.setHint(I18n.t("Nhập chữ")); field.setSelection(field.getText().length()); field.setMinLines(2); field.setMaxLines(6);
     FrameLayout wrap = new FrameLayout(this); wrap.setPadding(dp(20), dp(8), dp(20), 0); wrap.addView(field);
     AlertDialog dialog = new AlertDialog.Builder(this).setTitle(adding ? I18n.t("Thêm chữ") : I18n.t("Sửa chữ")).setView(wrap)
       .setPositiveButton("Xong", (d, w) -> {
