@@ -1,7 +1,7 @@
 {
-  "version": "1.0.12",
-  "filename": "Kinnect-1.0.12-native.apk",
-  "sha256": "8695d25b1c4ba68297edd619b53f20c48dcef16cd3d35dc7aaaec3dd60d96be4",
+  "version": "1.0.13",
+  "filename": "Kinnect-1.0.13-native.apk",
+  "sha256": "705621fa69129012434ef69f564669957a33d9c533c6c3ac41092603c5b943f6",
   "playVersion": "1.2.1",
   "languages": [
     "vi",
@@ -19,5 +19,5 @@
     "realPayoutVerified": false,
     "separateWalletShop": "Web 320/390/768/1024/1366: no section overlap; independent account menu entries. Native 320dp font130: layout audit passed."
   },
-  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.12"
+  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.13"
 }
