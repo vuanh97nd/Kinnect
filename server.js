@@ -1,3 +1,4 @@
+import {createApkDownload} from './lib/apk-download.js';
 import { publishedApk } from './lib/apk-releases.js';
 import {createTyping} from './lib/typing.js';
 import {createCalls} from "./lib/calls.js";
@@ -14,11 +15,12 @@ import { randomUUID } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { fileURLToPath } from "node:url";
 
-export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSender, emailReady } = {}) {
+export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSender, emailReady, apkDirectory=fileURLToPath(new URL("./dist/",import.meta.url)) } = {}) {
   loadMailEnv();
   loadMailEnv("oauth.env");
   loadMailEnv("turn.env");
   loadMailEnv("ai.env");
+  const downloadApk=createApkDownload(apkDirectory,new URL("./dist/published-apk.json",import.meta.url));
   let notifyAIStream = () => {};
   let notifyNotifications = () => {};
   let pushNotification = () => {};
@@ -243,6 +245,8 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     }
     // Nút "Tải app": tự tìm APK của bản phát hành mới nhất trên GitHub và chuyển thẳng tới file để tải.
     if (path === "/download/android") {
+      if(!["GET","HEAD"].includes(req.method)){res.writeHead(405,{Allow:"GET, HEAD"});return res.end();}
+      if(await downloadApk(req,res))return;
       const fallback = "https://github.com/vuanh97nd/Kinnect/releases/latest";
       try {
         if (!latestApk || latestApk.expires < Date.now()) {
@@ -266,30 +270,38 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
       return res.end(JSON.stringify({ ok: true, version: "0.3.1", uiVersion: "2026-10-26-new-ui", liveChatHistory: true, storyViewers: true }));
     }
     const files = {
+      "/kinnect-logo-v106.svg": ["kinnect-logo-v106.svg", "image/svg+xml"],
+      "/kinnect-logo-v106-32.png": ["kinnect-logo-v106-32.png", "image/png"],
+      "/kinnect-logo-v106-120.png": ["kinnect-logo-v106-120.png", "image/png"],
+      "/kinnect-logo-v106-152.png": ["kinnect-logo-v106-152.png", "image/png"],
+      "/kinnect-logo-v106-167.png": ["kinnect-logo-v106-167.png", "image/png"],
+      "/kinnect-logo-v106-180.png": ["kinnect-logo-v106-180.png", "image/png"],
+      "/kinnect-logo-v106-192.png": ["kinnect-logo-v106-192.png", "image/png"],
+      "/kinnect-logo-v106-512.png": ["kinnect-logo-v106-512.png", "image/png"],
       "/website/support.html": ["website/support.html", "text/html"],
       "/website/privacy.html": ["website/privacy.html", "text/html"],
       "/website/community.html": ["website/community.html", "text/html"],
-      "/kinnect-mark.svg": ["kinnect-mark.svg", "image/svg+xml"],
+      "/kinnect-mark.svg": ["kinnect-logo-v106.svg", "image/svg+xml"],
       "/favicon.ico": ["favicon.ico", "image/x-icon"],
-      "/favicon-32.png": ["favicon-32.png", "image/png"],
-      "/kinnect-ios-120-v7.png": ["kinnect-ios-120-v7.png", "image/png"],
-      "/apple-touch-icon-120x120.png": ["kinnect-ios-120-v7.png", "image/png"],
-      "/apple-touch-icon-120x120-precomposed.png": ["kinnect-ios-120-v7.png", "image/png"],
-      "/kinnect-ios-152-v7.png": ["kinnect-ios-152-v7.png", "image/png"],
-      "/apple-touch-icon-152x152.png": ["kinnect-ios-152-v7.png", "image/png"],
-      "/apple-touch-icon-152x152-precomposed.png": ["kinnect-ios-152-v7.png", "image/png"],
-      "/kinnect-ios-167-v7.png": ["kinnect-ios-167-v7.png", "image/png"],
-      "/apple-touch-icon-167x167.png": ["kinnect-ios-167-v7.png", "image/png"],
-      "/apple-touch-icon-167x167-precomposed.png": ["kinnect-ios-167-v7.png", "image/png"],
-      "/kinnect-ios-180-v7.png": ["kinnect-ios-180-v7.png", "image/png"],
-      "/apple-touch-icon-180x180.png": ["kinnect-ios-180-v7.png", "image/png"],
-      "/apple-touch-icon-180x180-precomposed.png": ["kinnect-ios-180-v7.png", "image/png"],
+      "/favicon-32.png": ["kinnect-logo-v106-32.png", "image/png"],
+      "/kinnect-ios-120-v7.png": ["kinnect-logo-v106-120.png", "image/png"],
+      "/apple-touch-icon-120x120.png": ["kinnect-logo-v106-120.png", "image/png"],
+      "/apple-touch-icon-120x120-precomposed.png": ["kinnect-logo-v106-120.png", "image/png"],
+      "/kinnect-ios-152-v7.png": ["kinnect-logo-v106-152.png", "image/png"],
+      "/apple-touch-icon-152x152.png": ["kinnect-logo-v106-152.png", "image/png"],
+      "/apple-touch-icon-152x152-precomposed.png": ["kinnect-logo-v106-152.png", "image/png"],
+      "/kinnect-ios-167-v7.png": ["kinnect-logo-v106-167.png", "image/png"],
+      "/apple-touch-icon-167x167.png": ["kinnect-logo-v106-167.png", "image/png"],
+      "/apple-touch-icon-167x167-precomposed.png": ["kinnect-logo-v106-167.png", "image/png"],
+      "/kinnect-ios-180-v7.png": ["kinnect-logo-v106-180.png", "image/png"],
+      "/apple-touch-icon-180x180.png": ["kinnect-logo-v106-180.png", "image/png"],
+      "/apple-touch-icon-180x180-precomposed.png": ["kinnect-logo-v106-180.png", "image/png"],
       "/kinnect-icon-192.png": ["kinnect-icon-192.png", "image/png"],
-      "/apple-touch-icon.png": ["apple-touch-icon.png", "image/png"],
-      "/apple-touch-icon-v5.png": ["apple-touch-icon-v5.png", "image/png"],
-      "/apple-touch-icon-v6.png": ["apple-touch-icon-v6.png", "image/png"],
-      "/apple-touch-icon-precomposed.png": ["apple-touch-icon.png", "image/png"],
-      "/website/apple-touch-icon.png": ["website/apple-touch-icon.png", "image/png"],
+      "/apple-touch-icon.png": ["kinnect-logo-v106-180.png", "image/png"],
+      "/apple-touch-icon-v5.png": ["kinnect-logo-v106-180.png", "image/png"],
+      "/apple-touch-icon-v6.png": ["kinnect-logo-v106-180.png", "image/png"],
+      "/apple-touch-icon-precomposed.png": ["kinnect-logo-v106-180.png", "image/png"],
+      "/website/apple-touch-icon.png": ["kinnect-logo-v106-180.png", "image/png"],
       "/website/": ["website/index.html", "text/html"],
       "/website/index.html": ["website/index.html", "text/html"],
       "/website/style.css": ["website/style.css", "text/css"],

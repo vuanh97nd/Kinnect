@@ -1997,7 +1997,7 @@ body:has(#auth[hidden]):has(#app[hidden])::before {
   inset: 0;
   z-index: 1500;
   background:
-    url("/kinnect-icon.png?v=4") center calc(50% - 10px) / 84px 84px no-repeat,
+    url("/kinnect-logo-v106.svg") center calc(50% - 10px) / 84px 84px no-repeat,
     radial-gradient(120% 70% at 50% 0%, #efe9ff 0%, var(--bg) 60%);
   animation: boot-pulse 1.2s ease-in-out infinite alternate;
 }

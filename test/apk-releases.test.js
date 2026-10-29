@@ -29,7 +29,7 @@ test('stable latest remains discoverable when missing from the release collectio
 
 test('download redirects to the selected APK without browser caching; outage opens the releases page', async () => {
   for (const offline of [false,true]) {
-    const app=createApp({fetchImpl:async url=>{if(offline)throw Error('offline');return new Response(JSON.stringify(url.endsWith('/latest')?release('v0.8.4'):[release('v0.7.1')]),{status:200});}});
+    const app=createApp({apkDirectory:null,fetchImpl:async url=>{if(offline)throw Error('offline');return new Response(JSON.stringify(url.endsWith('/latest')?release('v0.8.4'):[release('v0.7.1')]),{status:200});}});
     await new Promise(resolve=>app.server.listen(0,'127.0.0.1',resolve));
     try {
       const response=await fetch('http://127.0.0.1:'+app.server.address().port+'/download/android',{redirect:'manual'});

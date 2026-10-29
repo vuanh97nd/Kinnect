@@ -2810,3 +2810,24 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 @keyframes kinnect-ring-left{to{transform:translateX(-5px)}}@keyframes kinnect-ring-right{to{transform:translateX(5px)}}
 @media(prefers-color-scheme:dark){.kinnect-boot{background:#151419}.kinnect-boot>.kinnect-boot-tagline{color:#b1aabd}}
 @media(prefers-reduced-motion:reduce){.kinnect-boot-rings>i{animation:none;transform:translateX(-5px)}.kinnect-boot-rings>i+i{transform:translateX(5px)}}
+
+/* Public profile information shares the APK tab order and content groups. */
+#kn .profile-with-about-tab{display:block;min-width:0}
+#kn .profile-with-about-tab .profile-content{min-width:0}
+#kn .profile-about-details{padding:18px;border-radius:16px}
+#kn .profile-about-details .profile-facts-title{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}
+#kn .profile-about-details h2{font-size:18px;margin:0}
+#kn .profile-about-details .profile-facts-title>span{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--k-muted)}
+#kn .profile-about-details svg{width:16px;height:16px;flex-shrink:0}
+#kn .profile-about-details h3{font-size:13px;margin:0 0 8px;color:var(--k-muted);font-weight:500}
+#kn .profile-about-bio{margin-bottom:18px}
+#kn .profile-about-bio p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.6;margin:0}
+#kn .profile-about-details .profile-fact-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px}
+#kn .profile-about-details .profile-fact{display:flex;flex-direction:column;gap:5px;padding:12px 0;border-bottom:1px solid var(--k-line);min-width:0}
+#kn .profile-about-details .profile-fact small{font-size:12px;color:var(--k-muted)}
+#kn .profile-about-details .profile-fact strong{font-size:14px;font-weight:500;overflow-wrap:anywhere}
+#kn .profile-about-interests{margin-top:18px}
+#kn .profile-about-joined{display:flex;align-items:center;gap:7px;color:var(--k-muted);font-size:12px;margin:18px 0;line-height:1.5}
+#kn .profile-with-about-tab .tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:3px}
+#kn .profile-with-about-tab .tabs>button{flex:1;white-space:nowrap;padding-left:8px;padding-right:8px}
+@media(max-width:519px){#kn .profile-about-details{padding:16px}#kn .profile-about-details .profile-fact-grid{grid-template-columns:minmax(0,1fr)}#kn .profile-with-about-tab .tabs>button{font-size:12px}}

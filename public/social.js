@@ -1321,7 +1321,7 @@ function openNotificationCenter() {
 async function showSystemNotification(n) {
   if (!("Notification" in window) || Notification.permission !== "granted" || !document.hidden) return;
   const title = n.kind === "message" ? "Tin nhắn mới từ " + n.actor.name : "Thông báo từ " + n.actor.name;
-  const options = { body: n.kind === "message" ? "Bạn có tin nhắn mới trên Kinnect." : NOTE_TEXT[n.kind] || "Có hoạt động mới trên Kinnect.", icon: "/kinnect-icon-192.png", tag: "kinnect-" + n.id, data: { url: n.kind === "message" ? "/?chat=" + encodeURIComponent(n.actor.id) : "/" } };
+  const options = { body: n.kind === "message" ? "Bạn có tin nhắn mới trên Kinnect." : NOTE_TEXT[n.kind] || "Có hoạt động mới trên Kinnect.", icon: "/kinnect-logo-v106.svg", tag: "kinnect-" + n.id, data: { url: n.kind === "message" ? "/?chat=" + encodeURIComponent(n.actor.id) : "/" } };
   try {
     const registration = await navigator.serviceWorker?.getRegistration();
     if (registration?.active) await registration.showNotification(title, options);

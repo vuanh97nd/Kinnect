@@ -36,3 +36,11 @@ release=json.loads(run('gh','api','repos/'+repo+'/releases/'+str(release['id']))
 if asset.get('digest')!='sha256:'+metadata['sha256']:raise RuntimeError('Uploaded checksum mismatch; release remains draft')
 run('gh','release','edit',tag,'--repo',repo,'--draft=false','--latest')
 print(run('gh','release','view',tag,'--repo',repo,'--json','url','--jq','.url'))
+
+metadata["publishedRelease"]="https://github.com/"+repo+"/releases/tag/"+tag
+(root/"docs/cloud-handoff/artifact.json").write_text(json.dumps(metadata,ensure_ascii=False,indent=2)+"\n",encoding="utf8")
+
+release_pointer=root/"dist/published-apk.json"
+temporary_pointer=release_pointer.with_suffix(".json.tmp")
+temporary_pointer.write_text(json.dumps({key:metadata[key] for key in ["version","filename","sha256","publishedRelease"]},indent=2)+"\n",encoding="utf8")
+os.replace(temporary_pointer,release_pointer)

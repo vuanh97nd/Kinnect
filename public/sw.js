@@ -1,6 +1,6 @@
-const CACHE = 'kinnect-static-v33-app-parity';
+const CACHE = 'kinnect-static-v34-brand106-download';
 self.addEventListener('message', event => { if(event.data === 'SKIP_WAITING') self.skipWaiting(); });
-const STATIC = ['/v2.css','/v2.js','/v2-icons.js','/camera.js','/media-editor.js','/media-editor.css','/kinnect-icon-192.png','/apple-touch-icon.png','/offline.html'];
+const STATIC = ['/v2.css','/v2.js','/v2-icons.js','/camera.js','/media-editor.js','/media-editor.css','/kinnect-logo-v106.svg','/apple-touch-icon.png','/offline.html'];
 // Cài đặt từng tệp riêng để một tệp lỗi không làm hỏng toàn bộ việc đăng ký SW.
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(async cache => {
@@ -13,7 +13,7 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => { event.waitUntil(self.clients.claim().then(() => caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('kinnect-static-') && key !== CACHE).map(key => caches.delete(key)))))); });
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
-  if (event.request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
+  if (event.request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/') || url.pathname.startsWith('/download/')) return;
   if (event.request.mode === 'navigate') {
     const offlinePage = () => caches.match('/offline.html');
     event.respondWith(self.navigator.onLine === false
@@ -43,7 +43,7 @@ async function ringCall(d) {
   const video = d.mode !== 'audio', title = d.from?.name || 'Kinnect';
   const options = {
     body: video ? '📹 Cuộc gọi video đến · Chạm để trả lời' : '📞 Cuộc gọi thoại đến · Chạm để trả lời',
-    icon: d.icon || '/kinnect-icon-192.png', badge: '/kinnect-icon-192.png', tag: 'kinnect-call-' + d.callId,
+    icon: d.icon || '/kinnect-logo-v106.svg', badge: '/kinnect-logo-v106.svg', tag: 'kinnect-call-' + d.callId,
     requireInteraction: true, renotify: true, silent: false, vibrate: RING,
     actions: [{ action: 'accept', title: video ? 'Trả lời video' : 'Trả lời' }, { action: 'decline', title: 'Từ chối' }],
     data: { url: '/?call=' + encodeURIComponent(d.callId), callId: d.callId, call: true },
@@ -63,12 +63,12 @@ async function endCall(d) {
   open.forEach(n => n.close());
   if (d.reason === 'answered' || d.reason === 'declined') {
     // Safari yêu cầu mỗi push phải hiện thông báo: hiện bản tóm tắt im lặng rồi đóng.
-    const n = await self.registration.showNotification('Kinnect', { body: d.reason === 'answered' ? 'Cuộc gọi đã được trả lời' : 'Đã từ chối cuộc gọi', tag: 'kinnect-call-done', silent: true, icon: '/kinnect-icon-192.png' });
+    const n = await self.registration.showNotification('Kinnect', { body: d.reason === 'answered' ? 'Cuộc gọi đã được trả lời' : 'Đã từ chối cuộc gọi', tag: 'kinnect-call-done', silent: true, icon: '/kinnect-logo-v106.svg' });
     setTimeout(() => self.registration.getNotifications({ tag: 'kinnect-call-done' }).then(l => l.forEach(x => x.close())), 3000);
     return n;
   }
   return self.registration.showNotification(d.from?.name || 'Kinnect', {
-    body: d.mode === 'audio' ? 'Cuộc gọi thoại nhỡ' : 'Cuộc gọi video nhỡ', icon: d.icon || '/kinnect-icon-192.png', badge: '/kinnect-icon-192.png',
+    body: d.mode === 'audio' ? 'Cuộc gọi thoại nhỡ' : 'Cuộc gọi video nhỡ', icon: d.icon || '/kinnect-logo-v106.svg', badge: '/kinnect-logo-v106.svg',
     tag: 'kinnect-missed-' + d.callId, data: { url: d.from ? '/?chat=' + encodeURIComponent(d.from.id) : '/' },
   });
 }
@@ -82,12 +82,12 @@ self.addEventListener('push', event => {
     if (d.type === 'notification') {
       const chat = d.kind === 'message' || d.kind === 'group_message';
       return self.registration.showNotification(d.title || 'Kinnect', {
-        body: d.body || 'Có thông báo mới', icon: d.icon || '/kinnect-icon-192.png', badge: '/kinnect-icon-192.png', tag: d.tag || 'kinnect',
+        body: d.body || 'Có thông báo mới', icon: d.icon || '/kinnect-logo-v106.svg', badge: '/kinnect-logo-v106.svg', tag: d.tag || 'kinnect',
         renotify: true, timestamp: d.created || Date.now(), vibrate: chat ? [200, 100, 200] : [150],
         actions: chat ? [{ action: 'open', title: 'Trả lời' }] : [], data: { url: d.url || '/' },
       });
     }
-    return self.registration.showNotification('Kinnect', { body: 'Có hoạt động mới trên Kinnect', icon: '/kinnect-icon-192.png', tag: 'kinnect' });
+    return self.registration.showNotification('Kinnect', { body: 'Có hoạt động mới trên Kinnect', icon: '/kinnect-logo-v106.svg', tag: 'kinnect' });
   })());
 });
 self.addEventListener('notificationclose', event => { const id = event.notification.data?.callId; if (id) ringing.delete(id); });

@@ -1,0 +1,3 @@
+import {chromium} from 'playwright';import {readFile,writeFile} from 'node:fs/promises';
+const svg=await readFile('public/kinnect-logo-v106.svg','utf8'),b=await chromium.launch({channel:'chrome'}),p=await b.newPage();
+try{for(const size of [32,120,152,167,180,192,512]){const encoded=await p.evaluate(async({svg,size})=>{const image=new Image();image.src='data:image/svg+xml;base64,'+btoa(svg);await image.decode();const canvas=document.createElement('canvas');canvas.width=canvas.height=size;canvas.getContext('2d').drawImage(image,0,0,size,size);return canvas.toDataURL('image/png').split(',')[1];},{svg,size});await writeFile(`public/kinnect-logo-v106-${size}.png`,Buffer.from(encoded,'base64'));}}finally{await b.close();}

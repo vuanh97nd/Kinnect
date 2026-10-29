@@ -2066,10 +2066,29 @@ public class MainActivity extends Activity {
     chatActionSheet("Tùy chọn hồ sơ",icons,labels,actions);
   }
 
+  private View profileAbout(final JSONObject source) {
+    JSONObject user;try{user=new JSONObject(source.toString());}catch(Exception ignored){user=json();}
+    JSONObject visibility=user.optJSONObject("profileVisibility");
+    for(String key:new String[]{"bio","age","city","height","weight","occupation","school","gender","orientation","communityRole","pronouns","relationshipRole","lookingFor","interests"})if(visibility!=null&&!visibility.optBoolean(key,true))user.remove(key);
+    if(user.has("identityPublic")&&!user.optBoolean("identityPublic"))for(String key:new String[]{"gender","orientation","communityRole","pronouns","relationshipRole"})user.remove(key);
+    LinearLayout panel=column();panel.setBackground(outlined(CARD,16));panel.setPadding(dp(16),dp(16),dp(16),dp(16));
+    LinearLayout heading=row();TextView title=label("Giới thiệu",18,TEXT);title.setTypeface(null,Typeface.BOLD);heading.addView(title,new LinearLayout.LayoutParams(0,-2,1));heading.addView(icon("globe",14,MUTED),new LinearLayout.LayoutParams(dp(14),dp(14)));TextView publicLabel=label("Công khai",12,MUTED);publicLabel.setPadding(dp(5),0,0,0);heading.addView(publicLabel);panel.addView(heading);
+    boolean filled=false;String bio=user.optString("bio").trim();
+    if(!bio.isEmpty()){TextView caption=label("Tiểu sử",12,MUTED);caption.setPadding(0,dp(18),0,dp(6));panel.addView(caption);TextView text=label(bio,14,TEXT);text.setLineSpacing(0,1.3f);panel.addView(text);filled=true;}
+    String[][] fields={{"age","Tuổi"," tuổi"},{"city","Nơi sống",""},{"height","Chiều cao"," cm"},{"weight","Cân nặng"," kg"},{"occupation","Nghề nghiệp",""},{"school","Trường học",""},{"gender","Bản dạng giới",""},{"orientation","Xu hướng",""},{"communityRole","Vai trò cộng đồng",""},{"pronouns","Cách xưng hô",""},{"relationshipRole","Tình trạng quan hệ",""},{"lookingFor","Mong muốn",""}};
+    for(String[] field:fields){String value=user.isNull(field[0])?"":user.optString(field[0]).trim();if(value.isEmpty()||value.equals("0"))continue;LinearLayout item=column();item.setPadding(0,dp(12),0,dp(12));item.addView(label(field[1],12,MUTED));TextView text=label(value+field[2],14,TEXT);text.setPadding(0,dp(5),0,0);item.addView(text);panel.addView(item);panel.addView(divider());filled=true;}
+    JSONArray interests=user.optJSONArray("interests");if(interests!=null&&interests.length()>0){TextView caption=label("Sở thích",12,MUTED);caption.setPadding(0,dp(18),0,dp(6));panel.addView(caption);LinearLayout chips=row();panel.addView(chips);int used=0,available=getResources().getDisplayMetrics().widthPixels-dp(80);
+      for(int i=0;i<interests.length();i++){TextView text=label(interests.optString(i),13,ACCENT);text.setPadding(dp(10),dp(7),dp(10),dp(7));text.setBackground(background(PRIMARY_SOFT,10));text.setMaxWidth(available);text.measure(View.MeasureSpec.makeMeasureSpec(available,View.MeasureSpec.AT_MOST),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));int width=text.getMeasuredWidth()+dp(6);if(used>0&&used+width>available){chips=row();panel.addView(chips);used=0;}LinearLayout.LayoutParams chipAt=new LinearLayout.LayoutParams(-2,-2);chipAt.rightMargin=dp(6);chipAt.bottomMargin=dp(6);chips.addView(text,chipAt);used+=width;}filled=true;}
+    boolean own=me!=null&&user.optString("id").equals(me.optString("id"));
+    if(!filled)panel.addView(emptyBlock("user","Chưa có thông tin công khai",own?"Cập nhật hồ sơ để mọi người hiểu bạn hơn.":"Thành viên này chưa chia sẻ thông tin giới thiệu."));
+    if(user.optLong("joinedAt")>0){TextView joined=label("Tham gia Kinnect từ "+new java.text.SimpleDateFormat("MM/yyyy",java.util.Locale.getDefault()).format(new java.util.Date(user.optLong("joinedAt"))),12,MUTED);joined.setPadding(0,dp(18),0,dp(12));panel.addView(joined);}
+    if(own)panel.addView(button("Chỉnh sửa hồ sơ",()->editProfile()));return panel;
+  }
+
   private void profileSections(final JSONObject user) {
     final LinearLayout controls = row(), list = column();
-    final String[] tabs = { "Bài viết", "Album ảnh", "Video" };
-    final int[] selected = { 0 }, generation = { 0 };
+    final String[] tabs = { "Giới thiệu", "Bài viết", "Album ảnh", "Video" };
+    final int[] selected = { 1 }, generation = { 0 };
     final int ownerScreen = screen;
     final Runnable[] render = new Runnable[1];
     render[0] = () -> {
@@ -2084,9 +2103,10 @@ public class MainActivity extends Activity {
         item.setBackground(active?background(CARD,11):pressable(SOFT,11));item.setElevation(active?dp(1):0);item.setSelected(active);
       }
       final int current = selected[0];
-      request("GET", current == 2 ? "/api/shorts?user=" + user.optString("id") : "/api/posts?user=" + user.optString("id"), null, data -> {
+      if(current==0){list.addView(profileAbout(user));return;}
+      request("GET", current == 3 ? "/api/shorts?user=" + user.optString("id") : "/api/posts?user=" + user.optString("id"), null, data -> {
         if (current != selected[0] || revision != generation[0] || ownerScreen != screen || !list.isAttachedToWindow()) return;
-        if (current == 2) {
+        if (current == 3) {
           final JSONArray videos = data.optJSONArray("shorts");
           if (videos == null || videos.length() == 0) { list.addView(emptyBlock("clapperboard", "Chưa có video", "Video ngắn sẽ hiển thị tại đây.")); return; }
           LinearLayout line = null;
@@ -2110,7 +2130,7 @@ public class MainActivity extends Activity {
             line.addView(tile, lp);
           }
           for (int pad = videos.length() % 3; pad > 0 && pad < 3; pad++) line.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
-        } else if (current == 1) {
+        } else if (current == 2) {
           List<JSONObject> photos = new ArrayList<>(); JSONArray posts = data.optJSONArray("posts");
           for (int i = 0; posts != null && i < posts.length(); i++) { JSONObject media = posts.optJSONObject(i).optJSONObject("media"); if (media != null && media.optString("kind").equals("image")) photos.add(media); }
           final boolean own = user.optString("id").equals(me.optString("id"));
@@ -2153,7 +2173,9 @@ public class MainActivity extends Activity {
     LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2);
     cp.setMargins(0, dp(6), 0, dp(10));
     segmented(controls, tabs, selected[0], i -> { if(selected[0]==i)return;selected[0] = i; render[0].run(); });
-    content.addView(controls, cp); content.addView(list); render[0].run();
+    HorizontalScrollView tabScroll=new HorizontalScrollView(this);tabScroll.setHorizontalScrollBarEnabled(false);tabScroll.setFillViewport(true);
+    for(int i=0;i<controls.getChildCount();i++){TextView tab=(TextView)controls.getChildAt(i);tab.setMinWidth(dp(82));tab.setPadding(dp(10),0,dp(10),0);tab.setLayoutParams(new LinearLayout.LayoutParams(-2,dp(38)));}
+    tabScroll.addView(controls,new HorizontalScrollView.LayoutParams(-1,-2));content.addView(tabScroll,cp);content.addView(list);render[0].run();
   }
 
   private void privateAlbum(final JSONObject owner) {
