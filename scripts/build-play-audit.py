@@ -1,9 +1,12 @@
 from pathlib import Path
-import json,subprocess,zipfile,os
+import json,subprocess,zipfile,os,argparse
+parser=argparse.ArgumentParser();parser.add_argument('--review-screens',action='store_true');options=parser.parse_args();audit='PlayReviewScreens' if options.review_screens else 'PlayPolicyAudit'
 r=Path(__file__).resolve().parents[1];w=r/'work/play-policy-audit';w.mkdir(exist_ok=True);cfg=json.loads((r/'work/play-tools/tools.json').read_text());bt=Path(cfg['buildTools']);java=next((r/'work/android-tools/jdk').glob('jdk-*'))/'bin';platform=Path(cfg['platform']);classes=w/'classes';dex=w/'dex';classes.mkdir(exist_ok=True);dex.mkdir(exist_ok=True)
 def run(*a,env=None):subprocess.run([str(x)for x in a],check=True,cwd=r,env=env)
-run(java/'javac.exe','-encoding','UTF-8','-source','8','-target','8','-classpath',str(platform)+';'+str(r/'work/android-tools/deps/webrtc/classes.jar'),'-d',classes,r/'android/test/PlayPolicyAudit.java');listing=w/'classes.list';listing.write_text('\n'.join(str(p.resolve())for p in classes.rglob('*.class')));run(java/'java.exe','-cp',bt/'lib/d8.jar','com.android.tools.r8.D8','--min-api','26','--lib',platform,'--output',dex,'@'+str(listing))
-manifest=w/'AndroidManifest.xml';manifest.write_text('<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="app.kinnect.audit"><uses-sdk android:minSdkVersion="26" android:targetSdkVersion="36"/><instrumentation android:name="app.kinnect.audit.PlayPolicyAudit" android:targetPackage="app.kinnect.live"/><application android:label="Kinnect Play policy QA"/></manifest>')
+run(java/'javac.exe','-encoding','UTF-8','-source','8','-target','8','-classpath',str(platform)+';'+str(r/'work/android-tools/deps/webrtc/classes.jar')+';'+str(r/'android/build/play/classes'),'-d',classes,r/('android/test/'+audit+'.java'));listing=w/'classes.list';listing.write_text('\n'.join(str(p.resolve())for p in classes.rglob('*.class')));run(java/'java.exe','-cp',bt/'lib/d8.jar','com.android.tools.r8.D8','--min-api','26','--lib',platform,'--output',dex,'@'+str(listing))
+manifest=w/'AndroidManifest.xml';manifest.write_text('<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="app.kinnect.audit"><uses-sdk android:minSdkVersion="26" android:targetSdkVersion="36"/><instrumentation android:name="app.kinnect.audit.'+audit+'" android:targetPackage="app.kinnect.live"/><application android:label="Kinnect Play policy QA"/></manifest>')
 run(cfg['aapt2'],'link','-I',platform,'--manifest',manifest,'-o',w/'unsigned.apk')
-with zipfile.ZipFile(w/'unsigned.apk','a')as z:z.write(dex/'classes.dex','classes.dex')
+with zipfile.ZipFile(w/'unsigned.apk','a')as z:
+ z.write(dex/'classes.dex','classes.dex')
+ if options.review_screens:z.write(r/'work/play-reviewer/credentials.json','assets/private-reviewer.json')
 run(bt/'zipalign.exe','-f','4',w/'unsigned.apk',w/'aligned.apk');env=os.environ.copy();env['KINNECT_PLAY_PASS']=(r/'work/play-signing/store-password.txt').read_text();run(java/'java.exe','-jar',bt/'lib/apksigner.jar','sign','--ks',r/'work/play-signing/upload.jks','--ks-pass','env:KINNECT_PLAY_PASS','--key-pass','env:KINNECT_PLAY_PASS','--out',w/'audit.apk',w/'aligned.apk',env=env)

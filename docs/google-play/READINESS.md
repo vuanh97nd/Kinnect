@@ -49,3 +49,7 @@ Không có quy trình kỹ thuật nào bảo đảm 100% không bị từ chố
 ## Yêu cầu xóa khi tài khoản không đăng nhập được
 
 Trang xóa ngoài app cung cấp kênh email riêng. Chủ vận hành xác minh quyền sở hữu, dừng server rồi dùng `node scripts/delete-account-owner.mjs --username USERNAME` để xem dry run; chỉ thực thi khi có yêu cầu đã xác minh bằng `--execute --confirm USERNAME --verified-request PRIVATE_REFERENCE`. Khởi động lại server sau thao tác để đóng socket/cuộc gọi cũ. Không dùng đình chỉ như thay thế cho xóa; không yêu cầu người dùng gửi mật khẩu/OTP qua email.
+
+## Bộ bàn giao cuối
+
+AAB 1.1.0 (100), target API 36; kiểm tra runtime Android 16 với PAGE_SIZE=16384. 97 kiểm thử Node đạt. Đã tạo tài khoản reviewer thường; thông tin riêng tại work/play-reviewer/APP-ACCESS-PRIVATE.txt, không nằm trong Git hoặc ZIP công khai. Ảnh chụp thật 1080×1920: hồ sơ, cài đặt và quyền riêng tư. Chưa tải lên Play Console, chưa có Pre-launch report hoặc kiểm thử máy thật.

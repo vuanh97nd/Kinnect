@@ -1,0 +1,1 @@
+package android.content; public abstract class ContentResolver {public abstract java.io.InputStream openInputStream(android.net.Uri uri)throws java.io.FileNotFoundException;public String getType(android.net.Uri uri){throw new AssertionError("MIME lookup must not block a valid MP4");}}
