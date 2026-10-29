@@ -1,1 +1,23 @@
-{"name":"kinnect-live","version":"0.1.0","private":true,"type":"module","scripts":{"start":"node server.js","test":"node --test"},"dependencies":{"ws":"8.18.3"}}
+{
+  "name": "kinnect-live",
+  "version": "0.3.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test",
+    "moderate": "node scripts/moderate.js",
+    "test:e2e": "playwright test",
+    "admin": "node scripts/admin.js",
+    "test:e2e:v2": "playwright test --config=playwright.v2.config.js"
+  },
+  "dependencies": {
+    "ws": "8.22.0"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
+}

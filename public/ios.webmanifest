@@ -1,0 +1,26 @@
+{
+  "id": "/",
+  "name": "Kinnect — Kết nối đúng gu",
+  "short_name": "Kinnect",
+  "description": "Không gian kết bạn và trò chuyện của chúng mình. Dành cho người từ 18 tuổi.",
+  "lang": "vi",
+  "start_url": "/?source=homescreen",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f0f2f5",
+  "theme_color": "#6d4aff",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/vuanh97nd/Kinnect/81a7a0ba474f208332f9c7f0407e4a769daa6a81/public/kinnect-ios-180-v7.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://raw.githubusercontent.com/vuanh97nd/Kinnect/81a7a0ba474f208332f9c7f0407e4a769daa6a81/public/kinnect-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+/* Kinnect calls: calm surfaces, readable states, controls within thumb reach. */
+dialog.video-call{--call-blue:#5c94ff;box-sizing:border-box;isolation:isolate;background:radial-gradient(ellipse at 20% 10%,#264b69 0,transparent 52%),radial-gradient(ellipse at 90% 80%,#233448 0,transparent 60%),#101c2c;color:#f5f8ff;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 32px 120px #0009;outline:none}
+dialog.video-call::backdrop{background:#080d19bd;backdrop-filter:blur(16px)}
+.video-call::before{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(#07111d66,transparent 30%,transparent 60%,#07111de6)}
+.video-call .call-topline{position:absolute;inset:24px 28px auto;display:flex;align-items:center;justify-content:space-between;z-index:4}
+.call-wordmark{font-size:19px;font-weight:750;letter-spacing:-.5px;color:#fff}.call-wordmark>span{display:inline-block;margin-left:10px;padding:4px 7px;border:1px solid #ffffff2b;border-radius:6px;font-size:9px;letter-spacing:2px;font-weight:600;vertical-align:middle;color:#b4c6dc}
+.video-call button{font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}.video-call button:focus-visible{outline:3px solid #b1d3ff;outline-offset:5px}.video-call button:disabled{opacity:.5;cursor:wait}
+.video-call .call-expand{display:grid;place-items:center;width:40px;height:40px;min-height:40px;padding:10px;border:1px solid #ffffff1a;background:#ffffff0e;border-radius:50%;color:#d7e5f7}.call-expand svg{width:19px;height:19px}.call-expand span{display:none}
+.video-call .call-remote{background:transparent;object-fit:contain}
+.video-call .call-identity{z-index:2;top:24%;left:24px;right:24px;gap:0}
+.video-call .call-avatar{position:relative;isolation:isolate;width:112px;height:112px;background:linear-gradient(145deg,#72b9ef,#4479b6);box-shadow:0 0 0 12px #ffffff05,0 0 0 28px #ffffff03,0 14px 40px #0003;border:2px solid #ffffff26;border-radius:50%;font-size:42px;font-weight:650;overflow:visible}
+.call-avatar img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover}
+.video-call:not(.is-connected) .call-avatar::after{content:"";position:absolute;inset:-12px;border:1px solid #a4d7ff33;border-radius:50%;animation:call-ring 2.8s ease-out infinite}
+.video-call .call-identity h2{color:#f5f8ff;font-size:30px;font-weight:650;letter-spacing:-.7px;margin:32px 0 8px;max-width:100%;overflow-wrap:anywhere}
+.video-call .call-identity p{font-size:14px;letter-spacing:.2px;color:#aac0d6;margin:0;line-height:1.5;font-variant-numeric:tabular-nums}
+.video-call.is-connected .call-identity p{color:#9be0cb}
+.video-call .call-local{z-index:3;top:92px;right:24px;width:150px;height:198px;max-height:28vh!important;object-fit:cover;border:1px solid #ffffff40;border-radius:18px;background:#263b50;box-shadow:0 8px 28px #0004;transition:opacity .2s}
+.video-call.camera-muted .call-local{opacity:0}
+.video-call.has-remote:not(.audio-call) .call-identity{top:93px;left:28px;right:200px;align-items:flex-start;text-align:left}
+.video-call.has-remote:not(.audio-call) .call-identity h2{font-size:20px;margin:0 0 6px;text-shadow:0 2px 12px #000}
+.video-call.has-remote:not(.audio-call) .call-identity p{font-size:13px}.video-call.has-remote:not(.audio-call) .call-avatar{display:none}
+.video-call.audio-call .call-identity{top:24%;left:24px;right:24px;align-items:center;text-align:center}.video-call.audio-call .call-avatar{display:grid}.video-call.audio-call .call-identity h2{font-size:30px;margin:32px 0 8px}
+.video-call .call-controls{bottom:calc(36px + env(safe-area-inset-bottom));left:20px;right:20px;gap:28px;align-items:start;flex-wrap:nowrap}
+.video-call .call-controls button{position:relative;display:flex;flex-direction:column;align-items:center;gap:12px;width:76px;min-width:0;min-height:0;height:auto;margin:0;padding:0;border:0;border-radius:0;background:transparent;color:#e5eef9;backdrop-filter:none;box-shadow:none;font-size:12px;font-weight:500;line-height:1.3}
+.video-call .call-controls button svg{box-sizing:border-box;display:block;width:60px;height:60px;padding:18px;border-radius:50%;background:#ffffff14;border:1px solid #ffffff18;transition:background .2s,transform .2s}
+.video-call .call-controls button:hover svg{background:#ffffff28;transform:translateY(-2px)}
+.video-call .call-controls button[aria-pressed=true] svg{background:#e5efff;color:#263b50;border-color:transparent}.video-call .call-controls button[aria-pressed=true]::after{content:"";position:absolute;top:29px;left:23px;width:30px;height:2px;transform:rotate(-45deg);background:currentColor;color:#263b50;box-shadow:0 0 0 2px #e5efff}
+.video-call .call-controls .call-end svg{background:#f14f69;border-color:transparent;color:#fff;transform:rotate(135deg)}.video-call .call-controls .call-end:hover svg{background:#ff6380;transform:rotate(135deg) translateY(-2px)}
+.video-call .call-controls .call-accept svg{background:#27bc86;border-color:transparent;color:#fff}.video-call .call-controls .call-accept:hover svg{background:#33d59b}
+.video-call.is-incoming .call-controls{gap:64px}.video-call.is-incoming .call-accept svg{animation:call-pickup 1.7s ease-in-out infinite}
+.video-call .call-controls [hidden]{display:none!important}.video-call .call-audio{z-index:4;bottom:160px;min-height:42px;background:#e6efff;color:#17385c;font-size:13px;box-shadow:0 5px 22px #0004}
+@keyframes call-ring{0%{transform:scale(.95);opacity:.8}100%{transform:scale(1.35);opacity:0}}
+@keyframes call-pickup{50%{box-shadow:0 0 0 9px #27bc861a}}
+@media(min-width:1000px){dialog.video-call{width:min(1080px,calc(100vw - 80px));height:min(760px,calc(100dvh - 72px));border:1px solid #ffffff1a;border-radius:28px}dialog.video-call.audio-call{width:min(520px,calc(100vw - 80px))}.video-call.call-maximized{width:100vw;height:100dvh;border-radius:0}.video-call:fullscreen{width:100vw;height:100dvh;border-radius:0}}
+@media(max-width:599px){.video-call .call-topline{inset:calc(16px + env(safe-area-inset-top)) 20px auto}.video-call .call-identity,.video-call.audio-call .call-identity{top:25%}.video-call .call-local{top:calc(78px + env(safe-area-inset-top));right:16px;width:104px;height:148px;border-radius:14px}.video-call.has-remote:not(.audio-call) .call-identity{top:calc(82px + env(safe-area-inset-top));left:20px;right:140px}.video-call .call-identity h2,.video-call.audio-call .call-identity h2{font-size:26px}.video-call .call-controls{gap:20px;bottom:calc(32px + env(safe-area-inset-bottom))}.video-call .call-controls button{width:72px}.video-call .call-controls button svg{width:58px;height:58px;padding:17px}}
+@media(max-height:560px){.video-call .call-identity,.video-call.audio-call .call-identity{top:22%}.video-call .call-avatar{width:72px;height:72px;font-size:28px}.video-call .call-identity h2,.video-call.audio-call .call-identity h2{font-size:22px;margin:18px 0 6px}.video-call .call-controls{bottom:18px}.video-call .call-controls button svg{width:48px;height:48px;padding:13px}.video-call .call-controls button{gap:6px}.video-call .call-local{height:100px}}
+@media(prefers-reduced-motion:reduce){.video-call *, .video-call *::after{animation:none!important;transition:none!important}}
+
+.video-call.is-incoming .call-local{display:none}
+
+/* Compact video stage; preserve camera proportions on all screen sizes. */
+dialog.video-call:not(.audio-call){width:min(960px,calc(100vw - 32px));height:min(640px,calc(100dvh - 32px));margin:auto;border-radius:24px}
+.video-call:not(.audio-call) .call-remote{inset:76px 0 138px;width:100%;height:calc(100% - 214px);object-fit:contain;aspect-ratio:auto}
+.video-call .call-local{box-sizing:border-box;min-height:0;width:144px;height:108px;aspect-ratio:4/3;object-fit:contain}
+.video-call .call-controls{gap:14px}
+@media(max-width:599px){dialog.video-call:not(.audio-call){width:100%;height:min(620px,100dvh);border-radius:20px}.video-call .call-local{width:104px;height:78px;aspect-ratio:4/3}.video-call .call-controls{left:8px;right:8px;gap:6px}.video-call .call-controls button{width:66px;font-size:11px}.video-call .call-controls button svg{width:50px;height:50px;padding:14px}.video-call .call-controls button[aria-pressed=true]::after{top:24px;left:19px;width:27px}}
+dialog.video-call.call-maximized,dialog.video-call:fullscreen{width:100vw;height:100dvh;border-radius:0}

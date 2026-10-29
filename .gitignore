@@ -14,3 +14,26 @@ dist/
 local.properties
 .gradle/
 .idea/
+/data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+/test-results/
+/playwright-report/
+mail.env
+oauth.env
+turn.env
+/music/*
+!/music/README.txt
+!/music/credits.json
+
+/work/
+/music-removed/
+
+ai.env
+
+# Website static assets are build inputs; root APK output remains ignored.
+!website/dist/
+!website/dist/**
+__pycache__/
+*.pyc

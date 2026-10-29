@@ -1,0 +1,308 @@
+/* Màn hình Live kiểu TikTok trên điện thoại: video tràn màn hình, mọi thứ nổi trên video */
+@media (max-width: 999px) {
+  #app #live:not([hidden]){position:fixed;inset:0;z-index:70;margin:0;padding:0!important;background:#000;color:#fff;overflow:hidden}
+  body:has(#live:not([hidden])) nav,body:has(#live:not([hidden])) #app>header{visibility:hidden}
+  #app #live .live-layout,#app #live .live-stage{display:block;position:static}
+  #app #live .video-wrap{position:absolute;inset:0;border-radius:0;aspect-ratio:auto;background:#000;margin:0}
+  #app #live .video-wrap video{width:100%;height:100%;object-fit:cover}
+  #app #live .video-wrap.landscape video{object-fit:contain}
+  #app #live:not([hidden]){width:100vw;max-width:100vw;height:100dvh;touch-action:pan-y}
+  #app #live .video-wrap::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(#0008,transparent 18%,transparent 55%,#000a)}
+  #app #live .video-wrap .badge{position:absolute;z-index:2;top:calc(env(safe-area-inset-top) + 64px);left:12px;padding:4px 8px;font-size:10.5px;border-radius:6px}
+  #app #live .live-heading{position:absolute;z-index:3;top:calc(env(safe-area-inset-top) + 10px);left:10px;right:10px;margin:0;display:flex;align-items:center;gap:10px;flex-wrap:nowrap}
+  #app #live #live-browse{order:3;margin-left:auto;width:38px;height:38px;min-height:38px;padding:0;border-radius:50%;font-size:0;background:#0006!important;color:#fff!important;backdrop-filter:blur(10px)}
+  #app #live #live-browse::before{content:"✕";font-size:17px}
+  #app #live #live-browse svg{display:none}
+  #app #live .live-heading h2{order:1;min-width:0;max-width:52%;margin:0;padding:8px 14px;border-radius:999px;background:#0006;backdrop-filter:blur(10px);color:#fff;font-size:14.5px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #app #live #count{order:2;flex:none;padding:7px 11px;border-radius:999px;background:#0006;backdrop-filter:blur(10px);color:#fff;font-size:12.5px;font-weight:700}
+  #app #live #count::before{content:"👁 "}
+  #live-swipe-controls{display:none!important}
+  /* Nút điều khiển: cột bên phải */
+  #app #live .controls{position:absolute;z-index:3;right:10px;bottom:calc(env(safe-area-inset-bottom) + 84px);display:flex;flex-direction:column;flex-wrap:nowrap;gap:10px;width:64px;padding:0;margin:0;background:none;border:0;box-shadow:none}
+  #app #live .controls button{width:64px;min-height:52px;padding:6px 4px;border-radius:16px;background:#0000004d!important;backdrop-filter:blur(12px);color:#fff!important;font-size:10.5px!important;font-weight:700;line-height:1.15;white-space:normal;border:1px solid #ffffff26}
+  #app #live .controls button.on,#app #live .fx-toggle[aria-pressed="true"]{background:linear-gradient(135deg,#7a5cff,#e5479b)!important;border-color:transparent}
+  #app #live .controls #leave{background:none!important}
+  #app #live .controls select{display:none}
+  #app #live .controls [hidden]{display:none!important}
+  #app #live:has(#live-fx:empty) .fx-toggle{display:none}
+  /* Hiệu ứng: khay nổi phía dưới, ẩn/hiện bằng nút ✨ */
+  #app #live #live-fx{position:absolute;z-index:4;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 70px);padding:12px 10px;margin:0;background:#000b;backdrop-filter:blur(16px);border-radius:20px 20px 0 0;display:none}
+  #app #live.fx-open #live-fx{display:block}
+  #app #live.fx-open .live-chat #messages{opacity:0}
+  #app #live.fx-open .controls>:not(.fx-toggle){display:none}
+  #app #live.fx-open .controls{bottom:calc(env(safe-area-inset-bottom) + 170px)}
+  #app #live #live-fx .fx-picker{background:none;padding:0;margin:0}
+  #app #live #live-fx .fx-row{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:8px;flex-wrap:nowrap}
+  #app #live #live-fx .fx-chip{flex:none;min-height:36px;padding:0 14px;border-radius:999px;background:#ffffff1f!important;color:#fff!important;font-size:13px!important;border:1px solid #ffffff22;box-shadow:none}
+  #app #live #live-fx .fx-chip.on{background:linear-gradient(135deg,#7a5cff,#e5479b)!important;border-color:transparent}
+  #app #live #live-fx .fx-note{margin:2px 4px 0;color:#fffa;font-size:12px}
+  /* Trò chuyện: chữ nổi trên video ở góc trái dưới */
+  #app #live .live-chat{position:absolute;z-index:3;left:0;right:0;bottom:0;height:auto;min-height:0;max-height:none;background:none;border:0;border-radius:0;padding:0 10px calc(env(safe-area-inset-bottom) + 10px);transition:opacity .2s}
+  #app #live .live-chat h3{display:none}
+  #app #live .live-chat #messages{flex:none;height:auto;min-height:0;max-height:30dvh;background:none;padding:24px 0 6px;margin-right:78px;display:flex;flex-direction:column;align-items:flex-start;gap:5px;-webkit-mask-image:linear-gradient(transparent,#000 22%);mask-image:linear-gradient(transparent,#000 22%)}
+  #app #live .live-chat #messages p{margin:0;max-width:100%;padding:6px 11px;border-radius:14px;background:#0000004d;color:#fff;font-size:13.5px;line-height:1.35;text-align:left;text-shadow:0 1px 2px #0008;overflow-wrap:anywhere}
+  #app #live .live-chat #messages p strong{color:#ffd36e;font-weight:700}
+  #app #live .live-chat #messages > :not(p){color:#fffc;background:none;text-align:left;padding:0;font-size:13px}
+  #app #live .live-chat #chat{padding:0;margin:4px 0 0;background:none;border:0;gap:8px}
+  #app #live .live-chat #chat input{height:44px;min-height:44px;border-radius:999px;padding:0 16px;background:#ffffff26!important;backdrop-filter:blur(12px);color:#fff;border:1px solid #ffffff2e;font-size:16px!important}
+  #app #live .live-chat #chat input::placeholder{color:#fffb}
+  #app #live .live-chat #chat button{height:44px;min-height:44px;width:44px;padding:0;border-radius:50%;font-size:0;background:linear-gradient(135deg,#7a5cff,#e5479b)!important}
+  #app #live .live-chat #chat button::before{content:"➤";font-size:17px;color:#fff}
+
+  /* Nút điều khiển dạng biểu tượng tròn + nhãn nhỏ (kiểu TikTok Live) */
+  #app #live .controls{gap:14px;width:60px;align-items:center}
+  #app #live .controls button{width:60px;min-height:0;padding:0!important;background:none!important;backdrop-filter:none;border:0!important;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:10.5px!important;font-weight:600;text-shadow:0 1px 3px #000c;line-height:1.15}
+  #app #live .controls button::before{content:"";width:44px;height:44px;border-radius:50%;background:#ffffff26;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:inset 0 0 0 1px #ffffff30}
+  #app #live .controls button::after{content:"";position:absolute}
+  #app #live .controls button.on::before,#app #live .fx-toggle[aria-pressed="true"]::before{background-color:#7a5cff}
+  #app #live .controls #leave::before{background-color:#ed375c;box-shadow:none}
+  #app #live .controls button{position:relative}
+  #app #live .controls button::after{top:11px;left:50%;width:22px;height:22px;margin-left:-11px;background:#fff;-webkit-mask:var(--ic) center/contain no-repeat;mask:var(--ic) center/contain no-repeat}
+  #app #live .controls .fx-toggle{--ic:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203l1.8%204.6L18.5%209l-4.7%201.6L12%2015l-1.8-4.4L5.5%209l4.7-1.4z%22/%3E%3Cpath%20d%3D%22M19%2015l.8%202%202%20.8-2%20.8-.8%202-.8-2-2-.8%202-.8z%22/%3E%3C/svg%3E")}
+  #app #live .controls #mic{--ic:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%229%22%20y%3D%223%22%20width%3D%226%22%20height%3D%2211%22%20rx%3D%223%22/%3E%3Cpath%20d%3D%22M5%2011a7%207%200%200014%200M12%2018v3%22/%3E%3C/svg%3E")}
+  #app #live .controls #camera{--ic:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%208a2%202%200%20012-2h2l2-2h6l2%202h2a2%202%200%20012%202v9a2%202%200%2001-2%202H5a2%202%200%2001-2-2z%22/%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212.5%22%20r%3D%223.5%22/%3E%3C/svg%3E")}
+  #app #live .controls #gift{--ic:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%228%22%20width%3D%2218%22%20height%3D%224%22%20rx%3D%221%22/%3E%3Cpath%20d%3D%22M5%2012v8h14v-8M12%208v12M12%208S10.5%203%208%204.5%209%208%2012%208zM12%208s1.5-5%204-3.5S15%208%2012%208z%22/%3E%3C/svg%3E")}
+  #app #live .controls #report-live{--ic:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M5%2021V4M5%204h11l-2%204%202%204H5%22/%3E%3C/svg%3E")}
+  #app #live .controls #leave{--ic:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M18%206L6%2018M6%206l12%2012%22/%3E%3C/svg%3E")}
+}
+#app #lobby.lobby-gone>:not(#create){display:none!important}
+#app #live .live-diag{position:absolute;z-index:5;left:12px;top:calc(env(safe-area-inset-top) + 98px);font-size:11px;color:#fff;background:#0009;padding:3px 7px;border-radius:6px}
+#app #live .live-diag[hidden]{display:none}
+
+/* Shared icon set for the live action rail. */
+#app #live .controls #mic{--ic:url("data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%2024%2024%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%221.7%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%229%22%20y%3D%222%22%20width%3D%226%22%20height%3D%2212%22%20rx%3D%223%22%2F%3E%3Cpath%20d%3D%22M5%2010v2a7%207%200%200014%200v-2M12%2019v3m-4%200h8%22%2F%3E%3C%2Fsvg%3E")}
+#app #live .controls #camera{--ic:url("data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%2024%2024%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%221.7%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%225%22%20width%3D%2212%22%20height%3D%2214%22%20rx%3D%223%22%2F%3E%3Cpath%20d%3D%22m15%2010%206-4v12l-6-4%22%2F%3E%3C%2Fsvg%3E")}
+#app #live .controls #gift{--ic:url("data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%2024%2024%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%221.7%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%227%22%20width%3D%2218%22%20height%3D%225%22%20rx%3D%221%22%2F%3E%3Cpath%20d%3D%22M5%2012v9h14v-9M12%207v14M12%207S5%208%206%204s6%203%206%203%205-7%206-3-6%203-6%203Z%22%2F%3E%3C%2Fsvg%3E")}
+#app #live .controls #report-live{--ic:url("data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%2024%2024%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%221.7%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M5%2021V3h14l-3%205%203%205H5%22%2F%3E%3C%2Fsvg%3E")}
+#app #live .controls #leave{--ic:url("data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%2024%2024%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%221.7%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%206%2012%2012M6%2018%2018%206%22%2F%3E%3C%2Fsvg%3E")}
+#app #live .controls .fx-toggle{--ic:url("data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%2024%2024%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%221.7%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m12%203%202.5%206.5L21%2012l-6.5%202.5L12%2021l-2.5-6.5L3%2012l6.5-2.5L12%203Z%22%2F%3E%3C%2Fsvg%3E")}
+
+/* Immersive live stage — desktop theatre and mobile overlay. */
+#app #live{--live-ink:#f6f6fb;--live-muted:#a1a1b4;color:var(--live-ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+#app #live button:focus-visible,#app #live input:focus-visible,#app #live select:focus-visible{outline:2px solid #c6b9ff;outline-offset:4px}
+#app #live .live-heading h2::before{content:attr(data-initial);display:inline-grid;place-items:center;width:32px;height:32px;margin-right:10px;border-radius:50%;background:linear-gradient(145deg,#8a72f5,#e663a5);font-size:14px;color:#fff;vertical-align:middle}
+#app #live .video-wrap .badge{background:#fc416c;color:#fff;font-size:10px;letter-spacing:1.2px;font-weight:800;border:0;box-shadow:0 4px 20px #fc416c26}
+#app #live .live-play{position:absolute;z-index:3;left:50%;top:50%;transform:translate(-50%,-50%);display:grid;place-items:center;gap:8px;width:auto;min-height:48px;padding:18px 24px;border:1px solid #ffffff24;border-radius:20px;background:#13121bd9;backdrop-filter:blur(16px);color:#fff;font-size:13px;box-shadow:0 8px 36px #0005}
+#app #live .live-play svg{width:28px;height:28px}#app #live .live-play[hidden]{display:none!important}
+#app #live .live-chat #messages:empty::before{content:"Hãy là người đầu tiên gửi lời chào";display:block;color:#b9b5c7;font-size:13px;line-height:1.5;padding:12px 0}
+#app #live .live-chat #chat button{cursor:pointer}
+#app #live .controls .live-sound{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.7'%3E%3Cpath d='m11 4-6 5H2v6h3l6 5V4Zm4 4a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14'/%3E%3C/svg%3E")}
+@media(min-width:1000px){
+  #app #live:not([hidden]){position:fixed;inset:0;z-index:100;max-width:none;width:100vw;height:100dvh;margin:0;padding:0!important;background:radial-gradient(ellipse at 25% 45%,#252033,transparent 65%),#0d0c12;overflow:hidden}
+  #app #live .live-heading{position:absolute;inset:20px 28px auto;z-index:5;display:flex;align-items:center;gap:16px;margin:0;height:44px}
+  #app #live .live-heading h2{order:0;display:flex;align-items:center;margin:0;max-width:55%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff;font-size:16px;font-weight:650;letter-spacing:-.3px}
+  #app #live .live-heading h2::before{flex-shrink:0}
+  #app #live #count{order:1;background:#ffffff0b;border:1px solid #ffffff12;padding:7px 12px;border-radius:999px;color:#c8c4d5;font-size:12px}
+  #app #live #live-browse{order:3;margin-left:auto;display:grid;place-items:center;width:40px;min-height:40px;padding:0;border:1px solid #ffffff1a;border-radius:50%;background:#ffffff0c!important;color:#fff!important;font-size:0}
+  #app #live #live-browse::before{content:"✕";font-size:18px}
+  #app #live .live-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px;height:100%;padding:84px 28px 28px;box-sizing:border-box}
+  #app #live .live-stage{position:relative;display:block;min-height:0;height:100%;overflow:hidden;border-radius:22px;background:#08080c;border:1px solid #ffffff0d}
+  #app #live .video-wrap{position:absolute;inset:0;aspect-ratio:auto;margin:0;border-radius:0;background:radial-gradient(ellipse,#262232,#08080c);height:100%;width:100%}
+  #app #live .video-wrap video{width:100%;height:100%;max-height:none;object-fit:contain}
+  #app #live .video-wrap::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(#0005,transparent 25%,transparent 65%,#0008)}
+  #app #live .video-wrap .badge{position:absolute;top:18px;left:18px;border-radius:6px;padding:6px 9px;z-index:2}
+  #app #live .controls{position:absolute;z-index:4;bottom:24px;right:18px;display:flex;flex-direction:column;align-items:center;gap:16px;width:64px;margin:0;padding:0;border:0;background:none;box-shadow:none}
+  #app #live .controls button{position:relative;display:flex;flex-direction:column;align-items:center;gap:7px;width:64px;min-height:0;height:auto;margin:0;padding:0!important;background:none!important;border:0;box-shadow:none;color:#fff!important;font-size:10px!important;font-weight:600;line-height:1.3;text-align:center}
+  #app #live .controls button::before{content:"";display:block;width:44px;height:44px;border:1px solid #ffffff25;border-radius:50%;background:#ffffff15;backdrop-filter:blur(16px);transition:background .2s}
+  #app #live .controls button::after{content:"";position:absolute;top:12px;left:22px;width:22px;height:22px;background:#fff;mask:var(--ic) center/contain no-repeat}
+  #app #live .controls button:hover::before{background:#ffffff30}
+  #app #live .controls #gift::before{background:linear-gradient(145deg,#9a61ec,#ed4c94);border-color:transparent}
+  #app #live .controls #leave::before{background:#e84364;border-color:transparent}
+  #app #live .controls button[hidden],#app #live .controls select[hidden]{display:none!important}
+  #app #live .controls select{width:78px;min-height:32px;padding:4px;border:1px solid #ffffff25;border-radius:9px;background:#24212e;color:#eee;font-size:10px}
+  #app #live .controls .fx-toggle[aria-pressed=true]::before{background:#7956dd}
+  #app #live:has(#live-fx:empty) .fx-toggle{display:none}
+  #app #live #live-fx{display:none;position:absolute;z-index:6;bottom:24px;left:20px;right:104px;max-height:50%;overflow:auto;padding:14px;border-radius:18px;background:#17141eeb;backdrop-filter:blur(20px);border:1px solid #ffffff1a}
+  #app #live.fx-open #live-fx{display:block}
+  #app #live #live-fx .fx-picker{background:transparent;margin:0;color:#fff}
+  #app #live #live-fx .fx-chip{background:#ffffff12!important;color:#eee!important;border:1px solid #ffffff20;border-radius:999px;font-size:12px!important}
+  #app #live #live-fx .fx-chip.on{background:#7956dd!important}
+  #app #live .live-chat{display:flex;flex-direction:column;min-width:0;min-height:0;height:100%;padding:0;border:1px solid #ffffff0e;border-radius:22px;background:#19171f;overflow:hidden;box-sizing:border-box}
+  #app #live .live-chat h3{display:block;margin:0;padding:21px 20px;border-bottom:1px solid #ffffff0a;color:#f4f1fa;font-size:14px;font-weight:650;letter-spacing:-.2px}
+  #app #live .live-chat #messages{flex:1;min-height:0;max-height:none;height:auto;margin:0;padding:18px;overflow:auto;background:transparent;scrollbar-width:thin;scrollbar-color:#ffffff26 transparent;mask-image:linear-gradient(transparent,#000 14px)}
+  #app #live .live-chat #messages p{margin:0 0 12px;padding:0;background:transparent;color:#dfdbe9;font-size:13px;line-height:1.65;overflow-wrap:anywhere;text-align:left}
+  #app #live .live-chat #messages p strong{color:#ba9cfb;font-weight:650}
+  #app #live .live-chat #chat{display:flex;gap:8px;margin:0;padding:14px;border:0;border-top:1px solid #ffffff0a;background:#19171f}
+  #app #live .live-chat #chat input{flex:1;min-width:0;height:44px;min-height:44px;margin:0;padding:0 14px;border:1px solid #ffffff13;border-radius:999px;background:#ffffff08!important;color:#fff;font-size:13px}
+  #app #live .live-chat #chat input::placeholder{color:#9690a5}
+  #app #live .live-chat #chat button{flex:0 0 44px;min-width:44px;width:44px;min-height:44px;height:44px;padding:0;border:0;border-radius:50%;background:#8b65e8!important;color:#fff;font-size:0}
+  #app #live .live-chat #chat button::before{content:"➤";font-size:18px}
+  #app #live #live-swipe-controls:not([hidden]){display:flex!important;position:absolute;top:16px;right:16px;z-index:4;gap:8px;align-items:center}
+  #app #live #live-swipe-controls span{display:none}
+  #app #live #live-swipe-controls button{width:38px;height:38px;min-height:38px;border-radius:50%;padding:0;border:1px solid #ffffff22;background:#ffffff12;color:#fff;font-size:18px}
+  #app #live #live-swipe-controls button:disabled{opacity:.3}
+  #app #live .live-diag{top:68px}
+}
+@media(min-width:1000px) and (max-height:700px){#app #live .controls{gap:9px;bottom:16px}#app #live .controls button::before{width:36px;height:36px}#app #live .controls button::after{top:8px}#app #live .controls button{gap:3px}}
+@media(max-width:999px){
+  #app #live .live-heading{top:calc(env(safe-area-inset-top) + 12px);left:14px;right:14px;gap:8px}
+  #app #live .live-heading h2{padding:5px 10px 5px 5px;max-width:58%;font-size:13px!important;background:#18131f66;border:1px solid #ffffff15}
+  #app #live .live-heading h2::before{width:30px;height:30px;font-size:12px;margin-right:7px}
+  #app #live #count{font-size:10px;padding:8px;white-space:nowrap;background:#18131f66}
+  #app #live #count::before{content:""}
+  #app #live .video-wrap .badge{left:16px;top:calc(env(safe-area-inset-top) + 70px);padding:5px 8px;font-size:9px}
+  #app #live .video-wrap::after{background:linear-gradient(#08060d88,transparent 25%,transparent 40%,#08060dbb)}
+  #app #live .controls{z-index:4;right:10px;gap:16px;bottom:calc(env(safe-area-inset-bottom) + 90px)}
+  #app #live .controls button{font-size:10px!important;max-width:60px;font-weight:500}
+  #app #live .controls button::before{background:#ffffff18;box-shadow:inset 0 0 0 1px #ffffff20}
+  #app #live .controls #gift::before{background:linear-gradient(145deg,#9a61ec,#ed4c94);box-shadow:0 6px 20px #e34b8d40}
+  #app #live .live-chat{padding:0 14px calc(env(safe-area-inset-bottom) + 14px)}
+  #app #live .live-chat #messages{max-height:27dvh;gap:7px;margin-right:72px}
+  #app #live .live-chat #messages p{background:#13101866;border-radius:12px;font-size:13px;padding:6px 10px;line-height:1.5}
+  #app #live .live-chat #messages p strong{color:#d0b5ff}
+  #app #live .live-chat #chat input{background:#ffffff16!important;border-color:#ffffff20;height:46px}
+  #app #live .live-chat #chat button{background:#9d72ee!important;height:46px;width:46px;min-height:46px}
+  #app #live #live-fx{border-top:1px solid #ffffff20;background:#17131fe8}
+  #app #live .live-diag{top:calc(env(safe-area-inset-top) + 104px)}
+}
+@media(prefers-reduced-motion:reduce){#app #live *,#app #live *::before{transition:none!important;animation:none!important}}
+
+@media(min-width:1000px){#app #live .live-chat{max-height:none}#app #live .live-heading #count{margin-left:0}}
+
+/* Kinnect media and messaging styles bundle */
+/* Kinnect calls: calm surfaces, readable states, controls within thumb reach. */
+dialog.video-call{--call-blue:#5c94ff;box-sizing:border-box;isolation:isolate;background:radial-gradient(ellipse at 20% 10%,#264b69 0,transparent 52%),radial-gradient(ellipse at 90% 80%,#233448 0,transparent 60%),#101c2c;color:#f5f8ff;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 32px 120px #0009;outline:none}
+dialog.video-call::backdrop{background:#080d19bd;backdrop-filter:blur(16px)}
+.video-call::before{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(#07111d66,transparent 30%,transparent 60%,#07111de6)}
+.video-call .call-topline{position:absolute;inset:24px 28px auto;display:flex;align-items:center;justify-content:space-between;z-index:4}
+.call-wordmark{font-size:19px;font-weight:750;letter-spacing:-.5px;color:#fff}.call-wordmark>span{display:inline-block;margin-left:10px;padding:4px 7px;border:1px solid #ffffff2b;border-radius:6px;font-size:9px;letter-spacing:2px;font-weight:600;vertical-align:middle;color:#b4c6dc}
+.video-call button{font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}.video-call button:focus-visible{outline:3px solid #b1d3ff;outline-offset:5px}.video-call button:disabled{opacity:.5;cursor:wait}
+.video-call .call-expand{display:grid;place-items:center;width:40px;height:40px;min-height:40px;padding:10px;border:1px solid #ffffff1a;background:#ffffff0e;border-radius:50%;color:#d7e5f7}.call-expand svg{width:19px;height:19px}.call-expand span{display:none}
+.video-call .call-remote{background:transparent;object-fit:contain}
+.video-call .call-identity{z-index:2;top:24%;left:24px;right:24px;gap:0}
+.video-call .call-avatar{position:relative;isolation:isolate;width:112px;height:112px;background:linear-gradient(145deg,#72b9ef,#4479b6);box-shadow:0 0 0 12px #ffffff05,0 0 0 28px #ffffff03,0 14px 40px #0003;border:2px solid #ffffff26;border-radius:50%;font-size:42px;font-weight:650;overflow:visible}
+.call-avatar img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover}
+.video-call:not(.is-connected) .call-avatar::after{content:"";position:absolute;inset:-12px;border:1px solid #a4d7ff33;border-radius:50%;animation:call-ring 2.8s ease-out infinite}
+.video-call .call-identity h2{color:#f5f8ff;font-size:30px;font-weight:650;letter-spacing:-.7px;margin:32px 0 8px;max-width:100%;overflow-wrap:anywhere}
+.video-call .call-identity p{font-size:14px;letter-spacing:.2px;color:#aac0d6;margin:0;line-height:1.5;font-variant-numeric:tabular-nums}
+.video-call.is-connected .call-identity p{color:#9be0cb}
+.video-call .call-local{z-index:3;top:92px;right:24px;width:150px;height:198px;max-height:28vh!important;object-fit:cover;border:1px solid #ffffff40;border-radius:18px;background:#263b50;box-shadow:0 8px 28px #0004;transition:opacity .2s}
+.video-call.camera-muted .call-local{opacity:0}
+.video-call.has-remote:not(.audio-call) .call-identity{top:93px;left:28px;right:200px;align-items:flex-start;text-align:left}
+.video-call.has-remote:not(.audio-call) .call-identity h2{font-size:20px;margin:0 0 6px;text-shadow:0 2px 12px #000}
+.video-call.has-remote:not(.audio-call) .call-identity p{font-size:13px}.video-call.has-remote:not(.audio-call) .call-avatar{display:none}
+.video-call.audio-call .call-identity{top:24%;left:24px;right:24px;align-items:center;text-align:center}.video-call.audio-call .call-avatar{display:grid}.video-call.audio-call .call-identity h2{font-size:30px;margin:32px 0 8px}
+.video-call .call-controls{bottom:calc(36px + env(safe-area-inset-bottom));left:20px;right:20px;gap:28px;align-items:start;flex-wrap:nowrap}
+.video-call .call-controls button{position:relative;display:flex;flex-direction:column;align-items:center;gap:12px;width:76px;min-width:0;min-height:0;height:auto;margin:0;padding:0;border:0;border-radius:0;background:transparent;color:#e5eef9;backdrop-filter:none;box-shadow:none;font-size:12px;font-weight:500;line-height:1.3}
+.video-call .call-controls button svg{box-sizing:border-box;display:block;width:60px;height:60px;padding:18px;border-radius:50%;background:#ffffff14;border:1px solid #ffffff18;transition:background .2s,transform .2s}
+.video-call .call-controls button:hover svg{background:#ffffff28;transform:translateY(-2px)}
+.video-call .call-controls button[aria-pressed=true] svg{background:#e5efff;color:#263b50;border-color:transparent}.video-call .call-controls button[aria-pressed=true]::after{content:"";position:absolute;top:29px;left:23px;width:30px;height:2px;transform:rotate(-45deg);background:currentColor;color:#263b50;box-shadow:0 0 0 2px #e5efff}
+.video-call .call-controls .call-end svg{background:#f14f69;border-color:transparent;color:#fff;transform:rotate(135deg)}.video-call .call-controls .call-end:hover svg{background:#ff6380;transform:rotate(135deg) translateY(-2px)}
+.video-call .call-controls .call-accept svg{background:#27bc86;border-color:transparent;color:#fff}.video-call .call-controls .call-accept:hover svg{background:#33d59b}
+.video-call.is-incoming .call-controls{gap:64px}.video-call.is-incoming .call-accept svg{animation:call-pickup 1.7s ease-in-out infinite}
+.video-call .call-controls [hidden]{display:none!important}.video-call .call-audio{z-index:4;bottom:160px;min-height:42px;background:#e6efff;color:#17385c;font-size:13px;box-shadow:0 5px 22px #0004}
+@keyframes call-ring{0%{transform:scale(.95);opacity:.8}100%{transform:scale(1.35);opacity:0}}
+@keyframes call-pickup{50%{box-shadow:0 0 0 9px #27bc861a}}
+@media(min-width:1000px){dialog.video-call{width:min(1080px,calc(100vw - 80px));height:min(760px,calc(100dvh - 72px));border:1px solid #ffffff1a;border-radius:28px}dialog.video-call.audio-call{width:min(520px,calc(100vw - 80px))}.video-call.call-maximized{width:100vw;height:100dvh;border-radius:0}.video-call:fullscreen{width:100vw;height:100dvh;border-radius:0}}
+@media(max-width:599px){.video-call .call-topline{inset:calc(16px + env(safe-area-inset-top)) 20px auto}.video-call .call-identity,.video-call.audio-call .call-identity{top:25%}.video-call .call-local{top:calc(78px + env(safe-area-inset-top));right:16px;width:104px;height:148px;border-radius:14px}.video-call.has-remote:not(.audio-call) .call-identity{top:calc(82px + env(safe-area-inset-top));left:20px;right:140px}.video-call .call-identity h2,.video-call.audio-call .call-identity h2{font-size:26px}.video-call .call-controls{gap:20px;bottom:calc(32px + env(safe-area-inset-bottom))}.video-call .call-controls button{width:72px}.video-call .call-controls button svg{width:58px;height:58px;padding:17px}}
+@media(max-height:560px){.video-call .call-identity,.video-call.audio-call .call-identity{top:22%}.video-call .call-avatar{width:72px;height:72px;font-size:28px}.video-call .call-identity h2,.video-call.audio-call .call-identity h2{font-size:22px;margin:18px 0 6px}.video-call .call-controls{bottom:18px}.video-call .call-controls button svg{width:48px;height:48px;padding:13px}.video-call .call-controls button{gap:6px}.video-call .call-local{height:100px}}
+@media(prefers-reduced-motion:reduce){.video-call *, .video-call *::after{animation:none!important;transition:none!important}}
+
+.video-call.is-incoming .call-local{display:none}
+
+/* Messaging workspace: quiet hierarchy, generous reading space, compact actions. */
+#app .view-inbox{--msg-accent:#7654ce;--msg-soft:#eee9fa;--msg-surface:#fff;--msg-canvas:#f7f8fc;--msg-border:#e9e9f1;--msg-text:#252334;--msg-muted:#8c899c;--msg-incoming:#fff;color:var(--msg-text)}
+#app .messenger-sidebar{box-sizing:border-box;min-width:0;display:flex;flex-direction:column;background:var(--msg-surface);color:var(--msg-text)}
+#app .messenger-sidebar .inbox-heading{display:flex!important;align-items:center;gap:8px;margin:0;padding:22px 18px 18px;border:0}
+#app .messenger-sidebar .inbox-heading h2{font-size:24px;letter-spacing:-.8px;font-weight:750;color:var(--msg-text);flex:1;line-height:1.2}
+#app .messenger-sidebar .inbox-new{width:36px;min-width:36px;min-height:36px;height:36px;border-radius:11px;background:var(--msg-soft)!important;color:var(--msg-accent)!important;padding:9px}
+#app .messenger-sidebar .inbox-create-group{min-height:36px;height:36px;margin:0;padding:0 10px;border-radius:10px;background:var(--msg-soft)!important;color:var(--msg-accent)!important;font-size:11px;font-weight:650;white-space:nowrap}
+#app .messenger-sidebar .inbox-search{width:calc(100% - 36px);flex-shrink:0;height:42px;min-height:42px;margin:0 18px 16px!important;padding:0 14px 0 38px;border:1px solid transparent;border-radius:12px;font-size:13px;background-color:var(--msg-canvas);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23928aab' stroke-width='1.7'%3E%3Ccircle cx='10.5' cy='10.5' r='6.5'/%3E%3Cpath d='m16 16 4 4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:12px center;background-size:17px;color:var(--msg-text);box-shadow:none}
+#app .messenger-sidebar .inbox-search:focus{outline:none;border-color:#aa91e7;box-shadow:0 0 0 3px #8e6cdb12}
+#app .messenger-sidebar .inbox-filters{flex-shrink:0;gap:6px;margin:0 18px 12px!important;padding-bottom:12px;border-bottom:1px solid var(--msg-border)}
+#app .messenger-sidebar .inbox-filters button{min-height:32px;padding:0 12px;border-radius:9px;font-size:12px;font-weight:600;color:var(--msg-muted)!important}
+#app .messenger-sidebar .inbox-filters button.active{background:var(--msg-soft)!important;color:var(--msg-accent)!important}
+#app .messenger-sidebar .inbox-list{flex:1;min-height:0;margin:0!important;padding:0 8px 12px;border:0;border-radius:0;background:transparent;overflow:auto;scrollbar-width:thin;scrollbar-color:#9a8fb633 transparent}
+#app .messenger-sidebar .inbox-row{min-height:78px;margin:2px 0;padding:10px;gap:4px;border-radius:13px}
+#app .messenger-sidebar .inbox-row:hover{background:var(--msg-canvas)!important}
+#app .messenger-sidebar .inbox-row.is-unread{background:#8b6bd508!important}
+#app .messenger-sidebar .inbox-row.is-selected{background:var(--msg-soft)!important}
+#app .messenger-sidebar .inbox-open{gap:11px;min-height:52px}
+#app .messenger-sidebar .inbox-avatar{flex-basis:46px}
+#app .messenger-sidebar .inbox-avatar .avatar{width:46px;height:46px;font-size:19px;box-shadow:0 0 0 1px #00000005}
+#app .messenger-sidebar .inbox-row .row-text{gap:6px}
+#app .messenger-sidebar .inbox-row .row-text b{font-size:13px;font-weight:650;color:var(--msg-text)}
+#app .messenger-sidebar .inbox-row .row-text>span{font-size:12px;color:var(--msg-muted)}
+#app .messenger-sidebar .inbox-meta{gap:7px;max-width:58px}
+#app .messenger-sidebar .inbox-meta time{font-size:9px;color:var(--msg-muted);white-space:nowrap}
+#app .messenger-sidebar .inbox-unread{background:var(--msg-accent);min-width:18px;height:18px;font-size:9px}
+#app .messenger-sidebar .inbox-more{width:28px;flex-basis:28px;font-size:20px}
+#app .messenger-welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;text-align:center;background:radial-gradient(ellipse at 50% 45%,#b2a2e614,transparent 65%),var(--msg-canvas);min-width:0;padding:32px;box-sizing:border-box}
+.messenger-welcome-icon{display:grid;place-items:center;width:84px;height:84px;margin-bottom:20px;border-radius:28px;color:#8764d4;background:linear-gradient(145deg,#e8e1fb,#f5f0ff);box-shadow:0 12px 36px #77609c15;transform:rotate(-7deg)}.messenger-welcome-icon svg{width:36px;height:36px;transform:rotate(7deg)}
+#app .messenger-welcome h2{font-size:22px;letter-spacing:-.6px;line-height:1.4;margin:0 0 9px;color:var(--msg-text)}
+#app .messenger-welcome p{font-size:13px;color:var(--msg-muted);margin:0;line-height:1.6}
+#app .view-inbox .chat-box{min-width:0;min-height:0;box-shadow:none!important;border-color:var(--msg-border)!important;background:var(--msg-surface)}
+#app .view-inbox .chat-head{min-height:76px;box-sizing:border-box;padding:16px 20px;gap:10px;border-color:var(--msg-border);background:var(--msg-surface)}
+#app .view-inbox .chat-who{gap:12px;color:var(--msg-text)!important;background:transparent!important}
+#app .view-inbox .chat-who .avatar{width:42px;height:42px;flex-basis:42px;font-size:18px}
+#app .view-inbox .chat-identity b{font-size:15px;font-weight:650;letter-spacing:-.2px;color:var(--msg-text)}
+#app .view-inbox .chat-identity span{font-size:11px;color:var(--msg-muted)}
+#app .view-inbox .chat-head .chat-call{width:38px;min-width:38px;min-height:38px;height:38px;border:0!important;border-radius:12px;background:var(--msg-soft)!important;color:var(--msg-accent)!important}
+#app .view-inbox .chat-head .chat-call:hover{background:var(--msg-accent)!important;color:#fff!important}
+#app .view-inbox .chat-head .more summary{background:transparent;color:var(--msg-muted);box-shadow:none;border-radius:10px}
+#app .view-inbox .dm-log{padding:24px;gap:10px;background:radial-gradient(ellipse at 90% 5%,#aa94e908,transparent 60%),var(--msg-canvas);scrollbar-width:thin;scrollbar-color:#9a8fb633 transparent}
+#app .view-inbox .day-sep{margin:6px 0 14px;padding:5px 12px;background:transparent;color:var(--msg-muted);font-size:10px;font-weight:500;letter-spacing:.2px}
+#app .view-inbox .dm-log .bubble{max-width:78%;padding:11px 15px;border-radius:18px 18px 18px 5px;background:var(--msg-incoming);color:var(--msg-text);box-shadow:0 2px 6px #25233405;border:1px solid var(--msg-border)}
+#app .view-inbox .dm-log .bubble.mine{border-radius:18px 18px 5px 18px;border-color:transparent;background:linear-gradient(130deg,#8160d8,#7053c7)!important;color:#fff;box-shadow:0 3px 9px #7250cb12}
+#app .view-inbox .dm-log .bubble p{font-size:14px;line-height:1.6}
+#app .view-inbox .dm-log .bubble>small,#app .view-inbox .dm-log .bubble>.message-receipt{font-size:9px;opacity:.65;margin-top:6px;background:transparent!important;color:inherit!important;padding:0!important;border:0!important}
+#app .view-inbox .dm-compose{position:relative;padding:16px 20px;gap:10px;background:var(--msg-surface);border-color:var(--msg-border)}
+#app .view-inbox .dm-compose input:not([type=file]){height:46px;min-height:46px;border:1px solid var(--msg-border);background:var(--msg-canvas);border-radius:14px;padding:0 16px;font-size:14px;color:var(--msg-text);box-shadow:none}
+#app .view-inbox .dm-compose input:focus{outline:2px solid #a68add55;outline-offset:1px}
+#app .view-inbox .dm-compose button[type=submit]{width:46px;height:46px;min-height:46px;flex-basis:46px;border-radius:14px;background:var(--msg-accent)!important;box-shadow:0 5px 12px #7654ce22}
+#app .view-inbox .dm-compose .chat-attach-button{color:var(--msg-accent)!important;background:transparent!important;flex-basis:32px;width:32px;padding:5px}
+#app .view-inbox .dm-compose button:disabled{opacity:.5;cursor:wait}
+#app .view-inbox .chat-intro h3{color:var(--msg-text)}#app .view-inbox .chat-intro p{color:var(--msg-muted)}
+#app .view-inbox .chat-pins{padding:8px 16px;background:var(--msg-soft);border-bottom:1px solid var(--msg-border)}
+#app .view-inbox .chat-pins button{background:transparent;color:var(--msg-accent);font-size:12px}
+#app .view-inbox .chat-typing{color:var(--msg-muted);font-size:11px;background:var(--msg-canvas)}
+@media(min-width:1000px){
+  body[data-view=inbox] #social-panel{grid-column:2 / 4!important;grid-row:4!important;display:block!important;gap:0;width:100%;max-width:none;min-width:0;height:calc(100dvh - 112px);min-height:420px;margin-top:12px;padding:0!important;overflow:hidden;border:1px solid var(--msg-border);border-radius:22px;background:var(--msg-surface);box-shadow:0 12px 45px #251a3f05}
+  body[data-view=inbox] #rail{display:none!important}
+  body[data-view=inbox] #app>footer{display:none}
+  #app .view-inbox .messenger-sidebar{grid-column:1;grid-row:1;border-right:1px solid var(--msg-border);height:100%;overflow:hidden}
+  #app .view-inbox>.chat-box,#app .view-inbox>.messenger-welcome{grid-column:2;grid-row:1;height:100%;width:100%;border:0!important;border-radius:0!important}
+  #app .messenger-sidebar .screen-back{display:none!important}
+  #app .view-inbox .chat-head>.icon-btn{display:none}
+}
+@media(min-width:1000px) and (max-width:1239px){body[data-view=inbox] #social-panel{grid-column:2!important}#app .messenger-sidebar .inbox-heading{padding-left:14px;padding-right:14px}#app .view-inbox .chat-head{padding:14px 12px;gap:6px}#app .view-inbox .chat-head .chat-call{width:34px;min-width:34px;height:34px;min-height:34px}#app .view-inbox .dm-compose{padding:12px;gap:6px}}
+@media(max-width:999px){
+  #app .view-inbox{padding:0!important;background:var(--msg-surface);border-radius:18px;overflow:hidden}
+  #app .view-inbox:has(>.chat-box)>.messenger-sidebar,#app .view-inbox>.messenger-welcome{display:none}
+  #app .messenger-sidebar .inbox-heading{padding:18px 12px 16px}
+  #app .messenger-sidebar .inbox-heading h2{font-size:25px}
+  #app .messenger-sidebar .inbox-search{font-size:16px}
+  #app .messenger-sidebar .inbox-list{padding:0 6px 12px}
+  #app .messenger-sidebar .inbox-row{min-height:82px;padding:10px 8px}
+  #app .messenger-sidebar .inbox-row .row-text b{font-size:14px}
+  #app .messenger-sidebar .inbox-avatar{flex-basis:50px}#app .messenger-sidebar .inbox-avatar .avatar{width:50px;height:50px;font-size:21px}
+  #app .view-inbox .chat-box{border-radius:18px!important;border:0!important}
+  #app .view-inbox .chat-head{min-height:70px;padding:12px 10px;gap:7px}
+  #app .view-inbox .chat-who{gap:9px}
+  #app .view-inbox .chat-who .avatar{width:38px;height:38px;flex-basis:38px}
+  #app .view-inbox .chat-identity b{font-size:14px;max-width:none}
+  #app .view-inbox .chat-head .chat-call{width:34px;min-width:34px;height:34px;min-height:34px;border-radius:11px}
+  #app .view-inbox .dm-log{padding:18px 12px;gap:9px}
+  #app .view-inbox .dm-log .bubble{max-width:84%;padding:10px 13px}
+  #app .view-inbox .dm-compose{padding:12px 10px;gap:8px}
+  #app .view-inbox .dm-compose input:not([type=file]){font-size:16px;height:44px;min-height:44px;padding:0 12px}
+  #app .view-inbox .dm-compose button[type=submit]{width:44px;height:44px;min-height:44px;flex-basis:44px;border-radius:13px}
+}
+@media(max-width:360px){#app .view-inbox .chat-head{gap:4px;padding:10px 6px}#app .view-inbox .chat-identity b{max-width:100px}#app .view-inbox .chat-who{gap:6px}#app .view-inbox .chat-head>.icon-btn{width:28px}}
+@media(prefers-color-scheme:dark){#app .view-inbox{--msg-accent:#b99bf4;--msg-soft:#30273e;--msg-surface:#201e27;--msg-canvas:#19171f;--msg-border:#302d39;--msg-text:#f0edf6;--msg-muted:#9992a9;--msg-incoming:#2a2633}#app .view-inbox .dm-compose button[type=submit]{background:#8660d7!important;color:#fff}#app .messenger-welcome-icon{background:linear-gradient(145deg,#37284f,#292033);color:#c5a8fb}#app .messenger-sidebar .inbox-row.is-unread{background:#b99bf408!important}}
+
+@media(min-width:1000px){#app #social-panel>.view-inbox{display:grid!important;grid-template-columns:310px minmax(0,1fr);height:100%;width:100%;gap:0;padding:0!important;margin:0;min-height:0}}
+@media(min-width:1000px) and (max-width:1239px){#app #social-panel>.view-inbox{grid-template-columns:270px minmax(0,1fr)}}
+
+#app .view-inbox .dm-log{margin:0;background:var(--msg-canvas)!important}#app .view-inbox .dm-log .bubble:not(.mine):not(.message-recalled){background:var(--msg-incoming)!important}
+/* Keep history items at their content height when the conversation overflows. */
+#app .dm-log > *{flex-shrink:0}
+#app .dm-log .bubble{flex:0 0 auto;height:auto;min-height:min-content}
+
+/* Compact video stage; preserve camera proportions on all screen sizes. */
+dialog.video-call:not(.audio-call){width:min(960px,calc(100vw - 32px));height:min(640px,calc(100dvh - 32px));margin:auto;border-radius:24px}
+.video-call:not(.audio-call) .call-remote{inset:76px 0 138px;width:100%;height:calc(100% - 214px);object-fit:contain;aspect-ratio:auto}
+.video-call .call-local{box-sizing:border-box;min-height:0;width:144px;height:108px;aspect-ratio:4/3;object-fit:contain}
+.video-call .call-controls{gap:14px}
+@media(max-width:599px){dialog.video-call:not(.audio-call){width:100%;height:min(620px,100dvh);border-radius:20px}.video-call .call-local{width:104px;height:78px;aspect-ratio:4/3}.video-call .call-controls{left:8px;right:8px;gap:6px}.video-call .call-controls button{width:66px;font-size:11px}.video-call .call-controls button svg{width:50px;height:50px;padding:14px}.video-call .call-controls button[aria-pressed=true]::after{top:24px;left:19px;width:27px}}
+dialog.video-call.call-maximized,dialog.video-call:fullscreen{width:100vw;height:100dvh;border-radius:0}

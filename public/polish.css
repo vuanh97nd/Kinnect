@@ -1,0 +1,858 @@
+/* Polish layer v2 — các điều chỉnh "lột xác" áp lên các màn hiện có.
+   Dùng CSS specificity vừa đủ để chèn lên compact/theme/desktop, không rewrite
+   toàn bộ. Nếu cần quay về bản cũ, chỉ việc gỡ polish.css khỏi index.html. */
+
+/* --- 1. Typography toàn app --- */
+body,
+#app,
+#auth {
+  font-family: var(--font-sans) !important;
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+#app h1,
+#app h2,
+#app h3,
+#app h4 {
+  letter-spacing: -0.01em;
+  line-height: var(--lh-snug);
+}
+
+/* --- 2. HEADER: icon-only, nhất quán, cao hơn --- */
+#app > header.topbar {
+  min-height: 60px;
+  padding: var(--space-3) var(--space-4);
+  gap: var(--space-3);
+  backdrop-filter: saturate(1.1) blur(10px);
+  background-color: color-mix(in srgb, var(--card) 90%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
+#app .brand h1 {
+  font-size: var(--text-lg);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.015em;
+}
+#app .brand h1 small {
+  display: none; /* "COMMUNITY" phụ, bỏ đi cho sạch */
+}
+
+#app .top-actions {
+  gap: var(--space-2);
+  align-items: center;
+}
+#app .top-actions > .icon-tab,
+#app .top-actions > .live-tab {
+  position: relative;
+  padding: 8px 10px;
+  min-height: 40px;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--ink);
+  border: 0;
+  font-weight: var(--fw-medium);
+  transition: background var(--motion-fast) var(--easing),
+    transform var(--motion-fast) var(--easing);
+}
+#app .top-actions > .icon-tab:hover,
+#app .top-actions > .live-tab:hover {
+  background: var(--soft);
+}
+#app .top-actions > .icon-tab:active,
+#app .top-actions > .live-tab:active {
+  transform: scale(0.95);
+}
+#app .top-actions > .icon-tab > svg,
+#app .top-actions > .live-tab > svg,
+#app .top-actions > .icon-tab > .tab-icon {
+  width: 22px;
+  height: 22px;
+}
+/* Badge nhỏ gọn, đồng dạng cho mọi icon có đếm */
+#app .top-actions #unread,
+#app .top-actions #friends-count {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: inline-grid;
+  place-items: center;
+  background: var(--danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: var(--fw-bold);
+  line-height: 1;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 0 0 2px var(--card);
+}
+#app .top-actions #unread:empty,
+#app .top-actions #friends-count:empty {
+  display: none;
+}
+/* Avatar nút tài khoản: ring tím mỏng */
+#app #me-btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-pill);
+}
+#app #me-btn .avatar {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--card);
+  box-shadow: 0 0 0 2px var(--primary);
+}
+/* Ô search thanh header: focus mượt */
+#app .top-search {
+  flex: 1;
+  max-width: 420px;
+  height: 40px;
+  padding: 0 var(--space-3);
+  gap: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--soft);
+  transition: box-shadow var(--motion-fast) var(--easing),
+    background var(--motion-fast) var(--easing);
+}
+#app .top-search:focus-within {
+  background: var(--card);
+  box-shadow: 0 0 0 2px var(--primary-soft), 0 0 0 3px var(--primary);
+}
+#app .top-search input {
+  background: transparent;
+  border: 0;
+  font-size: var(--text-base);
+}
+
+/* --- 3. BUTTON SYSTEM: ba cấp --- */
+#app button[type="submit"],
+#app button.auth-cta,
+#app .primary,
+#auth button.auth-cta,
+#auth #auth-submit {
+  background: var(--brand-gradient);
+  color: #fff;
+  border: 0;
+  border-radius: var(--radius-md);
+  padding: 12px 20px;
+  font-weight: var(--fw-semibold);
+  font-size: var(--text-base);
+  letter-spacing: 0.01em;
+  box-shadow: var(--shadow-glow);
+  transition: transform var(--motion-fast) var(--easing),
+    box-shadow var(--motion-fast) var(--easing),
+    filter var(--motion-fast) var(--easing);
+}
+#app button[type="submit"]:hover:not(:disabled),
+#auth button.auth-cta:hover:not(:disabled),
+#auth #auth-submit:hover:not(:disabled) {
+  filter: brightness(1.05);
+  box-shadow: 0 14px 36px rgba(109, 74, 255, 0.4);
+}
+#app button[type="submit"]:active:not(:disabled),
+#auth #auth-submit:active:not(:disabled) {
+  transform: scale(0.98);
+}
+#app .secondary {
+  background: transparent;
+  color: var(--primary);
+  border: 1.5px solid color-mix(in srgb, var(--primary) 70%, transparent);
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  font-weight: var(--fw-medium);
+  transition: background var(--motion-fast) var(--easing),
+    transform var(--motion-fast) var(--easing);
+}
+#app .secondary:hover:not(:disabled) {
+  background: var(--primary-soft);
+}
+#app .ghost {
+  background: transparent;
+  color: var(--ink);
+  border: 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-weight: var(--fw-medium);
+}
+#app .ghost:hover {
+  background: var(--soft);
+}
+#app .danger {
+  background: var(--danger);
+  color: #fff;
+  border: 0;
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  font-weight: var(--fw-semibold);
+}
+
+/* --- 4. CARD: shadow nhẹ hơn, bo mềm hơn --- */
+#app .social-card,
+#app .rail-box,
+#app .friend-row,
+#app .list-row {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  transition: transform var(--motion-fast) var(--easing),
+    box-shadow var(--motion-base) var(--easing);
+}
+#app .social-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+/* --- 5. SKELETON: shimmer thay vì phẳng --- */
+#app .skeleton {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--line) 50%, transparent);
+}
+#app .skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0,
+    color-mix(in srgb, var(--card) 55%, transparent) 50%,
+    transparent 100%
+  );
+  animation: polish-shimmer 1.2s ease-in-out infinite;
+}
+@keyframes polish-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* --- 6. EMPTY STATE: khoảng cách + typography --- */
+#app .empty-state {
+  padding: var(--space-10) var(--space-6);
+  text-align: center;
+  display: grid;
+  gap: var(--space-3);
+  justify-items: center;
+  color: var(--muted);
+}
+#app .empty-state .empty-ico {
+  font-size: 44px;
+  line-height: 1;
+  margin-bottom: var(--space-2);
+  opacity: 0.9;
+}
+#app .empty-state h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--text-lg);
+  font-weight: var(--fw-semibold);
+}
+#app .empty-state p {
+  margin: 0;
+  max-width: 320px;
+  font-size: var(--text-sm);
+  line-height: var(--lh-normal);
+}
+
+/* --- 7. AVATAR fallback đỡ demo-ish --- */
+#app .avatar.fallback {
+  background: color-mix(in srgb, var(--primary-soft) 65%, var(--soft));
+  color: var(--primary);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+}
+
+/* --- 8. TOAST (status) ở góc, auto-dismiss --- */
+#notice[role="status"] {
+  position: fixed;
+  z-index: var(--z-toast);
+  left: 50%;
+  bottom: calc(var(--nav-h, 64px) + var(--space-5));
+  transform: translateX(-50%) translateY(16px);
+  min-width: 240px;
+  max-width: min(92vw, 420px);
+  padding: 12px 18px;
+  background: var(--ink);
+  color: var(--card);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-medium);
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-base) var(--easing),
+    transform var(--motion-base) var(--easing);
+}
+#notice[role="status"].show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+@media (min-width: 1000px) {
+  #notice[role="status"] {
+    left: auto;
+    right: var(--space-6);
+    bottom: var(--space-6);
+    transform: translateY(16px);
+  }
+  #notice[role="status"].show {
+    transform: translateY(0);
+  }
+}
+
+/* --- 9. NAV side (desktop) --- */
+@media (min-width: 1000px) {
+  #app > nav {
+    gap: var(--space-1);
+  }
+  #app > nav > button {
+    border-radius: var(--radius-md);
+    font-weight: var(--fw-medium);
+    transition: background var(--motion-fast) var(--easing);
+  }
+  #app > nav > button.active {
+    background: var(--primary-soft);
+    color: var(--primary);
+    font-weight: var(--fw-semibold);
+  }
+}
+
+/* --- 10. Micro-interactions --- */
+#app button,
+#auth button {
+  transition: transform var(--motion-fast) var(--easing),
+    filter var(--motion-fast) var(--easing),
+    background var(--motion-fast) var(--easing);
+}
+#app button:active:not(:disabled),
+#auth button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+#app button:disabled,
+#auth button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* --- 11. FEED CARD: author / content / actions có nhịp rõ --- */
+#app .post-card,
+#app article.post {
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-3);
+  background: var(--card);
+  border: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+  box-shadow: var(--shadow-sm);
+}
+#app .post-head,
+#app article.post .post-author {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  margin-bottom: var(--space-3);
+}
+#app .post-head .avatar,
+#app article.post .post-author .avatar {
+  width: 44px;
+  height: 44px;
+}
+#app .post-body,
+#app article.post p {
+  font-size: var(--text-md);
+  line-height: var(--lh-normal);
+  margin: var(--space-2) 0 var(--space-3);
+  color: var(--ink);
+}
+#app .post-actions,
+#app article.post .post-actions {
+  display: flex;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid color-mix(in srgb, var(--line) 50%, transparent);
+}
+#app .post-actions > button {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--muted);
+  border: 0;
+  font-weight: var(--fw-medium);
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--motion-fast) var(--easing),
+    color var(--motion-fast) var(--easing);
+}
+#app .post-actions > button:hover {
+  background: var(--soft);
+  color: var(--ink);
+}
+#app .post-actions > button.liked {
+  color: var(--like);
+}
+/* Composer thanh "bạn đang nghĩ gì" nhấn nhẹ */
+#app .composer,
+#app .feed-composer {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  border: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+#app .composer input,
+#app .composer textarea,
+#app .feed-composer input,
+#app .feed-composer textarea {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--soft);
+  border: 0;
+  font-size: var(--text-base);
+  transition: background var(--motion-fast) var(--easing),
+    box-shadow var(--motion-fast) var(--easing);
+}
+#app .composer input:focus,
+#app .composer textarea:focus,
+#app .feed-composer input:focus,
+#app .feed-composer textarea:focus {
+  outline: none;
+  background: var(--card);
+  box-shadow: 0 0 0 2px var(--primary-soft), 0 0 0 3px var(--primary);
+}
+
+/* --- 12. PROFILE: cover + avatar nổi hơn --- */
+#app .profile-cover,
+#app .view-profile .cover {
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  position: relative;
+  overflow: hidden;
+}
+#app .view-profile .profile-avatar,
+#app .profile-head .avatar {
+  width: 128px;
+  height: 128px;
+  border: 4px solid var(--card);
+  box-shadow: var(--shadow-md);
+}
+#app .view-profile h1,
+#app .profile-head h2 {
+  font-size: var(--text-2xl);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+}
+#app .view-profile .profile-stats,
+#app .profile-head .stats {
+  gap: var(--space-5);
+}
+
+/* --- 13. CALL PANEL: cải thiện contrast + nút tròn --- */
+dialog.video-call {
+  background: #0b0d1a;
+  color: #fff;
+  border: 0;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 0;
+  overflow: hidden;
+}
+dialog.video-call .call-topline {
+  padding: var(--space-3) var(--space-4);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.55), transparent);
+}
+dialog.video-call .call-wordmark {
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.04em;
+}
+dialog.video-call .call-wordmark span {
+  margin-left: 6px;
+  padding: 2px 6px;
+  background: var(--brand-gradient);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+}
+dialog.video-call .call-identity h2 {
+  color: #fff;
+  font-weight: var(--fw-bold);
+  font-size: var(--text-xl);
+  letter-spacing: -0.01em;
+}
+dialog.video-call .call-identity p {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: var(--text-sm);
+}
+dialog.video-call .call-controls {
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.65), transparent);
+}
+dialog.video-call .call-controls > button {
+  width: 56px;
+  height: 56px;
+  min-height: 56px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  border: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  transition: transform var(--motion-fast) var(--easing),
+    background var(--motion-fast) var(--easing);
+}
+dialog.video-call .call-controls > button:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+dialog.video-call .call-controls > button.call-accept {
+  background: var(--success);
+}
+dialog.video-call .call-controls > button.call-end {
+  background: var(--danger);
+}
+dialog.video-call .call-controls > button span {
+  display: none; /* nút tròn chỉ còn icon */
+}
+
+/* --- 14. LIVE: badge TRỰC TIẾP + chat panel --- */
+#live-panel .badge {
+  background: var(--danger);
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.04em;
+  box-shadow: 0 4px 12px rgba(225, 29, 72, 0.3);
+}
+#live-panel .live-chat {
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  background: var(--card);
+  border: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+}
+#live-panel #messages {
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  font-size: var(--text-sm);
+}
+#live-panel .controls button {
+  border-radius: var(--radius-pill);
+  padding: 10px 18px;
+}
+
+/* --- 15. CHIPS / TABS nhất quán --- */
+#app .chips button,
+#app .feed-section-tabs button,
+#app .friends-tabs button[role="tab"] {
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--soft);
+  color: var(--muted);
+  border: 0;
+  font-weight: var(--fw-medium);
+  font-size: var(--text-sm);
+  transition: background var(--motion-fast) var(--easing),
+    color var(--motion-fast) var(--easing);
+}
+#app .chips button.active,
+#app .feed-section-tabs button.active,
+#app .friends-tabs button[role="tab"][aria-selected="true"] {
+  background: var(--primary);
+  color: #fff;
+}
+#app .chips button:hover:not(.active),
+#app .feed-section-tabs button:hover:not(.active) {
+  background: color-mix(in srgb, var(--primary-soft) 70%, var(--soft));
+  color: var(--primary);
+}
+
+/* Match the mobile content offset, including devices without a top safe area. */
+@media(max-width:999px){#app>header.topbar{min-height:calc(57px + env(safe-area-inset-top))}}
+
+/* Keep the v2 finish authoritative over legacy header/toast overrides. */
+#app>header.topbar .top-actions>.icon-tab {
+  border-radius:var(--radius-pill)!important
+}
+#app>header.topbar :is(#friends-button,#notification-bell,[data-tab=inbox]).icon-tab:hover:not(.active) {
+  background:var(--soft)!important
+}
+#app>header.topbar #me-btn>.avatar {
+  box-sizing:border-box;
+  width:30px!important;
+  height:30px!important;
+  min-width:30px!important;
+  min-height:30px!important;
+  max-width:30px;
+  max-height:30px;
+  border:2px solid var(--card)!important;
+  box-shadow:0 0 0 2px var(--primary)
+}
+#app .profile-completion-actions>.primary {
+  background:var(--brand-gradient);
+  box-shadow:var(--shadow-glow)
+}
+#app article.social-card.post {
+  border-radius:20px;
+  box-shadow:0 2px 5px rgba(16,18,30,.06),0 12px 28px rgba(16,18,30,.07)!important
+}
+#app #notice[role="status"] {
+  position:fixed!important;
+  inset:auto auto calc(var(--nav-h,64px) + 20px + env(safe-area-inset-bottom)) 50%;
+  width:max-content;
+  min-width:0;
+  max-width:min(92vw,420px);
+  box-sizing:border-box;
+  margin:0;
+  padding:12px 18px;
+  border:0;
+  border-radius:var(--radius-pill);
+  background:var(--ink);
+  color:var(--card);
+  opacity:0;
+  transform:translate(-50%,16px);
+  transition:opacity var(--motion-base) var(--easing),transform var(--motion-base) var(--easing);
+  pointer-events:none
+}
+#app #notice[role="status"].show {
+  opacity:1;
+  transform:translate(-50%,0)
+}
+@media(min-width:1000px) {
+  #app #notice[role="status"] {
+    left:auto;
+    right:24px;
+    bottom:24px;
+    transform:translateY(16px)
+  }
+  #app #notice[role="status"].show {
+    transform:translateY(0)
+  }
+}
+
+/* Audit fixes: keep the composer flexible and controls inside short viewports. */
+#app .composer-row { min-width: 0; width: 100%; }
+#app .composer-row textarea { flex: 1 1 0; width: 0; min-width: 0; box-sizing: border-box; }
+#app .composer:not(.composer-expanded) .composer-row textarea { height: 44px; min-height: 44px; }
+#app .live-grid-error { padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink); text-align: center; }
+#app .live-grid-error p { margin: 0 0 12px; }
+@media (orientation: landscape) and (max-height: 500px) {
+  body[data-view="shorts"][data-reel="ready"] .reel-side {
+    top: auto; bottom: 12px; right: max(10px, env(safe-area-inset-right));
+    display: grid; grid-template-columns: repeat(2, 48px); gap: 4px 8px;
+    align-items: center; justify-items: center;
+  }
+  #app .reel-side .reel-action { min-height: 44px; padding: 2px; gap: 1px; }
+  #app .reel-side .reel-action svg { width: 22px; height: 22px; }
+  #app .reel-side .person-link.reel-creator { width: 40px; height: 40px; min-width: 40px; min-height: 40px; margin: 0!important; }
+  body[data-view="shorts"][data-reel="ready"] .reel-meta { right: 132px; bottom: 12px; }
+}
+@media (min-width: 700px) {
+  .studio.tt .tt-card { margin: 8px auto 0; }
+  .studio.tt .tt-bottom { box-sizing: border-box; width: min(100%, 720px); margin: 0 auto; flex-shrink: 0; }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .studio.tt .tt-bottom { height: 64px; padding: 4px 12px; }
+  .studio.tt .tt-gallery span { width: 36px; height: 36px; }
+  .studio.tt .tt-card { width: calc(100% - 24px); max-width: 1100px; margin: 8px auto 0; }
+  .studio.tt .tt-stage { right: 240px; }
+  .studio.tt .tt-stage canvas { object-fit: contain; }
+  .studio.tt .tt-sound { top: 8px; right: 12px; max-width: 208px; }
+  .studio.tt .tt-rail { top: 52px; right: 12px; left: auto; transform: none; width: 208px; box-sizing: border-box; gap: 4px; }
+  .studio.tt .tt-tool { width: 46px; flex: 1; min-width: 0; }
+  .studio.tt .tt-modes { left: auto; right: 12px; bottom: 90px; transform: none; width: 208px; box-sizing: border-box; }
+  .studio.tt .tt-shutter-row { left: auto; right: 12px; bottom: 10px; width: 208px; height: 78px; }
+  .studio.tt .tt-carousel { position: absolute; top: auto; bottom: 0; right: 228px; width: min(320px, calc(100vw - 300px)); box-sizing: border-box; }
+  .studio.tt .tt-sheet { right: 240px; bottom: 90px; max-height: calc(100% - 110px); overflow-y: auto; }
+}
+
+/* Kinnect redesign 2026-10 — lớp cuối cùng, chỉ ghi đè giao diện.
+   Thanh trên: Thông báo → Bạn bè → Tin nhắn → Avatar, icon 20×20 có chấm báo.
+   Bảng màu sáng mới; giao diện tối giữ nguyên. */
+
+/* ---------- Bảng màu sáng ---------- */
+@media (prefers-color-scheme: light) {
+  :root,
+  #app,
+  #auth {
+    --bg: #f6f5fa;
+    --ink: #1f1d2b;
+    --muted: #6a6478;
+    --line: #e4e0ec;
+    --soft: #f4f1fa;
+    --primary: #6c47e0;
+    --primary-soft: #f1ecff;
+    --primary-strong: #5b3fd6;
+    --danger: #c2365a;
+    --danger-soft: #fde8ee;
+    --success: #1f7a4d;
+    --success-soft: #e3f4ea;
+    --online: #2e9e66;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  :root,
+  #app,
+  #auth {
+    --primary-strong: var(--primary);
+    --online: #40ae78;
+  }
+}
+
+/* ---------- Thanh trên ---------- */
+html body #app .topbar {
+  border-bottom: 1px solid var(--line);
+}
+html body #app .top-actions {
+  gap: 2px;
+}
+html body #app .top-actions > .icon-tab {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  box-shadow: none;
+}
+html body #app .top-actions > .icon-tab[hidden],
+html body #app .top-actions > .icon-tab[data-tab="live"] {
+  display: none;
+}
+html body #app .top-actions .tab-icon {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  max-width: 20px;
+  min-height: 20px;
+  max-height: 20px;
+  stroke-width: 1.8;
+}
+html body #app#app .top-actions > .icon-tab.active,
+html body #app#app .top-actions > #notification-bell[aria-expanded="true"] {
+  background: var(--primary-soft) !important;
+  color: var(--primary-strong) !important;
+}
+/* Khi khung thông báo đang mở, chỉ chuông được tô sáng. */
+html body #app#app .top-actions:has(#notification-bell[aria-expanded="true"]) > .icon-tab.active:not(#notification-bell) {
+  background: transparent !important;
+  color: var(--ink) !important;
+}
+
+/* ---------- Chấm báo ---------- */
+/* Số đếm vẫn nằm trong DOM cho trình đọc màn hình và kiểm thử; hiển thị thành chấm tím. */
+html body #app .top-actions #friends-count,
+html body #app .top-actions .nav-count,
+html body #app .top-actions #unread {
+  position: absolute !important;
+  top: 7px !important;
+  right: 7px !important;
+  width: 6px !important;
+  height: 6px !important;
+  min-width: 6px !important;
+  min-height: 6px !important;
+  max-height: 6px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 2px solid var(--card) !important;
+  box-sizing: content-box !important;
+  border-radius: 50% !important;
+  background: var(--primary) !important;
+  box-shadow: none !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  overflow: hidden !important;
+  transform: none !important;
+}
+html body #app .top-actions #friends-count:empty,
+html body #app .top-actions .nav-count:empty,
+html body #app .top-actions .nav-count[hidden],
+html body #app .top-actions #unread:empty,
+html body #app .top-actions #notification-bell:not(.bell-fresh) #unread {
+  display: none !important;
+}
+
+/* ---------- Đăng nhập: cột thương hiệu PC với điện thoại xem trước ---------- */
+#auth .auth-brand {
+  background: var(--primary-soft);
+  color: var(--ink);
+  justify-content: flex-start;
+}
+#auth .auth-brand::before { display: none; }
+#auth .auth-brand h2 { color: var(--ink); }
+#auth .auth-brand-top b { color: var(--primary); }
+#auth .auth-brand-top img { box-shadow: none; }
+#auth .ks-show { position: relative; flex: 1; display: flex; justify-content: center; align-items: flex-end; min-height: 360px; margin-top: 24px; }
+#auth .ks-phone { position: relative; width: 230px; height: 400px; box-sizing: border-box; padding: 10px 10px 0; border-radius: 34px 34px 0 0; border: 7px solid var(--ink); border-bottom: 0; background: var(--bg); box-shadow: 0 30px 60px -20px #3b24a055; overflow: hidden; animation: ks-rise .8s .1s cubic-bezier(.2,.7,.2,1) both, ks-float 6s 1s ease-in-out infinite; }
+#auth .ks-notch { width: 66px; height: 16px; border-radius: 0 0 10px 10px; background: var(--ink); margin: -10px auto 6px; }
+#auth .ks-top { display: flex; align-items: center; justify-content: space-between; padding: 2px 2px 8px; }
+#auth .ks-top b { display: flex; align-items: center; gap: 5px; font-size: 13px; color: var(--primary); }
+#auth .ks-top em { font-style: normal; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 6px; background: var(--primary); color: #fff; font-size: 11px; }
+#auth .ks-top span { display: flex; gap: 7px; color: var(--ink); }
+#auth .ks-show svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+#auth .ks-top svg { width: 13px; height: 13px; }
+#auth .ks-stories { display: flex; gap: 8px; padding: 2px 2px 9px; }
+#auth .ks-stories i { position: relative; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; font-style: normal; }
+#auth .ks-stories i::before { content: ""; position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(var(--primary), #c9b5ff, var(--primary)); animation: ks-spin 5s linear infinite; }
+#auth .ks-stories span { position: relative; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--primary-soft); border: 2px solid var(--card); font-size: 9px; font-weight: 700; color: var(--primary-strong); }
+#auth .ks-post { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 8px; display: grid; gap: 7px; }
+#auth .ks-who { display: flex; align-items: center; gap: 6px; }
+#auth .ks-who i { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--primary-soft); color: var(--primary-strong); font-size: 8px; font-weight: 700; font-style: normal; }
+#auth .ks-who b { display: block; font-size: 10px; color: var(--ink); }
+#auth .ks-who small { display: block; font-size: 8px; color: var(--muted); }
+#auth .ks-art { position: relative; height: 96px; border-radius: 10px; overflow: hidden; }
+#auth .ks-art svg { width: 100%; height: 100%; display: block; stroke: none; }
+#auth .ks-art em { position: absolute; left: 9px; bottom: 8px; font-style: normal; font-weight: 700; font-size: 12px; color: #fff; text-shadow: 0 1px 6px #0006; }
+#auth .ks-sun { animation: ks-sun 6s ease-in-out infinite; }
+#auth .ks-acts { display: flex; gap: 10px; color: var(--ink); }
+#auth .ks-acts svg { width: 14px; height: 14px; }
+#auth .ks-acts .ks-like { color: var(--danger); fill: currentColor; animation: ks-beat 2.4s ease-in-out infinite; }
+#auth .ks-chat { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; padding: 9px 2px; }
+#auth .ks-bubble { font-size: 10px; padding: 6px 9px; border-radius: 12px 12px 12px 4px; background: var(--card); border: 1px solid var(--line); color: var(--ink); animation: ks-in .6s .4s both; }
+#auth .ks-typing { display: flex; gap: 3px; padding: 6px 8px; border-radius: 10px; background: var(--primary-soft); }
+#auth .ks-typing i { width: 5px; height: 5px; border-radius: 50%; background: var(--primary); animation: ks-dot 1.2s ease-in-out infinite; }
+#auth .ks-typing i:nth-child(2) { animation-delay: .15s; }
+#auth .ks-typing i:nth-child(3) { animation-delay: .3s; }
+#auth .ks-chip { position: absolute; display: flex; align-items: center; gap: 7px; padding: 7px 11px 7px 7px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); box-shadow: 0 12px 28px -12px #3b24a04d; font-size: 11px; color: var(--ink); white-space: nowrap; z-index: 2; }
+#auth .ks-chip > i { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--primary-soft); color: var(--primary-strong); font-size: 9px; font-weight: 700; font-style: normal; flex-shrink: 0; }
+#auth .ks-chip > i svg { width: 14px; height: 14px; }
+#auth .ks-heart { width: 14px; height: 14px; color: var(--danger); fill: currentColor; }
+#auth .ks-live { width: 10px !important; height: 10px !important; margin: 0 3px 0 7px; background: var(--danger) !important; animation: ks-ping 1.6s ease-out infinite; }
+#auth .ks-c1 { top: 40px; left: calc(50% - 215px); animation: ks-in .6s .3s both, ks-float 5s 1s ease-in-out infinite; }
+#auth .ks-c2 { top: 170px; right: calc(50% - 210px); animation: ks-in .6s .6s both, ks-float 5.5s 1.4s ease-in-out infinite; }
+#auth .ks-c3 { bottom: 60px; left: calc(50% - 200px); animation: ks-cycle 7s 1.2s ease-in-out infinite both; }
+#auth .auth-back { width: auto !important; gap: 6px; padding: 0 12px 0 8px !important; font-weight: 600; border-radius: 999px; }
+#auth .auth-back svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+#auth .auth-notice { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; padding: 10px 12px; border-radius: 12px; background: var(--primary-soft); color: var(--primary-strong); font-size: 13px; }
+#auth .auth-notice[hidden] { display: none; }
+@keyframes ks-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes ks-spin { to { transform: rotate(1turn); } }
+@keyframes ks-beat { 0%, 60%, 100% { transform: scale(1); } 30% { transform: scale(1.3); } }
+@keyframes ks-dot { 0%, 80%, 100% { opacity: .3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+@keyframes ks-sun { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes ks-in { from { opacity: 0; transform: translateY(10px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes ks-cycle { 0%, 8% { opacity: 0; transform: translateY(10px); } 16%, 70% { opacity: 1; transform: none; } 80%, 100% { opacity: 0; transform: translateY(-6px); } }
+@keyframes ks-ping { 0% { box-shadow: 0 0 0 0 #c2365a99; } 100% { box-shadow: 0 0 0 8px #c2365a00; } }
+@keyframes ks-rise { from { opacity: 0; transform: translateY(60px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { #auth .ks-show *, #auth .ks-show *::before { animation: none !important; } }

@@ -1,0 +1,252 @@
+/* Kinnect Studio: quay video + thanh hiệu ứng dùng chung cho Live */
+body.studio-open { overflow: hidden; }
+.studio {
+  position: fixed; inset: 0; z-index: 3000; background: #000; color: #fff;
+  display: flex; flex-direction: column;
+  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.studio-top { position: absolute; top: env(safe-area-inset-top); left: 0; right: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; }
+.studio button { font: inherit; cursor: pointer; border: 0; }
+.studio-x, .studio-flip { width: 44px; height: 44px; border-radius: 50%; background: #0007 !important; color: #fff !important; font-size: 20px; backdrop-filter: blur(6px); }
+.studio-time { padding: 6px 12px; border-radius: 999px; background: #0007; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.studio.recording .studio-time { background: #ff4f9a; }
+.studio-stage { flex: 1; min-height: 0; display: grid; place-items: center; overflow: hidden; }
+.studio-stage canvas { max-width: 100%; max-height: 100%; aspect-ratio: auto; border-radius: 0; }
+@media (min-width: 700px) { .studio-stage canvas { border-radius: 18px; max-height: calc(100% - 20px); } }
+.studio-fx { padding: 8px 0 0; }
+.studio-bottom { display: flex; justify-content: center; padding: 14px 0 18px; }
+.studio-rec { width: 78px; height: 78px; border-radius: 50%; background: transparent !important; box-shadow: inset 0 0 0 5px #fff; display: grid; place-items: center; padding: 0; }
+.studio-rec span { width: 62px; height: 62px; border-radius: 50%; background: #ff4f9a; transition: all .2s; }
+.studio.recording .studio-rec span { width: 30px; height: 30px; border-radius: 8px; }
+.studio.recording .studio-fx { opacity: .4; pointer-events: none; }
+.studio-review { position: absolute; inset: 0; z-index: 5; background: #000; display: flex; flex-direction: column; gap: 12px; padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom)); }
+.studio-review[hidden] { display: none; }
+.studio-preview { flex: 1; min-height: 0; width: 100%; object-fit: contain; border-radius: 16px; background: #111; }
+.studio-caption { min-height: 48px; padding: 0 14px; border-radius: 12px; border: 1px solid #333; background: #1a1a1a; color: #fff; font-size: 16px; }
+.studio-actions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; }
+.studio-retake, .studio-post { min-height: 50px; border-radius: 12px; font-weight: 800; font-size: 16px; }
+.studio-retake { background: #262626 !important; color: #fff !important; }
+.studio-post { background: linear-gradient(135deg, #6d4aff, #ff4f9a) !important; color: #fff !important; }
+.studio-post:disabled { opacity: .6; }
+
+/* Thanh hiệu ứng */
+.fx-picker { display: grid; gap: 8px; }
+.fx-row { display: flex; gap: 8px; overflow-x: auto; padding: 0 14px; scrollbar-width: none; }
+.fx-row::-webkit-scrollbar { display: none; }
+.fx-chip { flex: 0 0 auto; min-height: 38px; padding: 0 14px; border-radius: 999px; border: 0; font-weight: 700; font-size: 14px; white-space: nowrap; cursor: pointer; }
+.fx-picker.dark .fx-chip { background: #ffffff26 !important; color: #fff !important; }
+.fx-picker.dark .fx-chip.on { background: #fff !important; color: #111 !important; }
+.fx-picker:not(.dark) .fx-chip { background: var(--soft, #f1f2f6) !important; color: var(--ink, #15161a) !important; }
+.fx-picker:not(.dark) .fx-chip.on { background: linear-gradient(135deg, #6d4aff, #ff4f9a) !important; color: #fff !important; }
+.fx-note { margin: 0; padding: 0 14px; font-size: 12.5px; color: #bbb; }
+.fx-picker:not(.dark) .fx-note { color: var(--muted, #6b6f7b); }
+
+/* Live: hiệu ứng dưới khung hình */
+.live-fx { margin: 10px 0; }
+.live-fx:empty { display: none; }
+.live-fx .fx-row { padding: 0; }
+
+/* Thanh tạo video trong tab Video */
+.create-bar { display: flex; gap: 8px; padding: 8px; background: #111; border-radius: 14px; margin-bottom: 10px; }
+#app .create-rec { flex: 1; min-height: 44px; border-radius: 12px; background: linear-gradient(135deg, #6d4aff, #ff4f9a) !important; color: #fff !important; font-weight: 800; font-size: 15px; }
+.create-bar .file-pick { flex: 1; justify-content: center; min-height: 44px; max-width: none; }
+
+/* ===== Kinnect Studio ===== */
+.studio.tt { background: #000; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); display: flex; flex-direction: column; }
+.tt-card { position: relative; flex: 1; min-height: 0; margin: 6px 0 0; border-radius: 22px; overflow: hidden; background: #111; }
+@media (min-width: 700px) { .tt-card { width: min(100%, calc((100dvh - 120px) * 9 / 16)); margin: 12px auto 0; } }
+.tt-stage { position: absolute; inset: 0; display: grid; place-items: center; }
+.tt-stage canvas { width: 100%; height: 100%; object-fit: cover; }
+.tt-progress { position: absolute; top: 8px; left: 12px; right: 12px; height: 4px; border-radius: 4px; background: #ffffff33; z-index: 3; opacity: 0; transition: opacity .2s; }
+.tt-progress i { display: block; height: 100%; width: 0; border-radius: 4px; background: #ff4f9a; }
+.studio.recording .tt-progress { opacity: 1; }
+.tt-x { position: absolute; top: 16px; left: 12px; z-index: 3; width: 44px; height: 44px; border: 0; background: none !important; color: #fff !important; font-size: 26px; text-shadow: 0 1px 4px #0008; cursor: pointer; }
+.tt-time { position: absolute; top: 24px; left: 50%; transform: translateX(-50%); z-index: 3; color: #fff; font-weight: 800; font-size: 15px; text-shadow: 0 1px 4px #0008; }
+.tt-rail { position: absolute; top: 14px; right: 6px; z-index: 3; display: flex; flex-direction: column; gap: 10px; }
+.tt-tool { width: 56px; border: 0; background: none !important; color: #fff !important; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; padding: 2px 0; }
+.tt-tool svg { width: 30px; height: 30px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 3px #0009); }
+.tt-tool small { font-size: 11px; font-weight: 700; text-shadow: 0 1px 3px #000c; }
+.tt-tool.on svg { stroke: #ff4f9a; }
+.studio.recording .tt-rail, .studio.recording .tt-modes, .studio.recording .tt-carousel { opacity: 0; pointer-events: none; }
+.tt-sheet { position: absolute; left: 0; right: 0; bottom: 168px; z-index: 4; padding: 10px 0; background: #000a; backdrop-filter: blur(10px); }
+.tt-sheet[hidden] { display: none; }
+.tt-count { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; font-size: 120px; font-weight: 900; color: #fff; text-shadow: 0 4px 20px #0009; pointer-events: none; }
+.tt-count[hidden] { display: none; }
+.tt-modes { position: absolute; left: 0; right: 0; bottom: 118px; z-index: 3; display: flex; justify-content: center; gap: 6px; }
+.tt-modes button { border: 0; min-height: 32px; padding: 0 14px; border-radius: 999px; background: none !important; color: #ffffffcc !important; font-weight: 800; font-size: 15px; text-shadow: 0 1px 3px #0009; cursor: pointer; }
+.tt-modes button.on { background: #fff !important; color: #111 !important; text-shadow: none; }
+.tt-shutter-row { position: absolute; left: 0; right: 0; bottom: 18px; z-index: 3; height: 92px; display: flex; align-items: center; justify-content: center; }
+.tt-carousel { position: absolute; inset: 0; display: flex; align-items: center; gap: 14px; overflow-x: auto; padding: 0 calc(50% - 30px) 0 calc(50% + 56px); scrollbar-width: none; scroll-snap-type: x mandatory; }
+.tt-carousel::-webkit-scrollbar { display: none; }
+.tt-fx { flex: 0 0 60px; height: 60px; border-radius: 50%; border: 2px solid #ffffff99; background: #ffffff26 !important; display: grid; place-items: center; font-size: 30px; cursor: pointer; scroll-snap-align: center; padding: 0; backdrop-filter: blur(6px); }
+.tt-fx.on { border: 3px solid #fff; box-shadow: 0 0 0 3px #ff4f9a; }
+.tt-shutter { position: relative; z-index: 2; width: 84px; height: 84px; border-radius: 50%; border: 0; padding: 0; background: transparent !important; box-shadow: inset 0 0 0 6px #fff; display: grid; place-items: center; cursor: pointer; }
+.tt-shutter span { width: 66px; height: 66px; border-radius: 50%; background: #fff; transition: all .2s; }
+.studio.recording .tt-shutter { box-shadow: inset 0 0 0 6px #ff4f9a99; }
+.studio.recording .tt-shutter span { width: 34px; height: 34px; border-radius: 8px; background: #ff4f9a; }
+.tt-bottom { display: flex; align-items: center; justify-content: space-between; padding: 12px 18px 10px; color: #fff; }
+.tt-gallery { position: relative; width: 56px; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; }
+.tt-gallery input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.tt-gallery span { width: 42px; height: 42px; border-radius: 10px; border: 2px solid #fff; display: grid; place-items: center; font-size: 20px; background: #333; }
+.tt-gallery small { font-size: 11px; font-weight: 700; }
+.tt-gallery:focus-within span { outline: 3px solid #ff4f9a; }
+.tt-tabs { display: flex; gap: 22px; align-items: center; font-size: 15px; letter-spacing: .5px; }
+.tt-tabs b { color: #fff; }
+.tt-live { border: 0; background: none !important; color: #ffffff99 !important; font-weight: 800; font-size: 15px; letter-spacing: .5px; cursor: pointer; }
+.tt-spacer { width: 56px; }
+/* Màn đăng */
+.tt-post { position: absolute; inset: 0; z-index: 10; background: #000; display: flex; flex-direction: column; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+.tt-post[hidden] { display: none; }
+.tt-post-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid #222; color: #fff; font-size: 17px; }
+.tt-back { width: 44px; height: 44px; border: 0; background: none !important; color: #fff !important; font-size: 32px; line-height: 1; cursor: pointer; }
+.tt-post-head span { width: 44px; }
+.tt-post-body { display: flex; gap: 12px; padding: 14px; }
+.tt-caption { flex: 1; min-width: 0; border: 0; background: transparent; color: #fff; font-size: 16px; resize: none; outline: none; }
+.tt-caption::placeholder { color: #888; }
+.tt-preview { width: 108px; height: 192px; object-fit: cover; border-radius: 10px; background: #222; }
+.tt-post-actions { margin-top: auto; display: grid; grid-template-columns: 1fr 1.6fr; gap: 10px; padding: 12px 14px 16px; }
+.tt-retake, .tt-publish { min-height: 50px; border: 0; border-radius: 10px; font-weight: 800; font-size: 16px; cursor: pointer; }
+.tt-retake { background: #262626 !important; color: #fff !important; }
+.tt-publish { background: #ff4f9a !important; color: #fff !important; }
+.tt-publish:disabled { opacity: .6; }
+
+/* Âm thanh */
+.tt-sound { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); z-index: 3; max-width: 56%; min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: #0007 !important; color: #fff !important; font-weight: 800; font-size: 15px; display: flex; align-items: center; gap: 6px; backdrop-filter: blur(8px); cursor: pointer; }
+.tt-sound span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tt-sound.on { background: #ff4f9acc !important; }
+.studio.recording .tt-sound { pointer-events: none; }
+.studio.recording .tt-time { top: 66px; }
+.tt-tracks { display: grid; gap: 4px; max-height: 42vh; overflow-y: auto; padding: 0 12px; }
+.tt-track { display: flex; align-items: center; min-height: 44px; padding: 0 14px; border: 0; border-radius: 12px; background: #ffffff1a !important; color: #fff !important; font-weight: 700; font-size: 14.5px; text-align: left; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; position: relative; }
+.tt-track.on { background: #ff4f9a !important; }
+.tt-track.own input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.tt-track.own:focus-within { outline: 3px solid #fff; }
+.tt-sheet { bottom: 130px !important; border-radius: 18px 18px 0 0; }
+/* Chế độ LIVE */
+.tt-tabs { gap: 6px !important; }
+.tt-mode { border: 0; min-height: 36px; padding: 0 12px; background: none !important; color: #ffffff88 !important; font-weight: 800; font-size: 15px; letter-spacing: .5px; cursor: pointer; }
+.tt-mode.on { color: #fff !important; }
+.studio[data-mode="live"] .tt-modes, .studio[data-mode="live"] .tt-shutter-row, .studio[data-mode="live"] .tt-gallery, .studio[data-mode="live"] .tt-sound, .studio[data-mode="live"] [data-tool="timer"] { visibility: hidden; }
+.tt-golive { position: absolute; left: 12px; right: 12px; bottom: 16px; z-index: 4; padding: 14px; border-radius: 18px; background: #0009; backdrop-filter: blur(10px); display: grid; gap: 12px; }
+.tt-golive[hidden] { display: none; }
+.tt-title { min-height: 46px; padding: 0 12px; border: 0; border-radius: 12px; background: #ffffff1f; color: #fff; font-size: 16px; font-weight: 700; outline: none; }
+.tt-title::placeholder { color: #ffffffaa; }
+.tt-golive-btn { min-height: 52px; border: 0; border-radius: 999px; background: #ff4f9a !important; color: #fff !important; font-size: 17px; font-weight: 800; cursor: pointer; }
+.studio small{background:none!important;padding:0!important;border:0!important;color:#fff!important;font-size:11px}
+.studio[data-mode="live"] [data-tool="timer"]{display:none}
+
+/* ===== Phong cách riêng Kinnect cho Studio (ghi đè bố cục trước) ===== */
+.studio.tt { --k1: #7c5cff; --k2: #ff4f9a; --kgrad: linear-gradient(135deg, var(--k1), var(--k2)); background: radial-gradient(120% 60% at 50% 0%, #1d1838, #07060c 70%); }
+.tt-card { border-radius: 28px; margin: 8px 8px 0; box-shadow: 0 0 0 1px #ffffff14; }
+/* Thanh công cụ ngang, kính mờ, ở trên */
+.tt-rail { top: 70px; right: auto; left: 50%; transform: translateX(-50%); flex-direction: row; gap: 4px; padding: 6px; border-radius: 18px; background: #00000059; backdrop-filter: blur(14px); }
+.tt-tool { width: 60px; padding: 4px 0; border-radius: 12px; }
+.tt-tool svg { width: 24px; height: 24px; filter: none; }
+.tt-tool small { font-size: 11px; text-shadow: none; }
+.tt-tool.on { background: #ffffff1f !important; }
+.tt-tool.on svg { stroke: var(--k2); }
+/* Nhạc nền: nút góc phải trên */
+.tt-sound { left: auto; right: 12px; transform: none; max-width: 48%; min-height: 40px; border-radius: 14px; background: #00000059 !important; font-size: 14px; }
+.tt-sound.on { background: var(--kgrad) !important; }
+.tt-time { left: 64px; transform: none; top: 26px; }
+/* Thời lượng: điều khiển phân đoạn */
+.tt-modes { bottom: 200px; left: 50%; right: auto; transform: translateX(-50%); gap: 0; padding: 4px; border-radius: 999px; background: #00000059; backdrop-filter: blur(10px); }
+.tt-modes button { min-height: 30px; font-size: 13.5px; text-shadow: none; }
+.tt-modes button.on { background: #ffffffe6 !important; color: #1b1440 !important; }
+/* Hiệu ứng: dải thẻ phía trên nút chụp (không ôm quanh nút) */
+.tt-shutter-row { height: auto; bottom: 16px; flex-direction: column; gap: 14px; }
+.tt-carousel { position: static; inset: auto; width: 100%; padding: 0 12px; gap: 8px; justify-content: flex-start; scroll-snap-type: none; }
+.tt-fx { flex: 0 0 auto; width: auto; height: auto; min-height: 40px; padding: 0 12px 0 6px; border-radius: 14px; border: 1px solid #ffffff2e; background: #00000059 !important; display: flex; align-items: center; gap: 6px; font-size: 20px; color: #fff; }
+.tt-fx small { font-size: 12.5px; font-weight: 700; color: #fff; }
+.tt-fx.on { border-color: transparent; background: var(--kgrad) !important; box-shadow: none; }
+/* Nút chụp: viền chuyển sắc Kinnect */
+.tt-shutter { width: 78px; height: 78px; box-shadow: none; background: var(--kgrad) !important; padding: 5px; }
+.tt-shutter span { width: 100%; height: 100%; background: #fff; border: 4px solid #0d0b18; box-sizing: border-box; }
+.studio.recording .tt-shutter { box-shadow: 0 0 0 6px #ff4f9a40; }
+.studio.recording .tt-shutter span { width: 30px; height: 30px; border-radius: 9px; border: 0; background: var(--kgrad); }
+.tt-progress i { background: var(--kgrad); }
+.studio.recording .tt-time { background: var(--kgrad); padding: 4px 10px; border-radius: 999px; text-shadow: none; }
+/* Thanh dưới: nút thư viện + chuyển chế độ dạng phân đoạn */
+.tt-bottom { padding: 10px 14px 12px; }
+.tt-gallery span { border-radius: 14px; border: 0; background: #ffffff1f; }
+.tt-tabs { padding: 4px; border-radius: 999px; background: #ffffff14; }
+.tt-mode { min-height: 34px; padding: 0 14px; border-radius: 999px; font-size: 14px; letter-spacing: 0; text-transform: none; }
+.tt-mode.on { background: var(--kgrad) !important; }
+.tt-sheet { border-radius: 22px 22px 0 0; background: #120f22e6; }
+.tt-track.on { background: var(--kgrad) !important; }
+/* Màn chia sẻ và lên sóng */
+.tt-publish, .tt-golive-btn { background: var(--kgrad) !important; }
+.tt-golive { border-radius: 22px; background: #0d0b18b3; }
+@media (max-width: 380px) { .tt-tool { width: 54px; } }
+/* Chọn nhạc kiểu Facebook */
+.tt-sound span{letter-spacing:normal!important;text-transform:none!important}
+.mp{position:fixed;inset:0;z-index:2147483000;background:#0000;transition:background .2s;display:flex;align-items:flex-end;justify-content:center}
+.mp.open{background:#0008}
+.mp-sheet{width:100%;max-width:560px;height:86dvh;display:flex;flex-direction:column;background:#fff;color:#1c1e21;border-radius:22px 22px 0 0;transform:translateY(100%);transition:transform .22s ease;box-shadow:0 -10px 40px #0004;padding-bottom:env(safe-area-inset-bottom)}
+.mp.open .mp-sheet{transform:none}
+.mp-grip{width:40px;height:5px;border-radius:9px;background:#d0d3d8;margin:8px auto 2px}
+.mp-head{display:grid;grid-template-columns:72px 1fr 72px;align-items:center;padding:4px 10px}
+.mp-head h2{margin:0;text-align:center;font-size:17px;font-weight:800}
+.mp-close{width:38px;height:38px;min-height:38px!important;border:0;border-radius:50%;background:#f0f2f5!important;color:#1c1e21!important;font-size:16px;padding:0!important}
+.mp-off{justify-self:end;border:0;background:none!important;color:#e0245e!important;font-weight:700;font-size:13px;padding:0!important;min-height:0!important}
+.mp-search{display:flex;align-items:center;gap:8px;margin:6px 14px 4px;padding:0 14px;height:42px;border-radius:999px;background:#f0f2f5;color:#65676b}
+.mp-search svg{width:18px;height:18px;flex:none}
+.mp-search input{flex:1;border:0!important;background:transparent!important;font-size:15px!important;min-height:0!important;padding:0!important;outline:none;color:#1c1e21}
+.mp-tabs{display:flex;gap:6px;padding:8px 14px}
+.mp-tabs button{border:0;border-radius:999px;padding:7px 14px!important;min-height:0!important;background:#f0f2f5!important;color:#1c1e21!important;font-weight:700;font-size:14px}
+.mp-tabs button.on{background:#e7e1ff!important;color:#6d4aff!important}
+.mp-list{flex:1;overflow-y:auto;padding:4px 6px 10px;overscroll-behavior:contain}
+.mp-row,.mp-upload{display:flex;align-items:center;gap:12px;padding:8px 8px;border-radius:14px;cursor:pointer}
+.mp-row:hover,.mp-upload:hover{background:#f5f6f8}
+.mp-row.on{background:#f1edff}
+.mp-art{flex:0 0 52px;width:52px;height:52px;border-radius:10px;display:grid;place-items:center;color:#fff;font-size:22px;font-weight:800;background:linear-gradient(135deg,hsl(var(--h,260) 70% 58%),hsl(calc(var(--h,260) + 50) 75% 45%))}
+.mp-art.own{background:#e7e1ff;color:#6d4aff;font-size:28px}
+.mp-meta{flex:1;min-width:0;display:flex;flex-direction:column}
+.mp-meta b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mp-meta small{font-size:12.5px;color:#65676b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mp-play{flex:none;width:38px;height:38px;min-height:38px!important;padding:0!important;border:0;border-radius:50%;background:#f0f2f5!important;display:grid;place-items:center}
+.mp-play svg{width:16px;height:16px;fill:#1c1e21}
+.mp-row.on .mp-play{background:#6d4aff!important}.mp-row.on .mp-play svg{fill:#fff}
+.mp-empty{text-align:center;color:#65676b;padding:30px 0}
+.mp-bar{display:flex;align-items:center;gap:12px;padding:10px 14px 14px;border-top:1px solid #e4e6eb}
+.mp-bar[hidden]{display:none}
+.mp-now{flex:1;min-width:0;display:flex;flex-direction:column}
+.mp-now b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mp-now small{color:#65676b}
+.mp-use{border:0;border-radius:999px;padding:0 20px!important;min-height:44px!important;background:linear-gradient(135deg,#6d4aff,#ff4f9a)!important;color:#fff!important;font-weight:800}
+@media(prefers-color-scheme:dark){.mp-sheet{background:#242526;color:#e4e6eb}.mp-close,.mp-search,.mp-tabs button,.mp-play{background:#3a3b3c!important;color:#e4e6eb!important}.mp-search input{color:#e4e6eb}.mp-play svg{fill:#e4e6eb}.mp-row:hover,.mp-upload:hover{background:#303133}.mp-row.on{background:#2e2752}.mp-tabs button.on{background:#2e2752!important;color:#b9a6ff!important}.mp-bar{border-color:#3a3b3c}.mp-meta small,.mp-now small,.mp-empty{color:#b0b3b8}}
+.mp-more{display:block;margin:8px auto;border:0;border-radius:999px;padding:8px 18px!important;min-height:0!important;background:#f0f2f5!important;color:#1c1e21!important;font-weight:700}@media(prefers-color-scheme:dark){.mp-more{background:#3a3b3c!important;color:#e4e6eb!important}}
+.mp small{background:none!important;padding:0!important;border-radius:0!important;color:#65676b!important;font-size:12.5px!important}@media(prefers-color-scheme:dark){.mp small{color:#b0b3b8!important}}
+/* Bảng hiệu ứng web kiểu app (bộ lọc có ảnh xem trước, làm đẹp dạng nút tròn) */
+.tt-sheet.fxp{padding:10px 0 12px!important;background:linear-gradient(#0000,#000c 30%)!important;backdrop-filter:none!important;border-radius:0!important}
+.fxp-filters{display:flex;gap:8px;overflow-x:auto;padding:4px 12px;scrollbar-width:none}
+.fxp-filters::-webkit-scrollbar{display:none}
+.fxp-filter{flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;background:none!important;border:0;padding:0!important;min-height:0!important;color:#fffc!important;font-size:11px;font-weight:600;cursor:pointer}
+.fxp-filter canvas{width:58px;height:76px;border-radius:12px;border:2px solid transparent;background:#333;object-fit:cover}
+.fxp-filter.on{color:#fff!important;font-weight:800}.fxp-filter.on canvas{border-color:#fff}
+.fxp-beauty{display:flex;justify-content:space-around;padding:6px 8px}
+.fxp-chip{display:flex;flex-direction:column;align-items:center;gap:4px;background:none!important;border:0;padding:0!important;min-height:0!important;color:#fffc!important;font-size:11px;font-weight:600;cursor:pointer}
+.fxp-chip i{font-style:normal;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:#ffffff33;font-size:20px;color:#fff}
+.fxp-chip.on{color:#fff!important;font-weight:800}.fxp-chip.on i{background:#fff;color:#1c1530}
+.fxp-slider{display:flex;align-items:center;gap:10px;padding:4px 18px 8px;color:#fff;font-size:12px;font-weight:700}
+.fxp-slider span{width:60px}.fxp-slider b{width:26px;text-align:right}
+.fxp-slider input{flex:1;accent-color:#fff;min-height:0!important;padding:0!important;background:none!important;border:0!important}
+.fxp-note{margin:4px 0 0;text-align:center;font-size:11px;color:#fffa}
+/* Màn "Chia sẻ video / Đăng tin": theo màu giao diện của app (sáng/tối), xem trước lớn ở trên, chú thích bên dưới */
+.tt-post { background: var(--bg); color: var(--ink); }
+.tt-post-head { color: var(--ink); border-bottom: 1px solid var(--line); background: var(--card); font-weight: 800; }
+.tt-post-head .tt-back { color: var(--ink) !important; background: none !important; font-size: 26px; width: 44px; }
+.tt-post-body { flex-direction: column; align-items: center; gap: 14px; padding: 16px; overflow: auto; flex: 1; min-height: 0; }
+.tt-preview { width: auto; height: min(52dvh, 460px); aspect-ratio: 9 / 16; max-width: 100%; border-radius: 18px; background: #000; box-shadow: 0 12px 30px -12px #0006; object-fit: cover; }
+.tt-caption { width: 100%; flex: none; min-height: 84px; padding: 12px 14px; border: 1px solid var(--line) !important; border-radius: 14px; background: var(--card) !important; color: var(--ink) !important; }
+.tt-caption::placeholder { color: var(--muted); }
+.tt-post-actions { background: var(--card); border-top: 1px solid var(--line); }
+.tt-retake { background: var(--soft) !important; color: var(--ink) !important; border-radius: 14px; }
+.tt-publish { border-radius: 14px; }
+/* Bố cục đăng: video xem lại lớn ở trên, chú thích gọn bên dưới */
+.tt-post-body { justify-content: flex-start; }
+.tt-preview { order: 0; height: min(58dvh, 520px); }
+.tt-caption { order: 1; min-height: 56px; max-height: 120px; }
+
+/* Shared Live retouch controls. */
+.fx-slider{display:flex;align-items:center;gap:12px;padding:7px 10px;font-size:12px}.fx-slider input{flex:1;min-width:100px;accent-color:#a67aee}.fx-note{font-size:11px;line-height:1.4}.fx-picker.dark .fx-slider{color:#f1e8ff}

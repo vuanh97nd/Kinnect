@@ -1,0 +1,8 @@
+import {test,expect} from '@playwright/test';
+test('profile avatar opens file chooser directly and stays on profile after save',async({page})=>{
+ await page.request.post('/api/register',{data:{username:'direct_avatar_'+Date.now(),password:'abcdef',name:'Avatar trực tiếp',agree18:true}});await page.goto('/');await expect(page.locator('#app')).toBeVisible();await page.locator('[data-tab=profile]').first().click();
+ const chooser=page.waitForEvent('filechooser');await page.getByRole('button',{name:'Đổi ảnh đại diện trên trang cá nhân',exact:true}).click();await (await chooser).setFiles(new URL('../public/apple-touch-icon.png',import.meta.url).pathname.replace(/^\/(C:)/,'$1'));
+ await expect(page.locator('.profile-avatar-edit img')).toBeVisible();await expect.poll(()=>page.locator('.profile-avatar-edit img').evaluate(img=>img.naturalWidth)).toBeGreaterThan(0);await expect(page.locator('.profile-edit-screen')).toBeHidden();await expect(page.locator('#notice')).toHaveText('Đã cập nhật ảnh đại diện.');
+ await page.getByLabel('Đổi ảnh bìa',{exact:true}).setInputFiles(new URL('../public/apple-touch-icon.png',import.meta.url).pathname.replace(/^\/(C:)/,'$1'));await expect(page.locator('.profile-cover-image')).toBeVisible();await expect.poll(()=>page.locator('.profile-cover-image').evaluate(img=>img.naturalWidth)).toBeGreaterThan(0);await expect(page.locator('.profile-avatar-edit')).toHaveCSS('width','180px');
+ await page.getByRole('button',{name:'Tài khoản của tôi',exact:true}).click();await page.getByRole('menuitem',{name:'Cài đặt tài khoản',exact:true}).click();await page.getByRole('button',{name:'Chỉnh sửa tài khoản',exact:true}).click();await expect(page.locator('.profile-edit-screen')).toBeVisible();
+});

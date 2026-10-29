@@ -1,0 +1,180 @@
+/* Giao diện PC (≥1000px). Chỉ áp dụng trên màn hình rộng — giao diện mobile giữ nguyên. */
+@media (min-width: 1000px) {
+  body { background: var(--bg); }
+  main#app {
+    display: grid !important;
+    grid-template-columns: 248px minmax(0, 640px) 320px !important;
+    grid-template-areas: "top top top" "nav optin rail" "nav notice rail" "nav main rail" "nav foot rail" !important;
+    grid-template-rows: auto auto auto 1fr auto !important;
+    column-gap: 32px !important;
+    justify-content: center;
+    max-width: 1320px !important;
+    margin: 0 auto !important;
+    padding: 0 24px !important;
+    box-sizing: border-box;
+  }
+
+  /* Thanh trên: cố định, ba vùng thẳng hàng với ba cột */
+  #app > header.topbar {
+    grid-area: top;
+    position: sticky; top: 0; z-index: 40;
+    display: grid !important;
+    grid-template-columns: 248px minmax(0, 640px) 320px;
+    column-gap: 32px; align-items: center;
+    height: 64px; margin: 0 -24px; padding: 0 24px;
+    background: color-mix(in srgb, var(--bg) 88%, transparent) !important;
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--line);
+  }
+  body[data-view="shorts"][data-reel="ready"] #app > header.topbar { display: grid !important; grid-template-columns: 248px minmax(0, 640px) 320px; }
+  #app > header.topbar .brand { grid-column: 1; justify-self: start; min-width: 0; margin-right: 0; }
+  #app > header.topbar .top-search { grid-column: 2; justify-self: stretch; align-self: center; flex: none; width: 100%; min-width: 0; max-width: none; }
+  #app > header.topbar .top-search input { box-sizing: border-box; width: 100%; height: 42px; min-height: 42px; }
+  #app > header.topbar .top-actions { grid-column: 3; justify-self: end; gap: 6px !important; }
+  #app #notification-bell { font-size: 0 !important; }
+  #app #notification-bell #unread { position: absolute; top: 2px; right: 0; font-size: 11px; }
+  #app .top-actions .icon-tab { border-radius: 12px !important; }
+  #app .top-actions .icon-tab:hover { background: var(--soft) !important; }
+
+  /* Trên PC, ẩn nút quay lại trong tiêu đề nội dung. */
+  #social-panel .screen-back, #social-panel .view-head > .app-back-button { display: none !important; }
+
+  /* Menu trái dọc, dính khi cuộn */
+  #app > nav {
+    grid-area: nav;
+    position: sticky !important; top: 80px; align-self: start;
+    display: flex !important; flex-direction: column !important; align-items: stretch !important;
+    gap: 4px; width: auto !important; height: auto !important;
+    margin: 16px 0 0 !important; padding: 0 !important;
+    background: none !important; border: 0 !important; box-shadow: none !important;
+    inset: auto !important; transform: none !important;
+  }
+  #app > nav [data-tab] {
+    display: flex !important; flex-direction: row !important; align-items: center; justify-content: flex-start !important;
+    gap: 14px; width: 100% !important; height: 48px; min-height: 48px; padding: 0 14px !important;
+    border-radius: 12px !important; font-size: 15px !important; font-weight: 600;
+    color: var(--ink) !important; background: none !important; text-align: left;
+  }
+  #app > nav [data-tab] .tab-icon, #app > nav [data-tab] svg { width: 24px; height: 24px; flex-shrink: 0; }
+  #app > nav [data-tab]:hover { background: var(--soft) !important; }
+  #app > nav [data-tab].active, #app > nav [data-tab][aria-current="page"] {
+    background: color-mix(in srgb, var(--brand, #8b5cf6) 16%, transparent) !important;
+    color: var(--brand, #8b5cf6) !important;
+  }
+  #app > nav #create-post {
+    order: 10; display: flex !important; align-items: center; justify-content: center; gap: 8px;
+    width: 100% !important; height: 46px !important; min-height: 46px; margin: 14px 0 0 !important;
+    border-radius: 999px !important; padding: 0 !important; position: static !important; transform: none !important;
+    background: linear-gradient(135deg, #8b5cf6, #ff4f9a) !important; color: #fff !important;
+    font-size: 15px !important; font-weight: 700; box-shadow: 0 10px 24px -12px #8b5cf6;
+  }
+  #app > nav #create-post::before, #app > nav #create-post::after { content: none !important; }
+  #app > nav #create-post span { font-size: 0 !important; width: auto !important; height: auto !important; background: none !important; box-shadow: none !important; position: static !important; }
+  #app > nav #create-post span::after { content: "＋  Quay video"; font-size: 15px; }
+
+  /* Mọi trang nội dung dùng cùng cột giữa và cùng trục căn. */
+  #social-panel { grid-area: main; grid-column: 2; justify-self: center; box-sizing: border-box; width: 100%; max-width: 640px; min-width: 0; padding-top: 16px; }
+  body[data-view="inbox"] #social-panel .inbox-heading { display: grid !important; grid-template-columns: minmax(0, 1fr) 40px auto !important; align-items: center; gap: 12px !important; }
+  body[data-view="inbox"] #social-panel .inbox-heading > h2 { grid-column: 1; min-width: 0; margin: 0; }
+  body[data-view="inbox"] #social-panel .inbox-heading > .inbox-new { grid-column: 2; width: 40px; min-width: 40px; height: 40px; min-height: 40px; }
+  body[data-view="inbox"] #social-panel .inbox-heading > .inbox-create-group { grid-column: 3; min-height: 40px; white-space: nowrap; }
+  #live-panel { grid-area: main; min-width: 0; padding-top: 16px; }
+  body[data-view="shorts"][data-reel="ready"] #social-panel { max-width: none; }
+  #rail { grid-area: rail; position: sticky; top: 80px; align-self: start; max-height: calc(100dvh - 96px); overflow: auto; margin-top: 16px; scrollbar-width: none; }
+  #app #social-panel .account-home-profile{display:flex;align-items:center;gap:14px;width:100%;min-height:88px;margin:8px 0 24px;padding:16px;text-align:left;color:var(--ink)!important;background:var(--card)!important;border:1px solid var(--line)!important;border-radius:16px;box-sizing:border-box}
+  #social-panel .account-home-profile>.avatar{width:52px;height:52px;flex:0 0 52px}
+  #social-panel .account-home-who{display:flex;flex:1;flex-direction:column;gap:4px;min-width:0}
+  #social-panel .account-home-who strong{font-size:16px}
+  #app #social-panel .account-home-who small{font-size:13px;color:var(--muted)!important;background:transparent!important;padding:0!important;border:0!important;border-radius:0!important}
+  #social-panel .account-home-arrow{font-size:28px;color:var(--muted);line-height:1}
+  #social-panel .account-home-section{margin:0 0 24px}
+  #social-panel .account-home-section>h3{margin:0 0 10px;font-size:15px}
+  #app #social-panel .account-home-link{display:flex;flex-direction:column;align-items:flex-start;gap:5px;width:100%;min-height:64px;margin:0;padding:14px 16px;text-align:left;color:var(--ink)!important;background:var(--card)!important;border:1px solid var(--line)!important;box-sizing:border-box}
+  #social-panel .account-home-link+.account-home-link{border-top:0;border-radius:0 0 14px 14px}
+  #social-panel .account-home-link:first-of-type{border-radius:14px 14px 0 0}
+  #app #social-panel .account-home-link small{font-size:13px;color:var(--muted)!important;background:transparent!important;padding:0!important;border:0!important;border-radius:0!important}
+  #social-panel .account-home-links{display:flex;flex-direction:column;padding:4px 16px;background:var(--card);border:1px solid var(--line);border-radius:14px}
+  #social-panel .account-home-links a{padding:12px 0;color:var(--ink);text-decoration:none}
+  #social-panel .account-home-links a+a{border-top:1px solid var(--line)}
+  #social-panel .account-home-links a:hover{color:var(--primary)}
+  #app #social-panel .account-home-logout{width:100%;min-height:46px;margin:0;padding:0 16px;text-align:left;color:#f0445e!important;background:var(--card)!important;border:1px solid var(--line)!important;border-radius:14px}
+  /* Các ô tìm kiếm PC dùng chung màu bề mặt, viền và placeholder. */
+  #app .top-search input,
+  #app .view-discover .search-bar input,
+  #app .view-friends .friends-search,
+  #app .view-inbox .inbox-search {
+    background: var(--card) !important;
+    color: var(--ink) !important;
+    border: 1px solid var(--line) !important;
+  }
+  #app .top-search input::placeholder,
+  #app .view-discover .search-bar input::placeholder,
+  #app .view-friends .friends-search::placeholder,
+  #app .view-inbox .inbox-search::placeholder { color: var(--muted) !important; opacity: 1; }
+
+  #app #notice:empty { display: none; }
+  #app #notice:not(:empty) { position: fixed !important; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 60; }
+
+  /* Lưới thẻ người dùng rộng hơn */
+  #app .user-grid, #app .grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 14px !important; }
+  #app .social-card { border-radius: 16px; }
+
+  /* Video dọc được căn giữa trong cùng trục nội dung. */
+  body[data-view="shorts"][data-reel="ready"] .reel { width: min(100%, calc((100dvh - 96px) * 9 / 16)) !important; margin: 0 auto; }
+  body[data-view="discover"] #social-panel .people-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; align-items: start; }
+  body[data-view="discover"] #social-panel .skeleton-list.grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+
+  /* Live dùng vùng giữa và phải; tin nhắn giữ riêng cột giữa như các trang khác. */
+  body[data-view="live"] #rail { display: none !important; }
+  body[data-view="live"] #live-panel { grid-column: 2 / 4 !important; }
+}
+@media (min-width: 1000px) and (max-width: 1239px) {
+  main#app { grid-template-columns: 220px minmax(0, 1fr) !important; grid-template-areas: "top top" "nav optin" "nav notice" "nav main" "nav foot" !important; }
+  #app > header.topbar { grid-template-columns: 220px minmax(0, 1fr) auto; }
+  #rail { display: none !important; }
+  body[data-view="live"] #live-panel { grid-column: 2 !important; }
+}
+
+/* Keep the existing login layout, with tighter spacing on PC only. */
+@media (min-width: 1000px) {
+  #auth .auth-panel { max-width: 440px; padding: 24px 28px; }
+  #auth .auth-top { margin-bottom: 12px; }
+  #auth .auth-panel h1 { font-size: 28px; margin-top: 12px; }
+  #auth .auth-sub { font-size: 14px; margin-bottom: 14px; }
+  #auth form, #auth fieldset { gap: 10px; }
+  #auth .field label { margin-bottom: 4px; }
+  #auth .input-wrap { min-height: 42px; }
+  #auth .input-wrap input { min-height: 42px; padding-top: 9px; padding-bottom: 9px; }
+  #auth #auth-submit { min-height: 44px !important; }
+  #auth .social-btn { min-height: 42px; }
+  #auth .social-login { gap: 8px; }
+  #auth .divider { margin: 4px 0 8px; }
+  #auth .auth-switch { margin: 12px 0; }
+  #auth .auth-panel > .fine { margin: 10px 0; font-size: 11px; line-height: 1.5; }
+  #auth .site-links { margin-top: 12px; font-size: 12px; }
+  #auth .recent-accounts h2 { font-size: 24px; margin: 12px 0 6px; }
+  #auth .recent-accounts > .muted { margin-bottom: 12px; }
+}
+/* Reduce repeated copy on the PC login screen without changing its flow. */
+@media (min-width: 1000px) {
+  #auth .auth-brand { padding: 32px 40px; }
+  #auth .auth-brand h2 { font-size: 34px; line-height: 1.2; margin: 32px 0 0; }
+  #auth .auth-brand ul { display: none; }
+  #auth .auth-panel { max-width: 440px; }
+  #auth:has(#login-mode.active):has(#forgot-view[hidden]):has(#oauth-form[hidden]) #auth-title,
+  #auth:has(#login-mode.active):has(#forgot-view[hidden]):has(#oauth-form[hidden]) #auth-sub,
+  #auth:has(#login-mode.active) #username-hint,
+  #auth .recent-accounts > .muted,
+  #auth .recent-quick-hint { display: none; }
+  #auth:not(.has-recent) .recent-create { display: none; }
+  #auth .recent-list { gap: 6px; margin-bottom: 10px; }
+  #auth .recent-item { border-radius: 12px; }
+  #auth .recent-pick { padding: 10px 12px; }
+  #auth .recent-avatar { width: 38px; height: 38px; font-size: 18px; }
+  #auth .recent-other, #auth .recent-create { min-height: 40px; padding: 9px 12px; margin-top: 6px; }
+  #auth .recent-accounts h2 { font-size: 20px; margin: 8px 0 12px; }
+  #auth .recent-accounts { margin-bottom: 16px; }
+  #auth .auth-switch { font-size: 13px; }
+  #auth .auth-panel > .fine { display: none; }
+  #auth .site-links { gap: 14px; margin-top: 10px; }
+}

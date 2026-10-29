@@ -1,0 +1,11 @@
+package app.kinnect.live;
+import android.content.Context;import android.graphics.*;import android.graphics.drawable.Drawable;import android.text.*;import android.text.style.ReplacementSpan;import android.widget.TextView;
+/** App typography and locally bundled Noto reaction artwork; retains Unicode text for accessibility. */
+final class KinnectText extends TextView {
+ private boolean changing;
+ KinnectText(Context c){super(c);setTypeface(ApprovedTypography.font(c,Typeface.NORMAL));setIncludeFontPadding(true);}
+ @Override public void setTypeface(Typeface face,int style){try{Typeface chosen=getResources().getFont(getResources().getIdentifier((style&Typeface.BOLD)!=0?"kinnect_semibold":"kinnect_regular","font",getContext().getPackageName()));super.setTypeface(Typeface.create(chosen,style));}catch(Exception e){super.setTypeface(face);}}
+ @Override public void setTypeface(Typeface face){setTypeface(face,face!=null?face.getStyle():Typeface.NORMAL);}
+ @Override public void setText(CharSequence text,BufferType type){if(changing||text==null){super.setText(text,type);return;}changing=true;try{SpannableStringBuilder b=new SpannableStringBuilder(text);for(int i=0;i<b.length();){int cp=Character.codePointAt(b,i),n=Character.charCount(cp),end=i+n;if(end<b.length()&&b.charAt(end)=='\ufe0f')end++;int id=getResources().getIdentifier("emoji_noto_"+Integer.toHexString(cp),"drawable",getContext().getPackageName());boolean compound=end<b.length()&&(b.charAt(end)==0x200d||(Character.codePointAt(b,end)>=0x1f3fb&&Character.codePointAt(b,end)<=0x1f3ff));if(id!=0&&!compound){Drawable icon=getContext().getDrawable(id).mutate();b.setSpan(new Emoji(icon),i,end,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);}i=end;}super.setText(b,type);}finally{changing=false;}}
+ private static final class Emoji extends ReplacementSpan {final Drawable icon;Emoji(Drawable d){icon=d;}public int getSize(Paint p,CharSequence s,int start,int end,Paint.FontMetricsInt fm){return Math.round(p.getTextSize()*1.12f);}public void draw(Canvas c,CharSequence s,int start,int end,float x,int top,int y,int bottom,Paint p){int size=Math.round(p.getTextSize()*1.12f);int save=c.save();c.translate(x,y+(p.ascent()+p.descent()-size)/2);icon.setBounds(0,0,size,size);icon.draw(c);c.restoreToCount(save);}}
+}

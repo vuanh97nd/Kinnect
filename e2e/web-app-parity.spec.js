@@ -1,0 +1,12 @@
+import {test,expect} from '@playwright/test';
+import {createApp} from '../server.js';
+test('app parity filters, groups and AI on web',async({browser})=>{
+ const instance=createApp({authLimit:300});await new Promise(r=>instance.server.listen(0,'127.0.0.1',r));const baseURL='http://127.0.0.1:'+instance.server.address().port;const c=await browser.newContext({baseURL,viewport:{width:390,height:844}});const errors=[];
+ try{const reg=await c.request.post('/api/register',{data:{username:'parityowner',name:'Người kiểm tra',password:'abcdef',agree18:true}});const u=(await reg.json()).user;instance.social.db.prepare("UPDATE users SET role='admin' WHERE id=?").run(u.id);
+ const peer=await browser.newContext({baseURL});const pr=await peer.request.post('/api/register',{data:{username:'paritypeer',name:'Thành viên mẫu',password:'abcdef',agree18:true}});const pu=(await pr.json()).user;
+ const p=await c.newPage();p.on('pageerror',e=>errors.push(e.message));await p.goto('/?s=discover');await expect(p.locator('.native-person-tile')).toHaveCount(1);await p.getByRole('button',{name:'Tuổi',exact:true}).click();await expect(p.locator('dialog')).toBeVisible();await p.getByRole('button',{name:'Áp dụng',exact:true}).click();await expect(p.locator('dialog')).toHaveCount(0);await p.screenshot({path:'C:/Users/ANH/Documents/Codex/2026-10-28/c-n-gi-a-hai-d/outputs/web-kham-pha.png'});
+ const g=(await (await c.request.post('/api/groups',{data:{name:'Nhóm kiểm tra',members:[pu.id]}})).json()).group;await p.goto('/?s=groupDetails&group='+g.id);await expect(p.getByText('Đổi ảnh nhóm',{exact:false})).toBeVisible();await p.getByRole('button',{name:'Bổ nhiệm phó nhóm',exact:true}).click();await expect(p.getByText(/Phó nhóm/).first()).toBeVisible();await p.screenshot({path:'C:/Users/ANH/Documents/Codex/2026-10-28/c-n-gi-a-hai-d/outputs/web-nhom.png'});
+ await p.goto('/?s=admin');await p.getByRole('button',{name:'Cấu hình AI',exact:true}).click();await expect(p.locator('[data-ai-credentials]')).toBeVisible();expect(errors).toEqual([]);expect(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();await peer.close();
+ }finally{await c.close();await Promise.all([...instance.wss.clients].map(ws=>new Promise(r=>{ws.once('close',r);ws.terminate();})));instance.wss.close();instance.server.closeAllConnections();await new Promise(r=>instance.server.close(r));instance.social.close();}
+});
+
