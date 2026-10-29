@@ -2913,3 +2913,5 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 #kn .kn-store{display:flex;flex-direction:column;gap:0;width:100%}#kn .kn-store>*,#kn .kn-wallet>*{min-width:0;flex-shrink:0}
 #kn .kn-store-grid{width:100%}#kn .store-section-title{flex-wrap:wrap}#kn .kn-store-product{height:auto}#kn .store-product-copy{gap:12px}
 #kn .kn-wallet{width:100%;grid-template-columns:minmax(0,1fr)}#kn .wallet-balance h2,#kn .wallet-earnings h2{overflow-wrap:anywhere}#kn .wallet-status{margin:0;padding:0 4px}
+
+.kinnect-call-dock{position:fixed;z-index:70;top:74px;left:50%;transform:translateX(-50%);display:flex;gap:8px;padding:8px;border-radius:16px;background:#352067;color:white;box-shadow:0 8px 24px #0003;max-width:calc(100% - 24px)}.kinnect-call-dock button{border:0;border-radius:10px;padding:10px;background:#ffffff22;color:white;cursor:pointer}.kinnect-call-dock button:last-child{background:#b92649}

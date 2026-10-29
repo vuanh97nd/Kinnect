@@ -1,7 +1,7 @@
 {
-  "version": "1.0.13",
-  "filename": "Kinnect-1.0.13-native.apk",
-  "sha256": "705621fa69129012434ef69f564669957a33d9c533c6c3ac41092603c5b943f6",
+  "version": "1.0.14",
+  "filename": "Kinnect-1.0.14-native.apk",
+  "sha256": "31e100cf6aa6ac95b92b28e59abe8fe806ee5df918b3722f52adbad9b0cf8af6",
   "playVersion": "1.2.1",
   "languages": [
     "vi",
@@ -17,7 +17,8 @@
     "storeWeb": "320/390/1366 px; no overflow",
     "realBillingPurchaseVerified": false,
     "realPayoutVerified": false,
-    "separateWalletShop": "Web 320/390/768/1024/1366: no section overlap; independent account menu entries. Native 320dp font130: layout audit passed."
+    "separateWalletShop": "Web 320/390/768/1024/1366: no section overlap; independent account menu entries. Native 320dp font130: layout audit passed.",
+    "callNavigation": "Two browser video call connected; feed/account/wallet/store preserve connected peer and live audio; return/end cleanup. Native emulator minimize/restore passes; no physical phone audio verification."
   },
-  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.13"
+  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.14"
 }

@@ -95,7 +95,7 @@
   // ---------- Navigation ----------
   const titles = { feed: "Bảng tin", discover: "Khám phá", video: "Video", live: "Trực tiếp", inbox: "Tin nhắn", friends: "Bạn bè", notifications: "Thông báo", profile: "Trang cá nhân", account: "Tài khoản", settings: "Cài đặt", admin: "Quản trị", studio: "Tạo nội dung" };
   async function go(screen, params = {}, { push = true } = {}) {
-    if(media.call && screen!=="call"){const c=media.call;media.call=null;if(c.id)try{socketSend({type:c.incoming&&!c.accepted?"call-decline":"call-end",callId:c.id});}catch{}stopCallTracks(c);}
+
     if(media.room && screen!=="live")await leaveLive();
     if(s.screen==="studio"&&screen!=="studio"&&!media.room)stopCapture();
     const navigationRevision=s.navigationRevision=(s.navigationRevision||0)+1;
@@ -769,9 +769,9 @@
     else if(message.candidate){if(pc.remoteDescription)await pc.addIceCandidate(message.candidate);else pc.pendingCandidates.push(message.candidate);}
   }
   function stopCallTracks(c){clearTimeout(c.timeout);clearTimeout(c.disconnectTimer);clearTimeout(c.resumeTimeout);clearInterval(c.clock);c.pc?.close();c.stream?.getTracks().forEach(t=>t.stop());}
-  async function finishCall(note='Cuộc gọi đã kết thúc.'){stopRinging();
+  async function finishCall(note='Cuộc gọi đã kết thúc.'){stopRinging();stopDialing();callCue('end');
     const c=media.call;if(!c)return;media.call=null;clearCandidateQueue();stopCallTracks(c);if(/kết nối|camera|mic/i.test(note))s.lastCallError='CALL-27B · '+note;toast(note);
-    if(s.me){await go('inbox',c.person.id?{chat:c.person.id}:{});}
+    if(s.me){if(s.screen==='call')await go('inbox',c.person.id?{chat:c.person.id}:{});else render();}
   }
   async function prepareCall(c){
     if(!navigator.mediaDevices?.getUserMedia)throw Error('Trình duyệt chưa cho phép camera/mic. Mở Kinnect bằng Safari qua HTTPS.');
@@ -780,7 +780,7 @@
   }
   async function connectCall(c){
     if(c.pc)return c.pc;
-    c.pc=await newPeer(data=>socketSend({type:'call-signal',callId:c.id,...data}),c.stream,stream=>{if(media.call===c){c.remote=stream;attachMedia();}});
+    c.pc=await newPeer(data=>socketSend({type:'call-signal',callId:c.id,...data}),c.stream,stream=>{if(media.call===c){c.remote=stream;attachMedia();syncCallDock();}});
     if(media.call!==c){c.pc.close();return;}
     const connected=()=>{if(media.call!==c)return;clearTimeout(c.timeout);clearTimeout(c.disconnectTimer);const changed=c.status!=='Đã kết nối';c.status='Đã kết nối';c.connectedAt ||= Date.now();if(changed)render();c.clock ||= setInterval(()=>{const el=app.querySelector('[data-call-clock]');if(el){const sec=Math.floor((Date.now()-c.connectedAt)/1000);el.textContent=String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');}},1000);};
     const fail=()=>{if(media.call!==c)return;try{socketSend({type:'call-end',callId:c.id});}catch{}finishCall('Không kết nối được cuộc gọi. Hãy thử lại hoặc đổi mạng.');};
@@ -793,7 +793,7 @@
     if(media.call||media.room)throw Error('Kết thúc phiên hiện tại trước khi gọi.');
     const u=community.chat;if(!u||u.isGroup)return;
     s.lastCallError='';const c=media.call={person:u,mode,incoming:false,id:'',requestId:crypto.randomUUID(),status:'Đang chuẩn bị…',accepted:false};await go('call');
-    try{await ensureSocket();if(!await prepareCall(c))return;socketSend({type:'call-start',to:u.id,mode,requestId:c.requestId});c.status='Đang gọi…';render();}catch(err){if(media.call===c)await finishCall(err.message);}
+    try{await ensureSocket();if(!await prepareCall(c))return;socketSend({type:'call-start',to:u.id,mode,requestId:c.requestId});c.status='Đang gọi…';startDialing();render();}catch(err){if(media.call===c)await finishCall(err.message);}
   }
   function callStageScreen(){const c=media.call;if(!c)return emptyState('phone','Không có cuộc gọi','Mở cuộc trò chuyện để bắt đầu gọi.');return `<section class="v2-call-stage"><video data-call-remote autoplay playsinline></video>${c.mode==='video'?'<video data-call-local autoplay playsinline muted></video>':''}<div class="v2-call-identity">${av(c.person)}<h1>${esc(c.person.name)}</h1><p role="status">${esc(c.status)}</p><small class="v2-call-build">CALL-27B</small><time data-call-clock></time></div><div class="v2-call-controls">${c.incoming&&!c.accepted?btn(c.answering?'Đang chuẩn bị…':'Trả lời','phone','call-answer','primary').replace('type="button"','type="button"'+(c.answering?' disabled':'')):btn(c.stream?.getAudioTracks()[0]?.enabled===false?'Bật mic':'Tắt mic','mic','call-mic','secondary')+(c.mode==='video'?btn(c.stream?.getVideoTracks()[0]?.enabled===false?'Bật camera':'Tắt camera','video','call-camera','secondary'):'')}${c.playbackBlocked?btn('Bật âm thanh cuộc gọi','volume-2','call-play','secondary'):''}${c.accepted?btn('Âm thanh','volume-2','call-output','secondary'):''}${btn(c.incoming&&!c.accepted?'Từ chối':'Kết thúc','phone-off','call-end','danger-action')}</div></section>`;}
   function callScreen(){const c=media.call;if(!c)return callStageScreen();return head(c.mode==='audio'?'Cuộc gọi thoại':'Cuộc gọi video','Kết nối gần hơn, trò chuyện thoải mái hơn.')+'<div class="stage-cols approved-call"><div>'+callStageScreen()+'</div><aside class="panel details approved-device-panel"><h2>Thiết bị cuộc gọi</h2>'+callDeviceField('audioinput','Micro')+callDeviceField('audiooutput','Loa')+(c.mode==='video'?callDeviceField('videoinput','Camera cuộc gọi'):'')+'<hr><p class="body-copy">Chọn thiết bị khi trình duyệt hỗ trợ. Trạng thái kết nối luôn hiển thị trong cuộc gọi.</p></aside></div>';}
@@ -843,7 +843,7 @@
     if(m.type==='call-incoming'){if(!pushOn()&&document.hidden&&'Notification' in window&&Notification.permission==='granted'){const notification=new Notification(m.mode==='audio'?'Cuộc gọi thoại đến':'Cuộc gọi video đến',{body:m.from.name,icon:'/kinnect-logo-v106.svg',tag:'kinnect-call'});notification.onclick=()=>{window.focus();notification.close();};}if(media.call||media.room){socketSend({type:'call-decline',callId:m.callId});return;}media.call={person:m.from,id:m.callId,mode:m.mode,incoming:true,accepted:false,status:m.mode==='audio'?'Cuộc gọi thoại đến':'Cuộc gọi video đến'};await go('call');if(media.autoAnswer===m.callId){media.autoAnswer=null;app.querySelector('[data-do="call-answer"]')?.click();}else startRinging();return;}
     if(m.type==='call-ringing'){const c=media.call;if(!c||m.requestId!==c.requestId){socketSend({type:'call-end',callId:m.callId});return;}c.id=m.callId;return;}
     if(m.type==='call-ended'){const c=media.call;if(c&&(m.callId===c.id||m.requestId===c.requestId)){await finishCall(({busy:'Người này đang bận.',unavailable:'Người này chưa trực tuyến.',missed:'Không có trả lời.',declined:'Cuộc gọi bị từ chối.',disconnected:'Thiết bị bên kia mất kết nối máy chủ.',answered_elsewhere:'Cuộc gọi đã được nhận trên thiết bị khác.'})[m.reason]||'Cuộc gọi đã kết thúc.');}return;}
-    if(m.type==='call-accepted'){const c=media.call;if(!c||c.id!==m.callId)return;c.accepted=true;c.status='Đang kết nối…';const pc=await connectCall(c);if(pc&&!c.incoming){await pc.setLocalDescription(await pc.createOffer());socketSend({type:'call-signal',callId:c.id,description:pc.localDescription.toJSON()});}render();return;}
+    if(m.type==='call-accepted'){stopDialing();callCue('connected');const c=media.call;if(!c||c.id!==m.callId)return;c.accepted=true;c.status='Đang kết nối…';const pc=await connectCall(c);if(pc&&!c.incoming){await pc.setLocalDescription(await pc.createOffer());socketSend({type:'call-signal',callId:c.id,description:pc.localDescription.toJSON()});}render();return;}
     if(m.type==='call-signal'){const c=media.call;if(!c||c.id!==m.callId||!c.stream)return;const pc=await connectCall(c);if(pc){await peerSignal(pc,m,data=>socketSend({type:'call-signal',callId:c.id,...data}));if(['connected','completed'].includes(pc.iceConnectionState))pc.oniceconnectionstatechange?.();}return;}
     if(m.type==='joined'){media.liveAudience=[];media.liveJoining='';delete s.params.room;media.room={...(media.rooms.find(r=>r.id===m.room.id)||{}),...m.room,hostId:m.hostUserId||(m.role==='host'?s.me.id:undefined)};media.liveRole=m.role;media.liveMessages=Array.isArray(m.history)?m.history.filter(item=>!item.roomId||item.roomId===m.room.id).slice(-200):[];s.screen='live';render();return;}
     if(m.type==='peer'&&media.liveRole==='host'){
@@ -914,7 +914,11 @@
   document.addEventListener('visibilitychange',sendVisibility);
   navigator.serviceWorker?.addEventListener('message',e=>{if(e.data?.type==='push-call')ensureSocket().catch(()=>{});});
   // Chuông trong trang khi có cuộc gọi đến (WebAudio, không cần tệp âm thanh).
-  let ringTimer=null,ringCtx=null;
+  let ringTimer=null,ringCtx=null,dialTimer=null;
+  function callCue(kind){try{ringCtx=ringCtx||new(window.AudioContext||window.webkitAudioContext)();ringCtx.resume();const at=ringCtx.currentTime;const notes=kind==='end'?[480,380]:kind==='connected'?[660,880]:[440,480];notes.forEach((freq,i)=>{const o=ringCtx.createOscillator(),g=ringCtx.createGain();o.frequency.value=freq;g.gain.setValueAtTime(0,at+i*.18);g.gain.linearRampToValueAtTime(.1,at+i*.18+.02);g.gain.linearRampToValueAtTime(0,at+i*.18+.16);o.connect(g).connect(ringCtx.destination);o.start(at+i*.18);o.stop(at+i*.18+.18);});}catch{}}
+  function startDialing(){stopDialing();callCue('dial');dialTimer=setInterval(()=>{if(!media.call||media.call.accepted){stopDialing();return;}callCue('dial');},2800);}
+  function stopDialing(){clearInterval(dialTimer);dialTimer=null;}
+
   function ringTone(){try{ringCtx=ringCtx||new (window.AudioContext||window.webkitAudioContext)();ringCtx.resume?.();const t=ringCtx.currentTime;[0,.45].forEach(o=>{const osc=ringCtx.createOscillator(),g=ringCtx.createGain();osc.type='sine';osc.frequency.setValueAtTime(880,t+o);osc.frequency.setValueAtTime(660,t+o+.18);g.gain.setValueAtTime(0,t+o);g.gain.linearRampToValueAtTime(.22,t+o+.03);g.gain.linearRampToValueAtTime(0,t+o+.36);osc.connect(g).connect(ringCtx.destination);osc.start(t+o);osc.stop(t+o+.38);});navigator.vibrate?.([400,200,400]);}catch{}}
   function startRinging(){if(ringTimer)return;ringTone();ringTimer=setInterval(()=>{if(!media.call?.incoming||media.call.accepted){stopRinging();return;}ringTone();},2200);}
   function stopRinging(){clearInterval(ringTimer);ringTimer=null;try{navigator.vibrate?.(0);}catch{}}
@@ -1019,7 +1023,9 @@ function postCommentRows(id,comments){return threadComments(comments).map(c=>{
   });
 
   // ---------- Render ----------
-  function render() { renderView(); syncOverlayHistory(); }
+  function render() { renderView(); syncCallDock(); syncOverlayHistory(); }
+  function syncCallDock(){document.querySelector('.kinnect-call-dock')?.remove();let audio=document.getElementById('kinnect-call-audio');if(!media.call){if(audio){audio.srcObject=null;audio.remove();}return;}if(!audio){audio=document.createElement('audio');audio.id='kinnect-call-audio';audio.autoplay=true;document.body.append(audio);}audio.srcObject=s.screen==='call'?null:media.call.remote||null;if(audio.srcObject)audio.play().catch(()=>{});if(s.screen==='call')return;const dock=document.createElement('div');dock.className='kinnect-call-dock';const open=document.createElement('button');open.textContent='↗ '+(media.call.person?.name||'Cuộc gọi')+' · Quay lại';open.onclick=()=>go('call');const end=document.createElement('button');end.textContent='Kết thúc';end.onclick=()=>realtimeAction('call-end');dock.append(open,end);document.body.append(dock);}
+
   function renderView() {
     const formSnapshots=[...app.querySelectorAll('form')].filter(f=>!f.matches('[data-comment-form],[data-community-send],[data-auth-form],[data-recovery-email]')).map(f=>({attribute:[...f.attributes].find(a=>a.name.startsWith('data-'))?.name,fields:[...f.elements].filter(e=>e.name&&e.type!=='file'&&e.type!=='password'&&e.type!=='submit').map(e=>({name:e.name,type:e.type,value:e.value,checked:e.checked}))}));
     const oldLive=app.querySelector('[data-live-video]');

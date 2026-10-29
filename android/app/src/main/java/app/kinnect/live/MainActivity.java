@@ -348,6 +348,7 @@ public class MainActivity extends Activity {
       toolbar.addView(settings, new LinearLayout.LayoutParams(dp(44), dp(44)));
     }
     root.addView(toolbar, new LinearLayout.LayoutParams(-1, dp(WebDesign.HEADER)));
+    if(calls!=null)root.post(()->{if(calls!=null)calls.attachReturn(root);});
     headerActive = "";
     View line = new View(this);
     line.setBackgroundColor(LINE);
@@ -3637,7 +3638,7 @@ public class MainActivity extends Activity {
   protected void onStop() {
     super.onStop();
     KinnectService.appVisible=false;
-    if(calls!=null){calls.close();calls=null;}
+
     if (shortVideo != null) shortVideo.pause();
     resumeVideos.clear();
     for (VideoView video : mediaVideos) if (video.isPlaying()) { resumeVideos.add(video); video.pause(); }
@@ -3663,7 +3664,7 @@ public class MainActivity extends Activity {
     notificationHandler.removeCallbacksAndMessages(null);
     notificationHandler.post(notificationPoll);
     ensureCalls();
-    if (calls != null) calls.checkPending();
+    if (calls != null) {calls.checkPending();if(root!=null)calls.attachReturn(root);}
     for (VideoView video : resumeVideos) if (video.isAttachedToWindow()) if(!mediaCallBlocked)video.start();
     resumeVideos.clear();
     if (resumeStory != null) resumeStory.run();
@@ -3678,6 +3679,7 @@ public class MainActivity extends Activity {
     for (VideoView video : mediaVideos) { try { video.stopPlayback(); } catch (RuntimeException ignored) {} }
     mediaVideos.clear(); resumeVideos.clear();
     stopShort();
+    if(calls!=null){calls.close();calls=null;}
     super.onDestroy();
   }
 
