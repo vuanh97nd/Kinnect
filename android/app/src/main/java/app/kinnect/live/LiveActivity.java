@@ -23,7 +23,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
   private NativeRtc rtc;
   private JSONObject config;
   private boolean host, joined, ready, previewing;
-  private String liveMode="chat",gameTitle="";private boolean choosingMode,externalPicker,projectionPrompt,gameSound=true,screenPaused,gameSession;
+  private boolean creationEntry;private String liveMode="chat",gameTitle="";private boolean choosingMode,externalPicker,projectionPrompt,gameSound=true,screenPaused,gameSession;
   private LiveGameService gameService;private ServiceConnection gameConnection;private LiveKaraoke karaoke;private View screenCover;
   private TextView modeLabel(String mode){return text(I18n.t(modeName(mode)),12,0xffffffff);}
   private String modeName(String mode){return mode.equals("karaoke")?"Hát karaoke":mode.equals("game")?"Chơi game":"Trò chuyện";}
@@ -101,7 +101,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     root.setBackgroundColor(BG);
     root.setOnApplyWindowInsetsListener((v, i) -> { if(Build.VERSION.SDK_INT>=30){android.graphics.Insets bars=i.getInsets(android.view.WindowInsets.Type.systemBars());android.graphics.Insets keyboard=i.getInsets(android.view.WindowInsets.Type.ime());v.setPadding(bars.left,bars.top,bars.right,Math.max(bars.bottom,keyboard.bottom));}else v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom()); return i; });
     setContentView(root);
-    lobby();
+    creationEntry=getIntent().getBooleanExtra(EXTRA_HOST,false);lobby();
     String origin = ServerConfig.DEFAULT_ORIGIN;
     NativeApi.shared.call("GET", "/api/call-config", null, (data, error, code) -> {
       if (isFinishing() || isDestroyed()) return;
@@ -231,7 +231,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     try{rtc=new NativeRtc(this,config,display,null,new NativeRtc.Events(){public void signal(String peer,JSONObject payload){}public void status(String text){status.setText(text);}},liveMode.equals("karaoke"));final NativeRtc previewRtc=rtc;display.addFrameListener(new org.webrtc.EglRenderer.FrameListener(){private boolean received;public void onFrame(android.graphics.Bitmap bitmap){if(bitmap!=null)bitmap.recycle();if(received)return;received=true;runOnUiThread(()->{if(!previewing||rtc!=previewRtc||isFinishing()||isDestroyed())return;status.setText(I18n.t("Camera đã sẵn sàng · Chưa phát sóng"));start.setEnabled(true);start.setAlpha(1);});}},0f);rtc.media(this,true);rtc.microphone(false);start.setOnClickListener(v->{if(!previewing||!ready||joining)return;topicText=title.getText().toString().trim();start.setEnabled(false);previewLook=rtc.effects();carryPreview=true;pendingHostMic=mic[0];rtc.microphone(pendingHostMic);createHostRoom();});}
     catch(Exception error){if(rtc!=null){rtc.close();rtc=null;}status.setText(I18n.t("Không mở được camera. Kiểm tra quyền camera/micro rồi mở lại."));}
   }
-  private boolean pendingHostMic=true;
+  private boolean gameComments=true;private boolean pendingHostMic=true;
   private void showGamePreview(){
     previewing=true;host=false;if(rtc!=null){rtc.close();rtc=null;}root.removeAllViews();root.setBackgroundColor(BG);
     ScrollView scroll=new ScrollView(this);LinearLayout body=column();body.setPadding(dp(20),dp(16),dp(20),dp(24));scroll.addView(body);root.addView(scroll,new LinearLayout.LayoutParams(-1,-1));
@@ -243,14 +243,15 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     EditText name=field(I18n.t("Tên game (không bắt buộc)"));name.setText(gameTitle);name.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(60)});LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(-1,dp(50));np.topMargin=dp(12);body.addView(name,np);
     CheckBox mic=new CheckBox(this);mic.setTypeface(ApprovedTypography.font(this,0));mic.setTextColor(TEXT);mic.setText(I18n.t("Bật micro bình luận"));mic.setChecked(pendingHostMic);body.addView(mic);
     CheckBox sound=new CheckBox(this);sound.setTypeface(ApprovedTypography.font(this,0));sound.setTextColor(TEXT);sound.setText(I18n.t("Phát tiếng game nếu được ứng dụng cho phép"));sound.setChecked(gameSound&&Build.VERSION.SDK_INT>=29);sound.setEnabled(Build.VERSION.SDK_INT>=29);body.addView(sound);
+    CheckBox comments=new CheckBox(this);comments.setTypeface(ApprovedTypography.font(this,0));comments.setTextColor(TEXT);comments.setText(I18n.t("Bình luận nổi khi chơi game"));comments.setChecked(gameComments);comments.setOnCheckedChangeListener((b,on)->gameComments=on);body.addView(comments);
     TextView privacy=text(I18n.t("Nên chọn chia sẻ một ứng dụng và bật Không làm phiền. Khi chia sẻ toàn màn hình, nội dung và thông báo khác có thể xuất hiện."),12,MUTED);privacy.setPadding(0,dp(12),0,dp(16));body.addView(privacy);
     TextView start=pill(I18n.t("Chọn màn hình & Bắt đầu Live"),true,()->{topicText=title.getText().toString().trim();gameTitle=name.getText().toString().trim();pendingHostMic=mic.isChecked();gameSound=sound.isChecked();requestGameProjection();});start.setMinHeight(dp(56));start.setPadding(dp(12),dp(12),dp(12),dp(12));body.addView(start,new LinearLayout.LayoutParams(-1,-2));
     status=text(I18n.t("Chưa phát sóng · Camera không bật"),12,MUTED);status.setPadding(0,dp(16),0,0);body.addView(status);
   }
-  private void requestGameProjection(){if(projectionPrompt||gameSession||joining||!ready)return;projectionPrompt=true;try{startActivityForResult(((MediaProjectionManager)getSystemService(MEDIA_PROJECTION_SERVICE)).createScreenCaptureIntent(),323);}catch(Exception e){projectionPrompt=false;liveToast("Không mở được quyền chia sẻ màn hình.");}}
-  @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);externalPicker=false;if(request==321||request==322){if(karaoke!=null)karaoke.result(request,result,data);return;}if(request!=323)return;projectionPrompt=false;if(result!=RESULT_OK||data==null){status.setText(I18n.t("Đã hủy chia sẻ · Chưa phát sóng"));return;}if(!ready||isFinishing()){liveToast("Mất kết nối; hãy chọn chia sẻ lại.");return;}startGameSession(data);}
+  private void requestGameProjection(){if(projectionPrompt||gameSession||joining||!ready)return;if(gameComments&&!android.provider.Settings.canDrawOverlays(this)){projectionPrompt=true;try{startActivityForResult(new Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,android.net.Uri.parse("package:"+getPackageName())),324);}catch(Exception e){projectionPrompt=false;gameComments=false;liveToast("Chưa bật bình luận nổi; vẫn có thể phát game.");}return;}projectionPrompt=true;try{startActivityForResult(((MediaProjectionManager)getSystemService(MEDIA_PROJECTION_SERVICE)).createScreenCaptureIntent(),323);}catch(Exception e){projectionPrompt=false;liveToast("Không mở được quyền chia sẻ màn hình.");}}
+  @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);externalPicker=false;if(request==324){projectionPrompt=false;liveToast(android.provider.Settings.canDrawOverlays(this)?"Đã bật bình luận nổi. Bấm bắt đầu Live.":"Chưa cấp quyền bình luận nổi. Có thể tắt lựa chọn này để phát.");return;}if(request==321||request==322){if(karaoke!=null)karaoke.result(request,result,data);return;}if(request!=323)return;projectionPrompt=false;if(result!=RESULT_OK||data==null){status.setText(I18n.t("Đã hủy chia sẻ · Chưa phát sóng"));return;}if(!ready||isFinishing()){liveToast("Mất kết nối; hãy chọn chia sẻ lại.");return;}startGameSession(data);}
   private void startGameSession(Intent permission){
-    gameConnection=new ServiceConnection(){public void onServiceConnected(ComponentName name,IBinder binder){if(isFinishing()||isDestroyed())return;try{gameService=((LiveGameService.SessionBinder)binder).service();gameService.attach(new LiveGameService.Controls(){public void stop(){sendLive("leave");stopGameSession();finish();}public void pause(){toggleScreenPause();}public void mic(){liveMic=!liveMic;if(rtc!=null)rtc.microphone(liveMic);if(gameService!=null)gameService.flags(screenPaused,!liveMic);}});
+    gameConnection=new ServiceConnection(){public void onServiceConnected(ComponentName name,IBinder binder){if(isFinishing()||isDestroyed())return;try{gameService=((LiveGameService.SessionBinder)binder).service();gameService.attach(new LiveGameService.Controls(){public void reply(String text){if(joined&&ready)sendLive("chat","text",text);else liveToast("Chưa kết nối để gửi bình luận.");}public void stop(){sendLive("leave");stopGameSession();finish();}public void pause(){toggleScreenPause();}public void mic(){liveMic=!liveMic;if(rtc!=null)rtc.microphone(liveMic);if(gameService!=null)gameService.flags(screenPaused,!liveMic);}});
       gameSession=true;screenPaused=false;SurfaceViewRenderer display=new SurfaceViewRenderer(LiveActivity.this);localLive=display;rtc=new NativeRtc(LiveActivity.this,config,display,null,new NativeRtc.Events(){public void signal(String peer,JSONObject value){}public void status(String value){liveToast(value);}},true);
       rtc.screen(LiveActivity.this,permission,()->{sendLive("leave");stopGameSession();finish();},gameSound);rtc.microphone(pendingHostMic);liveMic=pendingHostMic;carryPreview=true;createHostRoom();
     }catch(Exception e){if(rtc!=null){rtc.close();rtc=null;}stopGameSession();joining=false;previewing=false;showGamePreview();status.setText(I18n.t("Không chia sẻ được màn hình. Hãy cấp quyền lại."));}}
@@ -296,7 +297,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
       if (room != null && !joined) { host = false; socket.send(NativeSocket.json("type", "join", "multiGuest", true, "liveModes",true,"room", room)); getIntent().removeExtra(EXTRA_ROOM); }
       if (getIntent().getBooleanExtra(EXTRA_HOST, false) && !joined) { getIntent().removeExtra(EXTRA_HOST); askTitleAndHost(); }
     }
-    if (type.equals("rooms")) { lastRooms = m.optJSONArray("rooms"); if (!joined && !previewing) { renderRooms(); } }
+    if (type.equals("rooms")) { lastRooms = m.optJSONArray("rooms"); if (!joined && !previewing) { renderRooms();if(!creationEntry)autoJoin(); } }
     if (type.equals("joined")) { joined = true; joining = false; showRoom(m);if(karaoke!=null&&host)karaoke.publish(); }
     if(type.equals("viewers")){JSONArray users=m.optJSONArray("users");String[] names=new String[users==null?0:users.length()];for(int i=0;i<names.length;i++)names[i]=users.optJSONObject(i).optString("name");Sheet sheet=new Sheet(this).setTitle(I18n.t("Người đang xem")).setNegativeButton(I18n.t("Đóng"),null);if(names.length>0)sheet.setItemIcon("user_round").setItems(names,(d,n)->{});else sheet.setMessage(I18n.t("Chưa có người xem"));sheet.show();return;}
     if(type.equals("live-mode-state")){if(!currentRoom.equals(m.optString("room")))return;if(liveMode.equals("karaoke")){ensureKaraoke();karaoke.state(m);}if(screenCover!=null)screenCover.setVisibility(m.optBoolean("screenPaused")?View.VISIBLE:View.GONE);return;}
@@ -311,10 +312,10 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     if (type.equals("peer") && rtc != null) rtc.offer(m.optString("id"));
     if (type.equals("signal") && rtc != null && (liveState==null||m.optInt("revision")==0||m.optInt("revision")==liveState.optInt("revision"))) rtc.signal(m.optString("from"), m);
     if (type.equals("peer-left") && rtc != null) rtc.remove(m.optString("id"));
-    if(type.equals("count")&&viewers!=null){viewers.setText(String.valueOf(m.optInt("viewers")));renderAudience(m.optJSONArray("users"));}
+    if(type.equals("count")&&viewers!=null){viewers.setText(String.valueOf(m.optInt("viewers")));if(gameService!=null)gameService.viewers(m.optInt("viewers"));renderAudience(m.optJSONArray("users"));}
     if(type.equals("viewer-joined")&&m.optJSONObject("user")!=null)showArrival(m.optJSONObject("user").optString("name"));
     if(type.equals("live-reaction"))showReaction(m.optString("kind"),m.optString("name"));
-    if (type.equals("chat") && chat != null) addChat(m.optString("name"), m.optString("text"));
+    if (type.equals("chat")){if(chat!=null)addChat(m.optString("name"),m.optString("text"));if(gameService!=null)gameService.comment(m.optString("name"),m.optString("text"));}
     if (type.equals("room-ended") || type.equals("ended")) { if (host) { Toast.makeText(this, I18n.t("Buổi trực tiếp đã kết thúc."), Toast.LENGTH_LONG).show(); finish(); } else roomEnded(); }
     if (type.equals("error")) { if(host&&!joined){stopGameSession();host=false;joining=false;previewing=false;showHostPreview();status.setText(m.optString("message",I18n.t("Chưa bắt đầu được Live. Hãy thử lại.")));return;}joining=false;if(liveStage!=null){liveStage.setTranslationY(0);liveStage.setAlpha(1);}status.setText(m.optString("message")); status.setVisibility(View.VISIBLE); }
   }
@@ -338,7 +339,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
   private long swipeAt;
 
   private void autoJoin() {
-    if (previewing || joined || joining || host || socket == null || !ready || lastRooms == null || lastRooms.length() == 0) return;
+    if (creationEntry || choosingMode || previewing || joined || joining || host || socket == null || !ready || lastRooms == null || lastRooms.length() == 0) return;
     if (getIntent().getBooleanExtra(EXTRA_HOST, false)) return;
     JSONObject first = lastRooms.optJSONObject(0);
     if (first == null) return;
@@ -389,7 +390,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     if (!dark) getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
     lobby();
     renderRooms();
-    // Return to the mode-filtered lobby after a broadcast ends.
+    if(!creationEntry)autoJoin();
   }
 
   private void addChat(String name, String body) {
@@ -544,8 +545,8 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     if (rtc != null) { rtc.close(); rtc = null; }
   }
 
-  protected void onStop() { super.onStop(); if ((joined || previewing) && !gameSession&&gameConnection==null&&!projectionPrompt&&!externalPicker&&!isChangingConfigurations()) finish(); }
-  @Override protected void onResume(){super.onResume();externalPicker=false;}
+  protected void onStop() { super.onStop();if(karaoke!=null)karaoke.pause();if(gameSession&&gameService!=null&&gameComments)gameService.overlayVisible(true); if ((joined || previewing) && !gameSession&&gameConnection==null&&!projectionPrompt&&!externalPicker&&!isChangingConfigurations()) finish(); }
+  @Override protected void onResume(){super.onResume();externalPicker=false;if(gameService!=null)gameService.overlayVisible(false);}
   @Override public void onBackPressed(){if(joined){confirmLeave();return;}super.onBackPressed();}
 
   protected void onDestroy() {

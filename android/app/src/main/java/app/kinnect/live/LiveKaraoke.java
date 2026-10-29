@@ -3,6 +3,7 @@ import android.app.*;import android.content.*;import android.net.Uri;import andr
 
 /** Native, local-file karaoke with one consented singer at a time. */
 final class LiveKaraoke {
+ private YouTubeSongSearch youtube;private String youtubeReference="";
  interface Room {LiveAudioMix mix();boolean joined();boolean host();String self();JSONObject stage();void send(String type,Object...args);void toast(String text);}
  private final Activity activity;private final Room room;private final Handler handler=new Handler(Looper.getMainLooper());private final ExecutorService io=Executors.newSingleThreadExecutor();
  private JSONObject state=new JSONObject();private JSONArray lines=new JSONArray();private String title="",pendingSinger="",trackOwner="";private boolean importing,closed,showLyrics=true,published;private long receivedAt,lastSync,serverElapsed;private int publishedRevision=-1;private Dialog controls;private TextView current,next,previous,caption,entry;private LinearLayout lyricBox;private LiveAudioMix loadedMix;
@@ -20,6 +21,8 @@ final class LiveKaraoke {
  void publish(){LiveAudioMix mix=room.mix();if(!room.joined()||!turn()||mix==null||mix!=loadedMix||mix.durationMs()<1000||importing)return;mix.playing=false;room.send("sing-track","title",title,"durationMs",mix.durationMs(),"lines",lines);published=false;publishedRevision=-1;}
  void open(){if(closed)return;if(controls!=null)controls.dismiss();LinearLayout body=column();caption=text(title.isEmpty()?"Chưa chọn nhạc nền":title,14);caption.setTextColor(WebTheme.isDark(activity)?0xfff6f1ff:0xff271f38);body.addView(caption);
   if(!room.joined()||turn()){
+   action(body,"search","Tìm bài trên YouTube",()->{LiveAudioMix active=room.mix();if(active!=null&&active.playing){active.playing=false;transport();}closeSheet();if(youtube!=null)youtube.close();youtube=new YouTubeSongSearch(activity,(name,url)->{youtubeReference=name;room.toast("Đã chọn bài tham khảo. Chọn nhạc có quyền sử dụng để phát vào Live.");});youtube.show();});
+   if(!youtubeReference.isEmpty()){TextView reference=text(youtubeReference,12);reference.setTextColor(0xff9877ef);reference.setMaxLines(2);body.addView(reference);}
    action(body,"music","Chọn nhạc nền từ máy",()->pick(321,"audio/*"));action(body,"type","Nhập lời LRC có mốc thời gian",()->pick(322,"*/*"));
    action(body,"pencil","Đổi tên bài hát",this::rename);
    if(room.joined()){action(body,"play",room.mix()!=null&&room.mix().playing?"Tạm dừng bài hát":"Phát / tiếp tục bài hát",()->{LiveAudioMix mix=room.mix();if(mix==null||mix!=loadedMix){room.toast("Chọn nhạc nền trước.");return;}if(!published){publish();room.toast("Đang chuẩn bị bài hát, bấm phát lại sau giây lát.");return;}mix.playing=!mix.playing;transport();open();});action(body,"rotate_ccw","Hát lại từ đầu",()->{LiveAudioMix mix=room.mix();if(mix!=null){mix.playing=false;mix.seek(0);transport();}open();});}
@@ -39,5 +42,6 @@ final class LiveKaraoke {
  private void transport(){LiveAudioMix mix=room.mix();if(room.joined()&&turn()&&mix!=null&&publishedRevision>=0)room.send("sing-transport","revision",publishedRevision,"positionMs",mix.positionMs(),"playing",mix.playing);lastSync=SystemClock.elapsedRealtime();}
  private final Runnable tick=new Runnable(){public void run(){if(closed)return;LiveAudioMix mix=room.mix();if(room.joined()&&turn()&&mix!=null&&published&&SystemClock.elapsedRealtime()-lastSync>3000)transport();render();handler.postDelayed(this,200);}};
  private void render(){if(entry==null)return;String song=state.optString("title");entry.setText(I18n.t("Hát karaoke")+" · "+(song.isEmpty()?I18n.t(room.host()?"Chọn bài":"Xin hát"):song));lyricBox.setVisibility(showLyrics?View.VISIBLE:View.GONE);JSONArray lyric=state.optJSONArray("lines");long ms=state.optLong("positionMs")+(state.optBoolean("playing")?SystemClock.elapsedRealtime()-receivedAt+serverElapsed:0);if(turn()&&room.mix()!=null&&published)ms=room.mix().positionMs();int ix=lyric==null?-1:KaraokeLyrics.current(lyric,ms);if(lyric==null||lyric.length()==0){previous.setText(state.optString("singerName"));current.setText(I18n.t(song.isEmpty()?"Chọn nhạc nền để bắt đầu":"Bài hát chưa có lời LRC"));next.setText(I18n.t("Chạm thanh Karaoke để mở điều khiển"));}else{previous.setText(ix>0?lyric.optJSONObject(ix-1).optString("text"):"");current.setText(ix>=0?lyric.optJSONObject(ix).optString("text"):I18n.t("Chuẩn bị hát…"));next.setText(ix+1<lyric.length()?lyric.optJSONObject(ix+1).optString("text"):"");}}
- void close(){closed=true;handler.removeCallbacksAndMessages(null);io.shutdownNow();closeSheet();LiveAudioMix mix=room.mix();if(mix!=null){mix.playing=false;mix.monitor(false);}}
+ void close(){closed=true;if(youtube!=null)youtube.close();handler.removeCallbacksAndMessages(null);io.shutdownNow();closeSheet();LiveAudioMix mix=room.mix();if(mix!=null){mix.playing=false;mix.monitor(false);}}
+ void pause(){if(youtube!=null)youtube.close();}
 }

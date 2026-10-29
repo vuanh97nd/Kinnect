@@ -1,6 +1,41 @@
 {
   "references": [
     {
+      "file": "GameCommentOverlay.java",
+      "line": 13,
+      "name": "eye"
+    },
+    {
+      "file": "GameCommentOverlay.java",
+      "line": 13,
+      "name": "message_square"
+    },
+    {
+      "file": "GameCommentOverlay.java",
+      "line": 13,
+      "name": "send"
+    },
+    {
+      "file": "GameCommentOverlay.java",
+      "line": 13,
+      "name": "x"
+    },
+    {
+      "file": "GameCommentOverlay.java",
+      "line": 20,
+      "name": "mic"
+    },
+    {
+      "file": "GameCommentOverlay.java",
+      "line": 20,
+      "name": "message_square"
+    },
+    {
+      "file": "GameCommentOverlay.java",
+      "line": 20,
+      "name": "radio"
+    },
+    {
       "file": "LiveActivity.java",
       "line": 125,
       "name": "back"
@@ -42,12 +77,12 @@
     },
     {
       "file": "LiveActivity.java",
-      "line": 448,
+      "line": 449,
       "name": "eye"
     },
     {
       "file": "LiveKaraoke.java",
-      "line": 14,
+      "line": 15,
       "name": "mic"
     },
     {

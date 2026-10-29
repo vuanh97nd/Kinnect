@@ -1,7 +1,7 @@
 {
-  "version": "1.0.24",
-  "filename": "Kinnect-1.0.24-native.apk",
-  "sha256": "61e03e7b50c13c29e712491bd14e848443dc89ede6cf22dcd24b1584bca1f133",
+  "version": "1.0.25",
+  "filename": "Kinnect-1.0.25-native.apk",
+  "sha256": "73157b4273d30b908efcf503d0652d641f5bf9fd82ef2f11f6f60370360abedb",
   "playVersion": "1.2.4",
   "languages": [
     "vi",
@@ -41,7 +41,8 @@
     "photo21": "Advanced native photo editor: 33 renderer/activity checks, 130 VI/EN layout checks, entry and 4 backend checks; see photo21/verification.json",
     "live22": "Camera/Video/Live menu, native review and 3 Live modes; backend116, screen/audio capture and WebRTC PCM checks; see live22/verification.json",
     "camera23": "Direct + camera; Save/Studio Pro nonoverlap; full-text dialog buttons; native17 camera/review and9 editor exit checks; see camera23/verification.json",
-    "exit24": "Close icon in both Studio Pro editors;9 native exit checks; see exit24/verification.json"
+    "exit24": "Close icon in both Studio Pro editors;9 native exit checks; see exit24/verification.json",
+    "live25": "Floating game comments/viewers/reply; official YouTube search reference; viewer/creation routes separated; see live25/verification.json"
   },
-  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.24"
+  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.25"
 }

@@ -1,0 +1,30 @@
+{
+  "version": "1.0.25",
+  "versionCode": 90,
+  "sha256": "73157b4273d30b908efcf503d0652d641f5bf9fd82ef2f11f6f60370360abedb",
+  "checks": {
+    "overlayAndYouTubeURL": 29,
+    "realGameProjection": 16,
+    "youtubeAndLiveRoute": 7,
+    "screen": "Android16/320dp/font130",
+    "qaCode": 115,
+    "qaPayloadMatchesReleaseExceptManifestAndSignature": true
+  },
+  "overlay": "Real TYPE_APPLICATION_OVERLAY; bounded4 newest comments, viewer count, draggable header, collapse, reply keyboard with @name prefix, send callback to existing room socket, mic/pause/return actions. Overlay only while game session is backgrounded. Permission opt-in; existing notification controls retained.",
+  "youtube": "Visible official m.youtube.com search site inside WebView; reference selection validates watch/shorts URL, no scraping, download, audio extraction, hidden playback or audio rebroadcast. Backing mix pauses when opening YouTube.",
+  "liveRouting": "Viewer Live autojoins swipe feed. Host creation entry opens3 modes and never autojoins.",
+  "limitations": [
+    "YouTube music is NOT transmitted to Live viewers; choose rights-cleared local backing audio for that",
+    "No physical-device/multi-device or game-specific verification",
+    "Overlay permission granted by emulator appops for audit; real Android settings intent implemented",
+    "Reply callback checked; no real public comment sent during audit",
+    "YouTube search results visibly loaded; actual full song playback not verified"
+  ],
+  "physicalDeviceVerified": false,
+  "webClientChanged": false,
+  "playCandidateChanged": false,
+  "references": [
+    "https://developer.android.com/reference/android/provider/Settings#ACTION_MANAGE_OVERLAY_PERMISSION",
+    "https://developers.google.com/youtube/terms/developer-policies"
+  ]
+}
