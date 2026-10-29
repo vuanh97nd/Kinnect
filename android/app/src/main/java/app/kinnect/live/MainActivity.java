@@ -4993,25 +4993,27 @@ public class MainActivity extends Activity {
 
   private android.app.Dialog messageMenu(final String kind, final JSONObject m, boolean own, final String sourcePath, final Runnable refresh) {
     if (m.optBoolean("recalled")) {
-      return new Sheet(this).setItems(new String[] { I18n.t("Xoá ở phía bạn") }, (d, w) -> request("DELETE", "/api/chat-messages/" + kind + "/" + m.optString("id"), json(), r -> refresh.run())).show();
+      return new Sheet(this).setTitle(I18n.t("Tùy chọn tin nhắn")).setItemIcons(new String[]{"trash"}).setItems(new String[] { I18n.t("Xoá ở phía bạn") }, (d, w) -> request("DELETE", "/api/chat-messages/" + kind + "/" + m.optString("id"), json(), r -> refresh.run())).show();
     }
     final String base = "/api/chat-messages/" + kind + "/" + m.optString("id");
-    final List<String> labels = new ArrayList<>();
+    final List<String> labels = new ArrayList<>(), icons = new ArrayList<>();
     final List<Runnable> actions = new ArrayList<>();
-    labels.add(I18n.t("Thả cảm xúc"));
-    actions.add(() -> reactionBar(null, w ->
-      request("POST", base + "/reaction", json("reaction", REACTIONS[w][0]), r -> refresh.run())));
+    icons.add("pin");
     labels.add(m.optBoolean("pinned") ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn");
     actions.add(() -> request(m.optBoolean("pinned") ? "DELETE" : "POST", base + "/pin", json(), r -> refresh.run()));
+    icons.add("forward");
     labels.add(I18n.t("Chuyển tiếp tin nhắn"));
     actions.add(() -> forwardMessage(sourcePath, m));
     if (own) {
+      icons.add("recall");
       labels.add(I18n.t("Thu hồi với mọi người"));
       actions.add(() -> confirm(I18n.t("Thu hồi tin nhắn này?"), () -> request("POST", base + "/recall", json(), r -> refresh.run())));
     }
+    icons.add("trash");
     labels.add(I18n.t("Xoá ở phía bạn"));
     actions.add(() -> request("DELETE", base, json(), r -> refresh.run()));
     if (!own) {
+      icons.add("flag");
       labels.add(I18n.t("Báo cáo tin nhắn"));
       actions.add(() -> report(kind.equals("group")?"group_message":"message", m.optString("id")));
     }
@@ -5022,7 +5024,7 @@ public class MainActivity extends Activity {
       for (String[] r : REACTIONS) if (reactions.optInt(r[0]) > 0) b.append(r[1]).append(" ").append(reactions.optInt(r[0])).append("  ");
       title = b.toString().trim();
     }
-    return new Sheet(this).setTitle(I18n.t(title)).setItems(labels.toArray(new String[0]), (d, w) -> actions.get(w).run()).show();
+    return new Sheet(this).setTitle(title==null?I18n.t("Tùy chọn tin nhắn"):I18n.t(title)).setItemIcons(icons.toArray(new String[0])).setItems(labels.toArray(new String[0]), (d, w) -> actions.get(w).run()).show();
   }
 
   private View chatNameWrap(EditText input){FrameLayout outer=new FrameLayout(this),inner=new FrameLayout(this);inner.addView(input,new FrameLayout.LayoutParams(-1,-2));outer.addView(inner,new FrameLayout.LayoutParams(-1,-2));return outer;}
@@ -5307,7 +5309,7 @@ public class MainActivity extends Activity {
   }
 
   private FrameLayout chatHeaderButton(String glyph,String description,Runnable action){
-    FrameLayout button=new FrameLayout(this);button.setBackground(background(PRIMARY_SOFT,12));ImageView image=new ImageView(this);
+    FrameLayout button=new FrameLayout(this);button.setBackgroundColor(android.graphics.Color.TRANSPARENT);ImageView image=new ImageView(this);
     if(glyph.equals("menu_lines"))image.setImageDrawable(new SettingsGlyph("menu_lines",ACCENT,PRIMARY_SOFT));else image.setImageDrawable(WebIcons.load(this,glyph));image.setImageTintList(android.content.res.ColorStateList.valueOf(ACCENT));
     button.addView(image,new FrameLayout.LayoutParams(dp(22),dp(22),Gravity.CENTER));button.setContentDescription(description);button.setOnClickListener(v->action.run());LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(dp(44),dp(44));p.leftMargin=dp(6);button.setLayoutParams(p);return button;
   }
@@ -5328,7 +5330,7 @@ public class MainActivity extends Activity {
 
   private FrameLayout softIconButton(String name, String label, Runnable action) {
     FrameLayout f = new FrameLayout(this);
-    f.setBackground(background(PRIMARY_SOFT, 12));
+    f.setBackgroundColor(android.graphics.Color.TRANSPARENT);
     f.addView(icon(name, 22, ACCENT), new FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER));
     f.setContentDescription(label);
     f.setOnClickListener(v -> action.run());

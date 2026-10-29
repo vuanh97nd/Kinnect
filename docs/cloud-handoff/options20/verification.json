@@ -1,0 +1,11 @@
+{
+  "version": "1.0.20",
+  "versionCode": 85,
+  "sha256": "0241f9785e89f41b5a7d42a9753c747c929f0c9a11be75c463d9a5987dc27e36",
+  "signatureMatches1_0_19": true,
+  "qa": "Android16 font100/130 menu rows of sent/received/recalled messages: each icon visibly renders and labels are not truncated; duplicate emotion menu action absent; received messages do not offer recall. Header with transparent call/video/menu buttons visually inspected.",
+  "qaVariant": "code110, existing QA signature; all non-manifest/non-signature entries match delivered APK.",
+  "physicalDeviceVerified": false,
+  "published": false,
+  "webClientModified": false
+}

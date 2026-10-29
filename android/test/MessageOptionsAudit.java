@@ -1,0 +1,30 @@
+package app.kinnect.audit;
+import android.app.*;import android.os.*;import android.content.*;import android.view.*;import android.widget.*;import android.graphics.*;import java.lang.reflect.*;import java.io.*;import org.json.*;
+/** Offline measurement of the actual native components; does not send messages or upload media. */
+public class MessageOptionsAudit extends Instrumentation {
+ public void onCreate(Bundle b){super.onCreate(b);start();}
+ Object call(Object a,String n,Class<?>[] t,Object...v)throws Exception{Method m=a.getClass().getDeclaredMethod(n,t);m.setAccessible(true);return m.invoke(a,v);}
+ void set(Object a,String n,Object v)throws Exception{Field f=a.getClass().getDeclaredField(n);f.setAccessible(true);f.set(a,v);}
+ void check(boolean b,String why){if(!b)throw new AssertionError(why);}
+ int dp(Activity a,int v){return Math.round(v*a.getResources().getDisplayMetrics().density);}
+ TextView find(View v,String value){if(v instanceof TextView&&((TextView)v).getText().toString().equals(value))return(TextView)v;if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++){TextView t=find(g.getChildAt(i),value);if(t!=null)return t;}}return null;}
+ EditText input(View v){if(v instanceof EditText)return(EditText)v;if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++){EditText e=input(g.getChildAt(i));if(e!=null)return e;}}return null;}
+ String text(View v){String s=v instanceof TextView?((TextView)v).getText().toString():"";if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++)s+="\n"+text(g.getChildAt(i));}return s;}
+ void shot(Activity a,String n)throws Exception{waitForIdleSync();Thread.sleep(200);try(FileOutputStream out=new FileOutputStream(new File(a.getExternalFilesDir(null),n))){getUiAutomation().takeScreenshot().compress(Bitmap.CompressFormat.PNG,100,out);}}
+ public void onStart(){Bundle result=new Bundle();try{
+ getTargetContext().getSharedPreferences("native_setup",0).edit().putBoolean("asked_v1",true).commit();
+ Class<?> language=getTargetContext().getClassLoader().loadClass("app.kinnect.live.I18n");Method select=language.getDeclaredMethod("select",Context.class,String.class);select.setAccessible(true);select.invoke(null,getTargetContext(),"vi");
+ Activity a=startActivitySync(new Intent().setClassName("app.kinnect.live","app.kinnect.live.MainActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));Thread.sleep(900);
+ runOnMainSync(()->{try{LinearLayout header=new LinearLayout(a);header.setGravity(Gravity.CENTER_VERTICAL);header.setPadding(dp(a,12),dp(a,52),dp(a,12),dp(a,12));header.setBackgroundColor(Color.WHITE);TextView name=new TextView(a);name.setText("Cuộc trò chuyện");name.setTextColor(Color.BLACK);header.addView(name,new LinearLayout.LayoutParams(0,-2,1));for(String icon:new String[]{"call","video"})header.addView((View)call(a,"softIconButton",new Class[]{String.class,String.class,Runnable.class},icon,icon,(Runnable)()->{}));header.addView((View)call(a,"chatHeaderButton",new Class[]{String.class,String.class,Runnable.class},"menu_lines","Tùy chọn",(Runnable)()->{}));a.setContentView(header);}catch(Exception e){throw new RuntimeException(e);}});shot(a,"options20-header.png");
+ for(int state=0;state<3;state++){
+  final boolean own=state!=1,recalled=state==2;final Dialog[] dialog={null};
+  runOnMainSync(()->{try{JSONObject m=new JSONObject().put("id","offline-menu-audit").put("recalled",recalled);dialog[0]=(Dialog)call(a,"messageMenu",new Class[]{String.class,JSONObject.class,boolean.class,String.class,Runnable.class},"direct",m,own,"/unused",(Runnable)()->{});}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();Thread.sleep(200);
+  runOnMainSync(()->{View decor=dialog[0].getWindow().getDecorView();check(find(decor,"Thả cảm xúc")==null,"Duplicate emotion action remains");
+   String[] labels=recalled?new String[]{"Xoá ở phía bạn"}:own?new String[]{"Ghim tin nhắn","Chuyển tiếp tin nhắn","Thu hồi với mọi người","Xoá ở phía bạn"}:new String[]{"Ghim tin nhắn","Chuyển tiếp tin nhắn","Xoá ở phía bạn","Báo cáo tin nhắn"};
+   for(String label:labels){TextView t=find(decor,label);check(t!=null,"Missing menu row: "+label);ViewGroup row=(ViewGroup)t.getParent();check(row.getChildCount()==2&&row.getChildAt(0)instanceof ImageView,"Missing icon for "+label);ImageView icon=(ImageView)row.getChildAt(0);check(icon.getDrawable()!=null&&icon.getWidth()>0,"Unloaded icon");Bitmap drawn=Bitmap.createBitmap(icon.getWidth(),icon.getHeight(),Bitmap.Config.ARGB_8888);icon.draw(new Canvas(drawn));int visible=0;for(int x=0;x<drawn.getWidth();x++)for(int y=0;y<drawn.getHeight();y++)if((drawn.getPixel(x,y)>>>24)>20)visible++;drawn.recycle();check(visible>6,"Blank icon for "+label);check(t.getLayout()!=null&&t.getLayout().getEllipsisCount(t.getLineCount()-1)==0,"Clipped menu text");}
+   if(!own)check(find(decor,"Thu hồi với mọi người")==null,"Received message offers recall");
+  });shot(a,"options20-"+state+".png");runOnMainSync(()->dialog[0].dismiss());
+ }
+ runOnMainSync(()->a.finish());result.putString("result","PASS: real sent/received/recalled menu rows have visibly rendered icons and full labels; duplicate reaction action removed; received message does not offer recall. No actions sent to server.");finish(Activity.RESULT_OK,result);
+ }catch(Throwable e){result.putString("error",e.toString());finish(Activity.RESULT_CANCELED,result);}}
+}
