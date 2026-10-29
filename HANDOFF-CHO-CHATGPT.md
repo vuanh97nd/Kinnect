@@ -4,7 +4,7 @@
 - Bỏ minimum height của profileSections; giữ nguyên tab controls để tránh mất focus khi chuyển tab.
 - Thêm `lib/ai-stream.js` (SSE UTF-8), truyền sự kiện AI chỉ tới phiên đăng nhập của người nhận; web và APK dựng bản nháp riêng, chỉ lưu tin nhắn đầy đủ.
 - Worker nguồn nằm trong `ai-worker/`; triển khai bằng `wrangler deploy --config ai-worker/wrangler.jsonc`. Cần secret KINNECT_API_TOKEN đã cấp; không đưa vào repo.
-- Máy chủ và Worker đã triển khai; APK được kiểm trên giả lập ở font 1.0/1.3, chưa kiểm trên thiết bị thật. 20 bài AI/Worker và kiểm tra streaming web đạt. `node --test` trước lần thêm kiểm thử Worker cuối: 87/87 đạt.
+- Máy chủ và Worker đã triển khai; APK được kiểm trên giả lập ở font 1.0/1.3, chưa kiểm trên thiết bị thật. 21 bài AI/Worker và kiểm tra streaming web đạt. `node --test` trước lần thêm kiểm thử Worker cuối: 87/87 đạt.
 - Kiểm tra lại trên thiết bị thật: hồ sơ ít nội dung, chuyển tab bài/ảnh/video, câu AI dài, rớt mạng khi đang nhận chữ và thao tác yêu cầu quản trị viên.
 - APK được đóng gói trên baseline 1.0.4, chỉ thay MainActivity; giữ logo/tài nguyên/lớp khác và chứng chỉ ký cũ. Xem script đóng gói `scripts/handoff-checks/package-profile-stream-windows.py`.
 

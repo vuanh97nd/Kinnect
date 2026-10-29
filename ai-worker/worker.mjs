@@ -16,11 +16,11 @@ async function cloud(env,messages,image){
  const input={messages,max_tokens:700,temperature:0.1};if(image){delete input.messages;input.prompt=messages.map(m=>m.role.toUpperCase()+': '+m.content).join('\n');input.image=Array.from(Uint8Array.from(atob(image.data),c=>c.charCodeAt(0)));}
  let timer;try{const data=await Promise.race([env.AI.run(model,input),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('timeout')),25000);})]);const answer=data?.response||data?.choices?.[0]?.message?.content;if(typeof answer!=='string'||!answer.trim())throw Error('empty');return answer;}finally{clearTimeout(timer);}
 }
-async function nvidia(env,messages,image,send){
+async function nvidia(env,messages,image,send,stream=false){
  if(!env.NVIDIA_API_KEY||!env.NVIDIA_MODEL||image&&!env.NVIDIA_VISION_MODEL)throw Error('unavailable');
  const list=messages.map((m,i)=>image&&i===messages.length-1?{role:m.role,content:[{type:'text',text:m.content},{type:'image_url',image_url:{url:'data:'+image.mime+';base64,'+image.data}}]}:m);
- const response=await send('https://integrate.api.nvidia.com/v1/chat/completions',{method:'POST',redirect:'error',signal:AbortSignal.timeout(25000),headers:{Authorization:'Bearer '+env.NVIDIA_API_KEY,'Content-Type':'application/json'},body:JSON.stringify({model:image?env.NVIDIA_VISION_MODEL:env.NVIDIA_MODEL,messages:list,max_tokens:700,temperature:0.1,stream:false})});
- if(!response.ok)throw Error('provider');const data=await response.json(),answer=data?.choices?.[0]?.message?.content;if(typeof answer!=='string'||!answer.trim())throw Error('empty');return answer;
+ const response=await send('https://integrate.api.nvidia.com/v1/chat/completions',{method:'POST',redirect:'error',signal:AbortSignal.timeout(25000),headers:{Authorization:'Bearer '+env.NVIDIA_API_KEY,'Content-Type':'application/json'},body:JSON.stringify({model:image?env.NVIDIA_VISION_MODEL:env.NVIDIA_MODEL,messages:list,max_tokens:700,temperature:0.1,stream})});
+ if(!response.ok)throw Error('provider');if(stream)return response.body;const data=await response.json(),answer=data?.choices?.[0]?.message?.content;if(typeof answer!=='string'||!answer.trim())throw Error('empty');return answer;
 }
 function parseReview(answer){
  const value=JSON.parse(answer.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,''));const allowed=['sexual_explicit','violence','harassment','hate','scam','privacy','other'];
@@ -37,7 +37,7 @@ export function createWorker(send=fetch){return {async fetch(request,env){
  let body,image;try{body=await limitedJson(request);if(!body||typeof body.text!=='string'||body.text.length>12000)throw Error('text');image=imageInput(body.image);if(!body.text.trim()&&!image)throw Error('empty');if(body.history!==undefined&&(!Array.isArray(body.history)||body.history.length>8||body.history.some(m=>!['user','assistant'].includes(m?.role)||typeof m.content!=='string'||m.content.length>2000)))throw Error('history');}catch{return json({error:'Invalid request: text, optional PNG/JPEG image, and up to 8 history messages'},400);}
  const moderation=path==='/v1/moderate',messages=[{role:'system',content:moderation?REVIEW:SUPPORT},...(moderation?[]:body.history||[]),{role:'user',content:body.text}];let answer,provider='cloudflare';
  if(!moderation&&body.stream===true&&!image){
-   try{const stream=await env.AI.run(env.TEXT_MODEL||'@cf/meta/llama-3.1-8b-instruct-fp8',{messages,max_tokens:700,temperature:0.1,stream:true});return new Response(stream,{headers:{'Content-Type':'text/event-stream','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});}catch{return json({error:'AI unavailable',retryable:true},503);}
+   let stream;try{stream=await env.AI.run(env.TEXT_MODEL||'@cf/meta/llama-3.1-8b-instruct-fp8',{messages,max_tokens:700,temperature:0.1,stream:true});}catch{try{stream=await nvidia(env,messages,null,send,true);}catch{return json({error:'AI unavailable',retryable:true},503);}}return new Response(stream,{headers:{'Content-Type':'text/event-stream','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
  }
  try{answer=await cloud(env,messages,image);}catch{try{answer=await nvidia(env,messages,image,send);provider='nvidia';}catch{return json({error:'AI unavailable',retryable:true,humanReviewRequired:moderation},503);}}
  if(moderation){try{return json({...parseReview(answer),provider});}catch{return json({decision:'review',categories:['other'],reason:'AI trả kết quả không hợp lệ; cần admin xem xét.',evidence:'',humanReviewRequired:true,provider});}}
