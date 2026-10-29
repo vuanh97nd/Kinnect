@@ -24,6 +24,12 @@
       "category": "interface"
     },
     {
+      "resource": "ic_flow_brush",
+      "source": "ic_brush",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
       "resource": "ic_flow_call",
       "source": "ic_call",
       "redrawn": false,
@@ -566,6 +572,12 @@
     {
       "resource": "ic_flow_forward",
       "source": "ic_forward",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_gamepad",
+      "source": "ic_gamepad",
       "redrawn": false,
       "category": "interface"
     },

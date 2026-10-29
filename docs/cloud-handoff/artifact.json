@@ -1,7 +1,7 @@
 {
-  "version": "1.0.21",
-  "filename": "Kinnect-1.0.21-native.apk",
-  "sha256": "d8d71ec262023b27d268df18a3aa45a90688e7f6631c70755161d1f830d84cee",
+  "version": "1.0.22",
+  "filename": "Kinnect-1.0.22-native.apk",
+  "sha256": "04c7a53d5977adb68705222a859c861555c5f4c8555a94c74fc82dc2739cebc0",
   "playVersion": "1.2.4",
   "languages": [
     "vi",
@@ -38,7 +38,8 @@
     "compact18": "Offline actual native components at 320dp and font100/130; see compact18/verification.json",
     "steady19": "Mail isolation, native footer/back menus, stable first-frame feed, no startup popup; see steady19/verification.json",
     "options20": "Popup/menu icon coverage, 25 actual renders, transparent chat header; see options20/verification.json",
-    "photo21": "Advanced native photo editor: 33 renderer/activity checks, 130 VI/EN layout checks, entry and 4 backend checks; see photo21/verification.json"
+    "photo21": "Advanced native photo editor: 33 renderer/activity checks, 130 VI/EN layout checks, entry and 4 backend checks; see photo21/verification.json",
+    "live22": "Camera/Video/Live menu, native review and 3 Live modes; backend116, screen/audio capture and WebRTC PCM checks; see live22/verification.json"
   },
-  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.21"
+  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.22"
 }

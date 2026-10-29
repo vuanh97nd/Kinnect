@@ -236,6 +236,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     thumb = Bitmap.createBitmap(90, 120, Bitmap.Config.ARGB_8888);
     String photoUri = getIntent().getStringExtra(EXTRA_PHOTO);
     if (photoUri != null) loadStill(Uri.parse(photoUri), story ? "video" : "photo");
+    String reviewUri=getIntent().getStringExtra("review_video");if(reviewUri!=null)showVideoReview(Uri.parse(reviewUri));
     if (still == null) ensurePermissions();
   }
 
@@ -521,7 +522,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   protected void onResume() {
     super.onResume();
     Choreographer.getInstance().postFrameCallback(this);
-    if (camera.isAvailable()) openCamera();
+    if (camera.isAvailable()&&reviewedVideo==null) openCamera();if(reviewVideo!=null)reviewVideo.start();
   }
 
   @Override
@@ -529,13 +530,13 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     if (recording) stopRecording();
     Choreographer.getInstance().removeFrameCallback(this);
     closeCamera();
-    if (music != null) music.pause();
+    if (music != null) music.pause();if(reviewVideo!=null)reviewVideo.pause();
     super.onPause();
   }
 
   @Override
   protected void onDestroy() {
-    worker.shutdownNow();
+    if(reviewVideo!=null){reviewVideo.stopPlayback();reviewVideo=null;}worker.shutdownNow();
     if (music != null) { music.release(); music = null; }
     super.onDestroy();
   }
@@ -676,10 +677,8 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
 
   private void openGallery() {
     if(recording)return;
-    new Sheet(this).setTitle(I18n.t("Thư viện")).setItemIcons(new String[]{"image","sparkles","clapperboard"}).setItems(new String[]{I18n.t("Chỉnh ảnh từ máy"),I18n.t("Studio Pro · Sửa ảnh nâng cao"),I18n.t("Đăng video có sẵn")},(d,w)->{
-      Intent pick=new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(w==2?"video/*":"image/*");
-      try{startActivityForResult(pick,w==2?404:w==1?405:403);}catch(Exception e){Toast.makeText(this,I18n.t("Không mở được thư viện."),Toast.LENGTH_SHORT).show();}
-    }).show();
+    boolean video=mode.equals("video");Intent pick=new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(video?"video/*":"image/*").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+    try{startActivityForResult(pick,video?404:403);}catch(Exception e){Toast.makeText(this,I18n.t("Không mở được thư viện."),Toast.LENGTH_SHORT).show();}
   }
 
   private void openPhotoPro(Uri uri){Intent intent=new Intent(this,PhotoEditActivity.class).setData(uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);intent.setClipData(android.content.ClipData.newRawUri("photo",uri));startActivityForResult(intent,406);}
@@ -991,14 +990,17 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     modeTabs.setVisibility(View.VISIBLE);
   }
 
-  private void done(File file) {
-    Intent result = new Intent();
-    result.putExtra(EXTRA_VIDEO, file.getAbsolutePath());
-    result.putExtra(EXTRA_STORY, story);
-    setResult(RESULT_OK, result);
-    finish();
+  private Uri reviewedVideo;private VideoView reviewVideo;private boolean videoProEdited;
+  private void done(File file){videoProEdited=false;showVideoReview(Uri.fromFile(file));}
+  private void openVideoPro(Uri uri){if(reviewVideo!=null)reviewVideo.pause();Intent editor=new Intent(this,MediaEditActivity.class).setData(uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);editor.setClipData(android.content.ClipData.newRawUri("video",uri));startActivityForResult(editor,408);}
+  private void showVideoReview(Uri uri){
+    closeCamera();reviewedVideo=uri;if(reviewVideo!=null)reviewVideo.stopPlayback();reviewLayer.removeAllViews();reviewLayer.setVisibility(View.VISIBLE);reviewLayer.setBackgroundColor(0xff08070d);reviewVideo=new VideoView(this);reviewVideo.setVideoURI(uri);reviewVideo.setOnPreparedListener(player->{player.setLooping(true);reviewVideo.start();});reviewLayer.addView(reviewVideo,new FrameLayout.LayoutParams(-1,-1,Gravity.CENTER));
+    TextView pro=text(I18n.t("Studio Pro"),13,0xffffffff,true);pro.setPadding(dp(14),0,dp(14),0);pro.setGravity(Gravity.CENTER);pro.setBackground(round(0xcc1a1724,16));pro.setCompoundDrawablesRelativeWithIntrinsicBounds(tinted("sparkles"),null,null,null);pro.setCompoundDrawablePadding(dp(6));pro.setOnClickListener(v->openVideoPro(reviewedVideo));FrameLayout.LayoutParams pp=new FrameLayout.LayoutParams(-2,dp(44),Gravity.TOP|Gravity.END);pp.setMargins(0,dp(52),dp(14),0);reviewLayer.addView(pro,pp);
+    ImageView back=icon("back",0xffffffff);back.setPadding(dp(10),dp(10),dp(10),dp(10));back.setContentDescription(I18n.t("Quay lại"));back.setOnClickListener(v->dismissVideoReview());FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(dp(44),dp(44),Gravity.TOP|Gravity.START);bp.setMargins(dp(12),dp(12),0,0);reviewLayer.addView(back,bp);
+    LinearLayout bar=new LinearLayout(this);bar.setPadding(dp(16),dp(12),dp(16),dp(22));bar.setGravity(Gravity.CENTER);TextView again=text(I18n.t("Quay lại"),14,0xffffffff,true);again.setGravity(Gravity.CENTER);again.setBackground(round(0x44ffffff,20));again.setOnClickListener(v->dismissVideoReview());bar.addView(again,new LinearLayout.LayoutParams(0,dp(50),1));TextView next=text(I18n.t("Tiếp tục"),14,0xffffffff,true);next.setGravity(Gravity.CENTER);next.setBackground(round(ACCENT,20));next.setOnClickListener(v->deliverReviewedVideo());LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(0,dp(50),1);np.leftMargin=dp(12);bar.addView(next,np);reviewLayer.addView(bar,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
   }
-
+  private void dismissVideoReview(){if(reviewVideo!=null){reviewVideo.stopPlayback();reviewVideo=null;}reviewedVideo=null;reviewLayer.setVisibility(View.GONE);if(camera.isAvailable())openCamera();}
+  private void deliverReviewedVideo(){if(reviewedVideo==null)return;Intent result=new Intent().setData(reviewedVideo).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);result.setClipData(android.content.ClipData.newRawUri("video",reviewedVideo));result.putExtra(EXTRA_STORY,story);result.putExtra("videoProEdited",videoProEdited);if("file".equals(reviewedVideo.getScheme())){result.putExtra(EXTRA_VIDEO,reviewedVideo.getPath());setResult(RESULT_OK,result);}else setResult(RESULT_FIRST_USER,result);finish();}
   private void finishCancelled() {
     setResult(RESULT_CANCELED);
     finish();
@@ -1006,7 +1008,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
 
   @Override
   public void onBackPressed() {
-    if (reviewLayer.getVisibility() == View.VISIBLE) { reviewLayer.setVisibility(View.GONE); return; }
+    if (reviewLayer.getVisibility() == View.VISIBLE) { if(reviewedVideo!=null)dismissVideoReview();else reviewLayer.setVisibility(View.GONE);return; }
     if (!panel.isEmpty()) { showPanel(""); return; }
     finishCancelled();
   }
@@ -1272,22 +1274,14 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   protected void onActivityResult(int request, int result, Intent data) {
     super.onActivityResult(request, result, data);
     if (result != RESULT_OK || data == null || data.getData() == null) return;
+    if(request==407){openVideoPro(data.getData());return;}
+    if(request==408){videoProEdited=true;showVideoReview(data.getData());return;}
     if(request==405){openPhotoPro(data.getData());return;}
     if(request==406){final String path=data.getStringExtra(EXTRA_IMAGE);if(path==null)return;final File edited=new File(path);worker.execute(()->{try{Bitmap shown=PhotoRenderer.decode(edited,1280);ui.post(()->{capturedPhoto=edited;photoProEdited=true;showReview(shown);});}catch(Exception|OutOfMemoryError e){ui.post(()->Toast.makeText(this,I18n.t("Không mở được ảnh."),Toast.LENGTH_SHORT).show());}});return;}
     if(request==403)photoProEdited=false;
     if (request == 402) setMusic(null, data.getData(), "Nhạc của bạn");
-    if (request == 403) loadStill(data.getData(), "photo");
-    if (request == 404) {
-      Intent r = new Intent();
-      r.setData(data.getData());
-      r.setClipData(android.content.ClipData.newRawUri("video", data.getData()));
-      r.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-      try { getContentResolver().takePersistableUriPermission(data.getData(), data.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION); }
-      catch (SecurityException ignored) {}
-      r.putExtra(EXTRA_ACTION, "pick-video");
-      setResult(RESULT_FIRST_USER, r);
-      finish();
-    }
+    if (request == 403) {final Uri selected=data.getData();worker.execute(()->{try{File local=File.createTempFile("gallery-photo-",".img",getCacheDir());try(InputStream in=getContentResolver().openInputStream(selected);OutputStream out=new FileOutputStream(local)){byte[] buffer=new byte[32768];long bytes=0;for(int n;(n=in.read(buffer))!=-1;){bytes+=n;if(bytes>64L*1024*1024)throw new IOException("large");out.write(buffer,0,n);}}Bitmap shown=PhotoRenderer.decode(local,1280);ui.post(()->{if(isFinishing()||isDestroyed())return;capturedPhoto=local;photoProEdited=false;showReview(shown);});}catch(Exception|OutOfMemoryError e){ui.post(()->Toast.makeText(this,I18n.t("Không mở được ảnh."),Toast.LENGTH_SHORT).show());}});}
+    if (request == 404) {videoProEdited=false;try{getContentResolver().takePersistableUriPermission(data.getData(),data.getFlags()&Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(SecurityException ignored){}showVideoReview(data.getData());}
   }
 
   private void setMusic(String url, Uri local, String title) {

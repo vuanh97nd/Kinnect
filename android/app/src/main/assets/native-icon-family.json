@@ -576,6 +576,12 @@
       "category": "interface"
     },
     {
+      "resource": "ic_flow_gamepad",
+      "source": "ic_gamepad",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
       "resource": "ic_flow_globe",
       "source": "ic_globe",
       "redrawn": false,

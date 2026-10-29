@@ -76,7 +76,7 @@ public class MainActivity extends Activity {
   private void setupBackground(){if(Distribution.PLAY){if(Build.VERSION.SDK_INT>=33&&checkSelfPermission("android.permission.POST_NOTIFICATIONS")!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"},950);return;}android.content.SharedPreferences p=getSharedPreferences("native_setup",0);if(p.getBoolean("asked_v1",false)){backgroundExtras(false);return;}p.edit().putBoolean("asked_v1",true).apply();java.util.ArrayList<String> want=new java.util.ArrayList<>();if(Build.VERSION.SDK_INT>=33)want.add("android.permission.POST_NOTIFICATIONS");want.add(Manifest.permission.RECORD_AUDIO);want.add(Manifest.permission.CAMERA);if(Build.VERSION.SDK_INT>=31)want.add("android.permission.BLUETOOTH_CONNECT");java.util.ArrayList<String> missing=new java.util.ArrayList<>();for(String w:want)if(checkSelfPermission(w)!=PackageManager.PERMISSION_GRANTED)missing.add(w);if(missing.isEmpty())backgroundExtras(true);else requestPermissions(missing.toArray(new String[0]),950);}
   private void backgroundExtras(boolean prompt){if(Distribution.PLAY)return;try{if(Build.VERSION.SDK_INT>=34&&!getSystemService(android.app.NotificationManager.class).canUseFullScreenIntent()){if(prompt)new AlertDialog.Builder(this).setTitle(I18n.t("Cuộc gọi toàn màn hình")).setMessage(I18n.t("Cho phép Kinnect hiện cuộc gọi đến toàn màn hình, kể cả khi khóa máy.")).setPositiveButton(I18n.t("Cho phép"),(d,w)->{try{startActivity(new Intent("android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT",android.net.Uri.parse("package:"+getPackageName())));}catch(RuntimeException ignored){}}).setNegativeButton(I18n.t("Để sau"),(d,w)->battery()).show();else battery();return;}}catch(RuntimeException ignored){}if(prompt)battery();}
   private void battery(){android.os.PowerManager pm=(android.os.PowerManager)getSystemService(POWER_SERVICE);if(pm!=null&&!pm.isIgnoringBatteryOptimizations(getPackageName()))try{startActivity(new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,android.net.Uri.parse("package:"+getPackageName())));}catch(RuntimeException ignored){}}
-  private void handleExtras(Intent intent){if(intent==null||me==null)return;String destination=intent.getStringExtra("commerce_destination");if(destination!=null){intent.removeExtra("commerce_destination");if(destination.equals("account"))meMenu();else if(destination.equals("notifications"))notifications();else if(destination.equals("friends"))friendsScreen("friends");else if(destination.equals("create"))chooseVideo();else navigate(destination);}if(intent.getBooleanExtra("accept_call",false)){intent.removeExtra("accept_call");ensureCalls();if(calls!=null)calls.checkPending();}String n=intent.getStringExtra("notification");if(n!=null){intent.removeExtra("notification");try{openNotification(new JSONObject(n));}catch(JSONException ignored){}}}
+  private void handleExtras(Intent intent){if(intent==null||me==null)return;String destination=intent.getStringExtra("commerce_destination");if(destination!=null){intent.removeExtra("commerce_destination");if(destination.equals("account"))meMenu();else if(destination.equals("notifications"))notifications();else if(destination.equals("friends"))friendsScreen("friends");else if(destination.equals("create"))openCreateMenu();else navigate(destination);}if(intent.getBooleanExtra("accept_call",false)){intent.removeExtra("accept_call");ensureCalls();if(calls!=null)calls.checkPending();}String n=intent.getStringExtra("notification");if(n!=null){intent.removeExtra("notification");try{openNotification(new JSONObject(n));}catch(JSONException ignored){}}}
   private LocationListener locationListener;
   // Màu lấy từ public/theme.css để app và web mobile trông giống nhau; tự theo chế độ sáng/tối của máy.
   private int BG, CARD, TEXT, MUTED, ACCENT, SOFT, LINE, PRIMARY_SOFT;
@@ -410,7 +410,7 @@ public class MainActivity extends Activity {
           plus.addView(icon("plus", 24, WHITE), new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
           plus.setContentDescription(I18n.t("Tạo nội dung"));
           plus.setTooltipText(I18n.t("Tạo nội dung"));
-          plus.setOnClickListener(v -> chooseVideo());
+          plus.setOnClickListener(v -> openCreateMenu());
           holder.addView(plus, new FrameLayout.LayoutParams(dp(44), dp(44), Gravity.CENTER));
           bottom.addView(holder, new LinearLayout.LayoutParams(0, dp(62), 1));
           continue;
@@ -2949,6 +2949,7 @@ public class MainActivity extends Activity {
     title.setMaxLines(2);
     title.setEllipsize(android.text.TextUtils.TruncateAt.END);
     info.addView(title);
+    String mode=room.optString("liveMode","chat");info.addView(label(I18n.t(mode.equals("karaoke")?"Hát karaoke":mode.equals("game")?"Chơi game":"Trò chuyện"),11,0xffdacbff));
     info.addView(label(room.optString("host"), 12, 0xccffffff));
     c.addView(info, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
     c.setOnClickListener(v -> {
@@ -3276,9 +3277,26 @@ public class MainActivity extends Activity {
     return r;
   }
 
+  private android.app.Dialog createMenu;
+  private void openCreateMenu(){
+    if(createMenu!=null&&createMenu.isShowing())return;
+    LinearLayout body=column();
+    String[][] actions={{"camera","Camera","Chụp ảnh hoặc quay video"},{"clapperboard","Video","Chọn video có sẵn hoặc Studio Pro"},{"radio","Live","Trò chuyện, hát, game"}};
+    for(int i=0;i<actions.length;i++){final int which=i;body.addView(createAction(actions[i][0],actions[i][1],actions[i][2],()->{if(me==null){auth(false);return;}if(which==0)startActivityForResult(new Intent(this,StudioActivity.class).putExtra(StudioActivity.EXTRA_MODE,"photo"),203);else if(which==1)chooseVideo();else startActivity(new Intent(this,LiveActivity.class).putExtra(LiveActivity.EXTRA_HOST,true));}));}
+    createMenu=new Sheet(this).setTitle(I18n.t("Tạo nội dung")).setView(body).setNegativeButton(I18n.t("Đóng"),null).show();
+  }
+  private View createAction(String glyph,String title,String hint,Runnable action){
+    LinearLayout tile=row();tile.setGravity(Gravity.CENTER_VERTICAL);tile.setMinimumHeight(dp(60));tile.setPadding(dp(8),dp(7),dp(8),dp(7));tile.setBackground(pressable(CARD,14));
+    FrameLayout mark=new FrameLayout(this);mark.setBackground(background(PRIMARY_SOFT,13));mark.addView(icon(glyph,22,ACCENT),new FrameLayout.LayoutParams(dp(22),dp(22),Gravity.CENTER));tile.addView(mark,new LinearLayout.LayoutParams(dp(44),dp(44)));
+    LinearLayout copy=column();copy.setPadding(dp(12),0,dp(8),0);TextView name=label(I18n.t(title),14,TEXT);name.setTypeface(null,Typeface.BOLD);copy.addView(name);TextView description=label(I18n.t(hint),11,MUTED);description.setSingleLine(true);description.setEllipsize(android.text.TextUtils.TruncateAt.END);copy.addView(description);tile.addView(copy,new LinearLayout.LayoutParams(0,-2,1));tile.addView(icon("chevron_right",16,MUTED),new LinearLayout.LayoutParams(dp(18),dp(18)));
+    tile.setContentDescription(I18n.t(title));tile.setOnClickListener(v->{if(createMenu!=null)createMenu.dismiss();action.run();});return tile;
+  }
+  private View createToolAction(String glyph,String title,Runnable action){
+    LinearLayout tile=column();tile.setGravity(Gravity.CENTER);tile.setPadding(dp(8),dp(12),dp(8),dp(12));tile.setMinimumHeight(dp(86));tile.setBackground(pressable(PRIMARY_SOFT,14));tile.addView(icon(glyph,24,ACCENT),new LinearLayout.LayoutParams(dp(24),dp(24)));TextView name=label(I18n.t(title),12,TEXT);name.setGravity(Gravity.CENTER);name.setPadding(0,dp(7),0,0);tile.addView(name,new LinearLayout.LayoutParams(-1,-2));tile.setContentDescription(I18n.t(title));tile.setOnClickListener(v->{if(createMenu!=null)createMenu.dismiss();action.run();});return tile;
+  }
   private void chooseVideo() {
     if(postingVideo){say(I18n.t("Đang tải video, vui lòng chờ."));return;}
-    new Sheet(this).setTitle(I18n.t("Studio")).setItemIcons(new String[]{"camera","sparkles","clapperboard"}).setItems(new String[]{I18n.t("Chụp ảnh / quay video"),I18n.t("Studio Pro · Sửa ảnh nâng cao"),I18n.t("Đăng video có sẵn")},(d,w)->{if(w==0)startActivityForResult(new Intent(this,StudioActivity.class),203);else pickFile(w==1?213:200,w==1?"image/*":"video/*");}).setNegativeButton(I18n.t("Đóng"),null).show();
+    pickFile(216,"video/*");
   }
 
   private void captureVideo() {
@@ -3380,6 +3398,8 @@ public class MainActivity extends Activity {
       catch (SecurityException ignored) {}
     }
 
+    if(request==216){if(result==RESULT_OK&&data!=null&&data.getData()!=null){Intent studio=new Intent(this,StudioActivity.class).putExtra(StudioActivity.EXTRA_MODE,"video").putExtra("review_video",data.getData().toString()).setData(data.getData()).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);studio.setClipData(android.content.ClipData.newRawUri("video",data.getData()));startActivityForResult(studio,203);}return;}
+    if(request==215){if(result==RESULT_OK&&data!=null&&data.getData()!=null)reviewMedia(data.getData(),212);return;}
     if(request==213){if(result==RESULT_OK&&data!=null&&data.getData()!=null){android.net.Uri uri=data.getData();Intent editor=new Intent(this,PhotoEditActivity.class).setData(uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);editor.setClipData(android.content.ClipData.newRawUri("photo",uri));startActivityForResult(editor,214);}return;}
     if(request==214){if(result==RESULT_OK&&data!=null&&data.getData()!=null){composePost();preparePostMedia(300,data.getData());}return;}
     if (request >= 210 && request <= 212) {
@@ -3410,7 +3430,7 @@ public class MainActivity extends Activity {
       return;
     }
     if ((request == 203 || request == 204) && result == RESULT_FIRST_USER && data != null && data.getData() != null) {
-      if (request == 204) reviewMedia(data.getData(),211); else uploadVideo(data.getData());
+      if (request == 204) reviewMedia(data.getData(),211); else uploadVideoNow(data.getData());
       return;
     }
     if ((request == 203 || request == 204) && result == RESULT_OK && data != null && data.getBooleanExtra(StudioActivity.EXTRA_STORY, false)) {
@@ -3428,7 +3448,7 @@ public class MainActivity extends Activity {
     }
     if (request == 204 && result == RESULT_FIRST_USER) { pickFile(304, "image/*|video/*"); return; }
     if (request == 203 && result == RESULT_OK && data != null && data.getStringExtra(StudioActivity.EXTRA_VIDEO) != null) {
-      uploadVideo(android.net.Uri.fromFile(new java.io.File(data.getStringExtra(StudioActivity.EXTRA_VIDEO))));
+      uploadVideoNow(android.net.Uri.fromFile(new java.io.File(data.getStringExtra(StudioActivity.EXTRA_VIDEO))));
       return;
     }
     if (request == 203 && result == RESULT_FIRST_USER) {
@@ -3448,7 +3468,7 @@ public class MainActivity extends Activity {
       data != null &&
       data.getData() != null
     ) {
-      uploadVideo(data.getData());
+      uploadVideoNow(data.getData());
       return;
     }
     if (
@@ -3823,7 +3843,7 @@ public class MainActivity extends Activity {
     final String[] tabs={"Bảng tin","Khám phá","Video","Live"};long clock=android.os.SystemClock.uptimeMillis();int manual=0;
     PhoneFeatureShowcase(){super();setClickable(true);setContentDescription(I18n.t("Xem trước Bảng tin, Khám phá, Tạo nội dung, Video và Live"));}
     void selectPreview(int index){manual=index;clock=android.os.SystemClock.uptimeMillis();invalidate();}
-    void previewCreate(){new Sheet(MainActivity.this).setTitle(I18n.t("Tạo nội dung · Đăng nhập để tiếp tục")).setItemIcons(new String[]{"newspaper","clapperboard","radio"}).setItems(new String[]{I18n.t("Đăng bài viết"),I18n.t("Quay / đăng video"),I18n.t("Mở phòng trực tiếp")},(d,which)->auth(false)).setNegativeButton(I18n.t("Đóng"),null).show();}
+    void previewCreate(){openCreateMenu();}
     @Override public boolean onTouchEvent(android.view.MotionEvent event){if(event.getAction()==android.view.MotionEvent.ACTION_DOWN)return true;if(event.getAction()!=android.view.MotionEvent.ACTION_UP)return true;performClick();float scale=Math.min(getWidth()/330f,getHeight()/450f);if(scale<=0)return true;float x=(event.getX()-(getWidth()-380*scale)/2)/scale,y=(event.getY()-(getHeight()-450*scale)/2)/scale;if(y>=378&&y<=415&&x>=100&&x<280){int tab=(int)((x-100)/36);if(tab==2)previewCreate();else selectPreview(tab<2?tab:tab-1);return true;}if(x<100||x>280)return true;int active=(manual+(android.animation.ValueAnimator.areAnimatorsEnabled()?(int)((android.os.SystemClock.uptimeMillis()-clock)/1500):0))%4;if(active==0&&y>=140&&y<=172||active==2&&y>200&&x>244||active==3&&y>=127&&y<=154)auth(false);return true;}
     @Override public boolean performClick(){super.performClick();return true;}
     void iphoneStatus(){for(int i=0;i<4;i++)box(234+i*3.3f,37-(i+1)*1.8f,2.4f,(i+1)*1.8f,.7f,TEXT);pen.setColor(TEXT);pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth(1.4f);canvas.drawArc(new RectF(249,29,260,40),222,96,false,pen);canvas.drawArc(new RectF(251.5f,31.5f,257.5f,37.5f),222,96,false,pen);pen.setStyle(Paint.Style.FILL);circle(254.5f,36.3f,.9f,TEXT);pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth(.8f);canvas.drawRoundRect(new RectF(263,29,276,36),1.6f,1.6f,pen);pen.setStyle(Paint.Style.FILL);box(264.4f,30.4f,9.9f,4.2f,.7f,TEXT);box(277,31.2f,1.1f,2.8f,.4f,TEXT);}

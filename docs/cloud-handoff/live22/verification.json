@@ -1,0 +1,49 @@
+{
+  "version": "1.0.22",
+  "versionCode": 87,
+  "sha256": "04c7a53d5977adb68705222a859c861555c5f4c8555a94c74fc82dc2739cebc0",
+  "physicalDeviceVerified": false,
+  "webClientChanged": false,
+  "playCandidateChanged": false,
+  "checks": {
+    "backend": 116,
+    "nativeModesAndPCM": 88,
+    "cameraReviewRouting": 12,
+    "realAndroidProjectionAndGameCapture": 16,
+    "localWebRtcAudio": "PASS: generated backing track traversed mixer + Opus + receiver PCM with microphone muted",
+    "qaVersionCode": 112,
+    "qaPayloadMatchesReleaseExceptManifestAndSignature": true,
+    "fontScales": [
+      1,
+      1.3
+    ]
+  },
+  "behavior": {
+    "createMenu": [
+      "Camera",
+      "Video",
+      "Live"
+    ],
+    "gallery": "Choose image/video first, then preview with Studio Pro at top right; captured media uses the same review; video edit returns to same video review",
+    "liveModes": [
+      "chat",
+      "karaoke",
+      "game"
+    ],
+    "karaoke": "User-supplied backing audio 1 second–10 minutes, optional timed LRC, real sender PCM mix, voice/music/reverb, host-controlled consented singing queue",
+    "game": "Explicit OS screen consent, foreground service, microphone and permitted game audio Android10+, notification controls, privacy pause/resume, OS revocation cleanup"
+  },
+  "limitations": [
+    "No licensed commercial karaoke catalog supplied",
+    "Lyrics highlight line by line; no pitch correction or key shifting",
+    "No simultaneous remote duet",
+    "No floating face camera overlay in gaming",
+    "Game audio depends on Android and source-app capture policy",
+    "No physical multi-device or Bluetooth timing verification",
+    "External picker/editor navigation in CameraFlowAudit intercepted; real native review checked"
+  ],
+  "androidReferences": [
+    "https://developer.android.com/media/grow/media-projection",
+    "https://developer.android.com/media/platform/av-capture"
+  ]
+}

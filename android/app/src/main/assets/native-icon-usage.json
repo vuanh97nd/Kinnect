@@ -2,43 +2,53 @@
   "references": [
     {
       "file": "LiveActivity.java",
-      "line": 111,
+      "line": 125,
       "name": "back"
     },
     {
       "file": "LiveActivity.java",
-      "line": 124,
+      "line": 138,
       "name": "rotate_ccw"
     },
     {
       "file": "LiveActivity.java",
-      "line": 153,
+      "line": 167,
       "name": "radio"
     },
     {
       "file": "LiveActivity.java",
-      "line": 185,
+      "line": 199,
       "name": "radio"
     },
     {
       "file": "LiveActivity.java",
-      "line": 212,
+      "line": 229,
       "name": "flip"
     },
     {
       "file": "LiveActivity.java",
-      "line": 212,
+      "line": 229,
       "name": "wand"
     },
     {
       "file": "LiveActivity.java",
-      "line": 212,
+      "line": 229,
       "name": "mic"
     },
     {
       "file": "LiveActivity.java",
-      "line": 396,
+      "line": 239,
+      "name": "gamepad"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 448,
       "name": "eye"
+    },
+    {
+      "file": "LiveKaraoke.java",
+      "line": 14,
+      "name": "mic"
     },
     {
       "file": "MainActivity.java",
@@ -382,187 +392,192 @@
     },
     {
       "file": "MainActivity.java",
-      "line": 3120,
+      "line": 3121,
       "name": "close"
     },
     {
       "file": "MainActivity.java",
-      "line": 3163,
+      "line": 3164,
       "name": "send"
     },
     {
       "file": "MainActivity.java",
-      "line": 3267,
+      "line": 3268,
       "name": "heart"
     },
     {
       "file": "MainActivity.java",
-      "line": 3821,
+      "line": 3291,
+      "name": "chevron_right"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3841,
       "name": "newspaper"
     },
     {
       "file": "MainActivity.java",
-      "line": 3821,
+      "line": 3841,
       "name": "compass"
     },
     {
       "file": "MainActivity.java",
-      "line": 3821,
+      "line": 3841,
       "name": "clapperboard"
     },
     {
       "file": "MainActivity.java",
-      "line": 3821,
+      "line": 3841,
       "name": "radio"
     },
     {
       "file": "MainActivity.java",
-      "line": 3840,
+      "line": 3860,
       "name": "bell"
     },
     {
       "file": "MainActivity.java",
-      "line": 3841,
+      "line": 3861,
       "name": "plus"
     },
     {
       "file": "MainActivity.java",
-      "line": 3841,
+      "line": 3861,
       "name": "heart"
     },
     {
       "file": "MainActivity.java",
-      "line": 3841,
+      "line": 3861,
       "name": "message_circle"
     },
     {
       "file": "MainActivity.java",
-      "line": 3841,
+      "line": 3861,
       "name": "share_2"
     },
     {
       "file": "MainActivity.java",
-      "line": 3842,
+      "line": 3862,
       "name": "search"
     },
     {
       "file": "MainActivity.java",
-      "line": 3842,
+      "line": 3862,
       "name": "sliders_horizontal"
     },
     {
       "file": "MainActivity.java",
-      "line": 3843,
+      "line": 3863,
       "name": "heart"
     },
     {
       "file": "MainActivity.java",
-      "line": 3843,
+      "line": 3863,
       "name": "message_circle"
     },
     {
       "file": "MainActivity.java",
-      "line": 3843,
+      "line": 3863,
       "name": "share_2"
     },
     {
       "file": "MainActivity.java",
-      "line": 3844,
+      "line": 3864,
       "name": "heart"
     },
     {
       "file": "MainActivity.java",
-      "line": 3846,
+      "line": 3866,
       "name": "plus"
     },
     {
       "file": "MainActivity.java",
-      "line": 3893,
+      "line": 3913,
       "name": "log_in"
     },
     {
       "file": "MainActivity.java",
-      "line": 3896,
+      "line": 3916,
       "name": "x"
     },
     {
       "file": "MainActivity.java",
-      "line": 4139,
+      "line": 4159,
       "name": "more"
     },
     {
       "file": "MainActivity.java",
-      "line": 4442,
+      "line": 4462,
       "name": "x"
     },
     {
       "file": "MainActivity.java",
-      "line": 4514,
+      "line": 4534,
       "name": "plus"
     },
     {
       "file": "MainActivity.java",
-      "line": 4613,
+      "line": 4633,
       "name": "close"
     },
     {
       "file": "MainActivity.java",
-      "line": 4631,
+      "line": 4651,
       "name": "eye"
     },
     {
       "file": "MainActivity.java",
-      "line": 4678,
+      "line": 4698,
       "name": "users_round"
     },
     {
       "file": "MainActivity.java",
-      "line": 5085,
+      "line": 5105,
       "name": "close"
     },
     {
       "file": "MainActivity.java",
-      "line": 5230,
+      "line": 5250,
       "name": "back"
     },
     {
       "file": "MainActivity.java",
-      "line": 5257,
+      "line": 5277,
       "name": "call"
     },
     {
       "file": "MainActivity.java",
-      "line": 5258,
+      "line": 5278,
       "name": "video"
     },
     {
       "file": "MainActivity.java",
-      "line": 5273,
+      "line": 5293,
       "name": "attach"
     },
     {
       "file": "MainActivity.java",
-      "line": 5295,
+      "line": 5315,
       "name": "send"
     },
     {
       "file": "MainActivity.java",
-      "line": 5410,
+      "line": 5430,
       "name": "message_circle"
     },
     {
       "file": "MainActivity.java",
-      "line": 5506,
+      "line": 5526,
       "name": "send"
     },
     {
       "file": "MainActivity.java",
-      "line": 5755,
+      "line": 5775,
       "name": "video"
     },
     {
       "file": "MainActivity.java",
-      "line": 5763,
+      "line": 5783,
       "name": "x"
     },
     {
@@ -632,17 +647,22 @@
     },
     {
       "file": "StudioActivity.java",
-      "line": 842,
+      "line": 841,
       "name": "back"
     },
     {
       "file": "StudioActivity.java",
-      "line": 1041,
+      "line": 999,
+      "name": "back"
+    },
+    {
+      "file": "StudioActivity.java",
+      "line": 1043,
       "name": "close"
     },
     {
       "file": "StudioActivity.java",
-      "line": 1058,
+      "line": 1060,
       "name": "search"
     },
     {

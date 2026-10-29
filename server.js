@@ -1,4 +1,5 @@
 import {createLiveGuests} from './lib/live-guests.js';
+import {createLiveModes} from './lib/live-modes.js';
 import {createApkDownload} from './lib/apk-download.js';
 import { publishedApk } from './lib/apk-releases.js';
 import {createTyping} from './lib/typing.js';
@@ -86,7 +87,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         .filter((r) => social.user(r.host.userId)?.suspended === 0 && !social.blocked(me.id, r.host.userId))
         .map((r) => {
           const host = social.user(r.host.userId);
-          return { id: r.id, title: r.title, host: r.host.name, hostId: r.host.userId, hostUsername: host?.username || "", avatar: host?.avatar ? "/api/users/" + host.id + "/avatar" : null, viewers: r.members.size - 1, started: r.created || Date.now() };
+          return { id: r.id, title: r.title, liveMode:r.mode||'chat',gameTitle:r.gameTitle||'',host: r.host.name, hostId: r.host.userId, hostUsername: host?.username || "", avatar: host?.avatar ? "/api/users/" + host.id + "/avatar" : null, viewers: r.members.size - 1, started: r.created || Date.now() };
         })
         .sort((a, b) => b.viewers - a.viewers || b.started - a.started);
       return res.end(JSON.stringify({ rooms: list }));
@@ -479,6 +480,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
             title: r.title,
             host: r.host.name,
             hostId: r.host.userId,
+            liveMode:r.mode||'chat',gameTitle:r.gameTitle||'',
             viewers: r.members.size - 1,
           })),
       });
@@ -515,6 +517,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     }
   }
   const liveGuests=createLiveGuests({send,social});
+  const liveModes=createLiveModes({send,social,listing});
   function leave(ws) {
     const room = rooms.get(ws.room);
     ws.room = null;ws.legacyLiveRoom=null;
@@ -527,7 +530,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     } else {
       send(room.host, { type: "peer-left", id: ws.id });
       livePresence(room);
-      liveGuests.left(room,ws);
+      liveGuests.left(room,ws);liveModes.left(room,ws);
     }
     listing();
   }
@@ -597,7 +600,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
           chatHistory: [],
           created: Date.now(),
         };
-        ws.liveV2=m.multiGuest===true;liveGuests.init(room);
+        ws.liveV2=m.multiGuest===true;ws.liveModes=m.liveModes===true;liveGuests.init(room);liveModes.init(room,m);
         rooms.set(room.id, room);
         ws.room = room.id;
         send(ws, {
@@ -605,9 +608,9 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
           role: "host",
           history: [],
           aiModeration:!!social.ai.status().moderation,
-          room: { id: room.id, title: room.title, host: room.host.name, hostId: room.host.userId, avatar: social.user(room.host.userId)?.avatar ? "/api/users/"+room.host.userId+"/avatar":null, viewers:liveAudience(room,ws.userId).length },
+          room: { id: room.id, title: room.title, liveMode:room.mode,gameTitle:room.gameTitle,host: room.host.name, hostId: room.host.userId, avatar: social.user(room.host.userId)?.avatar ? "/api/users/"+room.host.userId+"/avatar":null, viewers:liveAudience(room,ws.userId).length },
         });
-        liveGuests.state(room);
+        liveGuests.state(room);liveModes.state(room,ws);
         listing();
         return;
       }
@@ -626,18 +629,18 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         ws.name = account.name;
         ws.room = room.id;
         const firstVisit=![...room.members.values()].some(peer=>peer.userId===ws.userId);
-        ws.liveV2=m.multiGuest===true;
+        ws.liveV2=m.multiGuest===true;ws.liveModes=m.liveModes===true;
         room.members.set(ws.id, ws);
         send(ws, {
           type: "joined",multiGuest:true,
           role: "viewer",
-          room: { id: room.id, title: room.title, host: room.host.name, hostId: room.host.userId, avatar: social.user(room.host.userId)?.avatar ? "/api/users/"+room.host.userId+"/avatar":null, viewers:liveAudience(room,ws.userId).length },
+          room: { id: room.id, title: room.title, liveMode:room.mode,gameTitle:room.gameTitle,host: room.host.name, hostId: room.host.userId, avatar: social.user(room.host.userId)?.avatar ? "/api/users/"+room.host.userId+"/avatar":null, viewers:liveAudience(room,ws.userId).length },
           host: room.host.id,
           hostUserId: room.host.userId,
           history: (room.chatHistory || []).filter(message => !social.blocked(ws.userId, message.senderId) && social.user(message.senderId)?.suspended === 0),
         });
         if(!room.host.liveV2)send(room.host, { type: "peer", id: ws.id });
-        liveGuests.state(room);
+        liveGuests.state(room);liveModes.state(room,ws);
         livePresence(room,firstVisit?ws:null);
         listing();
         return;
@@ -648,7 +651,8 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
       }
       const room = rooms.get(ws.room);
       if (!room) return error("Bạn chưa tham gia phòng.");
-      if(liveGuests.handle(room,ws,m))return;
+      if(liveModes.handle(room,ws,m))return;
+      if(liveGuests.handle(room,ws,m)){if(['live-guest-answer','live-guest-leave','live-guest-remove'].includes(m.type))liveModes.reconcile(room);return;}
       if(m.type==='live-frame'){
         if(ws!==room.host||!social.ai.status().moderation||Date.now()-(ws.aiFrameAt||0)<15000)return;
         ws.aiFrameAt=Date.now();const image=m.image;if(!image||image.mime!=='image/jpeg'||typeof image.data!=='string'||image.data.length>200000||!/^[A-Za-z0-9+/]+={0,2}$/.test(image.data))return;
