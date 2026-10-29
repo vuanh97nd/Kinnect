@@ -1,0 +1,28 @@
+plugins { id 'com.android.application' version '8.13.2' }
+def repo = rootDir.toPath().resolve('../..').normalize().toFile()
+android {
+ namespace 'app.kinnect.live'
+ compileSdk 36
+ buildToolsVersion '36.0.0'
+ defaultConfig { applicationId 'app.kinnect.live'; minSdk 26; targetSdk 36; versionCode 102; versionName '1.2.0' }
+ signingConfigs { release { storeFile file("${repo}/work/play-signing/upload.jks"); storePassword System.getenv('KINNECT_PLAY_PASS'); keyAlias 'kinnect-upload'; keyPassword System.getenv('KINNECT_PLAY_PASS') } }
+ buildTypes { release { signingConfig signingConfigs.release; minifyEnabled false; debuggable false } }
+ sourceSets {
+  main {
+   manifest.srcFile "${repo}/android/build/play-gradle/AndroidManifest.xml"
+   java.srcDirs = ["${repo}/android/app/src/main/java", "${repo}/android/app/src/play/java"]
+   // The main Distribution.java is removed from a generated source mirror by the build script.
+   java.srcDirs = ["${repo}/android/build/play-gradle/java"]
+   res.srcDirs = ["${repo}/android/app/src/main/res"]
+   assets.srcDirs = ["${repo}/android/app/src/main/assets", "${repo}/android/build/play-gradle/assets"]
+   jniLibs.srcDirs = ["${repo}/work/android-tools/deps/webrtc/jni"]
+  }
+ }
+ compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
+ packaging { jniLibs { useLegacyPackaging=false } }
+}
+dependencies {
+ implementation files("${repo}/work/android-tools/deps/webrtc/classes.jar")
+ implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+ implementation 'com.android.billingclient:billing:9.1.0'
+}

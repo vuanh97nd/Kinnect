@@ -191,3 +191,7 @@ set PORT=3000 && node server.js
 - Báo cáo rà soát ban đầu: `RA-SOAT-KINNECT-2026-10-26.md`
 - Handoff này: `HANDOFF-CHO-CHATGPT.md`
 - Commit điểm xuất phát: `git show 84d6fbd`
+
+
+## Cập nhật 29/10: cửa hàng và căn giao diện
+APK trực tiếp 1.0.10 (75); Play AAB 1.2.0 (102) dùng Billing 9.1.0. Đọc docs/google-play/MONETIZATION.md trước mở bán. Checkout chưa cấu hình; chưa kiểm thử giao dịch thật. Không tuyên bố đã phát hành Play. Sửa VI/EN, Live trống và nhãn xem trước.

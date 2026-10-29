@@ -15,11 +15,12 @@ import { randomUUID } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { fileURLToPath } from "node:url";
 
-export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSender, emailReady, apkDirectory=fileURLToPath(new URL("./dist/",import.meta.url)) } = {}) {
+export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSender, emailReady, storeVerifier,storeEnv,apkDirectory=fileURLToPath(new URL("./dist/",import.meta.url)) } = {}) {
   loadMailEnv();
   loadMailEnv("oauth.env");
   loadMailEnv("turn.env");
   loadMailEnv("ai.env");
+  loadMailEnv("billing.env");
   const downloadApk=createApkDownload(apkDirectory,new URL("./dist/published-apk.json",import.meta.url));
   let notifyAIStream = () => {};
   let notifyNotifications = () => {};
@@ -29,7 +30,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     onNotification: ({ userId, id }) => { notifyNotifications(userId); if (id) pushNotification(userId, id); },
     onAIStream: event => notifyAIStream(event),
     onCallMessage: ({ userIds }) => notifyCallMessage(userIds),
-    fetchImpl,authLimit,
+    fetchImpl,authLimit,storeVerifier,storeEnv,
     sendEmail:emailSender||sendMail,mailReady:emailReady||smtpConfigured,
     // Báo về email quản trị khi có người gửi yêu cầu quên mật khẩu.
     onResetRequest: (r) => {

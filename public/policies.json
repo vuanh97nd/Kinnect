@@ -34,6 +34,10 @@
         "Bạn có thể sửa/ẩn thông tin, tắt vị trí, thay đổi quyền nhận tin, chặn/báo cáo và yêu cầu xóa tài khoản. Trong app: Cài đặt & riêng tư → Xóa tài khoản và dữ liệu. Ngoài app: https://app.kinnect.io.vn/delete-account. Không cần cài ứng dụng để dùng trang này. Nếu không đăng nhập được hoặc muốn yêu cầu truy cập/sửa/xóa dữ liệu cụ thể, liên hệ riêng anhvn53@wru.vn; chúng tôi xác minh quyền sở hữu trước khi xử lý. Không gửi mật khẩu, OTP hay dữ liệu nhạy cảm qua GitHub công khai."
       ],
       [
+        "Cửa hàng và giao dịch số",
+        "Khi cửa hàng Google Play được mở bán, Google xử lý thanh toán và thông tin thẻ; Kinnect không nhận số thẻ hoặc mã bảo mật thẻ. Kinnect gửi mã tài khoản đã băm và mã giao dịch tới Google để xác minh, lưu mã sản phẩm, trạng thái, thời điểm xác minh và mã giao dịch được mã hóa để khôi phục quyền lợi và xử lý giao dịch hủy/hoàn tiền. Quyền lợi gắn với tài khoản Kinnect đã mua, không chuyển sang tài khoản khác. Xóa tài khoản xóa dữ liệu giao dịch lưu tại Kinnect và quyền truy cập; không tự hoàn tiền hoặc xóa lịch sử tại Google. Yêu cầu hoàn tiền qua Google Play. Nếu không xác minh lại được, quyền lợi trả phí có thể tạm ngừng sau tối đa 24 giờ; tính năng miễn phí vẫn dùng được."
+      ],
+      [
         "Độ tuổi, thay đổi và phạm vi",
         "Kinnect chỉ dành cho người đủ 18 tuổi, không cung cấp dịch vụ cho trẻ vị thành niên. Không được giả tuổi để đăng ký. Khi biết tài khoản chưa đủ tuổi hoặc có nguy cơ xâm hại trẻ em, chúng tôi sẽ hạn chế truy cập và xử lý theo quy trình an toàn. Xác nhận tuổi trong app là tự khai, không được quảng cáo như xác minh danh tính. Thay đổi đáng kể về dữ liệu sẽ được thông báo và xin lựa chọn lại khi cần. Hiện không tích hợp SDK quảng cáo hoặc bán dữ liệu cá nhân để quảng cáo."
       ]

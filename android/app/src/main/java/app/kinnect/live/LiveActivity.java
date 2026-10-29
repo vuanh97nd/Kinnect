@@ -140,7 +140,8 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     status.setPadding(0, dp(140), 0, 0);
     c.addView(status, new LinearLayout.LayoutParams(-1, -2));
     rooms = column();
-    c.addView(rooms, new LinearLayout.LayoutParams(-1, -2));
+    rooms.setGravity(Gravity.CENTER);
+    c.addView(rooms, new LinearLayout.LayoutParams(-1, 0, 1));
 
     LinearLayout fab = row();
     fab.setGravity(Gravity.CENTER);
@@ -177,26 +178,35 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     }
     status.setVisibility(View.GONE);
     LinearLayout empty = column();
-    empty.setGravity(Gravity.CENTER_HORIZONTAL);
-    empty.setPadding(dp(20), dp(110), dp(20), 0);
+    empty.setGravity(Gravity.CENTER);
+    empty.setPadding(dp(16), dp(24), dp(16), dp(24));
     FrameLayout bubble = new FrameLayout(this);
     bubble.setBackground(round(WebDesign.SOFT[WebTheme.isDark(this) ? 1 : 0], 99));
     bubble.addView(icon("radio", ACCENT), new FrameLayout.LayoutParams(dp(30), dp(30), Gravity.CENTER));
     empty.addView(bubble, new LinearLayout.LayoutParams(dp(72), dp(72)));
     TextView t = text(I18n.t("Chưa có buổi live"), 18, TEXT);
     t.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+    t.setGravity(Gravity.CENTER);
     t.setPadding(0, dp(16), 0, dp(4));
-    empty.addView(t);
-    empty.addView(text(I18n.t("Hãy là người mở màn!"), 14, MUTED));
+    empty.addView(t,new LinearLayout.LayoutParams(-1,-2));
+    TextView subtitle=text(I18n.t("Hãy là người mở màn!"),14,MUTED);
+    subtitle.setGravity(Gravity.CENTER);
+    empty.addView(subtitle,new LinearLayout.LayoutParams(-1,-2));
     rooms.addView(empty, new LinearLayout.LayoutParams(-1, -2));
   }
 
   /** Local preview only: no create/join/signaling until the explicit start button. */
+  private TextView previewBadge(){
+    TextView badge=text(I18n.t("Xem trước · Chưa phát sóng"),12,0xffffffff);
+    badge.setGravity(Gravity.CENTER);badge.setSingleLine(false);badge.setMinHeight(dp(36));
+    badge.setPadding(dp(12),dp(8),dp(12),dp(8));badge.setBackground(round(0x88000000,18));
+    return badge;
+  }
   private void showHostPreview(){
     if(previewing||joined)return;previewing=true;host=false;if(rtc!=null){rtc.close();rtc=null;}
     root.removeAllViews();root.setBackgroundColor(0xff111017);FrameLayout stage=new FrameLayout(this);root.addView(stage,new LinearLayout.LayoutParams(-1,0,1));SurfaceViewRenderer display=new SurfaceViewRenderer(this);stage.addView(display,new FrameLayout.LayoutParams(-1,-1));
     TextView close=text(I18n.t("×"),30,0xffffffff);close.setGravity(Gravity.CENTER);close.setContentDescription(I18n.t("Đóng camera chuẩn bị Live"));close.setOnClickListener(v->finish());FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.START);cp.setMargins(dp(12),dp(8),0,0);stage.addView(close,cp);
-    TextView badge=text(I18n.t("Xem trước · Chưa phát sóng"),12,0xffffffff);badge.setGravity(Gravity.CENTER);badge.setBackground(round(0x88000000,18));FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(-2,dp(36),Gravity.TOP|Gravity.CENTER_HORIZONTAL);bp.topMargin=dp(16);stage.addView(badge,bp);
+    TextView badge=previewBadge();FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(-1,-2,Gravity.TOP|Gravity.CENTER_HORIZONTAL);bp.setMargins(dp(64),dp(16),dp(64),0);stage.addView(badge,bp);
     LinearLayout controls=column();controls.setPadding(dp(16),dp(10),dp(16),dp(16));controls.setBackgroundColor(0xff18151f);root.addView(controls,new LinearLayout.LayoutParams(-1,-2));
     EditText title=field(I18n.t("Tiêu đề buổi Live"));title.setText(topicText);title.setTextColor(0xffffffff);title.setHintTextColor(0xffaaa3b7);title.setBackground(round(0xff302a3d,14));title.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(80)});controls.addView(title,new LinearLayout.LayoutParams(-1,dp(48)));
     LinearLayout actions=row();final boolean[] mic={true};actions.addView(sideButton("flip",I18n.t("Lật camera"),()->{if(rtc!=null)rtc.flip();}),new LinearLayout.LayoutParams(0,-2,1));actions.addView(sideButton("wand",I18n.t("Làm đẹp"),this::effectsMenu),new LinearLayout.LayoutParams(0,-2,1));actions.addView(sideButton("mic","Micro",()->{mic[0]=!mic[0];badge.setText(mic[0]?I18n.t("Xem trước · Mic sẽ bật khi phát"):I18n.t("Xem trước · Mic sẽ tắt khi phát"));}),new LinearLayout.LayoutParams(0,-2,1));controls.addView(actions);

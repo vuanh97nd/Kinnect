@@ -165,6 +165,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
 
   private TextView label(String text, float size, int color) { TextView t = new TextView(this); t.setText(text); t.setTextSize(size); t.setTextColor(color); return t; }
 
+  private boolean proApplied;private EditorProject proBefore;
   private void build() {
     LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(BG); setContentView(root);
     root.setOnApplyWindowInsetsListener((v, insets) -> { v.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(), insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom()); return insets; });
@@ -315,7 +316,15 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
         tool("delete", I18n.t("Xóa"), false, this::delete);
       }
     }
+    tool("sparkles","Studio Pro",proApplied,this::proTemplates);
     updateButtons();
+  }
+
+  private void proTemplates(){
+    NativeApi.shared.call("GET","/api/store",null,(catalog,error,status)->{if(closed)return;if(error!=null){showHint(error,2200);return;}boolean owned=false;org.json.JSONArray ids=catalog.optJSONArray("owned");for(int i=0;ids!=null&&i<ids.length();i++)if(ids.optString(i).equals("kinnect_studio_pro"))owned=true;
+      if(!owned){new Sheet(this).setTitle("Studio Pro").setMessage(I18n.t("Ba mẫu dựng video Aurora, Travel và Cinema. Các công cụ chỉnh sửa hiện có vẫn miễn phí.")).setPositiveButton(I18n.t("Xem cửa hàng"),(d,w)->startActivity(new Intent(this,StoreActivity.class))).setNegativeButton(I18n.t("Đóng"),null).show();return;}
+      new Sheet(this).setTitle("Studio Pro").setItems(new String[]{"Aurora","Travel","Cinema",I18n.t("Gỡ mẫu Pro")},(d,index)->{if(project.clips.isEmpty())return;if(index==3){if(proBefore!=null){remember();project=proBefore.copy();proBefore=null;proApplied=false;afterClipsChanged();}return;}if(proBefore==null)proBefore=project.copy();remember();proApplied=true;for(EditorProject.Clip clip:project.clips){clip.fx.filter=index==0?"lavender":index==1?"golden":"cinema";clip.fx.intensity=index==0?.78f:index==1?.65f:.85f;clip.transition=index==0?"fade":index==1?"slideLeft":"black";clip.transitionLength=index==2?.35f:.5f;clip.fx.contrastLevel=index==2?1.12f:1.04f;clip.fx.saturation=index==1?1.12f:1f;}afterClipsChanged();showHint(I18n.t("Đã áp dụng mẫu Studio Pro."),1800);}).show();
+    });
   }
 
   private void onCurrentClip(Runnable then) { int i = project.clipAt(playhead); if (i < 0) return; select("clip", project.clips.get(i).id); then.run(); }
@@ -1019,6 +1028,10 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
 
   // ---------- Export ----------
   private void export(boolean save) {
+    if(proApplied){NativeApi.shared.call("GET","/api/store",null,(catalog,error,status)->{if(closed)return;boolean owned=false;org.json.JSONArray ids=catalog==null?null:catalog.optJSONArray("owned");for(int i=0;ids!=null&&i<ids.length();i++)if(ids.optString(i).equals("kinnect_studio_pro"))owned=true;if(error!=null||!owned){showHint(I18n.t("Cần xác minh quyền Studio Pro trước khi xuất. Bạn có thể gỡ mẫu Pro để dùng công cụ miễn phí."),3000);return;}exportReady(save);});return;}
+    exportReady(save);
+  }
+  private void exportReady(boolean save) {
     if (busy || project.clips.isEmpty()) return; saveRequested = save; closeSheet(); playing = false; updateButtons();
     EditorProject.Clip only = project.clips.size() == 1 ? project.clips.get(0) : null;
     if (!dirty && only != null && only.file.equals(input)) { deliver(input); return; }

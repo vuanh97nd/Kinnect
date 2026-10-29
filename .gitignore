@@ -31,6 +31,10 @@ turn.env
 /music-removed/
 
 ai.env
+billing.env
+android/play-release/.gradle/
+android/play-release/build/
+android/play-release/local.properties
 
 # Website static assets are build inputs; root APK output remains ignored.
 !website/dist/

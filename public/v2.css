@@ -2836,3 +2836,23 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 #kn .kn-confirm{display:flex;flex-direction:column;max-height:calc(100dvh - 32px - env(safe-area-inset-bottom));min-height:0}
 #kn .kn-confirm p{overflow-y:auto;min-height:0;overscroll-behavior:contain}
 #kn .kn-confirm-actions{flex-shrink:0}
+
+/* Live empty state remains centered at narrow widths and larger text sizes. */
+#kn .live-idle .kn-empty{width:100%;min-width:0;margin-inline:auto;box-sizing:border-box}
+#kn .live-idle .kn-empty h2,#kn .live-idle .kn-empty p{width:100%;text-align:center;overflow-wrap:anywhere}
+
+#kn .kn-store{max-width:1000px;margin-inline:auto;padding:12px 0 28px;min-width:0}
+#kn .kn-store-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:16px;margin:20px 0}
+#kn .kn-store-product{display:flex;flex-direction:column;gap:12px;padding:18px;min-width:0;overflow-wrap:anywhere}
+#kn .kn-store-product h2,#kn .kn-store-product p{margin:0}#kn .kn-store-product button{width:100%;white-space:normal;height:auto;min-height:44px}
+#kn .kn-store-swatch{height:110px;border-radius:18px;display:grid;place-items:center;color:white;font-size:24px;font-weight:700}
+#kn .store-kinnect_style_aurora{--store-color:#8b5cf6;background:linear-gradient(135deg,#8b5cf6,#ec4899)}
+#kn .store-kinnect_style_ocean{--store-color:#0284c7;background:linear-gradient(135deg,#0284c7,#14b8a6)}
+#kn .store-kinnect_style_sunset{--store-color:#f97316;background:linear-gradient(135deg,#f97316,#db2777)}
+#kn .store-kinnect_studio_pro{background:linear-gradient(135deg,#7c3aed,#c026d3)}
+#kn .av[class*="store-kinnect_style_"]{border:3px solid var(--store-color);box-sizing:border-box;padding:2px}
+#kn .app[data-store-style="kinnect_style_aurora"] .v2-bubble.outgoing{background:#6d28d9;color:white}
+#kn .app[data-store-style="kinnect_style_ocean"] .v2-bubble.outgoing{background:#0369a1;color:white}
+#kn .app[data-store-style="kinnect_style_sunset"] .v2-bubble.outgoing{background:#c2410c;color:white}
+
+#kn .kn-store-preview{display:grid;justify-items:center;gap:14px;text-align:center;padding:24px;margin-block:16px}#kn .kn-store-preview .av{width:76px;height:76px}#kn .store-preview-chat{padding:14px 22px;color:white;border-radius:18px;max-width:100%;overflow-wrap:anywhere}
