@@ -1449,5 +1449,8 @@
   "Lên Live": "Join LIVE",
   "Máy chủ đang tạm gián đoạn. Vui lòng thử lại sau.": "The server is temporarily unavailable. Please try again later.",
   "Tùy chọn tin nhắn": "Message options",
-  "Kết nối chậm, vui lòng thử lại.": "The connection is slow. Please try again."
+  "Kết nối chậm, vui lòng thử lại.": "The connection is slow. Please try again.",
+  "Tùy chọn video": "Video options",
+  "Chỉnh ảnh từ máy": "Edit a photo from this device",
+  "Đăng video có sẵn": "Post an existing video"
 }

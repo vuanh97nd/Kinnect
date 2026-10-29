@@ -1,7 +1,7 @@
 {
   "version": "1.0.20",
   "filename": "Kinnect-1.0.20-native.apk",
-  "sha256": "0241f9785e89f41b5a7d42a9753c747c929f0c9a11be75c463d9a5987dc27e36",
+  "sha256": "45f32b1fc56b0e056a46a5e98a02ac5d5a057b51edb947e405a87c774be78ed8",
   "playVersion": "1.2.4",
   "languages": [
     "vi",
@@ -37,7 +37,7 @@
     "playChecks": "dist/google-play/artifact-checks.json",
     "compact18": "Offline actual native components at 320dp and font100/130; see compact18/verification.json",
     "steady19": "Mail isolation, native footer/back menus, stable first-frame feed, no startup popup; see steady19/verification.json",
-    "options20": "Message option menu icons, no duplicate reaction action, transparent call/video/menu header; see options20/verification.json"
+    "options20": "Popup/menu icon coverage, 25 actual renders, transparent chat header; see options20/verification.json"
   },
   "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.20"
 }

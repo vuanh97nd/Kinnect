@@ -25,6 +25,11 @@ public class MessageOptionsAudit extends Instrumentation {
    if(!own)check(find(decor,"Thu hồi với mọi người")==null,"Received message offers recall");
   });shot(a,"options20-"+state+".png");runOnMainSync(()->dialog[0].dismiss());
  }
- runOnMainSync(()->a.finish());result.putString("result","PASS: real sent/received/recalled menu rows have visibly rendered icons and full labels; duplicate reaction action removed; received message does not offer recall. No actions sent to server.");finish(Activity.RESULT_OK,result);
+ for(int state=0;state<4;state++){
+  final boolean video=state<2,mine=state%2==0;final Dialog[] dialog={null};final LinearLayout card=new LinearLayout(a);
+  runOnMainSync(()->{try{set(a,"me",new JSONObject().put("id","menu-owner"));JSONObject item=new JSONObject().put("id","offline-options").put("user_id",mine?"menu-owner":"other").put("author",new JSONObject().put("id","other"));dialog[0]=(Dialog)(video?call(a,"shortOptions",new Class[]{JSONObject.class},item):call(a,"postOptions",new Class[]{JSONObject.class,boolean.class,LinearLayout.class},item,mine,card));}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();Thread.sleep(150);
+  runOnMainSync(()->{String[] labels=video?new String[]{mine?"Xoá video của tôi":"Báo cáo video","Xem hồ sơ","Đóng"}:mine?new String[]{"Chỉnh sửa bài viết","Thay đổi đối tượng xem","Ẩn bài viết","Xoá bài viết"}:new String[]{"Ẩn bài viết","Báo cáo bài viết"};for(String label:labels){TextView t=find(dialog[0].getWindow().getDecorView(),label);check(t!=null,"Missing option "+label);ViewGroup row=(ViewGroup)t.getParent();check(row.getChildAt(0)instanceof ImageView,"Missing option icon "+label);ImageView icon=(ImageView)row.getChildAt(0);Bitmap drawn=Bitmap.createBitmap(icon.getWidth(),icon.getHeight(),Bitmap.Config.ARGB_8888);icon.draw(new Canvas(drawn));int pixels=0;for(int x=0;x<drawn.getWidth();x++)for(int y=0;y<drawn.getHeight();y++)if((drawn.getPixel(x,y)>>>24)>20)pixels++;drawn.recycle();check(pixels>6,"Blank option icon "+label);}});shot(a,"options20-extra-"+state+".png");runOnMainSync(()->dialog[0].dismiss());
+ }
+ runOnMainSync(()->a.finish());result.putString("result","PASS: video/post owner and other menus plus real sent/received/recalled message menu rows have visibly rendered icons and full labels; duplicate reaction action removed; received message does not offer recall. No actions sent to server.");finish(Activity.RESULT_OK,result);
  }catch(Throwable e){result.putString("error",e.toString());finish(Activity.RESULT_CANCELED,result);}}
 }

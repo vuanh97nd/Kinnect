@@ -20,6 +20,7 @@ final class Sheet {
   private DialogInterface.OnClickListener onPositive, onNegative, onNeutral, onItem;
   private CharSequence[] items;
   private String[] itemIcons;
+  private String itemIcon;
   private boolean[] checked;
   private DialogInterface.OnMultiChoiceClickListener onCheck;
   private View view;
@@ -37,6 +38,7 @@ final class Sheet {
   Sheet setMessage(CharSequence m) { message = m; return this; }
   Sheet setView(View v) { view = v; return this; }
   Sheet setItems(CharSequence[] list, DialogInterface.OnClickListener l) { items = list; onItem = l; return this; }
+  Sheet setItemIcon(String icon) { itemIcon=icon; return this; }
   Sheet setItemIcons(String[] icons) { itemIcons = icons; return this; }
   Sheet setMultiChoiceItems(CharSequence[] list, boolean[] state, DialogInterface.OnMultiChoiceClickListener l) { items = list; checked = state; onCheck = l; return this; }
   Sheet setPositiveButton(CharSequence t, DialogInterface.OnClickListener l) { positive = t; onPositive = l; return this; }
@@ -125,11 +127,12 @@ final class Sheet {
           row.setOnClickListener(v -> { checked[index] = !checked[index]; box2.setChecked(checked[index]); if (onCheck != null) onCheck.onClick(dialog, index, checked[index]); });
         } else row.setOnClickListener(v -> { dialog.dismiss(); if (onItem != null) onItem.onClick(dialog, index); });
         TextView t = text(label, 13, danger ? 0xffe0245e : ink, false);
-        if (itemIcons != null && i < itemIcons.length) {
-          int iconId = WebIcons.resolve(context,itemIcons[i]);
+        if (checked == null || itemIcons != null || itemIcon != null) {
+          String glyph=itemIcons!=null&&i<itemIcons.length?itemIcons[i]:itemIcon!=null?itemIcon:"circle_check";
+          int iconId = WebIcons.resolve(context,glyph);
           if (iconId != 0) {
             ImageView icon = new ImageView(context);
-            icon.setImageDrawable(WebIcons.load(context,itemIcons[i]));
+            icon.setImageDrawable(WebIcons.load(context,glyph));
             icon.setColorFilter(danger ? 0xffe0245e : ink);
             LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(dp(21), dp(21));
             ip.rightMargin = dp(14);

@@ -2306,11 +2306,11 @@ public class MainActivity extends Activity {
     String value = (key.equals("height")||key.equals("weight"))&&me.isNull(key)?"":key.equals("interests") ? join(me.optJSONArray("interests")).replace(" · ", ", ") : me.optString(key);
     final EditText field = input(into, title, value, multiline);
     field.setFilters(new android.text.InputFilter[] { new android.text.InputFilter.LengthFilter(maximum) });
-    if(choices!=null){setProfileChoice(field,value);field.setFocusable(false);field.setOnClickListener(v->new Sheet(this).setTitle(I18n.t(title)).setItems(I18n.items(choices),(d,w)->setProfileChoice(field,choices[w])).setNeutralButton(I18n.t("Để trống"),(d,w)->setProfileChoice(field,"")).show());}
+    if(choices!=null){setProfileChoice(field,value);field.setFocusable(false);field.setOnClickListener(v->new Sheet(this).setTitle(I18n.t(title)).setItemIcon("circle_check").setItems(I18n.items(choices),(d,w)->setProfileChoice(field,choices[w])).setNeutralButton(I18n.t("Để trống"),(d,w)->setProfileChoice(field,"")).show());}
     if (choices != null) head.addView(roundAction("chevron_down", I18n.t("Chọn ") + title.toLowerCase(Locale.ROOT), false, () -> {
       String[] labels = new String[choices.length + 1]; labels[0] = "Không muốn tiết lộ";
       System.arraycopy(choices, 0, labels, 1, choices.length);
-      new Sheet(this).setTitle(I18n.t(title)).setItems(I18n.items(labels), (d, w) -> setProfileChoice(field,w == 0 ? "" : choices[w - 1])).show();
+      new Sheet(this).setTitle(I18n.t(title)).setItemIcon("circle_check").setItems(I18n.items(labels), (d, w) -> setProfileChoice(field,w == 0 ? "" : choices[w - 1])).show();
     }));
     if (!key.equals("name")) {
       final String sharedKey = key.equals("birthDate") ? "age" : key;
@@ -2600,7 +2600,7 @@ public class MainActivity extends Activity {
   }
 
   private void languageMenu() {
-    new Sheet(this).setTitle(I18n.t("Ngôn ngữ ứng dụng"))
+    new Sheet(this).setTitle(I18n.t("Ngôn ngữ ứng dụng")).setItemIcons(new String[]{"globe","globe","settings"})
       .setItems(new String[]{"Tiếng Việt","English",I18n.t("Theo hệ thống")},(dialog,index)->{
         I18n.select(this,new String[]{"vi","en","system"}[index]);recreate();
       }).setNegativeButton(I18n.t("Đóng"),null).show();
@@ -2619,7 +2619,7 @@ public class MainActivity extends Activity {
     privacyToggle(privacy, "discoverable", I18n.t("Cho phép tìm thấy tôi"), I18n.t("Xuất hiện trong Khám phá và Bạn bè quanh đây"));
     privacyToggle(privacy, "showDistance", I18n.t("Hiển thị khoảng cách"), I18n.t("Chỉ hiện khoảng cách gần đúng"));
     privacyToggle(privacy, "showActivity", I18n.t("Trạng thái hoạt động"), I18n.t("Cho người khác biết khi bạn đang online"));
-    groupRow(privacy, "message_square", I18n.t("Ai có thể nhắn tin · ") + (me.optString("dmMode").equals("everyone") ? I18n.t("Mọi thành viên") : I18n.t("Bạn bè")), false, () -> new Sheet(this).setTitle(I18n.t("Ai có thể nhắn tin")).setItems(new String[] { I18n.t("Mọi thành viên"), I18n.t("Bạn bè") }, (d, w) -> request("PATCH", "/api/me", json("dmMode", w == 0 ? "everyone" : "friends"), r -> { me = r.optJSONObject("user"); settings(); })).show());
+    groupRow(privacy, "message_square", I18n.t("Ai có thể nhắn tin · ") + (me.optString("dmMode").equals("everyone") ? I18n.t("Mọi thành viên") : I18n.t("Bạn bè")), false, () -> new Sheet(this).setTitle(I18n.t("Ai có thể nhắn tin")).setItemIcons(new String[]{"globe","users_round"}).setItems(new String[] { I18n.t("Mọi thành viên"), I18n.t("Bạn bè") }, (d, w) -> request("PATCH", "/api/me", json("dmMode", w == 0 ? "everyone" : "friends"), r -> { me = r.optJSONObject("user"); settings(); })).show());
     if(Distribution.PLAY){
       groupTitle("message_square",I18n.t("Đồng bộ giữa các thiết bị"));LinearLayout sync=settingsGroup();android.content.SharedPreferences preferences=getSharedPreferences("play_privacy",0);Switch toggle=new Switch(this);toggle.setText(I18n.t("Đồng bộ tin nhắn nền"));toggle.setTextSize(14);toggle.setTextColor(TEXT);toggle.setChecked(preferences.getBoolean("background_messages",false));sync.addView(toggle);sync.addView(label(I18n.t("Tùy chọn giữ thông báo đang hoạt động để tiếp tục đồng bộ tin nhắn giữa web và điện thoại. Có thể tắt bất cứ lúc nào; khi tắt, Android có thể ngừng kết nối nền."),12,MUTED));toggle.setOnCheckedChangeListener((button,enabled)->{preferences.edit().putBoolean("background_messages",enabled).apply();KinnectService.stop(this);KinnectService.start(this);});
     }
@@ -3005,11 +3005,7 @@ public class MainActivity extends Activity {
       if (shortPlayer != null) shortPlayer.setVolume(shortMuted ? 0 : 1, shortMuted ? 0 : 1);
       showShort(shortIndex);
     }));
-    final boolean mine = item.optString("user_id").equals(me.optString("id"));
-    side.addView(reelButton("more", mine ? I18n.t("Thêm") : I18n.t("Báo cáo"), WHITE, () -> new Sheet(this).setItems(new String[] { mine ? I18n.t("Xoá video của tôi") : I18n.t("Báo cáo video"), I18n.t("Xem hồ sơ"), I18n.t("Đóng") }, (d, w) -> {
-      if (w == 0) { if (mine) confirm(I18n.t("Xoá video?"), () -> request("DELETE", "/api/shorts/" + item.optString("id"), json(), r -> navigate("shorts"))); else report("short", item.optString("id")); }
-      if (w == 1) person(author);
-    }).show()));
+    side.addView(reelButton("more", I18n.t("Tùy chọn video"), WHITE, () -> shortOptions(item)));
     ScrollView actionRail = new ScrollView(this);
     actionRail.setVerticalScrollBarEnabled(false);
     actionRail.setFillViewport(true);
@@ -3096,6 +3092,14 @@ public class MainActivity extends Activity {
   }
 
   // Bình luận video kiểu TikTok: bảng trượt từ dưới, "N bình luận", tim bên phải, trả lời thu gọn, hàng emoji nhanh.
+  private android.app.Dialog shortOptions(final JSONObject item) {
+    final boolean mine=item.optString("user_id").equals(me.optString("id"));
+    return new Sheet(this).setTitle(I18n.t("Tùy chọn video")).setItemIcons(new String[]{mine?"trash":"flag","user_round","close"}).setItems(new String[]{mine?I18n.t("Xoá video của tôi"):I18n.t("Báo cáo video"),I18n.t("Xem hồ sơ"),I18n.t("Đóng")},(d,w)->{
+      if(w==0){if(mine)confirm(I18n.t("Xoá video?"),()->request("DELETE","/api/shorts/"+item.optString("id"),json(),r->navigate("shorts")));else report("short",item.optString("id"));}
+      if(w==1)person(item.optJSONObject("author"));
+    }).show();
+  }
+
   private void shortComments(final JSONObject item) {
     final android.app.Dialog dialog = new android.app.Dialog(this);
     dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -4278,19 +4282,22 @@ public class MainActivity extends Activity {
     });
   }
 
-  private void postOptions(final JSONObject post, boolean mine, final LinearLayout card) {
-    List<String> labels = new ArrayList<>();
+  private android.app.Dialog postOptions(final JSONObject post, boolean mine, final LinearLayout card) {
+    List<String> labels = new ArrayList<>(), icons = new ArrayList<>();
     List<Runnable> actions = new ArrayList<>();
     if (mine) {
+      icons.add("pencil");
       labels.add(I18n.t("Chỉnh sửa bài viết"));
       actions.add(() -> {
         LinearLayout form = column();
         EditText body = input(form, I18n.t("Bạn đang nghĩ gì?"), post.optString("body"), true);
         new Sheet(this).setTitle(I18n.t("Chỉnh sửa bài viết")).setView(form).setPositiveButton(I18n.t("Lưu"), (d, w) -> request("PATCH", "/api/posts/" + post.optString("id"), json("body", body.getText().toString()), result -> refreshPage())).setNegativeButton(I18n.t("Huỷ"), null).show();
       });
+      icons.add("globe");
       labels.add(I18n.t("Thay đổi đối tượng xem"));
       actions.add(() -> new Sheet(this).setTitle(I18n.t("Ai có thể xem bài viết?")).setItemIcons(new String[]{"globe","users_round"}).setItems(new String[] { I18n.t("Mọi thành viên"), I18n.t("Người theo dõi") }, (d, w) -> request("PATCH", "/api/posts/" + post.optString("id"), json("visibility", w == 0 ? "public" : "followers"), result -> refreshPage())).show());
     }
+    icons.add("eye_off");
     labels.add(I18n.t("Ẩn bài viết"));
     actions.add(() -> {
       Set<String> hidden = new HashSet<>(getSharedPreferences("kinnect_feed", 0).getStringSet("hidden:" + me.optString("id"), Collections.emptySet()));
@@ -4304,14 +4311,15 @@ public class MainActivity extends Activity {
         refreshPage();
       }));
     });
+    icons.add(mine ? "trash" : "flag");
     labels.add(mine ? I18n.t("Xoá bài viết") : I18n.t("Báo cáo bài viết"));
     actions.add(() -> { if (mine) confirm(I18n.t("Xoá bài viết?"), () -> request("DELETE", "/api/posts/" + post.optString("id"), json(), result -> refreshPage())); else report("post", post.optString("id")); });
-    new Sheet(this).setTitle(I18n.t("Tùy chọn bài viết")).setItems(labels.toArray(new String[0]),(dialog,index)->actions.get(index).run()).show();
+    return new Sheet(this).setTitle(I18n.t("Tùy chọn bài viết")).setItemIcons(icons.toArray(new String[0])).setItems(labels.toArray(new String[0]),(dialog,index)->actions.get(index).run()).show();
   }
 
   private void sharePost(final JSONObject post) {
     final String url = "https://app.kinnect.io.vn/?s=postDetail&post=" + post.optString("id");
-    new Sheet(this).setTitle(I18n.t("Chia sẻ bài viết")).setItems(new String[] { I18n.t("Gửi cho bạn bè"), I18n.t("Sao chép liên kết"), I18n.t("Chia sẻ qua ứng dụng khác") }, (dialog, choice) -> {
+    new Sheet(this).setTitle(I18n.t("Chia sẻ bài viết")).setItemIcons(new String[]{"send","copy","share_2"}).setItems(new String[] { I18n.t("Gửi cho bạn bè"), I18n.t("Sao chép liên kết"), I18n.t("Chia sẻ qua ứng dụng khác") }, (dialog, choice) -> {
       if (choice == 1) {
         ((android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("Kinnect", url));
         say(I18n.t("Đã sao chép liên kết."));
@@ -4323,7 +4331,7 @@ public class MainActivity extends Activity {
         if (users == null || users.length() == 0) { say(I18n.t("Bạn chưa có bạn bè để chia sẻ.")); return; }
         String[] names = new String[users.length()];
         for (int i = 0; i < names.length; i++) names[i] = users.optJSONObject(i).optString("name");
-        new Sheet(this).setTitle(I18n.t("Gửi cho bạn bè")).setItems(names, (d, w) -> request("POST", "/api/users/" + users.optJSONObject(w).optString("id") + "/messages", json("body", url), result -> say(I18n.t("Đã chia sẻ bài viết.")))).show();
+        new Sheet(this).setTitle(I18n.t("Gửi cho bạn bè")).setItemIcon("user_round").setItems(names, (d, w) -> request("POST", "/api/users/" + users.optJSONObject(w).optString("id") + "/messages", json("body", url), result -> say(I18n.t("Đã chia sẻ bài viết.")))).show();
       });
     }).show();
   }
@@ -4958,7 +4966,7 @@ public class MainActivity extends Activity {
         if (seen.add(path)) { names.add((k == 1 ? "Nhóm · " : "") + target.optString("name")); paths.add(path); }
       }
       if (names.isEmpty()) { say(I18n.t("Chưa có bạn bè hoặc hội thoại để chuyển tiếp.")); return; }
-      new Sheet(this).setTitle(I18n.t("Chuyển tiếp tin nhắn")).setItems(names.toArray(new String[0]), (dialog, index) -> {
+      new Sheet(this).setTitle(I18n.t("Chuyển tiếp tin nhắn")).setItemIcon("user_round").setItems(names.toArray(new String[0]), (dialog, index) -> {
         // Re-read the source so recalled/deleted messages cannot be forwarded from stale UI.
         request("GET", source, null, data -> {
           JSONArray rows = data.optJSONArray("messages");
@@ -5605,7 +5613,7 @@ public class MainActivity extends Activity {
     JSONObject author = comment.optJSONObject("author");
     if (author == null || !author.optString("id").equals(me.optString("id"))) { report("comment", comment.optString("id")); return; }
     final String path = base + "/" + comment.optString("id");
-    new Sheet(this).setItems(new String[] { I18n.t("Chỉnh sửa"), I18n.t("Xoá bình luận") }, (dialog, choice) -> {
+    new Sheet(this).setItemIcons(new String[]{"pencil","trash"}).setItems(new String[] { I18n.t("Chỉnh sửa"), I18n.t("Xoá bình luận") }, (dialog, choice) -> {
       if (choice == 1) { confirm(I18n.t("Xoá bình luận này?"), () -> request("DELETE", path, json(), data -> reload.run())); return; }
       LinearLayout form = column();
       final Dialog[] editor = { null };

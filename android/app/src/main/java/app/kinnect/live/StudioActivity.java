@@ -675,7 +675,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
 
   private void openGallery() {
     if (recording) return;
-    new Sheet(this).setTitle(I18n.t("Thư viện")).setItems(new String[] { I18n.t("🖼  Chỉnh ảnh từ máy"), I18n.t("🎬  Đăng video có sẵn") }, (d, w) -> {
+    new Sheet(this).setTitle(I18n.t("Thư viện")).setItemIcons(new String[]{"image","clapperboard"}).setItems(new String[] { I18n.t("Chỉnh ảnh từ máy"), I18n.t("Đăng video có sẵn") }, (d, w) -> {
       Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
       pick.addCategory(Intent.CATEGORY_OPENABLE);
       pick.setType(w == 0 ? "image/*" : "video/*");
