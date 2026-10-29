@@ -1,0 +1,17 @@
+{
+  "version": "1.0.19",
+  "versionCode": 84,
+  "sha256": "6b21146f412797264444bf501153c4711495aecf4e4b47151fe6da48877b710f",
+  "certificateMatches1_0_18": true,
+  "backendTests": 110,
+  "targetedMailTestsAfterExplicitOptIn": 10,
+  "mailIsolation": "Factory defaults to no live delivery, including test/in-memory instances; production CLI explicitly opts in. Admin reset notifications and OTP share the injected sender; TLS-connect spy confirms no live SMTP in regression tests.",
+  "nativeComponents": "Android16: font100/130, footer time/receipt/emotion/options; menu preserves forward/recall/delete; settings Back callback; About default; upload caption insets.",
+  "nativeNavigation": "Server-backed ordinary QA account: exact same feed viewport/content and media height on return; immediate and first rendered frame positions unchanged; active Feed tap resets top. Actual chat menu > settings > Back > parent menu > Back > chat passed. No messages or recovery emails sent by native QA.",
+  "qaVariant": "code109 and QA signature solely to update emulator; all other ZIP payloads identical to delivered APK.",
+  "physicalDeviceVerified": false,
+  "published": false,
+  "webClientModified": false,
+  "startupErrors": "Saved diagnostic log retained without opening any startup popup; actual final APK component audit passed. Timeout/HTTP408/504 use concise translated text; repeated identical toasts suppressed for six seconds.",
+  "backendDeployment": "Managed Node server restarted; local and public health and public OAuth-provider GET passed (native User-Agent). Tunnel preserved."
+}

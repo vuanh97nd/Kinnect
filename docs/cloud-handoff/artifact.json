@@ -1,7 +1,7 @@
 {
-  "version": "1.0.18",
-  "filename": "Kinnect-1.0.18-native.apk",
-  "sha256": "f235af2c61987209c1ac9995d78150af3d8425d8a28c0cb4995b9fd86712e6f3",
+  "version": "1.0.19",
+  "filename": "Kinnect-1.0.19-native.apk",
+  "sha256": "6b21146f412797264444bf501153c4711495aecf4e4b47151fe6da48877b710f",
   "playVersion": "1.2.4",
   "languages": [
     "vi",
@@ -35,7 +35,8 @@
     "feedPosition": "ordinary reviewer on emulator and browser: return preserves scroll, active feed tap scrolls top/refreshes",
     "mediaSwipe": "shared controller; no duplicate root handler; web gesture/cancel/comments and native retained reel stage tests pass",
     "playChecks": "dist/google-play/artifact-checks.json",
-    "compact18": "Offline actual native components at 320dp and font100/130; see compact18/verification.json"
+    "compact18": "Offline actual native components at 320dp and font100/130; see compact18/verification.json",
+    "steady19": "Mail isolation, native footer/back menus, stable first-frame feed, no startup popup; see steady19/verification.json"
   },
-  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.18"
+  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.19"
 }

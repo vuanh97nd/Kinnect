@@ -126,11 +126,11 @@ public final class NativeApi {
           result = new JSONObject();
         }
         if(method.equals("GET")&&status==200&&response.length()<262144&&connection.getHeaderField("ETag")!=null&&revision==epoch)snapshots.put(snapshotKey,new Snapshot(connection.getHeaderField("ETag"),response));
-        if (status < 200 || status >= 300) error = result.optString("error", httpFailure(status));
+        if (status < 200 || status >= 300) error = status >= 500 ? httpFailure(status) : result.optString("error", httpFailure(status));
       } catch (OutOfMemoryError failure) {
         error = I18n.t("Thiết bị không đủ bộ nhớ để chuẩn bị tệp tải lên.");
       } catch (java.net.SocketTimeoutException failure) {
-        error = I18n.t("Kết nối tải lên hết thời gian chờ. Kiểm tra mạng rồi thử lại.");
+        error = I18n.t(progress != null ? "Kết nối tải lên hết thời gian chờ. Kiểm tra mạng rồi thử lại." : "Kết nối chậm, vui lòng thử lại.");
       } catch (Exception failure) {
         error = status >= 200 && status < 300 ? I18n.t("Máy chủ trả về dữ liệu không hợp lệ.") : status > 0 ? httpFailure(status) : I18n.t("Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.");
       } finally {
@@ -145,6 +145,8 @@ public final class NativeApi {
   }
 
   private static String httpFailure(int status) {
+    if (status == 408 || status == 504) return I18n.t("Kết nối chậm, vui lòng thử lại.");
+    if (status >= 500) return I18n.t("Máy chủ đang tạm gián đoạn. Vui lòng thử lại sau.");
     if (status == 413) return I18n.t("Máy chủ hoặc đường truyền từ chối kích thước tải lên (HTTP 413).");
     if (status == 401) return I18n.t("Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.");
     if (status == 429) return I18n.t("Máy chủ đang bận hoặc cần chờ trước lần đăng tiếp theo (HTTP 429).");

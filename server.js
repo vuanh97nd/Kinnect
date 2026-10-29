@@ -16,12 +16,16 @@ import { randomUUID } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { fileURLToPath } from "node:url";
 
-export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSender, emailReady, storeVerifier,storeEnv,apkDirectory=fileURLToPath(new URL("./dist/",import.meta.url)) } = {}) {
+export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSender, emailReady, allowEmailDelivery = false, storeVerifier,storeEnv,apkDirectory=fileURLToPath(new URL("./dist/",import.meta.url)) } = {}) {
   loadMailEnv();
   loadMailEnv("oauth.env");
   loadMailEnv("turn.env");
   loadMailEnv("ai.env");
   loadMailEnv("billing.env");
+  // Test/in-memory apps must never inherit the workstation's live SMTP delivery.
+  const isolatedMail = !allowEmailDelivery || dbPath === ":memory:" || !!process.env.NODE_TEST_CONTEXT;
+  const deliverEmail = emailSender ?? (isolatedMail ? async () => false : sendMail);
+  const emailAvailable = emailReady ?? (isolatedMail ? () => false : smtpConfigured);
   const downloadApk=createApkDownload(apkDirectory,new URL("./dist/published-apk.json",import.meta.url));
   let notifyAIStream = () => {};
   let notifyNotifications = () => {};
@@ -32,13 +36,14 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     onAIStream: event => notifyAIStream(event),
     onCallMessage: ({ userIds }) => notifyCallMessage(userIds),
     fetchImpl,authLimit,storeVerifier,storeEnv,
-    sendEmail:emailSender||sendMail,mailReady:emailReady||smtpConfigured,
+    sendEmail:deliverEmail,mailReady:emailAvailable,
     // Báo về email quản trị khi có người gửi yêu cầu quên mật khẩu.
     onResetRequest: (r) => {
       const when = new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
       console.log(`[quen-mat-khau] ${when} Đã tiếp nhận yêu cầu khôi phục.`);
       if (!mailConfigured()) return;
-      sendMail({
+      deliverEmail({
+        to: process.env.RESET_NOTIFY_EMAIL,
         subject: `Kinnect: yêu cầu quên mật khẩu @${r.username}`,
         text: [
           "Có yêu cầu đặt lại mật khẩu trên Kinnect.",
@@ -721,7 +726,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const dbPath = resolve(process.env.DATA_DIR || "data", "kinnect.sqlite");
   mkdirSync(dirname(dbPath), { recursive: true });
-  const { server } = createApp({ dbPath });
+  const { server } = createApp({ dbPath, allowEmailDelivery: true });
   server.listen(Number(process.env.PORT || 3000), "0.0.0.0", () =>
     console.log("Kinnect Live listening on port " + (process.env.PORT || 3000)),
   );

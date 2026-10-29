@@ -124,10 +124,9 @@ public class MainActivity extends Activity {
         if (error == null && user != null) { me = user; navigate("feed"); handleExtras(getIntent()); }
         else auth(false);
         handleLink(getIntent());
-        CrashLog.showPending(this);
       }, wait);
     });
-    else startupHandler.postDelayed(() -> { if (!isDestroyed() && !isFinishing()) { intro(); handleLink(getIntent()); CrashLog.showPending(this); } }, 700);
+    else startupHandler.postDelayed(() -> { if (!isDestroyed() && !isFinishing()) { intro(); handleLink(getIntent()); } }, 700);
   }
 
   private void splash() {
@@ -285,12 +284,21 @@ public class MainActivity extends Activity {
   private void revealKeyboardFocus(){View focused=getCurrentFocus();if(!(focused instanceof EditText))return;if("chat-compose".equals(focused.getTag())&&aiChatScroll!=null&&aiChatScroll.isAttachedToWindow())aiChatScroll.post(()->aiChatScroll.fullScroll(View.FOCUS_DOWN));else focused.requestRectangleOnScreen(new android.graphics.Rect(0,-dp(90),focused.getWidth(),focused.getHeight()+dp(12)),true);}
   private interface RefreshLoader{void run(Runnable complete);}
   private RefreshLoader feedRefresh;private boolean shortRefreshing;
+  private PullRefreshScrollView retainedFeed;
+  private LinearLayout retainedFeedContent;
+  private RefreshLoader retainedFeedRefresh;
+  private final ArrayList<VideoView> retainedFeedVideos = new ArrayList<>();
   private void shell(String title, boolean navigation) {
     if(feedRefresh!=null&&content!=null&&content.getParent()instanceof ScrollView)feedScrollY=((ScrollView)content.getParent()).getScrollY();
+    if(feedRefresh!=null&&feedRows!=null&&content!=null&&content.getParent() instanceof PullRefreshScrollView){
+      retainedFeed=(PullRefreshScrollView)content.getParent();retainedFeedContent=content;retainedFeedRefresh=feedRefresh;
+      retainedFeedVideos.clear();retainedFeedVideos.addAll(mediaVideos);
+      if(retainedFeed.getParent() instanceof ViewGroup)((ViewGroup)retainedFeed.getParent()).removeView(retainedFeed);
+    }
     feedRefresh=null;shortRefreshing=false;reelViewport=null;
     onTabRoot = false;
     if (splashAnimator != null) { splashAnimator.cancel(); splashAnimator = null; }
-    for (VideoView video : mediaVideos) { try { video.stopPlayback(); } catch (RuntimeException ignored) {} }
+    for (VideoView video : mediaVideos) { try { if(retainedFeedVideos.contains(video))video.pause();else video.stopPlayback(); } catch (RuntimeException ignored) {} }
     mediaVideos.clear(); resumeVideos.clear();
     stopShort();
     stopLocation();
@@ -901,6 +909,9 @@ public class MainActivity extends Activity {
     text=I18n.t(text);
     if (notice != null) notice.setText(text);
     if (text == null || text.trim().isEmpty()) return;
+    long toastNow=android.os.SystemClock.elapsedRealtime();
+    if(text.equals(lastToastMessage)&&toastNow-lastToastAt<6000)return;
+    lastToastMessage=text;lastToastAt=toastNow;
     final ViewGroup host = findViewById(android.R.id.content);
     if (host == null) { Toast.makeText(this, text, Toast.LENGTH_SHORT).show(); return; }
     if (toastView != null) host.removeView(toastView);
@@ -939,6 +950,8 @@ public class MainActivity extends Activity {
   }
 
   private View toastView;
+  private String lastToastMessage="";
+  private long lastToastAt;
 
   private JSONObject json(Object... values) {
     JSONObject obj = new JSONObject();
@@ -970,7 +983,7 @@ public class MainActivity extends Activity {
     final UploadProgress upload=data!=null&&(data.optString("media").startsWith("data:")||data.optString("data").startsWith("data:"))?new UploadProgress(this):null;
     api.call(method, path, data, upload, (answer, error, status) -> {
       if(upload!=null)upload.close();
-      if (isFinishing() || isDestroyed() || generation != screen) return;
+      if (isFinishing() || isDestroyed() || generation != screen) { finished.run(); return; }
       try {
         if (error != null) {
           if(status==428&&answer!=null&&!answer.optString("version").isEmpty()){
@@ -1008,7 +1021,7 @@ public class MainActivity extends Activity {
   }
 
   private void auth(boolean register) {
-    feedRows=null;feedScrollY=0;
+    clearRetainedFeed();feedRows=null;feedScrollY=0;
     subBack = null;
     shell("", false);
     toolbar.setVisibility(View.GONE);
@@ -1579,7 +1592,21 @@ public class MainActivity extends Activity {
   }
 
 
+  private void clearRetainedFeed() {
+    for(VideoView video:retainedFeedVideos)try{video.stopPlayback();}catch(RuntimeException ignored){}
+    retainedFeedVideos.clear();retainedFeed=null;retainedFeedContent=null;retainedFeedRefresh=null;
+  }
+
   private void feed() {
+    if(feedRows!=null&&retainedFeed!=null){
+      View placeholder=(View)content.getParent();ViewGroup host=(ViewGroup)placeholder.getParent();
+      int index=host.indexOfChild(placeholder);ViewGroup.LayoutParams params=placeholder.getLayoutParams();
+      host.removeView(placeholder);content=retainedFeedContent;feedRefresh=retainedFeedRefresh;
+      host.addView(retainedFeed,index,params);mediaVideos.addAll(retainedFeedVideos);
+      retainedFeedVideos.clear();retainedFeed=null;retainedFeedContent=null;retainedFeedRefresh=null;
+      return;
+    }
+    clearRetainedFeed();
     if(me!=null&&me.optBoolean("isNew"))profileCompletion();
     stories();
     // Ô đăng bài: avatar + "… ơi, bạn đang nghĩ gì?" như web
@@ -1704,7 +1731,7 @@ public class MainActivity extends Activity {
       if (pendingMedia != null) say(I18n.t("Đang tải lên…"));
       JSONObject payload = json("body", text.getText().toString(), "visibility", visibility[0]);
       if (pendingMedia != null) try { payload.put("media", pendingMedia); } catch (JSONException ignored) {}
-      request("POST", "/api/posts", payload, d -> { pendingMedia = null;feedRows=null;feedScrollY=0; say(I18n.t("Đã đăng bài viết")); navigate("feed"); }, () -> { post.setEnabled(true); post.setAlpha(1f); });
+      request("POST", "/api/posts", payload, d -> { pendingMedia = null;clearRetainedFeed();feedRows=null;feedScrollY=0; say(I18n.t("Đã đăng bài viết")); navigate("feed"); }, () -> { post.setEnabled(true); post.setAlpha(1f); });
     });
     text.requestFocus();
   }
@@ -4964,10 +4991,9 @@ public class MainActivity extends Activity {
     return control;
   }
 
-  private void messageMenu(final String kind, final JSONObject m, boolean own, final Runnable refresh) {
+  private android.app.Dialog messageMenu(final String kind, final JSONObject m, boolean own, final String sourcePath, final Runnable refresh) {
     if (m.optBoolean("recalled")) {
-      new Sheet(this).setItems(new String[] { I18n.t("Xoá ở phía bạn") }, (d, w) -> request("DELETE", "/api/chat-messages/" + kind + "/" + m.optString("id"), json(), r -> refresh.run())).show();
-      return;
+      return new Sheet(this).setItems(new String[] { I18n.t("Xoá ở phía bạn") }, (d, w) -> request("DELETE", "/api/chat-messages/" + kind + "/" + m.optString("id"), json(), r -> refresh.run())).show();
     }
     final String base = "/api/chat-messages/" + kind + "/" + m.optString("id");
     final List<String> labels = new ArrayList<>();
@@ -4977,6 +5003,8 @@ public class MainActivity extends Activity {
       request("POST", base + "/reaction", json("reaction", REACTIONS[w][0]), r -> refresh.run())));
     labels.add(m.optBoolean("pinned") ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn");
     actions.add(() -> request(m.optBoolean("pinned") ? "DELETE" : "POST", base + "/pin", json(), r -> refresh.run()));
+    labels.add(I18n.t("Chuyển tiếp tin nhắn"));
+    actions.add(() -> forwardMessage(sourcePath, m));
     if (own) {
       labels.add(I18n.t("Thu hồi với mọi người"));
       actions.add(() -> confirm(I18n.t("Thu hồi tin nhắn này?"), () -> request("POST", base + "/recall", json(), r -> refresh.run())));
@@ -4994,7 +5022,7 @@ public class MainActivity extends Activity {
       for (String[] r : REACTIONS) if (reactions.optInt(r[0]) > 0) b.append(r[1]).append(" ").append(reactions.optInt(r[0])).append("  ");
       title = b.toString().trim();
     }
-    new Sheet(this).setTitle(I18n.t(title)).setItems(labels.toArray(new String[0]), (d, w) -> actions.get(w).run()).show();
+    return new Sheet(this).setTitle(I18n.t(title)).setItems(labels.toArray(new String[0]), (d, w) -> actions.get(w).run()).show();
   }
 
   private View chatNameWrap(EditText input){FrameLayout outer=new FrameLayout(this),inner=new FrameLayout(this);inner.addView(input,new FrameLayout.LayoutParams(-1,-2));outer.addView(inner,new FrameLayout.LayoutParams(-1,-2));return outer;}
@@ -5003,8 +5031,13 @@ public class MainActivity extends Activity {
     input.setPadding(dp(16),dp(12),dp(16),dp(12));input.setMinimumHeight(dp(50));input.setBackground(outlined(CARD,14));
   }
 
-  private void chatActionSheet(String title,List<String> icons,List<String> labels,List<Runnable> actions){
-    new Sheet(this).setTitle(I18n.t(title)).setItemIcons(icons.toArray(new String[0])).setItems(labels.toArray(new String[0]),(dialog,index)->actions.get(index).run()).show();
+  private android.app.Dialog chatActionSheet(String title,List<String> icons,List<String> labels,List<Runnable> actions){
+    return chatActionSheet(title,icons,labels,actions,null);
+  }
+  private android.app.Dialog chatActionSheet(String title,List<String> icons,List<String> labels,List<Runnable> actions,final Runnable back){
+    android.app.Dialog sheet=new Sheet(this).setTitle(I18n.t(title)).setItemIcons(icons.toArray(new String[0])).setItems(labels.toArray(new String[0]),(dialog,index)->actions.get(index).run()).setNegativeButton(I18n.t("Quay lại"),(dialog,which)->{if(back!=null)back.run();}).show();
+    sheet.setOnCancelListener(dialog->{if(back!=null)back.run();});
+    return sheet;
   }
 
   private void conversationMenu(String kind,String id,String name){conversationMenu(kind,id,name,false);}
@@ -5018,7 +5051,9 @@ public class MainActivity extends Activity {
       icons.add("bell");labels.add(muted?I18n.t("Bật thông báo"):I18n.t("Tắt thông báo"));actions.add(()->request("POST",prefs,json("muted",!muted),r->{if(outside)navigate("inbox");else say(muted?I18n.t("Đã bật thông báo"):I18n.t("Đã tắt thông báo"));}));
       icons.add("eye_off");labels.add(I18n.t("Ẩn hội thoại"));actions.add(()->request("POST",prefs,json("hidden",true),r->navigate("inbox")));
       icons.add("trash");labels.add(I18n.t("Xóa hội thoại ở phía bạn"));actions.add(()->confirm(I18n.t("Xóa lịch sử ở phía bạn? Người khác vẫn giữ tin nhắn của họ."),()->request("DELETE",kind.equals("direct")?"/api/users/"+id+"/messages":"/api/groups/"+id+"/messages",json(),r->navigate("inbox"))));
-      chatActionSheet(name,icons,labels,actions);
+      final JSONObject parentGroup=currentGroup,parentUser=chatUser;
+      Runnable back=outside?null:kind.equals("group")&&parentGroup!=null?()->groupMenu(parentGroup):parentUser!=null?()->directChatMenu(parentUser):null;
+      chatActionSheet(I18n.t("Cài đặt hội thoại"),icons,labels,actions,back);
     });
   }
 
@@ -5032,7 +5067,7 @@ public class MainActivity extends Activity {
     LinearLayout choices=column();String[] presets={"violet","ocean","sunset","forest"},names={"Tím kết nối","Biển xanh","Hoàng hôn","Rừng xanh"};
     final android.app.Dialog[] photoDialog={null};final Sheet sheet=new Sheet(this).setTitle(I18n.t("Ảnh đại diện nhóm"));
     for(int i=0;i<presets.length;i++){final String preset=presets[i];LinearLayout item=row();ImageView preview=new ImageView(this);preview.setImageBitmap(groupSample(preset,dp(52)));item.addView(preview,new LinearLayout.LayoutParams(dp(52),dp(52)));TextView title=label(I18n.t(names[i]),15,TEXT);title.setPadding(dp(12),0,0,0);item.addView(title);item.setPadding(dp(8),dp(8),dp(8),dp(8));item.setOnClickListener(v->{if(photoDialog[0]!=null)photoDialog[0].dismiss();request("POST","/api/groups/"+g.optString("id")+"/avatar",json("preset",preset),d->groupChat(d.optJSONObject("group")));});choices.addView(item);}
-    choices.addView(primary(I18n.t("Chọn ảnh từ thư viện"),()->{if(photoDialog[0]!=null)photoDialog[0].dismiss();photoGroup=g;pickFile(309,"image/*");}));photoDialog[0]=sheet.setView(choices).setNegativeButton(I18n.t("Đóng"),null).show();
+    choices.addView(primary(I18n.t("Chọn ảnh từ thư viện"),()->{if(photoDialog[0]!=null)photoDialog[0].dismiss();photoGroup=g;pickFile(309,"image/*");}));photoDialog[0]=sheet.setView(choices).setNegativeButton(I18n.t("Quay lại"),(d,w)->groupMenu(g)).show();
   }
   private void profileCompletion(){
     if(me==null||getSharedPreferences("kinnect_profile",0).getBoolean("completion_dismissed:"+me.optString("id"),false))return;
@@ -5067,8 +5102,8 @@ public class MainActivity extends Activity {
     icons.add("group_three");labels.add(I18n.t("Thành viên và vai trò"));actions.add(()->groupMembers(g));
     if(groupManager(g)){
       icons.add("camera");labels.add(I18n.t("Đổi ảnh nhóm"));actions.add(()->groupPhotoOptions(g));
-      icons.add("pencil");labels.add(I18n.t("Đổi tên nhóm"));actions.add(()->{EditText name=new KinnectInput(this);styleChatName(name);name.setText(g.optString("name"));new Sheet(this).setTitle(I18n.t("Tên nhóm")).setView(chatNameWrap(name)).setPositiveButton(I18n.t("Lưu"),(d,w)->request("PATCH","/api/groups/"+id,json("name",name.getText().toString()),r->groupChat(r.optJSONObject("group")))).setNegativeButton(I18n.t("Hủy"),null).show();});
-      icons.add("user_plus");labels.add(I18n.t("Thêm thành viên"));actions.add(()->request("GET","/api/friends",null,d->{JSONArray users=d.optJSONArray("users");if(users==null||users.length()==0){say(I18n.t("Chưa có bạn bè để thêm."));return;}String[] names=new String[users.length()];boolean[] chosen=new boolean[users.length()];for(int i=0;i<names.length;i++)names[i]=users.optJSONObject(i).optString("name");new Sheet(this).setTitle(I18n.t("Thêm thành viên")).setMultiChoiceItems(names,chosen,(dialog,index,checked)->chosen[index]=checked).setPositiveButton(I18n.t("Thêm"),(dialog,index)->{JSONArray ids=new JSONArray();for(int i=0;i<chosen.length;i++)if(chosen[i])ids.put(users.optJSONObject(i).optString("id"));request("POST","/api/groups/"+id+"/members",json("members",ids),r->groupChat(r.optJSONObject("group")));}).setNegativeButton(I18n.t("Hủy"),null).show();}));
+      icons.add("pencil");labels.add(I18n.t("Đổi tên nhóm"));actions.add(()->{EditText name=new KinnectInput(this);styleChatName(name);name.setText(g.optString("name"));new Sheet(this).setTitle(I18n.t("Tên nhóm")).setView(chatNameWrap(name)).setPositiveButton(I18n.t("Lưu"),(d,w)->request("PATCH","/api/groups/"+id,json("name",name.getText().toString()),r->groupChat(r.optJSONObject("group")))).setNegativeButton(I18n.t("Quay lại"),(d,w)->groupMenu(g)).show();});
+      icons.add("user_plus");labels.add(I18n.t("Thêm thành viên"));actions.add(()->request("GET","/api/friends",null,d->{JSONArray users=d.optJSONArray("users");if(users==null||users.length()==0){say(I18n.t("Chưa có bạn bè để thêm."));return;}String[] names=new String[users.length()];boolean[] chosen=new boolean[users.length()];for(int i=0;i<names.length;i++)names[i]=users.optJSONObject(i).optString("name");new Sheet(this).setTitle(I18n.t("Thêm thành viên")).setMultiChoiceItems(names,chosen,(dialog,index,checked)->chosen[index]=checked).setPositiveButton(I18n.t("Thêm"),(dialog,index)->{JSONArray ids=new JSONArray();for(int i=0;i<chosen.length;i++)if(chosen[i])ids.put(users.optJSONObject(i).optString("id"));request("POST","/api/groups/"+id+"/members",json("members",ids),r->groupChat(r.optJSONObject("group")));}).setNegativeButton(I18n.t("Quay lại"),(dialog,index)->groupMenu(g)).show();}));
     }
     icons.add("settings");labels.add(I18n.t("Cài đặt hội thoại"));actions.add(()->conversationMenu("group",id,g.optString("name")));
     icons.add("log_out");labels.add(I18n.t("Rời nhóm"));actions.add(()->confirm(I18n.t("Rời nhóm? Nếu bạn là trưởng nhóm, quyền sẽ chuyển cho phó nhóm hoặc thành viên tiếp theo."),()->request("POST","/api/groups/"+id+"/leave",json(),r->navigate("inbox"))));
@@ -5314,24 +5349,26 @@ public class MainActivity extends Activity {
     JSONObject reactions = m.optJSONObject("reactions");
     StringBuilder rx = new StringBuilder();
     for (String[] reaction : REACTIONS) if (reactions != null && reactions.optInt(reaction[0]) > 0) rx.append(reaction[1]);
-    String caption = clock + (status.isEmpty() ? "" : delivered ? "  ✓✓" : "  ✓") + (m.optBoolean("pinned") ? "  📌" : "") + (rx.length() > 0 ? "  " + rx : "");
-    TextView time = label(caption, 10, own ? 0xccffffff : MUTED);
-    time.setPadding(0, 0, dp(4), 0);
+    TextView time = label(clock, 10, own ? 0xccffffff : MUTED);
+    time.setPadding(0, 0, dp(5), 0);
     time.setSingleLine(true);
-    time.setMaxWidth(dp(80));
-    time.setEllipsize(android.text.TextUtils.TruncateAt.END);
-    time.setContentDescription(caption + (status.isEmpty() ? "" : " · " + status));
-    time.setTooltipText(String.valueOf(time.getContentDescription()));
+    time.setContentDescription(clock + (m.optBoolean("pinned") ? " · " + I18n.t("Ghim tin nhắn") : ""));
     footer.addView(time);
+    int toolColor = own ? 0xddffffff : MUTED;
+    if(!status.isEmpty()){
+      FrameLayout receiptIcon=new FrameLayout(this);
+      receiptIcon.addView(icon(seen ? "eye" : "check",13,toolColor),new FrameLayout.LayoutParams(dp(13),dp(13),Gravity.CENTER));
+      receiptIcon.setAlpha(seen?1f:.6f);receiptIcon.setContentDescription(status);receiptIcon.setTooltipText(status);
+      footer.addView(receiptIcon,new LinearLayout.LayoutParams(dp(20),dp(32)));
+    }
     final String base = "/api/chat-messages/" + (group ? "group" : "direct") + "/" + m.optString("id");
     LinearLayout tools = row();
-    int toolColor = own ? 0xddffffff : MUTED;
     if (!m.optBoolean("recalled")) {
-      tools.addView(messageTool("smile", I18n.t("Cảm xúc tin nhắn"), toolColor, () -> reactionBar(null, w -> request("POST", base + "/reaction", json("reaction", REACTIONS[w][0]), result -> refresh.run()))));
-      tools.addView(messageTool("forward", I18n.t("Chuyển tiếp tin nhắn"), toolColor, () -> forwardMessage(path, m)));
-      if (own) tools.addView(messageTool("recall", I18n.t("Thu hồi với mọi người"), toolColor, () -> confirm(I18n.t("Thu hồi tin nhắn này?"), () -> request("POST", base + "/recall", json(), result -> refresh.run()))));
+      View reaction=messageTool("smile", I18n.t("Cảm xúc tin nhắn"), toolColor, () -> reactionBar(null, w -> request("POST", base + "/reaction", json("reaction", REACTIONS[w][0]), result -> refresh.run())));
+      if(rx.length()>0){reaction.setContentDescription(I18n.t("Cảm xúc tin nhắn")+": "+rx);reaction.setTooltipText(String.valueOf(reaction.getContentDescription()));}
+      tools.addView(reaction);
     }
-    tools.addView(messageTool("trash", I18n.t("Xoá tin nhắn ở phía bạn"), toolColor, () -> request("DELETE", base, json(), result -> refresh.run())));
+    tools.addView(messageTool("more", I18n.t("Tùy chọn tin nhắn"), toolColor, () -> messageMenu(group ? "group" : "direct",m,own,path,refresh)));
     footer.addView(tools);
     return footer;
   }
@@ -5413,7 +5450,7 @@ public class MainActivity extends Activity {
         }
         final Runnable refresh = () -> { lastMessages = ""; loadChat(path, list, scroll, group, other); };
         bubble.addView(messageFooter(m, own, clock.format(at), group, path, refresh));
-        bubble.setOnLongClickListener(v -> { messageMenu(group ? "group" : "direct", m, own, () -> { lastMessages = ""; loadChat(path, list, scroll, group, other); }); return true; });
+        bubble.setOnLongClickListener(v -> { messageMenu(group ? "group" : "direct", m, own, path, () -> { lastMessages = ""; loadChat(path, list, scroll, group, other); }); return true; });
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-2, -2);
         p.gravity = own ? Gravity.END : Gravity.START;
         p.setMargins(own ? dp(48) : 0, dp(3), own ? 0 : dp(48), dp(3));
