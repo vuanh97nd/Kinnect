@@ -834,9 +834,9 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     img.setScaleType(ImageView.ScaleType.FIT_CENTER);
     img.setImageBitmap(photo);
     reviewLayer.addView(img, new FrameLayout.LayoutParams(-1, -1));
-    TextView pro=text(I18n.t("Studio Pro"),13,0xffffffff,true);pro.setPadding(dp(14),0,dp(14),0);pro.setGravity(Gravity.CENTER);pro.setBackground(round(0xcc1a1724,16));pro.setCompoundDrawablesRelativeWithIntrinsicBounds(tinted("sparkles"),null,null,null);pro.setCompoundDrawablePadding(dp(6));pro.setOnClickListener(v->{if(capturedPhoto!=null)openPhotoPro(Uri.fromFile(capturedPhoto));});FrameLayout.LayoutParams pp=new FrameLayout.LayoutParams(-2,dp(44),Gravity.TOP|Gravity.END);pp.setMargins(0,dp(52),dp(14),0);reviewLayer.addView(pro,pp);
+    TextView pro=text(I18n.t("Studio Pro"),13,0xffffffff,true);pro.setPadding(dp(14),0,dp(14),0);pro.setGravity(Gravity.CENTER);pro.setBackground(round(0xcc1a1724,16));pro.setCompoundDrawablesRelativeWithIntrinsicBounds(tinted("sparkles"),null,null,null);pro.setCompoundDrawablePadding(dp(6));pro.setOnClickListener(v->{if(capturedPhoto!=null)openPhotoPro(Uri.fromFile(capturedPhoto));});
     LinearLayout top = new LinearLayout(this);
-    top.setGravity(Gravity.CENTER_VERTICAL);
+    top.setGravity(Gravity.TOP);
     top.setPadding(dp(10), dp(14), dp(14), dp(10));
     ImageView back = icon("back", 0xffffffff);
     back.setPadding(dp(9), dp(9), dp(9), dp(9));
@@ -852,7 +852,9 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     save.setOnClickListener(v -> {
       if (saveToGallery(capturedPhoto)) { save.setText(I18n.t("  Đã lưu")); save.setCompoundDrawablesRelativeWithIntrinsicBounds(tinted("check"), null, null, null); }
     });
-    top.addView(save, new LinearLayout.LayoutParams(-2, dp(40)));
+    LinearLayout reviewActions=new LinearLayout(this);reviewActions.setOrientation(LinearLayout.VERTICAL);reviewActions.setGravity(Gravity.END);
+    save.setMinHeight(dp(44));save.setPadding(dp(14),dp(8),dp(14),dp(8));reviewActions.addView(save,new LinearLayout.LayoutParams(-2,-2));
+    pro.setMinHeight(dp(44));pro.setPadding(dp(14),dp(8),dp(14),dp(8));LinearLayout.LayoutParams proAt=new LinearLayout.LayoutParams(-2,-2);proAt.topMargin=dp(10);reviewActions.addView(pro,proAt);top.addView(reviewActions,new LinearLayout.LayoutParams(-2,-2));
     reviewLayer.addView(top, new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
     LinearLayout bar = new LinearLayout(this);
     bar.setGravity(Gravity.CENTER);

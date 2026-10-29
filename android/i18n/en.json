@@ -1659,5 +1659,12 @@
   "Chọn ảnh có sẵn": "Choose existing photo",
   "Thư viện video": "Video library",
   "Thư viện ảnh": "Photo library",
-  "Chụp ảnh hoặc quay video": "Take a photo or record video"
+  "Chụp ảnh hoặc quay video": "Take a photo or record video",
+  "Thoát": "Exit",
+  "Thoát Studio Pro?": "Exit Studio Pro?",
+  "Thoát không lưu": "Exit without saving",
+  "Lưu nháp và thoát": "Save draft and exit",
+  "Tiếp tục chỉnh sửa": "Continue editing",
+  "Thoát không lưu sẽ bỏ bản nháp chỉnh sửa hiện tại. Ảnh gốc vẫn được giữ nguyên.": "Exiting without saving discards this editing draft. Your original photo is preserved.",
+  "Thoát không lưu sẽ bỏ chỉnh sửa video hiện tại. Video gốc vẫn được giữ nguyên.": "Exiting without saving discards current video edits. Your original video is preserved."
 }

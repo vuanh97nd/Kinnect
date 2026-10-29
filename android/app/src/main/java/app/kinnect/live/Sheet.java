@@ -175,7 +175,7 @@ final class Sheet {
   }
 
   private LinearLayout.LayoutParams weight() {
-    LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(50), 1);
+    LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
     p.setMargins(dp(5), 0, dp(5), 0);
     return p;
   }
@@ -199,6 +199,8 @@ final class Sheet {
     Button b = new KinnectButton(context);
     b.setText(label);
     b.setAllCaps(false);
+    b.setMinHeight(dp(50));
+    b.setPadding(dp(10),dp(12),dp(10),dp(12));
     b.setTextSize(15);
     b.setTypeface(ApprovedTypography.font(context,Typeface.BOLD));
     b.setStateListAnimator(null);

@@ -3277,22 +3277,9 @@ public class MainActivity extends Activity {
     return r;
   }
 
-  private android.app.Dialog createMenu;
   private void openCreateMenu(){
-    if(createMenu!=null&&createMenu.isShowing())return;
-    LinearLayout body=column();
-    String[][] actions={{"camera","Camera","Chụp ảnh hoặc quay video"},{"clapperboard","Video","Chọn video có sẵn hoặc Studio Pro"},{"radio","Live","Trò chuyện, hát, game"}};
-    for(int i=0;i<actions.length;i++){final int which=i;body.addView(createAction(actions[i][0],actions[i][1],actions[i][2],()->{if(me==null){auth(false);return;}if(which==0)startActivityForResult(new Intent(this,StudioActivity.class).putExtra(StudioActivity.EXTRA_MODE,"photo"),203);else if(which==1)chooseVideo();else startActivity(new Intent(this,LiveActivity.class).putExtra(LiveActivity.EXTRA_HOST,true));}));}
-    createMenu=new Sheet(this).setTitle(I18n.t("Tạo nội dung")).setView(body).setNegativeButton(I18n.t("Đóng"),null).show();
-  }
-  private View createAction(String glyph,String title,String hint,Runnable action){
-    LinearLayout tile=row();tile.setGravity(Gravity.CENTER_VERTICAL);tile.setMinimumHeight(dp(60));tile.setPadding(dp(8),dp(7),dp(8),dp(7));tile.setBackground(pressable(CARD,14));
-    FrameLayout mark=new FrameLayout(this);mark.setBackground(background(PRIMARY_SOFT,13));mark.addView(icon(glyph,22,ACCENT),new FrameLayout.LayoutParams(dp(22),dp(22),Gravity.CENTER));tile.addView(mark,new LinearLayout.LayoutParams(dp(44),dp(44)));
-    LinearLayout copy=column();copy.setPadding(dp(12),0,dp(8),0);TextView name=label(I18n.t(title),14,TEXT);name.setTypeface(null,Typeface.BOLD);copy.addView(name);TextView description=label(I18n.t(hint),11,MUTED);description.setSingleLine(true);description.setEllipsize(android.text.TextUtils.TruncateAt.END);copy.addView(description);tile.addView(copy,new LinearLayout.LayoutParams(0,-2,1));tile.addView(icon("chevron_right",16,MUTED),new LinearLayout.LayoutParams(dp(18),dp(18)));
-    tile.setContentDescription(I18n.t(title));tile.setOnClickListener(v->{if(createMenu!=null)createMenu.dismiss();action.run();});return tile;
-  }
-  private View createToolAction(String glyph,String title,Runnable action){
-    LinearLayout tile=column();tile.setGravity(Gravity.CENTER);tile.setPadding(dp(8),dp(12),dp(8),dp(12));tile.setMinimumHeight(dp(86));tile.setBackground(pressable(PRIMARY_SOFT,14));tile.addView(icon(glyph,24,ACCENT),new LinearLayout.LayoutParams(dp(24),dp(24)));TextView name=label(I18n.t(title),12,TEXT);name.setGravity(Gravity.CENTER);name.setPadding(0,dp(7),0,0);tile.addView(name,new LinearLayout.LayoutParams(-1,-2));tile.setContentDescription(I18n.t(title));tile.setOnClickListener(v->{if(createMenu!=null)createMenu.dismiss();action.run();});return tile;
+    if(me==null){auth(false);return;}
+    startActivityForResult(new Intent(this,StudioActivity.class).putExtra(StudioActivity.EXTRA_MODE,"photo"),203);
   }
   private void chooseVideo() {
     if(postingVideo){say(I18n.t("Đang tải video, vui lòng chờ."));return;}

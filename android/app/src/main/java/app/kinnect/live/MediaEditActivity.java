@@ -171,7 +171,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     root.requestApplyInsets();
 
     LinearLayout top = new LinearLayout(this); top.setGravity(Gravity.CENTER_VERTICAL); top.setPadding(dp(4), 0, dp(10), 0);
-    top.addView(iconButton("close", I18n.t("Đóng"), this::onBackPressed), new LinearLayout.LayoutParams(dp(46), dp(46)));
+    TextView leave=label(I18n.t("Thoát"),13,INK);leave.setGravity(Gravity.CENTER);leave.setPadding(dp(8),0,dp(8),0);leave.setOnClickListener(v->requestExit());top.addView(leave,new LinearLayout.LayoutParams(-2,dp(46)));
     top.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
     qualityChip = label("1080p", 13, INK); qualityChip.setTypeface(Typeface.DEFAULT_BOLD); qualityChip.setGravity(Gravity.CENTER); qualityChip.setPadding(dp(12), 0, dp(12), 0);
     qualityChip.setCompoundDrawablesRelative(null, null, small(editorIcon("chevron_down", MUTED), 14), null); qualityChip.setCompoundDrawablePadding(dp(4));
@@ -1021,9 +1021,10 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     if (captions != null) { captions.cancel(); captions = null; busy = false; }
     if (sheet.getVisibility() == View.VISIBLE) { closeSheet(); return; }
     if (selKind != null) { select(null, 0); return; }
-    if (dirty) { new AlertDialog.Builder(this).setMessage(I18n.t("Bỏ chỉnh sửa?")).setPositiveButton(I18n.t("Bỏ"), (d, w) -> finish()).setNegativeButton(I18n.t("Giữ lại"), null).show(); return; }
-    super.onBackPressed();
+    requestExit();
   }
+
+  private void requestExit(){if(exporting){cancelExport(I18n.t("Đã hủy xuất."));return;}new Sheet(this).setTitle(I18n.t("Thoát Studio Pro?")).setMessage(I18n.t("Thoát không lưu sẽ bỏ chỉnh sửa video hiện tại. Video gốc vẫn được giữ nguyên.")).setPositiveButton(I18n.t("Thoát không lưu"),(d,w)->{if(captions!=null){captions.cancel();captions=null;}if(micRecording)stopMic();setResult(RESULT_CANCELED);finish();}).setNegativeButton(I18n.t("Tiếp tục chỉnh sửa"),null).show();}
 
   // ---------- Export ----------
   private void export(boolean save) {
