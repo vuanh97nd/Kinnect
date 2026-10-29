@@ -13,6 +13,8 @@ public final class NativeApi {
   public static final NativeApi shared = new NativeApi();
   private final ExecutorService executor = Executors.newFixedThreadPool(3);
   private final Handler main = new Handler(Looper.getMainLooper());
+  private static final class Snapshot{final String etag,body;Snapshot(String e,String b){etag=e;body=b;}}
+  private final java.util.Map<String,Snapshot> snapshots=java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<String,Snapshot>(){protected boolean removeEldestEntry(java.util.Map.Entry<String,Snapshot> e){return size()>32;}});
   private volatile int epoch = 0;
   private SessionStore sessions;
   public synchronized void initialize(android.content.Context context,String server){sessions=new SessionStore(context);configure(server);cookie=sessions.load(origin);device=sessions.loadDevice(origin);}
@@ -49,7 +51,7 @@ public final class NativeApi {
   public synchronized void clear() {
     cookie = "";
     if(sessions!=null)sessions.save(origin, "");
-    epoch++;
+    epoch++;snapshots.clear();
   }
 
   public interface Progress { void sent(long bytes,long total); }
@@ -64,10 +66,12 @@ public final class NativeApi {
     final String server = origin,
       session = cookie;
     final int revision = epoch;
+    final String snapshotKey=revision+":"+server+path;final Snapshot snapshot=method.equals("GET")?snapshots.get(snapshotKey):null;
     executor.execute(() -> {
       JSONObject result = null;
       String error = null;
       int status = 0;
+      int deliveryRevision=revision;
       HttpURLConnection connection = null;
       try {
         if (
@@ -78,9 +82,9 @@ public final class NativeApi {
         ).openConnection();
         connection.setInstanceFollowRedirects(false);
         connection.setConnectTimeout(15000);
-        connection.setReadTimeout(600000);
+        connection.setReadTimeout(method.equals("GET")?20000:600000);
         connection.setRequestMethod(method);
-        connection.setRequestProperty("Accept", "application/json");
+        connection.setRequestProperty("Accept", "application/json");if(snapshot!=null)connection.setRequestProperty("If-None-Match",snapshot.etag);
         connection.setRequestProperty("Origin", server);
         String jar = join(session, device);
         if (!jar.isEmpty()) connection.setRequestProperty("Cookie", jar);
@@ -100,24 +104,28 @@ public final class NativeApi {
         }
         status = connection.getResponseCode();
         java.util.List<String> setCookies = connection.getHeaderFields().get("Set-Cookie");
+        boolean sessionChanged=false;
         synchronized (this) {
           for (int i = 0; setCookies != null && i < setCookies.size(); i++) {
             String responseCookie = setCookies.get(i);
             if (responseCookie == null || !server.equals(origin) || revision != epoch) continue;
-            if (responseCookie.startsWith("kinnect_session=")) {cookie = responseCookie.split(";", 2)[0];if(cookie.equals("kinnect_session="))cookie="";if(sessions!=null)sessions.save(origin,cookie);}
+            if(responseCookie.startsWith("kinnect_session=")){String next=responseCookie.split(";",2)[0];if(next.equals("kinnect_session="))next="";sessionChanged|=!cookie.equals(next);cookie=next;if(sessions!=null)sessions.save(origin,cookie);}
             if (responseCookie.startsWith("kinnect_device=")) {device = responseCookie.split(";", 2)[0];if(sessions!=null)sessions.saveDevice(origin,device);}
           }
         }
+        synchronized(this){if(sessionChanged&&server.equals(origin)&&revision==epoch){epoch++;deliveryRevision=epoch;}}
+        boolean unchanged=status==304&&snapshot!=null;if(unchanged)status=200;
         InputStream input =
           status >= 200 && status < 300
             ? connection.getInputStream()
             : connection.getErrorStream();
-        String response = input == null ? "{}" : new String(read(input, 2000000), "UTF-8");
+        String response=unchanged?snapshot.body:input==null?"{}":new String(read(input,2000000),"UTF-8");
         try { result = new JSONObject(response); }
         catch (org.json.JSONException invalid) {
           if (status >= 200 && status < 300) throw new IOException(I18n.t("Máy chủ trả về dữ liệu không hợp lệ."));
           result = new JSONObject();
         }
+        if(method.equals("GET")&&status==200&&response.length()<262144&&connection.getHeaderField("ETag")!=null&&revision==epoch)snapshots.put(snapshotKey,new Snapshot(connection.getHeaderField("ETag"),response));
         if (status < 200 || status >= 300) error = result.optString("error", httpFailure(status));
       } catch (OutOfMemoryError failure) {
         error = I18n.t("Thiết bị không đủ bộ nhớ để chuẩn bị tệp tải lên.");
@@ -131,7 +139,8 @@ public final class NativeApi {
       final JSONObject answer = result;
       final String message = error;
       final int code = status;
-      main.post(() -> callback.done(answer, message, code));
+      final int acceptedRevision=deliveryRevision;
+      main.post(() -> {if(epoch==acceptedRevision&&server.equals(origin))callback.done(answer,message,code);});
     });
   }
 

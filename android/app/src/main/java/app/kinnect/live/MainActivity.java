@@ -281,6 +281,8 @@ public class MainActivity extends Activity {
   private final Handler notificationHandler = new Handler(Looper.getMainLooper());
   private final Runnable notificationPoll = new Runnable() { public void run() { if (!stopped) { refreshBadges(); notificationHandler.postDelayed(this, 20000); } } };
 
+  private void installChatKeyboard(EditText input,ScrollView messages){input.setTag("chat-compose");input.setOnFocusChangeListener((v,has)->{if(has)messages.post(()->messages.fullScroll(View.FOCUS_DOWN));});messages.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,oright,ob)->{if(input.hasFocus()&&b-t<ob-ot)messages.post(()->messages.fullScroll(View.FOCUS_DOWN));});}
+  private void revealKeyboardFocus(){View focused=getCurrentFocus();if(!(focused instanceof EditText))return;if("chat-compose".equals(focused.getTag())&&aiChatScroll!=null&&aiChatScroll.isAttachedToWindow())aiChatScroll.post(()->aiChatScroll.fullScroll(View.FOCUS_DOWN));else focused.requestRectangleOnScreen(new android.graphics.Rect(0,-dp(90),focused.getWidth(),focused.getHeight()+dp(12)),true);}
   private void shell(String title, boolean navigation) {
     onTabRoot = false;
     if (splashAnimator != null) { splashAnimator.cancel(); splashAnimator = null; }
@@ -299,7 +301,7 @@ public class MainActivity extends Activity {
     root = column();
     root.setBackgroundColor(BG);
     root.setOnApplyWindowInsetsListener((v, insets) -> {
-      v.setPadding(0, insets.getSystemWindowInsetTop(), 0, insets.getSystemWindowInsetBottom());
+      if(Build.VERSION.SDK_INT>=30){android.graphics.Insets bars=insets.getInsets(android.view.WindowInsets.Type.systemBars());android.graphics.Insets keyboard=insets.getInsets(android.view.WindowInsets.Type.ime());v.setPadding(bars.left,bars.top,bars.right,Math.max(bars.bottom,keyboard.bottom));if(keyboard.bottom>bars.bottom)v.post(this::revealKeyboardFocus);}else v.setPadding(0,insets.getSystemWindowInsetTop(),0,insets.getSystemWindowInsetBottom());
       return insets;
     });
     setContentView(root);
@@ -2400,11 +2402,12 @@ public class MainActivity extends Activity {
     headerActive = "bell";
     badgesAt = 0;
     shell(I18n.t("Thông báo"), true);
-    if (headActions != null) headActions.addView(roundAction("check", I18n.t("Đánh dấu tất cả đã đọc"), false, () -> request("POST", "/api/notifications", json(), d -> { bellCount = 0; badgesAt = 0; notifications(); })));
+    if (headActions != null) headActions.addView(roundAction("check", I18n.t("Đánh dấu tất cả đã đọc"), false, () -> request("POST", "/api/notifications", json("scope","social"), d -> { bellCount = 0; badgesAt = 0; notifications(); })));
     request("GET", "/api/notifications", null, data -> {
       JSONArray rows = data.optJSONArray("notifications");
       for (int i = 0; rows != null && i < rows.length(); i++) {
         final JSONObject n = rows.optJSONObject(i), u = n.optJSONObject("actor");
+        if(n.optString("kind").equals("message")||n.optString("kind").equals("group_message"))continue;
         LinearLayout r = row();
         r.setPadding(dp(12), dp(10), dp(12), dp(10));
         r.setBackground(background(n.optInt("seen") == 0 ? PRIMARY_SOFT : CARD, 14));
@@ -3634,6 +3637,8 @@ public class MainActivity extends Activity {
     );
   }
 
+  @Override protected void onUserLeaveHint(){super.onUserLeaveHint();if(calls!=null)calls.enterPip();}
+  @Override public void onPictureInPictureModeChanged(boolean pip,android.content.res.Configuration config){super.onPictureInPictureModeChanged(pip,config);if(!pip&&calls!=null)calls.restorePip();}
   @Override
   protected void onStop() {
     super.onStop();
@@ -3659,7 +3664,7 @@ public class MainActivity extends Activity {
   protected void onResume() {
     super.onResume();
     stopped = false;
-    if(storeReturning&&me!=null){storeReturning=false;api.call("GET","/api/me",null,(data,error,status)->{if(error==null&&data!=null&&!isDestroyed()){me=data.optJSONObject("user");refreshPage();}});}
+    if(storeReturning&&me!=null){storeReturning=false;api.call("GET","/api/me",null,(data,error,status)->{if(error==null&&data!=null&&!isDestroyed()){JSONObject fresh=data.optJSONObject("user");boolean styleChanged=fresh!=null&&!fresh.optString("storeStyle").equals(me.optString("storeStyle"));if(fresh!=null)me=fresh;if(styleChanged)refreshPage();}});}
     KinnectService.appVisible = true;
     notificationHandler.removeCallbacksAndMessages(null);
     notificationHandler.post(notificationPoll);
@@ -5273,7 +5278,7 @@ public class MainActivity extends Activity {
     bar.addView(clip, new LinearLayout.LayoutParams(dp(42), dp(42)));
     final EditText input = new EditText(this);
     input.setHint(I18n.t("Nhắn tin..."));
-    input.setContentDescription(I18n.t("Tin nhắn"));
+    input.setContentDescription(I18n.t("Tin nhắn"));installChatKeyboard(input,msgScroll);
     input.setFilters(new android.text.InputFilter[] { new android.text.InputFilter.LengthFilter(2000) });
     input.setTextColor(TEXT);
     input.setHintTextColor(MUTED);
@@ -5343,20 +5348,21 @@ public class MainActivity extends Activity {
     return f;
   }
 
+  private void reconcileChatRows(LinearLayout current,LinearLayout next){java.util.Map<String,View> reusable=new java.util.HashMap<>();for(int i=0;i<current.getChildCount();i++){View child=current.getChildAt(i);Object key=child.getTag();if(key instanceof String&&((String)key).startsWith("message:"))reusable.put((String)key,child);}java.util.ArrayList<View> wanted=new java.util.ArrayList<>();while(next.getChildCount()>0){View child=next.getChildAt(0);next.removeViewAt(0);View retained=child.getTag()instanceof String?reusable.get((String)child.getTag()):null;wanted.add(retained==null?child:retained);}for(int i=current.getChildCount()-1;i>=0;i--)if(!wanted.contains(current.getChildAt(i)))current.removeViewAt(i);for(int i=0;i<wanted.size();i++){View child=wanted.get(i);if(i<current.getChildCount()&&current.getChildAt(i)==child)continue;if(child.getParent()==current)current.removeView(child);current.addView(child,i);}}
   private void loadChat(final String path, final LinearLayout list, final ScrollView scroll, final boolean group, final JSONObject other) {
     if (Boolean.TRUE.equals(list.getTag())) return;
     list.setTag(Boolean.TRUE);
     request("GET", path, null, data -> {
-      JSONArray messages = data.optJSONArray("messages");
+      JSONArray messages = data.optJSONArray("messages");if(messages==null)return;
       String signature = (messages == null ? "" : messages.toString())+data.optString("aiSupport");
       if (signature.equals(lastMessages) && list.getChildCount() > 0) return;
       final boolean followBottom = lastMessages.isEmpty() || list.getHeight() - scroll.getScrollY() - scroll.getHeight() < dp(64);
       final int previousY = scroll.getScrollY();
       lastMessages = signature;
-      list.removeAllViews();
+      LinearLayout nextList=column();
       JSONObject aiInfo=data.optJSONObject("aiSupport");if(!group&&aiInfo!=null&&aiInfo.optBoolean("available")){
-        boolean enabled=aiInfo.optString("consent").equals("enabled");TextView info=label(enabled?I18n.t("Trợ lý AI đã bật."):I18n.t("Trợ lý AI đang tắt. Bạn vẫn có thể nhắn quản trị viên."),12,MUTED);list.addView(info);
-        list.addView(button(enabled?I18n.t("Tắt AI"):I18n.t("Bật trợ lý AI"),()->{Runnable apply=()->request("POST","/api/me/ai-consent",json("enabled",!enabled),r->{lastMessages="";loadChat(path,list,scroll,group,other);});if(enabled)apply.run();else confirm(I18n.t("Bật trợ lý AI? Nội dung bạn gửi và tối đa 6 tin nhắn liên quan được gửi tới Cloudflare, hoặc NVIDIA khi dự phòng, để tạo câu trả lời. Không gửi mật khẩu, OTP hoặc dữ liệu nhạy cảm. Bạn có thể tắt AI bất cứ lúc nào và tiếp tục nhắn quản trị viên."),apply);}));
+        boolean enabled=aiInfo.optString("consent").equals("enabled");TextView info=label(enabled?I18n.t("Trợ lý AI đã bật."):I18n.t("Trợ lý AI đang tắt. Bạn vẫn có thể nhắn quản trị viên."),12,MUTED);nextList.addView(info);
+        nextList.addView(button(enabled?I18n.t("Tắt AI"):I18n.t("Bật trợ lý AI"),()->{Runnable apply=()->request("POST","/api/me/ai-consent",json("enabled",!enabled),r->{lastMessages="";loadChat(path,list,scroll,group,other);});if(enabled)apply.run();else confirm(I18n.t("Bật trợ lý AI? Nội dung bạn gửi và tối đa 6 tin nhắn liên quan được gửi tới Cloudflare, hoặc NVIDIA khi dự phòng, để tạo câu trả lời. Không gửi mật khẩu, OTP hoặc dữ liệu nhạy cảm. Bạn có thể tắt AI bất cứ lúc nào và tiếp tục nhắn quản trị viên."),apply);}));
       }
       String lastDay = "";
       java.text.SimpleDateFormat day = new java.text.SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()), clock = new java.text.SimpleDateFormat("HH:mm", Locale.getDefault());
@@ -5373,7 +5379,7 @@ public class MainActivity extends Activity {
         ht.setPadding(0, dp(12), 0, 0);
         ht.setGravity(Gravity.CENTER);
         hello.addView(ht,new LinearLayout.LayoutParams(-1,-2));
-        list.addView(hello, new LinearLayout.LayoutParams(-1, -2));
+        nextList.addView(hello, new LinearLayout.LayoutParams(-1, -2));
       }
       for (int i = 0; messages != null && i < messages.length(); i++) {
         final JSONObject m = messages.optJSONObject(i);
@@ -5388,7 +5394,7 @@ public class MainActivity extends Activity {
           LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-2, -2);
           sp.gravity = Gravity.CENTER_HORIZONTAL;
           sp.setMargins(0, dp(10), 0, dp(10));
-          list.addView(sep, sp);
+          nextList.addView(sep, sp);
         }
         LinearLayout bubble = column();
         bubble.setPadding(dp(14), dp(9), dp(14), dp(7));
@@ -5447,8 +5453,10 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-2, -2);
         p.gravity = own ? Gravity.END : Gravity.START;
         p.setMargins(own ? dp(48) : 0, dp(3), own ? 0 : dp(48), dp(3));
-        list.addView(bubble, p);
+        bubble.setTag("message:"+m.optString("id")+":"+m.toString());
+        nextList.addView(bubble,p);
       }
+      reconcileChatRows(list,nextList);
       paintAIStream();
       scroll.post(() -> { if (followBottom) scroll.fullScroll(View.FOCUS_DOWN); else scroll.scrollTo(0, previousY); });
     }, () -> list.setTag(Boolean.FALSE));

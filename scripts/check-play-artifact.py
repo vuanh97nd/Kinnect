@@ -1,6 +1,6 @@
 from pathlib import Path
 import json,subprocess,xml.etree.ElementTree as E,zipfile,struct,hashlib
-r=Path(__file__).resolve().parents[1];jdk=next((r/'work/android-tools/jdk').glob('jdk-*'))/'bin';cfg=json.loads((r/'work/play-tools/tools.json').read_text());out=r/'dist/google-play';aab=out/'Kinnect-1.2.1-play.aab';apk=out/'Kinnect-1.2.1-play-test.apk'
+r=Path(__file__).resolve().parents[1];jdk=next((r/'work/android-tools/jdk').glob('jdk-*'))/'bin';cfg=json.loads((r/'work/play-tools/tools.json').read_text());out=r/'dist/google-play';aab=out/'Kinnect-1.2.2-play.aab';apk=out/'Kinnect-1.2.2-play-test.apk'
 raw=subprocess.run([str(jdk/'java.exe'),'-jar',cfg['bundletool'],'dump','manifest','--bundle='+str(aab),'--module=base'],text=True,capture_output=True,check=True).stdout;root=E.fromstring(raw);ns='{http://schemas.android.com/apk/res/android}';assert root.find('uses-sdk').get(ns+'targetSdkVersion')=='36';assert root.get('package')=='app.kinnect.live';assert root.find('application').get(ns+'debuggable','false')=='false';assert root.find('application').get(ns+'usesCleartextTraffic')=='false'
 permissions={p.get(ns+'name')for p in root.findall('uses-permission')};forbidden={'REQUEST_INSTALL_PACKAGES','READ_MEDIA_IMAGES','READ_MEDIA_VIDEO','READ_EXTERNAL_STORAGE','REQUEST_IGNORE_BATTERY_OPTIMIZATIONS','ACCESS_NOTIFICATION_POLICY'};assert not any(p.split('.')[-1] in forbidden for p in permissions)
 components=[x.get(ns+'name','')for x in root.find('application')];assert not any('ApkUpdateActivity'in x or 'ApkUpdateProvider'in x for x in components)

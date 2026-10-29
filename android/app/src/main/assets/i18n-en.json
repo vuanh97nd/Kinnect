@@ -1405,5 +1405,13 @@
   "Chưa có giao dịch": "No transactions yet",
   "Thu nhập quà tặng": "Gift earnings",
   "Tỷ lệ chia áp dụng sau phí thanh toán và hoàn tiền.": "The split applies after payment fees and refunds.",
-  "Chưa kết nối dịch vụ thanh toán và chi trả. Không phát sinh giao dịch.": "Payment and payout services are not connected. No transaction has occurred."
+  "Chưa kết nối dịch vụ thanh toán và chi trả. Không phát sinh giao dịch.": "Payment and payout services are not connected. No transaction has occurred.",
+  "Đang kết nối lại…": "Reconnecting…",
+  "Không thể nối lại cuộc gọi. Hãy gọi lại.": "Could not reconnect. Please call again.",
+  "Cuộc gọi đang tiếp tục · Chạm để quay lại": "Call in progress · Tap to return",
+  "Thu nhỏ cuộc gọi": "Minimize call",
+  "Loa": "Speaker",
+  "Đổi": "Flip",
+  "Mic": "Mic",
+  "Đang nối lại…": "Reconnecting…"
 }

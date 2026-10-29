@@ -1,8 +1,8 @@
 {
-  "version": "1.0.14",
-  "filename": "Kinnect-1.0.14-native.apk",
-  "sha256": "31e100cf6aa6ac95b92b28e59abe8fe806ee5df918b3722f52adbad9b0cf8af6",
-  "playVersion": "1.2.1",
+  "version": "1.0.15",
+  "filename": "Kinnect-1.0.15-native.apk",
+  "sha256": "09dfbf26fca6909484c9b3e7a52dc2a1328e97437874ef708342e9b86f1ed9b7",
+  "playVersion": "1.2.2",
   "languages": [
     "vi",
     "en"
@@ -12,13 +12,15 @@
     "languageAudit": "work/play-language-audit-result.log",
     "policyAudit": "work/play-policy-111-result.log",
     "physicalDeviceVerified": false,
-    "backendTests": 102,
+    "backendTests": 104,
     "languageLayout": "320 dp; font 130%; centered VI/EN",
     "storeWeb": "320/390/1366 px; no overflow",
     "realBillingPurchaseVerified": false,
     "realPayoutVerified": false,
     "separateWalletShop": "Web 320/390/768/1024/1366: no section overlap; independent account menu entries. Native 320dp font130: layout audit passed.",
-    "callNavigation": "Two browser video call connected; feed/account/wallet/store preserve connected peer and live audio; return/end cleanup. Native emulator minimize/restore passes; no physical phone audio verification."
+    "callNavigation": "Two browser video call connected; feed/account/wallet/store preserve connected peer and live audio; return/end cleanup. Native emulator minimize/restore passes; no physical phone audio verification.",
+    "reconnect": "socket loss resumed connected two-browser call",
+    "androidFeatures": "System PiP; real IME chat and inline comment visibility; unchanged row identity retained"
   },
-  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.14"
+  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.15"
 }

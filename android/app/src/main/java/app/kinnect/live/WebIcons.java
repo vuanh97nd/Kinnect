@@ -3,6 +3,7 @@ package app.kinnect.live;
 /** Native vector assets exported from the same SVG paths as the web. */
 final class WebIcons {
   static android.graphics.drawable.Drawable load(android.content.Context context, String name) {
+    if(name.equals("call")||name.equals("phone")||name.equals("phone_off")){int call=context.getResources().getIdentifier("ic_call_"+(name.equals("call")?"phone":name),"drawable",context.getPackageName());if(call!=0)return context.getDrawable(call).mutate();}
     int preferred = resolve(context, name);
     if (preferred != 0) try { return context.getDrawable(preferred).mutate(); } catch (RuntimeException invalidVector) { }
     int legacy = context.getResources().getIdentifier("ic_" + name, "drawable", context.getPackageName());
