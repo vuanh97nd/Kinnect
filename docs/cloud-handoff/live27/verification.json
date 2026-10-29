@@ -1,0 +1,13 @@
+{
+  "version": "1.0.27",
+  "versionCode": 92,
+  "sha256": "3f531946b22b6e65e86544d0fe0cfb0747adc31595d51e448e08edd9634f3f2c",
+  "checks": 10,
+  "qaVersionCode": 117,
+  "qaPayloadMatchesReleaseExceptManifestAndSignature": true,
+  "behavior": "Viewer stage is sole root child; no All/Chat/Game filter row. Chat and Game share swipe sequence. Creation entry only shows Chat/Game and does not autojoin.",
+  "signalling": "Intercepted native socket; no real room joined.",
+  "physicalDeviceVerified": false,
+  "temporaryFreeStudioProPreserved": true,
+  "webAndPlayChanged": false
+}

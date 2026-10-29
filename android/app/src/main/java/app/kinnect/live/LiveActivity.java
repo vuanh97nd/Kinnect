@@ -139,7 +139,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     refresh.setContentDescription(I18n.t("Làm mới"));
     refresh.setOnClickListener(v -> renderRooms());
     bar.addView(refresh, new LinearLayout.LayoutParams(dp(44), dp(44)));
-    root.addView(modeFilters(false),new LinearLayout.LayoutParams(-1,-2));root.addView(bar, new LinearLayout.LayoutParams(-1, dp(56)));
+    root.addView(bar, new LinearLayout.LayoutParams(-1, dp(56)));
 
     FrameLayout stage = host?new FrameLayout(this):new ViewerStage();
     ScrollView scroll = new ScrollView(this);
@@ -180,14 +180,12 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
 
   private String topicText = "";
 
-  private String roomFilter="all";
-  private JSONArray filteredRooms(){JSONArray list=new JSONArray();for(int i=0;lastRooms!=null&&i<lastRooms.length();i++){JSONObject room=lastRooms.optJSONObject(i);if(room!=null&&(roomFilter.equals("all")||roomFilter.equals(room.optString("liveMode","chat"))))list.put(room);}return list;}
-  private LinearLayout modeFilters(boolean viewing){LinearLayout tabs=row();tabs.setTag("live:top-filters");tabs.setBackgroundColor(viewing?0xff15101f:CARD);tabs.setPadding(dp(4),dp(3),dp(4),dp(3));for(String mode:new String[]{"all","chat","game"}){TextView chip=text(I18n.t(mode.equals("all")?"Tất cả":modeName(mode)),11,mode.equals(roomFilter)?0xffffffff:viewing?0xffd6cbe7:TEXT);chip.setGravity(Gravity.CENTER);chip.setMinHeight(dp(44));chip.setPadding(dp(3),dp(6),dp(3),dp(6));chip.setBackground(round(mode.equals(roomFilter)?ACCENT:viewing?0xff251e32:SOFT,12));chip.setContentDescription(I18n.t(mode.equals("all")?"Tất cả":modeName(mode)));chip.setOnClickListener(v->{if(joining||liveRole.equals("guest")||host)return;roomFilter=mode;if(viewing){if(socket!=null)sendLive("leave");if(rtc!=null){rtc.close();rtc=null;}joined=false;currentRoom="";liveStage=null;root.removeAllViews();lobby();renderRooms();autoJoin();}else{root.removeAllViews();lobby();renderRooms();if(!creationEntry)autoJoin();}});LinearLayout.LayoutParams at=new LinearLayout.LayoutParams(0,-2,1);at.setMargins(dp(2),0,dp(2),0);tabs.addView(chip,at);}return tabs;}
+  private JSONArray viewingRooms(){return lastRooms==null?new JSONArray():lastRooms;}
   private void renderRooms() {
     if (rooms == null) return;
     rooms.removeAllViews();
     if(!ready){status.setText(I18n.t("Đang kết nối…"));status.setVisibility(View.VISIBLE);return;}
-    int count=0;for(int i=0;lastRooms!=null&&i<lastRooms.length();i++){JSONObject room=lastRooms.optJSONObject(i);if(room==null||!roomFilter.equals("all")&&!roomFilter.equals(room.optString("liveMode","chat")))continue;count++;LinearLayout tile=row();tile.setPadding(dp(14),dp(14),dp(14),dp(14));tile.setBackground(round(CARD,18));tile.addView(icon(modeIcon(room.optString("liveMode","chat")),ACCENT),new LinearLayout.LayoutParams(dp(30),dp(30)));LinearLayout copy=column();copy.setPadding(dp(12),0,0,0);TextView title=text(room.optString("title").isEmpty()?room.optString("host"):room.optString("title"),15,TEXT);title.setMaxLines(2);copy.addView(title);copy.addView(text(I18n.t(modeName(room.optString("liveMode","chat")))+" · "+room.optString("host")+" · "+room.optInt("viewers")+" "+I18n.t("người xem"),11,MUTED));tile.addView(copy,new LinearLayout.LayoutParams(0,-2,1));tile.setOnClickListener(v->{if(!joining&&ready){joining=true;sendLive("join","room",room.optString("id"),"multiGuest",true,"liveModes",true);}});LinearLayout.LayoutParams at=new LinearLayout.LayoutParams(-1,-2);at.bottomMargin=dp(10);rooms.addView(tile,at);}
+    int count=0;for(int i=0;lastRooms!=null&&i<lastRooms.length();i++){JSONObject room=lastRooms.optJSONObject(i);if(room==null)continue;count++;LinearLayout tile=row();tile.setPadding(dp(14),dp(14),dp(14),dp(14));tile.setBackground(round(CARD,18));tile.addView(icon(modeIcon(room.optString("liveMode","chat")),ACCENT),new LinearLayout.LayoutParams(dp(30),dp(30)));LinearLayout copy=column();copy.setPadding(dp(12),0,0,0);TextView title=text(room.optString("title").isEmpty()?room.optString("host"):room.optString("title"),15,TEXT);title.setMaxLines(2);copy.addView(title);copy.addView(text(I18n.t(modeName(room.optString("liveMode","chat")))+" · "+room.optString("host")+" · "+room.optInt("viewers")+" "+I18n.t("người xem"),11,MUTED));tile.addView(copy,new LinearLayout.LayoutParams(0,-2,1));tile.setOnClickListener(v->{if(!joining&&ready){joining=true;sendLive("join","room",room.optString("id"),"multiGuest",true,"liveModes",true);}});LinearLayout.LayoutParams at=new LinearLayout.LayoutParams(-1,-2);at.bottomMargin=dp(10);rooms.addView(tile,at);}
     status.setVisibility(View.GONE);if(count>0)return;
     status.setVisibility(View.GONE);
     LinearLayout empty = column();
@@ -339,7 +337,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
   private void autoJoin() {
     if (creationEntry || choosingMode || previewing || joined || joining || host || socket == null || !ready || lastRooms == null || lastRooms.length() == 0) return;
     if (getIntent().getBooleanExtra(EXTRA_HOST, false)) return;
-    JSONObject first = filteredRooms().optJSONObject(0);
+    JSONObject first = viewingRooms().optJSONObject(0);
     if (first == null) return;
     joining = true;
     socket.send(NativeSocket.json("type", "join", "multiGuest", true, "liveModes",true,"room", first.optString("id")));
@@ -353,7 +351,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
   private int liveEnter;
   private boolean switchLive(final int direction) {
     if (host || liveRole.equals("guest") || previewing || socket==null || !ready || System.currentTimeMillis() - swipeAt < 400 || joining) return false;
-    JSONArray available=filteredRooms();int index=-1;for(int i=0;i<available.length();i++)if(available.optJSONObject(i).optString("id").equals(currentRoom))index=i;
+    JSONArray available=viewingRooms();int index=-1;for(int i=0;i<available.length();i++)if(available.optJSONObject(i).optString("id").equals(currentRoom))index=i;
     final JSONObject next=available.optJSONObject(index+direction);
     if (index < 0 || next == null) { Toast.makeText(this, direction > 0 ? I18n.t("Bạn đã xem đến buổi live cuối.") : I18n.t("Đây là buổi live đầu tiên."), Toast.LENGTH_SHORT).show(); return false; }
     swipeAt = System.currentTimeMillis();
@@ -434,7 +432,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     if(!carryPreview||!host){if(rtc!=null){rtc.close();rtc=null;}localLive=null;}carryPreview=false;liveState=null;liveTray=null;openTray="";guestRequested=false;guestUsers=new JSONArray();guestRequests=new JSONArray();
     liveGuestsSupported=m.optBoolean("multiGuest");roomInfo=m.optJSONObject("room")==null?new JSONObject():m.optJSONObject("room");screenCover=null;currentRoom=roomInfo.optString("id");liveRole=host?"host":"viewer";
     root.removeAllViews();root.setBackgroundColor(0xff0d0b13);getWindow().setStatusBarColor(0xff0d0b13);getWindow().setNavigationBarColor(0xff0d0b13);getWindow().getDecorView().setSystemUiVisibility(0);
-    if(!host)root.addView(modeFilters(true),new LinearLayout.LayoutParams(-1,-2));FrameLayout stage=host?new FrameLayout(this):new ViewerStage();liveStage=stage;root.addView(stage,new LinearLayout.LayoutParams(-1,0,1));if(liveEnter!=0){VerticalMediaStage.enter(stage,liveEnter);liveEnter=0;}
+    FrameLayout stage=host?new FrameLayout(this):new ViewerStage();liveStage=stage;root.addView(stage,new LinearLayout.LayoutParams(-1,0,1));if(liveEnter!=0){VerticalMediaStage.enter(stage,liveEnter);liveEnter=0;}
     liveBoard=new LiveBoard();stage.addView(liveBoard,new FrameLayout.LayoutParams(-1,-1));
     View shade=new View(this);shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0x8807060d,0x00000000,0x00000000,0xc90b0812}));stage.addView(shade,new FrameLayout.LayoutParams(-1,-1));
     reactionLayer=new FrameLayout(this);stage.addView(reactionLayer,new FrameLayout.LayoutParams(-1,-1));
