@@ -2610,6 +2610,7 @@ public class MainActivity extends Activity {
   private void settings() {
     if (me == null) { auth(false); return; }
     accountHeader(I18n.t("Cài đặt & riêng tư"), () -> meMenu());
+    if(me.optString("role").equals("admin")){groupTitle("shield_check",I18n.t("Thiết lập admin"));groupRow(settingsGroup(),"gift",I18n.t("Tặng xu thành viên"),false,()->startActivity(new Intent(this,CoinGrantActivity.class)));groupRow(settingsGroup(),"gift",I18n.t("Tặng xu & giá quà"),false,()->startActivity(new Intent(this,EconomyAdminActivity.class)));}
     groupTitle("globe", I18n.t("Ngôn ngữ"));
     groupRow(settingsGroup(),"globe",I18n.current().equals("en")?"English":I18n.t("Tiếng Việt"),false,()->languageMenu());
     groupTitle("user_round", I18n.t("Thông tin cá nhân"));

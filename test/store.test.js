@@ -38,7 +38,7 @@ test('pending transactions grant nothing; deletion erases receipts and preferenc
  assert.equal((await a.request('/me/account-deletion',{cookie:u.cookie,method:'DELETE',data:{confirmUsername:u.username,confirmDelete:true}})).status,200);assert.equal(a.social.db.prepare('SELECT COUNT(*) n FROM store_purchases').get().n,0);
 });
 
-test('temporary free Studio Pro is server controlled and never fabricates a purchase',async t=>{
- const a=await setup(t),u=await a.register('studio_free');let response=await a.request('/store',{cookie:u.cookie});assert.equal(response.body.studioProFree,true);assert.deepEqual(response.body.owned,[]);assert.equal(a.social.db.prepare('SELECT COUNT(*) n FROM store_purchases').get().n,0);
+test('Studio Pro trial promotion is disabled and never fabricates a purchase',async t=>{
+ const a=await setup(t),u=await a.register('studio_free');let response=await a.request('/store',{cookie:u.cookie});assert.equal(response.body.studioProFree,false);assert.deepEqual(response.body.owned,[]);assert.equal(a.social.db.prepare('SELECT COUNT(*) n FROM store_purchases').get().n,0);
  const paid=await setup(t,false),other=await paid.register('studio_paid');response=await paid.request('/store',{cookie:other.cookie});assert.equal(response.body.studioProFree,false);assert.deepEqual(response.body.owned,[]);
 });

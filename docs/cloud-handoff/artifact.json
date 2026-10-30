@@ -1,7 +1,7 @@
 {
-  "version": "1.0.31",
-  "filename": "Kinnect-1.0.31-native.apk",
-  "sha256": "46590e9af1a5942e08b03f4b8ec8a511dde09675ef6b61c1827141d7698448b7",
+  "version": "1.0.32",
+  "filename": "Kinnect-1.0.32-native.apk",
+  "sha256": "5fd4b73a95f28fe2f0de930b073372478e86c80173ac69c15de2e09132a9139a",
   "playVersion": "1.2.4",
   "languages": [
     "vi",
@@ -12,7 +12,7 @@
     "languageAudit": "work/flow-final-language-result.log",
     "policyAudit": "work/flow-final-policy-result.log",
     "physicalDeviceVerified": false,
-    "backendTests": 116,
+    "backendTests": 123,
     "languageLayout": "320 dp; font 130%; centered VI/EN",
     "storeWeb": "320/390/1366 px; no overflow",
     "realBillingPurchaseVerified": false,
@@ -48,7 +48,8 @@
     "live28": "Direct Live preparation with actual camera and inline mode choices; no viewer lobby or automatic broadcast; native16 checks; see live28/verification.json",
     "game29": "12 curated game choices; native17 picker/search/custom tests and16 preparation regression; see game29/verification.json",
     "live30": "Shared camera bottom setup31 checks and actual projection/audio/auto game launch17 checks on emulator; local simulated joined acknowledgement, no public broadcast; see live30/verification.json",
-    "commerce31": "290 native checks; 10 audio assets; see commerce31/verification.json"
+    "commerce31": "290 native checks; 10 audio assets; see commerce31/verification.json",
+    "store32": "Paid Studio/Game passes; dual coin policy; admin targeted grants; see store32/verification.json"
   },
-  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.31"
+  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.32"
 }

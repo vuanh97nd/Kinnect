@@ -605,6 +605,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
       if (["create","chat"].includes(m.type)&&!social.hasPrivacyConsent(account.id))return error("Vui lòng đồng ý thông báo dữ liệu trước khi phát live hoặc bình luận.");
       if (m.type === "create") {
         if (ws.room) return error("Hãy rời phòng hiện tại trước.");
+        if(m.liveMode==='game'&&!social.packageStore.gameAllowed(ws.userId))return error("Live Game cần gói 30 ngày · 490 xu. Mở Cửa hàng để kích hoạt.");
         if(m.multiGuest===true&&liveSFU.enabled&&!liveSFU.available)return error("Máy chủ truyền Live đang kết nối lại. Hãy thử lại sau.");
         if (rooms.size >= (liveSFU.enabled?liveSFU.maxRooms:100)) return error("Máy chủ đã đầy.");
         ws.name = account.name;
@@ -642,6 +643,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
           return error("Không thể tham gia phòng này.");
         if (!room) return error("Phòng đã kết thúc.");
         if (ws.room) return error("Hãy rời phòng hiện tại trước.");
+        if(m.liveMode==='game'&&!social.packageStore.gameAllowed(ws.userId))return error("Live Game cần gói 30 ngày · 490 xu. Mở Cửa hàng để kích hoạt.");
         if(room.mediaTransport==='sfu'&&m.multiGuest!==true)return error("Hãy cập nhật ứng dụng để xem phòng Live này.");
         const viewerLimit=room.mediaTransport==='sfu'?liveSFU.maxViewers:6;
         if(room.members.size>=viewerLimit+1)return error("Phòng Live đã đủ "+viewerLimit+" người xem.");
