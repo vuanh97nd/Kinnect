@@ -2500,6 +2500,7 @@ public class MainActivity extends Activity {
 
   private void admin() {
     shell(I18n.t("Quản trị Kinnect"), true);
+    content.addView(primary(I18n.t("Kinh tế & Quà Live"),()->startActivity(new Intent(this,EconomyAdminActivity.class))));
     content.addView(primary(I18n.t("Trợ lý AI và kiểm duyệt"),()->adminAI()));
     content.addView(label(I18n.t("Báo cáo và tài khoản"), 16, TEXT));
     adminResets();

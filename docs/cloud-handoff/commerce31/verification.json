@@ -1,0 +1,45 @@
+{
+  "version": "1.0.31",
+  "backend": {
+    "passed": 116,
+    "failed": 0
+  },
+  "native": {
+    "passed": 290,
+    "widthDp": 320,
+    "fontScale": 1.3,
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "soundAssets": 10,
+    "physicalPhoneVerified": false
+  },
+  "installation": {
+    "arm64-v8a": "clean install/extraction success on Android36 emulator (forced ABI; not native execution for ARM)",
+    "armeabi-v7a": "Not executable/installable on this64-bit-only emulator; ABI bytes included in APK but physical32-bit testing not performed",
+    "x86": "Not executable/installable on this64-bit-only emulator; ABI bytes included in APK but physical32-bit testing not performed",
+    "x86_64": "clean install/extraction success on Android36 emulator (forced ABI; not native execution for ARM)",
+    "x86_64Launch": "MainActivity started on production-signed APK",
+    "upgrade": "production APK1.0.30/code95 ->1.0.31/code96 update succeeded, same signing certificate"
+  },
+  "qaPayloadMatchesReleaseExceptManifestAndSignature": true,
+  "signing": "v1/v2/v3 verified; same website certificate; 16KB zip alignment; explicit native extraction",
+  "payments": {
+    "checkoutEnabled": false,
+    "payoutEnabled": false,
+    "realTransactionVerified": false
+  },
+  "signup": "Only successful new user insert; 2000 trial coins once by transactional trigger; existing users unchanged",
+  "liveSfu": {
+    "ready": true,
+    "maxViewers": 2000,
+    "maxRooms": 30,
+    "capacityBenchmark": false
+  },
+  "limits": [
+    "No physical S23 Ultra/One UI7 test",
+    "No physical32-bit runtime test",
+    "No real money purchase or payout"
+  ]
+}

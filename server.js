@@ -1,3 +1,4 @@
+import {createLiveGifts} from './lib/live-gifts.js';
 import {liveRoomBlocks} from './lib/live-access.js';
 import {createLiveSFU} from './lib/live-sfu.js';
 import {createLiveGuests} from './lib/live-guests.js';
@@ -532,6 +533,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
   server.once('close',()=>{clearTimeout(listingTimer);for(const room of rooms.values())clearTimeout(room.presenceTimer);liveSFU.close();});
   const liveGuests=createLiveGuests({send,social,sfu:liveSFU});
   const liveModes=createLiveModes({send,social,listing});
+  const liveGifts=createLiveGifts({send,social,env:(dbPath===":memory:"||process.env.NODE_TEST_CONTEXT)?{}:process.env});
   function leave(ws) {
     const room = rooms.get(ws.room);
     ws.room = null;ws.legacyLiveRoom=null;
@@ -571,7 +573,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     ws.window = Date.now();
     ws.messages = 0;
     ws.visible = false;
-    send(ws, { type: "welcome", id: ws.id, callResume: true, push: true });
+    send(ws, { type: "welcome", id: ws.id, callResume: true, push: true, liveGifts:liveGifts.catalog(ws.userId) });
     calls.join(ws);
     listing();
     ws.on("message", (raw) => {
@@ -676,12 +678,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         social.ai.enqueue('live',room.id,ws.userId,{text:'Kiểm tra khung hình livestream lấy mẫu. Phòng '+room.id,image});return;
       }
       if(m.type==='viewers'){const users=[...new Map([...room.members.values()].filter(peer=>peer!==room.host&&social.user(peer.userId)?.suspended===0&&!social.blocked(ws.userId,peer.userId)).map(peer=>[peer.userId,social.publicUser(social.user(peer.userId),ws.userId)])).values()];send(ws,{type:'viewers',room:room.id,users});return;}
-      if(m.type==='live-reaction') {
-        if(!['heart','rose','star','crown'].includes(m.kind)||Date.now()-(ws.reactionAt||0)<350)return;
-        ws.reactionAt=Date.now();
-        for(const peer of room.members.values())if(!social.blocked(peer.userId,ws.userId))send(peer,{type:'live-reaction',room:room.id,kind:m.kind,name:account.name,senderId:ws.userId,free:true});
-        return;
-      }
+      if(liveGifts.handle(room,ws,m,account))return;
       if (m.type === "gift") {
         try {
           const gift = social.gift(

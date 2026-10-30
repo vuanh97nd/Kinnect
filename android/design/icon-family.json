@@ -870,6 +870,12 @@
       "category": "interface"
     },
     {
+      "resource": "ic_flow_web_clock",
+      "source": "ic_web_clock",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
       "resource": "ic_flow_web_compass",
       "source": "ic_web_compass",
       "redrawn": true,
@@ -945,6 +951,12 @@
       "resource": "ic_flow_web_heart",
       "source": "ic_web_heart",
       "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_history",
+      "source": "ic_web_history",
+      "redrawn": false,
       "category": "interface"
     },
     {
@@ -1281,6 +1293,12 @@
       "resource": "ic_flow_web_volume_2",
       "source": "ic_web_volume_2",
       "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_volume_x",
+      "source": "ic_web_volume_x",
+      "redrawn": false,
       "category": "interface"
     },
     {
