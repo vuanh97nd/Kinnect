@@ -1,5 +1,7 @@
 package app.kinnect.live;
+import android.graphics.*;import android.graphics.drawable.Drawable;import android.widget.ImageView;
 final class StoreStyle {
- static int color(String id){return "kinnect_style_aurora".equals(id)?0xff8b5cf6:"kinnect_style_ocean".equals(id)?0xff0284c7:"kinnect_style_sunset".equals(id)?0xfff97316:0;}
- static int chatColor(String id){return "kinnect_style_aurora".equals(id)?0xff6d28d9:"kinnect_style_ocean".equals(id)?0xff0369a1:"kinnect_style_sunset".equals(id)?0xffc2410c:0;}
+ static int color(String id){return "style_neon".equals(id)?0xff06b6d4:"style_aurora".equals(id)?0xffc084fc:"style_galaxy".equals(id)?0xff818cf8:"kinnect_style_aurora".equals(id)?0xff8b5cf6:"kinnect_style_ocean".equals(id)?0xff0284c7:"kinnect_style_sunset".equals(id)?0xfff97316:0;}
+ static int chatColor(String id){return "style_neon".equals(id)?0xff6d28d9:"style_aurora".equals(id)?0xffa21caf:"style_galaxy".equals(id)?0xff3730a3:"kinnect_style_aurora".equals(id)?0xff6d28d9:"kinnect_style_ocean".equals(id)?0xff0369a1:"kinnect_style_sunset".equals(id)?0xffc2410c:0;}
+ static void badge(ImageView image,String membership){if(membership==null||membership.isEmpty()){image.setForeground(null);return;}image.setForeground(new Drawable(){final Paint p=new Paint(3);public void draw(Canvas c){Rect b=getBounds();float x=b.centerX(),y=b.bottom-b.height()*.16f,r=b.width()*.15f;p.setColor(membership.equals("member_creator")?0xfff59e0b:0xff7c3aed);c.drawCircle(x,y,r,p);p.setColor(Color.WHITE);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(1,r*.19f));c.drawLine(x-r*.4f,y,x-r*.08f,y+r*.3f,p);c.drawLine(x-r*.08f,y+r*.3f,x+r*.45f,y-r*.3f,p);p.setStyle(Paint.Style.FILL);}public void setAlpha(int a){}public void setColorFilter(ColorFilter f){}public int getOpacity(){return PixelFormat.TRANSLUCENT;}});}
 }

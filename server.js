@@ -627,7 +627,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
           role: "host",
           history: [],
           aiModeration:!!social.ai.status().moderation,
-          room: { id: room.id, title: room.title, liveMode:room.mode,gameTitle:room.gameTitle,host: room.host.name, hostId: room.host.userId, avatar: social.user(room.host.userId)?.avatar ? "/api/users/"+room.host.userId+"/avatar":null, viewers:liveAudience(room,ws.userId).length },
+          room: { id: room.id, title: room.title, liveDecoration:social.packageStore.liveTheme(room.host.userId),hostMembership:social.packageStore.membership(room.host.userId),liveMode:room.mode,gameTitle:room.gameTitle,host: room.host.name, hostId: room.host.userId, avatar: social.user(room.host.userId)?.avatar ? "/api/users/"+room.host.userId+"/avatar":null, viewers:liveAudience(room,ws.userId).length },
         });
         liveGuests.state(room);liveModes.state(room,ws);
         listing();
@@ -655,7 +655,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         send(ws, {
           type: "joined",multiGuest:true,
           role: "viewer",
-          room: { id: room.id, title: room.title, liveMode:room.mode,gameTitle:room.gameTitle,host: room.host.name, hostId: room.host.userId, avatar: social.user(room.host.userId)?.avatar ? "/api/users/"+room.host.userId+"/avatar":null, viewers:liveAudience(room,ws.userId).length },
+          room: { id: room.id, title: room.title, liveDecoration:social.packageStore.liveTheme(room.host.userId),hostMembership:social.packageStore.membership(room.host.userId),liveMode:room.mode,gameTitle:room.gameTitle,host: room.host.name, hostId: room.host.userId, avatar: social.user(room.host.userId)?.avatar ? "/api/users/"+room.host.userId+"/avatar":null, viewers:liveAudience(room,ws.userId).length },
           host: room.host.id,
           hostUserId: room.host.userId,
           history: (room.chatHistory || []).filter(message => !social.blocked(ws.userId, message.senderId) && social.user(message.senderId)?.suspended === 0),

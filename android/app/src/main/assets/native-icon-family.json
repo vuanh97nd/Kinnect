@@ -888,6 +888,12 @@
       "category": "interface"
     },
     {
+      "resource": "ic_flow_web_crown",
+      "source": "ic_web_crown",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
       "resource": "ic_flow_web_download",
       "source": "ic_web_download",
       "redrawn": false,
@@ -1220,6 +1226,12 @@
     {
       "resource": "ic_flow_web_square",
       "source": "ic_web_square",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_star",
+      "source": "ic_web_star",
       "redrawn": false,
       "category": "interface"
     },

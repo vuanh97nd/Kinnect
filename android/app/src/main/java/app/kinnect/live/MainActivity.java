@@ -906,6 +906,7 @@ public class MainActivity extends Activity {
 
   // Thông báo ngắn dạng "toast" nổi giống web (không chiếm chỗ trên màn).
   private void say(String text) {
+    if(SuccessEffects.message(this,text))return;
     text=I18n.t(text);
     if (notice != null) notice.setText(text);
     if (text == null || text.trim().isEmpty()) return;
@@ -1257,6 +1258,7 @@ public class MainActivity extends Activity {
     round.setColor(PRIMARY_SOFT);
     int styleColor=StoreStyle.color(u.optString("storeStyle"));if(styleColor!=0){round.setStroke(dp(3),styleColor);image.setPadding(dp(3),dp(3),dp(3),dp(3));}
     image.setBackground(round);
+    StoreStyle.badge(image,u.optString("storeMembership"));
     image.setClipToOutline(true);
     image.setImageBitmap(u.has("members")?groupSample(u.optString("avatarPreset","violet"),dp(size)):initials(u, dp(size)));
     image.setContentDescription(I18n.t("Ảnh của ") + u.optString("name"));
