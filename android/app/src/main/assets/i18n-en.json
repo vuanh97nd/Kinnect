@@ -1848,5 +1848,11 @@
   "Trong kho": "In inventory",
   "Mua gói bằng Xu tặng khi thử nghiệm": "Allow gifted coins for packages during trial",
   "Thử nghiệm đã kết thúc. Gói mới cần Xu mua.": "Trial ended. New packages require purchased coins.",
-  "Chưa mua được gói. Hãy tải lại cửa hàng.": "Unable to buy. Reload the store."
+  "Chưa mua được gói. Hãy tải lại cửa hàng.": "Unable to buy. Reload the store.",
+  "∞ xu · Admin": "∞ coins · Admin",
+  "Mua gói · ∞ xu": "Buy package · ∞ coins",
+  "Cần Studio Pro để xuất ảnh.": "Studio Pro is required to export photos.",
+  "Số dư": "Balance",
+  "Dùng mọi gói · Không trừ xu": "All packages · No coin debit",
+  "Xu tặng không rút thành tiền": "Gifted coins cannot be withdrawn"
 }

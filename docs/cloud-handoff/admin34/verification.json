@@ -1,0 +1,31 @@
+{
+  "version": "1.0.34",
+  "code": 99,
+  "backendTests": {
+    "pass": 126,
+    "fail": 0
+  },
+  "nativeUI": {
+    "pass": 2298,
+    "widthDp": 320,
+    "fontScale": 1.3,
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "cases": [
+      "normal/admin/large balances",
+      "single paid/gifted card",
+      "six shop tabs",
+      "optional admin buy affordance"
+    ]
+  },
+  "qaPayloadMatchesReleaseExceptManifestAndSignature": true,
+  "admin": "DB role and suspended status control unlimited coins/virtual ownership; no finite credits or cash balances manufactured; demotion removes virtual access",
+  "backendPurchase": "idempotent admin event with zero debit; no permanent purchase entitlement leaked after demotion",
+  "physicalPhoneVerified": false,
+  "googlePlayRealPaymentVerified": false,
+  "webUIChanged": false,
+  "qaPayloadMatchesRelease": true,
+  "signing": "v1/v2/v3 verified;16KB zip alignment;stable website certificate"
+}

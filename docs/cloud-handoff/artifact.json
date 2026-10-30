@@ -1,7 +1,7 @@
 {
-  "version": "1.0.33",
-  "filename": "Kinnect-1.0.33-native.apk",
-  "sha256": "558539a01b9833f8d89bf3b3543d33855219bbd680567463ccc6799310d55711",
+  "version": "1.0.34",
+  "filename": "Kinnect-1.0.34-native.apk",
+  "sha256": "e299ab652e914d9969356cb04862d8144de73379d0b32c6b8493a48d8f38a29b",
   "playVersion": "1.2.4",
   "languages": [
     "vi",
@@ -12,7 +12,7 @@
     "languageAudit": "work/flow-final-language-result.log",
     "policyAudit": "work/flow-final-policy-result.log",
     "physicalDeviceVerified": false,
-    "backendTests": 125,
+    "backendTests": 126,
     "languageLayout": "320 dp; font 130%; centered VI/EN",
     "storeWeb": "320/390/1366 px; no overflow",
     "realBillingPurchaseVerified": false,
@@ -50,7 +50,8 @@
     "live30": "Shared camera bottom setup31 checks and actual projection/audio/auto game launch17 checks on emulator; local simulated joined acknowledgement, no public broadcast; see live30/verification.json",
     "commerce31": "290 native checks; 10 audio assets; see commerce31/verification.json",
     "store32": "Paid Studio/Game passes; dual coin policy; admin targeted grants; see store32/verification.json",
-    "store33": "15 meaningful native identities; real package ownership/apply/gift inventory; success effects and admin contrast; see store33/verification.json"
+    "store33": "15 meaningful native identities; real package ownership/apply/gift inventory; success effects and admin contrast; see store33/verification.json",
+    "admin34": "2298native checks; compact balances,admin unlimited optional purchases,role revocation; see admin34/verification.json"
   },
-  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.33"
+  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.34"
 }

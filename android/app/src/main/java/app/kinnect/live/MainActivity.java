@@ -2015,7 +2015,6 @@ public class MainActivity extends Activity {
       bio.setPadding(dp(5), dp(12), dp(5), dp(8)); bio.setLineSpacing(0, 1.6f);
       panel.addView(bio);
     }
-    if (user.optJSONArray("interests") != null && user.optJSONArray("interests").length() > 0) panel.addView(label(join(user.optJSONArray("interests")), 12, ACCENT));
     stats(user, panel);
   }
 

@@ -876,6 +876,12 @@
       "category": "interface"
     },
     {
+      "resource": "ic_flow_web_coins",
+      "source": "ic_web_coins",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
       "resource": "ic_flow_web_compass",
       "source": "ic_web_compass",
       "redrawn": true,
