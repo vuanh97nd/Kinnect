@@ -1,0 +1,22 @@
+{
+  "version": "1.0.29",
+  "versionCode": 94,
+  "sha256": "23d73ecb7f7fb3bc84df9555159f20cddf711600bb965ffc317c56f286204864",
+  "checks": {
+    "picker": 17,
+    "preparationRegression": 16,
+    "screen": "320dp/font130",
+    "qaVersionCode": 119,
+    "qaPayloadMatchesReleaseExceptManifestAndSignature": true
+  },
+  "behavior": "Choose game opens12 curated suggestions, search without accents and aliases, selected check, Other game input and clear. Selected title populates Live metadata; Android app screen capture selection remains explicit. No automatic game launch, no installed-app scan or new permissions.",
+  "catalog": "Liên Quân Mobile, Free Fire, PUBG MOBILE VN, Roblox VN, Mobile Legends: Bang Bang, Tốc Chiến, Đấu Trường Chân Lý, Play Together VNG, Genshin Impact, Honkai: Star Rail, Delta Force, Minecraft. Curated suggestions, not a popularity ranking.",
+  "physicalDeviceVerified": false,
+  "webAndPlayChanged": false,
+  "references": [
+    "https://play.google.com/store/apps/details?hl=vi&id=com.garena.game.kgvn",
+    "https://play.google.com/store/apps/details?hl=en-US&id=com.vng.pubgmobile",
+    "https://play.google.com/store/apps/details?gl=VN&id=com.roblox.client.vnggames",
+    "https://www.hoyoverse.com/en-us/news/"
+  ]
+}

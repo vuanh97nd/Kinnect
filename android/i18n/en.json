@@ -1689,5 +1689,16 @@
   "Chưa kết nối để gửi bình luận.": "Not connected to send a comment.",
   "Tìm bài YouTube": "Search YouTube songs",
   "Studio Pro đang miễn phí": "Studio Pro is currently free",
-  "Chuẩn bị Live": "Prepare Live"
+  "Chuẩn bị Live": "Prepare Live",
+  "Chọn game": "Choose game",
+  "Tìm game": "Search games",
+  "Game khác": "Other game",
+  "Không chọn": "No game selected",
+  "Không tìm thấy game. Chọn Game khác để nhập tên.": "No matching game. Choose Other game to enter a name.",
+  "Sinh tồn": "Battle royale",
+  "Sáng tạo": "Sandbox",
+  "Chiến thuật": "Strategy",
+  "Giao lưu": "Social",
+  "Nhập vai": "Role-playing",
+  "Bắn súng": "Shooter"
 }

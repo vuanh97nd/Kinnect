@@ -225,7 +225,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     try{rtc=new NativeRtc(this,config,display,null,new NativeRtc.Events(){public void signal(String peer,JSONObject payload){}public void status(String text){status.setText(text);}},false);final NativeRtc previewRtc=rtc;display.addFrameListener(new org.webrtc.EglRenderer.FrameListener(){private boolean received;public void onFrame(android.graphics.Bitmap bitmap){if(bitmap!=null)bitmap.recycle();if(received)return;received=true;runOnUiThread(()->{if(!previewing||rtc!=previewRtc||isFinishing()||isDestroyed())return;status.setText(I18n.t("Camera đã sẵn sàng · Chưa phát sóng"));start.setEnabled(true);start.setAlpha(1);});}},0f);rtc.media(this,true);rtc.microphone(false);start.setOnClickListener(v->{if(!previewing||!ready||joining)return;topicText=title.getText().toString().trim();start.setEnabled(false);previewLook=rtc.effects();carryPreview=true;pendingHostMic=mic[0];rtc.microphone(pendingHostMic);createHostRoom();});}
     catch(Exception error){if(rtc!=null){rtc.close();rtc=null;}status.setText(I18n.t("Không mở được camera. Kiểm tra quyền camera/micro rồi mở lại."));}
   }
-  private boolean gameComments=true;private boolean pendingHostMic=true;
+  private LiveGamePicker gamePicker;private boolean gameComments=true;private boolean pendingHostMic=true;
   private void showGamePreview(){
     previewing=true;host=false;if(rtc!=null){rtc.close();rtc=null;}root.removeAllViews();root.setBackgroundColor(BG);
     ScrollView scroll=new ScrollView(this);LinearLayout body=column();body.setPadding(dp(20),dp(16),dp(20),dp(24));scroll.addView(body);root.addView(scroll,new LinearLayout.LayoutParams(-1,-1));
@@ -234,7 +234,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     TextView heading=text(I18n.t("Chơi game trực tiếp"),22,TEXT);heading.setTypeface(null,Typeface.BOLD);body.addView(heading);
     TextView hint=text(I18n.t("Chọn một ứng dụng game trong hộp thoại Android. Màn hình chỉ được phát sau khi bạn đồng ý."),14,MUTED);hint.setPadding(0,dp(12),0,dp(18));body.addView(hint);
     EditText title=field(I18n.t("Tiêu đề buổi Live"));title.setText(topicText);title.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(80)});body.addView(title,new LinearLayout.LayoutParams(-1,dp(50)));body.addView(preparationModes(title));
-    EditText name=field(I18n.t("Tên game (không bắt buộc)"));name.setText(gameTitle);name.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(60)});LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(-1,dp(50));np.topMargin=dp(12);body.addView(name,np);
+    EditText name=field(I18n.t("Chọn game"));name.setText(gameTitle);name.setFocusable(false);name.setCursorVisible(false);name.setKeyListener(null);name.setFocusable(false);name.setFocusableInTouchMode(false);name.setShowSoftInputOnFocus(false);name.setContentDescription(I18n.t("Chọn game"));name.setOnClickListener(v->{if(gamePicker!=null)gamePicker.close();gamePicker=new LiveGamePicker(this,gameTitle,value->{gameTitle=value;name.setText(value);});gamePicker.show();});name.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(60)});LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(-1,dp(50));np.topMargin=dp(12);body.addView(name,np);
     CheckBox mic=new CheckBox(this);mic.setTypeface(ApprovedTypography.font(this,0));mic.setTextColor(TEXT);mic.setText(I18n.t("Bật micro bình luận"));mic.setChecked(pendingHostMic);body.addView(mic);
     CheckBox sound=new CheckBox(this);sound.setTypeface(ApprovedTypography.font(this,0));sound.setTextColor(TEXT);sound.setText(I18n.t("Phát tiếng game nếu được ứng dụng cho phép"));sound.setChecked(gameSound&&Build.VERSION.SDK_INT>=29);sound.setEnabled(Build.VERSION.SDK_INT>=29);body.addView(sound);
     CheckBox comments=new CheckBox(this);comments.setTypeface(ApprovedTypography.font(this,0));comments.setTextColor(TEXT);comments.setText(I18n.t("Bình luận nổi khi chơi game"));comments.setChecked(gameComments);comments.setOnCheckedChangeListener((b,on)->gameComments=on);body.addView(comments);
@@ -544,6 +544,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
   @Override public void onBackPressed(){if(joined){confirmLeave();return;}super.onBackPressed();}
 
   protected void onDestroy() {
+    if(gamePicker!=null)gamePicker.close();
     stopGameSession();clearPendingGuest();
     if (socket != null) socket.close();
     if (rtc != null) rtc.close();
