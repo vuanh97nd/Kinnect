@@ -1,0 +1,12 @@
+{
+  "version": "1.0.28",
+  "versionCode": 93,
+  "sha256": "60945e01e8249e87e32e7f380660cfdaf7c47236742793843857f9bb68f2b07f",
+  "checks": 16,
+  "qaVersionCode": 118,
+  "qaPayloadMatchesReleaseExceptManifestAndSignature": true,
+  "behavior": "Host intent shows preparation immediately even while connecting; welcome opens actual camera preview; Chat/Game choices inline on preparation pages; switching releases camera and never creates/joins a room; explicit Start required. Studio camera stays in back stack. Viewer Live unchanged.",
+  "screen": "320dp/font130",
+  "physicalDeviceVerified": false,
+  "webAndPlayChanged": false
+}

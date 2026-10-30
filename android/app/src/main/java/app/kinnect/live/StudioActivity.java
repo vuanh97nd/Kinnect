@@ -310,7 +310,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
       dp5.topMargin = dp(4);
       cell.addView(dot, dp5);
       if (m[0].equals("live")) t.setTextColor(0xffff5c7c);
-      cell.setOnClickListener(v -> { if (m[0].equals("live")) { if (!recording && !busy) { closeCamera(); startActivity(new android.content.Intent(this, LiveActivity.class).putExtra(LiveActivity.EXTRA_HOST, true)); finish(); } return; } if (!recording && !busy) { mode = m[0]; renderModes(); buildRail(); shutter.setMode(mode); gridOverlay.setRatio(mode.equals("photo") ? ratio : 0); } });
+      cell.setOnClickListener(v -> { if (m[0].equals("live")) { if (!recording && !busy) { closeCamera(); startActivity(new android.content.Intent(this, LiveActivity.class).putExtra(LiveActivity.EXTRA_HOST, true)); } return; } if (!recording && !busy) { mode = m[0]; renderModes(); buildRail(); shutter.setMode(mode); gridOverlay.setRatio(mode.equals("photo") ? ratio : 0); } });
       modeTabs.addView(cell, new LinearLayout.LayoutParams(dp(story ? 140 : 84), -2));
     }
     if (shutter != null) shutter.setMode(mode);

@@ -28,11 +28,9 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
   private TextView modeLabel(String mode){return text(I18n.t(modeName(mode)),12,0xffffffff);}
   private String modeName(String mode){return mode.equals("game")?"Chơi game":"Trò chuyện";}
   private String modeIcon(String mode){return mode.equals("game")?"gamepad":"video";}
-  private void chooseMode(){if(choosingMode)return;choosingMode=true;LinearLayout body=column();
-    for(String mode:new String[]{"chat","game"}){LinearLayout card=row();card.setPadding(dp(12),dp(12),dp(12),dp(12));card.setBackground(round(SOFT,16));card.setMinimumHeight(dp(72));card.addView(icon(modeIcon(mode),ACCENT),new LinearLayout.LayoutParams(dp(28),dp(28)));LinearLayout copy=column();copy.setPadding(dp(12),0,0,0);TextView name=text(I18n.t(modeName(mode)),16,TEXT);name.setTypeface(null,Typeface.BOLD);copy.addView(name);TextView hint=text(I18n.t(mode.equals("chat")?"Camera, bình luận và khách mời":"Chia sẻ màn hình game và micro"),12,MUTED);copy.addView(hint);card.addView(copy,new LinearLayout.LayoutParams(0,-2,1));LinearLayout.LayoutParams at=new LinearLayout.LayoutParams(-1,-2);at.bottomMargin=dp(10);body.addView(card,at);card.setOnClickListener(v->{modeDialog.dismiss();liveMode=mode;prepareHost();});}
-    modeDialog=new Sheet(this).setTitle(I18n.t("Chọn chế độ Live")).setView(body).setNegativeButton(I18n.t("Quay lại"),null).show();modeDialog.setOnDismissListener(d->choosingMode=false);
-  }
-  private Dialog modeDialog;
+  private void chooseMode(){creationEntry=true;if(ready)prepareHost();else preparationWaiting();}
+  private LinearLayout preparationModes(EditText title){LinearLayout modes=row();modes.setTag("live:preparation-modes");modes.setPadding(dp(4),dp(6),dp(4),dp(6));for(String mode:new String[]{"chat","game"}){TextView chip=text(I18n.t(modeName(mode)),13,mode.equals(liveMode)?0xffffffff:0xffd8cbed);chip.setGravity(Gravity.CENTER);chip.setMinHeight(dp(48));chip.setPadding(dp(8),dp(8),dp(8),dp(8));chip.setBackground(round(mode.equals(liveMode)?ACCENT:0xff302a3d,14));android.graphics.drawable.Drawable d=WebIcons.load(this,modeIcon(mode));d.setTint(chip.getCurrentTextColor());d.setBounds(0,0,dp(20),dp(20));chip.setCompoundDrawables(null,d,null,null);chip.setCompoundDrawablePadding(dp(6));chip.setOnClickListener(v->{if(mode.equals(liveMode)||joining||gameSession||projectionPrompt)return;if(title!=null)topicText=title.getText().toString().trim();liveMode=mode;previewing=false;if(rtc!=null){rtc.close();rtc=null;}if(ready)prepareHost();else preparationWaiting();});LinearLayout.LayoutParams at=new LinearLayout.LayoutParams(0,-2,1);at.setMargins(dp(4),0,dp(4),0);modes.addView(chip,at);}return modes;}
+  private void preparationWaiting(){root.removeAllViews();rooms=null;root.setBackgroundColor(0xff111017);LinearLayout bar=row();bar.addView(liveAction("x","Thoát",this::finish),new LinearLayout.LayoutParams(dp(48),dp(48)));TextView title=text(I18n.t("Chuẩn bị Live"),18,0xffffffff);title.setPadding(dp(10),0,0,0);bar.addView(title);root.addView(bar);root.addView(preparationModes(null));status=text(I18n.t("Đang kết nối…"),14,0xffd8cbed);status.setGravity(Gravity.CENTER);root.addView(status,new LinearLayout.LayoutParams(-1,0,1));}
   private void createHostRoom(){if(socket==null||!ready||joining||joined)return;previewing=false;host=true;joining=true;sendLive("create","multiGuest",true,"liveModes",true,"liveMode",liveMode,"gameTitle",gameTitle,"title",topicText);}
 
   private LiveEffects previewLook;
@@ -100,7 +98,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     root.setBackgroundColor(BG);
     root.setOnApplyWindowInsetsListener((v, i) -> { if(Build.VERSION.SDK_INT>=30){android.graphics.Insets bars=i.getInsets(android.view.WindowInsets.Type.systemBars());android.graphics.Insets keyboard=i.getInsets(android.view.WindowInsets.Type.ime());v.setPadding(bars.left,bars.top,bars.right,Math.max(bars.bottom,keyboard.bottom));}else v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom()); return i; });
     setContentView(root);
-    creationEntry=getIntent().getBooleanExtra(EXTRA_HOST,false);lobby();
+    creationEntry=getIntent().getBooleanExtra(EXTRA_HOST,false);if(creationEntry)preparationWaiting();else lobby();
     String origin = ServerConfig.DEFAULT_ORIGIN;
     NativeApi.shared.call("GET", "/api/call-config", null, (data, error, code) -> {
       if (isFinishing() || isDestroyed()) return;
@@ -217,11 +215,11 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
   private void showHostPreview(){
     if(previewing||joined)return;if(liveMode.equals("game")){showGamePreview();return;}previewing=true;host=false;if(rtc!=null){rtc.close();rtc=null;}
     root.removeAllViews();root.setBackgroundColor(0xff111017);FrameLayout stage=new FrameLayout(this);root.addView(stage,new LinearLayout.LayoutParams(-1,0,1));SurfaceViewRenderer display=new SurfaceViewRenderer(this);localLive=display;stage.addView(display,new FrameLayout.LayoutParams(-1,-1));
-    TextView close=text(I18n.t("×"),30,0xffffffff);close.setGravity(Gravity.CENTER);close.setContentDescription(I18n.t("Đóng camera chuẩn bị Live"));close.setOnClickListener(v->finish());FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.START);cp.setMargins(dp(12),dp(8),0,0);stage.addView(close,cp);
+    TextView close=text(I18n.t("×"),30,0xffffffff);close.setGravity(Gravity.CENTER);close.setBackground(round(0x88000000,99));close.setContentDescription(I18n.t("Đóng camera chuẩn bị Live"));close.setOnClickListener(v->finish());FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.START);cp.setMargins(dp(12),dp(8),0,0);stage.addView(close,cp);
     TextView badge=previewBadge();FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(-1,-2,Gravity.TOP|Gravity.CENTER_HORIZONTAL);bp.setMargins(dp(64),dp(16),dp(64),0);stage.addView(badge,bp);
     LinearLayout controls=column();controls.setPadding(dp(16),dp(10),dp(16),dp(16));controls.setBackgroundColor(0xff18151f);root.addView(controls,new LinearLayout.LayoutParams(-1,-2));
     EditText title=field(I18n.t("Tiêu đề buổi Live"));title.setText(topicText);title.setTextColor(0xffffffff);title.setHintTextColor(0xffaaa3b7);title.setBackground(round(0xff302a3d,14));title.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(80)});controls.addView(title,new LinearLayout.LayoutParams(-1,dp(48)));
-    TextView modeChip=text(I18n.t(modeName(liveMode))+" · "+I18n.t("Đổi chế độ"),13,0xffc8b7f5);modeChip.setMinHeight(dp(44));modeChip.setGravity(Gravity.CENTER_VERTICAL);modeChip.setOnClickListener(v->{topicText=title.getText().toString();previewing=false;if(rtc!=null){rtc.close();rtc=null;}chooseMode();});controls.addView(modeChip);
+    controls.addView(preparationModes(title));
     LinearLayout actions=row();final boolean[] mic={true};actions.addView(sideButton("flip",I18n.t("Lật camera"),()->{if(rtc!=null)rtc.flip();}),new LinearLayout.LayoutParams(0,-2,1));actions.addView(sideButton("wand",I18n.t("Làm đẹp"),this::effectsMenu),new LinearLayout.LayoutParams(0,-2,1));actions.addView(sideButton("mic","Micro",()->{mic[0]=!mic[0];badge.setText(mic[0]?I18n.t("Xem trước · Mic sẽ bật khi phát"):I18n.t("Xem trước · Mic sẽ tắt khi phát"));}),new LinearLayout.LayoutParams(0,-2,1));controls.addView(actions);
     TextView start=pill(I18n.t("Bắt đầu Live"),true,()->{});start.setEnabled(false);start.setAlpha(.45f);controls.addView(start,new LinearLayout.LayoutParams(-1,dp(52)));status=text(I18n.t("Đang mở camera…"),12,0xffc9bfd7);status.setGravity(Gravity.CENTER);status.setPadding(0,dp(10),0,dp(4));controls.addView(status,new LinearLayout.LayoutParams(-1,-2));
     try{rtc=new NativeRtc(this,config,display,null,new NativeRtc.Events(){public void signal(String peer,JSONObject payload){}public void status(String text){status.setText(text);}},false);final NativeRtc previewRtc=rtc;display.addFrameListener(new org.webrtc.EglRenderer.FrameListener(){private boolean received;public void onFrame(android.graphics.Bitmap bitmap){if(bitmap!=null)bitmap.recycle();if(received)return;received=true;runOnUiThread(()->{if(!previewing||rtc!=previewRtc||isFinishing()||isDestroyed())return;status.setText(I18n.t("Camera đã sẵn sàng · Chưa phát sóng"));start.setEnabled(true);start.setAlpha(1);});}},0f);rtc.media(this,true);rtc.microphone(false);start.setOnClickListener(v->{if(!previewing||!ready||joining)return;topicText=title.getText().toString().trim();start.setEnabled(false);previewLook=rtc.effects();carryPreview=true;pendingHostMic=mic[0];rtc.microphone(pendingHostMic);createHostRoom();});}
@@ -231,11 +229,11 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
   private void showGamePreview(){
     previewing=true;host=false;if(rtc!=null){rtc.close();rtc=null;}root.removeAllViews();root.setBackgroundColor(BG);
     ScrollView scroll=new ScrollView(this);LinearLayout body=column();body.setPadding(dp(20),dp(16),dp(20),dp(24));scroll.addView(body);root.addView(scroll,new LinearLayout.LayoutParams(-1,-1));
-    TextView back=pill(I18n.t("Quay lại · Chọn chế độ"),false,()->{previewing=false;chooseMode();});body.addView(back,new LinearLayout.LayoutParams(-1,dp(48)));
+    ImageView back=icon("x",TEXT);back.setPadding(dp(10),dp(10),dp(10),dp(10));back.setContentDescription(I18n.t("Thoát"));back.setBackground(round(SOFT,99));back.setOnClickListener(v->finish());body.addView(back,new LinearLayout.LayoutParams(dp(44),dp(44)));
     ImageView game=icon("gamepad",ACCENT);LinearLayout.LayoutParams art=new LinearLayout.LayoutParams(dp(60),dp(60));art.gravity=Gravity.CENTER;art.setMargins(0,dp(28),0,dp(18));body.addView(game,art);
     TextView heading=text(I18n.t("Chơi game trực tiếp"),22,TEXT);heading.setTypeface(null,Typeface.BOLD);body.addView(heading);
     TextView hint=text(I18n.t("Chọn một ứng dụng game trong hộp thoại Android. Màn hình chỉ được phát sau khi bạn đồng ý."),14,MUTED);hint.setPadding(0,dp(12),0,dp(18));body.addView(hint);
-    EditText title=field(I18n.t("Tiêu đề buổi Live"));title.setText(topicText);title.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(80)});body.addView(title,new LinearLayout.LayoutParams(-1,dp(50)));
+    EditText title=field(I18n.t("Tiêu đề buổi Live"));title.setText(topicText);title.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(80)});body.addView(title,new LinearLayout.LayoutParams(-1,dp(50)));body.addView(preparationModes(title));
     EditText name=field(I18n.t("Tên game (không bắt buộc)"));name.setText(gameTitle);name.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(60)});LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(-1,dp(50));np.topMargin=dp(12);body.addView(name,np);
     CheckBox mic=new CheckBox(this);mic.setTypeface(ApprovedTypography.font(this,0));mic.setTextColor(TEXT);mic.setText(I18n.t("Bật micro bình luận"));mic.setChecked(pendingHostMic);body.addView(mic);
     CheckBox sound=new CheckBox(this);sound.setTypeface(ApprovedTypography.font(this,0));sound.setTextColor(TEXT);sound.setText(I18n.t("Phát tiếng game nếu được ứng dụng cho phép"));sound.setChecked(gameSound&&Build.VERSION.SDK_INT>=29);sound.setEnabled(Build.VERSION.SDK_INT>=29);body.addView(sound);
@@ -287,7 +285,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     String type = m.optString("type");
     if (type.equals("welcome")) {
       ready = true;socketId=m.optString("id");
-      renderRooms();
+      if(!creationEntry)renderRooms();
       // Mở từ tab "Trực tiếp": vào thẳng phòng đã chọn.
       String room = getIntent().getStringExtra(EXTRA_ROOM);
       if (room != null && !joined) { host = false; socket.send(NativeSocket.json("type", "join", "multiGuest", true, "liveModes",true,"room", room)); getIntent().removeExtra(EXTRA_ROOM); }
