@@ -1,7 +1,7 @@
 {
-  "version": "1.0.34",
-  "filename": "Kinnect-1.0.34-native.apk",
-  "sha256": "e299ab652e914d9969356cb04862d8144de73379d0b32c6b8493a48d8f38a29b",
+  "version": "1.0.35",
+  "filename": "Kinnect-1.0.35-native.apk",
+  "sha256": "d4c79d8650c2fc12542b27196349a408a869fa46e797bc25bd4bf23e04460c19",
   "playVersion": "1.2.4",
   "languages": [
     "vi",
@@ -51,7 +51,8 @@
     "commerce31": "290 native checks; 10 audio assets; see commerce31/verification.json",
     "store32": "Paid Studio/Game passes; dual coin policy; admin targeted grants; see store32/verification.json",
     "store33": "15 meaningful native identities; real package ownership/apply/gift inventory; success effects and admin contrast; see store33/verification.json",
-    "admin34": "2298native checks; compact balances,admin unlimited optional purchases,role revocation; see admin34/verification.json"
+    "admin34": "2298native checks; compact balances,admin unlimited optional purchases,role revocation; see admin34/verification.json",
+    "search35": "Search two tabs; Nearby belongs to Friends; production build and source review; no physical GPS check"
   },
-  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.34"
+  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.35"
 }

@@ -1,0 +1,14 @@
+{
+  "version": "1.0.35",
+  "code": 100,
+  "change": "Search has For you/Following only; Nearby entry under Friends with back/filter/location routing retained",
+  "validation": [
+    "Native production build passed",
+    "Reviewed narrow MainActivity diff against1.0.34"
+  ],
+  "physicalPhoneVerified": false,
+  "gpsOnRealPhoneVerified": false,
+  "webUIChanged": false,
+  "backendChanged": false,
+  "signing": "v1/v2/v3 verified;16KB zip alignment;stable website certificate"
+}

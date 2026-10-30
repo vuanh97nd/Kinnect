@@ -1309,9 +1309,13 @@ public class MainActivity extends Activity {
   }
 
 
-  private void discover() {
+  private boolean peopleFromFriends;
+  private void discover(){peopleFromFriends=false;if(discoverSort.equals("near"))discoverSort="interests";renderPeopleSearch(false);}
+  private void friendsNearby(){remember("friends-nearby",this::friendsNearby);headerActive="friends";accountHeader(I18n.t("Quanh đây"),()->friendsScreen("friends"));peopleFromFriends=true;discoverSort="near";renderPeopleSearch(true);}
+  private void refreshPeopleSearch(){if(peopleFromFriends)friendsNearby();else navigate("discover");}
+  private void renderPeopleSearch(boolean fromFriends) {
     final boolean hasLocation = me != null && me.optBoolean("hasLocation");
-    String[][] sorts = { { "interests", "Dành cho bạn" }, { "near", "Quanh đây" }, { "following", "Đang theo dõi" } };
+    String[][] sorts = { { "interests", "Dành cho bạn" }, { "following", "Đang theo dõi" } };
     LinearLayout seg = row();
     seg.setPadding(dp(4), dp(4), dp(4), dp(4));
     seg.setBackground(background(SOFT, 14));
@@ -1325,12 +1329,11 @@ public class MainActivity extends Activity {
       else t.setBackground(pressable(SOFT, 11));
       t.setOnClickListener(v -> {
         discoverSort = item[0]; nearScrollY=0;
-        if (item[0].equals("near") && !hasLocation) { silentLocate = false; requestLocation(); return; }
         navigate("discover");
       });
       seg.addView(t, new LinearLayout.LayoutParams(0, dp(48), 1));
     }
-    content.addView(seg, new LinearLayout.LayoutParams(-1, -2));
+    if(!fromFriends)content.addView(seg, new LinearLayout.LayoutParams(-1, -2));
 
     LinearLayout searchBox = row();
     searchBox.setPadding(dp(14), 0, dp(10), 0);
@@ -1353,7 +1356,7 @@ public class MainActivity extends Activity {
     sp.topMargin = dp(10);
     content.addView(searchBox, sp);
 
-    final boolean nearby = hasLocation && discoverSort.equals("near");
+    final boolean nearby = fromFriends && hasLocation;
     search.setOnEditorActionListener((v, a, e) -> { loadPeople(search.getText().toString(), nearby); return true; });
     LinearLayout quick=row();
     quick.setPadding(0,dp(12),0,dp(12));
@@ -1458,12 +1461,12 @@ public class MainActivity extends Activity {
     CheckBox online=new CheckBox(this);online.setText(I18n.t("Đang online"));online.setChecked(nearOnline);CheckBox recent=new CheckBox(this);recent.setText(I18n.t("Hoạt động gần đây"));recent.setChecked(nearRecent);if(all){form.addView(online);form.addView(recent);}
     final int[] radii={1,5,10,25,50};final Spinner radius=all&&discoverSort.equals("near")?filterChoice(form,I18n.t("Bán kính"),new String[]{"1 km","5 km","10 km","25 km","50 km"},discoverRadius+" km"):null;
     String title=only.equals("age")?"Lọc theo tuổi":only.equals("weight")?"Lọc theo cân nặng":only.equals("height")?"Lọc theo chiều cao":only.equals("gender")?"Lọc theo giới tính":"Bộ lọc thành viên";
-    final Sheet builder=new Sheet(this).setTitle(I18n.t(title)).setView(form).setNegativeButton(I18n.t("Hủy"),null).setNeutralButton(I18n.t("Đặt lại"),(d,index)->{if(all||only.equals("age"))nearMinAge=nearMaxAge=0;if(all||only.equals("weight"))nearMinWeight=nearMaxWeight=0;if(all||only.equals("height"))nearMinHeight=nearMaxHeight=0;if(all||only.equals("gender"))nearGender="";if(all){nearOrientation=nearCommunityRole=nearIntent="";nearOnline=nearRecent=false;discoverRadius=5;}nearScrollY=0;navigate("discover");});
+    final Sheet builder=new Sheet(this).setTitle(I18n.t(title)).setView(form).setNegativeButton(I18n.t("Hủy"),null).setNeutralButton(I18n.t("Đặt lại"),(d,index)->{if(all||only.equals("age"))nearMinAge=nearMaxAge=0;if(all||only.equals("weight"))nearMinWeight=nearMaxWeight=0;if(all||only.equals("height"))nearMinHeight=nearMaxHeight=0;if(all||only.equals("gender"))nearGender="";if(all){nearOrientation=nearCommunityRole=nearIntent="";nearOnline=nearRecent=false;discoverRadius=5;}nearScrollY=0;refreshPeopleSearch();});
     final android.app.Dialog[] dialog={null};form.addView(primary(I18n.t("Áp dụng"),()->{try{
       int[] age=ages==null?null:readFilterRange(ages,18,99),weight=weights==null?null:readFilterRange(weights,20,400),height=heights==null?null:readFilterRange(heights,80,250);
       if(age!=null){nearMinAge=age[0];nearMaxAge=age[1];}if(weight!=null){nearMinWeight=weight[0];nearMaxWeight=weight[1];}if(height!=null){nearMinHeight=height[0];nearMaxHeight=height[1];}if(gender!=null)nearGender=gender.getSelectedItemPosition()==0?"":genders[gender.getSelectedItemPosition()];
       if(all){nearOrientation=orientation.getSelectedItemPosition()==0?"":orientations[orientation.getSelectedItemPosition()];nearCommunityRole=community.getSelectedItemPosition()==0?"":roles[community.getSelectedItemPosition()];nearIntent=intent.getSelectedItemPosition()==0?"":intents[intent.getSelectedItemPosition()];nearOnline=online.isChecked();nearRecent=recent.isChecked();if(radius!=null)discoverRadius=radii[radius.getSelectedItemPosition()];}
-      if(dialog[0]!=null)dialog[0].dismiss();nearScrollY=0;navigate("discover");
+      if(dialog[0]!=null)dialog[0].dismiss();nearScrollY=0;refreshPeopleSearch();
     }catch(IllegalArgumentException error){say(I18n.t("Nhập khoảng hợp lệ: tuổi 18–99, cân nặng 20–400 kg, chiều cao 80–250 cm. Giá trị Từ không lớn hơn Đến."));}}));dialog[0]=builder.show();
   }
 
@@ -2707,6 +2710,8 @@ public class MainActivity extends Activity {
     remember("friends", () -> friendsScreen(selected));
     headerActive = "friends";
     shell(I18n.t("Bạn bè"), true);
+    peopleFromFriends=false;
+    if(selected.equals("friends"))content.addView(primary(I18n.t("Quanh đây"),this::friendsNearby));
     final String[] keys = { "friends", "incoming", "outgoing" };
     final String[] names = { "Bạn bè", "Lời mời", "Đã gửi" };
     int index = Arrays.asList(keys).indexOf(selected);
@@ -3600,7 +3605,7 @@ public class MainActivity extends Activity {
         me = d.optJSONObject("user");
         boolean quiet = silentLocate;
         silentLocate = false;
-        if (!quiet || (!had && tab.equals("discover") && onTabRoot)) navigate("discover");
+        if (!quiet || (!had && tab.equals("discover") && onTabRoot)) refreshPeopleSearch();
         else say("");
       }
     );
@@ -3849,7 +3854,7 @@ public class MainActivity extends Activity {
     void screen(int index){
       box(95,18,190,409,27,CARD);word("9:41",108,39,8,TEXT,true);iphoneStatus();glyph(miniLogo,103,54,19,WHITE);word("Kinnect",128,69,14,ACCENT,true);glyph(WebIcons.load(MainActivity.this,"bell"),237,56,13,MUTED);photo(258,54,17,17,8);word(tabs[index]+" · Hồ sơ mẫu",108,86,8,MUTED,false);
       if(index==0){circle(122,108,14,PRIMARY_SOFT);glyph(WebIcons.load(MainActivity.this,"plus"),115,101,14,ACCENT);word("Tạo tin",110,130,7,MUTED,false);photo(145,94,28,28,14);word("Minh Anh",143,130,7,MUTED,false);box(103,140,174,32,10,SOFT);photo(108,145,21,21,10);word("Bạn đang nghĩ gì?",137,158,8,MUTED,false);photo(107,184,21,21,10);word("Minh Anh · 27",134,193,9,TEXT,true);word("Hồ sơ minh họa",134,204,7,MUTED,false);word("Tập luyện mỗi ngày",107,220,9,TEXT,false);photo(103,229,174,119,9);glyph(WebIcons.load(MainActivity.this,"heart"),108,359,13,PINK);glyph(WebIcons.load(MainActivity.this,"message_circle"),139,359,13,MUTED);glyph(WebIcons.load(MainActivity.this,"share_2"),170,359,13,MUTED);}
-      else if(index==1){box(102,95,176,24,8,SOFT);word("Dành cho bạn",107,110,7,ACCENT,true);word("Quanh đây",171,110,7,MUTED,false);word("Đang theo dõi",218,110,7,MUTED,false);box(102,126,176,24,8,SOFT);glyph(WebIcons.load(MainActivity.this,"search"),108,133,10,MUTED);word("Tên hoặc @username",124,142,8,MUTED,false);String[] filters={"Tuổi","Cân nặng","Chiều cao","Giới tính"};for(int i=0;i<4;i++){box(102+i*37,157,35,21,6,SOFT);word(filters[i],105+i*37,170,6,TEXT,false);}glyph(WebIcons.load(MainActivity.this,"sliders_horizontal"),257,162,13,MUTED);String[] people={"Minh Anh, 27","Gia Huy, 28","Hoàng Nam, 30","Quang Minh, 26"};for(int i=0;i<4;i++){float px=103+(i%2)*89,py=187+(i/2)*96;box(px,py,85,91,8,SOFT);personPhoto(i,px,py,85,71);pen.setTextSize(7);pen.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));float labelX=px+(85-pen.measureText(people[i]))/2;word(people[i],labelX,py+84,7,TEXT,true);}}
+      else if(index==1){box(102,95,176,24,8,SOFT);word("Dành cho bạn",107,110,7,ACCENT,true);word("Đang theo dõi",198,110,7,MUTED,false);box(102,126,176,24,8,SOFT);glyph(WebIcons.load(MainActivity.this,"search"),108,133,10,MUTED);word("Tên hoặc @username",124,142,8,MUTED,false);String[] filters={"Tuổi","Cân nặng","Chiều cao","Giới tính"};for(int i=0;i<4;i++){box(102+i*37,157,35,21,6,SOFT);word(filters[i],105+i*37,170,6,TEXT,false);}glyph(WebIcons.load(MainActivity.this,"sliders_horizontal"),257,162,13,MUTED);String[] people={"Minh Anh, 27","Gia Huy, 28","Hoàng Nam, 30","Quang Minh, 26"};for(int i=0;i<4;i++){float px=103+(i%2)*89,py=187+(i/2)*96;box(px,py,85,91,8,SOFT);personPhoto(i,px,py,85,71);pen.setTextSize(7);pen.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));float labelX=px+(85-pen.measureText(people[i]))/2;word(people[i],labelX,py+84,7,TEXT,true);}}
       else if(index==2){box(100,94,180,282,12,0xff111116);photo(100,94,180,282,12);box(103,98,174,24,8,0xaa111116);word("Đề xuất",143,114,9,WHITE,true);word("Đang theo dõi",194,114,8,WHITE,false);photo(253,218,18,18,9);circle(262,240,6,ACCENT);word("+",259,244,9,WHITE,true);glyph(WebIcons.load(MainActivity.this,"heart"),255,260,14,WHITE);glyph(WebIcons.load(MainActivity.this,"message_circle"),255,291,14,WHITE);glyph(WebIcons.load(MainActivity.this,"share_2"),255,322,14,WHITE);box(103,331,141,40,8,0xaa111116);word("@minhanh_demo",111,346,9,WHITE,true);word("Video minh họa",111,362,8,WHITE,false);}
       else{box(101,96,178,280,12,0xff17151e);photo(101,96,178,280,12);box(108,103,40,17,6,PINK);word("LIVE",117,115,8,WHITE,true);box(151,103,68,17,6,0xaa17151e);word("Minh họa",163,115,8,WHITE,false);box(107,309,166,60,10,0xbb17151e);word("Minh Anh đang trực tiếp",114,328,10,WHITE,true);word("Chào mừng đến với Kinnect",114,345,8,WHITE,false);glyph(WebIcons.load(MainActivity.this,"heart"),251,349,14,PINK);}
     }
