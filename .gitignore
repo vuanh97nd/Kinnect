@@ -32,6 +32,8 @@ turn.env
 
 ai.env
 billing.env
+sfu.env
+services/live-sfu/bin/
 android/play-release/.gradle/
 android/play-release/build/
 android/play-release/local.properties

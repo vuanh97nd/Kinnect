@@ -1,0 +1,13 @@
+services:
+  live-sfu:
+    build: .
+    restart: unless-stopped
+    env_file: ../../sfu.env
+    environment:
+      KINNECT_SFU_LISTEN: 0.0.0.0:7885
+    ports:
+      - "127.0.0.1:7885:7885/tcp"
+      - "7886:7886/udp"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
