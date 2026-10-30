@@ -1,0 +1,25 @@
+{
+  "version": "1.0.36",
+  "code": 101,
+  "androidProjectionChecks": {
+    "pass": 25,
+    "source": "Actual Android screen consent/capture; separate-UID synthetic game with generated audio",
+    "verified": [
+      "No local screen renderer/sink",
+      "Actual captured frames and mixed game audio",
+      "Joined acknowledgement opens selected fixture game",
+      "Controller foreground holds video/game audio",
+      "Return to game resumes video/audio",
+      "Manual privacy pause/resume",
+      "Projection revocation releases service/capture"
+    ]
+  },
+  "publicRoomCreated": false,
+  "serverJoinedAcknowledgement": "Simulated locally in instrumentation",
+  "realLienQuanDeviceTest": false,
+  "physicalSamsungTest": false,
+  "qaPayloadMatchesReleaseExceptManifestAndSignature": true,
+  "backendChanged": false,
+  "webUIChanged": false,
+  "signing": "v1/v2/v3 verified;16KB zip alignment;stable website certificate"
+}
