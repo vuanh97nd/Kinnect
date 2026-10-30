@@ -5,18 +5,18 @@ import android.app.*;import android.graphics.*;import android.graphics.drawable.
 final class LiveGamePicker {
  interface Selected{void choose(String title);}
  static final String[][] GAMES={
-  {"Liên Quân Mobile","MOBA","lien quan aov arena of valor lq"},
-  {"Free Fire","Sinh tồn","ff garena freefire"},
-  {"PUBG MOBILE VN","Sinh tồn","pubg pubgmobile vng"},
-  {"Roblox VN","Sáng tạo","roblox robloxvn"},
-  {"Mobile Legends: Bang Bang","MOBA","mlbb mobile legends lien quan ml"},
-  {"Liên Minh Huyền Thoại: Tốc Chiến","MOBA","toc chien wild rift lol lien minh"},
-  {"Đấu Trường Chân Lý","Chiến thuật","dtcl tft teamfight tactics"},
-  {"Play Together VNG","Giao lưu","playtogether haegin"},
-  {"Genshin Impact","Nhập vai","genshin nguyen than hoyoverse"},
-  {"Honkai: Star Rail","Nhập vai","honkai starrail hsr hoyoverse"},
-  {"Delta Force","Bắn súng","deltaforce delta force garena"},
-  {"Minecraft","Sáng tạo","minecraft mojang"}
+  {"Liên Quân Mobile","MOBA","lien quan aov arena of valor lq","Liên Quân Mobile;Liên Quân;Arena of Valor"},
+  {"Free Fire","Sinh tồn","ff garena freefire","Free Fire;Free Fire MAX"},
+  {"PUBG MOBILE VN","Sinh tồn","pubg pubgmobile vng","PUBG MOBILE VN;PUBG MOBILE"},
+  {"Roblox VN","Sáng tạo","roblox robloxvn","Roblox VN;Roblox"},
+  {"Mobile Legends: Bang Bang","MOBA","mlbb mobile legends lien quan ml","Mobile Legends: Bang Bang;Mobile Legends: Bang Bang VNG;Mobile Legends"},
+  {"Liên Minh Huyền Thoại: Tốc Chiến","MOBA","toc chien wild rift lol lien minh","Tốc Chiến;Wild Rift;League of Legends: Wild Rift"},
+  {"Đấu Trường Chân Lý","Chiến thuật","dtcl tft teamfight tactics","Đấu Trường Chân Lý;TFT;TFT: Teamfight Tactics"},
+  {"Play Together VNG","Giao lưu","playtogether haegin","Play Together VNG;Play Together"},
+  {"Genshin Impact","Nhập vai","genshin nguyen than hoyoverse","Genshin Impact"},
+  {"Honkai: Star Rail","Nhập vai","honkai starrail hsr hoyoverse","Honkai: Star Rail"},
+  {"Delta Force","Bắn súng","deltaforce delta force garena","Delta Force;Garena Delta Force"},
+  {"Minecraft","Sáng tạo","minecraft mojang","Minecraft"}
  };
  static String normalized(String value){return Normalizer.normalize(value,Normalizer.Form.NFD).replaceAll("\\p{M}+","").replace('đ','d').replace('Đ','D').toLowerCase(Locale.ROOT).trim();}
  static boolean matches(String[] game,String query){String q=normalized(query);if(q.isEmpty())return true;String text=normalized(game[0]+" "+game[1]+" "+game[2]);for(String word:q.split("\\s+"))if(!text.contains(word))return false;return true;}

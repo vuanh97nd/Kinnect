@@ -1,7 +1,7 @@
 {
-  "version": "1.0.29",
-  "filename": "Kinnect-1.0.29-native.apk",
-  "sha256": "23d73ecb7f7fb3bc84df9555159f20cddf711600bb965ffc317c56f286204864",
+  "version": "1.0.30",
+  "filename": "Kinnect-1.0.30-native.apk",
+  "sha256": "053b24bd8d459d60c89497aa34af0d619f131a210e801afc304db1dad39f8938",
   "playVersion": "1.2.4",
   "languages": [
     "vi",
@@ -46,7 +46,8 @@
     "live26": "Karaoke removed; temporary free Studio Pro photo export/save33; top3 Live filters9; backend113; see live26/verification.json",
     "live27": "Unified viewer swipe feed without top filters; creation-only Chat/Game choice; native10 checks; see live27/verification.json",
     "live28": "Direct Live preparation with actual camera and inline mode choices; no viewer lobby or automatic broadcast; native16 checks; see live28/verification.json",
-    "game29": "12 curated game choices; native17 picker/search/custom tests and16 preparation regression; see game29/verification.json"
+    "game29": "12 curated game choices; native17 picker/search/custom tests and16 preparation regression; see game29/verification.json",
+    "live30": "Shared camera bottom setup31 checks and actual projection/audio/auto game launch17 checks on emulator; local simulated joined acknowledgement, no public broadcast; see live30/verification.json"
   },
-  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.29"
+  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.30"
 }

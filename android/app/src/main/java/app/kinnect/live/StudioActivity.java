@@ -211,7 +211,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     LinearLayout actions = new LinearLayout(this);
     actions.setGravity(Gravity.CENTER);
     actions.setPadding(dp(8), dp(8), dp(8), dp(4));
-    actions.addView(roundAction("image", I18n.t("Thư viện"), this::openGallery), new LinearLayout.LayoutParams(0, -2, 1));
+    galleryAction=roundAction("image", I18n.t("Thư viện"), this::openGallery);actions.addView(galleryAction, new LinearLayout.LayoutParams(0, -2, 1));
     actions.addView(roundAction("smile", "Sticker", () -> showPanel(panel.equals("sticker") ? "" : "sticker")), new LinearLayout.LayoutParams(0, -2, 1));
     shutter = new ShutterView(this);
     shutter.setContentDescription(I18n.t("Chụp hoặc quay"));
@@ -268,8 +268,8 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     rail.removeAllViews();
     rail.addView(railButton("flip", I18n.t("Lật"), this::flip));
     if (still == null) rail.addView(railButton(torch ? "flash" : "flash_off", torch ? I18n.t("Đèn: bật") : I18n.t("Đèn"), () -> { torch = !torch; applyTorch(); buildRail(); }));
-    rail.addView(railButton("timer", timerSeconds == 0 ? I18n.t("Hẹn giờ") : timerSeconds + I18n.t(" giây"), () -> { timerSeconds = timerSeconds == 0 ? 3 : timerSeconds == 3 ? 10 : 0; buildRail(); }));
-    rail.addView(railButton("grid", grid ? I18n.t("Lưới: bật") : I18n.t("Lưới"), () -> { grid = !grid; gridOverlay.setGrid(grid); buildRail(); }));
+    if(!mode.equals("live")) rail.addView(railButton("timer", timerSeconds == 0 ? I18n.t("Hẹn giờ") : timerSeconds + I18n.t(" giây"), () -> { timerSeconds = timerSeconds == 0 ? 3 : timerSeconds == 3 ? 10 : 0; buildRail(); }));
+    if(!mode.equals("live")) rail.addView(railButton("grid", grid ? I18n.t("Lưới: bật") : I18n.t("Lưới"), () -> { grid = !grid; gridOverlay.setGrid(grid); buildRail(); }));
     if (mode.equals("photo")) rail.addView(railButton("ratio", ratio == 0 ? "9:16" : ratio == 1 ? "3:4" : "1:1", () -> { ratio = (ratio + 1) % 3; gridOverlay.setRatio(ratio); buildRail(); }));
     if (mode.equals("video") && !story) rail.addView(railButton("timer", (limitSeconds == 0 ? "∞" : limitSeconds + "s"), () -> { limitSeconds = limitSeconds == 0 ? 15 : limitSeconds == 15 ? 30 : limitSeconds == 30 ? 60 : 0; buildRail(); }));
   }
@@ -290,7 +290,13 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     return b;
   }
 
+  private View galleryAction;private LiveSetupSheet liveSetup;
+  private void showLiveSetup(){if(liveSetup==null)liveSetup=new LiveSetupSheet(this,front,fx);liveSetup.front(front);liveSetup.show();}
+
   private void renderModes() {
+    if(musicLabel!=null)musicLabel.setVisibility(mode.equals("live")?View.GONE:View.VISIBLE);
+    if(galleryAction!=null)galleryAction.setVisibility(mode.equals("live")?View.INVISIBLE:View.VISIBLE);
+    if(shutter!=null)shutter.setContentDescription(I18n.t(mode.equals("live")?"Thiết lập Live":"Chụp hoặc quay"));
     modeTabs.removeAllViews();
     String[][] modes = story ? new String[][] { { "video", "TIN 15 GIÂY" } } : new String[][] { { "photo", "ẢNH" }, { "video", "VIDEO" }, { "live", "LIVE" } };
     for (final String[] m : modes) {
@@ -298,7 +304,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
       LinearLayout cell = new LinearLayout(this);
       cell.setOrientation(LinearLayout.VERTICAL);
       cell.setGravity(Gravity.CENTER_HORIZONTAL);
-      cell.setPadding(dp(18), 0, dp(18), 0);
+      cell.setPadding(dp(8), 0, dp(8), 0);
       TextView t = text(m[1], 13, on ? 0xffffffff : 0x99ffffff, true);
       t.setLetterSpacing(0.08f);
       t.setGravity(Gravity.CENTER);
@@ -310,8 +316,8 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
       dp5.topMargin = dp(4);
       cell.addView(dot, dp5);
       if (m[0].equals("live")) t.setTextColor(0xffff5c7c);
-      cell.setOnClickListener(v -> { if (m[0].equals("live")) { if (!recording && !busy) { closeCamera(); startActivity(new android.content.Intent(this, LiveActivity.class).putExtra(LiveActivity.EXTRA_HOST, true)); } return; } if (!recording && !busy) { mode = m[0]; renderModes(); buildRail(); shutter.setMode(mode); gridOverlay.setRatio(mode.equals("photo") ? ratio : 0); } });
-      modeTabs.addView(cell, new LinearLayout.LayoutParams(dp(story ? 140 : 84), -2));
+      cell.setOnClickListener(v -> { if (m[0].equals("live")) { if (!recording && !busy) { mode="live"; renderModes(); buildRail(); gridOverlay.setRatio(0); showLiveSetup(); } return; } if (!recording && !busy) { mode = m[0]; renderModes(); buildRail(); shutter.setMode(mode); gridOverlay.setRatio(mode.equals("photo") ? ratio : 0); } });
+      modeTabs.addView(cell, new LinearLayout.LayoutParams(story?dp(140):0, -2,story?0:1));
     }
     if (shutter != null) shutter.setMode(mode);
   }
@@ -521,6 +527,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   @Override
   protected void onResume() {
     super.onResume();
+    if(mode.equals("live")&&liveSetup==null)root.post(this::showLiveSetup);
     Choreographer.getInstance().postFrameCallback(this);
     if (camera.isAvailable()&&reviewedVideo==null) openCamera();if(reviewVideo!=null)reviewVideo.start();
   }
@@ -536,6 +543,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
 
   @Override
   protected void onDestroy() {
+    if(liveSetup!=null)liveSetup.close();
     if(reviewVideo!=null){reviewVideo.stopPlayback();reviewVideo=null;}worker.shutdownNow();
     if (music != null) { music.release(); music = null; }
     super.onDestroy();
@@ -759,6 +767,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
 
   // ======================= Chụp / quay =======================
   private void onShutter() {
+    if(mode.equals("live")){showLiveSetup();return;}
     if (busy) return;
     if (recording) { stopRecording(); return; }
     if (timerSeconds > 0) countdownThen(timerSeconds, this::shoot);

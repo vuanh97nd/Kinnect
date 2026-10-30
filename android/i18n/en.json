@@ -1700,5 +1700,17 @@
   "Chiến thuật": "Strategy",
   "Giao lưu": "Social",
   "Nhập vai": "Role-playing",
-  "Bắn súng": "Shooter"
+  "Bắn súng": "Shooter",
+  "Hãy chọn game trước.": "Choose a game first.",
+  "Không tìm thấy game trên máy. Hãy cài game hoặc chọn game khác.": "Game not found on this device. Install it or choose another game.",
+  "Không tìm thấy game trên máy.": "Game not found on this device.",
+  "Không mở được game. Chưa phát tiếp.": "Cannot open the game. Streaming has stopped.",
+  "Đang bắt đầu Live…": "Starting Live…",
+  "Máy chủ phản hồi chậm. Hãy thử lại.": "The server is taking too long. Please try again.",
+  "Kết nối Live bị gián đoạn. Hãy thử lại.": "Live connection interrupted. Please try again.",
+  "Không mở được camera. Hãy thử lại.": "Cannot open the camera. Please try again.",
+  "Không chia sẻ được màn hình. Hãy thử lại.": "Cannot share the screen. Please try again.",
+  "Phát toàn màn hình, gồm cả thông báo. Dùng Tạm che khi cần.": "Shares the entire screen, including notifications. Use Hide screen when needed.",
+  "Tiếng game": "Game sound",
+  "Thiết lập Live": "Live setup"
 }

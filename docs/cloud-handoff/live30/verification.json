@@ -1,0 +1,20 @@
+{
+  "version": "1.0.30",
+  "versionCode": 95,
+  "sha256": "053b24bd8d459d60c89497aa34af0d619f131a210e801afc304db1dad39f8938",
+  "checks": {
+    "nativeCameraSetup": 31,
+    "realProjectionAndGameAudio": 17,
+    "screen": "Android16 / 320dp / font130",
+    "qaVersionCode": 120,
+    "qaPayloadMatchesReleaseExceptManifestAndSignature": true
+  },
+  "behavior": "Studio Live tab retains camera device and texture, opens one bottom setup with Chat/Game. Game reveals searchable12 catalog. One Start button, installed launcher exact-label/alias resolution, missing game blocks before starting. Android consent required; API34+ default display capture avoids selecting game a second time. Server joined acknowledgement opens selected game only after room created. Front/back chosen before camera capture begins, common filter/sticker/beauty values retained. One icon row for mic/game sound/comments. Cancel returns to Studio, configured failure closes, screen revocation cleans service. Viewer feed unchanged.",
+  "verificationLimits": "Native/UI and actual media on emulator. Game fixture with generated audio is separate UID, named Minecraft for local launcher matching. Server joined acknowledgement simulated locally with socket=null: no public room or public broadcast. No real popular games or physical phone tested. Installed app launcher labels/localization can vary; unmatched game is rejected safely. Playback capture depends on game allowing it.",
+  "privacy": "Launcher intent visibility query only, no QUERY_ALL_PACKAGES permission or upload of installed-app list. Entire screen capture is explained in setup, still requires Android confirmation. Optional overlay permission; denied overlay may continue streaming without floating comments.",
+  "webAndPlayChanged": false,
+  "references": [
+    "https://developer.android.com/training/package-visibility/declaring",
+    "https://developer.android.com/media/grow/media-projection"
+  ]
+}
