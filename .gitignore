@@ -32,6 +32,10 @@ turn.env
 
 ai.env
 billing.env
+cloud-db.env
+gateway.env
+cloud-api-server.env
+cloud-api/.dev.vars
 sfu.env
 services/live-sfu/bin/
 android/play-release/.gradle/
@@ -43,3 +47,11 @@ android/play-release/local.properties
 !website/dist/**
 __pycache__/
 *.pyc
+
+chat-db.env
+
+chat-api-server.env
+
+jdk17/
+
+outputs/

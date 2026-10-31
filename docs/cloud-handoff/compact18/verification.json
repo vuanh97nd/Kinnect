@@ -12,6 +12,12 @@
   ],
   "qaVariant": "Emulator QA copy re-signed with existing QA key and code108 to update previously installed Play candidate106; all non-manifest non-signature ZIP entries identical to delivered APK.",
   "physicalDeviceVerified": false,
-  "published": false,
-  "webModified": false
+  "published": true,
+  "webModified": false,
+  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.18",
+  "publicationChecks": [
+    "Public latest and releases collection list v1.0.18 with expected APK SHA256",
+    "GitHub direct download HEAD 200, 63147060 bytes",
+    "app.kinnect.io.vn/download/android HEAD 200, filename Kinnect-1.0.18-native.apk, 63147060 bytes"
+  ]
 }

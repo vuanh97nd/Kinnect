@@ -11,7 +11,7 @@ jdk=next((tools/"jdk").glob("jdk-*"))/"bin"
 jar=tools/"platform/android-35-ext15/android.jar"
 out=root/"android/build/media-tests"
 out.mkdir(parents=True,exist_ok=True)
-cp=str(root/"android/build/classes")+";"+str(jar)
+cp=str(root/"android/build/native-store-17/classes")+";"+str(jar)
 sources=list((root/"android/test/provider-stubs").rglob("*.java"))+[root/"android/test/NativeMediaStreamTest.java",root/"android/test/MediaTypeTest.java"]
 subprocess.run([str(jdk/"javac.exe"),"-encoding","UTF-8","-cp",cp,"-d",str(out),*map(str,sources)],check=True)
 for test in ["MediaTypeTest","NativeMediaStreamTest"]:

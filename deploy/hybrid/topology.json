@@ -1,0 +1,10 @@
+{
+ "version":1,
+ "status":"allocation-deployed-backends-not-ready",
+ "allocation":{"provider":"cloudflare-durable-objects","selection":"fastest-healthy-backend","latencyProbeSeconds":60,"switchMarginMs":25,"cloudUsers":100,"overflowWhenPcOffline":"waiting","leaseSeconds":90,"pcHeartbeatSeconds":30,"endpoint":"https://kinnect-allocation.vuanh97nd.workers.dev","runtimeIntegrated":false},
+ "cloud":{"api":true,"authentication":"shared-postgres-fastest-backend","sessionAuthority":"postgres","wallet":"postgres","chat":"d1","notifications":true,"signaling":true},
+ "pc":{"mediaFiles":true,"sfu":true,"turn":true},
+ "whenPcOffline":{"authentication":"available-if-cloud-ready","textChat":"available-if-cloud-ready","wallet":"available-if-cloud-ready","mediaFiles":"unavailable","live":"unavailable","relayCalls":"unavailable","directCalls":"may-connect-peer-to-peer"},
+ "limits":{"liveRooms":30,"totalLiveViewers":2000,"capacityVerified":false},
+ "productionReady":false
+}

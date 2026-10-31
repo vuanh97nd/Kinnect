@@ -4,7 +4,7 @@ import android.content.Context;import org.json.*;import java.util.*;
 final class NativeCallEnds {
  private static final Map<String,JSONObject> ended=new LinkedHashMap<>();private static Context context;
  static synchronized void initialize(Context c){context=c.getApplicationContext();if(!ended.isEmpty())return;try{JSONArray rows=new JSONArray(context.getSharedPreferences("call_terminal",0).getString("pending","[]"));for(int i=0;i<rows.length();i++){JSONObject row=rows.getJSONObject(i);ended.put(key(row.getJSONObject("payload")),row);}}catch(Exception ignored){}clean();}
- private static String scope(){return Integer.toHexString(NativeApi.shared.cookieFor(ServerConfig.DEFAULT_ORIGIN).hashCode());}
+ private static String scope(){return Integer.toHexString(NativeApi.shared.cookieFor(NativeApi.shared.origin()).hashCode());}
  private static String key(JSONObject m){return m.optString("callId",m.optString("requestId"));}
  private static void save(){if(context!=null)context.getSharedPreferences("call_terminal",0).edit().putString("pending",new JSONArray(ended.values()).toString()).apply();}
  private static void clean(){long now=System.currentTimeMillis();Iterator<JSONObject> iterator=ended.values().iterator();while(iterator.hasNext())if(iterator.next().optLong("until")<=now)iterator.remove();}

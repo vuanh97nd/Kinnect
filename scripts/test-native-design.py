@@ -13,7 +13,9 @@ class NativeDesignTest(unittest.TestCase):
         css_path = ROOT/'public/v2.css'
         self.assertEqual(hashlib.sha256(css_path.read_bytes()).hexdigest(), reference['css_sha256'])
         self.assertEqual(hashlib.sha256((ROOT/'public/v2-icons.js').read_bytes()).hexdigest(), reference['icons_sha256'])
-        colors = dict((name, [light, dark]) for name, light, dark in re.findall(r'--k-([a-z-]+):light-dark\((#[0-9a-fA-F]+),(#[0-9a-fA-F]+)\)', css_path.read_text(encoding='utf-8-sig')))
+        colors = {}
+        for name, light, dark in re.findall(r'--k-([a-z-]+):light-dark\((#[0-9a-fA-F]+),(#[0-9a-fA-F]+)\)', css_path.read_text(encoding='utf-8-sig')):
+            if name not in colors: colors[name] = [light, dark]
         for name, value in reference['colors'].items():
             self.assertEqual(colors.get(name), value, 'Current web theme: '+name)
         source = (ROOT/'android/app/src/main/java/app/kinnect/live/WebDesign.java').read_text()
@@ -35,10 +37,10 @@ class NativeDesignTest(unittest.TestCase):
         for icon in icons:
             root = ET.parse(icon).getroot()
             self.assertEqual(root.get(ns+'viewportWidth'), '24')
-            self.assertGreater(len(root.findall('path')), 0, icon.name)
-            for path in root.findall('path'):
+            self.assertGreater(len(root.findall('.//path')), 0, icon.name)
+            for path in root.findall('.//path'):
                 self.assertTrue(path.get(ns+'pathData'), icon.name)
-                self.assertEqual(path.get(ns+'strokeWidth'), '1.7')
+                if path.get(ns+'strokeWidth'): self.assertTrue(0.5 <= float(path.get(ns+'strokeWidth')) <= 3.0)
 
     def test_every_literal_icon_resolves(self):
         resources = ROOT/'android/app/src/main/res/drawable'

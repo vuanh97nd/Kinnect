@@ -3002,3 +3002,17 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 #kn#kn .app .live-studio .v2-live-heading>.live-count{font-size:11px;min-width:34px;width:auto;height:36px;padding:0 2px;background:none;border-radius:0}#kn .live-count [data-live-viewers]{display:inline;font-size:11px;color:white}
 
 #kn .live-studio .v2-live-chat-log{height:118px;max-height:118px}#kn .live-studio .live-arrival{bottom:194px}#kn .live-studio:has(.live-horizontal-tray) .live-side-actions,#kn .live-studio:has(.live-horizontal-tray) .v2-live-chat-log,#kn .live-studio:has(.live-horizontal-tray) .live-arrival{visibility:hidden}
+
+/* Be Vietnam Pro — đồng bộ typography với app native (cùng bộ font bundle trong APK). */
+@font-face{font-family:'Be Vietnam Pro';src:url('/fonts/be-vietnam-pro-regular.ttf') format('truetype');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'Be Vietnam Pro';src:url('/fonts/be-vietnam-pro-semibold.ttf') format('truetype');font-weight:600;font-style:normal;font-display:swap}
+@font-face{font-family:'Be Vietnam Pro';src:url('/fonts/be-vietnam-pro-semibold.ttf') format('truetype');font-weight:700;font-style:normal;font-display:swap}
+body,#kn{font-family:'Be Vietnam Pro',system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+:root{--font-sans:'Be Vietnam Pro',system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+
+/* Vi tương tác: nhấn nút, nâng thẻ khi hover, shimmer skeleton. */
+#kn button,#kn .cursor-interaction{transition:transform .16s cubic-bezier(.2,.8,.2,1),box-shadow .16s ease,opacity .16s ease}
+#kn button:active,#kn .cursor-interaction:active{transform:scale(.97)}
+@media(hover:hover){#kn .panel,#kn .social-card{transition:transform .18s cubic-bezier(.2,.8,.2,1),box-shadow .18s ease}#kn .panel:hover,#kn .social-card:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(16,18,30,.14)}}
+@keyframes kn-shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+.kn-skeleton{background:linear-gradient(90deg,var(--k-wash,#f1ecff) 25%,#ffffff55 37%,var(--k-wash,#f1ecff) 63%);background-size:200% 100%;animation:kn-shimmer 1.2s infinite}

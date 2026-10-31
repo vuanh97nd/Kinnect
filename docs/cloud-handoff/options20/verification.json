@@ -13,5 +13,10 @@
   "qaVariant": "code110 with QA key to update emulator. All non-manifest/non-signature entries equal delivered APK.",
   "physicalDeviceVerified": false,
   "webClientModified": false,
-  "published": false
+  "published": true,
+  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.20",
+  "publicationChecks": [
+    "Public latest and updater collection list v1.0.20 with expected SHA256",
+    "GitHub direct APK and app /download/android respond200 with Kinnect-1.0.20-native.apk"
+  ]
 }

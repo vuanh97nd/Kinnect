@@ -24,7 +24,7 @@ import java.util.concurrent.*;
  */
 public final class MediaEditActivity extends Activity implements Choreographer.FrameCallback, TimelineView.Host {
   private static final int PICK_MUSIC = 10, SAVE = 11, PICK_CLIPS = 20, PICK_IMAGE = 21, MIC = 30;
-  private static final int BG = 0xff0f0d15, PANEL = 0xff1a1724, CARD = 0xff272233, ACCENT = 0xff7c5cff, INK = 0xfff4f1fa, MUTED = 0xffa79fb8;
+  private static final int BG = 0xff0a0a0c, PANEL = 0xff141418, CARD = 0xff222228, ACCENT = 0xff8b5cf6, INK = 0xfff5f3ff, MUTED = 0xffa7a2b8;
 
   private final ExecutorService worker = Executors.newSingleThreadExecutor(), loader = Executors.newSingleThreadExecutor(), faces = Executors.newSingleThreadExecutor();
   private EditorProject project = new EditorProject();
@@ -145,7 +145,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
 
   private void failure(String message) {
     if (closed) return; busy = false;
-    new AlertDialog.Builder(this).setMessage(message).setPositiveButton(I18n.t("Dùng bản gốc"), (d, w) -> { if (input != null) deliver(input); else finish(); }).setNegativeButton(I18n.t("Đóng"), (d, w) -> finish()).show();
+    new Sheet(this).setTitle(I18n.t("Không mở được nội dung")).setMessage(message).setPositiveButton(I18n.t("Dùng bản gốc"), (d, w) -> { if (input != null) deliver(input); else finish(); }).setNegativeButton(I18n.t("Đóng"), (d, w) -> finish()).show();
   }
 
   // ---------- Layout ----------
@@ -183,7 +183,9 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(-2, dp(34)); pp.leftMargin = dp(4); top.addView(post, pp);
     root.addView(top, new LinearLayout.LayoutParams(-1, dp(52)));
 
-    stage = new FrameLayout(this); stage.setBackgroundColor(0xff050408); root.addView(stage, new LinearLayout.LayoutParams(-1, 0, 1));
+    stage = new FrameLayout(this); stage.setBackground(rounded(0xff050408, 18)); stage.setClipToOutline(true);
+    LinearLayout.LayoutParams stageLp = new LinearLayout.LayoutParams(-1, 0, 1); stageLp.leftMargin = stageLp.rightMargin = dp(8);
+    root.addView(stage, stageLp);
     for (Deck d : decks) {
       d.view = new TextureView(this); d.view.setAlpha(.01f); stage.addView(d.view, new FrameLayout.LayoutParams(2, 2));
       d.view.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {

@@ -5,15 +5,18 @@ android {
  namespace 'app.kinnect.live'
  compileSdk 36
  buildToolsVersion '36.0.0'
- defaultConfig { applicationId 'app.kinnect.live'; minSdk 26; targetSdk 36; versionCode 106; versionName '1.2.4' }
- signingConfigs { release { storeFile file("${repo}/work/play-signing/upload.jks"); storePassword System.getenv('KINNECT_PLAY_PASS'); keyAlias 'kinnect-upload'; keyPassword System.getenv('KINNECT_PLAY_PASS') } }
+ defaultConfig { applicationId 'app.kinnect.live'; minSdk 26; targetSdk 36; versionCode 110; versionName '1.2.6' }
+ signingConfigs {
+  debug { storeFile file("${repo}/android/debug.keystore"); storePassword 'android'; keyAlias 'androiddebugkey'; keyPassword 'android' }
+  release { storeFile file("${repo}/work/play-signing/upload.jks"); storePassword System.getenv('KINNECT_PLAY_PASS'); keyAlias 'kinnect-upload'; keyPassword System.getenv('KINNECT_PLAY_PASS') }
+ }
  buildTypes { release { signingConfig signingConfigs.release; minifyEnabled false; debuggable false } }
  sourceSets {
   main {
    manifest.srcFile "${repo}/android/build/play-gradle/AndroidManifest.xml"
    java.srcDirs = ["${repo}/android/app/src/main/java", "${repo}/android/app/src/play/java"]
-   // The main Distribution.java is removed from a generated source mirror by the build script.
-   java.srcDirs = ["${repo}/android/build/play-gradle/java"]
+   java.exclude { details -> details.file.absolutePath.replace('\\', '/').contains('/src/main/java/') && details.file.name.startsWith('ApkUpdate') }
+   java.exclude { details -> details.file.absolutePath.replace('\\', '/').endsWith('/src/main/java/app/kinnect/live/Distribution.java') }
    res.srcDirs = ["${repo}/android/app/src/main/res"]
    assets.srcDirs = ["${repo}/android/app/src/main/assets", "${repo}/android/build/play-gradle/assets"]
    jniLibs.srcDirs = ["${repo}/work/android-tools/deps/webrtc/jni"]

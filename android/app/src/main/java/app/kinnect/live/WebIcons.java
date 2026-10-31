@@ -15,7 +15,8 @@ final class WebIcons {
     switch (name.replace('-','_')) {
       case "group_three":web="users_round";break;
       case "menu_lines":web="menu";break;
-      case "about_info":web="info";break;
+      case "about_info": web = "info"; break;
+      case "info": web = "circle_help"; break;
       case "bell_ring":web="bell";break;
       case "user_search":web="search";break;
       case "distance_pins":web="map_pin";break;
@@ -49,6 +50,7 @@ final class WebIcons {
       case "back": web = "arrow_left"; break;
       case "more": web = "ellipsis"; break;
       case "close": web = "x"; break;
+      case "export": web = "download"; break;
       case "share": web = "send"; break;
       case "recall": web = "rotate_ccw"; break;
       case "trash": web = "trash_2"; break;

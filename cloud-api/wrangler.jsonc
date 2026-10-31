@@ -1,0 +1,55 @@
+{
+	"name": "kinnect-cloud-api",
+	"main": "worker.js",
+	"compatibility_date": "2026-10-30",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"workers_dev": true,
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "USER_EVENTS",
+				"class_name": "UserEvents"
+			},
+			{
+				"name": "AUTH_LIMITS",
+				"class_name": "AuthLimits"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": [
+				"UserEvents"
+			]
+		},
+		{
+			"tag": "v2",
+			"new_sqlite_classes": [
+				"AuthLimits"
+			]
+		}
+	],
+	"d1_databases": [
+		{
+			"binding": "CHAT_DB",
+			"database_name": "kinnect-chat",
+			"database_id": "ede253ed-ddc4-4a9e-a6d5-d6d3baa3f74e"
+		}
+	],
+	"observability": {
+		"enabled": false
+	},
+	"hyperdrive": [
+		{
+			"binding": "HYPERDRIVE",
+			"id": "6898c16b24b942b5893159d301f0037e"
+		},
+		{
+			"binding": "CHAT_HYPERDRIVE",
+			"id": "1fc742f412c74f9cb02885907aff29e1"
+		}
+	]
+}

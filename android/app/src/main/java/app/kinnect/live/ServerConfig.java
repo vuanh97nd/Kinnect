@@ -8,6 +8,10 @@ public final class ServerConfig {
   public static final String DEFAULT_ORIGIN =
     "https://app.kinnect.io.vn";
 
+  /** Máy chủ dự phòng: allocation gateway tự định tuyến PC → cloud khi PC ngoại tuyến. */
+  public static final String FALLBACK_ORIGIN =
+    "https://kinnect-allocation.vuanh97nd.workers.dev";
+
   private ServerConfig() {}
 
   public static String normalize(String value) {

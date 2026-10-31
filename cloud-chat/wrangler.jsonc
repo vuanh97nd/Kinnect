@@ -1,0 +1,10 @@
+{
+ "name":"kinnect-chat",
+ "compatibility_date":"2026-10-30",
+ "d1_databases":[{
+  "binding":"CHAT_DB",
+  "database_name":"kinnect-chat",
+  "database_id":"ede253ed-ddc4-4a9e-a6d5-d6d3baa3f74e",
+  "migrations_dir":"migrations"
+ }]
+}

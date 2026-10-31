@@ -10,8 +10,13 @@
   "nativeNavigation": "Server-backed ordinary QA account: exact same feed viewport/content and media height on return; immediate and first rendered frame positions unchanged; active Feed tap resets top. Actual chat menu > settings > Back > parent menu > Back > chat passed. No messages or recovery emails sent by native QA.",
   "qaVariant": "code109 and QA signature solely to update emulator; all other ZIP payloads identical to delivered APK.",
   "physicalDeviceVerified": false,
-  "published": false,
+  "published": true,
   "webClientModified": false,
   "startupErrors": "Saved diagnostic log retained without opening any startup popup; actual final APK component audit passed. Timeout/HTTP408/504 use concise translated text; repeated identical toasts suppressed for six seconds.",
-  "backendDeployment": "Managed Node server restarted; local and public health and public OAuth-provider GET passed (native User-Agent). Tunnel preserved."
+  "backendDeployment": "Managed Node server restarted; local and public health and public OAuth-provider GET passed (native User-Agent). Tunnel preserved.",
+  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.19",
+  "publicationChecks": [
+    "Public latest and updater collection list v1.0.19 with expected asset SHA256",
+    "GitHub download and app.kinnect.io.vn/download/android HEAD 200, filename Kinnect-1.0.19-native.apk"
+  ]
 }

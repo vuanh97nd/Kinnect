@@ -74,7 +74,7 @@ public class MainActivity extends Activity {
   private void ensureCalls(){if(me!=null&&!mediaCallListening){mediaCallListening=true;KinnectService.listen(mediaCallEvents);}if(KinnectService.pendingIncoming!=null){mediaCallGate.update("call-incoming",KinnectService.pendingIncoming.optString("callId"));mediaCallBlocked=mediaCallGate.blocked();pauseForCall();}if(me!=null&&calls==null){calls=new NativeCalls(this,server());setupBackground();}}
   // Một lần: xin đủ quyền thông báo/cuộc gọi, cho phép toàn màn hình và chạy nền.
   private void setupBackground(){if(Distribution.PLAY){if(Build.VERSION.SDK_INT>=33&&checkSelfPermission("android.permission.POST_NOTIFICATIONS")!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"},950);return;}android.content.SharedPreferences p=getSharedPreferences("native_setup",0);if(p.getBoolean("asked_v1",false)){backgroundExtras(false);return;}p.edit().putBoolean("asked_v1",true).apply();java.util.ArrayList<String> want=new java.util.ArrayList<>();if(Build.VERSION.SDK_INT>=33)want.add("android.permission.POST_NOTIFICATIONS");want.add(Manifest.permission.RECORD_AUDIO);want.add(Manifest.permission.CAMERA);if(Build.VERSION.SDK_INT>=31)want.add("android.permission.BLUETOOTH_CONNECT");java.util.ArrayList<String> missing=new java.util.ArrayList<>();for(String w:want)if(checkSelfPermission(w)!=PackageManager.PERMISSION_GRANTED)missing.add(w);if(missing.isEmpty())backgroundExtras(true);else requestPermissions(missing.toArray(new String[0]),950);}
-  private void backgroundExtras(boolean prompt){if(Distribution.PLAY)return;try{if(Build.VERSION.SDK_INT>=34&&!getSystemService(android.app.NotificationManager.class).canUseFullScreenIntent()){if(prompt)new AlertDialog.Builder(this).setTitle(I18n.t("Cuộc gọi toàn màn hình")).setMessage(I18n.t("Cho phép Kinnect hiện cuộc gọi đến toàn màn hình, kể cả khi khóa máy.")).setPositiveButton(I18n.t("Cho phép"),(d,w)->{try{startActivity(new Intent("android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT",android.net.Uri.parse("package:"+getPackageName())));}catch(RuntimeException ignored){}}).setNegativeButton(I18n.t("Để sau"),(d,w)->battery()).show();else battery();return;}}catch(RuntimeException ignored){}if(prompt)battery();}
+  private void backgroundExtras(boolean prompt){if(Distribution.PLAY)return;try{if(Build.VERSION.SDK_INT>=34&&!getSystemService(android.app.NotificationManager.class).canUseFullScreenIntent()){if(prompt)new Sheet(this).setTitle(I18n.t("Cuộc gọi toàn màn hình")).setMessage(I18n.t("Cho phép Kinnect hiện cuộc gọi đến toàn màn hình, kể cả khi khóa máy.")).setPositiveButton(I18n.t("Cho phép"),(d,w)->{try{startActivity(new Intent("android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT",android.net.Uri.parse("package:"+getPackageName())));}catch(RuntimeException ignored){}}).setNegativeButton(I18n.t("Để sau"),(d,w)->battery()).show();else battery();return;}}catch(RuntimeException ignored){}if(prompt)battery();}
   private void battery(){android.os.PowerManager pm=(android.os.PowerManager)getSystemService(POWER_SERVICE);if(pm!=null&&!pm.isIgnoringBatteryOptimizations(getPackageName()))try{startActivity(new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,android.net.Uri.parse("package:"+getPackageName())));}catch(RuntimeException ignored){}}
   private void handleExtras(Intent intent){if(intent==null||me==null)return;String destination=intent.getStringExtra("commerce_destination");if(destination!=null){intent.removeExtra("commerce_destination");if(destination.equals("account"))meMenu();else if(destination.equals("notifications"))notifications();else if(destination.equals("friends"))friendsScreen("friends");else if(destination.equals("create"))openCreateMenu();else navigate(destination);}if(intent.getBooleanExtra("accept_call",false)){intent.removeExtra("accept_call");ensureCalls();if(calls!=null)calls.checkPending();}String n=intent.getStringExtra("notification");if(n!=null){intent.removeExtra("notification");try{openNotification(new JSONObject(n));}catch(JSONException ignored){}}}
   private LocationListener locationListener;
@@ -91,7 +91,7 @@ public class MainActivity extends Activity {
   }
 
   private GradientDrawable gradient(int radius) {
-    GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { ACCENT, ACCENT });
+    GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { ACCENT, 0xffd946c4 });
     d.setCornerRadius(dp(radius));
     return d;
   }
@@ -103,9 +103,11 @@ public class MainActivity extends Activity {
   @Override
   public void onCreate(Bundle state) {
     boolean night = WebTheme.isDark(this);
-    setTheme(night ? android.R.style.Theme_Material_NoActionBar : android.R.style.Theme_Material_Light_NoActionBar);
+    int themeId = getResources().getIdentifier(night ? "Kinnect.App.Dark" : "Kinnect.App.Light", "style", getPackageName());
+    setTheme(themeId != 0 ? themeId : (night ? android.R.style.Theme_Material_NoActionBar : android.R.style.Theme_Material_Light_NoActionBar));
     super.onCreate(state);
     CrashLog.install(this);
+    if (Build.VERSION.SDK_INT >= 33) getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::handleBack);
     palette();
     api.initialize(this,server());
     getWindow().setStatusBarColor(CARD);
@@ -154,7 +156,7 @@ public class MainActivity extends Activity {
   }
 
   private int dp(int n) {
-    return Math.round(n * getResources().getDisplayMetrics().density);
+    return Math.round(n * getResources().getDisplayMetrics().density * WebDesign.UI_SCALE);
   }
 
   private GradientDrawable background(int color, int radius) {
@@ -169,9 +171,39 @@ public class MainActivity extends Activity {
     return new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf((ACCENT & 0x00ffffff) | 0x33000000), background(color, radius), mask);
   }
 
+  // Giải mã entity HTML (&#127752;, &amp;…) mà server trả về trong nội dung bài viết/tin nhắn.
+  // Lặp tối đa 4 lần vì server đôi khi mã hoá 2 lớp (vd &amp;#127752;).
+  private String decodeEntities(String s) {
+    if (s == null || s.indexOf('&') < 0) return s;
+    java.util.regex.Pattern p = java.util.regex.Pattern.compile("&#(\\d+);|&#[xX]([0-9a-fA-F]+);|&(amp|lt|gt|quot|apos|nbsp);");
+    String out = s;
+    for (int pass = 0; pass < 4 && out.indexOf('&') >= 0; pass++) {
+      java.util.regex.Matcher m = p.matcher(out);
+      StringBuffer next = new StringBuffer();
+      boolean changed = false;
+      while (m.find()) {
+      String rep;
+      if (m.group(1) != null || m.group(2) != null) {
+        int cp = 0;
+        try { cp = m.group(1) != null ? Integer.parseInt(m.group(1)) : Integer.parseInt(m.group(2), 16); } catch (NumberFormatException ignored) {}
+        rep = Character.isValidCodePoint(cp) ? new String(Character.toChars(cp)) : m.group();
+      } else {
+        String n = m.group(3);
+        rep = n.equals("amp") ? "&" : n.equals("lt") ? "<" : n.equals("gt") ? ">" : n.equals("quot") ? "\"" : n.equals("apos") ? "'" : " ";
+      }
+        m.appendReplacement(next, java.util.regex.Matcher.quoteReplacement(rep));
+        changed = true;
+      }
+      if (!changed) break;
+      m.appendTail(next);
+      out = next.toString();
+    }
+    return out;
+  }
+
   private TextView label(String text, int size, int color) {
     TextView v = new KinnectText(this);
-    v.setText(text);
+    v.setText(decodeEntities(text));
     v.setTextColor(color);
     v.setTextSize(size);
     v.setIncludeFontPadding(false);
@@ -205,10 +237,15 @@ public class MainActivity extends Activity {
     b.setMinimumHeight(dp(WebDesign.CONTROL));
     b.setAllCaps(false);
     b.setStateListAnimator(null);
-    b.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+    b.setTypeface(ApprovedTypography.font(this, Typeface.BOLD));
     b.setTextSize(14);
-    b.setBackground(pressable(SOFT, 12));
-    LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, dp(46));
+    GradientDrawable tonal = background(SOFT, 99); // Nút dạng Pill theo M3
+    b.setBackground(new android.graphics.drawable.RippleDrawable(
+      android.content.res.ColorStateList.valueOf((ACCENT & 0x00ffffff) | 0x28000000),
+      tonal,
+      background(0xff000000, 99)
+    ));
+    LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, dp(48)); // Chiều cao 48dp chuẩn M3
     p.setMargins(0, dp(6), 0, dp(4));
     b.setLayoutParams(p);
     b.setOnClickListener(v -> action.run());
@@ -218,9 +255,41 @@ public class MainActivity extends Activity {
   private Button primary(String text, Runnable action) {
     Button b = button(text, action);
     b.setTextColor(WHITE);
-    b.setBackground(pressable(ACCENT, 12));
-    b.setElevation(dp(2));
+    b.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x33ffffff), brandGradient(99), null));
+    b.setElevation(dp(0));
+    tactile(b);
     return b;
+  }
+
+  /** Trộn hai màu để tạo gradient thương hiệu nhưng vẫn giữ tương phản chữ trắng ≥ 4.5:1. */
+  private int mix(int a, int b, float t) {
+    float u = 1f - t;
+    return 0xff000000
+      | (Math.round(((a >> 16) & 0xff) * u + ((b >> 16) & 0xff) * t) << 16)
+      | (Math.round(((a >> 8) & 0xff) * u + ((b >> 8) & 0xff) * t) << 8)
+      | Math.round((a & 0xff) * u + (b & 0xff) * t);
+  }
+
+  private GradientDrawable brandGradient(int radius) {
+    GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { ACCENT, mix(ACCENT, PINK, 0.35f) });
+    g.setCornerRadius(dp(radius));
+    return g;
+  }
+
+  /** Phản hồi chạm nhẹ (scale) cho CTA/nút hành động — không chặn sự kiện click. */
+  private void tactile(View v) {
+    v.setOnTouchListener((view, event) -> {
+      switch (event.getActionMasked()) {
+        case android.view.MotionEvent.ACTION_DOWN:
+          view.animate().scaleX(0.96f).scaleY(0.96f).setDuration(WebDesign.MOTION_FAST).start();
+          break;
+        case android.view.MotionEvent.ACTION_UP:
+        case android.view.MotionEvent.ACTION_CANCEL:
+          view.animate().scaleX(1f).scaleY(1f).setDuration(WebDesign.MOTION_BASE).start();
+          break;
+      }
+      return false;
+    });
   }
 
   private EditText input(
@@ -237,10 +306,10 @@ public class MainActivity extends Activity {
     v.setHintTextColor(MUTED);
     v.setTextSize(15);
     v.setSingleLine(!multiline);
-    v.setPadding(dp(14), dp(12), dp(14), dp(12));
-    GradientDrawable idle = background(CARD, 12);
+    v.setPadding(dp(16), dp(16), dp(16), dp(16)); // Tăng padding
+    GradientDrawable idle = background(CARD, 16); // M3 góc rộng hơn
     idle.setStroke(dp(1), LINE);
-    GradientDrawable focused = background(CARD, 12);
+    GradientDrawable focused = background(CARD, 16);
     focused.setStroke(dp(2), ACCENT);
     android.graphics.drawable.StateListDrawable states = new android.graphics.drawable.StateListDrawable();
     states.addState(new int[] { android.R.attr.state_focused }, focused);
@@ -248,22 +317,22 @@ public class MainActivity extends Activity {
     v.setBackground(states);
     LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(
       -1,
-      multiline ? dp(96) : dp(46)
+      multiline ? dp(112) : dp(56) // TextField M3 chuẩn cao 56dp
     );
-    p.setMargins(0, dp(7), 0, dp(10));
+    p.setMargins(0, dp(8), 0, dp(12));
     parent.addView(v, p);
     return v;
   }
 
   private LinearLayout card() {
     LinearLayout v = column();
-    v.setPadding(dp(16), dp(16), dp(16), dp(16));
+    v.setPadding(dp(20), dp(20), dp(20), dp(20)); // Padding to hơn
     GradientDrawable cardBg = background(CARD, WebDesign.CARD_RADIUS);
-    cardBg.setStroke(1, LINE);
+    cardBg.setStroke(1, LINE); // Nền M3 cũng mỏng
     v.setBackground(cardBg);
-    v.setElevation(dp(1));
+    v.setElevation(dp(2)); // Nổi nhẹ (Surface Container Low/High)
     LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
-    p.setMargins(0, dp(7), 0, dp(7));
+    p.setMargins(0, dp(8), 0, dp(8));
     content.addView(v, p);
     return v;
   }
@@ -283,7 +352,7 @@ public class MainActivity extends Activity {
   private void installChatKeyboard(EditText input,ScrollView messages){input.setTag("chat-compose");input.setOnFocusChangeListener((v,has)->{if(has)messages.post(()->messages.fullScroll(View.FOCUS_DOWN));});messages.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,oright,ob)->{if(input.hasFocus()&&b-t<ob-ot)messages.post(()->messages.fullScroll(View.FOCUS_DOWN));});}
   private void revealKeyboardFocus(){View focused=getCurrentFocus();if(!(focused instanceof EditText))return;if("chat-compose".equals(focused.getTag())&&aiChatScroll!=null&&aiChatScroll.isAttachedToWindow())aiChatScroll.post(()->aiChatScroll.fullScroll(View.FOCUS_DOWN));else focused.requestRectangleOnScreen(new android.graphics.Rect(0,-dp(90),focused.getWidth(),focused.getHeight()+dp(12)),true);}
   private interface RefreshLoader{void run(Runnable complete);}
-  private RefreshLoader feedRefresh;private boolean shortRefreshing;
+  private RefreshLoader feedRefresh,peopleRefresh;private boolean shortRefreshing;
   private PullRefreshScrollView retainedFeed;
   private LinearLayout retainedFeedContent;
   private RefreshLoader retainedFeedRefresh;
@@ -295,7 +364,7 @@ public class MainActivity extends Activity {
       retainedFeedVideos.clear();retainedFeedVideos.addAll(mediaVideos);
       if(retainedFeed.getParent() instanceof ViewGroup)((ViewGroup)retainedFeed.getParent()).removeView(retainedFeed);
     }
-    feedRefresh=null;shortRefreshing=false;reelViewport=null;
+    feedRefresh=null;peopleRefresh=null;shortRefreshing=false;reelViewport=null;
     onTabRoot = false;
     if (splashAnimator != null) { splashAnimator.cancel(); splashAnimator = null; }
     for (VideoView video : mediaVideos) { try { if(retainedFeedVideos.contains(video))video.pause();else video.stopPlayback(); } catch (RuntimeException ignored) {} }
@@ -311,34 +380,38 @@ public class MainActivity extends Activity {
     chatReload = null;
     profileEditorAvatar = null;
     root = column();
+    bottom = null;
+    root.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob) -> { if(r-l!=or-ol || b-t!=ob-ot) adaptShell(); });
     root.setBackgroundColor(BG);
     root.setOnApplyWindowInsetsListener((v, insets) -> {
       if(Build.VERSION.SDK_INT>=30){android.graphics.Insets bars=insets.getInsets(android.view.WindowInsets.Type.systemBars());android.graphics.Insets keyboard=insets.getInsets(android.view.WindowInsets.Type.ime());v.setPadding(bars.left,bars.top,bars.right,Math.max(bars.bottom,keyboard.bottom));if(keyboard.bottom>bars.bottom)v.post(this::revealKeyboardFocus);}else v.setPadding(0,insets.getSystemWindowInsetTop(),0,insets.getSystemWindowInsetBottom());
       return insets;
     });
     setContentView(root);
+    root.setAlpha(0f);
+    root.setTranslationY(dp(10));
+    root.setTranslationX(dp(navBack != 0 ? -14 : 0));
+    root.animate().alpha(1f).translationY(0f).translationX(0f).setDuration(WebDesign.MOTION_BASE).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
+    navBack = 0;
     getWindow().setStatusBarColor(CARD);
     getWindow().setNavigationBarColor(CARD);
     // Thanh trên giống web: logo · Live · Tin nhắn · Thông báo · tài khoản
     toolbar = row();
-    toolbar.setPadding(dp(12), 0, dp(10), 0);
+    toolbar.setPadding(dp(16), 0, dp(12), 0); // Khoảng cách hai bên giống Pixel
     toolbar.setBackgroundColor(CARD);
-    toolbar.setElevation(dp(1));
+    toolbar.setElevation(dp(2)); // Drop shadow nhẹ ở Top App Bar
     ImageView logo = new ImageView(this);
     logo.setImageResource(getResources().getIdentifier("kinnect_logo", "drawable", getPackageName()));
     logo.setClipToOutline(true);
-    logo.setBackground(background(CARD, 10));
-    toolbar.addView(logo, new LinearLayout.LayoutParams(dp(34), dp(34)));
-    TextView brand = label("Kinnect", 20, ACCENT);
-    brand.setTypeface(Typeface.create("sans-serif-black", Typeface.NORMAL));
-    brand.setLetterSpacing(-0.03f);
-    brand.setTextColor(ACCENT);
-    brand.setPadding(dp(8), 0, 0, 0);
-    toolbar.addView(brand, new LinearLayout.LayoutParams(0, -2, 1));
+    logo.setBackground(background(CARD, 12));
+    toolbar.addView(logo, new LinearLayout.LayoutParams(dp(40), dp(40))); // Logo to hơn
+    toolbar.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
     if (me != null && navigation) {
       toolbar.addView(topIcon("bell", I18n.t("Thông báo"), headerActive.equals("bell"), () -> notifications(), "bell"));
+      toolbar.addView(topIcon("shopping_bag", I18n.t("Cửa hàng"), false, this::openStore, null));
       toolbar.addView(topIcon("users_round", I18n.t("Bạn bè"), headerActive.equals("friends"), () -> friendsScreen(friendsCount > 0 ? "incoming" : "friends"), "friends"));
       toolbar.addView(topIcon("message_square", I18n.t("Tin nhắn"), headerActive.equals("inbox"), () -> navigate("inbox"), "inbox"));
+      FrameLayout meHolder = new FrameLayout(this);
       ImageView meButton = new ImageView(this);
       meButton.setScaleType(ImageView.ScaleType.CENTER_CROP);
       GradientDrawable round = new GradientDrawable();
@@ -346,13 +419,14 @@ public class MainActivity extends Activity {
       round.setColor(PRIMARY_SOFT);
       meButton.setBackground(round);
       meButton.setClipToOutline(true);
-      meButton.setImageBitmap(initials(me, dp(38)));
+      meButton.setImageBitmap(initials(me, dp(40)));
       loadAvatarInto(me, meButton);
-      meButton.setContentDescription(I18n.t("Tài khoản"));
-      meButton.setOnClickListener(v -> meMenu());
-      LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(dp(38), dp(38));
-      mp.setMargins(dp(6), 0, 0, 0);
-      toolbar.addView(meButton, mp);
+      meHolder.addView(meButton, new FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER));
+      meHolder.setContentDescription(I18n.t("Tài khoản"));
+      meHolder.setOnClickListener(v -> meMenu());
+      LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(dp(48), dp(48));
+      mp.setMargins(dp(4), 0, 0, 0);
+      toolbar.addView(meHolder, mp);
       refreshBadges();
     } else if (me == null) {
       ImageView settings = icon("settings", 22, MUTED);
@@ -372,7 +446,7 @@ public class MainActivity extends Activity {
     notice.setVisibility(View.GONE);
     root.addView(notice);
     PullRefreshScrollView scroll = new PullRefreshScrollView(this);
-    scroll.setRefreshListener(new PullRefreshScrollView.Listener(){public boolean enabled(){return feedRefresh!=null;}public void refresh(Runnable complete){if(feedRefresh!=null)feedRefresh.run(complete);else complete.run();}});
+    scroll.setRefreshListener(new PullRefreshScrollView.Listener(){public boolean enabled(){return feedRefresh!=null||peopleRefresh!=null;}public void refresh(Runnable complete){if(peopleRefresh!=null)peopleRefresh.run(complete);else if(feedRefresh!=null)feedRefresh.run(complete);else complete.run();}});
     scroll.setFillViewport(true);
     content = column();
     content.setPadding(dp(16), dp(14), dp(16), dp(24));
@@ -398,46 +472,84 @@ public class MainActivity extends Activity {
       root.addView(top, new LinearLayout.LayoutParams(-1, 1));
       bottom = row();
       bottom.setBackgroundColor(CARD);
+      bottom.setPadding(dp(4), dp(2), dp(4), dp(2));
       String[][] items = { { "feed", "house", "Bảng tin" }, { "discover", "compass", "Khám phá" }, { "create", "plus", "Tạo" }, { "shorts", "clapperboard", "Video" }, { "live", "radio", "Live" } };
       for (final String[] it : items) {
         if (it[0].equals("create")) {
           FrameLayout holder = new FrameLayout(this);
           FrameLayout plus = new FrameLayout(this);
           GradientDrawable plusBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { ACCENT, PINK });
-          plusBg.setCornerRadius(dp(99));
+          plusBg.setCornerRadius(dp(16)); // Google Material 3 squircle FAB
           plus.setBackground(plusBg);
           plus.setElevation(dp(4));
-          plus.addView(icon("plus", 24, WHITE), new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
+          plus.addView(icon("plus", 22, WHITE), new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
           plus.setContentDescription(I18n.t("Tạo nội dung"));
           plus.setTooltipText(I18n.t("Tạo nội dung"));
           plus.setOnClickListener(v -> openCreateMenu());
-          holder.addView(plus, new FrameLayout.LayoutParams(dp(44), dp(44), Gravity.CENTER));
-          bottom.addView(holder, new LinearLayout.LayoutParams(0, dp(62), 1));
+          tactile(plus);
+          holder.addView(plus, new FrameLayout.LayoutParams(dp(46), dp(40), Gravity.CENTER));
+          bottom.addView(holder, new LinearLayout.LayoutParams(0, dp(64), 1));
           continue;
         }
         boolean active = tab.equals(it[0]);
         LinearLayout b = column();
         b.setGravity(Gravity.CENTER);
         FrameLayout pill = new FrameLayout(this);
-        if (active) pill.setBackground(background(PRIMARY_SOFT, 99));
-        pill.addView(icon(it[1], 20, active ? ACCENT : MUTED), new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
-        b.addView(pill, new LinearLayout.LayoutParams(dp(50), dp(28)));
-        TextView t = label(I18n.t(it[2]), 11, active ? ACCENT : MUTED);
-        t.setPadding(0, dp(2), 0, 0);
+        if (active) pill.setBackground(background(PRIMARY_SOFT, 99)); // Dạng pill chuẩn Pixel
+        pill.addView(icon(it[1], 24, active ? ACCENT : MUTED), new FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER)); // Tăng size icon cho dễ nhìn
+        b.addView(pill, new LinearLayout.LayoutParams(dp(64), dp(32)));
+        TextView t = label(I18n.t(it[2]), 12, active ? ACCENT : MUTED); // M3 bottom nav label thường to hơn tí (12)
+        t.setPadding(0, dp(4), 0, 0);
         t.setGravity(Gravity.CENTER);
         t.setSingleLine(true);
         t.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        t.setTypeface(null, active ? Typeface.BOLD : Typeface.NORMAL);
+        t.setTypeface(Typeface.create("sans-serif-medium", active ? Typeface.BOLD : Typeface.NORMAL));
         b.addView(t);
         b.setContentDescription(I18n.t(it[2]));
         b.setSelected(active);
         b.setFocusable(true);
         b.setTooltipText(I18n.t(it[2]));
-        b.setBackground(pressable(CARD, 14));
+        b.setBackground(pressable(CARD, 16));
         b.setOnClickListener(v -> selectNavigation(it[0]));
-        bottom.addView(b, new LinearLayout.LayoutParams(0, dp(62), 1));
+        bottom.addView(b, new LinearLayout.LayoutParams(0, dp(68), 1)); // Tăng chiều cao bottom bar
       }
       root.addView(bottom);
+    }
+  }
+
+  // Relayout existing views so rotation keeps drafts, scroll positions and playback.
+  private void adaptShell() {
+    if (root == null || toolbar == null || toolbar.getParent() != root) return;
+    boolean compact = root.getWidth() > root.getHeight();
+    ViewGroup.LayoutParams hp = toolbar.getLayoutParams();
+    int headerHeight = dp(compact ? 48 : WebDesign.HEADER);
+    if (hp.height != headerHeight) { hp.height = headerHeight; toolbar.setLayoutParams(hp); }
+    int available = root.getWidth() - root.getPaddingLeft() - root.getPaddingRight();
+    for (int i=0;i<root.getChildCount();i++) {
+      View child=root.getChildAt(i);
+      if (!(child instanceof ScrollView)) continue;
+      LinearLayout.LayoutParams vp=(LinearLayout.LayoutParams)child.getLayoutParams();
+      int width=Math.min(available,dp(compact?1120:720));
+      if(width>0 && vp.width!=width){vp.width=width;child.setLayoutParams(vp);}
+    }
+    if (bottom == null || bottom.getParent() != root) return;
+    for (int i=0;i<bottom.getChildCount();i++) {
+      View child=bottom.getChildAt(i);
+      ViewGroup.LayoutParams lp=child.getLayoutParams();
+      int height=dp(compact?48:68);
+      if(lp.height!=height){lp.height=height;child.setLayoutParams(lp);}
+      if(child instanceof LinearLayout) {
+        LinearLayout cell=(LinearLayout)child;
+        int orientation=compact?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL;
+        if(cell.getOrientation()!=orientation)cell.setOrientation(orientation);
+        if(cell.getChildCount()>1 && cell.getChildAt(1) instanceof TextView) {
+          TextView caption=(TextView)cell.getChildAt(1);
+          caption.setPadding(compact?dp(4):0,compact?0:dp(4),0,0);
+          ViewGroup.LayoutParams pill=cell.getChildAt(0).getLayoutParams();
+          int width=dp(compact?40:64);
+          if(pill.width!=width){pill.width=width;cell.getChildAt(0).setLayoutParams(pill);}
+        }
+      }
     }
   }
 
@@ -455,24 +567,24 @@ public class MainActivity extends Activity {
 
   private FrameLayout topIcon(String name, String label, boolean active, Runnable action, String badgeKey) {
     FrameLayout f = new FrameLayout(this);
-    ImageView i = icon(name, 20, active ? ACCENT : TEXT);
-    f.addView(i, new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
+    ImageView i = icon(name, 24, active ? ACCENT : TEXT); // Tăng size M3 chuẩn 24dp cho TopBar icon
+    f.addView(i, new FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER));
     f.setBackground(pressable(active ? PRIMARY_SOFT : CARD, 99));
     if (badgeKey != null) {
       TextView badge = label("", 1, WHITE);
-      GradientDrawable bd = background(ACCENT, 99);
+      GradientDrawable bd = background(WebDesign.DANGER[WebTheme.isDark(this) ? 1 : 0], 99); // Màu đỏ thông báo chưa đọc
       bd.setStroke(dp(2), CARD);
       badge.setBackground(bd);
       badge.setVisibility(View.GONE);
-      FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(dp(10), dp(10), Gravity.TOP | Gravity.END);
-      bp.setMargins(0, dp(9), dp(8), 0);
+      FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(dp(12), dp(12), Gravity.TOP | Gravity.END); // Badge nhỉnh lên 12dp
+      bp.setMargins(0, dp(8), dp(6), 0);
       f.addView(badge, bp);
       if (badgeKey.equals("inbox")) inboxBadge = badge; else if (badgeKey.equals("friends")) friendsBadge = badge; else bellBadge = badge;
       showBadge(badge, badgeKey.equals("inbox") ? inboxCount : badgeKey.equals("friends") ? friendsCount : bellCount);
     }
     f.setContentDescription(label);
     f.setOnClickListener(v -> action.run());
-    f.setLayoutParams(new LinearLayout.LayoutParams(dp(40), dp(40)));
+    f.setLayoutParams(new LinearLayout.LayoutParams(dp(48), dp(48))); // M3 touch target 48x48
     return f;
   }
 
@@ -521,28 +633,42 @@ public class MainActivity extends Activity {
     });
   }
 
+  private final android.util.LruCache<String, Bitmap> avatarCache = new android.util.LruCache<String, Bitmap>(4096) {
+    protected int sizeOf(String key, Bitmap value) { return Math.max(1, value.getAllocationByteCount()/1024); }
+  };
+  private int avatarRevision;
+  private final java.util.WeakHashMap<ImageView,String> avatarViews=new java.util.WeakHashMap<>();
   private void loadAvatarInto(JSONObject u, final ImageView image) {
+    if(u!=null)avatarViews.put(image,u.optString("id"));
     String path = u == null ? "" : u.optString("avatar", "");
     if (path.isEmpty() || path.equals("null")) return;
+    final String cacheKey=api.origin()+":"+path;
+    final int revision=avatarRevision;
+    Bitmap cached=avatarCache.get(cacheKey);
+    if(cached!=null){image.setImageBitmap(cached);return;}
+    byte[] saved=api.cachedImage(path);if(saved!=null){Bitmap b=BitmapFactory.decodeByteArray(saved,0,saved.length);if(b!=null)image.setImageBitmap(b);}
     if(path.startsWith("data:image/")){try{byte[] bytes=android.util.Base64.decode(path.substring(path.indexOf(',')+1),android.util.Base64.DEFAULT);image.setImageBitmap(BitmapFactory.decodeByteArray(bytes,0,bytes.length));}catch(Exception ignored){}return;}
     api.image(path, bytes -> {
-      if (bytes == null || isDestroyed()) return;
-      Bitmap b = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-      if (b != null) image.setImageBitmap(b);
+      if (bytes == null || isDestroyed() || revision!=avatarRevision) return;
+      BitmapFactory.Options options=new BitmapFactory.Options();options.inJustDecodeBounds=true;
+      BitmapFactory.decodeByteArray(bytes,0,bytes.length,options);
+      options.inSampleSize=Math.max(1,Math.max(options.outWidth,options.outHeight)/256);options.inJustDecodeBounds=false;
+      Bitmap b = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
+      if (b != null) {avatarCache.put(cacheKey,b);image.setImageBitmap(b);}
     });
   }
 
   // Chip kiểu web: viền mảnh, nền trắng; đang chọn → nền tím nhạt chữ tím (soft) hoặc tím đặc (solid)
   private TextView webChip(String text, boolean active, boolean solid, Runnable action) {
-    TextView t = label(text, 14, active ? (solid ? WHITE : ACCENT) : TEXT);
+    TextView t = label(text, 15, active ? (solid ? WHITE : ACCENT) : TEXT); // Font 15
     t.setTypeface(null, active ? Typeface.BOLD : Typeface.NORMAL);
     t.setGravity(Gravity.CENTER);
-    t.setPadding(dp(16), 0, dp(16), 0);
+    t.setPadding(dp(20), 0, dp(20), 0); // Padding cho chuẩn
     GradientDrawable g = background(active ? (solid ? ACCENT : PRIMARY_SOFT) : CARD, 999);
-    if (!active) g.setStroke(1, LINE);
+    if (!active) g.setStroke(dp(1), LINE); // stroke 1dp
     t.setBackground(g);
     t.setOnClickListener(v -> action.run());
-    LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-2, dp(38));
+    LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-2, dp(40)); // Cao 40dp theo chip M3
     p.setMargins(0, dp(4), dp(8), dp(4));
     t.setLayoutParams(p);
     return t;
@@ -587,18 +713,27 @@ public class MainActivity extends Activity {
 
   private View accountRow(String glyph, String title, String subtitle, Runnable action) {
     LinearLayout row = row();
-    row.setPadding(dp(4), dp(12), dp(4), dp(12));
+    row.setPadding(dp(8), dp(16), dp(8), dp(16)); // Tăng padding lên chuẩn M3 List Item
     FrameLayout badge = new FrameLayout(this);
-    badge.setBackground(background(PRIMARY_SOFT, 12));
-    badge.addView(icon(glyph, 20, ACCENT), new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
-    row.addView(badge, new LinearLayout.LayoutParams(dp(36), dp(36)));
+    badge.setBackground(background(PRIMARY_SOFT, 99)); // Badge dạng tròn 99dp
+    badge.addView(icon(glyph, 24, ACCENT), new FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER));
+    row.addView(badge, new LinearLayout.LayoutParams(dp(40), dp(40)));
     LinearLayout text = column();
-    text.setPadding(dp(12), 0, dp(8), 0);
-    text.addView(label(title, WebDesign.LABEL, TEXT));
-    if (subtitle != null && !subtitle.isEmpty()) text.addView(label(subtitle, WebDesign.META, MUTED));
+    text.setPadding(dp(16), 0, dp(8), 0);
+    TextView labelTitle = label(title, WebDesign.LABEL, TEXT);
+    labelTitle.setSingleLine(true);
+    labelTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
+    text.addView(labelTitle);
+    if (subtitle != null && !subtitle.isEmpty()) {
+      TextView labelSub = label(subtitle, WebDesign.META, MUTED);
+      labelSub.setSingleLine(true);
+      labelSub.setEllipsize(android.text.TextUtils.TruncateAt.END);
+      text.addView(labelSub);
+    }
     row.addView(text, new LinearLayout.LayoutParams(0, -2, 1));
-    row.addView(icon("chevron-right", 18, MUTED), new LinearLayout.LayoutParams(dp(18), dp(18)));
+    row.addView(icon("chevron_right", 20, MUTED), new LinearLayout.LayoutParams(dp(20), dp(20)));
     row.setOnClickListener(v -> action.run());
+    row.setBackground(pressable(CARD, 16)); // Thêm background pressable cho row
     return row;
   }
 
@@ -608,24 +743,24 @@ public class MainActivity extends Activity {
     remember("account", () -> meMenu());
     shell(I18n.t("Tài khoản"), true);
     LinearLayout profile = row();
-    profile.setPadding(dp(16), dp(16), dp(14), dp(16));
+    profile.setPadding(dp(16), dp(16), dp(16), dp(16));
     GradientDrawable pg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { PRIMARY_SOFT, CARD });
-    pg.setCornerRadius(dp(16));
+    pg.setCornerRadius(dp(24));
     pg.setStroke(dp(1), LINE);
     profile.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf((ACCENT & 0x00ffffff) | 0x22000000), pg, null));
-    avatar(me, profile, 52);
+    avatar(me, profile, 64);
     LinearLayout text = column();
-    text.setPadding(dp(14), 0, 0, 0);
-    TextView n = label(me.optString("name"), 17, TEXT);
+    text.setPadding(dp(16), 0, 0, 0);
+    TextView n = label(me.optString("name"), 20, TEXT);
     n.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
     text.addView(n);
-    text.addView(label("@" + me.optString("username"), 13, MUTED));
+    text.addView(label("@" + me.optString("username"), 14, MUTED));
     profile.addView(text, new LinearLayout.LayoutParams(0, -2, 1));
-    profile.addView(icon("chevron_right", 18, MUTED), new LinearLayout.LayoutParams(dp(18), dp(18)));
+    profile.addView(icon("chevron_right", 24, MUTED), new LinearLayout.LayoutParams(dp(24), dp(24)));
     profile.setContentDescription(I18n.t("Trang cá nhân"));
     profile.setOnClickListener(v -> navigate("profile"));
     LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(-1, -2);
-    pp.bottomMargin = dp(14);
+    pp.bottomMargin = dp(16);
     content.addView(profile, pp);
 
     if (me.optString("role").equals("admin")) {
@@ -633,9 +768,9 @@ public class MainActivity extends Activity {
       groupRow(admin, "shield_check", I18n.t("Bảng quản trị"), false, () -> admin());
     }
     LinearLayout main = settingsGroup();
+    groupRow(main,"gamepad",I18n.t("Trò chơi"),false,this::gamesScreen);
     groupRow(main,"wallet",I18n.t("Ví Kinnect"),false,()->startActivity(new Intent(this,WalletActivity.class)));
-    groupRow(main,"shopping_bag",I18n.t("Cửa hàng Kinnect"),false,()->openStore());
-    groupRow(main, "settings", I18n.t("Cài đặt và quyền riêng tư"), false, () -> settings());
+      groupRow(main, "settings", I18n.t("Cài đặt và quyền riêng tư"), false, () -> settings());
     groupRow(main, "shield_check", I18n.t("Bảo mật và đăng nhập"), false, () -> securityScreen());
     groupRow(main, "bell", I18n.t("Cài đặt thông báo"), false, () -> nativeNotificationSettings());
     groupRow(main, "moon", I18n.t("Giao diện"), false, () -> appearanceScreen());
@@ -654,14 +789,71 @@ public class MainActivity extends Activity {
     content.addView(foot, new LinearLayout.LayoutParams(-1, -2));
   }
 
+  private void gamesScreen() {
+    remember("games", () -> gamesScreen());
+    accountHeader(I18n.t("Trò chơi"), () -> meMenu());
+    LinearLayout hero = column();
+    hero.setPadding(dp(20), dp(18), dp(20), dp(18));
+    hero.setBackground(brandGradient(24));
+    TextView heroTitle = label(I18n.t("Chơi cùng người cùng gu"), 20, WHITE);
+    heroTitle.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+    hero.addView(heroTitle);
+    TextView heroSub = label(I18n.t("Ghép cặp, chơi nhanh và nhận xu may mắn"), 13, 0xd9ffffff);
+    heroSub.setPadding(0, dp(4), 0, dp(12));
+    hero.addView(heroSub);
+    TextView heroTag = label(I18n.t("Nông trại đã mở"), 10, ACCENT);
+    heroTag.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+    heroTag.setPadding(dp(10), dp(5), dp(10), dp(5));
+    heroTag.setBackground(background(WHITE, 99));
+    hero.addView(heroTag, new LinearLayout.LayoutParams(-2, -2));
+    LinearLayout.LayoutParams heroLp = new LinearLayout.LayoutParams(-1, -2);
+    heroLp.bottomMargin = dp(8);
+    content.addView(hero, heroLp);
+
+    groupTitle("sun", I18n.t("Nông trại"));
+    LinearLayout farm = settingsGroup();
+    boolean farmInstalled = FarmGameModule.installed(this);
+    farm.addView(accountRow("sun", I18n.t("Nông trại"), I18n.t(farmInstalled ? "Đã cài · Chơi ngay" : "Module riêng · Tải về để chơi"), () -> FarmGameModule.open(this)), new LinearLayout.LayoutParams(-1, -2));
+
+    groupTitle("gamepad", I18n.t("Chơi nhanh 1-1"));
+    LinearLayout quick = settingsGroup();
+    addGame(quick, "circle_help", "Đoán số", "1 đấu 1 · Sắp ra mắt", "Mỗi người chọn một số từ 1 đến 99. Lần lượt đoán số của đối thủ, ai đoán đúng trước sẽ thắng.", true);
+    addGame(quick, "circle_check", "Caro 5", "1 đấu 1 · Sắp ra mắt", "Ai xếp đủ 5 quân liên tiếp trên bàn 15x15 trước sẽ thắng.", true);
+    addGame(quick, "users_round", "Oẳn tù tì", "1 đấu 1 · Sắp ra mắt", "Mỗi lượt chọn kéo, búa hoặc bao. Ai thắng 2 lượt trước sẽ thắng.", false);
+
+    groupTitle("users_round", I18n.t("Phòng nhóm"));
+    LinearLayout rooms = settingsGroup();
+    addGame(rooms, "sparkles", "Lô tô", "2-8 người · Sắp ra mắt", "Chủ phòng quay số, ai đủ hàng hoặc đủ bảng trước sẽ thắng.", true);
+    addGame(rooms, "gamepad", "Cờ cá ngựa", "2-4 người · Sắp ra mắt", "Đổ xúc xắc để đưa quân về đích. Chơi vui, không cần kinh nghiệm.", true);
+    addGame(rooms, "wand_sparkles", "Vòng quay may mắn", "Phòng đông · Sắp ra mắt", "Mỗi lượt quay nhận một phần quà nhỏ. Phòng đông sẽ mở vòng quay chung.", false);
+
+    groupTitle("radio", I18n.t("Trong Live"));
+    LinearLayout live = settingsGroup();
+    addGame(live, "radio", "Đấu trí Live", "Trong Live · Sắp ra mắt", "Người xem trả lời câu hỏi ngay trong Live. Điểm cao nhất lên bảng xếp hạng.", true);
+    addGame(live, "gift", "Bingo quà", "Trong Live · Sắp ra mắt", "Quà tặng trong Live mở số và tạo bingo. Người thắng nhận xu tặng.", false);
+  }
+
+
+
+
+
+
+
+
+  private void addGame(LinearLayout group, String glyph, String title, String subtitle, String detail, boolean divider) {
+    group.addView(accountRow(glyph, I18n.t(title), I18n.t(subtitle), () -> new Sheet(this).setTitle(I18n.t(title)).setMessage(I18n.t(detail) + "\n\n" + I18n.t("Trò chơi đang được hoàn thiện. Bạn sẽ sớm chơi được với thành viên khác.")).setPositiveButton(I18n.t("Đóng"), null).show()), new LinearLayout.LayoutParams(-1, -2));
+    if (divider) group.addView(divider());
+  }
+
   private LinearLayout settingsGroup() {
     LinearLayout g = column();
     g.setPadding(dp(4), dp(4), dp(4), dp(4));
-    GradientDrawable bg = background(CARD, 16);
+    GradientDrawable bg = background(CARD, WebDesign.CARD_RADIUS);
     bg.setStroke(dp(1), LINE);
     g.setBackground(bg);
+    g.setElevation(dp(2)); // Bóng nhẹ cho Group theo M3
     LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
-    p.bottomMargin = dp(12);
+    p.bottomMargin = dp(16);
     content.addView(g, p);
     return g;
   }
@@ -687,23 +879,24 @@ public class MainActivity extends Activity {
       View line = new View(this);
       line.setBackgroundColor(LINE);
       LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, 1);
-      lp.setMargins(dp(60), 0, dp(12), 0);
+      lp.setMargins(dp(64), 0, dp(16), 0); // Tăng margin đường kẻ
       group.addView(line, lp);
     }
     int tint = danger ? WebDesign.DANGER[WebTheme.isDark(this) ? 1 : 0] : ACCENT;
     LinearLayout r = row();
-    r.setPadding(dp(10), 0, dp(12), 0);
-    r.setBackground(pressable(CARD, 12));
-    r.addView(settingsIcon(iconName,tint),new LinearLayout.LayoutParams(dp(38),dp(38)));
-    TextView t = label(title, 14, danger ? tint : TEXT);
+    r.setPadding(dp(16), dp(12), dp(16), dp(12)); // Tăng padding
+    r.setBackground(pressable(CARD, 24)); // Góc bo 24 theo M3
+    r.addView(settingsIcon(iconName,tint),new LinearLayout.LayoutParams(dp(40),dp(40))); // Icon to hơn
+    TextView t = label(title, 15, danger ? tint : TEXT); // Chữ to hơn
     t.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-    t.setPadding(dp(12), 0, 0, 0);
+    t.setPadding(dp(16), 0, 0, 0); // M3 text padding
+    t.setSingleLine(true);
+    t.setEllipsize(android.text.TextUtils.TruncateAt.END);
     r.addView(t, new LinearLayout.LayoutParams(0, -2, 1));
-    if (!danger) r.addView(icon("chevron_right", 16, MUTED), new LinearLayout.LayoutParams(dp(16), dp(16)));
+    if (!danger) r.addView(icon("chevron_right", 20, MUTED), new LinearLayout.LayoutParams(dp(20), dp(20))); // Chevron to hơn
     r.setContentDescription(title);
     r.setOnClickListener(v -> action.run());
-    r.setMinimumHeight(dp(56));
-    r.setPadding(dp(10),dp(8),dp(12),dp(8));
+    r.setMinimumHeight(dp(64)); // Chiều cao chuẩn List Item M3 (64-72)
     group.addView(r, new LinearLayout.LayoutParams(-1, -2));
   }
 
@@ -919,35 +1112,37 @@ public class MainActivity extends Activity {
     String lower = text.toLowerCase(Locale.ROOT);
     boolean error = lower.startsWith("không") || lower.contains("lỗi") || lower.startsWith("cần") || lower.startsWith("vui lòng") || lower.contains("chưa") || lower.startsWith("nhập") || lower.contains("tối thiểu");
     boolean ok = lower.startsWith("đã");
-    int tint = error ? WebDesign.DANGER[WebTheme.isDark(this) ? 1 : 0] : ACCENT;
+    // Thông báo nổi kiểu Google Material 3 Pill Toast / Snackbar
+    int tint = error ? WebDesign.DANGER[WebTheme.isDark(this) ? 1 : 0] : ok ? WebDesign.SUCCESS[WebTheme.isDark(this) ? 1 : 0] : ACCENT;
     LinearLayout pill = row();
-    pill.setPadding(dp(12), dp(10), dp(16), dp(10));
-    GradientDrawable bg = background(CARD, 16);
-    bg.setStroke(dp(1), LINE);
+    pill.setPadding(dp(16), dp(12), dp(20), dp(12)); // Tăng padding
+    GradientDrawable bg = background(CARD, 999); // Hình pill chuẩn
+    bg.setStroke(dp(1), (tint & 0x00ffffff) | 0x38000000);
     pill.setBackground(bg);
-    pill.setElevation(dp(12));
+    pill.setElevation(dp(8)); // Đổ bóng nhẹ hơn
     FrameLayout mark = new FrameLayout(this);
-    mark.setBackground(background((tint & 0x00ffffff) | 0x1f000000, 99));
-    mark.addView(icon(ok ? "check" : error ? "circle_help" : "bell", 16, tint), new FrameLayout.LayoutParams(dp(16), dp(16), Gravity.CENTER));
-    pill.addView(mark, new LinearLayout.LayoutParams(dp(30), dp(30)));
+    mark.setBackground(background(tint, 999)); // Chấm đặc mầu
+    mark.addView(icon(ok ? "check" : error ? "circle_help" : "bell", 16, WHITE), new FrameLayout.LayoutParams(dp(16), dp(16), Gravity.CENTER));
+    pill.addView(mark, new LinearLayout.LayoutParams(dp(28), dp(28))); // Chấm biểu tượng tròn
     TextView msg = label(text, 14, TEXT);
     msg.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-    msg.setPadding(dp(10), 0, 0, 0);
+    msg.setPadding(dp(12), 0, 0, 0);
     msg.setMaxLines(3);
     pill.addView(msg, new LinearLayout.LayoutParams(-2, -2));
-    FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+    FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
     android.view.WindowInsets insets = host.getRootWindowInsets();
-    lp.topMargin = (insets == null ? dp(24) : insets.getSystemWindowInsetTop()) + dp(64);
+    // Material You Snackbar thường ở phía dưới (hoặc đỉnh tuỳ trường hợp), đặt cách đáy
+    lp.bottomMargin = (insets == null ? dp(24) : Math.max(insets.getSystemWindowInsetBottom(), dp(24))) + dp(80); 
     lp.leftMargin = dp(16);
     lp.rightMargin = dp(16);
     host.addView(pill, lp);
     toastView = pill;
     pill.setAlpha(0f);
-    pill.setTranslationY(-dp(16));
-    pill.animate().alpha(1f).translationY(0).setDuration(200).start();
+    pill.setTranslationY(dp(16)); // Slide up
+    pill.animate().alpha(1f).translationY(0).setDuration(250).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
     final View shown = pill;
     pill.setOnClickListener(v -> v.animate().alpha(0f).setDuration(150).withEndAction(() -> host.removeView(v)).start());
-    pill.postDelayed(() -> { if (shown.getParent() != null) shown.animate().alpha(0f).translationY(-dp(12)).setDuration(220).withEndAction(() -> { host.removeView(shown); if (toastView == shown) toastView = null; }).start(); }, error ? 3200 : 2400);
+    pill.postDelayed(() -> { if (shown.getParent() != null) shown.animate().alpha(0f).translationY(dp(12)).setDuration(220).withEndAction(() -> { host.removeView(shown); if (toastView == shown) toastView = null; }).start(); }, error ? 3500 : 2500);
   }
 
   private View toastView;
@@ -998,6 +1193,8 @@ public class MainActivity extends Activity {
           say(error);
           return;
         }
+        if(answer!=null&&answer.optBoolean("offline"))say(I18n.t("Đang dùng dự phòng · Đăng nhập và nhắn tin vẫn hoạt động."));
+        else if(answer!=null&&answer.optBoolean("cached"))say(I18n.t("Đang xem nội dung đã lưu trên máy."));
         done.accept(answer);
       } catch (RuntimeException failure) {
         CrashLog.record(this, failure);
@@ -1009,14 +1206,27 @@ public class MainActivity extends Activity {
   }
 
   // Keep the draft until the server confirms it; a second tap cannot duplicate a pending send.
+  private void cachedRequest(String path,Done done,Runnable finished){
+    JSONObject saved=api.cachedGet(path);String before="";
+    if(saved!=null){try{saved.remove("cached");before=saved.toString();saved.put("cached",true);done.accept(saved);}catch(JSONException ignored){}}
+    final String signature=before;
+    request("GET",path,null,data->{JSONObject comparison;try{comparison=new JSONObject(data.toString());comparison.remove("cached");}catch(JSONException e){return;}if(!signature.equals(comparison.toString()))done.accept(data);},finished);
+  }
+  private final java.util.WeakHashMap<EditText,String[]> messageRequests=new java.util.WeakHashMap<>();
   private void submitText(EditText input, View send, String path, JSONObject payload, Done sent) {
     if (!send.isEnabled()) return;
     final String draft = input.getText().toString();
     if (draft.trim().isEmpty()) return;
+    if(path.endsWith("/messages")){
+      String[] previous=messageRequests.get(input);String signature=path+"\n"+payload.toString();
+      if(previous==null||!previous[0].equals(signature)){previous=new String[]{signature,java.util.UUID.randomUUID().toString()};messageRequests.put(input,previous);}
+      try{payload.put("requestId",previous[1]);}catch(JSONException invalid){return;}
+    }
     send.setEnabled(false);
     send.setAlpha(0.5f);
     request("POST", path, payload, data -> {
       if (input.getText().toString().equals(draft)) input.setText("");
+      messageRequests.remove(input);
       sent.accept(data);
     }, () -> { send.setEnabled(true); send.setAlpha(1f); });
   }
@@ -1059,10 +1269,11 @@ public class MainActivity extends Activity {
     content = extras;
     authExtras(register);
     content = saved;
+    body.addView(extras);
 
     final EditText username = authField(body, "user_round", I18n.t("Tên đăng nhập"), false);
     username.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-    username.setTypeface(Typeface.DEFAULT);
+    username.setTypeface(ApprovedTypography.font(this, Typeface.NORMAL));
     final EditText name = register ? authField(body, "pencil", I18n.t("Tên hiển thị"), false) : null;
     final EditText password = authField(body, "lock_keyhole", I18n.t("Mật khẩu (từ 6 ký tự)"), true);
 
@@ -1109,7 +1320,6 @@ public class MainActivity extends Activity {
     LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, dp(50));
     sp.topMargin = dp(8);
     body.addView(submit, sp);
-    body.addView(extras);
 
     body.addView(textDivider(register ? I18n.t("Đã có tài khoản?") : I18n.t("Mới đến Kinnect?")));
     LinearLayout swap = authButton(register ? "log_in" : "user_plus", register ? I18n.t("Đăng nhập") : I18n.t("Tạo tài khoản mới"), false);
@@ -1149,11 +1359,11 @@ public class MainActivity extends Activity {
     e.setSingleLine(true);
     e.setBackground(null);
     e.setPadding(dp(10), 0, dp(8), 0);
-    e.setTypeface(Typeface.DEFAULT);
+    e.setTypeface(ApprovedTypography.font(this, Typeface.NORMAL));
     box.addView(e, new LinearLayout.LayoutParams(0, -1, 1));
     if (secret) {
       e.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-      e.setTypeface(Typeface.DEFAULT);
+      e.setTypeface(ApprovedTypography.font(this, Typeface.NORMAL));
       final FrameLayout eye = new FrameLayout(this);
       final ImageView eyeIcon = icon("eye", 19, MUTED);
       eye.addView(eyeIcon, new FrameLayout.LayoutParams(dp(19), dp(19), Gravity.CENTER));
@@ -1162,7 +1372,7 @@ public class MainActivity extends Activity {
       eye.setOnClickListener(v -> {
         boolean hidden = (e.getInputType() & InputType.TYPE_TEXT_VARIATION_PASSWORD) == InputType.TYPE_TEXT_VARIATION_PASSWORD;
         e.setInputType(InputType.TYPE_CLASS_TEXT | (hidden ? InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD : InputType.TYPE_TEXT_VARIATION_PASSWORD));
-        e.setTypeface(Typeface.DEFAULT);
+        e.setTypeface(ApprovedTypography.font(this, Typeface.NORMAL));
         e.setSelection(e.length());
         android.graphics.drawable.Drawable d = WebIcons.load(this, hidden ? "eye_off" : "eye");
         d.setTint(MUTED);
@@ -1247,7 +1457,7 @@ public class MainActivity extends Activity {
     if (next.equals("feed")) feed();
     if (next.equals("inbox")) inbox();
     if (next.equals("profile")) profile();
-    if (next.equals("live")) { startActivity(new Intent(this, LiveActivity.class)); tab = "feed"; feed(); }
+    if (next.equals("live")) { navigate("feed"); startActivity(new Intent(this, LiveActivity.class)); }
   }
 
   private ImageView avatar(JSONObject u, LinearLayout parent, int size) {
@@ -1256,31 +1466,19 @@ public class MainActivity extends Activity {
     GradientDrawable round = new GradientDrawable();
     round.setShape(GradientDrawable.OVAL);
     round.setColor(PRIMARY_SOFT);
-    int styleColor=StoreStyle.color(u.optString("storeStyle"));if(styleColor!=0){round.setStroke(dp(3),styleColor);image.setPadding(dp(3),dp(3),dp(3),dp(3));}
+    int styleColor=StoreStyle.color(u.optString("storeStyle"));
     image.setBackground(round);
     StoreStyle.badge(image,u.optString("storeMembership"));
+    if(styleColor!=0){
+      GradientDrawable border=new GradientDrawable();border.setShape(GradientDrawable.OVAL);border.setColor(android.graphics.Color.TRANSPARENT);border.setStroke(dp(2),styleColor);
+      android.graphics.drawable.Drawable badge=image.getForeground();
+      image.setForeground(badge==null?border:new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{border,badge}));
+    }
     image.setClipToOutline(true);
     image.setImageBitmap(u.has("members")?groupSample(u.optString("avatarPreset","violet"),dp(size)):initials(u, dp(size)));
     image.setContentDescription(I18n.t("Ảnh của ") + u.optString("name"));
     parent.addView(image, new LinearLayout.LayoutParams(dp(size), dp(size)));
-    String path = u.optString("avatar", "");
-    if(path.startsWith("data:image/")){loadAvatarInto(u,image);return image;}
-    if (!path.isEmpty() && !path.equals("null")) api.image(path, bytes -> {
-      if (bytes != null && !isDestroyed() && image.isAttachedToWindow()) {
-        BitmapFactory.Options o = new BitmapFactory.Options();
-        o.inJustDecodeBounds = true;
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.length, o);
-        o.inSampleSize = Math.max(1, Math.max(o.outWidth, o.outHeight) / 512);
-        o.inJustDecodeBounds = false;
-        Bitmap bitmap = BitmapFactory.decodeByteArray(
-          bytes,
-          0,
-          bytes.length,
-          o
-        );
-        if (bitmap != null) image.setImageBitmap(bitmap);
-      }
-    });
+    loadAvatarInto(u,image);
     return image;
   }
 
@@ -1309,13 +1507,11 @@ public class MainActivity extends Activity {
   }
 
 
-  private boolean peopleFromFriends;
-  private void discover(){peopleFromFriends=false;if(discoverSort.equals("near"))discoverSort="interests";renderPeopleSearch(false);}
-  private void friendsNearby(){remember("friends-nearby",this::friendsNearby);headerActive="friends";accountHeader(I18n.t("Quanh đây"),()->friendsScreen("friends"));peopleFromFriends=true;discoverSort="near";renderPeopleSearch(true);}
-  private void refreshPeopleSearch(){if(peopleFromFriends)friendsNearby();else navigate("discover");}
-  private void renderPeopleSearch(boolean fromFriends) {
+  private void discover(){nearQuery="";renderPeopleSearch();}
+  private void refreshPeopleSearch(){navigate("discover");}
+  private void renderPeopleSearch() {
     final boolean hasLocation = me != null && me.optBoolean("hasLocation");
-    String[][] sorts = { { "interests", "Dành cho bạn" }, { "following", "Đang theo dõi" } };
+    String[][] sorts = { { "interests", "Dành cho bạn" }, { "near", "Quanh đây" }, { "following", "Đang theo dõi" } };
     LinearLayout seg = row();
     seg.setPadding(dp(4), dp(4), dp(4), dp(4));
     seg.setBackground(background(SOFT, 14));
@@ -1333,31 +1529,10 @@ public class MainActivity extends Activity {
       });
       seg.addView(t, new LinearLayout.LayoutParams(0, dp(48), 1));
     }
-    if(!fromFriends)content.addView(seg, new LinearLayout.LayoutParams(-1, -2));
+    content.addView(seg, new LinearLayout.LayoutParams(-1, -2));
 
-    LinearLayout searchBox = row();
-    searchBox.setPadding(dp(14), 0, dp(10), 0);
-    GradientDrawable sb = background(CARD, 14);
-    sb.setStroke(dp(1), LINE);
-    searchBox.setBackground(sb);
-    searchBox.addView(icon("search", 18, MUTED), new LinearLayout.LayoutParams(dp(18), dp(18)));
-    final EditText search = new KinnectInput(this);
-    search.setHint(I18n.t("Tên hoặc @username"));search.setText(nearQuery);
-    search.setContentDescription(I18n.t("Tìm thành viên"));
-    search.setTextColor(TEXT);
-    search.setHintTextColor(MUTED);
-    search.setTextSize(15);
-    search.setSingleLine(true);
-    search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
-    search.setBackground(null);
-    search.setPadding(dp(10), 0, 0, 0);
-    searchBox.addView(search, new LinearLayout.LayoutParams(0, -1, 1));
-    LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, dp(48));
-    sp.topMargin = dp(10);
-    content.addView(searchBox, sp);
-
-    final boolean nearby = fromFriends && hasLocation;
-    search.setOnEditorActionListener((v, a, e) -> { loadPeople(search.getText().toString(), nearby); return true; });
+    final boolean nearby = discoverSort.equals("near") && hasLocation;
+    peopleRefresh=complete->{if(discoverSort.equals("near")&&(me==null||!me.optBoolean("hasLocation"))){complete.run();return;}nearScrollY=0;loadPeople(nearQuery,nearby,complete,true);};
     LinearLayout quick=row();
     quick.setPadding(0,dp(12),0,dp(12));
     String[] titles={"Tuổi","Cân nặng","Chiều cao","Giới tính",""};String[] keys={"age","weight","height","gender",""};float[] weights={.8f,1.2f,1.25f,1.1f};
@@ -1368,13 +1543,16 @@ public class MainActivity extends Activity {
       button.setContentDescription((i==4?I18n.t("Bộ lọc tổng hợp"):titles[i])+(selected?I18n.t(" · Đang chọn"):""));button.setSelected(selected);button.setOnClickListener(v->nearFilters(key));LinearLayout.LayoutParams bp=i==4?new LinearLayout.LayoutParams(dp(44),dp(44)):new LinearLayout.LayoutParams(0,dp(44),weights[i]);if(i>0)bp.leftMargin=dp(4);quick.addView(button,bp);
     }
     content.addView(quick,new LinearLayout.LayoutParams(-1,-2));
-    if(discoverSort.equals("near")&&!hasLocation){TextView enable=label(I18n.t("Bật vị trí để xem thành viên quanh đây"),14,MUTED);enable.setOnClickListener(v->requestLocation());content.addView(enable);return;}
+    if(discoverSort.equals("near")&&!hasLocation){content.addView(emptyBlock("map_pin",I18n.t("Khám phá quanh bạn"),I18n.t("Bật vị trí để tìm thành viên ở gần.")));content.addView(primary(I18n.t("Bật vị trí"),()->requestLocation()));return;}
     loadPeople(nearQuery, nearby);
   }
 
   private LinearLayout people;
 
   private void loadPeople(String query, boolean nearby) {
+    loadPeople(query,nearby,()->{},false);
+  }
+  private void loadPeople(String query,boolean nearby,Runnable complete,boolean refreshing) {
     if(!nearQuery.equals(query))nearScrollY=0;nearQuery=query;
     if (people != null && people.getParent() == content) content.removeView(people);
     people = column();
@@ -1383,8 +1561,10 @@ public class MainActivity extends Activity {
     final String requestedTab=discoverSort;
     String filters="&minWeight="+nearMinWeight+"&maxWeight="+nearMaxWeight+"&minHeight="+nearMinHeight+"&maxHeight="+nearMaxHeight+"&orientation="+encode(nearOrientation)+"&communityRole="+encode(nearCommunityRole)+"&gender="+encode(nearGender)+"&minAge="+nearMinAge+"&maxAge="+nearMaxAge+"&intent="+encode(nearIntent)+(nearRecent?"&recent=1":"");
     String sort=nearOnline?"active":requestedTab.equals("near")?"new":"interests";
-    request("GET","/api/discover?q="+encode(query)+(nearby?"&nearby=1&radius="+discoverRadius:"")+filters+"&sort="+sort+(requestedTab.equals("following")?"&following=1":""),null,data->{
+    String path="/api/discover?q="+encode(query)+(nearby?"&nearby=1&radius="+discoverRadius:"")+filters+"&sort="+sort+(requestedTab.equals("following")?"&following=1":"");
+    Done render=data->{
       if(people!=list||!discoverSort.equals(requestedTab))return;
+      list.removeAllViews();
       boolean filtered=nearMinWeight>0||nearMaxWeight>0||nearMinHeight>0||nearMaxHeight>0||nearOnline||!nearOrientation.isEmpty()||!nearCommunityRole.isEmpty()||!nearGender.isEmpty()||nearMinAge>0||nearMaxAge>0||!nearIntent.isEmpty()||nearRecent;
       if(filtered&&data.optInt("filterVersion")<2){list.addView(label(I18n.t("Máy chủ cần cập nhật để áp dụng bộ lọc. Các kết quả chưa lọc sẽ không hiển thị."),14,MUTED));return;}
       JSONArray users = data.optJSONArray("users");
@@ -1392,16 +1572,12 @@ public class MainActivity extends Activity {
         list.addView(discoveryEmptyState(), new LinearLayout.LayoutParams(-1, -2));
         return;
       }
-      LinearLayout line = null;
-      for (int i = 0; i < users.length(); i++) {
-        if (i % 3 == 0) { line = row(); line.setGravity(Gravity.TOP); list.addView(line); }
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, -2, 1);
-        p.setMargins(i % 3 == 0 ? 0 : dp(4), 0, i % 3 == 2 ? 0 : dp(4), dp(8));
-        line.addView(nearTile(users.optJSONObject(i)), p);
-      }
-      for(int pad=users.length()%3;pad>0&&pad<3;pad++){LinearLayout.LayoutParams emptyCell=new LinearLayout.LayoutParams(0,1,1);emptyCell.setMargins(dp(4),0,pad==2?0:dp(4),dp(8));line.addView(new View(this),emptyCell);}
+      AdaptivePeopleGrid grid=new AdaptivePeopleGrid();
+      list.addView(grid,new LinearLayout.LayoutParams(-1,-2));
+      for(int i=0;i<users.length();i++)grid.addView(nearTile(users.optJSONObject(i)));
       list.post(()->{if(people==list&&content.getParent() instanceof ScrollView)((ScrollView)content.getParent()).scrollTo(0,nearScrollY);});
-    });
+    };
+    if(refreshing)request("GET",path,null,render,complete);else cachedRequest(path,render,complete);
   }
 
   private String nearQuery="",nearGender="",nearOrientation="",nearCommunityRole="",nearIntent="";private boolean nearOnline,nearRecent;private int nearMinAge,nearMaxAge,nearMinWeight,nearMaxWeight,nearMinHeight,nearMaxHeight,nearScrollY;
@@ -1421,7 +1597,7 @@ public class MainActivity extends Activity {
         t.setGravity(Gravity.CENTER);
         t.setPadding(0, dp(14), 0, dp(2));
         empty.addView(t);
-        TextView s = label(discoverSort.equals("following") ? I18n.t("Khám phá và theo dõi những người bạn quan tâm.") : I18n.t("Thử tên hoặc @username khác."), 13, MUTED);
+        TextView s = label(discoverSort.equals("following") ? I18n.t("Khám phá và theo dõi những người bạn quan tâm.") : discoverSort.equals("near") ? I18n.t("Thử mở rộng bán kính hoặc điều chỉnh bộ lọc.") : I18n.t("Thử điều chỉnh bộ lọc để tìm thêm thành viên."), 13, MUTED);
         s.setGravity(Gravity.CENTER);
         empty.addView(s, new LinearLayout.LayoutParams(-1, -2));
         LinearLayout all = authButton("users_round", I18n.t("Xem tất cả"), false);
@@ -1433,12 +1609,34 @@ public class MainActivity extends Activity {
         return empty;
   }
 
+  private final class AdaptivePeopleGrid extends ViewGroup {
+    private int columns=3,cell,gap;
+    AdaptivePeopleGrid(){super(MainActivity.this);gap=dp(8);}
+    @Override protected ViewGroup.LayoutParams generateDefaultLayoutParams(){return new ViewGroup.LayoutParams(-2,-2);}
+    @Override protected void onMeasure(int widthSpec,int heightSpec){
+      int width=MeasureSpec.getSize(widthSpec);
+      columns=Math.max(3,Math.min(6,(width+gap)/(dp(128)+gap)));
+      cell=Math.max(0,(width-gap*(columns-1))/columns);
+      int exact=MeasureSpec.makeMeasureSpec(cell,MeasureSpec.EXACTLY);
+      for(int i=0;i<getChildCount();i++)getChildAt(i).measure(exact,exact);
+      int rows=(getChildCount()+columns-1)/columns;
+      setMeasuredDimension(width,rows==0?0:rows*(cell+gap));
+    }
+    @Override protected void onLayout(boolean changed,int l,int t,int r,int b){
+      for(int i=0;i<getChildCount();i++){
+        int x=(i%columns)*(cell+gap),y=(i/columns)*(cell+gap);
+        getChildAt(i).layout(x,y,x+cell,y+cell);
+      }
+    }
+  }
+
   private final class SquarePeopleTile extends FrameLayout {
     SquarePeopleTile(){super(MainActivity.this);}
     @Override protected void onMeasure(int widthSpec,int heightSpec){int side=View.MeasureSpec.getSize(widthSpec);super.onMeasure(widthSpec,View.MeasureSpec.makeMeasureSpec(side,View.MeasureSpec.EXACTLY));}
   }
-  private View nearTile(JSONObject u){FrameLayout tile=new SquarePeopleTile();tile.setBackground(background(SOFT,8));tile.setClipToOutline(true);ImageView photo=new ImageView(this);photo.setScaleType(ImageView.ScaleType.CENTER_CROP);tile.addView(photo,new FrameLayout.LayoutParams(-1,-1));String path=u.optString("avatar","");if(!path.isEmpty()&&!path.equals("null"))loadAvatarInto(u,photo);else{photo.setImageDrawable(WebIcons.load(this,"user_round"));photo.setImageTintList(android.content.res.ColorStateList.valueOf(MUTED));photo.setPadding(dp(20),dp(20),dp(20),dp(20));}
-    View shade=new View(this);shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0x00000000,0xbb000000}));FrameLayout.LayoutParams shadow=new FrameLayout.LayoutParams(-1,dp(54),Gravity.BOTTOM);tile.addView(shade,shadow);LinearLayout meta=column();meta.setPadding(dp(6),0,dp(6),dp(5));String distance=u.optString("distanceLabel","");if(!distance.isEmpty()&&!distance.equals("null")){TextView km=label(distance,11,WHITE);km.setPadding(0,0,0,0);meta.addView(km);}TextView name=label(u.optString("name"),12,WHITE);name.setSingleLine(true);name.setAutoSizeTextTypeUniformWithConfiguration(12,19,1,android.util.TypedValue.COMPLEX_UNIT_SP);name.setEllipsize(android.text.TextUtils.TruncateAt.END);name.setPadding(0,0,0,0);meta.addView(name);tile.addView(meta,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));if(u.optBoolean("isActive")){View online=new View(this);online.setBackground(background(0xff24d74d,99));FrameLayout.LayoutParams dot=new FrameLayout.LayoutParams(dp(8),dp(8),Gravity.TOP|Gravity.START);dot.setMargins(dp(7),dp(7),0,0);tile.addView(online,dot);}tile.setContentDescription(I18n.t("Xem hồ sơ ")+u.optString("name")+(distance.isEmpty()?"":" · "+distance));tile.setOnClickListener(v->{if(content.getParent() instanceof ScrollView)nearScrollY=((ScrollView)content.getParent()).getScrollY();person(u);});return tile;}
+  private View nearTile(JSONObject u){FrameLayout tile=new SquarePeopleTile();tile.setBackground(background(SOFT,14));tile.setClipToOutline(true);ImageView photo=new ImageView(this);String path=u.optString("avatar","");if(!path.isEmpty()&&!path.equals("null")){photo.setScaleType(ImageView.ScaleType.CENTER_CROP);loadAvatarInto(u,photo);}else{photo.setScaleType(ImageView.ScaleType.FIT_CENTER);photo.setImageDrawable(WebIcons.load(this,"user_round"));photo.setImageTintList(android.content.res.ColorStateList.valueOf(MUTED));photo.setPadding(dp(20),dp(20),dp(20),dp(20));}tile.addView(photo,new FrameLayout.LayoutParams(-1,-1));
+    if(RegistrationBadge.today(u.optLong("joinedAt"),System.currentTimeMillis())){TextView badge=label(I18n.t("Mới"),10,WHITE);badge.setPadding(dp(7),dp(3),dp(7),dp(3));badge.setBackground(background(ACCENT,99));badge.setContentDescription(I18n.t("Đăng ký hôm nay"));FrameLayout.LayoutParams at=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.END);at.setMargins(dp(5),dp(5),dp(5),0);tile.addView(badge,at);}
+    View shade=new View(this);shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0x00000000,0xcc000000}));FrameLayout.LayoutParams shadow=new FrameLayout.LayoutParams(-1,dp(56),Gravity.BOTTOM);tile.addView(shade,shadow);LinearLayout meta=column();meta.setPadding(dp(8),0,dp(8),dp(6));String distance=u.optString("distanceLabel","");if(!distance.isEmpty()&&!distance.equals("null")){TextView km=label(distance,11,0xe6ffffff);km.setPadding(0,0,0,dp(1));meta.addView(km);}TextView name=label(u.optString("name"),13,WHITE);name.setTypeface(ApprovedTypography.font(this,Typeface.BOLD));name.setSingleLine(true);name.setAutoSizeTextTypeUniformWithConfiguration(11,14,1,android.util.TypedValue.COMPLEX_UNIT_SP);name.setEllipsize(android.text.TextUtils.TruncateAt.END);name.setPadding(0,0,0,0);meta.addView(name);tile.addView(meta,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));if(u.optBoolean("isActive")){View online=new View(this);GradientDrawable dotBg=background(WebDesign.ONLINE[WebTheme.isDark(this)?1:0],99);dotBg.setStroke(dp(2),CARD);online.setBackground(dotBg);FrameLayout.LayoutParams dot=new FrameLayout.LayoutParams(dp(10),dp(10),Gravity.TOP|Gravity.START);dot.setMargins(dp(7),dp(7),0,0);tile.addView(online,dot);}tile.setContentDescription(I18n.t("Xem hồ sơ ")+u.optString("name")+(distance.isEmpty()?"":" · "+distance));tile.setOnClickListener(v->{if(content.getParent() instanceof ScrollView)nearScrollY=((ScrollView)content.getParent()).getScrollY();person(u);});return tile;}
 
   private void nearFilters(){nearFilters("");}
   private EditText[] filterRange(LinearLayout form,String title,String unit,int min,int max){form.addView(label(title+" ("+unit+")",14,TEXT));LinearLayout pair=row();form.addView(pair);LinearLayout left=column(),right=column();pair.addView(left,new LinearLayout.LayoutParams(0,-2,1));LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(0,-2,1);rp.leftMargin=dp(10);pair.addView(right,rp);EditText low=input(left,I18n.t("Từ"),min==0?"":String.valueOf(min),false),high=input(right,I18n.t("Đến"),max==0?"":String.valueOf(max),false);low.setInputType(2);high.setInputType(2);return new EditText[]{low,high};}
@@ -1473,16 +1671,29 @@ public class MainActivity extends Activity {
   private LinearLayout personTile(final JSONObject u) {
     LinearLayout c = column();
     c.setGravity(Gravity.CENTER_HORIZONTAL);
-    c.setPadding(dp(6), dp(14), dp(6), dp(10));
-    c.setBackground(outlined(CARD, 16));
+    c.setPadding(dp(8), dp(16), dp(8), dp(10));
+    GradientDrawable tileBg = background(CARD, 20);
+    tileBg.setStroke(dp(1), LINE);
+    c.setBackground(tileBg);
+    c.setElevation(dp(2));
+    tactile(c);
     c.setOnClickListener(v -> person(u));
     c.setContentDescription(I18n.t("Xem hồ sơ ") + u.optString("name"));
-    LinearLayout photo = row();
-    photo.setGravity(Gravity.CENTER);
-    avatar(u, photo, 52);
-    c.addView(photo, new LinearLayout.LayoutParams(-1, dp(56)));
-    TextView name = label(u.optString("name"), 13, TEXT);
-    name.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+    FrameLayout photo = new FrameLayout(this);
+    LinearLayout holder = new LinearLayout(this);
+    holder.setGravity(Gravity.CENTER);
+    avatar(u, holder, 64);
+    photo.addView(holder, new FrameLayout.LayoutParams(dp(64), dp(64), Gravity.CENTER));
+    if (u.optBoolean("isActive")) {
+      View online = new View(this);
+      GradientDrawable dotBg = background(WebDesign.ONLINE[WebTheme.isDark(this) ? 1 : 0], 99);
+      dotBg.setStroke(dp(2), CARD);
+      online.setBackground(dotBg);
+      photo.addView(online, new FrameLayout.LayoutParams(dp(14), dp(14), Gravity.BOTTOM | Gravity.END));
+    }
+    c.addView(photo, new LinearLayout.LayoutParams(-1, dp(68)));
+    TextView name = label(u.optString("name"), 14, TEXT);
+    name.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
     name.setGravity(Gravity.CENTER);
     name.setSingleLine(true);
     name.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -1632,10 +1843,12 @@ public class MainActivity extends Activity {
     pill.setOnClickListener(v -> composePost());
     final LinearLayout list = column();
     content.addView(list);
+    final boolean memoryFeed=feedRows!=null;
+    if(feedRows==null){JSONObject saved=api.cachedGet("/api/posts");if(saved!=null)feedRows=saved.optJSONArray("posts");}
     if(feedRows!=null){LinearLayout saved=content;content=list;try{posts(feedRows,"Chưa có bài viết.");}finally{content=saved;}final ScrollView scroll=(ScrollView)content.getParent();scroll.post(()->scroll.scrollTo(0,feedScrollY));}
     final String[] signature={feedRows==null?"":feedRows.toString()};final boolean[] fetching={false};
     feedRefresh=complete->{if(fetching[0]){complete.run();return;}fetching[0]=true;request("GET","/api/posts",null,data->{JSONArray posts=data.optJSONArray("posts");if(posts==null||posts.toString().equals(signature[0]))return;signature[0]=posts.toString();feedRows=posts;LinearLayout next=column();java.util.Set<String> existing=new java.util.HashSet<>();for(int i=0;i<list.getChildCount();i++)if(list.getChildAt(i).getTag()instanceof String)existing.add((String)list.getChildAt(i).getTag());LinearLayout saved=content;content=next;try{if(posts.length()==0)posts(posts,"Chưa có bài viết.");for(int i=0;i<posts.length();i++){JSONObject post=posts.optJSONObject(i);String key="post:"+post.optString("id")+":"+post.toString();if(existing.contains(key)){View placeholder=new View(this);placeholder.setTag(key);next.addView(placeholder);}else postCard(post);}}finally{content=saved;}reconcileChatRows(list,next);},()->{fetching[0]=false;complete.run();});};
-    if(feedRows==null)feedRefresh.run(()->{});
+    if(!memoryFeed)feedRefresh.run(()->{});
   }
 
   private void composePost() {
@@ -1653,7 +1866,9 @@ public class MainActivity extends Activity {
     head.setElevation(dp(1));
     FrameLayout back = new FrameLayout(this);
     back.setBackground(pressable(CARD, 99));
-    back.addView(icon("close", 22, TEXT), new FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER));
+    FrameLayout.LayoutParams closeLp = new FrameLayout.LayoutParams(dp(22), dp(22), Gravity.START | Gravity.CENTER_VERTICAL);
+    closeLp.leftMargin = dp(10);
+    back.addView(icon("close", 22, TEXT), closeLp);
     back.setContentDescription(I18n.t("Quay lại"));
     back.setOnClickListener(v -> navigate("feed"));
     head.addView(back, new LinearLayout.LayoutParams(dp(80), dp(44)));
@@ -1843,7 +2058,9 @@ public class MainActivity extends Activity {
       public void onTextChanged(CharSequence s, int a, int b, int c) {}
       public void afterTextChanged(android.text.Editable s) { render.run(); }
     });
+    for(String endpoint:new String[]{"/api/conversations","/api/groups"}){JSONObject saved=api.cachedGet(endpoint);JSONArray items=saved==null?null:saved.optJSONArray(endpoint.equals("/api/groups")?"groups":"users");for(int i=0;items!=null&&i<items.length();i++)rows.add(items.optJSONObject(i));}if(!rows.isEmpty())render.run();
     request("GET", "/api/conversations", null, data -> {
+      rows.clear();
       conversationUsers = data.optJSONArray("users");
       for (int i = 0; conversationUsers != null && i < conversationUsers.length(); i++) rows.add(conversationUsers.optJSONObject(i));
       request("GET", "/api/groups", null, g2 -> {
@@ -1870,17 +2087,17 @@ public class MainActivity extends Activity {
       face.addView(h);
     } else {
       FrameLayout g = new FrameLayout(this);
-      GradientDrawable o = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { ACCENT, ACCENT });
+      GradientDrawable o = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { ACCENT, 0xffd946c4 });
       o.setShape(GradientDrawable.OVAL);
       g.setBackground(o);
       ImageView groupGlyph=new ImageView(this);groupGlyph.setImageDrawable(new SettingsGlyph("group_three",WHITE,ACCENT));g.addView(groupGlyph,new FrameLayout.LayoutParams(dp(28),dp(28),Gravity.CENTER));
-      face.addView(g, new FrameLayout.LayoutParams(dp(50), dp(50)));
+      face.addView(g, new LinearLayout.LayoutParams(dp(50), dp(50)));
     }
     if (online) {
       View dot = new View(this);
       GradientDrawable d = new GradientDrawable();
       d.setShape(GradientDrawable.OVAL);
-      d.setColor(0xff22c55e);
+      d.setColor(WebDesign.ONLINE[WebTheme.isDark(this) ? 1 : 0]);
       d.setStroke(dp(2), CARD);
       dot.setBackground(d);
       face.addView(dot, new FrameLayout.LayoutParams(dp(14), dp(14), Gravity.BOTTOM | Gravity.END));
@@ -1888,10 +2105,18 @@ public class MainActivity extends Activity {
     r.addView(face, new LinearLayout.LayoutParams(dp(50), dp(50)));
     LinearLayout t = column();
     t.setPadding(dp(12), 0, dp(8), 0);
-    TextView n = label((pinned ? "📌 " : "") + title, 16, TEXT);
+    TextView n = label(title, 16, TEXT);
     n.setTypeface(null, Typeface.BOLD);
     n.setSingleLine(true);
+    n.setEllipsize(android.text.TextUtils.TruncateAt.END);
     n.setPadding(0, 0, 0, 0);
+    if (pinned) {
+      android.graphics.drawable.Drawable pinDrawable = WebIcons.load(this, "pin");
+      pinDrawable.setTint(ACCENT);
+      pinDrawable.setBounds(0, 0, dp(14), dp(14));
+      n.setCompoundDrawables(pinDrawable, null, null, null);
+      n.setCompoundDrawablePadding(dp(5));
+    }
     TextView s2 = label(subtitle, 14, unread > 0 ? TEXT : MUTED);
     s2.setTypeface(null, unread > 0 ? Typeface.BOLD : Typeface.NORMAL);
     s2.setSingleLine(true);
@@ -1940,13 +2165,41 @@ public class MainActivity extends Activity {
   }
 
 
+  private View loadingState(String message) {
+    LinearLayout state=column();state.setPadding(dp(16),dp(18),dp(16),dp(16));
+    for(int i=0;i<4;i++){
+      View line=new View(this);
+      line.setBackground(background(SOFT,8));
+      LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(i==3?dp(170):-1,dp(12));
+      lp.topMargin=dp(10);
+      state.addView(line,lp);
+    }
+    TextView caption=label(message,12,MUTED);
+    caption.setGravity(Gravity.CENTER);
+    caption.setPadding(0,dp(12),0,0);
+    state.addView(caption);
+    android.animation.ObjectAnimator pulse=android.animation.ObjectAnimator.ofFloat(state,View.ALPHA,0.45f,1f);
+    pulse.setDuration(900);
+    pulse.setRepeatMode(android.animation.ValueAnimator.REVERSE);
+    pulse.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+    pulse.start();
+    state.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){
+      public void onViewAttachedToWindow(View v) {}
+      public void onViewDetachedFromWindow(View v) { pulse.cancel(); }
+    });
+    state.setTag("loading");
+    return state;
+  }
   private void profile() {
+    final LinearLayout page=content;
+    final View loading=loadingState(I18n.t("Đang tải hồ sơ…"));page.addView(loading);
     request("GET", "/api/me", null, data -> {
       me = data.optJSONObject("user");
-      profileCompletion();
+      if(me==null)return;
+      page.removeView(loading);
       profileCard(me, true);
       profileSections(me);
-    });
+    },()->{if(loading.getParent()==page){page.removeView(loading);page.addView(button(I18n.t("Tải lại hồ sơ"),()->navigate("profile")));}});
   }
 
   // Native rendering of the web profile: cover, left identity, actions, bio and statistics.
@@ -1960,6 +2213,9 @@ public class MainActivity extends Activity {
     image.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[] { PRIMARY_SOFT, SOFT }));
     cover.addView(image, new FrameLayout.LayoutParams(-1, -1));
     if (!user.optString("cover").isEmpty() && !user.isNull("cover")) loadImage(user.optString("cover"), image);
+    View coverShade = new View(this);
+    coverShade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x00000000, 0x55000000 }));
+    cover.addView(coverShade, new FrameLayout.LayoutParams(-1, -1));
     if (self) {
       FrameLayout edit = new FrameLayout(this);
       edit.setBackground(background(0x66000000, 99));
@@ -1970,19 +2226,19 @@ public class MainActivity extends Activity {
       at.setMargins(0, dp(8), dp(8), 0);
       cover.addView(edit, at);
     }
-    panel.addView(cover, new LinearLayout.LayoutParams(-1, dp(116)));
+    panel.addView(cover, new LinearLayout.LayoutParams(-1, dp(120)));
     LinearLayout identity = row();
     identity.setGravity(Gravity.BOTTOM);
-    identity.setPadding(dp(5), 0, dp(5), 0);
+    identity.setPadding(dp(14), 0, dp(14), 0);
     LinearLayout holder = row();
     holder.setPadding(dp(4), dp(4), dp(4), dp(4));
     holder.setBackground(background(CARD, 99));
-    ImageView face = avatar(user, holder, 72);
+    ImageView face = avatar(user, holder, 88);
     if (self) face.setOnClickListener(v -> pickAvatar());
-    identity.addView(holder, new LinearLayout.LayoutParams(dp(80), dp(80)));
+    identity.addView(holder, new LinearLayout.LayoutParams(dp(96), dp(96)));
     LinearLayout name = column();
-    name.setPadding(dp(10), dp(28), 0, dp(3));
-    TextView title = label(user.optString("name"), 17, TEXT);
+    name.setPadding(dp(12), dp(28), 0, dp(3));
+    TextView title = label(user.optString("name"), 20, TEXT);
     title.setTypeface(null, Typeface.BOLD);
     name.addView(title);
     name.addView(label("@" + user.optString("username"), 12, MUTED));
@@ -1991,7 +2247,7 @@ public class MainActivity extends Activity {
     identityAt.topMargin = -dp(28);
     panel.addView(identity, identityAt);
     LinearLayout actions = row();
-    actions.setPadding(dp(5), dp(13), dp(5), 0);
+    actions.setPadding(dp(14), dp(13), dp(14), 0);
     if (self) {
       LinearLayout edit = authButton("pencil", I18n.t("Chỉnh sửa hồ sơ"), true);
       edit.setOnClickListener(v -> editProfile());
@@ -2015,7 +2271,7 @@ public class MainActivity extends Activity {
     panel.addView(actions);
     if (!user.optString("bio").isEmpty()) {
       TextView bio = label(user.optString("bio"), 13, MUTED);
-      bio.setPadding(dp(5), dp(12), dp(5), dp(8)); bio.setLineSpacing(0, 1.6f);
+      bio.setPadding(dp(14), dp(12), dp(14), dp(8)); bio.setLineSpacing(0, 1.6f);
       panel.addView(bio);
     }
     stats(user, panel);
@@ -2089,6 +2345,31 @@ public class MainActivity extends Activity {
     return panel;
   }
 
+  private final java.util.concurrent.ExecutorService previewLoader=java.util.concurrent.Executors.newFixedThreadPool(2);
+  private final android.util.LruCache<String,Bitmap> videoPreviews=new android.util.LruCache<String,Bitmap>(4096){
+    protected int sizeOf(String key,Bitmap value){return Math.max(1,value.getAllocationByteCount()/1024);}
+  };
+  private void loadVideoPreview(JSONObject video,ImageView target){
+    String path=video.optString("video");if(!path.startsWith("/")||path.startsWith("//"))return;
+    final String origin=api.origin(),key=origin+path;final int generation=screen;
+    Bitmap cached=videoPreviews.get(key);if(cached!=null){target.setImageBitmap(cached);return;}
+    byte[] saved=api.cachedThumbnail(path);if(saved!=null){Bitmap bitmap=BitmapFactory.decodeByteArray(saved,0,saved.length);if(bitmap!=null){target.setImageBitmap(bitmap);videoPreviews.put(key,bitmap);return;}}
+    final java.io.File local=api.cachedVideo(path);if(video.optBoolean("offline")&&local==null)return;
+    final java.util.Map<String,String> headers=new java.util.HashMap<>();headers.put("Cookie",api.jar());
+    previewLoader.execute(()->{
+      if(isDestroyed()||screen!=generation)return;
+      android.media.MediaMetadataRetriever retriever=new android.media.MediaMetadataRetriever();Bitmap frame=null;
+      try{if(local!=null)retriever.setDataSource(local.getAbsolutePath());else retriever.setDataSource(origin+path,headers);
+        if(android.os.Build.VERSION.SDK_INT>=27)frame=retriever.getScaledFrameAtTime(0,android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,240,384);
+        else {Bitmap original=retriever.getFrameAtTime(0,android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC);if(original!=null){float scale=Math.min(1f,Math.min(240f/original.getWidth(),384f/original.getHeight()));frame=Bitmap.createScaledBitmap(original,Math.max(1,Math.round(original.getWidth()*scale)),Math.max(1,Math.round(original.getHeight()*scale)),true);if(frame!=original)original.recycle();}}
+      }
+      catch(Exception ignored){}finally{try{retriever.release();}catch(Exception ignored){}}
+      final Bitmap result=frame;if(result==null)return;
+      if(screen==generation&&!isDestroyed()){java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();result.compress(Bitmap.CompressFormat.JPEG,82,bytes);api.cacheThumbnail(path,bytes.toByteArray());}
+      videoPreviews.put(key,result);
+      handler.post(()->{if(!isDestroyed()&&screen==generation&&target.isAttachedToWindow())target.setImageBitmap(result);});
+    });
+  }
   private void profileSections(final JSONObject user) {
     final LinearLayout controls = row(), list = column();
     final String[] tabs = { "Giới thiệu", "Bài viết", "Album ảnh", "Video" };
@@ -2108,8 +2389,10 @@ public class MainActivity extends Activity {
       }
       final int current = selected[0];
       if(current==0){list.addView(profileAbout(user));return;}
+      final View loading=loadingState(I18n.t("Đang tải…"));list.addView(loading);
       request("GET", current == 3 ? "/api/shorts?user=" + user.optString("id") : "/api/posts?user=" + user.optString("id"), null, data -> {
         if (current != selected[0] || revision != generation[0] || ownerScreen != screen || !list.isAttachedToWindow()) return;
+        list.removeView(loading);
         if (current == 3) {
           final JSONArray videos = data.optJSONArray("shorts");
           if (videos == null || videos.length() == 0) { list.addView(emptyBlock("clapperboard", I18n.t("Chưa có video"), I18n.t("Video ngắn sẽ hiển thị tại đây."))); return; }
@@ -2121,6 +2404,10 @@ public class MainActivity extends Activity {
             GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { 0xff42355d, 0xff1d1929 });
             g.setCornerRadius(dp(12));
             tile.setBackground(g);
+            tile.setClipToOutline(true);
+            ImageView preview=new ImageView(this);preview.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            tile.addView(preview,new FrameLayout.LayoutParams(-1,-1));
+            loadVideoPreview(videos.optJSONObject(i),preview);
             tile.addView(icon("play", 26, WHITE), new FrameLayout.LayoutParams(dp(26), dp(26), Gravity.CENTER));
             TextView dur = label(Math.round(videos.optJSONObject(i).optDouble("duration")) + "s", 11, WHITE);
             FrameLayout.LayoutParams dp2 = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.START);
@@ -2172,7 +2459,7 @@ public class MainActivity extends Activity {
           }
           for (int pad = photos.size() % 3; pad > 0 && pad < 3; pad++) line.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
         } else { LinearLayout saved = content; content = list; posts(data.optJSONArray("posts"), "Chưa có bài viết."); content = saved; }
-      });
+      },()->{if(loading.getParent()==list){list.removeView(loading);list.addView(button(I18n.t("Thử tải lại"),()->render[0].run()));}});
     };
     LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2);
     cp.setMargins(0, dp(6), 0, dp(10));
@@ -2415,7 +2702,9 @@ public class MainActivity extends Activity {
     badgesAt = 0;
     shell(I18n.t("Thông báo"), true);
     if (headActions != null) headActions.addView(roundAction("check", I18n.t("Đánh dấu tất cả đã đọc"), false, () -> request("POST", "/api/notifications", json("scope","social"), d -> { bellCount = 0; badgesAt = 0; notifications(); })));
-    request("GET", "/api/notifications", null, data -> {
+    final LinearLayout notices=column();content.addView(notices);
+    cachedRequest("/api/notifications", data -> {
+      notices.removeAllViews();
       JSONArray rows = data.optJSONArray("notifications");
       for (int i = 0; rows != null && i < rows.length(); i++) {
         final JSONObject n = rows.optJSONObject(i), u = n.optJSONObject("actor");
@@ -2448,12 +2737,12 @@ public class MainActivity extends Activity {
         });
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
         p.setMargins(0, dp(4), 0, dp(4));
-        content.addView(r, p);
+        notices.addView(r, p);
       }
       if (rows == null || rows.length() == 0) {
-        content.addView(emptyBlock("bell",I18n.t("Chưa có thông báo mới"),I18n.t("Thông báo mới sẽ hiển thị tại đây.")));
+        notices.addView(emptyBlock("bell",I18n.t("Chưa có thông báo mới"),I18n.t("Thông báo mới sẽ hiển thị tại đây.")));
       }
-    });
+    },()->{});
   }
 
   private void openNotification(JSONObject notification) {
@@ -2622,7 +2911,7 @@ public class MainActivity extends Activity {
     groupRow(personal, "pencil", me.optString("name") + I18n.t(" · chỉnh sửa hồ sơ"), false, () -> editProfile());
     groupTitle("shield_check", I18n.t("Quyền riêng tư"));
     LinearLayout privacy = settingsGroup();
-    privacyToggle(privacy, "discoverable", I18n.t("Cho phép tìm thấy tôi"), I18n.t("Xuất hiện trong Khám phá và Bạn bè quanh đây"));
+    privacyToggle(privacy, "discoverable", I18n.t("Cho phép tìm thấy tôi"), I18n.t("Xuất hiện trong Khám phá và Quanh đây"));
     privacyToggle(privacy, "showDistance", I18n.t("Hiển thị khoảng cách"), I18n.t("Chỉ hiện khoảng cách gần đúng"));
     privacyToggle(privacy, "showActivity", I18n.t("Trạng thái hoạt động"), I18n.t("Cho người khác biết khi bạn đang online"));
     groupRow(privacy, "message_square", I18n.t("Ai có thể nhắn tin · ") + (me.optString("dmMode").equals("everyone") ? I18n.t("Mọi thành viên") : I18n.t("Bạn bè")), false, () -> new Sheet(this).setTitle(I18n.t("Ai có thể nhắn tin")).setItemIcons(new String[]{"globe","users_round"}).setItems(new String[] { I18n.t("Mọi thành viên"), I18n.t("Bạn bè") }, (d, w) -> request("PATCH", "/api/me", json("dmMode", w == 0 ? "everyone" : "friends"), r -> { me = r.optJSONObject("user"); settings(); })).show());
@@ -2710,8 +2999,6 @@ public class MainActivity extends Activity {
     remember("friends", () -> friendsScreen(selected));
     headerActive = "friends";
     shell(I18n.t("Bạn bè"), true);
-    peopleFromFriends=false;
-    if(selected.equals("friends"))content.addView(primary(I18n.t("Quanh đây"),this::friendsNearby));
     final String[] keys = { "friends", "incoming", "outgoing" };
     final String[] names = { "Bạn bè", "Lời mời", "Đã gửi" };
     int index = Arrays.asList(keys).indexOf(selected);
@@ -2755,10 +3042,10 @@ public class MainActivity extends Activity {
       public void onTextChanged(CharSequence s, int a, int b, int c) {}
       public void afterTextChanged(android.text.Editable s) { render.run(); }
     });
-    request("GET", selected.equals("friends") ? "/api/friends" : "/api/friend-requests", null, data -> {
+    cachedRequest(selected.equals("friends") ? "/api/friends" : "/api/friend-requests", data -> {
       loaded[0] = data.optJSONArray(selected.equals("friends") ? "users" : selected);
       render.run();
-    });
+    },()->{});
     if (selected.equals("friends")) request("GET", "/api/friend-suggestions", null, data -> {
       suggested[0] = data.optJSONArray("users");
       if (loaded[0] != null) render.run();
@@ -2854,7 +3141,7 @@ public class MainActivity extends Activity {
     stopShort();if(reelViewport!=null&&reelViewport.getParent()==root){reelViewport.prepare();reelViewport.removeAllViews();return reelViewport;}
     ScrollView scroll=(ScrollView)content.getParent();int at=root.indexOfChild(scroll);root.removeView(scroll);
     reelViewport=new VerticalMediaStage(this,direction->{if(direction<0&&shortIndex==0){reelViewport.settle();refreshVideos(reelViewport);return true;}if(shortRows==null||shortRows.length()==0)return false;final int next=VideoFeedPolicy.index(shortIndex+direction,shortRows.length(),!shortsFollowing);if(next==shortIndex)return false;reelViewport.exit(direction,()->{shortEnter=direction;showShort(next);});return true;});
-    reelViewport.setBackgroundColor(0xff000000);root.addView(reelViewport,at,new LinearLayout.LayoutParams(-1,0,1));return reelViewport;
+    reelViewport.setRefreshAction(()->refreshVideos(reelViewport));reelViewport.setBackgroundColor(0xff000000);root.addView(reelViewport,at,new LinearLayout.LayoutParams(-1,0,1));return reelViewport;
   }
 
   private void downloadShort(JSONObject video) {
@@ -2863,6 +3150,14 @@ public class MainActivity extends Activity {
     save.addCategory(Intent.CATEGORY_OPENABLE); save.setType("video/mp4");
     save.putExtra(Intent.EXTRA_TITLE, "Kinnect-" + video.optString("id") + ".mp4");
     try { startActivityForResult(save, 309); } catch (Exception error) { pendingDownload = ""; say(I18n.t("Chưa mở được trình lưu video.")); }
+  }
+
+  private void downloadAudio(JSONObject video) {
+    pendingDownload = video.optString("video");
+    Intent save = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+    save.addCategory(Intent.CATEGORY_OPENABLE); save.setType("audio/mp4");
+    save.putExtra(Intent.EXTRA_TITLE, "Kinnect-Audio-" + video.optString("id") + ".m4a");
+    try { startActivityForResult(save, 309); } catch (Exception error) { pendingDownload = ""; say(I18n.t("Chưa mở được trình lưu âm thanh.")); }
   }
 
   private int findShort(String id) {
@@ -2886,7 +3181,7 @@ public class MainActivity extends Activity {
     final TextView loading = label(I18n.t("Đang tải video…"), 14, 0x99ffffff);
     stage.addView(loading, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
     stage.addView(reelTabs(), new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
-    request("GET", shortsFollowing ? "/api/shorts?feed=following" : "/api/shorts", null, data -> {
+    cachedRequest(shortsFollowing ? "/api/shorts?feed=following" : "/api/shorts", data -> {
       shortRows = orderedShorts(data.optJSONArray("shorts"));
       if (shortRows == null || shortRows.length() == 0) {
         stage.removeView(loading);
@@ -2909,56 +3204,69 @@ public class MainActivity extends Activity {
         return;
       }
       showShort(0);
-    });
+    },()->{});
   }
 
-  // Tab "Trực tiếp": lưới các buổi đang live, chạm để vào xem ngay.
+  // Tab "Trực tiếp": lưới các buổi đang live chuẩn Google / YouTube Live, chạm để vào xem ngay.
   private FrameLayout liveCard(final JSONObject room) {
     FrameLayout c = new FrameLayout(this);
     float hue = Math.abs(room.optString("hostId").hashCode()) % 360;
-    GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { Color.HSVToColor(new float[] { hue, 0.65f, 0.6f }), Color.HSVToColor(new float[] { (hue + 50) % 360, 0.75f, 0.3f }) });
-    g.setCornerRadius(dp(16));
+    GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { Color.HSVToColor(new float[] { hue, 0.52f, 0.28f }), Color.HSVToColor(new float[] { (hue + 38) % 360, 0.65f, 0.14f }) });
+    g.setCornerRadius(dp(20));
+    g.setStroke(Math.max(1, dp(1)), 0x22ffffff);
     c.setBackground(g);
     c.setClipToOutline(true);
     LinearLayout center = column();
     center.setGravity(Gravity.CENTER_HORIZONTAL);
     FrameLayout ring = new FrameLayout(this);
-    GradientDrawable rg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { 0xffff3b5c, PINK });
+    GradientDrawable rg = new GradientDrawable();
     rg.setShape(GradientDrawable.OVAL);
+    rg.setColor(0x22ee2b2b);
+    rg.setStroke(dp(2), 0xffee2b2b);
     ring.setBackground(rg);
-    ring.setPadding(dp(3), dp(3), dp(3), dp(3));
+    ring.setPadding(dp(4), dp(4), dp(4), dp(4));
     LinearLayout holder = new LinearLayout(this);
     JSONObject host = json("id", room.optString("hostId"), "name", room.optString("host"), "avatar", room.isNull("avatar") ? "" : room.optString("avatar"));
-    avatar(host, holder, 74);
+    avatar(host, holder, 72);
     ring.addView(holder);
     center.addView(ring);
     FrameLayout.LayoutParams cp = new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER);
-    cp.bottomMargin = dp(30);
+    cp.bottomMargin = dp(28);
     c.addView(center, cp);
     LinearLayout badges = row();
-    TextView live = label("LIVE", 11, WHITE);
+    TextView live = label("● LIVE", 10, WHITE);
     live.setTypeface(null, Typeface.BOLD);
-    live.setPadding(dp(7), dp(2), dp(7), dp(2));
-    live.setBackground(background(0xffff3b5c, 6));
+    live.setPadding(dp(8), dp(3), dp(8), dp(3));
+    live.setBackground(background(0xffee2b2b, 99));
     badges.addView(live);
-    TextView viewers = label("  👁 " + room.optInt("viewers") + "  ", 11, WHITE);
-    viewers.setBackground(background(0x66000000, 6));
+    LinearLayout viewers = row();
+    viewers.setPadding(dp(8), dp(3), dp(8), dp(3));
+    viewers.setBackground(background(0x88141418, 99));
+    viewers.addView(icon("eye", 12, WHITE), new LinearLayout.LayoutParams(dp(12), dp(12)));
+    TextView viewerCount = label(" " + room.optInt("viewers"), 10, WHITE);
+    viewerCount.setTypeface(null, Typeface.BOLD);
+    viewerCount.setPadding(0, 0, 0, 0);
+    viewers.addView(viewerCount);
     LinearLayout.LayoutParams vp = new LinearLayout.LayoutParams(-2, -2);
     vp.leftMargin = dp(6);
     badges.addView(viewers, vp);
     FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.START);
-    bp.setMargins(dp(8), dp(8), 0, 0);
+    bp.setMargins(dp(10), dp(10), 0, 0);
     c.addView(badges, bp);
     LinearLayout info = column();
-    info.setPadding(dp(10), dp(24), dp(10), dp(10));
-    info.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x00000000, 0xbb000000 }));
+    info.setPadding(dp(12), dp(28), dp(12), dp(12));
+    info.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x00000000, 0xd80a0a0c }));
+    String mode = room.optString("liveMode", "chat");
+    TextView modeTag = label(I18n.t(mode.equals("game") ? "Chơi game" : "Trò chuyện"), 10, 0xfffdd663);
+    modeTag.setTypeface(null, Typeface.BOLD);
+    info.addView(modeTag);
     TextView title = label(room.optString("title"), 14, WHITE);
     title.setTypeface(null, Typeface.BOLD);
     title.setMaxLines(2);
     title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+    title.setPadding(0, dp(2), 0, dp(2));
     info.addView(title);
-    String mode=room.optString("liveMode","chat");info.addView(label(I18n.t(mode.equals("game")?"Chơi game":"Trò chuyện"),11,0xffdacbff));
-    info.addView(label(room.optString("host"), 12, 0xccffffff));
+    info.addView(label(room.optString("host"), 12, 0xccd8dce0));
     c.addView(info, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
     c.setOnClickListener(v -> {
       Intent i = new Intent(this, LiveActivity.class);
@@ -2982,17 +3290,30 @@ public class MainActivity extends Activity {
     stage.addView(shortVideo, new FrameLayout.LayoutParams(-1, -1, Gravity.CENTER));
     Map<String, String> headers = new HashMap<>();
     headers.put("Cookie", api.jar());
-    shortVideo.setVideoURI(android.net.Uri.parse(server() + item.optString("video")), headers);
+    final String videoPath=item.optString("video");final java.io.File savedVideo=api.cachedVideo(videoPath);
+    FrameLayout preview=new FrameLayout(this);ImageView poster=new ImageView(this);poster.setScaleType(ImageView.ScaleType.FIT_CENTER);preview.addView(poster,new FrameLayout.LayoutParams(-1,-1));byte[] thumbnail=api.cachedThumbnail(videoPath);if(thumbnail!=null)poster.setImageBitmap(BitmapFactory.decodeByteArray(thumbnail,0,thumbnail.length));
+    TextView unavailable=label(I18n.t("Video chưa lưu trên máy · Chờ máy chủ hoạt động lại"),13,WHITE);unavailable.setGravity(Gravity.CENTER);unavailable.setPadding(dp(30),dp(12),dp(70),dp(12));unavailable.setBackgroundColor(0x99000000);unavailable.setVisibility(View.GONE);preview.addView(unavailable,new FrameLayout.LayoutParams(-1,-2,Gravity.CENTER));stage.addView(preview,new FrameLayout.LayoutParams(-1,-1));
+    if(savedVideo!=null)shortVideo.setVideoURI(android.net.Uri.fromFile(savedVideo));
+    else if(!item.optBoolean("offline"))shortVideo.setVideoURI(android.net.Uri.parse(server()+videoPath),headers);
+    else unavailable.setVisibility(View.VISIBLE);
     shortVideo.setOnPreparedListener(player -> {
       if (stopped || shortVideo != playerView) return;
       shortPlayer = player;
+      preview.setVisibility(View.GONE);api.warmVideo(videoPath);
       player.setLooping(true);
       player.setVolume(shortMuted ? 0 : 1, shortMuted ? 0 : 1);
       if(!mediaCallBlocked)shortVideo.start();
     });
-    shortVideo.setOnErrorListener((player, what, extra) -> { say(I18n.t("Không phát được video.")); return true; });
+    shortVideo.setOnErrorListener((player, what, extra) -> {preview.setVisibility(View.VISIBLE);unavailable.setVisibility(View.VISIBLE);return true;});
     if(shortEnter!=0){int direction=shortEnter;shortEnter=0;VerticalMediaStage.enter(stage,direction);}
-    stage.setOnClickListener(v->{if(shortVideo!=null){if(shortVideo.isPlaying())shortVideo.pause();else if(!mediaCallBlocked)shortVideo.start();}});
+    final FrameLayout pauseBadge = new FrameLayout(this);
+    GradientDrawable pauseBg = background(0x88141418, 999);
+    pauseBg.setStroke(dp(1), 0x33ffffff);
+    pauseBadge.setBackground(pauseBg);
+    pauseBadge.addView(icon("play", 28, WHITE), new FrameLayout.LayoutParams(dp(28), dp(28), Gravity.CENTER));
+    pauseBadge.setVisibility(View.GONE);
+    stage.addView(pauseBadge, new FrameLayout.LayoutParams(dp(64), dp(64), Gravity.CENTER));
+    stage.setOnClickListener(v->{if(shortVideo!=null){if(shortVideo.isPlaying()){shortVideo.pause();pauseBadge.setAlpha(0f);pauseBadge.setScaleX(0.85f);pauseBadge.setScaleY(0.85f);pauseBadge.setVisibility(View.VISIBLE);pauseBadge.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(150).start();}else if(!mediaCallBlocked){shortVideo.start();pauseBadge.animate().alpha(0f).setDuration(120).withEndAction(()->pauseBadge.setVisibility(View.GONE)).start();}}});
     // Cột nút bên phải
     LinearLayout side = column();
     side.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -3008,12 +3329,7 @@ public class MainActivity extends Activity {
       send.putExtra(Intent.EXTRA_TEXT, "Xem video của @" + author.optString("username") + " trên Kinnect: https://app.kinnect.io.vn/?video=" + item.optString("id"));
       try { startActivity(Intent.createChooser(send, I18n.t("Chia sẻ video"))); } catch (Exception ignored) {}
     }));
-    side.addView(reelButton("download", I18n.t("Tải video"), WHITE, () -> downloadShort(item)));
-    side.addView(reelButton(shortMuted ? "mute" : "sound", I18n.t("Âm thanh"), WHITE, () -> {
-      shortMuted = !shortMuted;
-      if (shortPlayer != null) shortPlayer.setVolume(shortMuted ? 0 : 1, shortMuted ? 0 : 1);
-      showShort(shortIndex);
-    }));
+    // Đã chuyển Tải video và Âm thanh vào shortOptions (Tùy chọn)
     side.addView(reelButton("more", I18n.t("Tùy chọn video"), WHITE, () -> shortOptions(item)));
     ScrollView actionRail = new ScrollView(this);
     actionRail.setVerticalScrollBarEnabled(false);
@@ -3024,25 +3340,62 @@ public class MainActivity extends Activity {
     sp.topMargin = dp(64); sp.bottomMargin = dp(65);
     stage.addView(actionRail, sp);
     stage.addView(reelTabs(), new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
-    // Tên + chú thích
+    // Tên + chú thích với lớp phủ gradient đáy sắc nét
+    View bottomScrim = new View(this);
+    bottomScrim.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x00000000, 0xcc000000 }));
+    stage.addView(bottomScrim, new FrameLayout.LayoutParams(-1, dp(190), Gravity.BOTTOM));
     LinearLayout meta = column();
-    TextView name = label("@" + author.optString("username"), 13, WHITE);
-    name.setTypeface(null, Typeface.BOLD);
+    TextView name = label("@" + author.optString("username"), 14, WHITE);
+    name.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
     name.setShadowLayer(4, 0, 1, 0xaa000000);
     meta.addView(name);
     if (!item.optString("caption").isEmpty()) {
-      TextView cap = label(item.optString("caption"), 13, WHITE);
+      TextView cap = label(item.optString("caption"), 13, 0xf2ffffff);
+      cap.setLineSpacing(0, 1.25f);
+      cap.setPadding(0, dp(4), 0, 0);
       cap.setShadowLayer(4, 0, 1, 0xaa000000);
       meta.addView(cap);
     }
 
     FrameLayout.LayoutParams mp = new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
-    mp.setMargins(dp(14), 0, dp(84), dp(18));
+    mp.setMargins(dp(14), 0, dp(76), dp(26));
     stage.addView(meta, mp);
+    actionRail.bringToFront();
+    stage.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob) -> {
+      int width=r-l,height=b-t;
+      boolean compact=width>height;
+      // A short viewport cannot hold the portrait rail. All actions stay visible
+      // in one bottom row; never rebuild the VideoView during a resize.
+      side.setOrientation(compact?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL);
+      side.setGravity(compact?Gravity.CENTER_VERTICAL:Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);
+      FrameLayout.LayoutParams rail=(FrameLayout.LayoutParams)actionRail.getLayoutParams();
+      int railWidth=compact?dp(310):dp(64);
+      int railHeight=compact?dp(76):-1;
+      int top=compact?0:dp(56),bottomMargin=compact?dp(6):dp(16);
+      if(rail.width!=railWidth||rail.height!=railHeight||rail.topMargin!=top||rail.bottomMargin!=bottomMargin) {
+        rail.width=railWidth;rail.height=railHeight;rail.gravity=Gravity.END|Gravity.BOTTOM;
+        rail.topMargin=top;rail.bottomMargin=bottomMargin;rail.rightMargin=compact?dp(8):0;
+        actionRail.setLayoutParams(rail);
+      }
+      for(int n=0;n<side.getChildCount();n++) {
+        View action=side.getChildAt(n);
+        LinearLayout.LayoutParams cell=(LinearLayout.LayoutParams)action.getLayoutParams();
+        int cw=compact?dp(n==0?54:64):dp(64);
+        if(cell.width!=cw){cell.width=cw;action.setLayoutParams(cell);}
+        if(n>0 && action instanceof LinearLayout) {
+          TextView caption=(TextView)((LinearLayout)action).getChildAt(1);
+          caption.setSingleLine(compact);
+          caption.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        }
+      }
+      FrameLayout.LayoutParams details=(FrameLayout.LayoutParams)meta.getLayoutParams();
+      int right=compact?dp(326):dp(84);
+      if(details.rightMargin!=right){details.rightMargin=right;details.bottomMargin=dp(12);meta.setLayoutParams(details);}
+    });
   }
 
   private TextView reelTab(String text, boolean active, Runnable click) {
-    TextView t = label(text, 16, active ? WHITE : 0x99ffffff);
+    TextView t = label(text, 16, WHITE);
     t.setTypeface(null, active ? Typeface.BOLD : Typeface.NORMAL);
     t.setPadding(dp(12), dp(6), dp(12), dp(6));
     t.setShadowLayer(4, 0, 1, 0xaa000000);
@@ -3053,19 +3406,25 @@ public class MainActivity extends Activity {
   private LinearLayout reelButton(String iconName, String caption, int color, Runnable click) {
     LinearLayout box = column();
     box.setGravity(Gravity.CENTER_HORIZONTAL);
-    box.setPadding(0, dp(3), 0, 0);
-    box.setMinimumHeight(dp(44));
-    ImageView i = icon(iconName, 24, color);
-    i.setElevation(dp(2));
-    box.addView(i, new LinearLayout.LayoutParams(dp(24), dp(24)));
+    box.setPadding(0, dp(8), 0, dp(3));
+    box.setMinimumHeight(dp(56));
+    ImageView i = icon(iconName, 25, color);
+    GradientDrawable orb = background(0xa617171c, 999);
+    orb.setStroke(dp(1), 0x33ffffff);
+    i.setBackground(orb);
+    i.setPadding(dp(10), dp(10), dp(10), dp(10));
+    i.setElevation(dp(3));
+    box.addView(i, new LinearLayout.LayoutParams(dp(46), dp(46)));
     TextView text = label(caption, 11, WHITE);
-    text.setTypeface(null, Typeface.BOLD);
+    text.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
     text.setShadowLayer(4, 0, 1, 0xaa000000);
     text.setGravity(Gravity.CENTER);
-    text.setPadding(0, dp(2), 0, 0);
+    text.setPadding(dp(3), dp(2), dp(3), dp(2));
+    text.setMaxLines(2);
     box.addView(text);
     box.setContentDescription(caption);
     box.setOnClickListener(v -> click.run());
+    tactile(box);
     return box;
   }
 
@@ -3074,15 +3433,15 @@ public class MainActivity extends Activity {
   private LinearLayout reelTabs() {
     LinearLayout bar = row();
     bar.setGravity(Gravity.CENTER);
-    bar.setPadding(0, dp(6), 0, dp(14));
-    bar.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x66000000, 0x00000000 }));
+    bar.setPadding(0, dp(10), 0, dp(14));
+    bar.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x99000000, 0x00000000 }));
     String[][] items = { { "for", "Đề xuất" }, { "following", "Đang theo dõi" } };
     for (final String[] it : items) {
       boolean active = it[0].equals(shortsTab);
       LinearLayout cell = column();
       cell.setGravity(Gravity.CENTER_HORIZONTAL);
       cell.setPadding(dp(12), 0, dp(12), 0);
-      TextView t = label((it[0].equals("live") ? "● " : "") + it[1], 14, active ? WHITE : 0xb3ffffff);
+      TextView t = label((it[0].equals("live") ? "● " : "") + it[1], 14, WHITE);
       t.setTypeface(null, active ? Typeface.BOLD : Typeface.NORMAL);
       t.setGravity(Gravity.CENTER);
       t.setShadowLayer(dp(3), 0, dp(1), 0xaa000000);
@@ -3091,8 +3450,8 @@ public class MainActivity extends Activity {
       cell.addView(t, new LinearLayout.LayoutParams(-1, -2));
       View line = new View(this);
       line.setBackground(background(active ? WHITE : 0x00000000, 99));
-      LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(24), dp(3));
-      lp.topMargin = dp(5);
+      LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(28), dp(3));
+      lp.topMargin = dp(6);
       cell.addView(line, lp);
       cell.setOnClickListener(v -> { shortsTab = it[0]; navigate("shorts"); });
       bar.addView(cell, new LinearLayout.LayoutParams(0, dp(44), 1));
@@ -3100,13 +3459,59 @@ public class MainActivity extends Activity {
     return bar;
   }
 
-  // Bình luận video kiểu TikTok: bảng trượt từ dưới, "N bình luận", tim bên phải, trả lời thu gọn, hàng emoji nhanh.
   private android.app.Dialog shortOptions(final JSONObject item) {
-    final boolean mine=item.optString("user_id").equals(me.optString("id"));
-    return new Sheet(this).setTitle(I18n.t("Tùy chọn video")).setItemIcons(new String[]{mine?"trash":"flag","user_round","close"}).setItems(new String[]{mine?I18n.t("Xoá video của tôi"):I18n.t("Báo cáo video"),I18n.t("Xem hồ sơ"),I18n.t("Đóng")},(d,w)->{
-      if(w==0){if(mine)confirm(I18n.t("Xoá video?"),()->request("DELETE","/api/shorts/"+item.optString("id"),json(),r->navigate("shorts")));else report("short",item.optString("id"));}
-      if(w==1)person(item.optJSONObject("author"));
-    }).show();
+    final boolean mine = item.optString("user_id").equals(me.optString("id"));
+    final android.app.Dialog[] dialog = new android.app.Dialog[1];
+    
+    LinearLayout container = column();
+    container.setPadding(0, dp(8), 0, dp(16));
+    
+    HorizontalScrollView scroll1 = new HorizontalScrollView(this);
+    scroll1.setHorizontalScrollBarEnabled(false);
+    LinearLayout row1 = row();
+    row1.setPadding(dp(16), 0, dp(16), 0);
+    
+    Runnable close = () -> { if (dialog[0] != null) dialog[0].dismiss(); };
+    
+    row1.addView(tiktokOptionBtn("download", I18n.t("Lưu video"), () -> { close.run(); downloadShort(item); }));
+    row1.addView(tiktokOptionBtn("music", I18n.t("Âm thanh"), () -> { close.run(); downloadAudio(item); }));
+    row1.addView(tiktokOptionBtn(shortMuted ? "mute" : "sound", shortMuted ? I18n.t("Bật âm") : I18n.t("Tắt âm"), () -> { 
+        close.run();
+        shortMuted = !shortMuted;
+        if (shortPlayer != null) shortPlayer.setVolume(shortMuted ? 0 : 1, shortMuted ? 0 : 1);
+        showShort(shortIndex);
+    }));
+    row1.addView(tiktokOptionBtn(mine ? "trash" : "flag", mine ? I18n.t("Xoá") : I18n.t("Báo cáo"), () -> {
+        close.run();
+        if (mine) confirm(I18n.t("Xoá video?"),()->request("DELETE","/api/shorts/"+item.optString("id"),json(),r->navigate("shorts"))); else report("short",item.optString("id"));
+    }));
+    row1.addView(tiktokOptionBtn("user_round", I18n.t("Hồ sơ"), () -> { close.run(); person(item.optJSONObject("author")); }));
+
+    scroll1.addView(row1);
+    container.addView(scroll1);
+    
+    dialog[0] = new Sheet(this).setTitle(I18n.t("Tùy chọn")).setView(container).show();
+    return dialog[0];
+  }
+
+  private LinearLayout tiktokOptionBtn(String iconName, String labelText, Runnable action) {
+    LinearLayout btn = column();
+    btn.setGravity(Gravity.CENTER);
+    btn.setPadding(0, 0, dp(16), 0);
+    
+    FrameLayout circle = new FrameLayout(this);
+    circle.setBackground(background(SOFT, 99));
+    circle.addView(icon(iconName, 24, TEXT), new FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER));
+    btn.addView(circle, new LinearLayout.LayoutParams(dp(54), dp(54)));
+    
+    TextView t = label(labelText, 12, TEXT);
+    t.setSingleLine(true);
+    t.setEllipsize(android.text.TextUtils.TruncateAt.END);
+    t.setGravity(Gravity.CENTER);
+    btn.addView(t, new LinearLayout.LayoutParams(dp(68), -2));
+    
+    btn.setOnClickListener(v -> action.run());
+    return btn;
   }
 
   private void shortComments(final JSONObject item) {
@@ -3497,7 +3902,15 @@ public class MainActivity extends Activity {
                 android.util.Base64.NO_WRAP
               )
           ),
-          d -> { if (profileEditorAvatar != null && profileEditorAvatar.isAttachedToWindow()) request("GET", "/api/me", null, updated -> { me = updated.optJSONObject("user"); loadAvatarInto(me, profileEditorAvatar); say(I18n.t("Đã đổi ảnh đại diện")); }); else navigate("profile"); }
+          d -> {
+            JSONObject updated=d.optJSONObject("user");if(updated==null){say(I18n.t("Không tải được hồ sơ mới. Vui lòng thử lại."));return;}
+            me=updated;avatarRevision++;avatarCache.evictAll();clearRetainedFeed();feedRows=null;
+            for(java.util.Map.Entry<ImageView,String> binding:new java.util.ArrayList<>(avatarViews.entrySet())){
+              ImageView view=binding.getKey();if(view!=null&&view.isAttachedToWindow()&&me.optString("id").equals(binding.getValue()))loadAvatarInto(me,view);
+            }
+            if(profileEditorAvatar==null||!profileEditorAvatar.isAttachedToWindow())navigate("profile");
+            say(I18n.t("Đã đổi ảnh đại diện"));
+          }
         );
       } catch (Exception e) {
         say(I18n.t("Chọn ảnh nhỏ hơn 1 MB."));
@@ -3678,6 +4091,7 @@ public class MainActivity extends Activity {
 
   @Override
   protected void onDestroy() {
+    previewLoader.shutdownNow();
     if(mediaCallListening)KinnectService.unlisten(mediaCallEvents);
     startupHandler.removeCallbacksAndMessages(null);
     if (splashAnimator != null) splashAnimator.cancel();
@@ -3694,6 +4108,7 @@ public class MainActivity extends Activity {
 
   // Ghi nhớ màn đang mở để nút Back quay về đúng màn trước.
   private String currentKey = "";
+  private int navBack = 0;
 
   private void remember(String key, Runnable page) {
     if (!goingBack && currentPage != null && !key.equals(currentKey)) { history.push(currentPage); while (history.size() > 30) history.removeLast(); }
@@ -3705,9 +4120,14 @@ public class MainActivity extends Activity {
 
   @Override
   public void onBackPressed() {
-    if (subBack != null) { Runnable r = subBack; subBack = null; r.run(); return; }
-    if (me != null && !history.isEmpty()) { goingBack = true; Runnable previous = history.pop(); previous.run(); goingBack = false; return; }
+    handleBack();
+  }
+
+  private void handleBack() {
+    if (subBack != null) { navBack = 1; Runnable r = subBack; subBack = null; r.run(); return; }
+    if (me != null && !history.isEmpty()) { navBack = 1; goingBack = true; Runnable previous = history.pop(); previous.run(); goingBack = false; return; }
     if (me != null && (!onTabRoot || !tab.equals("feed"))) {
+      navBack = 1;
       navigate(onTabRoot ? "feed" : tab);
       return;
     }
@@ -3740,14 +4160,16 @@ public class MainActivity extends Activity {
     popup.setElevation(dp(10));
     for (int i = 0; i < REACTIONS.length; i++) {
       final int index = i;
-      TextView e = new KinnectText(this);
-      e.setText(REACTIONS[i][1]);
-      e.setTextSize(28);
-      e.setGravity(Gravity.CENTER);
+      ImageView e = new ImageView(this);
+      String[] artwork={"1f44d","2764","1f602","1f62e","1f622","1f621"};
+      int resource=getResources().getIdentifier("emoji_noto_"+artwork[i],"drawable",getPackageName());
+      e.setImageResource(resource);
+      e.setScaleType(ImageView.ScaleType.FIT_CENTER);
+      e.setPadding(dp(7),dp(8),dp(7),dp(8));
       e.setContentDescription(new String[] { I18n.t("Thích"), I18n.t("Yêu thích"), "Haha", "Wow", I18n.t("Buồn"), I18n.t("Phẫn nộ") }[i]);
-      e.setScaleX(0f);
-      e.setScaleY(0f);
-      e.animate().scaleX(1f).scaleY(1f).setStartDelay(30L * i).setDuration(180).setInterpolator(new android.view.animation.OvershootInterpolator(2.2f)).start();
+      e.setScaleX(.85f);
+      e.setScaleY(.85f);
+      e.post(() -> e.animate().scaleX(1f).scaleY(1f).setStartDelay(30L * index).setDuration(180).setInterpolator(new android.view.animation.OvershootInterpolator(2.2f)).start());
       e.setOnTouchListener((v, ev) -> {
         if (ev.getActionMasked() == MotionEvent.ACTION_DOWN) v.animate().scaleX(1.35f).scaleY(1.35f).translationY(-dp(8)).setDuration(120).start();
         if (ev.getActionMasked() == MotionEvent.ACTION_CANCEL) v.animate().scaleX(1f).scaleY(1f).translationY(0).setDuration(120).start();
@@ -3894,25 +4316,25 @@ public class MainActivity extends Activity {
       for (int i = 0; i < accounts.length(); i++) {
         final JSONObject a = accounts.optJSONObject(i);
         LinearLayout r = row();
-        r.setPadding(dp(12), dp(10), dp(6), dp(10));
-        r.setBackground(outlined(CARD, 14));
-        avatar(a, r, 40);
+        r.setPadding(dp(16), dp(12), dp(8), dp(12));
+        r.setBackground(outlined(CARD, 24));
+        avatar(a, r, 44);
         LinearLayout t = column();
-        t.setPadding(dp(12), 0, 0, 0);
-        TextView n = label(a.optString("name"), 15, TEXT);
+        t.setPadding(dp(16), 0, 0, 0);
+        TextView n = label(a.optString("name"), 16, TEXT);
         n.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         t.addView(n);
-        t.addView(label("@" + a.optString("username"), 12, MUTED));
+        t.addView(label("@" + a.optString("username"), 13, MUTED));
         r.addView(t, new LinearLayout.LayoutParams(0, -2, 1));
         FrameLayout go = new FrameLayout(this);
-        go.addView(icon("log_in", 18, ACCENT), new FrameLayout.LayoutParams(dp(18), dp(18), Gravity.CENTER));
-        r.addView(go, new LinearLayout.LayoutParams(dp(36), dp(36)));
+        go.addView(icon("log_in", 20, ACCENT), new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
+        r.addView(go, new LinearLayout.LayoutParams(dp(44), dp(44)));
         FrameLayout remove = new FrameLayout(this);
-        remove.addView(icon("x", 16, MUTED), new FrameLayout.LayoutParams(dp(16), dp(16), Gravity.CENTER));
+        remove.addView(icon("x", 18, MUTED), new FrameLayout.LayoutParams(dp(18), dp(18), Gravity.CENTER));
         remove.setBackground(pressable(CARD, 99));
         remove.setContentDescription(I18n.t("Gỡ tài khoản khỏi thiết bị"));
         remove.setOnClickListener(v -> api.call("DELETE", "/api/remembered/" + a.optString("id"), json(), (d, e, s) -> { if (generation == screen && !isDestroyed()) { if (e != null) say(e); else auth(false); } }));
-        r.addView(remove, new LinearLayout.LayoutParams(dp(36), dp(36)));
+        r.addView(remove, new LinearLayout.LayoutParams(dp(44), dp(44)));
         r.setContentDescription(I18n.t("Đăng nhập nhanh ") + a.optString("name"));
         r.setOnClickListener(v -> api.call("POST", "/api/remembered/login", json("userId", a.optString("id")), (d, e, s) -> {
           if (generation != screen || isDestroyed()) return;
@@ -3921,7 +4343,7 @@ public class MainActivity extends Activity {
           navigate("feed");
         }));
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
-        p.setMargins(0, dp(10), 0, 0);
+        p.setMargins(0, dp(12), 0, 0);
         recent.addView(r, p);
       }
     });
@@ -3934,27 +4356,27 @@ public class MainActivity extends Activity {
         boolean google = provider.equals("google");
         LinearLayout b = row();
         b.setGravity(Gravity.CENTER);
-        b.setBackground(outlined(CARD, 14));
+        b.setBackground(outlined(CARD, 99));
         ImageView mark = new ImageView(this);
         mark.setImageResource(getResources().getIdentifier(google ? "ic_brand_google" : "ic_brand_facebook", "drawable", getPackageName()));
-        b.addView(mark, new LinearLayout.LayoutParams(dp(22), dp(22)));
-        TextView t = label(google ? "Google" : "Facebook", 14, TEXT);
+        b.addView(mark, new LinearLayout.LayoutParams(dp(24), dp(24)));
+        TextView t = label(google ? "Google" : "Facebook", 15, TEXT);
         t.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        t.setPadding(dp(10), 0, 0, 0);
+        t.setPadding(dp(12), 0, 0, 0);
         b.addView(t);
         b.setContentDescription(I18n.t("Tiếp tục với ") + (google ? "Google" : "Facebook"));
         b.setOnClickListener(v -> {
           try { startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(server() + "/api/oauth/" + provider + "/start?client=android"))); }
           catch (Exception e) { say(I18n.t("Không mở được trình duyệt.")); }
         });
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(50), 1);
-        if (i > 0) p.leftMargin = dp(10);
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(56), 1);
+        if (i > 0) p.leftMargin = dp(12);
         buttons.addView(b, p);
       }
       LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, -2);
-      bp.topMargin = dp(14);
+      bp.bottomMargin = dp(16);
       providersBox.addView(buttons, bp);
-      providersBox.addView(textDivider(I18n.t("hoặc")));
+      providersBox.addView(textDivider(I18n.t("hoặc tiếp tục với mật khẩu")));
     });
   }
 
@@ -3969,7 +4391,17 @@ public class MainActivity extends Activity {
     android.net.Uri uri = intent == null ? null : intent.getData();
     if (uri == null || !"kinnect".equals(uri.getScheme()) || !"oauth".equals(uri.getHost())) return;
     String code = uri.getQueryParameter("code"), ticket = uri.getQueryParameter("ticket"), error = uri.getQueryParameter("error");
-    if (error != null) { auth(false); say(I18n.t("Đăng nhập chưa hoàn tất. Hãy thử lại.")); return; }
+    if (error != null) {
+      auth(false);
+      // Báo rõ nguyên nhân để dễ xử lý: huỷ, hết hạn phiên OAuth, nhà cung cấp từ chối, tài khoản bị khoá.
+      String message = error.equals("cancelled") ? I18n.t("Bạn đã huỷ đăng nhập.")
+        : error.equals("state") ? I18n.t("Phiên đăng nhập đã hết hạn. Hãy thử lại.")
+        : error.equals("suspended") ? I18n.t("Tài khoản đang bị tạm khoá.")
+        : error.equals("provider") ? I18n.t("Google/Facebook từ chối đổi mã đăng nhập. Kiểm tra cấu hình OAuth trên máy chủ.")
+        : I18n.t("Đăng nhập chưa hoàn tất. Hãy thử lại.");
+      say(message);
+      return;
+    }
     if (code != null) api.call("POST", "/api/oauth/app-session", json("code", code), (d, e, s) -> {
       if (e != null) { auth(false); say(e); return; }
       me = d.optJSONObject("user");
@@ -4074,13 +4506,15 @@ public class MainActivity extends Activity {
   // ----- Hồ sơ: số liệu, người theo dõi, bài viết
   private void stats(JSONObject u, LinearLayout parent) {
     final LinearLayout r = row();
-    r.setPadding(0, dp(10), 0, dp(10));
+    r.setPadding(dp(14), dp(10), dp(14), dp(10));
     parent.addView(r);
     request("GET", "/api/users/" + u.optString("id") + "/stats", null, d -> {
       String[][] items = { { String.valueOf(d.optInt("posts")), "bài viết", "" }, { String.valueOf(d.optInt("followers")), "người theo dõi", "followers" }, { String.valueOf(d.optInt("following")), "đang theo dõi", "following" } };
       for (final String[] it : items) {
         LinearLayout c = column();
         c.setGravity(Gravity.CENTER);
+        c.setPadding(dp(10), dp(8), dp(10), dp(8));
+        c.setBackground(background(SOFT, 16));
         TextView n = label(it[0], 18, TEXT);
         n.setTypeface(null, Typeface.BOLD);
         n.setGravity(Gravity.CENTER);
@@ -4116,7 +4550,14 @@ public class MainActivity extends Activity {
   // ----- Danh sách bài viết dùng chung
   private void posts(JSONArray posts, String empty) {
     if (posts == null || posts.length() == 0) content.addView(emptyBlock("newspaper",I18n.t("Chưa có bài viết"),empty.contains(I18n.t("đầu tiên"))?I18n.t("Hãy là người đầu tiên chia sẻ."):I18n.t("Bài viết sẽ hiển thị tại đây.")));
+    int startIndex = content.getChildCount();
     for (int i = 0; posts != null && i < posts.length(); i++) postCard(posts.optJSONObject(i));
+    for (int i = startIndex; i < content.getChildCount(); i++) {
+      View card = content.getChildAt(i);
+      card.setAlpha(0f);
+      card.setTranslationY(dp(14));
+      card.animate().alpha(1f).translationY(0f).setDuration(WebDesign.MOTION_BASE).setStartDelay(Math.min(220, (i - startIndex) * 35L)).start();
+    }
   }
 
   private void postCard(final JSONObject p) {
@@ -4164,7 +4605,10 @@ public class MainActivity extends Activity {
       c.addView(body);
     }
     JSONObject media = p.optJSONObject("media");
-    if (media != null) mediaView(media, c);
+    if (media != null) {
+      if(media.optBoolean("offline")){LinearLayout offline=row();offline.setPadding(dp(12),dp(14),dp(12),dp(14));offline.setBackground(background(SOFT,12));offline.addView(icon("image",20,MUTED),new LinearLayout.LayoutParams(dp(20),dp(20)));TextView hint=label(I18n.t("Ảnh/video tạm ngoại tuyến"),12,MUTED);hint.setPadding(dp(10),0,0,0);offline.addView(hint,new LinearLayout.LayoutParams(0,-2,1));c.addView(offline);}
+      else mediaView(media, c);
+    }
     LinearLayout stats = row();
     stats.setPadding(0, dp(10), 0, dp(10));
     final TextView reactSummary = label(reactionSummary(p), 13, MUTED);
@@ -4354,11 +4798,13 @@ public class MainActivity extends Activity {
     LinearLayout b = row();
     b.setGravity(Gravity.CENTER);
     if (emoji != null && iconName == null) {
-      TextView e = label(emoji, 17, TEXT);
-      e.setPadding(0, 0, 0, 0);
-      b.addView(e);
+      String code=Integer.toHexString(emoji.codePointAt(0));
+      if("1f606".equals(code))code="1f602";
+      int resource=getResources().getIdentifier("emoji_noto_"+code,"drawable",getPackageName());
+      if(resource!=0){ImageView e=new ImageView(this);e.setImageResource(resource);e.setScaleType(ImageView.ScaleType.FIT_CENTER);b.addView(e,new LinearLayout.LayoutParams(dp(20),dp(20)));}
+      else {TextView e=label(emoji,17,TEXT);e.setPadding(0,0,0,0);b.addView(e,new LinearLayout.LayoutParams(dp(24),dp(24)));}
     } else {
-      ImageView i = icon(iconName, 20, TEXT);
+      ImageView i = icon(iconName, 20, active ? ACCENT : TEXT);
       b.addView(i, new LinearLayout.LayoutParams(dp(20), dp(20)));
     }
     TextView t = label(text, 14, active ? ACCENT : TEXT);
@@ -4367,6 +4813,7 @@ public class MainActivity extends Activity {
     b.addView(t);
     b.setBackground(pressable(active ? PRIMARY_SOFT : CARD, 12));
     b.setContentDescription(text);
+    tactile(b);
     return b;
   }
 
@@ -4383,6 +4830,10 @@ public class MainActivity extends Activity {
     boolean on = glyph != null;
     react.removeAllViews();
     LinearLayout fresh = actionButton(on ? null : "smile", glyph, on ? reactionName(key) : I18n.t("Cảm xúc"), on);
+    if (on && android.animation.ValueAnimator.areAnimatorsEnabled()) {
+      react.setScaleX(0.8f); react.setScaleY(0.8f);
+      react.animate().scaleX(1.12f).scaleY(1.12f).setDuration(120).withEndAction(() -> react.animate().scaleX(1f).scaleY(1f).setDuration(140).start()).start();
+    }
     while (fresh.getChildCount() > 0) { View v = fresh.getChildAt(0); fresh.removeViewAt(0); react.addView(v); }
     react.setBackground(fresh.getBackground());
     react.setContentDescription(fresh.getContentDescription());
@@ -4489,7 +4940,7 @@ public class MainActivity extends Activity {
     strip.setPadding(0, dp(6), 0, dp(6));
     strip.addView(storyBubble(me, "Tạo tin", true, () -> createStory()));
     LinearLayout storyCard = card();
-    storyCard.setPadding(dp(12), dp(10), dp(12), dp(10));
+    storyCard.setPadding(dp(12), dp(6), dp(12), dp(6));
     storyCard.addView(hscroll(strip));
     request("GET", "/api/stories", null, d -> {
       final JSONArray stories = d.optJSONArray("stories");
@@ -4507,7 +4958,7 @@ public class MainActivity extends Activity {
     LinearLayout b = column();
     b.setGravity(Gravity.CENTER_HORIZONTAL);
     FrameLayout ring = new FrameLayout(this);
-    GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { ACCENT, ACCENT });
+    GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, mine ? new int[] { LINE, LINE } : new int[] { ACCENT, PINK });
     g.setShape(GradientDrawable.OVAL);
     ring.setBackground(g);
     FrameLayout inner = new FrameLayout(this);
@@ -4516,11 +4967,12 @@ public class MainActivity extends Activity {
     w.setColor(CARD);
     inner.setBackground(w);
     LinearLayout holder = new LinearLayout(this);
-    avatar(u, holder, 50);
-    inner.addView(holder, new FrameLayout.LayoutParams(dp(50), dp(50), Gravity.CENTER));
-    ring.addView(inner, new FrameLayout.LayoutParams(dp(54), dp(54), Gravity.CENTER));
+    ImageView storyAvatar=avatar(u, holder, 52);
+    storyAvatar.setForeground(null);
+    inner.addView(holder, new FrameLayout.LayoutParams(dp(52), dp(52), Gravity.CENTER));
+    ring.addView(inner, new FrameLayout.LayoutParams(dp(57), dp(57), Gravity.CENTER));
     FrameLayout bubbleBox = new FrameLayout(this);
-    bubbleBox.addView(ring, new FrameLayout.LayoutParams(dp(60), dp(60), Gravity.CENTER));
+    bubbleBox.addView(ring, new FrameLayout.LayoutParams(dp(62), dp(62), Gravity.CENTER));
     if (mine) {
       FrameLayout plus = new FrameLayout(this);
       GradientDrawable pb = background(ACCENT, 99);
@@ -4582,7 +5034,7 @@ public class MainActivity extends Activity {
       stage.addView(img, new FrameLayout.LayoutParams(-1, -1));
       api.image(media.optString("url"), bytes -> { if (bytes != null && generation == screen) { Bitmap b = BitmapFactory.decodeByteArray(bytes, 0, bytes.length); if (b != null) img.setImageBitmap(b); } });
     } else {
-      stage.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { ACCENT, ACCENT }));
+      stage.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { ACCENT, 0xffd946c4 }));
     }
     if (!st.optString("body").isEmpty()) {
       TextView body = label(st.optString("body"), media == null ? 26 : 17, WHITE);
@@ -4901,7 +5353,7 @@ public class MainActivity extends Activity {
         LinearLayout r = row();
         r.setPadding(dp(10), dp(6), dp(10), dp(6));
         r.setBackground(background(CARD, 14));
-        r.addView(chip("▶", false, () -> {
+        r.addView(chip("▶ " + I18n.t("Nghe"), false, () -> {
           try {
             if (adminPlayer != null) adminPlayer.release();
             adminPlayer = new android.media.MediaPlayer();
@@ -5009,7 +5461,7 @@ public class MainActivity extends Activity {
     control.addView(icon(iconName, 16, color), new FrameLayout.LayoutParams(dp(16), dp(16), Gravity.CENTER));
     control.setContentDescription(description);
     control.setOnClickListener(v -> action.run());
-    control.setLayoutParams(new LinearLayout.LayoutParams(dp(32), dp(32)));
+    control.setLayoutParams(new LinearLayout.LayoutParams(dp(28), dp(24)));
     return control;
   }
 
@@ -5097,7 +5549,15 @@ public class MainActivity extends Activity {
     if(me==null||getSharedPreferences("kinnect_profile",0).getBoolean("completion_dismissed:"+me.optString("id"),false))return;
     String[] keys={"avatar","bio","city","interests","lookingFor"},titles={"Ảnh đại diện","Giới thiệu","Khu vực","Sở thích","Mục đích kết nối"};int done=0;List<String> missing=new ArrayList<>();
     for(int i=0;i<keys.length;i++){Object value=me.opt(keys[i]);boolean filled=value instanceof JSONArray?((JSONArray)value).length()>0:value!=null&&value!=JSONObject.NULL&&!value.toString().trim().isEmpty();if(filled)done++;else missing.add(titles[i]);}
-    if(done==keys.length)return;final LinearLayout panel=card();LinearLayout heading=row();TextView caption=label(I18n.t("Hoàn thiện hồ sơ · ")+done*100/keys.length+"%",16,TEXT);heading.addView(caption,new LinearLayout.LayoutParams(0,-2,1));FrameLayout close=new FrameLayout(this);close.setBackground(pressable(CARD,99));close.addView(icon("close",18,MUTED),new FrameLayout.LayoutParams(dp(18),dp(18),Gravity.CENTER));close.setContentDescription(I18n.t("Đóng gợi ý hoàn thiện hồ sơ"));close.setOnClickListener(v->{getSharedPreferences("kinnect_profile",0).edit().putBoolean("completion_dismissed:"+me.optString("id"),true).apply();if(panel.getParent() instanceof ViewGroup)((ViewGroup)panel.getParent()).removeView(panel);});heading.addView(close,new LinearLayout.LayoutParams(dp(44),dp(44)));panel.addView(heading);ProgressBar progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);progress.setMax(keys.length);progress.setProgress(done);progress.setProgressTintList(android.content.res.ColorStateList.valueOf(ACCENT));panel.addView(progress,new LinearLayout.LayoutParams(-1,dp(12)));panel.addView(label(I18n.t("Bổ sung: ")+android.text.TextUtils.join(", ",missing),13,MUTED));panel.addView(primary(I18n.t("Hoàn thiện hồ sơ"),()->editProfile()));
+    if(done==keys.length)return;
+    final LinearLayout panel=card();panel.setPadding(dp(12),dp(5),dp(6),dp(5));
+    LinearLayout heading=row();heading.setGravity(Gravity.CENTER_VERTICAL);
+    TextView caption=label(I18n.t("Hoàn thiện hồ sơ"),13,TEXT);caption.setSingleLine(true);caption.setEllipsize(android.text.TextUtils.TruncateAt.END);
+    heading.addView(caption,new LinearLayout.LayoutParams(0,-2,1));
+    TextView percent=label(done*100/keys.length+"%",13,ACCENT);percent.setPadding(dp(6),0,dp(4),0);heading.addView(percent);
+    FrameLayout edit=new FrameLayout(this);edit.addView(icon("pencil",18,ACCENT),new FrameLayout.LayoutParams(dp(18),dp(18),Gravity.CENTER));edit.setBackground(pressable(PRIMARY_SOFT,99));edit.setContentDescription(I18n.t("Hoàn thiện hồ sơ"));edit.setOnClickListener(v->editProfile());heading.addView(edit,new LinearLayout.LayoutParams(dp(40),dp(40)));
+    FrameLayout close=new FrameLayout(this);close.addView(icon("close",17,MUTED),new FrameLayout.LayoutParams(dp(17),dp(17),Gravity.CENTER));close.setContentDescription(I18n.t("Đóng gợi ý hoàn thiện hồ sơ"));close.setOnClickListener(v->{getSharedPreferences("kinnect_profile",0).edit().putBoolean("completion_dismissed:"+me.optString("id"),true).apply();if(panel.getParent() instanceof ViewGroup)((ViewGroup)panel.getParent()).removeView(panel);});heading.addView(close,new LinearLayout.LayoutParams(dp(40),dp(40)));
+    panel.addView(heading);
   }
 
   private JSONObject currentGroup;
@@ -5250,7 +5710,7 @@ public class MainActivity extends Activity {
     if (u != null || group && currentGroup!=null) avatar(u!=null?u:currentGroup, head, 36);
     else {
       FrameLayout g = new FrameLayout(this);
-      GradientDrawable o = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { ACCENT, ACCENT });
+      GradientDrawable o = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { ACCENT, 0xffd946c4 });
       o.setShape(GradientDrawable.OVAL);
       g.setBackground(o);
       ImageView groupGlyph=new ImageView(this);groupGlyph.setImageDrawable(new SettingsGlyph("group_three",WHITE,ACCENT));g.addView(groupGlyph,new FrameLayout.LayoutParams(dp(28),dp(28),Gravity.CENTER));
@@ -5261,7 +5721,9 @@ public class MainActivity extends Activity {
     TextView n = label(title, 14, TEXT);
     n.setTypeface(null, Typeface.BOLD);
     n.setSingleLine(true);
+    n.setEllipsize(android.text.TextUtils.TruncateAt.END);
     n.setPadding(0, 0, 0, 0);
+    n.addOnLayoutChangeListener((v, l, tp, r, b, ol, ot, or, ob) -> { TextView tv = (TextView) v; float need = tv.getPaint().measureText(String.valueOf(tv.getText())); if (tv.getWidth() > 0 && need > tv.getWidth()) { float target = Math.max(dp(11), tv.getTextSize() * tv.getWidth() / need - 1f); tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, target); } });
     who.addView(n);
     TextView st = label(subtitle, 12, MUTED);
     st.setPadding(0, 0, 0, 0);
@@ -5306,7 +5768,7 @@ public class MainActivity extends Activity {
     bar.addView(input, ip);
     if(group&&currentGroup!=null)installMentions(input,currentGroup);
     FrameLayout send = new FrameLayout(this);
-    send.setBackground(background(ACCENT, 999));
+    send.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x33ffffff), brandGradient(999), null));
     send.addView(icon("send", 20, WHITE), new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
     send.setContentDescription(I18n.t("Gửi"));
     final Runnable load = () -> loadChat(path, list, msgScroll, group, u);
@@ -5315,10 +5777,12 @@ public class MainActivity extends Activity {
       if (text.isEmpty()) return;
       submitText(input, send, path, json("body", text,"mentions",group?mentionIds(text,currentGroup):new JSONArray()), d -> { lastMessages = ""; load.run(); });
     });
+    tactile(send);
     bar.addView(send, new LinearLayout.LayoutParams(dp(46), dp(46)));
     box.addView(bar);
     lastMessages = "";
     aiChatReload=load;
+    list.addView(loadingState(I18n.t("Đang tải tin nhắn…")));
     load.run();
     final int generation = screen;
     poll = () -> {
@@ -5383,7 +5847,7 @@ public class MainActivity extends Activity {
       FrameLayout receiptIcon=new FrameLayout(this);
       receiptIcon.addView(icon(seen ? "eye" : "check",13,toolColor),new FrameLayout.LayoutParams(dp(13),dp(13),Gravity.CENTER));
       receiptIcon.setAlpha(seen?1f:.6f);receiptIcon.setContentDescription(status);receiptIcon.setTooltipText(status);
-      footer.addView(receiptIcon,new LinearLayout.LayoutParams(dp(20),dp(32)));
+      footer.addView(receiptIcon,new LinearLayout.LayoutParams(dp(20),dp(24)));
     }
     final String base = "/api/chat-messages/" + (group ? "group" : "direct") + "/" + m.optString("id");
     LinearLayout tools = row();
@@ -5401,7 +5865,7 @@ public class MainActivity extends Activity {
   private void loadChat(final String path, final LinearLayout list, final ScrollView scroll, final boolean group, final JSONObject other) {
     if (Boolean.TRUE.equals(list.getTag())) return;
     list.setTag(Boolean.TRUE);
-    request("GET", path, null, data -> {
+    cachedRequest(path, data -> {
       JSONArray messages = data.optJSONArray("messages");if(messages==null)return;
       String signature = (messages == null ? "" : messages.toString())+data.optString("aiSupport");
       if (signature.equals(lastMessages) && list.getChildCount() > 0) return;
@@ -5460,11 +5924,16 @@ public class MainActivity extends Activity {
         final JSONObject file = m.optJSONObject("attachment");
         if (!m.optBoolean("recalled") && file != null && file.optString("kind").equals("image")) mediaView(file, bubble);
         else if (!m.optBoolean("recalled") && file != null) {
-          TextView f = label("📎 " + file.optString("name"), 15, own ? WHITE : TEXT);
+          TextView f = label(file.optString("name"), 15, own ? WHITE : TEXT);
+          android.graphics.drawable.Drawable attachIcon = WebIcons.load(this, "attach");
+          attachIcon.setTint(own ? WHITE : ACCENT);
+          attachIcon.setBounds(0, 0, dp(16), dp(16));
+          f.setCompoundDrawables(attachIcon, null, null, null);
+          f.setCompoundDrawablePadding(dp(6));
           f.setOnClickListener(v -> openAttachment(file));
           bubble.addView(f);
         }
-        String body = m.optBoolean("recalled") ? "Tin nhắn đã được thu hồi" : m.optString("body");
+        String body = m.optBoolean("recalled") ? "Tin nhắn đã được thu hồi" : decodeEntities(m.optString("body"));
         if (!body.isEmpty()) {
           TextView t = label(body, 15, own ? WHITE : TEXT);
           t.setPadding(0, 0, 0, 0);
@@ -5484,7 +5953,11 @@ public class MainActivity extends Activity {
       reconcileChatRows(list,nextList);
       paintAIStream();
       scroll.post(() -> { if (followBottom) scroll.fullScroll(View.FOCUS_DOWN); else scroll.scrollTo(0, previousY); });
-    }, () -> list.setTag(Boolean.FALSE));
+    }, () -> {
+      list.setTag(Boolean.FALSE);
+      View loading=list.findViewWithTag("loading");
+      if(loading!=null){list.removeView(loading);list.addView(button(I18n.t("Tải lại tin nhắn"),()->{list.removeAllViews();list.addView(loadingState(I18n.t("Đang tải tin nhắn…")));loadChat(path,list,scroll,group,other);}));}
+    });
   }
 
   // Bình luận mở ngay dưới bài viết như web: bong bóng xám, "Thích · Trả lời · thời gian", ô "Viết bình luận…".
@@ -5720,6 +6193,8 @@ public class MainActivity extends Activity {
     final EditText caption = new KinnectInput(this);
     caption.setHint(I18n.t("Viết gì đó cho tin (không bắt buộc)"));
     new Sheet(this).setTitle(I18n.t("Đăng tin 24 giờ")).setView(caption).setPositiveButton(I18n.t("Chia sẻ tin"), (d, w) -> {
+      if (video == null || !video.exists()) { say(I18n.t("Không đọc được video. Vui lòng chọn tệp khác.")); return; }
+      if (video.length() > 25L * 1024L * 1024L) { say(I18n.t("Video quá lớn để đăng tin (tối đa 25 MB).")); return; }
       say(I18n.t("Đang đăng tin…"));
       final String text = caption.getText().toString();
       new Thread(() -> {
@@ -5727,6 +6202,8 @@ public class MainActivity extends Activity {
           byte[] bytes = NativeApi.readAll(new java.io.FileInputStream(video));
           final String media = "data:video/mp4;base64," + android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP);
           runOnUiThread(() -> request("POST", "/api/stories", json("body", text, "media", media), r -> { say(I18n.t("Đã đăng tin, hiển thị 24 giờ.")); navigate("feed"); }));
+        } catch (OutOfMemoryError oom) {
+          runOnUiThread(() -> say(I18n.t("Thiết bị không đủ bộ nhớ để chuẩn bị tệp tải lên.")));
         } catch (Exception e) {
           runOnUiThread(() -> say(I18n.t("Không đọc được video. Vui lòng chọn tệp khác.")));
         }
@@ -5745,7 +6222,7 @@ public class MainActivity extends Activity {
   private BitmapFactory.Options sampled(android.net.Uri uri) {
     BitmapFactory.Options o = new BitmapFactory.Options();
     o.inJustDecodeBounds = true;
-    try { BitmapFactory.decodeStream(getContentResolver().openInputStream(uri), null, o); } catch (Exception ignored) {}
+    try (java.io.InputStream in = getContentResolver().openInputStream(uri)) { BitmapFactory.decodeStream(in, null, o); } catch (Exception ignored) {}
     o.inSampleSize = Math.max(1, Math.max(o.outWidth, o.outHeight) / 1280);
     o.inJustDecodeBounds = false;
     return o;

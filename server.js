@@ -1,4 +1,6 @@
 import {createLiveGifts} from './lib/live-gifts.js';
+import {createPcCloudBridge} from './lib/pc-cloud-bridge.js';
+import {createSharedSession} from './lib/shared-session.js';
 import {liveRoomBlocks} from './lib/live-access.js';
 import {createLiveSFU} from './lib/live-sfu.js';
 import {createLiveGuests} from './lib/live-guests.js';
@@ -41,6 +43,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     onAIStream: event => notifyAIStream(event),
     onCallMessage: ({ userIds }) => notifyCallMessage(userIds),
     fetchImpl,authLimit,storeVerifier,storeEnv,
+    sharedSession: (dbPath===":memory:"||process.env.NODE_TEST_CONTEXT)?null:createSharedSession(),
     sendEmail:deliverEmail,mailReady:emailAvailable,
     // Báo về email quản trị khi có người gửi yêu cầu quên mật khẩu.
     onResetRequest: (r) => {
@@ -80,7 +83,9 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     return versionCache.value;
   }
   let latestApk = null;
+  const sharedCoreBridge=(dbPath===":memory:"||process.env.NODE_TEST_CONTEXT)?null:createPcCloudBridge(social,{syncFeedEnabled:resolve(dbPath)===resolve(process.env.DATA_DIR||'data','kinnect.sqlite')});
   const server = http.createServer(async (req, res) => {
+    if(sharedCoreBridge&&await sharedCoreBridge(req,res))return;
     const path = new URL(req.url, "http://localhost").pathname;
     // Danh sách buổi live đang phát (cho tab "Trực tiếp" ở trang Video, web và app).
     if (path === "/api/live/rooms" && req.method === "GET") {
@@ -255,6 +260,26 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         return res.end();
       }
     }
+    // Module Nông trại: APK riêng, tải khi người dùng muốn chơi.
+    if (path === "/download/farm-game") {
+      if (!["GET", "HEAD"].includes(req.method)) { res.writeHead(405, {Allow: "GET, HEAD"}); return res.end(); }
+      try {
+        const dir = new URL("./dist/", import.meta.url);
+        const builds = [];
+        for (const entry of await readdir(dir)) if (/^(?:FarmGame|farm-game)(?:-[\d.]+)?(?:-debug)?\.apk$/.test(entry)) builds.push({ entry, at: (await stat(new URL(entry, dir))).mtimeMs });
+        if (!builds.length) throw Error("Chưa có module");
+        const name = builds.sort((a, b) => b.at - a.at)[0].entry;
+        const file = new URL(name, dir);
+        const info = await stat(file);
+        res.writeHead(200, {"Content-Type": "application/vnd.android.package-archive", "Content-Length": info.size, "Content-Disposition": 'attachment; filename="' + name + '"', "Cache-Control": "no-store"});
+        if (req.method === "HEAD") { res.end(); return true; }
+        createReadStream(file).pipe(res);
+        return true;
+      } catch {
+        res.writeHead(404);
+        return res.end();
+      }
+    }
     // Nút "Tải app": tự tìm APK của bản phát hành mới nhất trên GitHub và chuyển thẳng tới file để tải.
     if (path === "/download/android") {
       if(!["GET","HEAD"].includes(req.method)){res.writeHead(405,{Allow:"GET, HEAD"});return res.end();}
@@ -380,6 +405,8 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
       "/v2.css": ["v2.css", "text/css"],
       "/v2.js": ["v2.js", "text/javascript"],
       "/v2-icons.js": ["v2-icons.js", "text/javascript"],
+      "/fonts/be-vietnam-pro-regular.ttf": ["fonts/be-vietnam-pro-regular.ttf", "font/ttf"],
+      "/fonts/be-vietnam-pro-semibold.ttf": ["fonts/be-vietnam-pro-semibold.ttf", "font/ttf"],
     };
     if (!files[path]) {
       res.writeHead(404);
@@ -618,6 +645,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
           members: new Map([[ws.id, ws]]),
           chatHistory: [],
           created: Date.now(),
+          comments: m.comments !== false,
         };
         ws.liveV2=m.multiGuest===true;ws.liveModes=m.liveModes===true;liveGuests.init(room);liveModes.init(room,m);
         rooms.set(room.id, room);
@@ -627,7 +655,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
           role: "host",
           history: [],
           aiModeration:!!social.ai.status().moderation,
-          room: { id: room.id, title: room.title, liveDecoration:social.packageStore.liveTheme(room.host.userId),hostMembership:social.packageStore.membership(room.host.userId),liveMode:room.mode,gameTitle:room.gameTitle,host: room.host.name, hostId: room.host.userId, avatar: social.user(room.host.userId)?.avatar ? "/api/users/"+room.host.userId+"/avatar":null, viewers:liveAudience(room,ws.userId).length },
+          room: { id: room.id, title: room.title, liveDecoration:social.packageStore.liveTheme(room.host.userId),hostMembership:social.packageStore.membership(room.host.userId),liveMode:room.mode,gameTitle:room.gameTitle,comments:room.comments!==false,host: room.host.name, hostId: room.host.userId, avatar: social.user(room.host.userId)?.avatar ? "/api/users/"+room.host.userId+"/avatar":null, viewers:liveAudience(room,ws.userId).length },
         });
         liveGuests.state(room);liveModes.state(room,ws);
         listing();
@@ -655,7 +683,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         send(ws, {
           type: "joined",multiGuest:true,
           role: "viewer",
-          room: { id: room.id, title: room.title, liveDecoration:social.packageStore.liveTheme(room.host.userId),hostMembership:social.packageStore.membership(room.host.userId),liveMode:room.mode,gameTitle:room.gameTitle,host: room.host.name, hostId: room.host.userId, avatar: social.user(room.host.userId)?.avatar ? "/api/users/"+room.host.userId+"/avatar":null, viewers:liveAudience(room,ws.userId).length },
+          room: { id: room.id, title: room.title, liveDecoration:social.packageStore.liveTheme(room.host.userId),hostMembership:social.packageStore.membership(room.host.userId),liveMode:room.mode,gameTitle:room.gameTitle,comments:room.comments!==false,host: room.host.name, hostId: room.host.userId, avatar: social.user(room.host.userId)?.avatar ? "/api/users/"+room.host.userId+"/avatar":null, viewers:liveAudience(room,ws.userId).length },
           host: room.host.id,
           hostUserId: room.host.userId,
           history: (room.chatHistory || []).filter(message => !social.blocked(ws.userId, message.senderId) && social.user(message.senderId)?.suspended === 0),
@@ -701,6 +729,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         return;
       }
       if (m.type === "chat") {
+        if (room.comments === false && ws !== room.host) return error("Bình luận đã tắt.");
         const text =
           typeof m.text === "string" ? m.text.trim().slice(0, 500) : "";
         if (text) {
