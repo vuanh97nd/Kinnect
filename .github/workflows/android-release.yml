@@ -48,6 +48,9 @@ jobs:
             exit 1
           fi
           printf '%s' "$KEYSTORE_B64" | base64 -d > android/debug.keystore
+      - name: Parse all vectors with the AndroidX parser
+        if: steps.existing.outputs.prebuilt != 'true'
+        run: python3 scripts/test-native-vector-parser.py
       - name: Build and verify signed testing APK
         if: steps.existing.outputs.prebuilt != 'true'
         run: |
@@ -67,7 +70,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           version="${GITHUB_REF_NAME#v}"
-          gh release create "$GITHUB_REF_NAME" "dist/Kinnect-$version-debug.apk" "dist/Kinnect-$version-debug.apk.sha256" --verify-tag --prerelease --title "Kinnect $version — Android thử nghiệm" --notes-file "docs/releases/$GITHUB_REF_NAME.md"
+          gh release create "$GITHUB_REF_NAME" "dist/Kinnect-$version-debug.apk" "dist/Kinnect-$version-debug.apk.sha256" --verify-tag --latest --title "Kinnect $version" --notes-file "docs/releases/$GITHUB_REF_NAME.md"
       - name: Remove temporary signing key
         if: always()
         run: rm -f android/debug.keystore

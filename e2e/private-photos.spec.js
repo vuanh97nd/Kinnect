@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 test('private album upload request approval and revoke on mobile',async({browser})=>{
  const owner=await browser.newContext({viewport:{width:320,height:780}}),viewer=await browser.newContext({viewport:{width:390,height:844}});
  try{
- const create=async(context,name)=>{const r=await context.request.post('/api/register',{data:{username:name+Date.now(),name,password:'abcdef',agree18:true}});expect(r.ok()).toBeTruthy();return (await r.json()).user;};
+ const create=async(context,name)=>{const r=await context.request.post('/api/register',{data:{username:name+Date.now(),name,password:'abcdef',agree18:true,acceptPrivacyNotice:true}});expect(r.ok()).toBeTruthy();return (await r.json()).user;};
  const a=await create(owner,'AlbumOwner'),b=await create(viewer,'AlbumViewer');await viewer.request.post('/api/users/'+a.id+'/follow',{data:{}});
  const p=await owner.newPage(),q=await viewer.newPage();await p.goto('/');await p.locator('[data-tab=profile]').first().click();await p.getByRole('tab',{name:'Ảnh riêng tư',exact:true}).click();const album=p.getByRole('region',{name:'Ảnh riêng tư',exact:true});
  await album.getByLabel('Thêm ảnh riêng tư').setInputFiles('public/apple-touch-icon.png');await expect(album.locator('.private-photo-item')).toHaveCount(1);

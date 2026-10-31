@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 test('feed publishes media and followed stories open in a vertical viewer',async({browser})=>{
  const context=await browser.newContext({viewport:{width:390,height:844}}),page=await context.newPage();
  try{
-  const username='feed_'+Date.now();const registered=await context.request.post('/api/register',{data:{username,password:'abcdef',name:'Bạn đăng tin',agree18:true}});expect(registered.status()).toBe(200);
+  const username='feed_'+Date.now();const registered=await context.request.post('/api/register',{data:{username,password:'abcdef',name:'Bạn đăng tin',agree18:true,acceptPrivacyNotice:true}});expect(registered.status()).toBe(200);
   await page.goto('/');await expect(page.locator('#app')).toBeVisible();
   await page.locator('[data-tab="feed"]').first().click();await expect(page.locator('.composer')).toBeVisible();
   await expect(page.locator('.composer-tools')).toBeHidden();

@@ -1,0 +1,10 @@
+{
+  "name": "kinnect-identity",
+  "compatibility_date": "2026-10-30",
+  "d1_databases": [{
+    "binding": "IDENTITY_DB",
+    "database_name": "kinnect-identity",
+    "database_id": "4d72f5d1-b40e-4230-af4f-cbb7109e7464",
+    "migrations_dir": "migrations"
+  }]
+}

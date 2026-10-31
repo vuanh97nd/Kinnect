@@ -1,0 +1,1 @@
+package android.content; public class Context { private final ContentResolver r;public Context(ContentResolver r){this.r=r;}public ContentResolver getContentResolver(){return r;}public java.io.File getCacheDir(){return new java.io.File(System.getProperty("java.io.tmpdir"));}}

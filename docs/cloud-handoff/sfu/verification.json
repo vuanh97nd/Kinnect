@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-30",
+  "deployed": true,
+  "publicHealth": {
+    "ok": true,
+    "version": "0.3.1",
+    "uiVersion": "2026-10-26-new-ui",
+    "liveChatHistory": true,
+    "storyViewers": true,
+    "liveGuests": true,
+    "liveMaxGuests": 3,
+    "liveSfu": {
+      "configured": true,
+      "ready": true,
+      "maxViewers": 2000,
+      "maxRooms": 30
+    }
+  },
+  "admissionLimits": {
+    "viewersPerRoom": 2000,
+    "concurrentRooms": 30,
+    "capacityBenchmark": false
+  },
+  "checks": {
+    "backendTests": 110,
+    "backendFailures": 0,
+    "goTests": 2,
+    "syntheticLowBitrateRtpReceivers": 50,
+    "nativeFullStack": "PASS; original APK1.0.30 NativeRtc camera through authenticated in-memory Kinnect backend and private SFU to native viewer,6 decoded frames, one publisher connection. Separate ports and private test users, no public room.",
+    "publicDownload": "HTTP200, remains Kinnect-1.0.30-native.apk"
+  },
+  "binarySha256": "861906664a0e50d55d8ecdd46d208c96cc474a8a4b68af6e3e8e41c671357452",
+  "gpu": {
+    "device": "NVIDIA GeForce RTX3050",
+    "vramMiB": 6144,
+    "usedBySFU": false,
+    "nvencWorkerImplemented": false
+  },
+  "limits": "No physical-phone, cross-network or2000-viewer/30-room video benchmark. Single backend and single SFU process on current PC; no distributed SFU cluster or new VPS provisioned. No VRAM expansion of system RAM.",
+  "scope": "Native app and shared backend media architecture. Web UI paused and unchanged; APK/Play artifacts unchanged; no API secrets or accounts in this document."
+}

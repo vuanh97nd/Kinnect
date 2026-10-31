@@ -3,7 +3,7 @@ test('live peers receive server TURN configuration and exchange video frames',as
  const host=await browser.newContext({permissions:['camera','microphone']}),viewer=await browser.newContext();
  try{
   for(const [context,name] of [[host,'relayhost'],[viewer,'relayviewer']]){
-   const registration=await context.request.post('/api/register',{data:{username:name+Date.now(),password:'abcdef',name,agree18:true}});expect(registration.ok()).toBeTruthy();
+   const registration=await context.request.post('/api/register',{data:{username:name+Date.now(),password:'abcdef',name,agree18:true,acceptPrivacyNotice:true}});expect(registration.ok()).toBeTruthy();
    await context.route('**/api/call-config',route=>route.fulfill({json:{iceServers:[{urls:'turn:127.0.0.1:9',username:'e2e',credential:'e2e'}]}}));
    await context.addInitScript(()=>{const Original=window.RTCPeerConnection;window.testLivePeers=[];window.RTCPeerConnection=class extends Original{constructor(config){super(config);window.testLivePeers.push(this);}};});
   }

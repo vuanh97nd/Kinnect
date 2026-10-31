@@ -299,6 +299,7 @@ function authMode(value) {
   sw.querySelector("button").dataset.mode = register ? "login" : "register";
   $("forgot-link").hidden = register;
   $("auth-status").textContent = "";
+  if ($("auth-notice")) $("auth-notice").hidden = true;
 }
 $("login-mode").onclick = () => authMode("login");
 $("register-mode").onclick = () => authMode("register");
@@ -554,6 +555,8 @@ $("logout").onclick = async () => {
     me = null;
     disconnectLive();
     showAuth();
+    const notice = $("auth-notice");
+    if (notice) { notice.textContent = "Bạn đã đăng xuất. Hẹn gặp lại!"; notice.hidden = false; }
   } catch (e) {
     status(e.message);
   }
@@ -813,12 +816,29 @@ async function liveGrid(reel, isCurrent) {
   const box = node("div", undefined, "live-grid");
   reel.append(box);
   // Trang được dựng ngoài màn rồi mới gắn vào, nên lần vẽ đầu không đòi box đã nằm trên trang.
-  let first = true;
+  let first = true, refreshTimer, loading = false;
   const draw = async () => {
+    if (loading) return;
+    clearTimeout(refreshTimer);
     if (!isCurrent() || (!first && !box.isConnected)) return;
     first = false;
-    let rooms = [];
-    try { rooms = (await api("/live/rooms")).rooms || []; } catch {}
+    loading = true;
+    box.setAttribute('aria-busy', 'true');
+    if (!box.children.length) box.append(node('p', 'Đang tải danh sách live…', 'live-grid-loading'));
+    let rooms;
+    try { rooms = (await api("/live/rooms")).rooms || []; }
+    catch {
+      if (!isCurrent()) return;
+      for (const el of box.querySelectorAll('.live-grid-error,.live-grid-loading,.live-grid-empty')) el.remove();
+      const error = node('div', undefined, 'live-grid-error');
+      error.setAttribute('role', 'status');
+      error.append(node('p', 'Chưa tải được danh sách live. Kiểm tra mạng rồi thử lại.'));
+      error.append(action('Thử lại', draw, 'secondary'));
+      box.prepend(error);
+      refreshTimer = setTimeout(draw, 8000);
+      return;
+    } finally { loading = false; box.setAttribute('aria-busy', 'false'); }
+    if (!isCurrent()) return;
     box.replaceChildren();
     if (!rooms.length) {
       const e = node("div", undefined, "live-grid-empty");
@@ -843,7 +863,7 @@ async function liveGrid(reel, isCurrent) {
       }
       box.append(grid);
     }
-    setTimeout(draw, 8000);
+    refreshTimer = setTimeout(draw, 8000);
   };
   await draw();
 }
@@ -861,7 +881,6 @@ async function shorts(panel, isCurrent = () => true, feed = "recommended") {
       r.readAsDataURL(blob);
     });
   const postVideo = async (blob, caption) => {
-    if (blob.size > 12 * 1024 * 1024) throw Error("Video tối đa 12 MB.");
     const data = await toBase64(blob);
     await uploadJson("/shorts", { data, caption }, (percent) => {
       status(percent < 0 ? "Đang chuẩn bị video…" : percent < 100 ? `Đang tải video lên ${percent}%…` : "Đang xử lý video…");
@@ -879,7 +898,7 @@ async function shorts(panel, isCurrent = () => true, feed = "recommended") {
   const file = node("input");
   file.type = "file";
   file.accept = "video/mp4";
-  file.setAttribute("aria-label", "Tải video MP4 có sẵn, tối đa 12 MB và 60 giây");
+  file.setAttribute("aria-label", "Tải video MP4 có sẵn");
   pick.append(file, node("span", "📁 Tải video lên"));
   file.onchange = async () => {
     const f = file.files[0];
@@ -1270,6 +1289,12 @@ function renderNotificationCenter() {
   list.scrollTop=scrollTop;
   if(focusKey){const target=[...notificationPanel.querySelectorAll('button')].find(button=>focusKey.id?button.dataset.notificationId===focusKey.id:focusKey.label?button.getAttribute('aria-label')===focusKey.label:button.textContent===focusKey.text);target?.focus({preventScroll:true});}
 }
+// Chấm trên chuông chỉ báo thông báo chưa xem mới đến kể từ lần mở khung gần nhất.
+// Số chưa đọc (#unread) và trạng thái "seen" phía máy chủ giữ nguyên.
+const bellOpenedKey = "kinnect-bell-opened";
+function bellOpenedIds() { try { return new Set(JSON.parse(localStorage.getItem(bellOpenedKey) || "[]")); } catch { return new Set(); } }
+function updateBellDot() { const opened = bellOpenedIds(); $("notification-bell")?.classList.toggle("bell-fresh", notificationCache.some(n => !n.seen && !opened.has(n.id))); }
+function markBellOpened() { try { localStorage.setItem(bellOpenedKey, JSON.stringify(notificationCache.filter(n => !n.seen).map(n => n.id).slice(-500))); } catch {} updateBellDot(); }
 function initializeNotificationCenter() {
   const bell = $("notification-bell");
   if (!notificationPanel) {
@@ -1287,6 +1312,7 @@ function openNotificationCenter() {
   notificationPanel.hidden = false;
   positionHeaderPopup(notificationPanel);
   $("notification-bell").setAttribute("aria-expanded", "true");
+  markBellOpened();
   renderNotificationCenter();
   syncHeaderPanelState();
   // Chuyển focus vào nút Đóng để truy cập bằng bàn phím/trình đọc màn hình.
@@ -1295,7 +1321,7 @@ function openNotificationCenter() {
 async function showSystemNotification(n) {
   if (!("Notification" in window) || Notification.permission !== "granted" || !document.hidden) return;
   const title = n.kind === "message" ? "Tin nhắn mới từ " + n.actor.name : "Thông báo từ " + n.actor.name;
-  const options = { body: n.kind === "message" ? "Bạn có tin nhắn mới trên Kinnect." : NOTE_TEXT[n.kind] || "Có hoạt động mới trên Kinnect.", icon: "/kinnect-icon-192.png", tag: "kinnect-" + n.id, data: { url: n.kind === "message" ? "/?chat=" + encodeURIComponent(n.actor.id) : "/" } };
+  const options = { body: n.kind === "message" ? "Bạn có tin nhắn mới trên Kinnect." : NOTE_TEXT[n.kind] || "Có hoạt động mới trên Kinnect.", icon: "/kinnect-logo-v106.svg", tag: "kinnect-" + n.id, data: { url: n.kind === "message" ? "/?chat=" + encodeURIComponent(n.actor.id) : "/" } };
   try {
     const registration = await navigator.serviceWorker?.getRegistration();
     if (registration?.active) await registration.showNotification(title, options);
@@ -1321,6 +1347,7 @@ async function refreshUnread(realtime = false) {
     if (knownNotificationIds.size > 500) knownNotificationIds = new Set(notifications.map(n => n.id));
     const count = notifications.filter(n => !n.seen).length;
     $("unread").textContent = count ? (count > 99 ? "99+" : String(count)) : "";
+    if ($("notification-bell")?.getAttribute("aria-expanded") === "true") markBellOpened(); else updateBellDot();
     const inbox = document.querySelector('#app [data-tab="inbox"]'); inbox.setAttribute("aria-label", "Tin nhắn");
     let badge = inbox.querySelector(".nav-count"); if (!badge) { badge = node("span", "", "nav-count"); badge.setAttribute("aria-hidden", "true"); inbox.append(badge); }
     const messages = notifications.filter(n => !n.seen && ["message","group_message"].includes(n.kind)).length;
@@ -1407,14 +1434,15 @@ async function adminPanel(panel,opts={}) {
   const feedback=node('p','','admin-feedback');feedback.setAttribute('role','status');root.append(feedback);
   const stats=node('div',undefined,'admin-stats');root.append(stats);
   let current=opts.section||'requests';const panes={},buttons={},statsValues={};
-  const labels={requests:'Yêu cầu mật khẩu',users:'Người dùng',reports:'Báo cáo',music:'Thư viện nhạc',activity:'Nhật ký'};
+  const labels={requests:'Yêu cầu mật khẩu',users:'Người dùng',reports:'Báo cáo',music:'Thư viện nhạc',ai:'Cấu hình AI',activity:'Nhật ký'};
   const tabs=node('div',undefined,'admin-tabs');tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Các mục quản trị');root.append(tabs);
   for(const [key,label] of Object.entries(labels)){
     const button=action(label,()=>select(key),'secondary');button.setAttribute('role','tab');button.id='admin-tab-'+key;button.setAttribute('aria-controls','admin-pane-'+key);tabs.append(button);buttons[key]=button;
     const pane=node('section',undefined,'admin-pane');pane.id='admin-pane-'+key;pane.setAttribute('role','tabpanel');pane.setAttribute('aria-labelledby',button.id);root.append(pane);panes[key]=pane;
   }
+  let aiLoaded=false;
   let musicLoaded=false;
-  function select(key){current=panes[key]?key:'requests';replaceNavigationOptions({section:current});for(const name of Object.keys(panes)){panes[name].hidden=name!==current;buttons[name].setAttribute('aria-selected',String(name===current));}if(current==='music'&&!musicLoaded){musicLoaded=true;musicAdmin(panes.music).catch(e=>{musicLoaded=false;feedback.textContent=e.message;});}}
+  function select(key){current=panes[key]?key:'requests';replaceNavigationOptions({section:current});for(const name of Object.keys(panes)){panes[name].hidden=name!==current;buttons[name].setAttribute('aria-selected',String(name===current));}if(current==='ai'&&!aiLoaded){aiLoaded=true;kinnectAIAdmin(panes.ai).catch(e=>{aiLoaded=false;feedback.textContent=e.message;});}if(current==='music'&&!musicLoaded){musicLoaded=true;musicAdmin(panes.music).catch(e=>{musicLoaded=false;feedback.textContent=e.message;});}}
   tabs.onkeydown=e=>{const keys=Object.keys(buttons),index=keys.indexOf(current);if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();const next=e.key==='Home'?0:e.key==='End'?keys.length-1:(index+(e.key==='ArrowRight'?1:-1)+keys.length)%keys.length;select(keys[next]);buttons[keys[next]].focus();}};
   function filterSelect(label,items){const select=node('select');select.setAttribute('aria-label',label);for(const [value,text] of items){const option=node('option',text);option.value=value;select.append(option);}return select;}
   function tools(pane,placeholder){const form=node('form',undefined,'admin-tools'),search=node('input');search.type='search';search.placeholder=placeholder;search.setAttribute('aria-label',placeholder);form.append(search);pane.append(form);return {form,search};}
@@ -1473,6 +1501,26 @@ async function adminPanel(panel,opts={}) {
   head.append(action('Làm mới',refreshAll));
   adminRequestsRefresh=()=>Promise.all([loadRequests(),overview()]).catch(showError);
   select(current);await refreshAll();
+}
+
+
+async function kinnectAIAdmin(panel){
+ panel.replaceChildren(node('p','Đang tải cấu hình AI…','muted'));
+ let data;try{data=await api('/admin/ai');}catch(error){panel.replaceChildren(node('h3','Cấu hình AI chưa tải được'),node('p',/không tìm thấy/i.test(error.message)?'Máy chủ đang chạy chưa nạp API cấu hình AI. Cần khởi động lại máy chủ Kinnect sau khi cập nhật, rồi tải lại trang.':error.message,'admin-feedback'));panel.append(action('Thử lại',()=>kinnectAIAdmin(panel),'secondary'));return;}const cfg=data.config,credentials=data.credentials;panel.replaceChildren();
+ panel.append(node('h3','Cloudflare chính · NVIDIA dự phòng'),node('p','Khóa chỉ lưu trên máy chủ. Để trống trường khóa để giữ khóa hiện tại. AI chỉ cảnh báo để quản trị viên xem xét, không tự xử phạt.','muted'));
+ const form=node('form',undefined,'social-card list');panel.append(form);
+ function field(title,value,secret=false){const label=node('label',title),input=node('input');input.type=secret?'password':'text';input.value=value||'';input.autocomplete=secret?'new-password':'off';label.append(input);form.append(label);return input;}
+ function check(title,value){const label=node('label'),input=node('input');input.type='checkbox';input.checked=!!value;label.append(input,document.createTextNode(' '+title));form.append(label);return input;}
+ const url=field('URL Worker Cloudflare',credentials.workerUrl),token=field('Khóa kết nối Worker'+(credentials.tokenSaved?' · Đã lưu':''),'',true),key=field('Khóa NVIDIA API'+(credentials.nvidiaKeySaved?' · Đã lưu':''),'',true),model=field('Model NVIDIA trả lời hỗ trợ',credentials.nvidiaModel),vision=field('Model NVIDIA đọc ảnh (tùy chọn)',credentials.nvidiaVisionModel);
+ model.placeholder='Mã model chính xác từ NVIDIA API Catalog';vision.placeholder='Để trống nếu chưa dùng NVIDIA kiểm duyệt ảnh';const fallback=check('Tự chuyển NVIDIA khi Cloudflare lỗi hoặc quá tải',credentials.fallbackEnabled),password=field('Mật khẩu quản trị để lưu khóa','',true);password.autocomplete='current-password';
+ const message=node('p','','admin-feedback');message.setAttribute('role','status');form.append(message);const save=node('button','Lưu cấu hình kết nối','primary');save.type='submit';form.append(save);
+ form.onsubmit=async event=>{event.preventDefault();save.disabled=true;try{const result=await api('/admin/ai/credentials','PATCH',{workerUrl:url.value.trim(),token:token.value.trim(),nvidiaKey:key.value.trim(),nvidiaModel:model.value.trim(),nvidiaVisionModel:vision.value.trim(),fallbackEnabled:fallback.checked,password:password.value});token.value=key.value=password.value='';message.textContent='Đã lưu cấu hình. Khóa đã được che và không trả về trình duyệt.';if(result.credentials.tokenSaved)token.placeholder='Đã lưu — để trống để giữ nguyên';if(result.credentials.nvidiaKeySaved)key.placeholder='Đã lưu — để trống để giữ nguyên';}catch(error){password.value='';message.textContent=error.message;}finally{save.disabled=false;}};
+ const testButtons=node('div',undefined,'admin-actions');panel.append(testButtons);for(const [provider,title] of [['cloudflare','Kiểm tra Cloudflare'],['nvidia','Kiểm tra NVIDIA'],['fallback','Kiểm tra chuyển dự phòng']]){const button=action(title,async()=>{button.disabled=true;message.textContent='Đang kiểm tra…';try{const result=await api('/admin/ai/test','POST',{provider});message.textContent=result.message+' · '+result.provider;}catch(error){message.textContent=error.message;}finally{button.disabled=false;}},'secondary');testButtons.append(button);}
+ const features=node('div',undefined,'social-card list');panel.append(features);function toggle(title,value){const label=node('label'),input=node('input');input.type='checkbox';input.checked=!!value;label.append(input,document.createTextNode(' '+title));features.append(label);return input;}
+ const support=toggle('AI tự trả lời từ tài khoản quản trị của tôi',cfg.support),moderation=toggle('AI duyệt avatar, bài viết, video và khung hình Live',cfg.moderation);features.append(node('p','Nhắn “quản trị viên” để chuyển người thật. Admin tự trả lời sẽ tạm dừng AI trong cuộc trò chuyện. Video: tối đa 8 khung hình trong 105 giây đầu; Live: một khung hình khoảng 20 giây khi chủ phòng dùng app hỗ trợ. Không kiểm tra âm thanh.','muted'));
+ features.append(action('Lưu bật/tắt AI',async()=>{try{await api('/admin/ai','PATCH',{adminId:me.id,support:support.checked,moderation:moderation.checked});message.textContent='Đã lưu trạng thái AI.';}catch(error){message.textContent=error.message;}},'primary'));
+ panel.append(node('h3','Hàng chờ và cảnh báo AI'),node('p','Đang chờ: '+cfg.queue+' · Lỗi: '+cfg.failed+'. Cảnh báo xuất hiện trong mục Báo cáo.','muted'));
+ for(const job of data.jobs){const card=node('article',undefined,'social-card');card.append(node('b',job.kind+' · '+job.state),node('small',new Date(job.created).toLocaleString('vi-VN'),'muted'));try{const result=JSON.parse(job.result||'{}');if(result.reason)card.append(node('p',result.reason));}catch{}if(job.kind==='support')card.append(action('Bật lại AI cho hội thoại',async()=>{await api('/admin/ai/conversations/'+job.actor,'PATCH',{paused:false});message.textContent='Đã bật lại AI cho cuộc trò chuyện.'},'secondary'));panel.append(card);}
 }
 
 // Quản trị: thư viện nhạc dùng chung trong Kinnect Studio
@@ -1678,7 +1726,6 @@ async function openCamera({story = false, photo = null} = {}) {
       $("create").requestSubmit();
     },
     onDone: async (blob, caption, progress) => {
-      if (blob.size > 12 * 1024 * 1024) throw Error("Video tối đa 12 MB.");
       progress(-1);
       const data=await toBase64(blob);
       progress(0);

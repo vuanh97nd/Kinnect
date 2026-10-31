@@ -1,0 +1,25 @@
+KINNECT - BO CAI MAY CHU DU PHONG WINDOWS
+
+1. Cai Node.js LTS 22.13 tro len tu https://nodejs.org/
+2. Giai nen toan bo ZIP vao mot thu muc.
+3. Bam Cai-may-chu.cmd. Mac dinh cai vao C:\Kinnect-Standby.
+   Neu PowerShell bi chan boi chinh sach may, lien he nguoi quan tri;
+   bo cai khong tu thay doi chinh sach bao mat.
+4. Chuong trinh kiem tra SHA256, Node/SQLite, cai thu vien va kiem tra cu phap.
+
+DAY LA BO CAI NEN, CHUA PHAI DU PHONG TU DONG.
+Khong chua tai khoan, anh/video, database, khoa, token tunnel hay cau hinh thanh toan.
+Khong tu bat server, mo cong, dang ky khoi dong hay chuyen luong truy cap.
+Khong can go Kinnect tren may chinh; may chinh khong bi thay doi.
+
+BUOC TRIEN KHAI TIEP THEO (can thuc hien tren ca hai PC):
+- Ket noi rieng giua hai mang, cau hinh quyen truy cap toi thieu.
+- Chup SQLite bang backup API, khong sao chep truc tiep file DB dang ghi/WAL.
+- Dong bo ca thu muc media va cau hinh rieng bang kenh bao mat.
+- Cai SFU rieng, cau hinh UDP/TURN va dia chi ngoai cua PC du phong.
+- Chi kich hoat mot may ghi du lieu. Khong chay chung tunnel hai may voi hai DB rieng.
+- Kiem tra dang nhap, anh/video, cuoc goi va Live truoc khi cho phep chuyen may.
+- Thu mat may chinh va thu khoi phuc du lieu ve may chinh truoc khi tu dong hoa.
+
+RAM 16 GB / o 500 GB khong phai cam ket nang luc 30 phong hay 2000 nguoi xem.
+Can biet CPU, SSD/HDD, Windows va toc do upload de hoan thien cau hinh.

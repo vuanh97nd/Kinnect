@@ -36,7 +36,7 @@ const av = (letter, hue) =>
 const art = {
   welcome:
     '<div class="ob-hero"><div class="ob-ring r1"></div><div class="ob-ring r2"></div>' +
-    '<img class="ob-hero-logo" src="/kinnect-icon.png?v=4" alt="" />' +
+    '<img class="ob-hero-logo" src="/kinnect-logo-v106.svg" alt="" />' +
     '<div class="ob-orbit o1">' + av("M", 260) + "</div>" +
     '<div class="ob-orbit o2">' + av("T", 330) + "</div>" +
     '<div class="ob-orbit o3">' + av("Q", 200) + "</div>" +
@@ -85,7 +85,7 @@ function openOnboarding() {
   root.setAttribute("aria-label", "Giới thiệu Kinnect");
   root.innerHTML =
     '<div class="ob-blob b1"></div><div class="ob-blob b2"></div>' +
-    '<header class="ob-top"><a class="ob-home" href="https://kinnect.io.vn/" aria-label="Về trang chủ Kinnect">←</a><img src="/kinnect-icon.png?v=4" alt="" /><strong>Kinnect</strong><a class="ob-site ob-get" href="' + (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? '/install-ios' : '/download/android') + '" target="_blank" rel="noopener">⬇ Tải app</a></header>' +
+    '<header class="ob-top"><a class="ob-home" href="https://kinnect.io.vn/" aria-label="Về trang chủ Kinnect">←</a><img src="/kinnect-logo-v106.svg" alt="" /><strong>Kinnect</strong><a class="ob-site ob-get" href="' + (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? '/install-ios' : '/download/android') + '" target="_blank" rel="noopener">⬇ Tải app</a></header>' +
     '<div class="ob-track" tabindex="0" aria-roledescription="carousel"></div>' +
     '<div class="ob-dots" role="tablist" aria-label="Chọn trang giới thiệu"></div>' +
     '<div class="ob-actions"><button type="button" class="ob-start">Bắt đầu ngay</button><button type="button" class="ob-login">Tôi đã có tài khoản</button></div>';

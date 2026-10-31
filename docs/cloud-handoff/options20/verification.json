@@ -1,0 +1,22 @@
+{
+  "version": "1.0.20",
+  "versionCode": 85,
+  "sha256": "45f32b1fc56b0e056a46a5e98a02ac5d5a057b51edb947e405a87c774be78ed8",
+  "signatureMatches1_0_19": true,
+  "scope": [
+    "Icons in message/video/post menus and remaining Sheet option lists",
+    "No duplicate reaction item in message menu; separate emotion button unchanged",
+    "Transparent phone/video/menu header buttons with 44dp touch areas"
+  ],
+  "audit": "Static inventory across all native setItems call sites; explicit per-action icons or shared choice/person icon; Sheet fallback circle_check for plain single-choice items. Multiple-choice lists retain native checkbox indicators. Form/confirmation body text is not an action-menu row.",
+  "nativeValidation": "Android16, font100/130: actual message sent/received/recalled and video/post owner/other menu rows visibly render icons; menu actions and permissions retained. Runtime render audit validates all 25 literal popup icon names extracted from source arrays, plus shared plain-choice fallback. Header visually inspected.",
+  "qaVariant": "code110 with QA key to update emulator. All non-manifest/non-signature entries equal delivered APK.",
+  "physicalDeviceVerified": false,
+  "webClientModified": false,
+  "published": true,
+  "publishedRelease": "https://github.com/vuanh97nd/Kinnect/releases/tag/v1.0.20",
+  "publicationChecks": [
+    "Public latest and updater collection list v1.0.20 with expected SHA256",
+    "GitHub direct APK and app /download/android respond200 with Kinnect-1.0.20-native.apk"
+  ]
+}

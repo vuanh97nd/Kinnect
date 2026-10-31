@@ -1,0 +1,17 @@
+{
+  // Website giới thiệu Kinnect: Worker chỉ phục vụ file tĩnh trong dist/.
+  // Sửa nội dung trong src/ rồi chạy "python build.py" trước khi deploy.
+  "name": "odd-disk-3093",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  },
+  "workers_dev": true,
+  "preview_urls": false,
+  "routes": [
+    { "pattern": "kinnect.io.vn", "custom_domain": true },
+    { "pattern": "www.kinnect.io.vn", "custom_domain": true }
+  ]
+}

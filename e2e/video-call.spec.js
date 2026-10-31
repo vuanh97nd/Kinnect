@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test';
 test('video call connects two peers with compact preview and audio output control',async({browser})=>{
  const contexts=[];try{
- const users=[];for(const name of ['Caller','Receiver']){const c=await browser.newContext({viewport:{width:390,height:844},permissions:['camera','microphone']});contexts.push(c);await c.route('**/api/call-config',route=>route.fulfill({json:{iceServers:[]}}));const r=await c.request.post('/api/register',{data:{username:name.toLowerCase()+Date.now(),name,password:'abcdef',agree18:true}});users.push((await r.json()).user);}
+ const users=[];for(const name of ['Caller','Receiver']){const c=await browser.newContext({viewport:{width:390,height:844},permissions:['camera','microphone']});contexts.push(c);await c.route('**/api/call-config',route=>route.fulfill({json:{iceServers:[]}}));const r=await c.request.post('/api/register',{data:{username:name.toLowerCase()+Date.now(),name,password:'abcdef',agree18:true,acceptPrivacyNotice:true}});users.push((await r.json()).user);}
  const a=await contexts[0].newPage(),b=await contexts[1].newPage();await a.goto('/?chat='+users[1].id);await b.goto('/?chat='+users[0].id);
  // Chờ cả hai trang vào xong màn chat VÀ WebSocket đã sẵn sàng trước khi bấm gọi.
  await Promise.all([a,b].map(page=>Promise.all([

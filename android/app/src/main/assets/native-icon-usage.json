@@ -1,0 +1,819 @@
+{
+  "references": [
+    {
+      "file": "CoinGrantActivity.java",
+      "line": 12,
+      "name": "history"
+    },
+    {
+      "file": "CommerceUi.java",
+      "line": 18,
+      "name": "arrow_left"
+    },
+    {
+      "file": "EconomyAdminActivity.java",
+      "line": 15,
+      "name": "rotate_ccw"
+    },
+    {
+      "file": "EconomyAdminActivity.java",
+      "line": 15,
+      "name": "history"
+    },
+    {
+      "file": "EconomyAdminActivity.java",
+      "line": 18,
+      "name": "trash_2"
+    },
+    {
+      "file": "GameCommentOverlay.java",
+      "line": 13,
+      "name": "eye"
+    },
+    {
+      "file": "GameCommentOverlay.java",
+      "line": 13,
+      "name": "message_square"
+    },
+    {
+      "file": "GameCommentOverlay.java",
+      "line": 13,
+      "name": "send"
+    },
+    {
+      "file": "GameCommentOverlay.java",
+      "line": 13,
+      "name": "x"
+    },
+    {
+      "file": "GameCommentOverlay.java",
+      "line": 20,
+      "name": "mic"
+    },
+    {
+      "file": "GameCommentOverlay.java",
+      "line": 20,
+      "name": "message_square"
+    },
+    {
+      "file": "GameCommentOverlay.java",
+      "line": 20,
+      "name": "radio"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 174,
+      "name": "back"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 190,
+      "name": "rotate_ccw"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 219,
+      "name": "radio"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 273,
+      "name": "radio"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 310,
+      "name": "flip"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 310,
+      "name": "wand"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 310,
+      "name": "mic"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 319,
+      "name": "x"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 320,
+      "name": "gamepad"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 348,
+      "name": "gamepad"
+    },
+    {
+      "file": "LiveActivity.java",
+      "line": 549,
+      "name": "eye"
+    },
+    {
+      "file": "LiveSetupSheet.java",
+      "line": 46,
+      "name": "gamepad"
+    },
+    {
+      "file": "LiveSetupSheet.java",
+      "line": 47,
+      "name": "chevron_right"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 366,
+      "name": "settings"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 419,
+      "name": "plus"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 637,
+      "name": "back"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 667,
+      "name": "chevron_right"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 692,
+      "name": "chevron_right"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 701,
+      "name": "shield_check"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 704,
+      "name": "wallet"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 705,
+      "name": "shopping_bag"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 706,
+      "name": "settings"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 707,
+      "name": "shield_check"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 708,
+      "name": "bell"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 709,
+      "name": "moon"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 710,
+      "name": "circle_help"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 711,
+      "name": "about_info"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 713,
+      "name": "key_round"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 714,
+      "name": "log_out"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 773,
+      "name": "chevron_right"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 795,
+      "name": "key_round"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 796,
+      "name": "mail"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 797,
+      "name": "monitor"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 798,
+      "name": "circle_help"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 910,
+      "name": "globe"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 965,
+      "name": "flag"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 966,
+      "name": "message_square"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 967,
+      "name": "shield_check"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 968,
+      "name": "users_round"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 969,
+      "name": "shield_check"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 970,
+      "name": "file_text"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1127,
+      "name": "arrow_left"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1245,
+      "name": "eye"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1419,
+      "name": "sliders_horizontal"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1470,
+      "name": "users_round"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1514,
+      "name": "user_round"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1578,
+      "name": "map_pin"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1591,
+      "name": "message"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1592,
+      "name": "check"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1594,
+      "name": "arrow_up_right"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1735,
+      "name": "close"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1763,
+      "name": "globe"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1768,
+      "name": "chevron_down"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1861,
+      "name": "search"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1877,
+      "name": "message_square_plus"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 1978,
+      "name": "pin"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2005,
+      "name": "more"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2064,
+      "name": "camera"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2108,
+      "name": "ellipsis"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2177,
+      "name": "globe"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2253,
+      "name": "play"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2275,
+      "name": "lock_keyhole"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2281,
+      "name": "chevron_right"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2365,
+      "name": "camera"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2366,
+      "name": "image"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2367,
+      "name": "eye"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2443,
+      "name": "chevron_down"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2546,
+      "name": "check"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2748,
+      "name": "gift"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2748,
+      "name": "gift"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2750,
+      "name": "globe"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2753,
+      "name": "pencil"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2759,
+      "name": "message_square"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2765,
+      "name": "image_lock"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2766,
+      "name": "user_block"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2767,
+      "name": "location_off"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2771,
+      "name": "trash"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2936,
+      "name": "message_square"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2938,
+      "name": "check"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2939,
+      "name": "x"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2940,
+      "name": "user_check"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 2941,
+      "name": "user_plus"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3034,
+      "name": "clapperboard"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3087,
+      "name": "eye"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3155,
+      "name": "play"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3376,
+      "name": "close"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3419,
+      "name": "send"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 3523,
+      "name": "heart"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4094,
+      "name": "newspaper"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4094,
+      "name": "compass"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4094,
+      "name": "clapperboard"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4094,
+      "name": "radio"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4113,
+      "name": "bell"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4114,
+      "name": "plus"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4114,
+      "name": "heart"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4114,
+      "name": "message_circle"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4114,
+      "name": "share_2"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4115,
+      "name": "search"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4115,
+      "name": "sliders_horizontal"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4116,
+      "name": "heart"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4116,
+      "name": "message_circle"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4116,
+      "name": "share_2"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4117,
+      "name": "heart"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4119,
+      "name": "plus"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4166,
+      "name": "log_in"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4169,
+      "name": "x"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4412,
+      "name": "more"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4426,
+      "name": "image"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4720,
+      "name": "x"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4759,
+      "name": "image_plus"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4808,
+      "name": "plus"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4907,
+      "name": "close"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4925,
+      "name": "eye"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 4972,
+      "name": "users_round"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 5385,
+      "name": "pencil"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 5386,
+      "name": "close"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 5532,
+      "name": "back"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 5559,
+      "name": "call"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 5560,
+      "name": "video"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 5575,
+      "name": "attach"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 5597,
+      "name": "send"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 5713,
+      "name": "message_circle"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 5752,
+      "name": "attach"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 5818,
+      "name": "send"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 6071,
+      "name": "video"
+    },
+    {
+      "file": "MainActivity.java",
+      "line": 6079,
+      "name": "x"
+    },
+    {
+      "file": "PhotoEditActivity.java",
+      "line": 24,
+      "name": "close"
+    },
+    {
+      "file": "PhotoEditActivity.java",
+      "line": 24,
+      "name": "export"
+    },
+    {
+      "file": "PhotoEditActivity.java",
+      "line": 25,
+      "name": "undo"
+    },
+    {
+      "file": "PhotoEditActivity.java",
+      "line": 25,
+      "name": "redo"
+    },
+    {
+      "file": "PhotoEditActivity.java",
+      "line": 25,
+      "name": "layer"
+    },
+    {
+      "file": "StoreActivity.java",
+      "line": 22,
+      "name": "wallet"
+    },
+    {
+      "file": "StoreActivity.java",
+      "line": 22,
+      "name": "ellipsis"
+    },
+    {
+      "file": "StudioActivity.java",
+      "line": 164,
+      "name": "close"
+    },
+    {
+      "file": "StudioActivity.java",
+      "line": 314,
+      "name": "image"
+    },
+    {
+      "file": "StudioActivity.java",
+      "line": 327,
+      "name": "flip"
+    },
+    {
+      "file": "StudioActivity.java",
+      "line": 1098,
+      "name": "back"
+    },
+    {
+      "file": "StudioActivity.java",
+      "line": 1305,
+      "name": "back"
+    },
+    {
+      "file": "StudioActivity.java",
+      "line": 1349,
+      "name": "close"
+    },
+    {
+      "file": "StudioActivity.java",
+      "line": 1366,
+      "name": "search"
+    },
+    {
+      "file": "SuccessEffects.java",
+      "line": 9,
+      "name": "x"
+    },
+    {
+      "file": "WalletActivity.java",
+      "line": 13,
+      "name": "info"
+    },
+    {
+      "file": "WalletActivity.java",
+      "line": 13,
+      "name": "refresh_cw"
+    }
+  ],
+  "legacyRasters": [
+    "ic_approved_bell.png",
+    "ic_approved_bookmark.png",
+    "ic_approved_camera.png",
+    "ic_approved_circle_help.png",
+    "ic_approved_clapperboard.png",
+    "ic_approved_compass.png",
+    "ic_approved_download.png",
+    "ic_approved_eye.png",
+    "ic_approved_eye_off.png",
+    "ic_approved_flag.png",
+    "ic_approved_heart.png",
+    "ic_approved_house.png",
+    "ic_approved_image.png",
+    "ic_approved_lock_keyhole.png",
+    "ic_approved_log_out.png",
+    "ic_approved_map_pin.png",
+    "ic_approved_message_circle.png",
+    "ic_approved_message_square.png",
+    "ic_approved_mic.png",
+    "ic_approved_moon.png",
+    "ic_approved_music_2.png",
+    "ic_approved_paperclip.png",
+    "ic_approved_phone.png",
+    "ic_approved_radio.png",
+    "ic_approved_search.png",
+    "ic_approved_send.png",
+    "ic_approved_settings.png",
+    "ic_approved_shield_check.png",
+    "ic_approved_sliders_horizontal.png",
+    "ic_approved_smile.png",
+    "ic_approved_switch_camera.png",
+    "ic_approved_trash_2.png",
+    "ic_approved_upload.png",
+    "ic_approved_users_round.png",
+    "ic_approved_user_plus.png",
+    "ic_approved_user_round.png",
+    "ic_approved_video.png"
+  ],
+  "brandAssetsUnchanged": true
+}

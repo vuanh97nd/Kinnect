@@ -1,0 +1,31 @@
+{
+  "version": "1.1.0",
+  "versionCode": 100,
+  "package": "app.kinnect.live",
+  "targetSdk": 36,
+  "minSdk": 26,
+  "debuggable": false,
+  "externalApkInstallerIncluded": false,
+  "forbiddenPermissionsAbsent": true,
+  "elf64": [
+    {
+      "library": "lib/arm64-v8a/libjingle_peerconnection_so.so",
+      "loadAlignments": [
+        16384,
+        16384,
+        16384
+      ]
+    },
+    {
+      "library": "lib/x86_64/libjingle_peerconnection_so.so",
+      "loadAlignments": [
+        16384,
+        16384,
+        16384
+      ]
+    }
+  ],
+  "aabSha256": "d387ed01b7dc025efbdbf1b8d9400e3b1051d1660d135895a5684c6fd3a240e9",
+  "qaApkSha256": "31faeda12fdee4044ce95c6da15e43371315fff82c9dad48418c3bdceae9f72f",
+  "requiresPlayConsoleReview": true
+}

@@ -50,7 +50,7 @@ async function register(app, username, extra = {}) {
       password: "very-strong-test-password",
       name: username,
       birthDate: "1994-05-10",
-      agree18: true,
+      agree18: true, acceptPrivacyNotice: true,
       ...extra,
     },
   });
@@ -77,7 +77,7 @@ test("18+ confirmation, six-character passwords, session privacy and logout", as
     (
       await request(app, "/register", {
         method: "POST",
-        body: { username: "shortpw", password: "abcde", agree18: true },
+        body: { username: "shortpw", password: "abcde", agree18: true, acceptPrivacyNotice: true },
       })
     ).status,
     400,
@@ -494,11 +494,14 @@ test("short videos upload, durable bytes/ranges, likes, comments, reports and mo
     ).status,
     400,
   );
-  const tooLong = Buffer.from(bytes);
-  const type = tooLong.indexOf(Buffer.from("mvhd")),
+  const longClip = Buffer.from(bytes);
+  const type = longClip.indexOf(Buffer.from("mvhd")),
     header = type + 4;
-  tooLong.writeUInt32BE(61 * tooLong.readUInt32BE(header + 12), header + 16);
-  assert.throws(() => mp4Duration(tooLong));
+  longClip.writeUInt32BE(61 * longClip.readUInt32BE(header + 12), header + 16);
+  assert.equal(mp4Duration(longClip), 61);
+  const zeroDuration = Buffer.from(longClip);
+  zeroDuration.writeUInt32BE(0, header + 16);
+  assert.throws(() => mp4Duration(zeroDuration));
   const result = await as(app, a, "/shorts", "POST", {
     data: "data:video/mp4;base64," + bytes.toString("base64"),
     caption: "A real playable fixture",
@@ -725,6 +728,8 @@ test("change password keeps current session and rejects wrong current password",
 test("Google login: state check, first-login 18+ confirmation, then direct login", async () => {
   const env = { ...process.env };
   Object.assign(process.env, {
+    FACEBOOK_APP_ID: "",
+    FACEBOOK_APP_SECRET: "",
     GOOGLE_CLIENT_ID: "test-client",
     GOOGLE_CLIENT_SECRET: "test-secret",
     PUBLIC_URL: "https://app.example",
@@ -773,7 +778,7 @@ test("Google login: state check, first-login 18+ confirmation, then direct login
         body: JSON.stringify(body),
       });
     assert.equal((await post({ ticket, username: "minhanh", agree18: false })).status, 400);
-    const done = await post({ ticket, username: "minhanh", name: "Minh Anh", agree18: true });
+    const done = await post({ ticket, username: "minhanh", name: "Minh Anh", agree18: true, acceptPrivacyNotice: true });
     assert.equal(done.status, 200);
     const session = done.headers.get("set-cookie").split(";")[0];
     const me = await (await fetch(url + "/api/me", { headers: { Cookie: session } })).json();
@@ -1037,7 +1042,7 @@ test('private call signaling requires acceptance and blocks outsiders, revoked s
  await as(app,b,'/users/'+a.id+'/block','POST',{});assert.equal((await aa.wait('call-ended')).reason,'unavailable');await bb.wait('call-ended');
  aa.send({type:'call-start',to:b.id,requestId:'blocked'});assert.equal((await aa.wait('call-ended')).reason,'unavailable');
  await as(app,b,'/users/'+a.id+'/block','DELETE',{});aa.send({type:'call-start',to:b.id,mode:'audio',requestId:'decline'});const declined=await aa.wait('call-ringing');await bb.wait('call-incoming');bb.send({type:'call-decline',callId:declined.callId});assert.equal((await aa.wait('call-ended')).reason,'declined');await bb.wait('call-ended');const declinedChat=(await as(app,a,'/users/'+b.id+'/messages')).body.messages;assert.ok(declinedChat.some(m=>m.body==='Cuộc gọi thoại bị từ chối.'));await aa.wait('conversations-changed');await bb.wait('conversations-changed');assert.ok((await as(app,a,'/conversations')).body.users.some(u=>u.id===b.id));assert.ok(!(await as(app,b,'/notifications')).body.notifications.some(n=>n.kind==='missed_call'));
- aa.send({type:'call-start',to:offline.id,mode:'video',requestId:'offline'});assert.equal((await aa.wait('call-ended')).reason,'unavailable');const missedChat=(await as(app,a,'/users/'+offline.id+'/messages')).body.messages;assert.ok(missedChat.some(m=>m.body==='Cuộc gọi video nhỡ.'));assert.ok(!(await as(app,offline,'/notifications')).body.notifications.some(n=>n.kind==='missed_call'));
+ aa.send({type:'call-start',to:offline.id,mode:'video',requestId:'offline'});assert.equal((await aa.wait('call-ended')).reason,'unavailable');const missedChat=(await as(app,a,'/users/'+offline.id+'/messages')).body.messages;assert.ok(missedChat.some(m=>m.body==='Cuộc gọi video nhỡ.'));assert.ok((await as(app,offline,'/notifications')).body.notifications.some(n=>n.kind==='missed_call'&&n.actor.id===a.id));
   aa.send({type:'call-start',to:b.id,requestId:'logout'});await aa.wait('call-ringing');await bb.wait('call-incoming');await as(app,a,'/logout','POST',{});assert.equal((await bb.wait('call-ended')).reason,'unavailable');
   assert.equal((await request(app,'/call-config')).status,401);assert.equal((await as(app,b,'/call-config')).status,200);
 });

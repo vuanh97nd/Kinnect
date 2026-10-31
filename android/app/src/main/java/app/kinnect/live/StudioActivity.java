@@ -31,6 +31,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   static final String EXTRA_VIDEO = "video", EXTRA_STORY = "story", EXTRA_PHOTO = "photo", EXTRA_IMAGE = "image", EXTRA_ACTION = "action", EXTRA_MODE = "mode";
   private static final int W = 720, H = 1280, FW = 540, FH = 960, PW = 1080, PH = 1920;
   private static final int ACCENT = 0xff7652e8, PINK = 0xffff4f9a;
+  private static final int GCAM_AMBER = 0xfffdd663, GCAM_RED = 0xffee2b2b, GCAM_PILL = 0x9918181d, GCAM_BTN = 0xff28282d;
 
   private final FxEngine fx = new FxEngine();
   private FrameLayout root, stage, panelHost, reviewLayer;
@@ -38,7 +39,9 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   private SurfaceView preview;
   private TextView timer, musicLabel, faceStatus, filterToast, countdown;
   private ShutterView shutter;
-  private LinearLayout modeTabs, rail;
+  private LinearLayout modeTabs, rail, zoomBar, creativeBar;
+  private FocusRingView focusRing;
+  private View flipButton;
   private GridOverlay gridOverlay;
   private CameraDevice device;
   private CameraCaptureSession session;
@@ -48,7 +51,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   private final Handler ui = new Handler(Looper.getMainLooper());
   private boolean front = true, recording = false, previewReady = false, torch = false, grid = false, story = false, busy = false;
   private String mode = "video", panel = "";
-  private int limitSeconds = 60, timerSeconds = 0, ratio = 0; // 0: 9:16 · 1: 3:4 · 2: 1:1
+  private int limitSeconds = 0, timerSeconds = 0, ratio = 0; // 0: 9:16 · 1: 3:4 · 2: 1:1
   private Bitmap frame, still, stillFull;
   private MediaRecorder recorder;
   private Surface recorderSurface;
@@ -66,13 +69,14 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   private Bitmap thumb;
   private final List<ImageView> filterThumbs = new ArrayList<>();
   private File capturedPhoto;
+  private boolean photoProEdited;
 
-  private int dp(float n) { return Math.round(n * getResources().getDisplayMetrics().density); }
+  private int dp(float n) { return Math.round(n * getResources().getDisplayMetrics().density * WebDesign.UI_SCALE); }
 
   private GradientDrawable round(int color, float radius) { GradientDrawable g = new GradientDrawable(); g.setColor(color); g.setCornerRadius(dp(radius)); return g; }
 
   private TextView text(String s, float size, int color, boolean bold) {
-    TextView t = new TextView(this);
+    TextView t = new KinnectText(this);
     t.setText(s);
     t.setTextSize(size);
     t.setTextColor(color);
@@ -84,7 +88,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   private ImageView icon(String name, int color) {
     ImageView v = new ImageView(this);
     int id = WebIcons.resolve(this, name);
-    if (id != 0) { android.graphics.drawable.Drawable d = getDrawable(id).mutate(); d.setTint(color); v.setImageDrawable(d); }
+    if (id != 0) { android.graphics.drawable.Drawable d = WebIcons.load(this, name); d.setTint(color); v.setImageDrawable(d); }
     return v;
   }
 
@@ -99,22 +103,24 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     story = getIntent().getBooleanExtra(EXTRA_STORY, false);
     String startMode = getIntent().getStringExtra(EXTRA_MODE);
     if (startMode != null) mode = startMode;
-    if (story) { mode = "video"; limitSeconds = 15; }
+    if (story) { mode = "video"; limitSeconds = 0; }
     root = new FrameLayout(this);
     root.setBackgroundColor(0xff000000);
     setContentView(root);
     root.setOnApplyWindowInsetsListener((v, i) -> { v.setPadding(0, i.getSystemWindowInsetTop(), 0, i.getSystemWindowInsetBottom()); return i; });
 
-    // Khung hình 9:16 ở giữa, bo góc như các app máy ảnh hiện đại
+    // Khung ngắm chuẩn Google Camera: bo góc 24dp trên nền đen tuyệt đối
     stage = new FrameLayout(this);
     stage.setClipToOutline(true);
-    stage.setBackground(round(0xff111111, 20));
+    stage.setBackground(round(0xff111111, 24));
     camera = new TextureView(this);
     preview = new SurfaceView(this);
     stage.addView(camera, new FrameLayout.LayoutParams(-1, -1));
     stage.addView(preview, new FrameLayout.LayoutParams(-1, -1));
     gridOverlay = new GridOverlay(this);
     stage.addView(gridOverlay, new FrameLayout.LayoutParams(-1, -1));
+    focusRing = new FocusRingView(this);
+    stage.addView(focusRing, new FrameLayout.LayoutParams(-1, -1));
     int width = getResources().getDisplayMetrics().widthPixels;
     FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(width, width * 16 / 9, Gravity.TOP);
     sp.topMargin = dp(4);
@@ -130,7 +136,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
       public void surfaceChanged(SurfaceHolder h, int f, int w, int hh) {}
       public void surfaceDestroyed(SurfaceHolder h) { previewReady = false; }
     });
-    // Vuốt ngang để đổi bộ lọc, chạm hai lần để đổi camera
+    // Vuốt ngang để đổi bộ lọc, chạm hai lần để đổi camera, chạm 1 lần để lấy nét kiểu Google Camera
     final GestureDetector gestures = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
       public boolean onDown(MotionEvent e) { return true; }
       public boolean onFling(MotionEvent a, MotionEvent b, float vx, float vy) {
@@ -139,90 +145,137 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         return true;
       }
       public boolean onDoubleTap(MotionEvent e) { flip(); return true; }
-      public boolean onSingleTapUp(MotionEvent e) { if (!panel.isEmpty()) showPanel(""); return true; }
+      public boolean onSingleTapConfirmed(MotionEvent e) {
+        if (!panel.isEmpty()) { showPanel(""); return true; }
+        triggerTapFocus(e.getX(), e.getY());
+        return true;
+      }
     });
     final ScaleGestureDetector pinch = new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
       public boolean onScale(ScaleGestureDetector d) { if (still == null) setZoom(zoom * d.getScaleFactor()); return true; }
     });
     stage.setOnTouchListener((v, e) -> { pinch.onTouchEvent(e); if (!pinch.isInProgress() && e.getPointerCount() == 1) gestures.onTouchEvent(e); return true; });
 
-    // Thanh trên: đóng · nhạc nền
+    // Thanh cài đặt nhanh trên cùng chuẩn Google Camera: Đóng · Nhạc nền · Cài đặt nhanh (Flash, Hẹn giờ, Lưới, Tỉ lệ)
     LinearLayout top = new LinearLayout(this);
     top.setGravity(Gravity.CENTER_VERTICAL);
-    top.setPadding(dp(10), dp(14), dp(10), dp(24));
-    top.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x88000000, 0x00000000 }));
+    top.setPadding(dp(12), dp(12), dp(12), dp(20));
+    top.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x99000000, 0x00000000 }));
     ImageView close = icon("close", 0xffffffff);
-    close.setPadding(dp(9), dp(9), dp(9), dp(9));
-    close.setContentDescription("Đóng");
+    close.setPadding(dp(10), dp(10), dp(10), dp(10));
+    GradientDrawable closeBg = round(GCAM_PILL, 999);
+    closeBg.setStroke(dp(1), 0x22ffffff);
+    close.setBackground(closeBg);
+    close.setContentDescription(I18n.t("Đóng"));
     close.setOnClickListener(v -> finishCancelled());
-    top.addView(close, new LinearLayout.LayoutParams(dp(42), dp(42)));
+    top.addView(close, new LinearLayout.LayoutParams(dp(40), dp(40)));
     top.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
-    musicLabel = text("🎵  Thêm nhạc", 14, 0xffffffff, true);
+    musicLabel = text(I18n.t("Thêm nhạc"), 13, 0xffffffff, true);
     musicLabel.setGravity(Gravity.CENTER);
-    musicLabel.setPadding(dp(16), 0, dp(16), 0);
-    musicLabel.setBackground(round(0x55000000, 999));
+    musicLabel.setPadding(dp(12), 0, dp(14), 0);
+    GradientDrawable musicBg = round(GCAM_PILL, 999);
+    musicBg.setStroke(dp(1), 0x26ffffff);
+    musicLabel.setBackground(musicBg);
+    musicLabel.setCompoundDrawablesRelativeWithIntrinsicBounds(tinted("music"), null, null, null);
+    musicLabel.setCompoundDrawablePadding(dp(6));
     musicLabel.setSingleLine(true);
     musicLabel.setEllipsize(android.text.TextUtils.TruncateAt.END);
-    musicLabel.setMaxWidth(dp(220));
+    musicLabel.setMaxWidth(dp(170));
     musicLabel.setOnClickListener(v -> chooseMusic());
-    top.addView(musicLabel, new LinearLayout.LayoutParams(-2, dp(38)));
+    top.addView(musicLabel, new LinearLayout.LayoutParams(-2, dp(36)));
     top.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
-    top.addView(new View(this), new LinearLayout.LayoutParams(dp(42), 1));
-    stage.addView(top, new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
 
-    // Thanh công cụ dọc bên phải
+    // Thanh công cụ nhanh kiểu Google Camera (Flash, Timer, Grid, Ratio/Duration) nằm gọn trên thanh đỉnh
     rail = new LinearLayout(this);
-    rail.setOrientation(LinearLayout.VERTICAL);
-    rail.setGravity(Gravity.CENTER_HORIZONTAL);
-    FrameLayout.LayoutParams rp = new FrameLayout.LayoutParams(dp(58), -2, Gravity.END | Gravity.TOP);
-    rp.topMargin = dp(70);
-    rp.rightMargin = dp(8);
-    rail.setPadding(0, dp(6), 0, dp(6));
-    rail.setBackground(round(0x40000000, 999));
-    stage.addView(rail, rp);
+    rail.setOrientation(LinearLayout.HORIZONTAL);
+    rail.setGravity(Gravity.CENTER_VERTICAL);
+    rail.setPadding(dp(4), dp(3), dp(4), dp(3));
+    GradientDrawable railBg = round(GCAM_PILL, 999);
+    railBg.setStroke(dp(1), 0x22ffffff);
+    rail.setBackground(railBg);
+    top.addView(rail, new LinearLayout.LayoutParams(-2, dp(40)));
+    stage.addView(top, new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
     buildRail();
 
     faceStatus = text("", 13, 0xffffffff, false);
     FrameLayout.LayoutParams fs = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-    fs.topMargin = dp(72);
+    fs.topMargin = dp(68);
     stage.addView(faceStatus, fs);
-    filterToast = text("", 30, 0xffffffff, true);
+    filterToast = text("", 22, 0xffffffff, true);
+    filterToast.setPadding(dp(18), dp(8), dp(18), dp(8));
+    filterToast.setBackground(round(0x99141418, 999));
     filterToast.setAlpha(0);
     stage.addView(filterToast, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
-    countdown = text("", 96, 0xffffffff, true);
+    countdown = text("", 92, GCAM_AMBER, true);
     countdown.setVisibility(View.GONE);
     stage.addView(countdown, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
-    timer = text("", 14, 0xffffffff, true);
-    timer.setPadding(dp(12), dp(4), dp(12), dp(4));
+    timer = text("", 13, 0xffffffff, true);
+    timer.setLetterSpacing(0.04f);
+    timer.setPadding(dp(14), dp(6), dp(14), dp(6));
     timer.setVisibility(View.GONE);
-    timer.setBackground(round(0xccff3b5c, 999));
+    GradientDrawable timerBg = round(GCAM_RED, 999);
+    timerBg.setStroke(dp(1), 0x44ffffff);
+    timer.setBackground(timerBg);
     FrameLayout.LayoutParams tp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-    tp.topMargin = dp(66);
+    tp.topMargin = dp(16);
     stage.addView(timer, tp);
 
-    // Vùng dưới: bảng hiệu ứng · hàng nút · chế độ
+    // Vùng dưới chuẩn Google Camera: Cụm Zoom (1x/2x/4x) · Công cụ sáng tạo · Hàng nút chụp 3 cột · Thanh chuyển chế độ dạng viên thuốc
     LinearLayout bottom = new LinearLayout(this);
     bottom.setOrientation(LinearLayout.VERTICAL);
-    bottom.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, new int[] { 0xee000000, 0x99000000, 0x00000000 }));
-    bottom.setPadding(0, dp(30), 0, dp(10));
+    bottom.setGravity(Gravity.CENTER_HORIZONTAL);
+    bottom.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, new int[] { 0xf5000000, 0xcc000000, 0x00000000 }));
+    bottom.setPadding(0, dp(16), 0, dp(12));
+
+    // Cụm nút thu phóng chuẩn Google Camera (1× · 2× · 4×)
+    zoomBar = new LinearLayout(this);
+    zoomBar.setGravity(Gravity.CENTER);
+    zoomBar.setPadding(dp(4), dp(4), dp(4), dp(4));
+    GradientDrawable zb = round(GCAM_PILL, 999);
+    zb.setStroke(dp(1), 0x26ffffff);
+    zoomBar.setBackground(zb);
+    LinearLayout.LayoutParams zlp = new LinearLayout.LayoutParams(-2, -2);
+    zlp.bottomMargin = dp(10);
+    bottom.addView(zoomBar, zlp);
+    renderZoomBar();
+
     panelHost = new FrameLayout(this);
     bottom.addView(panelHost, new LinearLayout.LayoutParams(-1, -2));
+
+    // Thanh công cụ sáng tạo gọn nhẹ (Bộ lọc · Làm đẹp · Sticker)
+    creativeBar = new LinearLayout(this);
+    creativeBar.setGravity(Gravity.CENTER);
+    creativeBar.setPadding(dp(12), dp(2), dp(12), dp(8));
+    bottom.addView(creativeBar, new LinearLayout.LayoutParams(-1, -2));
+    renderCreativeBar();
+
+    // Hàng nút chụp chính 3 cột chuẩn Google Camera: Thư viện (trái) · Nút chụp/quay lớn (giữa) · Đổi camera (phải)
     LinearLayout actions = new LinearLayout(this);
-    actions.setGravity(Gravity.CENTER);
-    actions.setPadding(dp(8), dp(8), dp(8), dp(4));
-    actions.addView(roundAction("image", "Thư viện", this::openGallery), new LinearLayout.LayoutParams(0, -2, 1));
-    actions.addView(roundAction("smile", "Sticker", () -> showPanel(panel.equals("sticker") ? "" : "sticker")), new LinearLayout.LayoutParams(0, -2, 1));
+    actions.setGravity(Gravity.CENTER_VERTICAL);
+    actions.setPadding(dp(28), dp(4), dp(28), dp(10));
+    galleryAction = buildGalleryWell();
+    LinearLayout leftSlot = new LinearLayout(this);
+    leftSlot.setGravity(Gravity.CENTER);
+    leftSlot.addView(galleryAction);
+    actions.addView(leftSlot, new LinearLayout.LayoutParams(0, -2, 1));
+
     shutter = new ShutterView(this);
-    shutter.setContentDescription("Chụp hoặc quay");
+    shutter.setContentDescription(I18n.t("Chụp hoặc quay"));
     shutter.setOnClickListener(v -> onShutter());
     actions.addView(shutter, new LinearLayout.LayoutParams(dp(84), dp(84)));
-    actions.addView(roundAction("wand", "Làm đẹp", () -> showPanel(panel.equals("beauty") ? "" : "beauty")), new LinearLayout.LayoutParams(0, -2, 1));
-    actions.addView(roundAction("palette", "Bộ lọc", () -> showPanel(panel.equals("filter") ? "" : "filter")), new LinearLayout.LayoutParams(0, -2, 1));
+
+    flipButton = buildFlipButton();
+    LinearLayout rightSlot = new LinearLayout(this);
+    rightSlot.setGravity(Gravity.CENTER);
+    rightSlot.addView(flipButton);
+    actions.addView(rightSlot, new LinearLayout.LayoutParams(0, -2, 1));
+    bottom.addView(actions, new LinearLayout.LayoutParams(-1, -2));
+
+    // Thanh chuyển chế độ dạng viên thuốc (Material 3 Pill Carousel) ở đáy màn hình như Google Camera
     modeTabs = new LinearLayout(this);
     modeTabs.setGravity(Gravity.CENTER);
-    modeTabs.setPadding(0, dp(2), 0, dp(4));
+    modeTabs.setPadding(dp(16), dp(2), dp(16), dp(2));
     bottom.addView(modeTabs, new LinearLayout.LayoutParams(-1, -2));
-    bottom.addView(actions);
     renderModes();
     root.addView(bottom, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
 
@@ -235,6 +288,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     thumb = Bitmap.createBitmap(90, 120, Bitmap.Config.ARGB_8888);
     String photoUri = getIntent().getStringExtra(EXTRA_PHOTO);
     if (photoUri != null) loadStill(Uri.parse(photoUri), story ? "video" : "photo");
+    String reviewUri=getIntent().getStringExtra("review_video");if(reviewUri!=null)showVideoReview(Uri.parse(reviewUri));
     if (still == null) ensurePermissions();
   }
 
@@ -245,90 +299,213 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     if (!need.isEmpty()) requestPermissions(need.toArray(new String[0]), 401);
   }
 
-  private LinearLayout roundAction(String iconName, String label, Runnable click) {
-    LinearLayout b = new LinearLayout(this);
-    b.setOrientation(LinearLayout.VERTICAL);
-    b.setGravity(Gravity.CENTER_HORIZONTAL);
-    FrameLayout circle = new FrameLayout(this);
-    circle.setBackground(round(0x33ffffff, 999));
-    circle.addView(icon(iconName, 0xffffffff), new FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER));
-    b.addView(circle, new LinearLayout.LayoutParams(dp(46), dp(46)));
-    TextView t = text(label, 11, 0xffffffff, true);
-    t.setPadding(0, dp(4), 0, 0);
-    t.setGravity(Gravity.CENTER);
-    b.addView(t, new LinearLayout.LayoutParams(-1, -2));
-    b.setContentDescription(label);
-    b.setOnClickListener(v -> click.run());
-    return b;
+  private ImageView galleryThumbView;
+
+  private View buildGalleryWell() {
+    FrameLayout well = new FrameLayout(this);
+    GradientDrawable bg = round(GCAM_BTN, 999);
+    bg.setStroke(dp(2), 0x55ffffff);
+    well.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x33ffffff), bg, null));
+    well.setClipToOutline(true);
+    galleryThumbView = new ImageView(this);
+    galleryThumbView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+    galleryThumbView.setVisibility(View.GONE);
+    well.addView(galleryThumbView, new FrameLayout.LayoutParams(-1, -1));
+    ImageView glyph = icon("image", 0xffffffff);
+    well.addView(glyph, new FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER));
+    well.setContentDescription(I18n.t("Thư viện"));
+    well.setOnClickListener(v -> openGallery());
+    well.setLayoutParams(new LinearLayout.LayoutParams(dp(52), dp(52)));
+    return well;
+  }
+
+  private View buildFlipButton() {
+    FrameLayout btn = new FrameLayout(this);
+    GradientDrawable bg = round(GCAM_BTN, 999);
+    bg.setStroke(dp(1), 0x28ffffff);
+    btn.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x33ffffff), bg, null));
+    final ImageView glyph = icon("flip", 0xffffffff);
+    btn.addView(glyph, new FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER));
+    btn.setContentDescription(I18n.t("Lật"));
+    btn.setOnClickListener(v -> {
+      if (recording || still != null) return;
+      glyph.animate().rotationBy(180f).setDuration(260).start();
+      flip();
+    });
+    btn.setLayoutParams(new LinearLayout.LayoutParams(dp(52), dp(52)));
+    return btn;
+  }
+
+  private void renderZoomBar() {
+    if (zoomBar == null) return;
+    zoomBar.setVisibility(still != null || mode.equals("live") ? View.GONE : View.VISIBLE);
+    zoomBar.removeAllViews();
+    float[] stops = { 1f, 2f, 4f };
+    int activeIdx = zoom < 1.6f ? 0 : zoom < 3.2f ? 1 : 2;
+    for (int i = 0; i < stops.length; i++) {
+      final float target = stops[i];
+      boolean on = i == activeIdx;
+      TextView chip = text(on ? (Math.abs(zoom - Math.round(zoom)) < 0.08f ? Math.round(zoom) + "×" : String.format(Locale.US, "%.1f×", zoom)) : Math.round(target) + "", on ? 12 : 11, on ? 0xff111114 : 0xd9ffffff, true);
+      chip.setShadowLayer(0, 0, 0, 0);
+      chip.setGravity(Gravity.CENTER);
+      chip.setBackground(round(on ? GCAM_AMBER : 0x00000000, 999));
+      int size = dp(on ? 34 : 30);
+      LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
+      if (i > 0) lp.leftMargin = dp(4);
+      chip.setOnClickListener(v -> animateZoomTo(target));
+      zoomBar.addView(chip, lp);
+    }
+  }
+
+  private void animateZoomTo(float target) {
+    if (still != null) return;
+    ValueAnimator anim = ValueAnimator.ofFloat(zoom, target);
+    anim.setDuration(200);
+    anim.addUpdateListener(a -> setZoom((Float) a.getAnimatedValue(), false));
+    anim.start();
+    showFilterName(String.format(Locale.US, "%.0f×", target));
+  }
+
+  private void renderCreativeBar() {
+    if (creativeBar == null) return;
+    creativeBar.setVisibility(recording ? View.INVISIBLE : View.VISIBLE);
+    creativeBar.removeAllViews();
+    boolean filterActive = !fx.filter.equals("none") || panel.equals("filter");
+    boolean beautyActive = fx.beautyOn || panel.equals("beauty");
+    boolean stickerActive = !fx.sticker.equals("none") || panel.equals("sticker");
+    creativeBar.addView(creativePill("palette", I18n.t("Bộ lọc"), panel.equals("filter"), filterActive, () -> showPanel(panel.equals("filter") ? "" : "filter")));
+    creativeBar.addView(creativePill("wand", I18n.t("Làm đẹp"), panel.equals("beauty"), beautyActive, () -> showPanel(panel.equals("beauty") ? "" : "beauty")));
+    creativeBar.addView(creativePill("smile", "Sticker", panel.equals("sticker"), stickerActive, () -> showPanel(panel.equals("sticker") ? "" : "sticker")));
+  }
+
+  private LinearLayout creativePill(String iconName, String label, boolean open, boolean active, Runnable click) {
+    LinearLayout pill = new LinearLayout(this);
+    pill.setGravity(Gravity.CENTER);
+    pill.setPadding(dp(12), dp(6), dp(12), dp(6));
+    GradientDrawable bg = round(open ? GCAM_AMBER : GCAM_PILL, 999);
+    bg.setStroke(dp(1), open ? GCAM_AMBER : active ? 0x88fdd663 : 0x26ffffff);
+    pill.setBackground(bg);
+    int fg = open ? 0xff111114 : active ? GCAM_AMBER : 0xffffffff;
+    ImageView ic = icon(iconName, fg);
+    pill.addView(ic, new LinearLayout.LayoutParams(dp(16), dp(16)));
+    TextView t = text(label, 12, fg, true);
+    if (open) t.setShadowLayer(0, 0, 0, 0);
+    t.setPadding(dp(6), 0, 0, 0);
+    pill.addView(t);
+    pill.setContentDescription(label);
+    pill.setOnClickListener(v -> click.run());
+    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, dp(34));
+    lp.setMargins(dp(4), 0, dp(4), 0);
+    pill.setLayoutParams(lp);
+    return pill;
   }
 
   private void buildRail() {
     rail.removeAllViews();
-    rail.addView(railButton("flip", "Lật", this::flip));
-    if (still == null) rail.addView(railButton(torch ? "flash" : "flash_off", torch ? "Đèn: bật" : "Đèn", () -> { torch = !torch; applyTorch(); buildRail(); }));
-    rail.addView(railButton("timer", timerSeconds == 0 ? "Hẹn giờ" : timerSeconds + " giây", () -> { timerSeconds = timerSeconds == 0 ? 3 : timerSeconds == 3 ? 10 : 0; buildRail(); }));
-    rail.addView(railButton("grid", grid ? "Lưới: bật" : "Lưới", () -> { grid = !grid; gridOverlay.setGrid(grid); buildRail(); }));
-    if (mode.equals("photo")) rail.addView(railButton("ratio", ratio == 0 ? "9:16" : ratio == 1 ? "3:4" : "1:1", () -> { ratio = (ratio + 1) % 3; gridOverlay.setRatio(ratio); buildRail(); }));
-    if (mode.equals("video") && !story) rail.addView(railButton("timer", limitSeconds + "s", () -> { limitSeconds = limitSeconds == 60 ? 15 : limitSeconds == 15 ? 30 : 60; buildRail(); }));
+    if (still == null) rail.addView(railButton(torch ? "flash" : "flash_off", torch ? I18n.t("Đèn: bật") : I18n.t("Đèn"), torch, () -> { torch = !torch; applyTorch(); buildRail(); }));
+    if (!mode.equals("live")) rail.addView(railButton("timer", timerSeconds == 0 ? I18n.t("Hẹn giờ") : timerSeconds + "s", timerSeconds > 0, () -> { timerSeconds = timerSeconds == 0 ? 3 : timerSeconds == 3 ? 10 : 0; buildRail(); }));
+    if (!mode.equals("live")) rail.addView(railButton("grid", grid ? I18n.t("Lưới: bật") : I18n.t("Lưới"), grid, () -> { grid = !grid; gridOverlay.setGrid(grid); buildRail(); }));
+    if (mode.equals("photo")) rail.addView(railBadgeButton(ratio == 0 ? "9:16" : ratio == 1 ? "3:4" : "1:1", ratio != 0, () -> { ratio = (ratio + 1) % 3; gridOverlay.setRatio(ratio); buildRail(); }));
+    if (mode.equals("video") && !story) rail.addView(railBadgeButton(limitSeconds == 0 ? "∞" : limitSeconds + "s", limitSeconds > 0, () -> { limitSeconds = limitSeconds == 0 ? 15 : limitSeconds == 15 ? 30 : limitSeconds == 30 ? 60 : 0; buildRail(); }));
   }
 
-  private LinearLayout railButton(String iconName, String label, Runnable click) {
-    LinearLayout b = new LinearLayout(this);
-    b.setOrientation(LinearLayout.VERTICAL);
-    b.setGravity(Gravity.CENTER_HORIZONTAL);
-    b.setPadding(0, dp(6), 0, dp(6));
-    ImageView i = icon(iconName, 0xffffffff);
-    i.setElevation(dp(2));
-    b.addView(i, new LinearLayout.LayoutParams(dp(26), dp(26)));
-    TextView t = text(label, 10, 0xffffffff, true);
-    t.setGravity(Gravity.CENTER);
-    b.addView(t);
+  private View railButton(String iconName, String label, boolean active, Runnable click) {
+    FrameLayout b = new FrameLayout(this);
+    b.setBackground(round(active ? 0x33fdd663 : 0x00000000, 999));
+    ImageView i = icon(iconName, active ? GCAM_AMBER : 0xffffffff);
+    b.addView(i, new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
+    if (iconName.equals("timer") && timerSeconds > 0) {
+      TextView badge = text(timerSeconds + "s", 9, GCAM_AMBER, true);
+      badge.setShadowLayer(0, 0, 0, 0);
+      FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.END);
+      bp.rightMargin = dp(2);
+      b.addView(badge, bp);
+    }
     b.setContentDescription(label);
     b.setOnClickListener(v -> { if (!recording) click.run(); });
+    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(34), dp(34));
+    lp.setMargins(dp(1), 0, dp(1), 0);
+    b.setLayoutParams(lp);
     return b;
   }
 
+  private View railBadgeButton(String badgeText, boolean active, Runnable click) {
+    TextView b = text(badgeText, 11, active ? 0xff111114 : 0xffffffff, true);
+    if (active) b.setShadowLayer(0, 0, 0, 0);
+    b.setGravity(Gravity.CENTER);
+    b.setPadding(dp(8), 0, dp(8), 0);
+    b.setBackground(round(active ? GCAM_AMBER : 0x22ffffff, 999));
+    b.setContentDescription(badgeText);
+    b.setOnClickListener(v -> { if (!recording) click.run(); });
+    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, dp(28));
+    lp.setMargins(dp(2), 0, dp(2), 0);
+    b.setLayoutParams(lp);
+    return b;
+  }
+
+  private View galleryAction;private LiveSetupSheet liveSetup;
+  private void showLiveSetup(){if(liveSetup==null)liveSetup=new LiveSetupSheet(this,front,fx);liveSetup.front(front);liveSetup.show();}
+
   private void renderModes() {
+    if(musicLabel!=null)musicLabel.setVisibility(mode.equals("live")?View.GONE:View.VISIBLE);
+    if(galleryAction!=null)galleryAction.setVisibility(mode.equals("live")?View.INVISIBLE:View.VISIBLE);
+    if(shutter!=null)shutter.setContentDescription(I18n.t(mode.equals("live")?"Thiết lập Live":"Chụp hoặc quay"));
+    renderZoomBar();
     modeTabs.removeAllViews();
-    String[][] modes = story ? new String[][] { { "video", "TIN 15 GIÂY" } } : new String[][] { { "photo", "ẢNH" }, { "video", "VIDEO" } };
+    String[][] modes = story ? new String[][] { { "video", "TIN 15 GIÂY" } } : new String[][] { { "photo", "ẢNH" }, { "video", "VIDEO" }, { "live", "LIVE" } };
     for (final String[] m : modes) {
       boolean on = m[0].equals(mode);
+      boolean isLive = m[0].equals("live");
       LinearLayout cell = new LinearLayout(this);
       cell.setOrientation(LinearLayout.VERTICAL);
-      cell.setGravity(Gravity.CENTER_HORIZONTAL);
-      cell.setPadding(dp(18), 0, dp(18), 0);
-      TextView t = text(m[1], 13, on ? 0xffffffff : 0x99ffffff, true);
-      t.setLetterSpacing(0.08f);
+      cell.setGravity(Gravity.CENTER);
+      cell.setPadding(dp(6), dp(2), dp(6), dp(2));
+      TextView t = text(m[1], 12.5f, on ? (isLive ? 0xffffffff : 0xff111114) : (isLive ? 0xffff6b88 : 0xb3ffffff), true);
+      if (on && !isLive) t.setShadowLayer(0, 0, 0, 0);
+      t.setLetterSpacing(0.06f);
       t.setGravity(Gravity.CENTER);
       t.setSingleLine(true);
-      cell.addView(t, new LinearLayout.LayoutParams(-1, -2));
-      View dot = new View(this);
-      dot.setBackground(round(on ? 0xffffffff : 0x00000000, 99));
-      LinearLayout.LayoutParams dp5 = new LinearLayout.LayoutParams(dp(5), dp(5));
-      dp5.topMargin = dp(4);
-      cell.addView(dot, dp5);
-      cell.setOnClickListener(v -> { if (!recording && !busy) { mode = m[0]; renderModes(); buildRail(); shutter.setMode(mode); gridOverlay.setRatio(mode.equals("photo") ? ratio : 0); } });
-      modeTabs.addView(cell, new LinearLayout.LayoutParams(dp(story ? 140 : 96), -2));
+      t.setPadding(dp(18), dp(6), dp(18), dp(6));
+      t.setBackground(round(on ? (isLive ? 0xffff3b5c : 0xffffffff) : 0x00000000, 999));
+      cell.addView(t, new LinearLayout.LayoutParams(-2, dp(34)));
+      cell.setOnClickListener(v -> { if (m[0].equals("live")) { if (!recording && !busy) { mode="live"; renderModes(); buildRail(); gridOverlay.setRatio(0); showLiveSetup(); } return; } if (!recording && !busy) { mode = m[0]; renderModes(); buildRail(); shutter.setMode(mode); gridOverlay.setRatio(mode.equals("photo") ? ratio : 0); } });
+      LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+      lp.setMargins(dp(4), 0, dp(4), 0);
+      modeTabs.addView(cell, lp);
     }
     if (shutter != null) shutter.setMode(mode);
   }
 
-  // ======================= Bảng hiệu ứng =======================
+  // ======================= Bảng hiệu ứng chuẩn Google Camera (Material 3 Dark Surface + Pixel Amber) =======================
   private void showPanel(String which) {
     panel = which;
     panelHost.removeAllViews();
     filterThumbs.clear();
+    if (!which.isEmpty()) {
+      GradientDrawable card = round(0xe61b1b20, 24);
+      card.setStroke(dp(1), 0x24ffffff);
+      panelHost.setBackground(card);
+      LinearLayout.LayoutParams plp = (LinearLayout.LayoutParams) panelHost.getLayoutParams();
+      plp.setMargins(dp(12), 0, dp(12), dp(8));
+      panelHost.setLayoutParams(plp);
+      panelHost.setPadding(0, dp(10), 0, dp(8));
+    } else {
+      panelHost.setBackground(null);
+      panelHost.setPadding(0, 0, 0, 0);
+    }
     if (which.equals("filter")) panelHost.addView(filterPanel());
     if (which.equals("beauty")) panelHost.addView(beautyPanel());
     if (which.equals("sticker")) panelHost.addView(stickerPanel());
+    renderCreativeBar();
   }
 
   private SeekBar slider(int value, SeekBar.OnSeekBarChangeListener l) {
     SeekBar s = new SeekBar(this);
     s.setMax(100);
     s.setProgress(value);
-    s.getProgressDrawable().setTint(0xffffffff);
-    s.getThumb().setTint(0xffffffff);
+    s.setThumbTintList(android.content.res.ColorStateList.valueOf(GCAM_AMBER));
+    s.setProgressTintList(android.content.res.ColorStateList.valueOf(GCAM_AMBER));
+    s.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0x38ffffff));
     s.setOnSeekBarChangeListener(l);
     return s;
   }
@@ -341,20 +518,24 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   private View filterPanel() {
     LinearLayout box = new LinearLayout(this);
     box.setOrientation(LinearLayout.VERTICAL);
-    final TextView pct = text(Math.round(fx.intensity * 100) + "", 12, 0xffffffff, true);
+    final TextView pct = text(Math.round(fx.intensity * 100) + "%", 11.5f, GCAM_AMBER, true);
+    pct.setShadowLayer(0, 0, 0, 0);
+    pct.setGravity(Gravity.END);
     LinearLayout sl = new LinearLayout(this);
     sl.setGravity(Gravity.CENTER_VERTICAL);
-    sl.setPadding(dp(20), 0, dp(20), 0);
-    sl.addView(text("Độ đậm", 12, 0xffffffff, true));
+    sl.setPadding(dp(18), dp(2), dp(18), dp(4));
+    TextView lbl = text(I18n.t("Độ đậm"), 12, 0xffe6e1e5, true);
+    lbl.setShadowLayer(0, 0, 0, 0);
+    sl.addView(lbl, new LinearLayout.LayoutParams(dp(64), -2));
     sl.addView(slider(Math.round(fx.intensity * 100), new Slide() {
-      public void onProgressChanged(SeekBar s, int v, boolean u) { fx.intensity = v / 100f; pct.setText(String.valueOf(v)); }
+      public void onProgressChanged(SeekBar s, int v, boolean u) { fx.intensity = v / 100f; pct.setText(v + "%"); }
     }), new LinearLayout.LayoutParams(0, -2, 1));
-    sl.addView(pct, new LinearLayout.LayoutParams(dp(30), -2));
+    sl.addView(pct, new LinearLayout.LayoutParams(dp(38), -2));
     if (!fx.filter.equals("none")) box.addView(sl);
     HorizontalScrollView hs = new HorizontalScrollView(this);
     hs.setHorizontalScrollBarEnabled(false);
     LinearLayout row = new LinearLayout(this);
-    row.setPadding(dp(10), dp(6), dp(10), dp(6));
+    row.setPadding(dp(10), dp(6), dp(10), dp(4));
     for (final String[] f : FxEngine.FILTERS) {
       boolean on = fx.filter.equals(f[0]);
       LinearLayout cell = new LinearLayout(this);
@@ -362,20 +543,23 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
       cell.setGravity(Gravity.CENTER_HORIZONTAL);
       cell.setPadding(dp(4), 0, dp(4), 0);
       FrameLayout pic = new FrameLayout(this);
-      pic.setBackground(round(on ? 0xffffffff : 0x00000000, 14));
+      GradientDrawable ring = round(0x00000000, 16);
+      ring.setStroke(dp(on ? 2 : 1), on ? GCAM_AMBER : 0x26ffffff);
+      pic.setBackground(ring);
       pic.setPadding(dp(2), dp(2), dp(2), dp(2));
       ImageView img = new ImageView(this);
       img.setScaleType(ImageView.ScaleType.CENTER_CROP);
       img.setClipToOutline(true);
-      img.setBackground(round(0xff333333, 12));
+      img.setBackground(round(0xff2b2b33, 14));
       img.setImageBitmap(thumb);
       img.setColorFilter(new ColorMatrixColorFilter(FxEngine.filterMatrix(f[0])));
       img.setTag(f[0]);
       filterThumbs.add(img);
-      pic.addView(img, new FrameLayout.LayoutParams(dp(58), dp(76)));
+      pic.addView(img, new FrameLayout.LayoutParams(dp(56), dp(72)));
       cell.addView(pic);
-      TextView t = text(f[1], 11, on ? 0xffffffff : 0xccffffff, on);
-      t.setPadding(0, dp(4), 0, 0);
+      TextView t = text(f[1], 11, on ? GCAM_AMBER : 0xd9ffffff, on);
+      if (on) t.setShadowLayer(0, 0, 0, 0);
+      t.setPadding(0, dp(5), 0, 0);
       cell.addView(t);
       cell.setOnClickListener(v -> { fx.filter = f[0]; showFilterName(f[1]); showPanel("filter"); });
       row.addView(cell);
@@ -391,38 +575,46 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   private View beautyPanel() {
     LinearLayout box = new LinearLayout(this);
     box.setOrientation(LinearLayout.VERTICAL);
-    final TextView pct = text(Math.round(fx.get(beautyKey) * 100) + "", 12, 0xffffffff, true);
+    final TextView pct = text(Math.round(fx.get(beautyKey) * 100) + "", 12, GCAM_AMBER, true);
+    pct.setShadowLayer(0, 0, 0, 0);
+    pct.setGravity(Gravity.END);
     LinearLayout sl = new LinearLayout(this);
     sl.setGravity(Gravity.CENTER_VERTICAL);
-    sl.setPadding(dp(20), 0, dp(20), 0);
+    sl.setPadding(dp(18), dp(2), dp(18), dp(2));
     String name = "";
     for (String[] b : FxEngine.BEAUTY) if (b[0].equals(beautyKey)) name = b[1];
-    sl.addView(text(name, 12, 0xffffffff, true), new LinearLayout.LayoutParams(dp(64), -2));
+    TextView nameTv = text(name, 12, 0xffe6e1e5, true);
+    nameTv.setShadowLayer(0, 0, 0, 0);
+    sl.addView(nameTv, new LinearLayout.LayoutParams(dp(72), -2));
     sl.addView(slider(Math.round(fx.get(beautyKey) * 100), new Slide() {
       public void onProgressChanged(SeekBar s, int v, boolean u) { fx.set(beautyKey, v / 100f); pct.setText(String.valueOf(v)); }
     }), new LinearLayout.LayoutParams(0, -2, 1));
-    sl.addView(pct, new LinearLayout.LayoutParams(dp(30), -2));
+    sl.addView(pct, new LinearLayout.LayoutParams(dp(32), -2));
     box.addView(sl);
     LinearLayout row = new LinearLayout(this);
     row.setGravity(Gravity.CENTER);
-    row.setPadding(dp(6), dp(8), dp(6), dp(6));
-    String[] glyph = { "✨", "☀️", "💎", "👁", "🌸" };
-    row.addView(beautyChip("🤖", fx.auto ? "AI: bật" : "AI", fx.auto, () -> {
+    row.setPadding(dp(8), dp(8), dp(8), dp(6));
+    row.addView(beautyChip("beauty", fx.auto ? I18n.t("AI: bật") : "Real Tone AI", fx.auto, () -> {
       fx.auto = !fx.auto;
-      if (fx.auto) { fx.beautyOn = true; fx.analyze(frame, face); showFilterName(face == null ? "AI: tự cân sáng" : "AI làm đẹp"); }
+      if (fx.auto) { fx.beautyOn = true; fx.analyze(frame, face); showFilterName(face == null ? I18n.t("AI: tự cân sáng") : I18n.t("AI làm đẹp")); }
       showPanel("beauty");
     }), new LinearLayout.LayoutParams(0, -2, 1));
-    final LinearLayout off = beautyChip("⭕", fx.beautyOn ? "Tắt" : "Đã tắt", !fx.beautyOn, () -> { fx.beautyOn = !fx.beautyOn; showPanel("beauty"); });
+    final LinearLayout off = beautyChip("none", fx.beautyOn ? I18n.t("Tắt") : I18n.t("Đã tắt"), !fx.beautyOn, () -> { fx.beautyOn = !fx.beautyOn; showPanel("beauty"); });
     row.addView(off, new LinearLayout.LayoutParams(0, -2, 1));
-    for (int i = 0; i < FxEngine.BEAUTY.length; i++) {
-      final String key = FxEngine.BEAUTY[i][0];
-      row.addView(beautyChip(glyph[i], FxEngine.BEAUTY[i][1], fx.beautyOn && key.equals(beautyKey), () -> { beautyKey = key; fx.beautyOn = true; showPanel("beauty"); }), new LinearLayout.LayoutParams(0, -2, 1));
+    for (final String[] item : BeautyCatalog.ITEMS) {
+      final String key = item[0];
+      row.addView(beautyChip(item[2], item[1], fx.beautyOn && key.equals(beautyKey), () -> { beautyKey = key; fx.beautyOn = true; showPanel("beauty"); }), new LinearLayout.LayoutParams(0, -2, 1));
     }
-    box.addView(row);
-    TextView reset = text("Khôi phục mặc định", 11, 0xccffffff, false);
+    for (int i = 0; i < row.getChildCount(); i++) row.getChildAt(i).setLayoutParams(new LinearLayout.LayoutParams(dp(68), -2));
+    HorizontalScrollView beautyScroll = new HorizontalScrollView(this);
+    beautyScroll.setHorizontalScrollBarEnabled(false);
+    beautyScroll.addView(row);
+    box.addView(beautyScroll);
+    TextView reset = text(I18n.t("Khôi phục mặc định"), 11, 0xb3ffffff, true);
+    reset.setShadowLayer(0, 0, 0, 0);
     reset.setGravity(Gravity.CENTER);
-    reset.setPadding(0, 0, 0, dp(4));
-    reset.setOnClickListener(v -> { fx.smooth = 0.5f; fx.whiten = 0.3f; fx.slim = 0.2f; fx.eyes = 0.2f; fx.blush = 0f; fx.beautyOn = true; showPanel("beauty"); });
+    reset.setPadding(dp(12), dp(3), dp(12), dp(5));
+    reset.setOnClickListener(v -> { fx.smooth = 0.5f; fx.whiten = 0.3f; fx.slim = 0.2f; fx.eyes = 0.2f; fx.blush = 0f; fx.lips = 0; fx.blemish = .4f; fx.beautyOn = true; showPanel("beauty"); });
     box.addView(reset);
     return box;
   }
@@ -431,16 +623,21 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     LinearLayout c = new LinearLayout(this);
     c.setOrientation(LinearLayout.VERTICAL);
     c.setGravity(Gravity.CENTER_HORIZONTAL);
-    TextView g = new TextView(this);
-    g.setText(glyph);
-    g.setTextSize(20);
-    g.setGravity(Gravity.CENTER);
-    GradientDrawable bg = round(on ? 0xffffffff : 0x33ffffff, 999);
-    g.setBackground(bg);
-    c.addView(g, new LinearLayout.LayoutParams(dp(44), dp(44)));
-    TextView t = text(label, 10, on ? 0xffffffff : 0xccffffff, on);
-    t.setPadding(0, dp(4), 0, 0);
-    c.addView(t);
+    FrameLayout g = new FrameLayout(this);
+    GradientDrawable ring = round(on ? 0x2efdd663 : 0x16ffffff, 999);
+    ring.setStroke(dp(on ? 2 : 1), on ? GCAM_AMBER : 0x38ffffff);
+    g.setBackground(ring);
+    ImageView mark = new ImageView(this);
+    mark.setImageDrawable(EditorIcons.drawable(this, glyph, on ? GCAM_AMBER : 0xffffffff));
+    g.addView(mark, new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
+    c.addView(g, new LinearLayout.LayoutParams(dp(40), dp(40)));
+    TextView t = text(label, 10.5f, on ? GCAM_AMBER : 0xd9ffffff, on);
+    if (on) t.setShadowLayer(0, 0, 0, 0);
+    t.setGravity(Gravity.CENTER);
+    t.setSingleLine(true);
+    t.setEllipsize(android.text.TextUtils.TruncateAt.END);
+    t.setPadding(0, dp(5), 0, 0);
+    c.addView(t, new LinearLayout.LayoutParams(-1, -2));
     c.setOnClickListener(v -> click.run());
     return c;
   }
@@ -449,25 +646,30 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     GridLayout gridView = new GridLayout(this);
     gridView.setColumnCount(6);
     gridView.setPadding(dp(8), dp(4), dp(8), dp(6));
-    int size = (getResources().getDisplayMetrics().widthPixels - dp(16)) / 6;
+    int size = (getResources().getDisplayMetrics().widthPixels - dp(40)) / 6;
     for (final String[] s : FxEngine.STICKERS) {
       boolean on = fx.sticker.equals(s[0]);
       LinearLayout cell = new LinearLayout(this);
       cell.setOrientation(LinearLayout.VERTICAL);
       cell.setGravity(Gravity.CENTER);
-      TextView g = new TextView(this);
-      g.setText(s[2]);
-      g.setTextSize(24);
-      g.setGravity(Gravity.CENTER);
-      g.setBackground(round(on ? 0x55ffffff : 0x1affffff, 14));
-      cell.addView(g, new LinearLayout.LayoutParams(size - dp(10), size - dp(10)));
-      TextView t = text(s[1], 9, 0xddffffff, on);
+      FrameLayout g = new FrameLayout(this);
+      GradientDrawable ring = round(on ? 0x2efdd663 : 0x14ffffff, 14);
+      ring.setStroke(dp(on ? 2 : 1), on ? GCAM_AMBER : 0x33ffffff);
+      g.setBackground(ring);
+      ImageView mark = new ImageView(this);
+      mark.setImageDrawable(EditorIcons.drawable(this, s[0].equals("none") ? "none" : "fx_" + s[0], on ? GCAM_AMBER : 0xffffffff));
+      g.addView(mark, new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
+      cell.addView(g, new LinearLayout.LayoutParams(dp(40), dp(40)));
+      TextView t = text(s[1], 9.5f, on ? GCAM_AMBER : 0xd9ffffff, on);
+      if (on) t.setShadowLayer(0, 0, 0, 0);
       t.setGravity(Gravity.CENTER);
       t.setSingleLine(true);
-      cell.addView(t);
+      t.setEllipsize(android.text.TextUtils.TruncateAt.END);
+      t.setPadding(0, dp(4), 0, 0);
+      cell.addView(t, new LinearLayout.LayoutParams(-1, -2));
       cell.setOnClickListener(v -> {
         fx.sticker = s[0];
-        if (!s[0].equals("none") && face == null) faceStatus.setText("Đưa khuôn mặt vào khung hình");
+        if (!s[0].equals("none") && face == null) faceStatus.setText(I18n.t("Đưa khuôn mặt vào khung hình"));
         showPanel("sticker");
       });
       GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
@@ -510,7 +712,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     super.onRequestPermissionsResult(code, p, r);
     if (code == 401 && checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) openCamera();
     else if (code == 401 && still == null) {
-      Toast.makeText(this, "Cần quyền camera để chụp và quay.", Toast.LENGTH_LONG).show();
+      Toast.makeText(this, I18n.t("Cần quyền camera để chụp và quay."), Toast.LENGTH_LONG).show();
       finishCancelled();
     }
   }
@@ -518,8 +720,9 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   @Override
   protected void onResume() {
     super.onResume();
+    if(mode.equals("live")&&liveSetup==null)root.post(this::showLiveSetup);
     Choreographer.getInstance().postFrameCallback(this);
-    if (camera.isAvailable()) openCamera();
+    if (camera.isAvailable()&&reviewedVideo==null) openCamera();if(reviewVideo!=null)reviewVideo.start();
   }
 
   @Override
@@ -527,14 +730,16 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     if (recording) stopRecording();
     Choreographer.getInstance().removeFrameCallback(this);
     closeCamera();
-    if (music != null) music.pause();
+    if (music != null) music.pause();if(reviewVideo!=null)reviewVideo.pause();
     super.onPause();
   }
 
   @Override
   protected void onDestroy() {
-    worker.shutdownNow();
+    if(liveSetup!=null)liveSetup.close();
+    if(reviewVideo!=null){reviewVideo.stopPlayback();reviewVideo=null;}worker.shutdownNow();
     if (music != null) { music.release(); music = null; }
+    if (cameraThread != null) { cameraThread.quitSafely(); cameraThread = null; cameraHandler = null; }
     super.onDestroy();
   }
 
@@ -579,10 +784,10 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
       manager.openCamera(chosen, new CameraDevice.StateCallback() {
         public void onOpened(CameraDevice d) { device = d; startPreview(); }
         public void onDisconnected(CameraDevice d) { d.close(); device = null; }
-        public void onError(CameraDevice d, int e) { d.close(); device = null; ui.post(() -> faceStatus.setText("Không mở được camera.")); }
+        public void onError(CameraDevice d, int e) { d.close(); device = null; ui.post(() -> faceStatus.setText(I18n.t("Không mở được camera."))); }
       }, cameraHandler);
     } catch (Exception e) {
-      faceStatus.setText("Không mở được camera.");
+      faceStatus.setText(I18n.t("Không mở được camera."));
     }
   }
 
@@ -603,7 +808,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         public void onConfigureFailed(CameraCaptureSession s) {}
       }, cameraHandler);
     } catch (Exception e) {
-      ui.post(() -> faceStatus.setText("Không mở được camera."));
+      ui.post(() -> faceStatus.setText(I18n.t("Không mở được camera.")));
     }
   }
 
@@ -622,13 +827,38 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   }
 
   private void setZoom(float value) {
+    setZoom(value, true);
+  }
+
+  private void setZoom(float value, boolean toast) {
     Float max = characteristics == null ? null : characteristics.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM);
     zoom = Math.max(1f, Math.min(max == null ? 4f : Math.min(max, 8f), value));
     if (previewRequest != null && session != null) {
       applyZoomTo(previewRequest);
       try { session.setRepeatingRequest(previewRequest.build(), null, cameraHandler); } catch (Exception ignored) {}
     }
-    showFilterName(String.format(java.util.Locale.US, "%.1f×", zoom));
+    renderZoomBar();
+    if (toast) showFilterName(String.format(java.util.Locale.US, I18n.t("%.1f×"), zoom));
+  }
+
+  private void triggerTapFocus(float x, float y) {
+    if (focusRing != null) focusRing.showAt(x, y);
+    if (still != null || characteristics == null || previewRequest == null || session == null) return;
+    try {
+      Rect active = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+      if (active != null && stage.getWidth() > 0 && stage.getHeight() > 0) {
+        int cx = Math.max(active.left, Math.min(active.right, active.left + Math.round((x / stage.getWidth()) * active.width())));
+        int cy = Math.max(active.top, Math.min(active.bottom, active.top + Math.round((y / stage.getHeight()) * active.height())));
+        int half = Math.max(60, Math.min(active.width(), active.height()) / 12);
+        Rect region = new Rect(Math.max(active.left, cx - half), Math.max(active.top, cy - half), Math.min(active.right, cx + half), Math.min(active.bottom, cy + half));
+        android.hardware.camera2.params.MeteringRectangle[] rects = { new android.hardware.camera2.params.MeteringRectangle(region, 800) };
+        Integer maxAf = characteristics.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF);
+        if (maxAf != null && maxAf > 0) previewRequest.set(CaptureRequest.CONTROL_AF_REGIONS, rects);
+        Integer maxAe = characteristics.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AE);
+        if (maxAe != null && maxAe > 0) previewRequest.set(CaptureRequest.CONTROL_AE_REGIONS, rects);
+        session.setRepeatingRequest(previewRequest.build(), null, cameraHandler);
+      }
+    } catch (Exception ignored) {}
   }
 
   private void applyTorch() {
@@ -649,16 +879,23 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     try {
       BitmapFactory.Options o = new BitmapFactory.Options();
       o.inJustDecodeBounds = true;
-      BitmapFactory.decodeStream(getContentResolver().openInputStream(uri), null, o);
+      try (InputStream in = getContentResolver().openInputStream(uri)) {
+        BitmapFactory.decodeStream(in, null, o);
+      }
       o.inSampleSize = Math.max(1, Math.min(o.outWidth / PW, o.outHeight / PH));
       o.inJustDecodeBounds = false;
-      Bitmap src = BitmapFactory.decodeStream(getContentResolver().openInputStream(uri), null, o);
+      Bitmap src;
+      try (InputStream in = getContentResolver().openInputStream(uri)) {
+        src = BitmapFactory.decodeStream(in, null, o);
+      }
+      if (src == null) throw new java.io.IOException("Decode failed");
       stillFull = Bitmap.createBitmap(PW, PH, Bitmap.Config.ARGB_8888);
       Canvas c = new Canvas(stillFull);
       c.drawColor(0xff000000);
       float scale = Math.max(PW / (float) src.getWidth(), PH / (float) src.getHeight());
       float w = src.getWidth() * scale, h = src.getHeight() * scale;
       c.drawBitmap(src, null, new RectF((PW - w) / 2, (PH - h) / 2, (PW + w) / 2, (PH + h) / 2), new Paint(Paint.FILTER_BITMAP_FLAG));
+      src.recycle();
       new Canvas(frame).drawBitmap(stillFull, null, new Rect(0, 0, FW, FH), new Paint(Paint.FILTER_BITMAP_FLAG));
       still = frame;
       front = false;
@@ -668,21 +905,21 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
       buildRail();
       face = null;
     } catch (Exception e) {
-      Toast.makeText(this, "Không mở được ảnh.", Toast.LENGTH_LONG).show();
+      Toast.makeText(this, I18n.t("Không mở được ảnh."), Toast.LENGTH_LONG).show();
     }
   }
 
   private void openGallery() {
-    if (recording) return;
-    new Sheet(this).setTitle("Thư viện").setItems(new String[] { "🖼  Chỉnh ảnh từ máy", "🎬  Đăng video có sẵn (MP4)" }, (d, w) -> {
-      Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-      pick.addCategory(Intent.CATEGORY_OPENABLE);
-      pick.setType(w == 0 ? "image/*" : "video/mp4");
-      try { startActivityForResult(pick, w == 0 ? 403 : 404); } catch (Exception e) { Toast.makeText(this, "Không mở được thư viện.", Toast.LENGTH_SHORT).show(); }
-    }).show();
+    if(recording)return;
+    boolean video=mode.equals("video");Intent pick=new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(video?"video/*":"image/*").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+    try{startActivityForResult(pick,video?404:403);}catch(Exception e){Toast.makeText(this,I18n.t("Không mở được thư viện."),Toast.LENGTH_SHORT).show();}
   }
 
+  private void openPhotoPro(Uri uri){Intent intent=new Intent(this,PhotoEditActivity.class).setData(uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);intent.setClipData(android.content.ClipData.newRawUri("photo",uri));startActivityForResult(intent,406);}
+
   // ======================= Vẽ từng khung hình =======================
+  private boolean hardwarePreview = true;
+
   @Override
   public void doFrame(long nanos) {
     Choreographer.getInstance().postFrameCallback(this);
@@ -691,18 +928,22 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
       camera.getBitmap(frame);
     }
     frameCount++;
-    boolean needFace = !fx.sticker.equals("none") || (fx.beautyOn && (fx.smooth > 0 || fx.slim > 0 || fx.eyes > 0 || fx.blush > 0));
+    boolean needFace = fx.needsFace();
     if (needFace && frameCount % 4 == 0 && !detecting) detectFace();
     if (panel.equals("filter") && frameCount % 45 == 0) refreshThumb();
     if (fx.auto && frameCount % 30 == 0) fx.analyze(frame, face);
     if (previewReady) {
       Canvas c = null;
       try {
-        c = preview.getHolder().lockCanvas();
+        if (hardwarePreview) {
+          try { c = preview.getHolder().getSurface().lockHardwareCanvas(); }
+          catch (Exception e) { hardwarePreview = false; c = null; }
+        }
+        if (c == null && !hardwarePreview) c = preview.getHolder().lockCanvas();
         if (c != null) fx.render(c, frame, face, frameCount);
       } catch (Exception ignored) {
       } finally {
-        if (c != null) try { preview.getHolder().unlockCanvasAndPost(c); } catch (Exception ignored) {}
+        if (c != null) try { if (hardwarePreview) preview.getHolder().getSurface().unlockCanvasAndPost(c); else preview.getHolder().unlockCanvasAndPost(c); } catch (Exception ignored) {}
       }
     }
     if (recording && recorderSurface != null) {
@@ -711,9 +952,12 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         try { fx.render(c, frame, face, frameCount); } finally { recorderSurface.unlockCanvasAndPost(c); }
       } catch (Exception ignored) {}
       float elapsed = (SystemClock.elapsedRealtime() - startedAt) / 1000f;
-      shutter.setProgress(elapsed / limitSeconds);
-      timer.setText("● " + (int) elapsed + "s / " + limitSeconds + "s");
-      if (elapsed >= limitSeconds) stopRecording();
+      shutter.setProgress(limitSeconds > 0 ? elapsed / limitSeconds : (elapsed % 60) / 60f);
+      int sec = (int) elapsed;
+      String cur = String.format(Locale.US, "%02d:%02d", sec / 60, sec % 60);
+      String lim = limitSeconds > 0 ? String.format(Locale.US, " / %02d:%02d", limitSeconds / 60, limitSeconds % 60) : "";
+      timer.setText("●  " + cur + lim);
+      if (limitSeconds > 0 && elapsed >= limitSeconds) stopRecording();
     }
   }
 
@@ -733,7 +977,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         final float[] result = next;
         ui.post(() -> {
           if (result == null) {
-            if (++missed >= 5) { face = null; if (!fx.sticker.equals("none")) faceStatus.setText("Đưa khuôn mặt vào khung hình"); }
+            if (++missed >= 5) { face = null; if (!fx.sticker.equals("none")) faceStatus.setText(I18n.t("Đưa khuôn mặt vào khung hình")); }
             return;
           }
           missed = 0;
@@ -752,6 +996,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
 
   // ======================= Chụp / quay =======================
   private void onShutter() {
+    if(mode.equals("live")){showLiveSetup();return;}
     if (busy) return;
     if (recording) { stopRecording(); return; }
     if (timerSeconds > 0) countdownThen(timerSeconds, this::shoot);
@@ -808,7 +1053,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         final Bitmap shown = cropped;
         ui.post(() -> { busy = false; capturedPhoto = file; showReview(shown); });
       } catch (Exception e) {
-        ui.post(() -> { busy = false; Toast.makeText(this, "Không chụp được ảnh.", Toast.LENGTH_SHORT).show(); });
+        ui.post(() -> { busy = false; Toast.makeText(this, I18n.t("Không chụp được ảnh."), Toast.LENGTH_SHORT).show(); });
       }
     });
   }
@@ -819,54 +1064,98 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     return Bitmap.createBitmap(b, 0, (b.getHeight() - h) / 2, w, h);
   }
 
-  // Màn xem lại sau khi chụp: lưu vào máy · đăng bài · đăng tin · chụp lại
+  // Màn xem lại sau khi chụp chuẩn Google Camera / Pixel Photos: lưu vào máy · đăng bài · đăng tin · chụp lại
   private void showReview(Bitmap photo) {
+    if (galleryThumbView != null && photo != null) {
+      galleryThumbView.setImageBitmap(photo);
+      galleryThumbView.setVisibility(View.VISIBLE);
+    }
     reviewLayer.removeAllViews();
     reviewLayer.setVisibility(View.VISIBLE);
+    reviewLayer.setBackgroundColor(0xff000000);
     ImageView img = new ImageView(this);
     img.setScaleType(ImageView.ScaleType.FIT_CENTER);
     img.setImageBitmap(photo);
     reviewLayer.addView(img, new FrameLayout.LayoutParams(-1, -1));
+
+    GradientDrawable proBg = round(GCAM_PILL, 999);
+    proBg.setStroke(dp(1), 0x44fdd663);
+    TextView pro = text(I18n.t("Studio Pro"), 13, GCAM_AMBER, true);
+    pro.setPadding(dp(14), dp(8), dp(14), dp(8));
+    pro.setMinHeight(dp(44));
+    pro.setGravity(Gravity.CENTER);
+    pro.setBackground(proBg);
+    android.graphics.drawable.Drawable spk = tinted("sparkles");
+    spk.setTint(GCAM_AMBER);
+    pro.setCompoundDrawablesRelativeWithIntrinsicBounds(spk, null, null, null);
+    pro.setCompoundDrawablePadding(dp(6));
+    pro.setOnClickListener(v -> { if (capturedPhoto != null) openPhotoPro(Uri.fromFile(capturedPhoto)); });
+
     LinearLayout top = new LinearLayout(this);
-    top.setGravity(Gravity.CENTER_VERTICAL);
-    top.setPadding(dp(10), dp(14), dp(14), dp(10));
+    top.setGravity(Gravity.TOP);
+    top.setPadding(dp(12), dp(14), dp(14), dp(16));
+    top.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x99000000, 0x00000000 }));
     ImageView back = icon("back", 0xffffffff);
-    back.setPadding(dp(9), dp(9), dp(9), dp(9));
-    back.setContentDescription("Chụp lại");
+    back.setPadding(dp(10), dp(10), dp(10), dp(10));
+    GradientDrawable backBg = round(GCAM_PILL, 999);
+    backBg.setStroke(dp(1), 0x26ffffff);
+    back.setBackground(backBg);
+    back.setContentDescription(I18n.t("Chụp lại"));
     back.setOnClickListener(v -> reviewLayer.setVisibility(View.GONE));
     top.addView(back, new LinearLayout.LayoutParams(dp(42), dp(42)));
     top.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
-    final TextView save = text("  Lưu vào máy", 14, 0xffffffff, true);
+
+    final TextView save = text(I18n.t("  Lưu vào máy"), 13.5f, 0xffffffff, true);
     save.setGravity(Gravity.CENTER);
-    save.setPadding(dp(14), 0, dp(16), 0);
-    save.setBackground(round(0x55000000, 999));
+    save.setMinHeight(dp(44));
+    save.setPadding(dp(14), dp(8), dp(16), dp(8));
+    GradientDrawable saveBg = round(GCAM_PILL, 999);
+    saveBg.setStroke(dp(1), 0x28ffffff);
+    save.setBackground(saveBg);
     save.setCompoundDrawablesRelativeWithIntrinsicBounds(tinted("download"), null, null, null);
     save.setOnClickListener(v -> {
-      if (saveToGallery(capturedPhoto)) { save.setText("  Đã lưu"); save.setCompoundDrawablesRelativeWithIntrinsicBounds(tinted("check"), null, null, null); }
+      if (saveToGallery(capturedPhoto)) {
+        save.setText(I18n.t("  Đã lưu"));
+        save.setTextColor(GCAM_AMBER);
+        android.graphics.drawable.Drawable chk = tinted("check");
+        chk.setTint(GCAM_AMBER);
+        save.setCompoundDrawablesRelativeWithIntrinsicBounds(chk, null, null, null);
+      }
     });
-    top.addView(save, new LinearLayout.LayoutParams(-2, dp(40)));
+    LinearLayout reviewActions = new LinearLayout(this);
+    reviewActions.setOrientation(LinearLayout.VERTICAL);
+    reviewActions.setGravity(Gravity.END);
+    reviewActions.addView(save, new LinearLayout.LayoutParams(-2, -2));
+    LinearLayout.LayoutParams proAt = new LinearLayout.LayoutParams(-2, -2);
+    proAt.topMargin = dp(10);
+    reviewActions.addView(pro, proAt);
+    top.addView(reviewActions, new LinearLayout.LayoutParams(-2, -2));
     reviewLayer.addView(top, new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
+
     LinearLayout bar = new LinearLayout(this);
     bar.setGravity(Gravity.CENTER);
-    bar.setPadding(dp(16), dp(12), dp(16), dp(22));
-    bar.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, new int[] { 0xcc000000, 0x00000000 }));
-    TextView again = text("Chụp lại", 15, 0xffffffff, true);
+    bar.setPadding(dp(16), dp(16), dp(16), dp(22));
+    bar.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, new int[] { 0xe6000000, 0x99000000, 0x00000000 }));
+    TextView again = text(I18n.t("Chụp lại"), 14.5f, 0xffffffff, true);
     again.setGravity(Gravity.CENTER);
-    again.setBackground(round(0x33ffffff, 999));
+    GradientDrawable againBg = round(GCAM_BTN, 999);
+    againBg.setStroke(dp(1), 0x28ffffff);
+    again.setBackground(againBg);
     again.setOnClickListener(v -> reviewLayer.setVisibility(View.GONE));
     bar.addView(again, new LinearLayout.LayoutParams(0, dp(50), 1));
-    TextView storyBtn = text("Đăng tin", 15, 0xffffffff, true);
+    TextView storyBtn = text(I18n.t("Đăng tin"), 14.5f, 0xffffffff, true);
     storyBtn.setGravity(Gravity.CENTER);
-    storyBtn.setBackground(round(0x33ffffff, 999));
+    GradientDrawable storyBg = round(GCAM_BTN, 999);
+    storyBg.setStroke(dp(1), 0x28ffffff);
+    storyBtn.setBackground(storyBg);
     storyBtn.setOnClickListener(v -> deliverPhoto("story"));
     LinearLayout.LayoutParams mid = new LinearLayout.LayoutParams(0, dp(50), 1);
     mid.setMargins(dp(10), 0, dp(10), 0);
     bar.addView(storyBtn, mid);
-    TextView post = text("Đăng bài", 15, 0xffffffff, true);
+    TextView post = text(I18n.t("Đăng bài"), 14.5f, 0xff111114, true);
+    post.setShadowLayer(0, 0, 0, 0);
     post.setGravity(Gravity.CENTER);
-    GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { 0xff6c47e0, PINK });
-    g.setCornerRadius(dp(999));
-    post.setBackground(g);
+    post.setBackground(round(0xffffffff, 999));
     post.setOnClickListener(v -> deliverPhoto("post"));
     bar.addView(post, new LinearLayout.LayoutParams(0, dp(50), 1));
     reviewLayer.addView(bar, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
@@ -874,28 +1163,31 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
 
   private android.graphics.drawable.Drawable tinted(String name) {
     int id = WebIcons.resolve(this, name);
-    android.graphics.drawable.Drawable d = getDrawable(id).mutate();
+    android.graphics.drawable.Drawable d = WebIcons.load(this, name);
     d.setTint(0xffffffff);
     d.setBounds(0, 0, dp(18), dp(18));
     return d;
   }
 
   private boolean saveToGallery(File file) {
+    if (file == null) return false;
     try {
       ContentValues v = new ContentValues();
       v.put(MediaStore.Images.Media.DISPLAY_NAME, "Kinnect_" + new java.text.SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date()) + ".jpg");
       v.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
       if (Build.VERSION.SDK_INT >= 29) v.put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Kinnect");
       Uri uri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v);
+      if (uri == null) throw new java.io.IOException("MediaStore insert returned null");
       try (OutputStream os = getContentResolver().openOutputStream(uri); InputStream in = new FileInputStream(file)) {
+        if (os == null) throw new java.io.IOException("OutputStream null");
         byte[] buf = new byte[8192];
         int n;
         while ((n = in.read(buf)) > 0) os.write(buf, 0, n);
       }
-      Toast.makeText(this, "Đã lưu vào Ảnh › Kinnect", Toast.LENGTH_SHORT).show();
+      Toast.makeText(this, I18n.t("Đã lưu vào Ảnh › Kinnect"), Toast.LENGTH_SHORT).show();
       return true;
     } catch (Exception e) {
-      Toast.makeText(this, "Không lưu được ảnh vào máy.", Toast.LENGTH_SHORT).show();
+      Toast.makeText(this, I18n.t("Không lưu được ảnh vào máy."), Toast.LENGTH_SHORT).show();
       return false;
     }
   }
@@ -903,6 +1195,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   private void deliverPhoto(String action) {
     Intent result = new Intent();
     result.putExtra(EXTRA_IMAGE, capturedPhoto.getAbsolutePath());
+    result.putExtra("photoProEdited",photoProEdited);
     result.putExtra(EXTRA_ACTION, action);
     setResult(RESULT_OK, result);
     finish();
@@ -927,9 +1220,8 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
       recorder.setVideoSize(W, H);
       recorder.setVideoFrameRate(30);
       recorder.setVideoEncodingBitRate(limitSeconds <= 30 ? 2400000 : 1300000);
-      recorder.setMaxFileSize(11L * 1024 * 1024);
       recorder.setOutputFile(output.getAbsolutePath());
-      recorder.setOnInfoListener((r, what, extra) -> { if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED) ui.post(this::stopRecording); });
+      
       recorder.prepare();
       recorderSurface = recorder.getSurface();
       recorder.start();
@@ -939,11 +1231,15 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
       timer.setVisibility(View.VISIBLE);
       rail.setVisibility(View.INVISIBLE);
       modeTabs.setVisibility(View.INVISIBLE);
+      if (creativeBar != null) creativeBar.setVisibility(View.INVISIBLE);
+      if (flipButton != null) flipButton.setVisibility(View.INVISIBLE);
+      if (galleryAction != null) galleryAction.setVisibility(View.INVISIBLE);
+      if (musicLabel != null) musicLabel.setVisibility(View.INVISIBLE);
       showPanel("");
       if (music != null) { music.seekTo(0); music.start(); }
     } catch (Exception e) {
       releaseRecorder();
-      Toast.makeText(this, "Không bắt đầu quay được trên máy này.", Toast.LENGTH_LONG).show();
+      Toast.makeText(this, I18n.t("Không bắt đầu quay được trên máy này."), Toast.LENGTH_LONG).show();
     }
   }
 
@@ -955,7 +1251,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     try { recorder.stop(); } catch (Exception e) { ok = false; }
     releaseRecorder();
     if (music != null) music.pause();
-    if (!ok || length < 1000) { Toast.makeText(this, "Video quá ngắn, hãy quay lâu hơn.", Toast.LENGTH_SHORT).show(); return; }
+    if (!ok || length < 1000) { Toast.makeText(this, I18n.t("Video quá ngắn, hãy quay lâu hơn."), Toast.LENGTH_SHORT).show(); return; }
     if (musicUrl == null && musicLocal == null) { done(output); return; }
     final ProgressDialog progress = ProgressDialog.show(this, "Kinnect", "Đang ghép nhạc nền…", true, false);
     final File video = output;
@@ -980,16 +1276,37 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     timer.setVisibility(View.GONE);
     rail.setVisibility(View.VISIBLE);
     modeTabs.setVisibility(View.VISIBLE);
+    if (creativeBar != null) creativeBar.setVisibility(View.VISIBLE);
+    if (flipButton != null) flipButton.setVisibility(View.VISIBLE);
+    if (galleryAction != null) galleryAction.setVisibility(mode.equals("live") ? View.INVISIBLE : View.VISIBLE);
+    if (musicLabel != null) musicLabel.setVisibility(mode.equals("live") ? View.GONE : View.VISIBLE);
   }
 
-  private void done(File file) {
-    Intent result = new Intent();
-    result.putExtra(EXTRA_VIDEO, file.getAbsolutePath());
-    result.putExtra(EXTRA_STORY, story);
-    setResult(RESULT_OK, result);
-    finish();
+  private Uri reviewedVideo;private VideoView reviewVideo;private boolean videoProEdited;
+  private void done(File file){videoProEdited=false;showVideoReview(Uri.fromFile(file));}
+  private void openVideoPro(Uri uri){if(reviewVideo!=null)reviewVideo.pause();Intent editor=new Intent(this,MediaEditActivity.class).setData(uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);editor.setClipData(android.content.ClipData.newRawUri("video",uri));startActivityForResult(editor,408);}
+  private void showVideoReview(Uri uri){
+    closeCamera();reviewedVideo=uri;if(reviewVideo!=null)reviewVideo.stopPlayback();reviewLayer.removeAllViews();reviewLayer.setVisibility(View.VISIBLE);reviewLayer.setBackgroundColor(0xff000000);reviewVideo=new VideoView(this);reviewVideo.setVideoURI(uri);reviewVideo.setOnPreparedListener(player->{player.setLooping(true);reviewVideo.start();});reviewLayer.addView(reviewVideo,new FrameLayout.LayoutParams(-1,-1,Gravity.CENTER));
+    final TextView playBadge = text("❚❚", 18, 0xffffffff, true);
+    playBadge.setGravity(Gravity.CENTER);
+    playBadge.setBackground(round(GCAM_PILL, 999));
+    playBadge.setAlpha(0f);
+    reviewLayer.addView(playBadge, new FrameLayout.LayoutParams(dp(56), dp(56), Gravity.CENTER));
+    reviewVideo.setOnTouchListener((v, e) -> {
+      if (e.getActionMasked() == MotionEvent.ACTION_UP) {
+        if (reviewVideo.isPlaying()) { reviewVideo.pause(); playBadge.setText("▶"); playBadge.animate().alpha(1f).setDuration(150).start(); }
+        else { reviewVideo.start(); playBadge.setText("❚❚"); playBadge.animate().alpha(0f).setDuration(250).start(); }
+      }
+      return true;
+    });
+    GradientDrawable proBg = round(GCAM_PILL, 999);
+    proBg.setStroke(dp(1), 0x44fdd663);
+    TextView pro=text(I18n.t("Studio Pro"),13,GCAM_AMBER,true);pro.setPadding(dp(14),0,dp(14),0);pro.setGravity(Gravity.CENTER);pro.setBackground(proBg);android.graphics.drawable.Drawable spk=tinted("sparkles");spk.setTint(GCAM_AMBER);pro.setCompoundDrawablesRelativeWithIntrinsicBounds(spk,null,null,null);pro.setCompoundDrawablePadding(dp(6));pro.setOnClickListener(v->openVideoPro(reviewedVideo));FrameLayout.LayoutParams pp=new FrameLayout.LayoutParams(-2,dp(44),Gravity.TOP|Gravity.END);pp.setMargins(0,dp(52),dp(14),0);reviewLayer.addView(pro,pp);
+    ImageView back=icon("back",0xffffffff);back.setPadding(dp(10),dp(10),dp(10),dp(10));GradientDrawable backBg=round(GCAM_PILL,999);backBg.setStroke(dp(1),0x28ffffff);back.setBackground(backBg);back.setContentDescription(I18n.t("Quay lại"));back.setOnClickListener(v->dismissVideoReview());FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(dp(44),dp(44),Gravity.TOP|Gravity.START);bp.setMargins(dp(12),dp(12),0,0);reviewLayer.addView(back,bp);
+    LinearLayout bar=new LinearLayout(this);bar.setPadding(dp(16),dp(16),dp(16),dp(22));bar.setGravity(Gravity.CENTER);bar.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, new int[] { 0xe6000000, 0x99000000, 0x00000000 }));GradientDrawable againBg=round(GCAM_BTN,999);againBg.setStroke(dp(1),0x28ffffff);TextView again=text(I18n.t("Quay lại"),14.5f,0xffffffff,true);again.setGravity(Gravity.CENTER);again.setBackground(againBg);again.setOnClickListener(v->dismissVideoReview());bar.addView(again,new LinearLayout.LayoutParams(0,dp(50),1));TextView next=text(I18n.t("Tiếp tục"),14.5f,0xff111114,true);next.setShadowLayer(0,0,0,0);next.setGravity(Gravity.CENTER);next.setBackground(round(0xffffffff,999));next.setOnClickListener(v->deliverReviewedVideo());LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(0,dp(50),1);np.leftMargin=dp(12);bar.addView(next,np);reviewLayer.addView(bar,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
   }
-
+  private void dismissVideoReview(){if(reviewVideo!=null){reviewVideo.stopPlayback();reviewVideo=null;}reviewedVideo=null;reviewLayer.setVisibility(View.GONE);if(camera.isAvailable())openCamera();}
+  private void deliverReviewedVideo(){if(reviewedVideo==null)return;Intent result=new Intent().setData(reviewedVideo).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);result.setClipData(android.content.ClipData.newRawUri("video",reviewedVideo));result.putExtra(EXTRA_STORY,story);result.putExtra("videoProEdited",videoProEdited);if("file".equals(reviewedVideo.getScheme())){result.putExtra(EXTRA_VIDEO,reviewedVideo.getPath());setResult(RESULT_OK,result);}else setResult(RESULT_FIRST_USER,result);finish();}
   private void finishCancelled() {
     setResult(RESULT_CANCELED);
     finish();
@@ -997,7 +1314,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
 
   @Override
   public void onBackPressed() {
-    if (reviewLayer.getVisibility() == View.VISIBLE) { reviewLayer.setVisibility(View.GONE); return; }
+    if (reviewLayer.getVisibility() == View.VISIBLE) { if(reviewedVideo!=null)dismissVideoReview();else reviewLayer.setVisibility(View.GONE);return; }
     if (!panel.isEmpty()) { showPanel(""); return; }
     finishCancelled();
   }
@@ -1034,10 +1351,10 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     close.setBackground(round(soft, 999));
     close.setOnClickListener(v -> dialog.dismiss());
     head.addView(close, new LinearLayout.LayoutParams(dp(38), dp(38)));
-    TextView title = plain("Âm nhạc", 17, ink, true);
+    TextView title = plain(I18n.t("Âm nhạc"), 17, ink, true);
     title.setGravity(Gravity.CENTER);
     head.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
-    TextView off = plain(musicUrl != null || musicLocal != null ? "Bỏ nhạc" : "", 13, 0xffe0245e, true);
+    TextView off = plain(musicUrl != null || musicLocal != null ? I18n.t("Bỏ nhạc") : "", 13, 0xffe0245e, true);
     off.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
     off.setOnClickListener(v -> { setMusic(null, null, null); dialog.dismiss(); });
     head.addView(off, new LinearLayout.LayoutParams(dp(60), -2));
@@ -1047,8 +1364,8 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     search.setPadding(dp(14), 0, dp(14), 0);
     search.setBackground(round(soft, 999));
     search.addView(icon("search", muted), new LinearLayout.LayoutParams(dp(18), dp(18)));
-    final EditText query = new EditText(this);
-    query.setHint("Tìm bài hát hoặc nghệ sĩ");
+    final EditText query = new KinnectInput(this);
+    query.setHint(I18n.t("Tìm bài hát hoặc nghệ sĩ"));
     query.setHintTextColor(muted);
     query.setTextColor(ink);
     query.setTextSize(15);
@@ -1077,7 +1394,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     now.addView(nowTitle);
     now.addView(nowSub);
     bar.addView(now, new LinearLayout.LayoutParams(0, -2, 1));
-    TextView use = plain("Dùng bài này", 15, 0xffffffff, true);
+    TextView use = plain(I18n.t("Dùng bài này"), 15, 0xffffffff, true);
     use.setGravity(Gravity.CENTER);
     use.setPadding(dp(20), 0, dp(20), 0);
     GradientDrawable ug = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { 0xff6c47e0, PINK });
@@ -1107,7 +1424,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     final java.util.function.Consumer<String[]> choose = t -> {
       picked[0] = t[0]; picked[1] = t[1]; picked[2] = t[2];
       nowTitle.setText(t[1]);
-      nowSub.setText(t[2].isEmpty() ? "Nhạc của bạn" : t[2]);
+      nowSub.setText(t[2].isEmpty() ? I18n.t("Nhạc của bạn") : t[2]);
       bar.setVisibility(View.VISIBLE);
     };
     render[0] = () -> {
@@ -1124,15 +1441,15 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         LinearLayout meta = new LinearLayout(this);
         meta.setOrientation(LinearLayout.VERTICAL);
         meta.setPadding(dp(12), 0, 0, 0);
-        meta.addView(plain("Chọn nhạc trong máy", 15, ink, true));
-        meta.addView(plain("MP3, M4A… chỉ dùng cho video của bạn", 12, muted, false));
+        meta.addView(plain(I18n.t("Chọn nhạc trong máy"), 15, ink, true));
+        meta.addView(plain(I18n.t("MP3, M4A… chỉ dùng cho video của bạn"), 12, muted, false));
         up.addView(meta);
         up.setOnClickListener(v -> {
           dialog.dismiss();
           Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
           pick.addCategory(Intent.CATEGORY_OPENABLE);
           pick.setType("audio/*");
-          try { startActivityForResult(pick, 402); } catch (Exception e) { Toast.makeText(this, "Không mở được trình chọn nhạc.", Toast.LENGTH_SHORT).show(); }
+          try { startActivityForResult(pick, 402); } catch (Exception e) { Toast.makeText(this, I18n.t("Không mở được trình chọn nhạc."), Toast.LENGTH_SHORT).show(); }
         });
         list.addView(up);
         return;
@@ -1165,7 +1482,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         tt.setSingleLine(true);
         tt.setEllipsize(android.text.TextUtils.TruncateAt.END);
         meta.addView(tt);
-        TextView st = plain(artist.isEmpty() ? "Thư viện Kinnect" : artist, 12, muted, false);
+        TextView st = plain(artist.isEmpty() ? I18n.t("Thư viện Kinnect") : artist, 12, muted, false);
         st.setSingleLine(true);
         st.setEllipsize(android.text.TextUtils.TruncateAt.END);
         meta.addView(st);
@@ -1189,13 +1506,13 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         list.addView(row);
       }
       if (total == 0) {
-        TextView e = plain(q.isEmpty() ? "Thư viện chưa có bài nào." : "Không tìm thấy bài phù hợp.", 14, muted, false);
+        TextView e = plain(q.isEmpty() ? I18n.t("Thư viện chưa có bài nào.") : I18n.t("Không tìm thấy bài phù hợp."), 14, muted, false);
         e.setGravity(Gravity.CENTER);
         e.setPadding(0, dp(30), 0, dp(30));
         list.addView(e, new LinearLayout.LayoutParams(-1, -2));
       }
       if (total > shown[0]) {
-        TextView more = plain("Xem thêm (" + (total - shown[0]) + " bài)", 14, ink, true);
+        TextView more = plain(I18n.t("Xem thêm (") + (total - shown[0]) + I18n.t(" bài)"), 14, ink, true);
         more.setGravity(Gravity.CENTER);
         more.setPadding(dp(18), dp(8), dp(18), dp(8));
         more.setBackground(round(soft, 999));
@@ -1220,7 +1537,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     if (w != null) {
       w.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0));
       w.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, Math.round(getResources().getDisplayMetrics().heightPixels * 0.86f));
-      w.setGravity(Gravity.BOTTOM);
+      ApprovedTypography.sheet(w.getDecorView());w.setGravity(Gravity.BOTTOM);
       w.setDimAmount(0.5f);
       w.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
     }
@@ -1235,7 +1552,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   }
 
   private TextView plain(String s, float size, int color, boolean bold) {
-    TextView t = new TextView(this);
+    TextView t = new KinnectText(this);
     t.setText(s);
     t.setTextSize(size);
     t.setTextColor(color);
@@ -1263,22 +1580,22 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   protected void onActivityResult(int request, int result, Intent data) {
     super.onActivityResult(request, result, data);
     if (result != RESULT_OK || data == null || data.getData() == null) return;
+    if(request==407){openVideoPro(data.getData());return;}
+    if(request==408){videoProEdited=true;showVideoReview(data.getData());return;}
+    if(request==405){openPhotoPro(data.getData());return;}
+    if(request==406){final String path=data.getStringExtra(EXTRA_IMAGE);if(path==null)return;final File edited=new File(path);worker.execute(()->{try{Bitmap shown=PhotoRenderer.decode(edited,1280);ui.post(()->{capturedPhoto=edited;photoProEdited=true;showReview(shown);});}catch(Exception|OutOfMemoryError e){ui.post(()->Toast.makeText(this,I18n.t("Không mở được ảnh."),Toast.LENGTH_SHORT).show());}});return;}
+    if(request==403)photoProEdited=false;
     if (request == 402) setMusic(null, data.getData(), "Nhạc của bạn");
-    if (request == 403) loadStill(data.getData(), "photo");
-    if (request == 404) {
-      Intent r = new Intent();
-      r.setData(data.getData());
-      r.putExtra(EXTRA_ACTION, "pick-video");
-      setResult(RESULT_FIRST_USER, r);
-      finish();
-    }
+    if (request == 403) {final Uri selected=data.getData();worker.execute(()->{try{File local=File.createTempFile("gallery-photo-",".img",getCacheDir());try(InputStream in=getContentResolver().openInputStream(selected);OutputStream out=new FileOutputStream(local)){byte[] buffer=new byte[32768];long bytes=0;for(int n;(n=in.read(buffer))!=-1;){bytes+=n;if(bytes>64L*1024*1024)throw new IOException("large");out.write(buffer,0,n);}}Bitmap shown=PhotoRenderer.decode(local,1280);ui.post(()->{if(isFinishing()||isDestroyed())return;capturedPhoto=local;photoProEdited=false;showReview(shown);});}catch(Exception|OutOfMemoryError e){ui.post(()->Toast.makeText(this,I18n.t("Không mở được ảnh."),Toast.LENGTH_SHORT).show());}});}
+    if (request == 404) {videoProEdited=false;try{getContentResolver().takePersistableUriPermission(data.getData(),data.getFlags()&Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(SecurityException ignored){}showVideoReview(data.getData());}
   }
 
   private void setMusic(String url, Uri local, String title) {
     if (music != null) { music.release(); music = null; }
     musicUrl = url;
     musicLocal = local;
-    musicLabel.setText(title == null ? "🎵  Thêm nhạc" : "🎵  " + title.replaceAll("\\s+", " ").trim());
+    musicLabel.setText(title == null ? I18n.t("Thêm nhạc") : title.replaceAll("\\s+", " ").trim());
+    musicLabel.setTextColor(title == null ? 0xffffffff : GCAM_AMBER);
     if (url == null && local == null) return;
     try {
       music = new MediaPlayer();
@@ -1290,17 +1607,91 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
       } else music.setDataSource(this, local);
       music.setLooping(true);
       music.setOnPreparedListener(p -> { if (!recording) p.start(); });
-      music.setOnErrorListener((p, w, e) -> { Toast.makeText(this, "Không phát được bài nhạc này.", Toast.LENGTH_SHORT).show(); return true; });
+      music.setOnErrorListener((p, w, e) -> { Toast.makeText(this, I18n.t("Không phát được bài nhạc này."), Toast.LENGTH_SHORT).show(); return true; });
       music.prepareAsync();
     } catch (Exception e) {
-      Toast.makeText(this, "Không phát được bài nhạc này.", Toast.LENGTH_SHORT).show();
+      Toast.makeText(this, I18n.t("Không phát được bài nhạc này."), Toast.LENGTH_SHORT).show();
       musicUrl = null;
       musicLocal = null;
     }
   }
 
-  // ======================= Các view vẽ tay =======================
-  /** Nút chụp: chế độ Ảnh = vòng trắng; Video = lõi đỏ, khi quay thu thành ô vuông và có vòng tiến trình. */
+  // ======================= Các view vẽ tay chuẩn Google Camera =======================
+  /** Vòng lấy nét cảm ứng chuẩn Google Camera (Pixel Camera Focus & Exposure Ring). */
+  static final class FocusRingView extends View {
+    private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private float fx = -1, fy = -1, scale = 1f, alpha = 0f;
+    private ValueAnimator anim;
+    private final Runnable fadeOut = () -> animateAlpha(0f, 280);
+
+    FocusRingView(android.content.Context c) { super(c); }
+
+    void showAt(float x, float y) {
+      fx = x;
+      fy = y;
+      removeCallbacks(fadeOut);
+      if (anim != null) anim.cancel();
+      anim = ValueAnimator.ofFloat(1.35f, 1.0f);
+      anim.setDuration(220);
+      alpha = 1f;
+      anim.addUpdateListener(a -> {
+        scale = (Float) a.getAnimatedValue();
+        invalidate();
+      });
+      anim.start();
+      postDelayed(fadeOut, 1100);
+    }
+
+    private void animateAlpha(float target, long duration) {
+      if (anim != null) anim.cancel();
+      anim = ValueAnimator.ofFloat(alpha, target);
+      anim.setDuration(duration);
+      anim.addUpdateListener(a -> {
+        alpha = (Float) a.getAnimatedValue();
+        invalidate();
+      });
+      anim.start();
+    }
+
+    @Override
+    protected void onDraw(Canvas c) {
+      if (alpha <= 0.01f || fx < 0 || fy < 0) return;
+      float density = getResources().getDisplayMetrics().density;
+      float r = 34f * density * scale;
+      int a = Math.round(alpha * 255);
+      p.setStyle(Paint.Style.STROKE);
+      p.setStrokeWidth(2f * density);
+      p.setColor((a << 24) | 0xfffdd663);
+      c.drawCircle(fx, fy, r, p);
+      // 4 vạch chia bên trong vòng lấy nét kiểu Google Camera
+      float tick = 5f * density;
+      c.drawLine(fx - r, fy, fx - r + tick, fy, p);
+      c.drawLine(fx + r - tick, fy, fx + r, fy, p);
+      c.drawLine(fx, fy - r, fx, fy - r + tick, p);
+      c.drawLine(fx, fy + r - tick, fx, fy + r, p);
+      p.setStyle(Paint.Style.FILL);
+      p.setColor(((a / 3) << 24) | 0xfffdd663);
+      c.drawCircle(fx, fy, 3.5f * density, p);
+      // Thanh trượt phơi sáng mặt trời (Google Camera Sun Exposure Indicator) cạnh vòng lấy nét
+      float sx = fx + r + 16f * density < getWidth() - 20f * density ? fx + r + 16f * density : fx - r - 16f * density;
+      p.setStyle(Paint.Style.STROKE);
+      p.setStrokeWidth(1.5f * density);
+      p.setColor(((a * 2 / 3) << 24) | 0xfffdd663);
+      c.drawLine(sx, fy - 24f * density, sx, fy - 7f * density, p);
+      c.drawLine(sx, fy + 7f * density, sx, fy + 24f * density, p);
+      p.setStyle(Paint.Style.FILL);
+      p.setColor((a << 24) | 0xfffdd663);
+      c.drawCircle(sx, fy, 3.2f * density, p);
+      for (int i = 0; i < 8; i++) {
+        double ang = i * Math.PI / 4.0;
+        float x1 = sx + (float) Math.cos(ang) * 4.8f * density, y1 = fy + (float) Math.sin(ang) * 4.8f * density;
+        float x2 = sx + (float) Math.cos(ang) * 6.8f * density, y2 = fy + (float) Math.sin(ang) * 6.8f * density;
+        c.drawLine(x1, y1, x2, y2, p);
+      }
+    }
+  }
+
+  /** Nút chụp chuẩn Google Camera: Ảnh = vành trắng sắc nét + đĩa trắng lớn; Video = vành trắng + tâm đỏ Pixel (#EE2B2B), khi quay chuyển thành hình vuông bo góc. */
   static final class ShutterView extends View {
     private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
     private String mode = "video";
@@ -1316,38 +1707,59 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     void setProgress(float v) { progress = Math.max(0, Math.min(1, v)); invalidate(); }
 
     @Override
+    public boolean onTouchEvent(MotionEvent e) {
+      int a = e.getActionMasked();
+      if (a == MotionEvent.ACTION_DOWN) animate().scaleX(0.91f).scaleY(0.91f).setDuration(90).start();
+      else if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) animate().scaleX(1f).scaleY(1f).setDuration(140).start();
+      return super.onTouchEvent(e);
+    }
+
+    @Override
     protected void onDraw(Canvas c) {
-      float w = getWidth(), h = getHeight(), cx = w / 2, cy = h / 2, r = Math.min(w, h) / 2;
-      float stroke = r * 0.12f;
+      float w = getWidth(), h = getHeight(), cx = w / 2f, cy = h / 2f, r = Math.min(w, h) / 2f;
+      float density = getResources().getDisplayMetrics().density;
+      float ringStroke = 3.5f * density;
+      float ringRadius = r - ringStroke;
+
+      // Nền tối nhẹ giữa vành ngoài và nhân nút chụp kiểu Google Camera
+      p.setStyle(Paint.Style.FILL);
+      p.setColor(0x44000000);
+      c.drawCircle(cx, cy, ringRadius, p);
+
+      // Vành ngoài màu trắng chuẩn Google Camera
       p.setStyle(Paint.Style.STROKE);
-      p.setStrokeWidth(stroke);
-      p.setColor(0x66ffffff);
-      c.drawCircle(cx, cy, r - stroke / 2, p);
+      p.setStrokeWidth(ringStroke);
+      p.setColor(rec ? 0x55ffffff : 0xffffffff);
+      c.drawCircle(cx, cy, ringRadius, p);
+
       if (rec) {
-        p.setShader(new SweepGradient(cx, cy, new int[] { 0xff7652e8, 0xffff4f9a, 0xff7652e8 }, null));
-        c.drawArc(new RectF(stroke / 2, stroke / 2, w - stroke / 2, h - stroke / 2), -90, 360 * progress, false, p);
-        p.setShader(null);
-      } else if (mode.equals("photo")) {
-        p.setColor(0xffffffff);
-        c.drawCircle(cx, cy, r - stroke / 2, p);
+        p.setStrokeCap(Paint.Cap.ROUND);
+        p.setColor(GCAM_RED);
+        RectF arc = new RectF(cx - ringRadius, cy - ringRadius, cx + ringRadius, cy + ringRadius);
+        c.drawArc(arc, -90, 360 * progress, false, p);
       }
+
       p.setStyle(Paint.Style.FILL);
       if (mode.equals("photo")) {
         p.setColor(0xffffffff);
-        c.drawCircle(cx, cy, r * 0.72f, p);
+        c.drawCircle(cx, cy, r * 0.77f, p);
       } else if (rec) {
+        p.setColor(GCAM_RED);
+        float s = r * 0.34f;
+        c.drawRoundRect(new RectF(cx - s, cy - s, cx + s, cy + s), 8f * density, 8f * density, p);
+      } else if (mode.equals("live")) {
         p.setColor(0xffff3b5c);
-        float s = r * 0.36f;
-        c.drawRoundRect(new RectF(cx - s, cy - s, cx + s, cy + s), s * 0.3f, s * 0.3f, p);
+        c.drawCircle(cx, cy, r * 0.64f, p);
       } else {
-        p.setShader(new LinearGradient(0, 0, w, h, 0xffff4d6d, 0xffff3b8f, Shader.TileMode.CLAMP));
-        c.drawCircle(cx, cy, r * 0.7f, p);
-        p.setShader(null);
+        p.setColor(0xffffffff);
+        c.drawCircle(cx, cy, r * 0.77f, p);
+        p.setColor(GCAM_RED);
+        c.drawCircle(cx, cy, r * 0.34f, p);
       }
     }
   }
 
-  /** Lưới 3×3 và vùng che khi chọn tỉ lệ 3:4 hoặc 1:1. */
+  /** Lưới 3×3 kèm tâm ngắm cân bằng (+) chuẩn Google Camera và vùng che khi chọn tỉ lệ 3:4 hoặc 1:1. */
   static final class GridOverlay extends View {
     private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
     private boolean grid;
@@ -1362,21 +1774,32 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     @Override
     protected void onDraw(Canvas c) {
       float w = getWidth(), h = getHeight(), top = 0, bottom = h;
+      float density = getResources().getDisplayMetrics().density;
       if (ratio > 0) {
-        float fh = ratio == 1 ? w * 4 / 3 : w;
-        top = (h - fh) / 2;
+        float fh = ratio == 1 ? w * 4f / 3f : w;
+        top = (h - fh) / 2f;
         bottom = top + fh;
-        p.setColor(0xcc000000);
+        p.setStyle(Paint.Style.FILL);
+        p.setColor(0xd9000000);
         c.drawRect(0, 0, w, top, p);
         c.drawRect(0, bottom, w, h, p);
       }
       if (!grid) return;
-      p.setColor(0x80ffffff);
-      p.setStrokeWidth(1.5f);
+      p.setStyle(Paint.Style.STROKE);
+      p.setColor(0x66ffffff);
+      p.setStrokeWidth(1f * density);
       for (int i = 1; i < 3; i++) {
-        c.drawLine(w * i / 3, top, w * i / 3, bottom, p);
-        c.drawLine(0, top + (bottom - top) * i / 3, w, top + (bottom - top) * i / 3, p);
+        c.drawLine(w * i / 3f, top, w * i / 3f, bottom, p);
+        c.drawLine(0, top + (bottom - top) * i / 3f, w, top + (bottom - top) * i / 3f, p);
       }
+      // Tâm ngắm cân bằng (+) ở giữa khung hình kiểu Google Camera
+      float cx = w / 2f, cy = (top + bottom) / 2f, cross = 10f * density;
+      p.setColor(0x99fdd663);
+      p.setStrokeWidth(1.5f * density);
+      c.drawLine(cx - cross, cy, cx + cross, cy, p);
+      c.drawLine(cx, cy - cross, cx, cy + cross, p);
+      p.setColor(0x44ffffff);
+      c.drawCircle(cx, cy, 18f * density, p);
     }
   }
 }

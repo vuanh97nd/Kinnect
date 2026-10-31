@@ -1,0 +1,2 @@
+INSTRUMENTATION_RESULT: result=PASS: real HTTPS password login, normal reviewer role, actual profile/tab/settings/policy screenshots; session logged out
+INSTRUMENTATION_CODE: -1

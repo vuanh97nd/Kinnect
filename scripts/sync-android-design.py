@@ -4,6 +4,7 @@ Input is static design source only. The Android app does not embed HTML/JS or a 
 """
 from pathlib import Path
 import argparse, hashlib, json, re, xml.etree.ElementTree as ET
+from android_vector_paths import normalize_svg_path
 
 ROOT = Path(__file__).resolve().parent.parent
 parser = argparse.ArgumentParser()
@@ -43,6 +44,7 @@ for name, svg in sorted(items.items()):
             r = min(float(at.get('rx',0)),w/2,h/2)
             d = f'M{x+r},{y}H{x+w-r}Q{x+w},{y} {x+w},{y+r}V{y+h-r}Q{x+w},{y+h} {x+w-r},{y+h}H{x+r}Q{x},{y+h} {x},{y+h-r}V{y+r}Q{x},{y} {x+r},{y}Z'
         else: raise ValueError('Unsupported SVG element: '+element.tag)
+        d = normalize_svg_path(d)
         ET.SubElement(root,'path',{a('pathData'):d,a('fillColor'):'#00000000',a('strokeColor'):'#FF000000',a('strokeWidth'):'1.7',a('strokeLineCap'):'round',a('strokeLineJoin'):'round'})
     path = ROOT/'android/app/src/main/res/drawable'/('ic_web_'+name.replace('-','_')+'.xml')
     path.write_text(ET.tostring(root,encoding='unicode')+'\n',encoding='utf-8')

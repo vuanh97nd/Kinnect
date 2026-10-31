@@ -1,0 +1,29 @@
+{
+  "converted": [
+    "Server-confirmed package purchase -> themed artwork, particles, check and Use now; no success text dialog",
+    "Saved/applied/copied/updated -> transient icon confirmation",
+    "Post/video published,friend request/friend accepted,report submitted -> transient confirmation",
+    "Admin coin grant -> icon success, no automatic history dialog"
+  ],
+  "preserved": [
+    "Source selection and payment confirmation with exact price",
+    "Delete/discard/account removal confirmations",
+    "Errors,insufficient balance and permission explanations",
+    "OTP/password recovery/security notices",
+    "Editor progress and detailed inline status",
+    "Incoming chat bubbles already have their own status feedback"
+  ],
+  "rules": [
+    "No purchase celebration on error,cancel,pending,restore or duplicate receipt",
+    "No sound added to ordinary success feedback",
+    "Reduced-motion uses static confirmation",
+    "Effect dismissal removes animation and leaves controls available"
+  ],
+  "implementation": [
+    "SuccessEffects.java",
+    "PackagePurchase.java",
+    "MainActivity.say",
+    "StoreActivity.message",
+    "CoinGrantActivity.toast"
+  ]
+}

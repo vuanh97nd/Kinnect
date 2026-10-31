@@ -1,0 +1,8 @@
+<resources>
+  <style name="Kinnect.Launch" parent="android:Theme.Material.Light.NoActionBar">
+    <item name="android:windowBackground">@drawable/launch_screen</item>
+    <item name="android:statusBarColor">#F6F5FA</item>
+    <item name="android:navigationBarColor">#F6F5FA</item>
+    <item name="android:windowLightStatusBar">true</item>
+  </style>
+<style name="Kinnect.App.Light" parent="android:Theme.Material.Light.NoActionBar"><item name="android:fontFamily">@font/kinnect_family</item><item name="android:colorAccent">#7650D7</item></style><style name="Kinnect.App.Dark" parent="android:Theme.Material.NoActionBar"><item name="android:fontFamily">@font/kinnect_family</item><item name="android:colorAccent">#B9A4FF</item></style></resources>

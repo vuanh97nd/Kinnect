@@ -1,0 +1,29 @@
+{
+  "version": "1.0.33",
+  "backendTests": {
+    "passed": 125,
+    "failed": 0
+  },
+  "nativeUI": {
+    "passed": 902,
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "widthDp": 320,
+    "fontScale": 1.3,
+    "uniqueArtwork": 15,
+    "detailSheets": 30,
+    "effect": "Real native effect rendered by QA; purchase callback simulated locally, no actual payment",
+    "adminContrast": "Explicit light/dark text/hint/disabled states checked"
+  },
+  "qaPayloadMatchesReleaseExceptManifestAndSignature": true,
+  "realGooglePlayPurchaseVerified": false,
+  "physicalPhoneVerified": false,
+  "payments": "No provider credentials/products; real topup/payout and paid-coin gifts remain closed",
+  "trial": "Admin can permit gifted coins for all package purchases; defaults on",
+  "webUIChanged": false,
+  "playCandidateChanged": false,
+  "qaPayloadMatchesRelease": true,
+  "signing": "v1/v2/v3 verified;16KB zip alignment;stable website certificate"
+}

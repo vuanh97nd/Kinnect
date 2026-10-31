@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 test('real message and friendship notifications arrive without reload, including overlapping requests',async({browser})=>{
  const a=await browser.newContext(),b=await browser.newContext();
  try{
- const register=async(c,n)=>(await (await c.request.post('/api/register',{data:{username:n+Date.now(),name:n,password:'abcdef',agree18:true}})).json()).user;
+ const register=async(c,n)=>(await (await c.request.post('/api/register',{data:{username:n+Date.now(),name:n,password:'abcdef',agree18:true,acceptPrivacyNotice:true}})).json()).user;
  const ua=await register(a,'noticea'),ub=await register(b,'noticeb');const p=await a.newPage();await p.goto('/');await expect(p.locator('#app')).toBeVisible();
  await expect.poll(()=>p.evaluate(()=>document.querySelector('#unread').textContent)).toBe('');
  const socketEvent=p.waitForEvent('websocket'); // reconnect below also verifies recovery refresh

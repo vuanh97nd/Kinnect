@@ -1,0 +1,11 @@
+{
+ "name":"kinnect-allocation",
+ "main":"worker.js",
+ "compatibility_date":"2026-10-30",
+ "workers_dev":true,
+ "vars":{"PUBLIC_BASIC_API":"true","LEGACY_ORIGIN":"https://app.kinnect.io.vn"},
+ "services":[{"binding":"CLOUD_API","service":"kinnect-cloud-api"}],
+ "durable_objects":{"bindings":[{"name":"ALLOCATOR","class_name":"Allocator"}]},
+ "migrations":[{"tag":"v1","new_sqlite_classes":["Allocator"]}],
+ "observability":{"enabled":false}
+}

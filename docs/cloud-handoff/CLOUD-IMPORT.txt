@@ -1,0 +1,23 @@
+KINNECT 1.0.4 CLOUD HANDOFF
+
+Read HANDOFF-CHO-CHATGPT.md first.
+
+Preferred Git branch after upload:
+  handoff/kinnect-1.0.4-cloud
+
+If GitHub is unavailable, upload Kinnect-1.0.4-cloud.bundle into the cloud session:
+  git clone Kinnect-1.0.4-cloud.bundle -b handoff/kinnect-1.0.4-cloud Kinnect
+  cd Kinnect
+
+Alternatively unpack Kinnect-1.0.4-cloud-source.zip into a new empty working folder.
+The signed APK is a separate file, Kinnect-1.0.4-native.apk, with its .sha256 file.
+
+No signing key, account database or private .env files are included.
+Backend tests: 79 total, 78 pass, 1 private-call-signaling failure (HTTP 503).
+Device coverage is emulator only; do not mark the physical Android install flow verified.
+
+To publish after GitHub connectivity is restored, from a configured Git checkout:
+  python scripts/publish-cloud-handoff.py --apk /path/to/Kinnect-1.0.4-native.apk --source-zip /path/to/Kinnect-1.0.4-cloud-source.zip
+This uses the existing Git credential helper or GH_TOKEN, never asks to paste keys into files,
+checks the APK checksum, pushes the prepared branch, creates a draft release, verifies
+GitHub's uploaded APK digest, then publishes v1.0.4. It refuses to overwrite a newer release.

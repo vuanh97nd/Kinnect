@@ -11,16 +11,16 @@
   "theme_color": "#6d4aff",
   "icons": [
     {
-      "src": "https://raw.githubusercontent.com/vuanh97nd/Kinnect/81a7a0ba474f208332f9c7f0407e4a769daa6a81/public/kinnect-ios-180-v7.png",
-      "sizes": "180x180",
+      "src": "/kinnect-logo-v106-192.png",
+      "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "https://raw.githubusercontent.com/vuanh97nd/Kinnect/81a7a0ba474f208332f9c7f0407e4a769daa6a81/public/kinnect-maskable-512.png",
+      "src": "/kinnect-logo-v106-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }

@@ -8,6 +8,10 @@ public final class ServerConfig {
   public static final String DEFAULT_ORIGIN =
     "https://app.kinnect.io.vn";
 
+  /** Máy chủ dự phòng: allocation gateway tự định tuyến PC → cloud khi PC ngoại tuyến. */
+  public static final String FALLBACK_ORIGIN =
+    "https://kinnect-allocation.vuanh97nd.workers.dev";
+
   private ServerConfig() {}
 
   public static String normalize(String value) {
@@ -30,7 +34,7 @@ public final class ServerConfig {
       return "https://" + host + (port == -1 || port == 443 ? "" : ":" + port);
     } catch (Exception error) {
       throw new IllegalArgumentException(
-        "Nhập địa chỉ HTTPS hợp lệ, không kèm đường dẫn hoặc mật khẩu."
+        I18n.t("Nhập địa chỉ HTTPS hợp lệ, không kèm đường dẫn hoặc mật khẩu.")
       );
     }
   }

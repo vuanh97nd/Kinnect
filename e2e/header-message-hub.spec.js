@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test';
 test('desktop message icon opens the conversation workspace in the center column',async({page})=>{
  await page.setViewportSize({width:1280,height:900});
- const registered=await page.request.post('/api/register',{data:{username:'messagehub'+Date.now(),name:'Menu giữa',password:'abcdef',agree18:true}});
+ const registered=await page.request.post('/api/register',{data:{username:'messagehub'+Date.now(),name:'Menu giữa',password:'abcdef',agree18:true,acceptPrivacyNotice:true}});
  expect(registered.ok()).toBeTruthy();await page.goto('/');
  await page.getByRole('button',{name:'Bạn bè',exact:true}).click();await expect(page.locator('.view-friends')).toBeVisible();
  const friends=await page.locator('#social-panel').boundingBox();

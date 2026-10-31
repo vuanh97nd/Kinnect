@@ -1,0 +1,26 @@
+{
+  "version": "1.0.23",
+  "versionCode": 88,
+  "sha256": "49806432d77c90bf27a8c7df195c59a78e8d2ee41c890fa11c0c0fe25eb98cc1",
+  "certificateSha256": "d8809c1e21f00ccf96984b37123d3d916d2e103bfa1dc2032043f47bb3b9988d",
+  "checks": {
+    "cameraAndReview": 17,
+    "editorExit": 9,
+    "screen": "320dp/font130; photo and video exit screenshots visually checked",
+    "qaVersionCode": 113,
+    "qaPayloadMatchesReleaseExceptManifestAndSignature": true
+  },
+  "physicalDeviceVerified": false,
+  "webClientChanged": false,
+  "playCandidateChanged": false,
+  "changes": [
+    "Plus directly opens photo camera, no chooser",
+    "Save and Studio Pro in measured vertical layout, 10dp gap",
+    "Visible Exit in both editors; Continue keeps editor; Exit without saving returns RESULT_CANCELED",
+    "Photo discard removes current draft after queued writes; no autosave recreation",
+    "Dialog buttons wrap their full text instead of fixed50dp clipping"
+  ],
+  "originalPhotoAndVideoPreserved": true,
+  "previouslyExportedFilesPreserved": true,
+  "live22FeaturesPreserved": true
+}

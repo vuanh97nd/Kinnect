@@ -1,33 +1,57 @@
+import {createLiveGifts} from './lib/live-gifts.js';
+import {createPcCloudBridge} from './lib/pc-cloud-bridge.js';
+import {createSharedSession} from './lib/shared-session.js';
+import {liveRoomBlocks} from './lib/live-access.js';
+import {createLiveSFU} from './lib/live-sfu.js';
+import {createLiveGuests} from './lib/live-guests.js';
+import {createLiveModes} from './lib/live-modes.js';
+import {createApkDownload} from './lib/apk-download.js';
+import { publishedApk } from './lib/apk-releases.js';
 import {createTyping} from './lib/typing.js';
 import {createCalls} from "./lib/calls.js";
+import { createWebPush } from "./lib/webpush.js";
 import http from "node:http";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, createReadStream } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { openSocial } from "./lib/social.js";
 import { loadMailEnv, mailConfigured, smtpConfigured, sendMail } from "./lib/mailer.js";
 import { readFile, readdir, stat, writeFile, unlink } from "node:fs/promises";
 import { createHash } from "node:crypto";
+import { brotliCompressSync, gzipSync, constants as zlibConstants } from "node:zlib";
 import { randomUUID } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { fileURLToPath } from "node:url";
 
-export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSender, emailReady } = {}) {
+export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSender, emailReady, allowEmailDelivery = false, storeVerifier,storeEnv,liveEnv,apkDirectory=fileURLToPath(new URL("./dist/",import.meta.url)) } = {}) {
   loadMailEnv();
   loadMailEnv("oauth.env");
   loadMailEnv("turn.env");
+  loadMailEnv("sfu.env");
+  loadMailEnv("ai.env");
+  loadMailEnv("billing.env");
+  // Test/in-memory apps must never inherit the workstation's live SMTP delivery.
+  const isolatedMail = !allowEmailDelivery || dbPath === ":memory:" || !!process.env.NODE_TEST_CONTEXT;
+  const deliverEmail = emailSender ?? (isolatedMail ? async () => false : sendMail);
+  const emailAvailable = emailReady ?? (isolatedMail ? () => false : smtpConfigured);
+  const downloadApk=createApkDownload(apkDirectory,new URL("./dist/published-apk.json",import.meta.url));
+  let notifyAIStream = () => {};
   let notifyNotifications = () => {};
+  let pushNotification = () => {};
   let notifyCallMessage = () => {};
   const social = openSocial(dbPath, {
-    onNotification: ({ userId }) => notifyNotifications(userId),
+    onNotification: ({ userId, id }) => { notifyNotifications(userId); if (id) pushNotification(userId, id); },
+    onAIStream: event => notifyAIStream(event),
     onCallMessage: ({ userIds }) => notifyCallMessage(userIds),
-    fetchImpl,authLimit,
-    sendEmail:emailSender||sendMail,mailReady:emailReady||smtpConfigured,
+    fetchImpl,authLimit,storeVerifier,storeEnv,
+    sharedSession: (dbPath===":memory:"||process.env.NODE_TEST_CONTEXT)?null:createSharedSession(),
+    sendEmail:deliverEmail,mailReady:emailAvailable,
     // Báo về email quản trị khi có người gửi yêu cầu quên mật khẩu.
     onResetRequest: (r) => {
       const when = new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
-      console.log(`[quen-mat-khau] ${when} @${r.username} (${r.exists ? "có tài khoản" : "không có tài khoản"})`);
+      console.log(`[quen-mat-khau] ${when} Đã tiếp nhận yêu cầu khôi phục.`);
       if (!mailConfigured()) return;
-      sendMail({
+      deliverEmail({
+        to: process.env.RESET_NOTIFY_EMAIL,
         subject: `Kinnect: yêu cầu quên mật khẩu @${r.username}`,
         text: [
           "Có yêu cầu đặt lại mật khẩu trên Kinnect.",
@@ -46,6 +70,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
   const rooms = new Map();
   // Mã phiên bản chung của giao diện: đổi khi bất kỳ file trong public/ thay đổi.
   let versionCache = { at: 0, value: "" };
+  const compressedStatic = new Map();
   async function buildVersion() {
     if (Date.now() - versionCache.at < 5000) return versionCache.value;
     const dir = new URL("./public/", import.meta.url);
@@ -58,7 +83,9 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     return versionCache.value;
   }
   let latestApk = null;
+  const sharedCoreBridge=(dbPath===":memory:"||process.env.NODE_TEST_CONTEXT)?null:createPcCloudBridge(social,{syncFeedEnabled:resolve(dbPath)===resolve(process.env.DATA_DIR||'data','kinnect.sqlite')});
   const server = http.createServer(async (req, res) => {
+    if(sharedCoreBridge&&await sharedCoreBridge(req,res))return;
     const path = new URL(req.url, "http://localhost").pathname;
     // Danh sách buổi live đang phát (cho tab "Trực tiếp" ở trang Video, web và app).
     if (path === "/api/live/rooms" && req.method === "GET") {
@@ -69,10 +96,24 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         .filter((r) => social.user(r.host.userId)?.suspended === 0 && !social.blocked(me.id, r.host.userId))
         .map((r) => {
           const host = social.user(r.host.userId);
-          return { id: r.id, title: r.title, host: r.host.name, hostId: r.host.userId, hostUsername: host?.username || "", avatar: host?.avatar ? "/api/users/" + host.id + "/avatar" : null, viewers: r.members.size - 1, started: r.created || Date.now() };
+          return { id: r.id, title: r.title, liveMode:r.mode||'chat',gameTitle:r.gameTitle||'',host: r.host.name, hostId: r.host.userId, hostUsername: host?.username || "", avatar: host?.avatar ? "/api/users/" + host.id + "/avatar" : null, viewers: r.members.size - 1, started: r.created || Date.now() };
         })
         .sort((a, b) => b.viewers - a.viewers || b.started - a.started);
       return res.end(JSON.stringify({ rooms: list }));
+    }
+    if (path.startsWith("/api/push/")) {
+      const out = (status, data) => { res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }); res.end(JSON.stringify(data)); };
+      if (path === "/api/push/key" && req.method === "GET") return out(200, { publicKey: webPush.publicKey });
+      const me = social.authenticate(req);
+      if (!me) return out(401, { error: "Vui lòng đăng nhập." });
+      if (req.method !== "POST") return out(405, { error: "Không hỗ trợ." });
+      let b = {};
+      try { let raw = ""; for await (const chunk of req) { raw += chunk; if (raw.length > 8192) return out(413, { error: "Quá lớn." }); } b = JSON.parse(raw || "{}"); } catch { return out(400, { error: "Dữ liệu không hợp lệ." }); }
+      if (path === "/api/push/subscribe") return webPush.subscribe(me.id, b.subscription) ? out(200, { ok: true }) : out(400, { error: "Đăng ký thông báo không hợp lệ." });
+      if (path === "/api/push/unsubscribe") { webPush.unsubscribe(me.id, b.endpoint); return out(200, { ok: true }); }
+      if (path === "/api/push/test") { await webPush.notifyTest(me.id); return out(200, { ok: true }); }
+      if (path === "/api/push/decline") { calls.declineById(me.id, String(b.callId || "")); return out(200, { ok: true }); }
+      return out(404, { error: "Không tìm thấy." });
     }
     if (path.startsWith("/api/") && path !== "/api/music") {
       res.once("finish", () => enforceAccess());
@@ -202,20 +243,52 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         return res.end();
       }
     }
+    // Bản APK thử nghiệm chưa phát hành: chỉ ai có link mới tải được, nút cập nhật trong app không thấy.
+    if (path === "/download/android-test") {
+      try {
+        const dir = new URL("./dist/", import.meta.url);
+        const builds = [];
+        for (const entry of await readdir(dir)) if (/^Kinnect-[\d.]+-native\.apk$/.test(entry)) builds.push({ entry, at: (await stat(new URL(entry, dir))).mtimeMs });
+        if (!builds.length) throw Error("Chưa có APK");
+        const name = builds.sort((a, b) => b.at - a.at)[0].entry;
+        const file = new URL(name, dir);
+        const info = await stat(file);
+        res.writeHead(200, { "Content-Type": "application/vnd.android.package-archive", "Content-Length": info.size, "Content-Disposition": 'attachment; filename="' + name + '"', "Cache-Control": "no-store" });
+        return createReadStream(file).pipe(res);
+      } catch {
+        res.writeHead(404);
+        return res.end();
+      }
+    }
+    // Module Nông trại: APK riêng, tải khi người dùng muốn chơi.
+    if (path === "/download/farm-game") {
+      if (!["GET", "HEAD"].includes(req.method)) { res.writeHead(405, {Allow: "GET, HEAD"}); return res.end(); }
+      try {
+        const dir = new URL("./dist/", import.meta.url);
+        const builds = [];
+        for (const entry of await readdir(dir)) if (/^(?:FarmGame|farm-game)(?:-[\d.]+)?(?:-debug)?\.apk$/.test(entry)) builds.push({ entry, at: (await stat(new URL(entry, dir))).mtimeMs });
+        if (!builds.length) throw Error("Chưa có module");
+        const name = builds.sort((a, b) => b.at - a.at)[0].entry;
+        const file = new URL(name, dir);
+        const info = await stat(file);
+        res.writeHead(200, {"Content-Type": "application/vnd.android.package-archive", "Content-Length": info.size, "Content-Disposition": 'attachment; filename="' + name + '"', "Cache-Control": "no-store"});
+        if (req.method === "HEAD") { res.end(); return true; }
+        createReadStream(file).pipe(res);
+        return true;
+      } catch {
+        res.writeHead(404);
+        return res.end();
+      }
+    }
     // Nút "Tải app": tự tìm APK của bản phát hành mới nhất trên GitHub và chuyển thẳng tới file để tải.
     if (path === "/download/android") {
+      if(!["GET","HEAD"].includes(req.method)){res.writeHead(405,{Allow:"GET, HEAD"});return res.end();}
+      if(await downloadApk(req,res))return;
       const fallback = "https://github.com/vuanh97nd/Kinnect/releases/latest";
       try {
         if (!latestApk || latestApk.expires < Date.now()) {
-          const r = await fetch("https://api.github.com/repos/vuanh97nd/Kinnect/releases?per_page=10", {
-            headers: { Accept: "application/vnd.github+json", "User-Agent": "Kinnect-Server" },
-            signal: AbortSignal.timeout(8000),
-          });
-          if (!r.ok) throw Error("GitHub " + r.status);
-          const release = (await r.json()).find((x) => !x.draft && x.assets?.some((a) => a.name.endsWith(".apk")));
-          const asset = release?.assets.find((a) => a.name.endsWith(".apk"));
-          if (!asset || !asset.browser_download_url.startsWith("https://github.com/vuanh97nd/Kinnect/releases/download/")) throw Error("Không có APK");
-          latestApk = { url: asset.browser_download_url, expires: Date.now() + 10 * 60000 };
+          const asset = await publishedApk(fetchImpl || fetch);
+          latestApk = { url: asset.url, expires: Date.now() + 60000 };
         }
         res.writeHead(302, { Location: latestApk.url, "Cache-Control": "no-store" });
       } catch {
@@ -231,33 +304,46 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     }
     if (path === "/health") {
       res.writeHead(200, { "Content-Type": "application/json" });
-      return res.end(JSON.stringify({ ok: true, version: "0.3.1" }));
+      return res.end(JSON.stringify({ ok: true, version: "0.3.1", uiVersion: "2026-10-26-new-ui", liveChatHistory: true, storyViewers: true,liveGuests:true,liveMaxGuests:3,liveSfu:liveSFU.status() }));
     }
     const files = {
+      "/third-party-notices.txt": ["third-party-notices.txt", "text/plain"],
+      "/delete-account": ["delete-account.html", "text/html"],
+      "/delete-account/": ["delete-account.html", "text/html"],
+      "/account-deletion.js": ["account-deletion.js", "text/javascript"],
+      "/account-deletion.css": ["account-deletion.css", "text/css"],
+      "/kinnect-logo-v106.svg": ["kinnect-logo-v106.svg", "image/svg+xml"],
+      "/kinnect-logo-v106-32.png": ["kinnect-logo-v106-32.png", "image/png"],
+      "/kinnect-logo-v106-120.png": ["kinnect-logo-v106-120.png", "image/png"],
+      "/kinnect-logo-v106-152.png": ["kinnect-logo-v106-152.png", "image/png"],
+      "/kinnect-logo-v106-167.png": ["kinnect-logo-v106-167.png", "image/png"],
+      "/kinnect-logo-v106-180.png": ["kinnect-logo-v106-180.png", "image/png"],
+      "/kinnect-logo-v106-192.png": ["kinnect-logo-v106-192.png", "image/png"],
+      "/kinnect-logo-v106-512.png": ["kinnect-logo-v106-512.png", "image/png"],
       "/website/support.html": ["website/support.html", "text/html"],
       "/website/privacy.html": ["website/privacy.html", "text/html"],
       "/website/community.html": ["website/community.html", "text/html"],
-      "/kinnect-mark.svg": ["kinnect-mark.svg", "image/svg+xml"],
+      "/kinnect-mark.svg": ["kinnect-logo-v106.svg", "image/svg+xml"],
       "/favicon.ico": ["favicon.ico", "image/x-icon"],
-      "/favicon-32.png": ["favicon-32.png", "image/png"],
-      "/kinnect-ios-120-v7.png": ["kinnect-ios-120-v7.png", "image/png"],
-      "/apple-touch-icon-120x120.png": ["kinnect-ios-120-v7.png", "image/png"],
-      "/apple-touch-icon-120x120-precomposed.png": ["kinnect-ios-120-v7.png", "image/png"],
-      "/kinnect-ios-152-v7.png": ["kinnect-ios-152-v7.png", "image/png"],
-      "/apple-touch-icon-152x152.png": ["kinnect-ios-152-v7.png", "image/png"],
-      "/apple-touch-icon-152x152-precomposed.png": ["kinnect-ios-152-v7.png", "image/png"],
-      "/kinnect-ios-167-v7.png": ["kinnect-ios-167-v7.png", "image/png"],
-      "/apple-touch-icon-167x167.png": ["kinnect-ios-167-v7.png", "image/png"],
-      "/apple-touch-icon-167x167-precomposed.png": ["kinnect-ios-167-v7.png", "image/png"],
-      "/kinnect-ios-180-v7.png": ["kinnect-ios-180-v7.png", "image/png"],
-      "/apple-touch-icon-180x180.png": ["kinnect-ios-180-v7.png", "image/png"],
-      "/apple-touch-icon-180x180-precomposed.png": ["kinnect-ios-180-v7.png", "image/png"],
+      "/favicon-32.png": ["kinnect-logo-v106-32.png", "image/png"],
+      "/kinnect-ios-120-v7.png": ["kinnect-logo-v106-120.png", "image/png"],
+      "/apple-touch-icon-120x120.png": ["kinnect-logo-v106-120.png", "image/png"],
+      "/apple-touch-icon-120x120-precomposed.png": ["kinnect-logo-v106-120.png", "image/png"],
+      "/kinnect-ios-152-v7.png": ["kinnect-logo-v106-152.png", "image/png"],
+      "/apple-touch-icon-152x152.png": ["kinnect-logo-v106-152.png", "image/png"],
+      "/apple-touch-icon-152x152-precomposed.png": ["kinnect-logo-v106-152.png", "image/png"],
+      "/kinnect-ios-167-v7.png": ["kinnect-logo-v106-167.png", "image/png"],
+      "/apple-touch-icon-167x167.png": ["kinnect-logo-v106-167.png", "image/png"],
+      "/apple-touch-icon-167x167-precomposed.png": ["kinnect-logo-v106-167.png", "image/png"],
+      "/kinnect-ios-180-v7.png": ["kinnect-logo-v106-180.png", "image/png"],
+      "/apple-touch-icon-180x180.png": ["kinnect-logo-v106-180.png", "image/png"],
+      "/apple-touch-icon-180x180-precomposed.png": ["kinnect-logo-v106-180.png", "image/png"],
       "/kinnect-icon-192.png": ["kinnect-icon-192.png", "image/png"],
-      "/apple-touch-icon.png": ["apple-touch-icon.png", "image/png"],
-      "/apple-touch-icon-v5.png": ["apple-touch-icon-v5.png", "image/png"],
-      "/apple-touch-icon-v6.png": ["apple-touch-icon-v6.png", "image/png"],
-      "/apple-touch-icon-precomposed.png": ["apple-touch-icon.png", "image/png"],
-      "/website/apple-touch-icon.png": ["website/apple-touch-icon.png", "image/png"],
+      "/apple-touch-icon.png": ["kinnect-logo-v106-180.png", "image/png"],
+      "/apple-touch-icon-v5.png": ["kinnect-logo-v106-180.png", "image/png"],
+      "/apple-touch-icon-v6.png": ["kinnect-logo-v106-180.png", "image/png"],
+      "/apple-touch-icon-precomposed.png": ["kinnect-logo-v106-180.png", "image/png"],
+      "/website/apple-touch-icon.png": ["kinnect-logo-v106-180.png", "image/png"],
       "/website/": ["website/index.html", "text/html"],
       "/website/index.html": ["website/index.html", "text/html"],
       "/website/style.css": ["website/style.css", "text/css"],
@@ -281,6 +367,9 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
       "/social-messenger.js": ["social-messenger.js", "text/javascript"],
       "/calls.js": ["calls.js", "text/javascript"],
       "/camera.js": ["camera.js", "text/javascript"],
+      "/editor-icons.js": ["editor-icons.js", "text/javascript"],
+      "/media-editor.js": ["media-editor.js", "text/javascript"],
+      "/media-editor.css": ["media-editor.css", "text/css"],
       "/vendor/vision/face_landmarker.task": ["vendor/vision/face_landmarker.task", "application/octet-stream"],
       "/vendor/vision/vision_bundle.mjs": ["vendor/vision/vision_bundle.mjs", "text/javascript"],
       "/vendor/vision/wasm/vision_wasm_internal.js": ["vendor/vision/wasm/vision_wasm_internal.js", "text/javascript"],
@@ -312,6 +401,12 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
       "/style.css": ["style.css", "text/css"],
       "/tokens.css": ["tokens.css", "text/css"],
       "/polish.css": ["polish.css", "text/css"],
+      "/v2": ["v2.html", "text/html"],
+      "/v2.css": ["v2.css", "text/css"],
+      "/v2.js": ["v2.js", "text/javascript"],
+      "/v2-icons.js": ["v2-icons.js", "text/javascript"],
+      "/fonts/be-vietnam-pro-regular.ttf": ["fonts/be-vietnam-pro-regular.ttf", "font/ttf"],
+      "/fonts/be-vietnam-pro-semibold.ttf": ["fonts/be-vietnam-pro-semibold.ttf", "font/ttf"],
     };
     if (!files[path]) {
       res.writeHead(404);
@@ -334,10 +429,28 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
             ),
         );
       }
+      const textual = /^(text\/|application\/(?:json|manifest\+json)|image\/svg\+xml)/.test(type);
+      const requestedVersion = new URL(req.url, "http://localhost").searchParams.get("v");
+      const immutable = /\.(?:js|css)$/.test(path) && path !== "/sw.js" && requestedVersion && requestedVersion === (await buildVersion());
+      const accepts = String(req.headers["accept-encoding"] || "");
+      const encoding = textual && body.length > 1024 ? (/\bbr\b/.test(accepts) ? "br" : /\bgzip\b/.test(accepts) ? "gzip" : "") : "";
+      if (encoding) {
+        const key = path + "|" + encoding + "|" + createHash("sha1").update(body).digest("hex");
+        let packed = compressedStatic.get(key);
+        if (!packed) {
+          packed = encoding === "br" ? brotliCompressSync(body, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 9 } }) : gzipSync(body, { level: 9 });
+          if (compressedStatic.size > 200) compressedStatic.clear();
+          compressedStatic.set(key, packed);
+        }
+        body = packed;
+      }
       res.writeHead(200, {
+        ...((path==='/delete-account'||path==='/delete-account/')?{'X-Frame-Options':'DENY','Content-Security-Policy':"default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'",'Referrer-Policy':'no-referrer'}:{}),
         "Content-Length": body.length,
-        "Content-Type": /^(text\/|application\/(?:json|manifest\+json)|image\/svg\+xml)/.test(type) ? type + "; charset=utf-8" : type,
-        "Cache-Control": path === "/Kinnect.mobileconfig" ? "no-store" : "no-cache",
+        ...(encoding ? { "Content-Encoding": encoding } : {}),
+        ...(textual ? { Vary: "Accept-Encoding" } : {}),
+        "Content-Type": textual ? type + "; charset=utf-8" : type,
+        "Cache-Control": path === "/Kinnect.mobileconfig" ? "no-store" : immutable ? "public, max-age=31536000, immutable" : "no-cache",
         ...(path === "/Kinnect.mobileconfig" ? {"Content-Disposition": 'attachment; filename="Kinnect.mobileconfig"'} : {}),
         "X-Content-Type-Options": "nosniff",
         "Referrer-Policy": "no-referrer",
@@ -354,7 +467,14 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
   const send = (ws, data) => {
     if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data));
   };
-  const calls=createCalls({social,wss,send});
+  notifyAIStream = ({userId,...event}) => {
+    for(const client of wss.clients)if(client.userId===userId&&social.authenticate(client.authRequest))send(client,{type:'ai-stream',...event});
+  };
+  const webPush = createWebPush({ social, fetchImpl: fetchImpl || fetch });
+  pushNotification = (userId, id) => { if (!visible(userId)) webPush.notification(userId, id); };
+  // A user "sees" Kinnect when one of their browser tabs reports it is visible.
+  const visible = (userId) => [...wss.clients].some((c) => c.userId === userId && c.visible && social.authenticate(c.authRequest));
+  const calls=createCalls({social,wss,send,webPush,visible});
   notifyNotifications = (userId) => {
     for (const client of wss.clients)
       if (client.userId === userId && social.authenticate(client.authRequest)) send(client, { type: "notifications-changed" });
@@ -374,7 +494,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         return;
       send(ws, data);
     });
-  const listing = () =>
+  const publishListing = () =>
     wss.clients.forEach((ws) => {
       const u = ws.authRequest && social.authenticate(ws.authRequest);
       if (!u) return;
@@ -391,10 +511,12 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
             title: r.title,
             host: r.host.name,
             hostId: r.host.userId,
+            liveMode:r.mode||'chat',gameTitle:r.gameTitle||'',
             viewers: r.members.size - 1,
           })),
       });
     });
+  let listingTimer;const listing=()=>{if(!liveSFU.enabled)return publishListing();if(listingTimer)return;listingTimer=setTimeout(()=>{listingTimer=null;publishListing();},100);listingTimer.unref();};
   function enforceAccess() {
     calls.enforce();
     for (const ws of wss.clients) {
@@ -414,20 +536,45 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         send(ws, { type: "ended" });
       }
     }
+    for(const room of rooms.values())liveGuests.access(room);
     listing();
   }
+  function liveAudience(room, viewerId) {
+    return [...new Map([...room.members.values()].filter(peer=>peer!==room.host&&social.user(peer.userId)?.suspended===0&&!social.blocked(viewerId,peer.userId)).map(peer=>{const u=social.user(peer.userId);return [u.id,{id:u.id,name:u.name,avatar:u.avatar?'/api/users/'+u.id+'/avatar':null}];})).values()];
+  }
+  function livePresence(room, entrant) {
+    if(room.mediaTransport==='sfu'){
+      room.pendingEntrant=entrant||room.pendingEntrant;if(room.presenceTimer)return;
+      room.presenceTimer=setTimeout(()=>{room.presenceTimer=null;if(!rooms.has(room.id))return;const entrant=room.pendingEntrant;room.pendingEntrant=null;const access=liveRoomBlocks(social,room),users=new Map();
+        const profiles=new Map(social.db.prepare('SELECT id,name,avatar IS NOT NULL AS hasAvatar,suspended FROM users WHERE id IN (SELECT value FROM json_each(?))').all(JSON.stringify([...access.ids])).map(u=>[u.id,u]));
+        for(const p of room.members.values())if(p!==room.host){const u=profiles.get(p.userId);if(u?.suspended===0)users.set(u.id,{id:u.id,name:u.name,avatar:u.hasAvatar?'/api/users/'+u.id+'/avatar':null});}
+        for(const peer of room.members.values()){const hidden=access.blocked.get(peer.userId)||new Set();let count=users.size;for(const id of hidden)if(users.has(id))count--;const sample=[];for(const u of users.values()){if(!hidden.has(u.id))sample.push(u);if(sample.length===8)break;}send(peer,{type:'count',room:room.id,viewers:count,users:sample});if(entrant&&entrant!==peer&&!hidden.has(entrant.userId))send(peer,{type:'viewer-joined',room:room.id,user:users.get(entrant.userId)});}
+      },100);room.presenceTimer.unref();return;
+    }
+    for(const peer of room.members.values()) {
+      const users=liveAudience(room,peer.userId);send(peer,{type:'count',room:room.id,viewers:users.length,users});
+      if(entrant&&entrant!==peer&&!social.blocked(peer.userId,entrant.userId))send(peer,{type:'viewer-joined',room:room.id,user:users.find(u=>u.id===entrant.userId)});
+    }
+  }
+  const liveSFU=createLiveSFU({env:liveEnv??((dbPath===":memory:"||process.env.NODE_TEST_CONTEXT)?{}:process.env),send,social,fetchImpl,onUnavailable:id=>{const room=rooms.get(id);if(room?.mediaTransport==='sfu')leave(room.host);}});
+  server.once('close',()=>{clearTimeout(listingTimer);for(const room of rooms.values())clearTimeout(room.presenceTimer);liveSFU.close();});
+  const liveGuests=createLiveGuests({send,social,sfu:liveSFU});
+  const liveModes=createLiveModes({send,social,listing});
+  const liveGifts=createLiveGifts({send,social,env:(dbPath===":memory:"||process.env.NODE_TEST_CONTEXT)?{}:process.env});
   function leave(ws) {
     const room = rooms.get(ws.room);
-    ws.room = null;
+    ws.room = null;ws.legacyLiveRoom=null;
     if (!room) return;
     room.members.delete(ws.id);
     if (room.host === ws) {
       broadcast(room, { type: "ended" });
       room.members.forEach((peer) => (peer.room = null));
+      clearTimeout(room.presenceTimer);liveSFU.discard(room.id);
       rooms.delete(room.id);
     } else {
       send(room.host, { type: "peer-left", id: ws.id });
-      broadcast(room, { type: "count", viewers: room.members.size - 1 });
+      livePresence(room);
+      liveGuests.left(room,ws);liveModes.left(room,ws);
     }
     listing();
   }
@@ -452,7 +599,9 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     ws.name = account.name;
     ws.window = Date.now();
     ws.messages = 0;
-    send(ws, { type: "welcome", id: ws.id });
+    ws.visible = false;
+    send(ws, { type: "welcome", id: ws.id, callResume: true, push: true, liveGifts:liveGifts.catalog(ws.userId) });
+    calls.join(ws);
     listing();
     ws.on("message", (raw) => {
       const account = social.authenticate(req);
@@ -465,7 +614,6 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         ws.window = Date.now();
         ws.messages = 0;
       }
-      if (++ws.messages > 30) return ws.close(1008, "Rate limit");
       let m;
       try {
         m = JSON.parse(raw);
@@ -473,29 +621,43 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         return send(ws, { type: "error", message: "Dữ liệu không hợp lệ" });
       }
       if (!m || typeof m !== "object") return;
+      const signalling=m.type==='signal'||m.type==='call-signal';
+      if(signalling){if(Date.now()-(ws.signalWindow||0)>10000){ws.signalWindow=Date.now();ws.signalMessages=0;}if(++ws.signalMessages>600)return ws.close(1008,'Signalling rate limit');}
+      else if(++ws.messages>30)return ws.close(1008,'Rate limit');
+
       const error = (message) => send(ws, { type: "error", message });
       if(typing.handle(ws,m,account))return;
+      if(m.type==="visibility"){ws.visible=m.visible===true;return;}
       if(calls.handle(ws,m))return;
+      if (["create","chat"].includes(m.type)&&!social.hasPrivacyConsent(account.id))return error("Vui lòng đồng ý thông báo dữ liệu trước khi phát live hoặc bình luận.");
       if (m.type === "create") {
         if (ws.room) return error("Hãy rời phòng hiện tại trước.");
-        if (rooms.size >= 100) return error("Máy chủ đã đầy.");
+        if(m.liveMode==='game'&&!social.packageStore.gameAllowed(ws.userId))return error("Live Game cần gói 30 ngày · 490 xu. Mở Cửa hàng để kích hoạt.");
+        if(m.multiGuest===true&&liveSFU.enabled&&!liveSFU.available)return error("Máy chủ truyền Live đang kết nối lại. Hãy thử lại sau.");
+        if (rooms.size >= (liveSFU.enabled?liveSFU.maxRooms:100)) return error("Máy chủ đã đầy.");
         ws.name = account.name;
         const room = {
           id: randomUUID(),
-          title: String(m.title || "Cùng trò chuyện")
+          title: String(m.title || "")
             .trim()
             .slice(0, 100),
           host: ws,
           members: new Map([[ws.id, ws]]),
+          chatHistory: [],
           created: Date.now(),
+          comments: m.comments !== false,
         };
+        ws.liveV2=m.multiGuest===true;ws.liveModes=m.liveModes===true;liveGuests.init(room);liveModes.init(room,m);
         rooms.set(room.id, room);
         ws.room = room.id;
         send(ws, {
-          type: "joined",
+          type: "joined",multiGuest:true,
           role: "host",
-          room: { id: room.id, title: room.title },
+          history: [],
+          aiModeration:!!social.ai.status().moderation,
+          room: { id: room.id, title: room.title, liveDecoration:social.packageStore.liveTheme(room.host.userId),hostMembership:social.packageStore.membership(room.host.userId),liveMode:room.mode,gameTitle:room.gameTitle,comments:room.comments!==false,host: room.host.name, hostId: room.host.userId, avatar: social.user(room.host.userId)?.avatar ? "/api/users/"+room.host.userId+"/avatar":null, viewers:liveAudience(room,ws.userId).length },
         });
+        liveGuests.state(room);liveModes.state(room,ws);
         listing();
         return;
       }
@@ -509,20 +671,26 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
           return error("Không thể tham gia phòng này.");
         if (!room) return error("Phòng đã kết thúc.");
         if (ws.room) return error("Hãy rời phòng hiện tại trước.");
-        if (room.members.size >= 7)
-          return error("Bản thử nghiệm giới hạn 6 người xem mỗi phòng.");
+        if(m.liveMode==='game'&&!social.packageStore.gameAllowed(ws.userId))return error("Live Game cần gói 30 ngày · 490 xu. Mở Cửa hàng để kích hoạt.");
+        if(room.mediaTransport==='sfu'&&m.multiGuest!==true)return error("Hãy cập nhật ứng dụng để xem phòng Live này.");
+        const viewerLimit=room.mediaTransport==='sfu'?liveSFU.maxViewers:6;
+        if(room.members.size>=viewerLimit+1)return error("Phòng Live đã đủ "+viewerLimit+" người xem.");
         ws.name = account.name;
         ws.room = room.id;
+        const firstVisit=![...room.members.values()].some(peer=>peer.userId===ws.userId);
+        ws.liveV2=m.multiGuest===true;ws.liveModes=m.liveModes===true;
         room.members.set(ws.id, ws);
         send(ws, {
-          type: "joined",
+          type: "joined",multiGuest:true,
           role: "viewer",
-          room: { id: room.id, title: room.title },
+          room: { id: room.id, title: room.title, liveDecoration:social.packageStore.liveTheme(room.host.userId),hostMembership:social.packageStore.membership(room.host.userId),liveMode:room.mode,gameTitle:room.gameTitle,comments:room.comments!==false,host: room.host.name, hostId: room.host.userId, avatar: social.user(room.host.userId)?.avatar ? "/api/users/"+room.host.userId+"/avatar":null, viewers:liveAudience(room,ws.userId).length },
           host: room.host.id,
           hostUserId: room.host.userId,
+          history: (room.chatHistory || []).filter(message => !social.blocked(ws.userId, message.senderId) && social.user(message.senderId)?.suspended === 0),
         });
-        send(room.host, { type: "peer", id: ws.id });
-        broadcast(room, { type: "count", viewers: room.members.size - 1 });
+        if(!room.host.liveV2)send(room.host, { type: "peer", id: ws.id });
+        liveGuests.state(room);liveModes.state(room,ws);
+        livePresence(room,firstVisit?ws:null);
         listing();
         return;
       }
@@ -532,6 +700,15 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
       }
       const room = rooms.get(ws.room);
       if (!room) return error("Bạn chưa tham gia phòng.");
+      if(liveModes.handle(room,ws,m))return;
+      if(liveGuests.handle(room,ws,m)){if(['live-guest-answer','live-guest-leave','live-guest-remove'].includes(m.type))liveModes.reconcile(room);return;}
+      if(m.type==='live-frame'){
+        if(ws!==room.host||!social.ai.status().moderation||Date.now()-(ws.aiFrameAt||0)<15000)return;
+        ws.aiFrameAt=Date.now();const image=m.image;if(!image||image.mime!=='image/jpeg'||typeof image.data!=='string'||image.data.length>200000||!/^[A-Za-z0-9+/]+={0,2}$/.test(image.data))return;
+        social.ai.enqueue('live',room.id,ws.userId,{text:'Kiểm tra khung hình livestream lấy mẫu. Phòng '+room.id,image});return;
+      }
+      if(m.type==='viewers'){const users=[...new Map([...room.members.values()].filter(peer=>peer!==room.host&&social.user(peer.userId)?.suspended===0&&!social.blocked(ws.userId,peer.userId)).map(peer=>[peer.userId,social.publicUser(social.user(peer.userId),ws.userId)])).values()];send(ws,{type:'viewers',room:room.id,users});return;}
+      if(liveGifts.handle(room,ws,m,account))return;
       if (m.type === "gift") {
         try {
           const gift = social.gift(
@@ -552,24 +729,29 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         return;
       }
       if (m.type === "chat") {
+        if (room.comments === false && ws !== room.host) return error("Bình luận đã tắt.");
         const text =
           typeof m.text === "string" ? m.text.trim().slice(0, 500) : "";
-        if (text)
-          broadcast(room, {
-            type: "chat",
-            name: ws.name,
-            senderId: ws.userId,
-            text,
-          });
+        if (text) {
+          const message = {type:"chat",id:randomUUID(),roomId:room.id,name:ws.name,senderId:ws.userId,text,created:Date.now()};
+          room.chatHistory ||= [];
+          room.chatHistory.push(message);
+          if(room.chatHistory.length>200)room.chatHistory.splice(0,room.chatHistory.length-200);
+          broadcast(room,message);
+          social.ai.enqueue('live',room.id,ws.userId,{text:'Bình luận livestream: '+text});
+        }
       }
       if (m.type === "signal") {
+        if(room.mediaTransport==='sfu'){liveSFU.signal(room,ws,m);return;}
+        if(m.description&&!liveGuests.isPublisher(room,ws)&&(m.description.type==='offer'||/^a=send(?:recv|only)\r?$/m.test(m.description.sdp||'')))return;
+        if(ws.liveV2&&room.host.liveV2&&m.revision!==room.stageRevision)return;
         const target = room.members.get(m.to);
         if (
           !target ||
           !target.authRequest ||
           !social.authenticate(target.authRequest) ||
           target === ws ||
-          (ws !== room.host && target !== room.host)
+          !liveGuests.canSignal(room,ws,target)
         )
           return;
         if (
@@ -580,10 +762,11 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
           send(target, {
             type: "signal",
             from: ws.id,
+            revision:room.host.liveV2?room.stageRevision:0,
             description: m.description,
           });
         else if (m.candidate && typeof m.candidate === "object")
-          send(target, { type: "signal", from: ws.id, candidate: m.candidate });
+          send(target, { type: "signal", from: ws.id, revision:room.host.liveV2?room.stageRevision:0,candidate: m.candidate });
       }
     });
     ws.on("close", () => {typing.disconnect(ws);calls.disconnect(ws);leave(ws);});
@@ -593,7 +776,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const dbPath = resolve(process.env.DATA_DIR || "data", "kinnect.sqlite");
   mkdirSync(dirname(dbPath), { recursive: true });
-  const { server } = createApp({ dbPath });
+  const { server } = createApp({ dbPath, allowEmailDelivery: true });
   server.listen(Number(process.env.PORT || 3000), "0.0.0.0", () =>
     console.log("Kinnect Live listening on port " + (process.env.PORT || 3000)),
   );

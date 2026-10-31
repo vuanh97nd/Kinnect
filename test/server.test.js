@@ -25,7 +25,7 @@ test("room lifecycle, chat, signaling isolation, host disconnect and HTTP", asyn
         password: "test-password-123",
         name: clients.length === 1 ? "Viewer" : "Host",
         birthDate: "1995-01-01",
-        agree18: true,
+        agree18: true, acceptPrivacyNotice: true,
       }),
     });
     assert.equal(response.status, 200);
@@ -123,7 +123,7 @@ test("viewer capacity and cross-origin rejection", async (t) => {
           username: "member_" + sockets.length,
           password: "test-password-123",
           birthDate: "1995-01-01",
-          agree18: true,
+          agree18: true, acceptPrivacyNotice: true,
         }),
       },
     );

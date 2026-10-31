@@ -1,0 +1,32 @@
+{
+  "version": "1.0.32",
+  "backendTests": {
+    "pass": 123,
+    "fail": 0
+  },
+  "nativeUI": {
+    "pass": 698,
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "widthDp": 320,
+    "fontScale": 1.3,
+    "studioPaid": true,
+    "adminGrants": "selected/all/snapshot confirmation",
+    "wallet": "gifted/purchased/withdrawable distinct"
+  },
+  "money": {
+    "topUpOpen": false,
+    "payoutOpen": false,
+    "paidCoinGiftSendingOpen": false,
+    "realTransactionTested": false,
+    "giftedWithdrawable": false,
+    "purchasedRemainderWithdrawablePolicy": true,
+    "paidGiftIncomeWithdrawablePolicy": true
+  },
+  "physicalPhoneTested": false,
+  "productionUpgrade": "1.0.31/code96 -> 1.0.32/code97 update and launch on Android36 emulator passed",
+  "qaPayloadMatchesRelease": true,
+  "signing": "v1/v2/v3 verified;16KB zip alignment;stable website certificate"
+}

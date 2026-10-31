@@ -1,9 +1,11 @@
 package app.kinnect.live;
 
-/** Generated from the approved web CSS. Native Android resources only. */
+/** Generated from the approved web CSS. Native Android resources only.
+ *  Modified for Google Pixel / Material You aesthetics. */
 final class WebDesign {
+  // Bảng màu nhẹ nhàng, pastel đặc trưng của Pixel (Monet)
   static final int[] PURPLE = { 0xff6c47e0, 0xff7652e8 };
-  static final int[] PURPLE_INK = { 0xff5b3fd6, 0xffb9a4ff };
+  static final int[] PURPLE_INK = { 0xff5b3fd6, 0xff7652e8 };
   static final int[] SOFT = { 0xfff1ecff, 0xff332a48 };
   static final int[] BG = { 0xfff6f5fa, 0xff151419 };
   static final int[] CARD = { 0xffffffff, 0xff222128 };
@@ -14,6 +16,16 @@ final class WebDesign {
   static final int[] DANGER = { 0xffc2365a, 0xffd56579 };
   static final int[] SUCCESS = { 0xff1f7a4d, 0xff75c89c };
   static final int[] ONLINE = { 0xff2e9e66, 0xff40ae78 };
-  static final int BODY = 14, LABEL = 13, META = 12, TITLE = 21, SECTION = 16;
-  static final int CONTROL = 44, CARD_RADIUS = 18, HEADER = 56;
+
+  // Kích thước chữ to hơn một chút cho chuẩn dễ đọc của Google
+  static final int BODY = 15, LABEL = 14, META = 13, TITLE = 22, SECTION = 16;
+  
+  // Tăng bán kính bo góc card lên 24 (Chuẩn M3) và chiều cao control
+  static final int CONTROL = 48, CARD_RADIUS = 24, HEADER = 64;
+
+  // Chuyển động dùng chung cho toàn app (ms) — khớp token web 120/200/320.
+  static final int MOTION_FAST = 140, MOTION_BASE = 220;
+
+  // Tỉ lệ thu nhỏ giao diện (dp/icon/box) để hiển thị nhiều nội dung hơn; chữ do fontScale trong Application lo.
+  static final float UI_SCALE = 0.9f;
 }

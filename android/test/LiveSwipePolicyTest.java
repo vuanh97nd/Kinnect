@@ -1,0 +1,2 @@
+package app.kinnect.live;
+public final class LiveSwipePolicyTest {public static void main(String[] args){check(0,-100,true,1);check(0,100,true,-1);check(0,59,true,0);check(0,60,true,0);check(100,-100,true,0);check(80,-200,true,1);check(0,-300,false,0);check(0,0,true,0);System.out.println("PASS: vertical up/down, short drag, boundary, horizontal/diagonal and excluded UI");}static void check(float x,float y,boolean allowed,int expected){if(LiveSwipePolicy.direction(x,y,60,allowed)!=expected)throw new AssertionError(x+","+y);}}
