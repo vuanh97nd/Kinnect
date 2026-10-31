@@ -7,12 +7,16 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--apk', type=Path)
 args = parser.parse_args()
 
+def text_sha256(path):
+    """Hash canonical LF content so Windows and CI checkouts agree."""
+    return hashlib.sha256(path.read_bytes().replace(b'\r\n', b'\n')).hexdigest()
+
 class NativeDesignTest(unittest.TestCase):
     def test_theme_matches_reviewed_web(self):
         reference = json.loads((ROOT/'android/design/web-reference.json').read_text(encoding='utf-8'))
         css_path = ROOT/'public/v2.css'
-        self.assertEqual(hashlib.sha256(css_path.read_bytes()).hexdigest(), reference['css_sha256'])
-        self.assertEqual(hashlib.sha256((ROOT/'public/v2-icons.js').read_bytes()).hexdigest(), reference['icons_sha256'])
+        self.assertEqual(text_sha256(css_path), reference['css_sha256'])
+        self.assertEqual(text_sha256(ROOT/'public/v2-icons.js'), reference['icons_sha256'])
         colors = {}
         for name, light, dark in re.findall(r'--k-([a-z-]+):light-dark\((#[0-9a-fA-F]+),(#[0-9a-fA-F]+)\)', css_path.read_text(encoding='utf-8-sig')):
             if name not in colors: colors[name] = [light, dark]

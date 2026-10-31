@@ -1,8 +1,8 @@
 {
   "reference": "https://app.kinnect.io.vn/",
-  "reviewed": "2026-10-27",
-  "css_sha256": "3958539c0cb970c4dccebb2619ab655fa3ce95b484307a306f936b5e3132ce3e",
-  "icons_sha256": "bb32f29f6e6393484aeafb810788f28226f5d5d1d3ba7fe7c84c6bb615fd2c40",
+  "reviewed": "2026-10-31",
+  "css_sha256": "1a433df9123636ec6c4533aa29ccbdfc783e6b6b0ddf253dfb02e004570d4ef9",
+  "icons_sha256": "354985c27e18021dbd9576a3a7ce9ceb504d0492d04df807aa0431d6d6e27146",
   "colors": {
     "purple": [
       "#6c47e0",
