@@ -2,6 +2,10 @@
 
 [**Tải APK Android 0.9.5**](https://github.com/vuanh97nd/Kinnect/releases/latest) · [Trang chủ](https://kinnect.io.vn/) · [Web mobile](https://app.kinnect.io.vn/)
 
+## Kinnect Farm (game APK thử nghiệm)
+
+Prototype nông trại **tiếng Việt**: `farm/` · build `./scripts/build-farm-apk.sh` → `dist/KinnectFarm-0.1.0-debug.apk` (package `app.kinnect.farm`). Chi tiết: [farm/README.md](farm/README.md).
+
 **0.9.5 — Android thử nghiệm.** Chỉnh ảnh/video trước khi đăng: timeline, cắt đoạn, tốc độ, chữ, nhạc, làm đẹp và hiệu ứng. Có lưu riêng về máy, tiếp tục đăng và tiến độ tải lên. Live có điều khiển làm đẹp.
 
 Tải `Kinnect-0.9.5-native.apk` trong Assets. [Ghi chú và giới hạn kiểm thử](https://github.com/vuanh97nd/Kinnect/releases/tag/v0.9.5) · [Mã nguồn bản phát hành](https://github.com/vuanh97nd/Kinnect/tree/v0.9.5).
