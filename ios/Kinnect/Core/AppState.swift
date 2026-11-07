@@ -12,7 +12,7 @@ struct UGCReportContext: Identifiable {
 
 struct PrivacyConsentRequest: Identifiable {
     let id = UUID()
-    let version: Int
+    let version: String
     let notice: String
 }
 
@@ -362,8 +362,39 @@ final class AppState: ObservableObject {
         case "direct-message", "group-message", "conversations-changed":
             Task { await refreshGlobalBadges() }
             NotificationCenter.default.post(name: .kinnectMessagesChanged, object: json)
+        case "error":
+            let message = (json["message"] as? String) ?? (json["error"] as? String) ?? ""
+            // server.js:626 rejects WS live "create"/"chat" without current consent; route to the explicit consent sheet.
+            if message.localizedCaseInsensitiveContains("đồng ý thông báo dữ liệu") {
+                presentPrivacyConsent(version: "", notice: message)
+            } else if !message.isEmpty {
+                showToast(message)
+            }
         default:
             break
+        }
+    }
+
+    /// Presents the explicit privacy consent sheet. If the version or full notice is unknown
+    /// (e.g. WebSocket errors carry only a message), fetch the authoritative values from
+    /// GET /api/me/privacy-consent so the POST sends the exact current server version.
+    func presentPrivacyConsent(version: String, notice: String) {
+        guard pendingPrivacyConsent == nil else { return }
+        if !version.isEmpty {
+            pendingPrivacyConsent = PrivacyConsentRequest(version: version, notice: notice)
+            return
+        }
+        Task { @MainActor in
+            do {
+                let status = try await KinnectAPIClient.shared.requestJSON("/api/me/privacy-consent")
+                if (status["accepted"] as? Bool) == true { return }
+                let serverVersion = (status["version"] as? String) ?? ""
+                let serverNotice = (status["notice"] as? String) ?? notice
+                guard !serverVersion.isEmpty else { showToast(notice); return }
+                self.pendingPrivacyConsent = PrivacyConsentRequest(version: serverVersion, notice: serverNotice)
+            } catch {
+                showToast(notice)
+            }
         }
     }
 }

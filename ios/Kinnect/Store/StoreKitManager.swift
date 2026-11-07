@@ -42,8 +42,33 @@ final class StoreKitManager: ObservableObject {
 
     /// Restores non-consumable and auto-renewable subscriptions through App Store sync.
     /// Note: Consumable coin balances are managed directly on the Kinnect account server.
-    func restorePurchases() async throws {
+    struct RestoreOutcome {
+        var reconciled: [String] = []      // server accepted and recorded entitlement
+        var revoked: [String] = []         // refunded/revoked by Apple: not re-granted
+        var failed: [String] = []          // server rejected or unreachable
+        var unverified = 0                 // StoreKit signature invalid
+        var isEmpty: Bool { reconciled.isEmpty && revoked.isEmpty && failed.isEmpty && unverified == 0 }
+    }
+
+    /// Restores non-consumable / auto-renewable entitlements:
+    /// 1) AppStore.sync() (may prompt Apple ID; throws on user cancel),
+    /// 2) iterate Transaction.currentEntitlements, skip revoked (refund) transactions,
+    /// 3) send each verified transaction to the Kinnect server and count the real server result.
+    /// Consumable coins are never restorable through StoreKit; their balance lives on the account server.
+    func restorePurchases() async throws -> RestoreOutcome {
         try await AppStore.sync()
+        var outcome = RestoreOutcome()
+        for await entitlement in Transaction.currentEntitlements {
+            guard case .verified(let transaction) = entitlement else { outcome.unverified += 1; continue }
+            if transaction.revocationDate != nil { outcome.revoked.append(transaction.productID); continue }
+            do {
+                _ = try await verifyWithBackendAndFinish(result: entitlement, transaction: transaction)
+                outcome.reconciled.append(transaction.productID)
+            } catch {
+                outcome.failed.append(transaction.productID)
+            }
+        }
+        return outcome
     }
 
     /// Initiates a real StoreKit 2 purchase and verifies the signed transaction on the Kinnect server.

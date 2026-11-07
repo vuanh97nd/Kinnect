@@ -274,10 +274,17 @@ struct WalletStoreView: View {
                         Button {
                             Task {
                                 do {
-                                    try await storeKit.restorePurchases()
-                                    appState.showToast("Đã đồng bộ giao dịch từ App Store.")
+                                    let r = try await storeKit.restorePurchases()
+                                    if r.isEmpty {
+                                        appState.showToast("Không tìm thấy gói mua nào có thể khôi phục cho Apple ID này.")
+                                    } else if r.failed.isEmpty && r.unverified == 0 {
+                                        let revokedNote = r.revoked.isEmpty ? "" : " \(r.revoked.count) gói đã hoàn tiền không được khôi phục."
+                                        appState.showToast("Đã khôi phục \(r.reconciled.count) gói.\(revokedNote)")
+                                    } else {
+                                        appState.showToast("Chưa khôi phục được \(r.failed.count + r.unverified) gói. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.")
+                                    }
                                 } catch {
-                                    appState.showToast("Không thể đồng bộ: \(error.localizedDescription)")
+                                    appState.showToast("Chưa khôi phục được: \(error.localizedDescription)")
                                 }
                             }
                         } label: {

@@ -227,9 +227,10 @@ struct AuthView: View {
         .sheet(isPresented: $showPrivacyNotice) {
             PrivacyConsentSheet(
                 request: PrivacyConsentRequest(
-                    version: 1,
+                    version: "",
                     notice: "Kinnect lưu hồ sơ, nội dung và tin nhắn trên máy chủ; không có mã hóa đầu cuối. Ảnh hồ sơ, bài đăng, ảnh/video và nội dung công khai có thể được gửi tới Cloudflare hoặc NVIDIA để kiểm duyệt. Tin nhắn hỗ trợ chỉ được gửi tới AI khi bạn chủ động bật trợ lý AI. Bạn có thể ẩn thông tin, báo cáo, chặn và xóa tài khoản cùng dữ liệu trong Cài đặt. Không gửi mật khẩu hoặc OTP. Chính sách đầy đủ: https://kinnect.io.vn/privacy. Liên hệ: anhvn53@wru.vn."
                 ),
+                recordOnServer: false,
                 onAccepted: {
                     acceptPrivacy = true
                 }

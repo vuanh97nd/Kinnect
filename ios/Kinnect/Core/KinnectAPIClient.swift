@@ -178,10 +178,11 @@ final class KinnectAPIClient {
 
         // Handle 428 Precondition Required (Explicit Privacy Consent needed - Apple Guideline 5.1.1)
         if http.statusCode == 428 {
-            let version = json["version"] as? Int ?? 1
+            // Server PRIVACY_VERSION is a date string (e.g. "2026-10-29"); never coerce to Int.
+            let version = (json["version"] as? String) ?? (json["version"] as? NSNumber)?.stringValue ?? ""
             let noticeText = (json["error"] as? String) ?? "Cần đồng ý điều khoản bảo vệ dữ liệu cá nhân trước khi thực hiện thao tác này."
             await MainActor.run {
-                AppState.shared.pendingPrivacyConsent = PrivacyConsentRequest(version: version, notice: noticeText)
+                AppState.shared.presentPrivacyConsent(version: version, notice: noticeText)
             }
             throw KinnectAPIError.serverError(status: 428, message: noticeText)
         }

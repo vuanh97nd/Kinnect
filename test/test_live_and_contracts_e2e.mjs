@@ -7,7 +7,9 @@ import { createApp } from "../server.js";
 
 const tmp = mkdtempSync(join(tmpdir(), "kinnect-ios-e2e-"));
 const dbPath = join(tmp, "test.sqlite");
-const { server, social } = createApp({ dbPath, allowEmailDelivery: false });
+// Fully isolated: ":memory:" disables the shared cloud session/bridge, SFU env and gift env (server.js:25-86).
+const { server, social } = createApp({ dbPath: ":memory:", allowEmailDelivery: false });
+const RUN = Date.now().toString(36).slice(-5);
 
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 const port = server.address().port;
@@ -34,6 +36,28 @@ async function registerUser(username, name, email, password) {
   const data = await res.json();
   if (!res.ok) throw new Error(`Register failed (${res.status}): ${JSON.stringify(data)}`);
   return { user: data.user, cookie };
+}
+
+// Explicit privacy consent flow (no server bypass): GET current version -> 428 on content write BEFORE consent
+// -> stale version rejected -> POST { accepted:true, version } exactly like iOS PrivacyConsentSheet -> accepted AFTER.
+async function acceptPrivacyConsentExplicitly(account) {
+  const headers = { "Content-Type": "application/json", Cookie: account.cookie };
+  const status = await (await fetch(`${baseUrl}/api/me/privacy-consent`, { headers })).json();
+  assert.equal(typeof status.version, "string");
+  if (!status.accepted) {
+    const denied = await fetch(`${baseUrl}/api/me/content-consent`, { method: "POST", headers, body: "{}" });
+    assert.equal(denied.status, 428, "content write must be denied before explicit consent");
+    assert.equal((await denied.json()).version, status.version);
+  }
+  const wrong = await fetch(`${baseUrl}/api/me/privacy-consent`, { method: "POST", headers, body: JSON.stringify({ accepted: true, version: "stale-version" }) });
+  assert.equal(wrong.status, 400, "stale consent version must be rejected");
+  const ok = await fetch(`${baseUrl}/api/me/privacy-consent`, { method: "POST", headers, body: JSON.stringify({ accepted: true, version: status.version }) });
+  assert.equal(ok.status, 200);
+  const after = await (await fetch(`${baseUrl}/api/me/privacy-consent`, { headers })).json();
+  assert.equal(after.accepted, true, "consent must be recorded after explicit acceptance");
+  const allowed = await fetch(`${baseUrl}/api/me/content-consent`, { method: "POST", headers, body: "{}" });
+  assert.equal(allowed.status, 200, "content write must succeed after explicit consent");
+  return { deniedBefore: !status.accepted, version: status.version };
 }
 
 function connectWS(cookie) {
@@ -71,9 +95,34 @@ function connectWS(cookie) {
 }
 
 console.log("1. Registering 3 test accounts (Host1, Host2, Viewer)...");
-const host1 = await registerUser("host_one", "Host One", "host1@kinnect.local", "Pass123456!");
-const host2 = await registerUser("host_two", "Host Two", "host2@kinnect.local", "Pass123456!");
-const viewer = await registerUser("viewer_user", "Viewer User", "viewer@kinnect.local", "Pass123456!");
+const host1 = await registerUser("host_one_" + RUN, "Host One", `host1_${RUN}@kinnect.local`, "Pass123456!");
+const host2 = await registerUser("host_two_" + RUN, "Host Two", `host2_${RUN}@kinnect.local`, "Pass123456!");
+const viewer = await registerUser("viewer_user_" + RUN, "Viewer User", `viewer_${RUN}@kinnect.local`, "Pass123456!");
+
+console.log("1b. WS live create denied BEFORE explicit consent (dedicated no-consent account)...");
+{
+  const probe = await registerUser("noconsent_" + RUN, "No Consent", `nc_${RUN}@kinnect.local`, "Pass123456!");
+  // Remove registration-time consent so the probe has no current consent row (server truth; no client bypass).
+  social.db.prepare("DELETE FROM privacy_consents WHERE user_id=?").run(probe.user.id);
+  const st = await (await fetch(`${baseUrl}/api/me/privacy-consent`, { headers: { Cookie: probe.cookie } })).json();
+  assert.equal(st.accepted, false, "probe must start without consent");
+  const pre = await connectWS(probe.cookie);
+  pre.ws.send(JSON.stringify({ type: "create", title: "Should fail", topic: "Music", liveMode: "chat" }));
+  const err = await pre.waitFor((m) => m.type === "error");
+  assert.match(String(err.message || err.error || ""), /đồng ý/i);
+  assert.ok(!pre.queue.some((m) => m.type === "joined"), "no room may be created without consent");
+  await acceptPrivacyConsentExplicitly(probe);
+  pre.ws.send(JSON.stringify({ type: "create", title: "After consent", topic: "Music", liveMode: "chat" }));
+  await pre.waitFor((m) => m.type === "joined" && m.role === "host");
+  pre.ws.send(JSON.stringify({ type: "leave" }));
+  pre.ws.close();
+  console.log("   WS create denied before consent, allowed after explicit consent: OK");
+}
+console.log("1c. Explicit privacy consent for each test user...");
+for (const acct of [host1, host2, viewer]) {
+  const r = await acceptPrivacyConsentExplicitly(acct);
+  console.log(`   ${acct.user.username}: deniedBefore=${r.deniedBefore} version=${r.version}`);
+}
 
 // Give viewer gifted/trial coins for gift test
 try {

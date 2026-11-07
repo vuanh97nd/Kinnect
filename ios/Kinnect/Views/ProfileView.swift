@@ -64,7 +64,7 @@ struct ProfileView: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(user.name)
                                         .font(.title3.bold())
-                                        .foregroundColor(.white)
+                                        .foregroundColor(KinnectTheme.textPrimary)
                                     Text("@\(user.handle.isEmpty ? user.name : user.handle)")
                                         .font(.subheadline)
                                         .foregroundColor(KinnectTheme.accentBright)
@@ -192,7 +192,7 @@ struct ProfileView: View {
                 HStack {
                     Text("Giới thiệu")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(KinnectTheme.textPrimary)
                     Spacer()
                     Text(user.isPrivate ? "Riêng tư" : "Công khai")
                         .font(.caption2.bold())
@@ -256,7 +256,7 @@ struct ProfileView: View {
                     KinnectIcon(glyph: .phone, size: 20, selected: true, tint: KinnectTheme.online)
                     Text("Trạng thái Cuộc gọi Native & PushKit")
                         .font(.subheadline.bold())
-                        .foregroundColor(.white)
+                        .foregroundColor(KinnectTheme.textPrimary)
                 }
                 Text(pushKit.voipRegistrationStatus)
                     .font(.caption)
@@ -281,7 +281,7 @@ struct ProfileView: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                    .foregroundColor(.white)
+                    .foregroundColor(KinnectTheme.textPrimary)
                 }
 
                 Button(role: .destructive) {
@@ -306,7 +306,7 @@ struct ProfileView: View {
                     KinnectIcon(glyph: .feed, size: 36, tint: KinnectTheme.textSecondary)
                     Text("Chưa có bài viết nào")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(KinnectTheme.textPrimary)
                     Text("Những bài viết bạn chia sẻ trên Bảng tin sẽ xuất hiện tại đây.")
                         .font(.caption)
                         .foregroundColor(KinnectTheme.textSecondary)
@@ -357,7 +357,7 @@ struct ProfileView: View {
                     HStack {
                         Text("Ảnh công khai")
                             .font(.subheadline.bold())
-                            .foregroundColor(.white)
+                            .foregroundColor(KinnectTheme.textPrimary)
                         Spacer()
                         KinnectIcon(glyph: .chevronRight, size: 14, tint: KinnectTheme.textSecondary)
                     }
@@ -389,7 +389,7 @@ struct ProfileView: View {
                     HStack {
                         Text("Album riêng tư")
                             .font(.subheadline.bold())
-                            .foregroundColor(.white)
+                            .foregroundColor(KinnectTheme.textPrimary)
                         Spacer()
                         KinnectIcon(glyph: .chevronRight, size: 14, tint: KinnectTheme.textSecondary)
                     }
@@ -412,7 +412,7 @@ struct ProfileView: View {
                     KinnectIcon(glyph: .video, size: 36, tint: KinnectTheme.textSecondary)
                     Text("Chưa có video ngắn nào")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(KinnectTheme.textPrimary)
                     Text("Các video ngắn bạn đăng trên luồng Shorts sẽ hiển thị tại đây.")
                         .font(.caption)
                         .foregroundColor(KinnectTheme.textSecondary)
@@ -461,7 +461,7 @@ struct ProfileView: View {
         VStack(spacing: 2) {
             Text("\(count)")
                 .font(.headline.bold())
-                .foregroundColor(.white)
+                .foregroundColor(KinnectTheme.textPrimary)
             Text(label)
                 .font(.caption2)
                 .foregroundColor(KinnectTheme.textSecondary)
@@ -475,7 +475,7 @@ struct ProfileView: View {
                 KinnectIcon(glyph: glyph, size: 22, tint: color)
                 Text(title)
                     .font(.subheadline.weight(.medium))
-                    .foregroundColor(.white)
+                    .foregroundColor(KinnectTheme.textPrimary)
                     .kinnectMultiline()
                 Spacer()
                 KinnectIcon(glyph: .chevronRight, size: 18, tint: KinnectTheme.textSecondary)
@@ -582,7 +582,7 @@ struct PublicAlbumManageSheet: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text(post.text.isEmpty ? "Ảnh công khai" : post.text)
                                     .font(.subheadline)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(KinnectTheme.textPrimary)
                                 if !post.imageUrl.isEmpty {
                                     KinnectRemoteImageView(rawURL: post.imageUrl, contentMode: .fill, cornerRadius: 10, maxHeight: 160)
                                 }
@@ -676,7 +676,7 @@ struct PrivateAlbumManageSheet: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(req.user.name)
                                         .font(.subheadline.bold())
-                                        .foregroundColor(.white)
+                                        .foregroundColor(KinnectTheme.textPrimary)
                                     Text(req.status == "granted" ? "Đã cấp quyền xem" : "Đang chờ bạn duyệt")
                                         .font(.caption2)
                                         .foregroundColor(req.status == "granted" ? KinnectTheme.online : KinnectTheme.warning)
@@ -714,25 +714,38 @@ struct PrivateAlbumManageSheet: View {
                             .foregroundColor(KinnectTheme.textSecondary)
                     } else {
                         ForEach(photos) { photo in
-                            HStack(spacing: 12) {
+                            HStack(alignment: .center, spacing: 12) {
+                                // Fixed-size, clipped thumbnail so the image can never extend under the text column.
                                 KinnectRemoteImageView(rawURL: photo.url, contentMode: .fill, cornerRadius: 8, maxHeight: 64)
                                     .frame(width: 64, height: 64)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                    .contentShape(Rectangle())
+                                    .layoutPriority(0)
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Ảnh bảo mật #\(photo.id.prefix(6))")
+                                    Text("Ảnh bảo mật")
                                         .font(.subheadline.bold())
-                                        .foregroundColor(.white)
+                                        .foregroundColor(KinnectTheme.textPrimary)
+                                        .lineLimit(1)
                                     Text("Chỉ người được duyệt mới xem được")
                                         .font(.caption2)
                                         .foregroundColor(KinnectTheme.textSecondary)
+                                        .lineLimit(2)
+                                        .fixedSize(horizontal: false, vertical: true)
                                 }
-                                Spacer()
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .layoutPriority(1)
                                 Button(role: .destructive) {
                                     Task { await deletePrivatePhoto(photo.id) }
                                 } label: {
                                     Image(systemName: "trash")
                                         .foregroundColor(KinnectTheme.danger)
+                                        .frame(width: 44, height: 44)
+                                        .contentShape(Rectangle())
                                 }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Xóa ảnh bảo mật")
                             }
+                            .padding(.vertical, 4)
                         }
                     }
                 }
@@ -1053,7 +1066,7 @@ struct ActiveSessionsSheet: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(ua)
                                 .font(.subheadline.bold())
-                                .foregroundColor(.white)
+                                .foregroundColor(KinnectTheme.textPrimary)
                                 .kinnectMultiline()
                             Text(current ? "Phiên hiện tại trên thiết bị này" : "Phiên hoạt động")
                                 .font(.caption)
@@ -1180,7 +1193,7 @@ struct BlockedUsersSheet: View {
                             KinnectAvatarView(name: u.name, avatarURL: u.avatarUrl, colorHex: u.avatarColor, size: 36)
                             Text(u.name)
                                 .font(.subheadline.bold())
-                                .foregroundColor(.white)
+                                .foregroundColor(KinnectTheme.textPrimary)
                             Spacer()
                             Button("Bỏ chặn") {
                                 Task { await unblock(u) }
@@ -1253,23 +1266,23 @@ struct DeleteAccountConfirmationSheet: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Nhập chính xác tên đăng nhập của bạn để xác nhận (\(requiredUsername.isEmpty ? (appState.currentUser?.handle ?? "") : requiredUsername)):")
                             .font(.caption.bold())
-                            .foregroundColor(.white)
+                            .foregroundColor(KinnectTheme.textPrimary)
                         TextField("Tên đăng nhập", text: $confirmUsername)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .padding(12)
                             .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                            .foregroundColor(.white)
+                            .foregroundColor(KinnectTheme.textPrimary)
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Nhập mật khẩu hiện tại")
                             .font(.caption.bold())
-                            .foregroundColor(.white)
+                            .foregroundColor(KinnectTheme.textPrimary)
                         SecureField("Mật khẩu của bạn", text: $password)
                             .padding(12)
                             .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                            .foregroundColor(.white)
+                            .foregroundColor(KinnectTheme.textPrimary)
                     }
 
                     Button(role: .destructive) {

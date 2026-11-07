@@ -2,6 +2,9 @@ import SwiftUI
 
 struct PrivacyConsentSheet: View {
     let request: PrivacyConsentRequest
+    /// false = pre-registration: no session yet, so the choice is passed to /api/register
+    /// as acceptPrivacyNotice instead of POSTing /api/me/privacy-consent (which requires auth).
+    var recordOnServer: Bool = true
     let onAccepted: () -> Void
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
@@ -22,7 +25,7 @@ struct PrivacyConsentSheet: View {
                             Text("Bảo vệ dữ liệu & Quyền riêng tư")
                                 .font(.headline.bold())
                                 .foregroundColor(KinnectTheme.textPrimary)
-                            Text("Phiên bản quy định: \(request.version)")
+                            Text(request.version.isEmpty ? "Thông báo dữ liệu hiện hành" : "Phiên bản quy định: \(request.version)")
                                 .font(.caption)
                                 .foregroundColor(KinnectTheme.textSecondary)
                         }
@@ -114,6 +117,11 @@ struct PrivacyConsentSheet: View {
     }
 
     private func acceptConsent() async {
+        guard recordOnServer else {
+            onAccepted()
+            dismiss()
+            return
+        }
         isSubmitting = true
         defer { isSubmitting = false }
         do {
@@ -131,3 +139,4 @@ struct PrivacyConsentSheet: View {
         }
     }
 }
+
