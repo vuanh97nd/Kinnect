@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)][string]$Message,
-    [string]$ThreadId = '01a1887d-0a8d-7b60-8a8c-25b9da8a1f93'
+    [string]$ThreadId = '01a1b659-f0cf-7192-b581-65591fa047db'
 )
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8

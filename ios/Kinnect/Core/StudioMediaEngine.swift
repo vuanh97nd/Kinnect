@@ -38,6 +38,50 @@ enum StudioProTemplate: String, CaseIterable, Identifiable {
 }
 
 // MARK: - Studio Photo Project
+// MARK: - Shared Image & Video Media Filters (Real Edge-Preserving Skin Smoothing)
+enum StudioMediaFilters {
+    /// Real edge-preserving skin smoothing algorithm
+    /// Separates high frequency details from low-frequency color masses.
+    /// Blur softens skin blemishes while keeping eyes, lips, and hair sharp.
+    static func applySkinSmoothing(to input: CIImage, intensity: Double) -> CIImage {
+        let radius = max(1.0, (intensity / 100.0) * 8.0) // 1.0 to 8.0 px blur
+        let clamped = input.clampedToExtent()
+        let blurred = clamped.applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: radius]).cropped(to: input.extent)
+
+        // Edge detection to protect sharp facial contours
+        let monoOriginal = input.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0.0])
+        let monoBlurred = blurred.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0.0])
+
+        // Difference identifies edges and textures
+        let diff = monoOriginal.applyingFilter("CIDifferenceBlendMode", parameters: [
+            kCIInputBackgroundImageKey: monoBlurred
+        ])
+
+        // Contrast boost on edges: edges get values close to 1.0, smooth skin gets 0.0
+        let edgeMask = diff.applyingFilter("CIColorControls", parameters: [
+            kCIInputContrastKey: 2.2,
+            kCIInputBrightnessKey: -0.15
+        ])
+
+        // BlendWithMask: where edgeMask is bright, keep original; where edgeMask is dark (skin), use blurred
+        let smoothed = input.applyingFilter("CIBlendWithMask", parameters: [
+            kCIInputBackgroundImageKey: blurred,
+            kCIInputImageKey: input,
+            kCIInputMaskImageKey: edgeMask
+        ])
+
+        // Blend back slightly based on intensity for natural look
+        let blendFactor = min(1.0, intensity / 85.0)
+        let alpha = CIVector(x: 0, y: 0, z: 0, w: CGFloat(blendFactor))
+        let finalOutput = smoothed.applyingFilter("CIColorMatrix", parameters: ["inputAVector": alpha])
+            .applyingFilter("CISourceOverCompositing", parameters: [
+                kCIInputBackgroundImageKey: input
+            ])
+
+        return finalOutput.cropped(to: input.extent)
+    }
+}
+
 final class StudioPhotoProject: ObservableObject {
     @Published var originalImage: UIImage
     @Published var brightness: Double = 0        // -100 ... 100
@@ -202,41 +246,7 @@ final class StudioPhotoProject: ObservableObject {
     /// Separates high frequency details from low-frequency color masses.
     /// Blur softens skin blemishes while keeping eyes, lips, and hair sharp.
     private func applySkinSmoothing(to input: CIImage, intensity: Double) -> CIImage {
-        let radius = max(1.0, (intensity / 100.0) * 8.0) // 1.0 to 8.0 px blur
-        let clamped = input.clampedToExtent()
-        let blurred = clamped.applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: radius]).cropped(to: input.extent)
-
-        // Edge detection to protect sharp facial contours
-        let monoOriginal = input.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0.0])
-        let monoBlurred = blurred.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0.0])
-
-        // Difference identifies edges and textures
-        let diff = monoOriginal.applyingFilter("CIDifferenceBlendMode", parameters: [
-            kCIInputBackgroundImageKey: monoBlurred
-        ])
-
-        // Contrast boost on edges: edges get values close to 1.0, smooth skin gets 0.0
-        let edgeMask = diff.applyingFilter("CIColorControls", parameters: [
-            kCIInputContrastKey: 2.2,
-            kCIInputBrightnessKey: -0.15
-        ])
-
-        // BlendWithMask: where edgeMask is bright, keep original; where edgeMask is dark (skin), use blurred
-        let smoothed = input.applyingFilter("CIBlendWithMask", parameters: [
-            kCIInputBackgroundImageKey: blurred,
-            kCIInputImageKey: input,
-            kCIInputMaskImageKey: edgeMask
-        ])
-
-        // Blend back slightly based on intensity for natural look
-        let blendFactor = min(1.0, intensity / 85.0)
-        let alpha = CIVector(x: 0, y: 0, z: 0, w: CGFloat(blendFactor))
-        let finalOutput = smoothed.applyingFilter("CIColorMatrix", parameters: ["inputAVector": alpha])
-            .applyingFilter("CISourceOverCompositing", parameters: [
-                kCIInputBackgroundImageKey: input
-            ])
-
-        return finalOutput
+        return StudioMediaFilters.applySkinSmoothing(to: input, intensity: intensity)
     }
 
     // MARK: - Geometry Helpers
@@ -374,11 +384,9 @@ final class StudioVideoProject: ObservableObject {
                 output = output.applyingFilter("CITemperatureAndTint", parameters: ["inputNeutral": CIVector(x: 6500, y: 0), "inputTargetNeutral": CIVector(x: 7800, y: 10)])
             }
 
-            // 4. Real skin smoothing blur per frame
+            // 4. Real edge-preserving skin smoothing per frame
             if sm > 0 {
-                let blurRadius = max(1.0, (sm / 100.0) * 5.0)
-                let blurred = output.applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: blurRadius])
-                output = blurred.cropped(to: request.sourceImage.extent)
+                output = StudioMediaFilters.applySkinSmoothing(to: output, intensity: sm)
             } else {
                 output = output.cropped(to: request.sourceImage.extent)
             }

@@ -4,6 +4,7 @@ import AuthenticationServices
 struct AuthView: View {
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var oauth = OAuthManager.shared
+    @ObservedObject private var loc = LocalizationManager.shared
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     enum AuthStage: String {
@@ -255,7 +256,7 @@ struct AuthView: View {
 
             // Header Copy
             VStack(alignment: .leading, spacing: 6) {
-                Text("Chào bạn trở lại!")
+                Text(L10n.tr("Chào bạn trở lại!"))
                     .font(.title2.bold())
                     .foregroundColor(KinnectTheme.textPrimary)
                 Text("Đăng nhập để tiếp tục những kết nối của bạn.")
@@ -346,7 +347,7 @@ struct AuthView: View {
                         if isSubmitting {
                             ProgressView().tint(.white)
                         } else {
-                            Text("Đăng nhập")
+                            Text(L10n.tr("Đăng nhập"))
                                 .font(.headline)
                         }
                         Spacer()
@@ -366,7 +367,7 @@ struct AuthView: View {
             // Footer Switch to Registration (Integrated container)
             HStack {
                 Spacer()
-                Text("Chưa có tài khoản?")
+                Text(L10n.tr("Chưa có tài khoản?"))
                     .font(.footnote)
                     .foregroundColor(KinnectTheme.textSecondary)
                 Button("Đăng ký ngay") {
@@ -392,7 +393,7 @@ struct AuthView: View {
                 Image(systemName: rememberMe ? "checkmark.square.fill" : "square")
                     .font(.body)
                     .foregroundColor(rememberMe ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
-                Text("Ghi nhớ đăng nhập")
+                Text(L10n.tr("Ghi nhớ đăng nhập"))
                     .font(.footnote)
                     .foregroundColor(KinnectTheme.textPrimary)
             }
@@ -686,16 +687,31 @@ struct AuthView: View {
 
     // MARK: - Social Auth Section (Google, Facebook, Apple)
     private var socialAuthSection: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
+            // Apple Sign In (App Store Review Guideline 4.8 Mandatory Requirement)
+            SignInWithAppleButton(
+                .signIn,
+                onRequest: { request in
+                    request.requestedScopes = [.fullName, .email]
+                },
+                onCompletion: { result in
+                    handleAppleSignIn(result: result)
+                }
+            )
+            .signInWithAppleButtonStyle(.white)
+            .frame(maxWidth: .infinity, minHeight: 46)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .accessibilityLabel(L10n.tr("Đăng nhập bằng Apple"))
+
             HStack {
                 VStack { Divider().background(KinnectTheme.border) }
-                Text("hoặc")
+                Text(L10n.tr("hoặc tiếp tục với mạng xã hội"))
                     .font(.caption2)
                     .foregroundColor(KinnectTheme.textSecondary)
                     .padding(.horizontal, 8)
                 VStack { Divider().background(KinnectTheme.border) }
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, 2)
 
             HStack(spacing: 12) {
                 // Google OAuth Button
@@ -714,6 +730,7 @@ struct AuthView: View {
                     .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
                     .overlay(RoundedRectangle(cornerRadius: 12).stroke(KinnectTheme.border, lineWidth: 1))
                 }
+                .accessibilityLabel(L10n.tr("Tiếp tục với Google"))
 
                 // Facebook OAuth Button
                 Button {
@@ -731,6 +748,7 @@ struct AuthView: View {
                     .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
                     .overlay(RoundedRectangle(cornerRadius: 12).stroke(KinnectTheme.border, lineWidth: 1))
                 }
+                .accessibilityLabel(L10n.tr("Tiếp tục với Facebook"))
             }
 
             if let oauthErr = oauth.oauthError {
@@ -738,6 +756,50 @@ struct AuthView: View {
                     .font(.caption)
                     .foregroundColor(KinnectTheme.warning)
                     .kinnectMultiline()
+            }
+        }
+    }
+
+    private func handleAppleSignIn(result: Result<ASAuthorization, Error>) {
+        switch result {
+        case .success(let authorization):
+            if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
+                let userIdentifier = appleIDCredential.user
+                let email = appleIDCredential.email ?? "\(userIdentifier)@privaterelay.appleid.com"
+                let givenName = appleIDCredential.fullName?.givenName ?? ""
+                let familyName = appleIDCredential.fullName?.familyName ?? ""
+                let fullName = [givenName, familyName].filter { !$0.isEmpty }.joined(separator: " ")
+                let nameToUse = fullName.isEmpty ? "Người dùng Apple" : fullName
+
+                Task {
+                    do {
+                        let res = try await KinnectAPIClient.shared.requestJSON(
+                            "/api/auth/apple",
+                            method: "POST",
+                            body: [
+                                "appleId": userIdentifier,
+                                "email": email,
+                                "name": nameToUse,
+                                "identityToken": appleIDCredential.identityToken.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+                            ]
+                        )
+                        if let userDict = res["user"] as? [String: Any] {
+                            let user = KinnectUser.from(userDict)
+                            appState.applyAuthenticatedUser(user, rawDict: userDict, rememberMe: true)
+                            await appState.refreshGlobalBadges()
+                        }
+                    } catch {
+                        if UIReviewFixture.isEnabled {
+                            appState.applyAuthenticatedUser(KinnectUser.from(UIReviewFixture.currentUserDict), rawDict: UIReviewFixture.currentUserDict, rememberMe: true)
+                        } else {
+                            appState.showToast("Apple Sign-In: \(error.localizedDescription)")
+                        }
+                    }
+                }
+            }
+        case .failure(let error):
+            if !UIReviewFixture.isEnabled {
+                appState.showToast("Đăng nhập bằng Apple thất bại: \(error.localizedDescription)")
             }
         }
     }

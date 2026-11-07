@@ -55,6 +55,7 @@ struct CameraStudioView: View {
 
     // Studio Pro Project Models (Real Photo & Video Editors)
     @StateObject private var photoProject = StudioPhotoProject(originalImage: UIImage())
+    @State private var videoProject: StudioVideoProject? = nil
     @State private var selectedTool: StudioEditTool = .color
     @State private var isComparingOriginal = false
 
@@ -704,6 +705,15 @@ struct CameraStudioView: View {
     }
 
     // MARK: - Save Media to Device Camera Roll
+    private func syncVideoProjectSliders(to vp: StudioVideoProject) {
+        vp.brightness = photoProject.brightness
+        vp.contrast = photoProject.contrast
+        vp.saturation = photoProject.saturation
+        vp.warmth = photoProject.warmth
+        vp.smooth = photoProject.smooth
+        vp.proTemplate = photoProject.proTemplate
+    }
+
     private func saveMediaToPhotos() {
         if let img = previewImage {
             PhotoSaveCoordinator.shared.onComplete = { success, error in
@@ -719,6 +729,33 @@ struct CameraStudioView: View {
                 #selector(PhotoSaveCoordinator.image(_:didFinishSavingWithError:contextInfo:)),
                 nil
             )
+        } else if let vp = videoProject ?? (capturedVideoTempURL.map { StudioVideoProject(sourceURL: $0) }) {
+            syncVideoProjectSliders(to: vp)
+            Task {
+                var targetURL = vp.sourceURL
+                if vp.hasEdits {
+                    do {
+                        appState.showToast("Đang xuất video qua Studio Pro...")
+                        targetURL = try await vp.exportVideo()
+                    } catch {
+                        appState.showToast("Không thể xuất video: \(error.localizedDescription)")
+                        return
+                    }
+                }
+                PhotoSaveCoordinator.shared.onComplete = { success, error in
+                    if success {
+                        appState.showToast("Đã lưu video đã chỉnh sửa vào Album ảnh trên thiết bị.")
+                    } else {
+                        appState.showToast("Không thể lưu video: \(error?.localizedDescription ?? "Lỗi quyền truy cập")")
+                    }
+                }
+                UISaveVideoAtPathToSavedPhotosAlbum(
+                    targetURL.path,
+                    PhotoSaveCoordinator.shared,
+                    #selector(PhotoSaveCoordinator.video(_:didFinishSavingWithError:contextInfo:)),
+                    nil
+                )
+            }
         } else if let tempURL = capturedVideoTempURL {
             PhotoSaveCoordinator.shared.onComplete = { success, error in
                 if success {
@@ -795,27 +832,50 @@ struct CameraStudioView: View {
         do {
             switch target {
             case .shortVideo:
-                guard !videoDataURL.isEmpty else {
+                guard !videoDataURL.isEmpty || capturedVideoTempURL != nil || videoProject != nil else {
                     appState.showToast("Vui lòng quay hoặc chọn một video MP4 (< 8MB).")
                     return
                 }
                 var durationToPublish = 15
-                if let tempURL = capturedVideoTempURL {
-                    let asset = AVURLAsset(url: tempURL)
-                    if let d = try? await asset.load(.duration) {
-                        let sec = CMTimeGetSeconds(d)
-                        if sec.isFinite && sec > 0 {
-                            durationToPublish = max(1, Int(round(sec)))
+                var finalVideoDataURL = videoDataURL
+
+                if let vp = videoProject ?? (capturedVideoTempURL.map { StudioVideoProject(sourceURL: $0) }) {
+                    syncVideoProjectSliders(to: vp)
+                    if vp.hasEdits {
+                        do {
+                            appState.showToast("Đang áp dụng hiệu ứng và xuất video...")
+                            let exportedURL = try await vp.exportVideo()
+                            let data = try Data(contentsOf: exportedURL)
+                            finalVideoDataURL = "data:video/mp4;base64," + data.base64EncodedString()
+                            let asset = AVURLAsset(url: exportedURL)
+                            if let d = try? await asset.load(.duration) {
+                                let sec = CMTimeGetSeconds(d)
+                                if sec.isFinite && sec > 0 {
+                                    durationToPublish = max(1, Int(round(sec)))
+                                }
+                            }
+                        } catch {
+                            appState.showToast("Lỗi xuất video: \(error.localizedDescription)")
+                            return
+                        }
+                    } else if let tempURL = capturedVideoTempURL {
+                        let asset = AVURLAsset(url: tempURL)
+                        if let d = try? await asset.load(.duration) {
+                            let sec = CMTimeGetSeconds(d)
+                            if sec.isFinite && sec > 0 {
+                                durationToPublish = max(1, Int(round(sec)))
+                            }
                         }
                     }
                 }
+
                 _ = try await KinnectAPIClient.shared.requestJSON(
                     "/api/shorts",
                     method: "POST",
                     body: [
                         "title": title.trimmingCharacters(in: .whitespacesAndNewlines),
                         "caption": finalCaption,
-                        "videoDataUrl": videoDataURL,
+                        "videoDataUrl": finalVideoDataURL,
                         "durationSec": durationToPublish
                     ],
                     requestId: reqId
