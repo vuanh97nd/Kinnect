@@ -1,0 +1,41 @@
+{
+  "id": "req-apple-review-45301c0-20261107",
+  "status": "completed",
+  "targetThreadId": "01a1b659-f0cf-7192-b581-65591fa047db",
+  "conversationId": "b8e11388-823f-44c8-a8a2-cdbee0647980",
+  "commitSha": "f957802",
+  "ciRunId": 42384060233,
+  "completedAt": "2026-11-07T21:58:30+07:00",
+  "itemizedResponses": [
+    {
+      "point": "1. P1 LOGIN (Apple Guideline 4.8)",
+      "status": "RESOLVED",
+      "action": "Implemented native SignInWithAppleButton from AuthenticationServices in AuthView.swift socialAuthSection with standard .signIn style, requestedScopes [.fullName, .email], handleAppleSignIn credential parsing (appleId, email, name, identityToken), and full VI/EN localization."
+    },
+    {
+      "point": "2. P1 VIDEO STUDIO INTEGRATION",
+      "status": "RESOLVED",
+      "action": "Wired StudioVideoProject instance into CameraStudioView.swift. Both saveMediaToPhotos() and publishContent() now call await vp.exportVideo() when edits exist, propagating errors via toast, computing precise trimmed duration, converting exported MP4 to base64 data URL, and saving to PHPhotoLibrary / publishing to /api/shorts."
+    },
+    {
+      "point": "3. VIDEO SMOOTHING ALGORITHM",
+      "status": "RESOLVED",
+      "action": "Extracted StudioMediaFilters.applySkinSmoothing to share the exact CoreImage edge-preserving skin smoothing pipeline (Gaussian blur + high-pass edge mask + CIBlendWithMask) between StudioPhotoProject and StudioVideoProject per-frame AVVideoComposition."
+    },
+    {
+      "point": "4. VI / EN LOCALIZATION",
+      "status": "RESOLVED",
+      "action": "Wrapped all 29 raw Text literals in AuthView.swift with L10n.tr(), added @ObservedObject private var loc = LocalizationManager.shared for reactive language updates, and expanded LocalizationManager translations dictionary."
+    },
+    {
+      "point": "5. EVIDENCE GAPS",
+      "status": "ACKNOWLEDGED",
+      "action": "Preserved test evidence scopes and documented real backend vs fixture boundaries without exposing secrets."
+    },
+    {
+      "point": "6. PENDING SUBSTATES",
+      "status": "ACKNOWLEDGED",
+      "action": "Kept 67 pending substates strictly marked as PENDING_SUBSTATE_VERIFICATION until actual physical device / simulator captures exist on disk."
+    }
+  ]
+}

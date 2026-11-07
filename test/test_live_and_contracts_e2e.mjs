@@ -807,6 +807,96 @@ console.log("   -> Verified permanent account deletion, password challenge, sess
 h1Conn.ws.close();
 h2Conn.ws.close();
 vConn.ws.close();
+
+console.log("7. Testing Sign in with Apple (/api/auth/apple) and Guideline 4.8 Contract Parity (6 assertions)...");
+
+function makeAppleIdToken({ sub, iss = "https://appleid.apple.com", aud = "app.kinnect.live", exp = Math.floor(Date.now() / 1000) + 3600, email }) {
+  const header = Buffer.from(JSON.stringify({ alg: "RS256", kid: "apple-test-key-1" })).toString("base64url");
+  const claims = { iss, aud, exp, sub };
+  if (email) claims.email = email;
+  const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
+  return `${header}.${payload}.mockSignatureBytes`;
+}
+
+// 7a. First-time Sign in with Apple (creates new user, associates oauth_accounts)
+const appleSub1 = "apple.sub.user." + RUN;
+const appleEmail1 = `apple_${RUN}@privaterelay.example.com`;
+const appleToken1 = makeAppleIdToken({ sub: appleSub1, email: appleEmail1 });
+
+const appleRes1 = await fetch(`${baseUrl}/api/auth/apple`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    identityToken: appleToken1,
+    appleId: appleSub1,
+    fullName: { givenName: "Anh", familyName: "Vu" },
+    email: appleEmail1
+  })
+});
+assert.equal(appleRes1.status, 200, "First Apple sign-in must succeed");
+const appleJson1 = await appleRes1.json();
+assert.equal(appleJson1.success, true);
+assert.equal(appleJson1.user.name, "Vu Anh");
+const appleCookie1 = (appleRes1.headers.get("set-cookie") || "").split(";")[0];
+assert.ok(appleCookie1.includes("kinnect_session="), "Must set session cookie");
+
+// Verify /api/me with session cookie works
+const meApple1 = await fetch(`${baseUrl}/api/me`, { headers: { Cookie: appleCookie1 } });
+assert.equal(meApple1.status, 200);
+assert.equal((await meApple1.json()).user.id, appleJson1.user.id);
+
+// 7b. Repeat Sign in with Apple (Apple omits fullName and email on subsequent logins)
+const appleToken1Repeat = makeAppleIdToken({ sub: appleSub1 }); // no email in claims
+const appleRes1Repeat = await fetch(`${baseUrl}/api/auth/apple`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    identityToken: appleToken1Repeat,
+    appleId: appleSub1
+    // Notice: no fullName or email provided by Apple on repeat logins
+  })
+});
+assert.equal(appleRes1Repeat.status, 200, "Repeat Apple sign-in must succeed without email/fullName");
+const appleJson1Repeat = await appleRes1Repeat.json();
+assert.equal(appleJson1Repeat.user.id, appleJson1.user.id, "Must return existing linked user account");
+
+// 7c. Reject expired Apple token
+const expiredAppleToken = makeAppleIdToken({ sub: "apple.sub.expired", exp: Math.floor(Date.now() / 1000) - 600 });
+const appleExpiredRes = await fetch(`${baseUrl}/api/auth/apple`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ identityToken: expiredAppleToken, appleId: "apple.sub.expired" })
+});
+assert.equal(appleExpiredRes.status, 401, "Expired Apple token must be rejected with 401");
+
+// 7d. Reject invalid issuer
+const badIssuerToken = makeAppleIdToken({ sub: "apple.sub.badiss", iss: "https://evil.issuer.com" });
+const appleBadIssRes = await fetch(`${baseUrl}/api/auth/apple`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ identityToken: badIssuerToken, appleId: "apple.sub.badiss" })
+});
+assert.equal(appleBadIssRes.status, 401, "Invalid issuer must be rejected with 401");
+
+// 7e. Reject mismatched subject vs appleId parameter
+const mismatchToken = makeAppleIdToken({ sub: "apple.sub.real" });
+const appleMismatchRes = await fetch(`${baseUrl}/api/auth/apple`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ identityToken: mismatchToken, appleId: "apple.sub.impostor" })
+});
+assert.equal(appleMismatchRes.status, 400, "Mismatched subject vs appleId must be rejected with 400");
+
+// 7f. Reject missing identityToken
+const missingTokenRes = await fetch(`${baseUrl}/api/auth/apple`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ appleId: "apple.sub.real" })
+});
+assert.equal(missingTokenRes.status, 400, "Missing identityToken must be rejected with 400");
+
+console.log("   -> Verified Sign in with Apple native contract, repeat login resolution, token expiry, issuer and sub validation!");
 server.close();
+
 console.log("ALL END-TO-END FUNCTIONAL TESTS PASSED 100%!");
 process.exit(0);

@@ -58,6 +58,11 @@ struct CameraStudioView: View {
     @State private var videoProject: StudioVideoProject? = nil
     @State private var selectedTool: StudioEditTool = .color
     @State private var isComparingOriginal = false
+    @State private var videoCompositionRevision = UUID().uuidString
+
+    private var isVideoActive: Bool {
+        capturedVideoTempURL != nil || !videoDataURL.isEmpty || UIReviewFixture.activeScreen == "camera-studio-video-edit"
+    }
 
     // Pickers
     @State private var selectedLibraryItem: PhotosPickerItem?
@@ -91,7 +96,12 @@ struct CameraStudioView: View {
             }
             cameraController.onCapturedVideoData = { data, tempURL in
                 self.capturedVideoTempURL = tempURL
+                self.previewImage = nil
+                self.originalImage = nil
                 self.target = .shortVideo
+                let vp = StudioVideoProject(sourceURL: tempURL)
+                self.videoProject = vp
+                self.syncVideoProjectSliders(to: vp)
                 if data.count > 8 * 1024 * 1024 {
                     appState.showToast("Video vượt quá giới hạn 8MB của máy chủ.")
                 } else {
@@ -323,6 +333,7 @@ struct CameraStudioView: View {
                         previewImage = nil
                         videoDataURL = ""
                         capturedVideoTempURL = nil
+                        videoProject = nil
                     }
 
                     VStack(alignment: .leading, spacing: 1) {
@@ -374,7 +385,7 @@ struct CameraStudioView: View {
                 // Large Media Stage (Zoomable Photo Canvas or Native AVPlayer)
                 ZStack(alignment: .bottom) {
                     if let vURL = capturedVideoTempURL ?? (UIReviewFixture.activeScreen == "camera-studio-video-edit" ? UIReviewFixture.samplePlayableVideoURL() : nil) {
-                        StudioVideoPlayerView(videoURL: vURL)
+                        StudioVideoPlayerView(videoURL: vURL, videoProject: videoProject ?? StudioVideoProject(sourceURL: vURL), revisionId: videoCompositionRevision)
                             .frame(maxWidth: .infinity, minHeight: 280, maxHeight: 340)
                             .clipShape(RoundedRectangle(cornerRadius: 16))
                     } else {
@@ -450,29 +461,90 @@ struct CameraStudioView: View {
                 VStack(spacing: 12) {
                     switch selectedTool {
                     case .crop:
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Tỉ lệ khung hình:")
-                                .font(.caption.bold())
-                                .foregroundColor(KinnectTheme.textSecondary)
+                        if isVideoActive {
+                            VStack(alignment: .leading, spacing: 10) {
+                                HStack {
+                                    Text("Cắt thời lượng video (Trim):")
+                                        .font(.caption.bold())
+                                        .foregroundColor(KinnectTheme.textSecondary)
+                                    Spacer()
+                                    if let vp = videoProject {
+                                        Text(String(format: "%.1fs - %.1fs (%.1fs)", vp.trimIn, vp.trimOut, max(0, vp.trimOut - vp.trimIn)))
+                                            .font(.caption.bold())
+                                            .foregroundColor(KinnectTheme.accentBright)
+                                    }
+                                }
 
-                            HStack(spacing: 8) {
-                                ForEach(StudioCropRatio.allCases) { ratio in
+                                if let vp = videoProject {
+                                    VStack(spacing: 8) {
+                                        HStack {
+                                            Text(L10n.tr("Điểm đầu"))
+                                                .font(.caption2)
+                                                .foregroundColor(KinnectTheme.textSecondary)
+                                                .frame(width: 50, alignment: .leading)
+                                            Slider(value: Binding(get: { vp.trimIn }, set: { vp.trimIn = min($0, max(0, vp.trimOut - 0.5)) }), in: 0...max(1, vp.duration), step: 0.1)
+                                                .tint(KinnectTheme.accentBright)
+                                        }
+
+                                        HStack {
+                                            Text(L10n.tr("Điểm cuối"))
+                                                .font(.caption2)
+                                                .foregroundColor(KinnectTheme.textSecondary)
+                                                .frame(width: 50, alignment: .leading)
+                                            Slider(value: Binding(get: { vp.trimOut }, set: { vp.trimOut = max($0, min(vp.duration, vp.trimIn + 0.5)) }), in: 0...max(1, vp.duration), step: 0.1)
+                                                .tint(KinnectTheme.accentBright)
+                                        }
+                                    }
+                                }
+
+                                HStack(spacing: 12) {
                                     Button {
-                                        photoProject.cropRatio = ratio
-                                        updatePhotoPreview()
+                                        photoProject.rotation = (photoProject.rotation + 90) % 360
+                                        if let vp = videoProject {
+                                            vp.rotation = photoProject.rotation
+                                            videoCompositionRevision = UUID().uuidString
+                                        }
                                     } label: {
-                                        Text(ratio.rawValue)
-                                            .font(.caption.weight(photoProject.cropRatio == ratio ? .bold : .medium))
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 6)
-                                            .background(
-                                                RoundedRectangle(cornerRadius: 8)
-                                                    .fill(photoProject.cropRatio == ratio ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
-                                            )
-                                            .foregroundColor(.white)
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "rotate.right.fill")
+                                            Text(String(format: "%@ (%d°)", L10n.tr("Xoay 90°"), photoProject.rotation))
+                                                .font(.caption.bold())
+                                        }
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 8)
+                                        .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                                        .foregroundColor(.white)
+                                    }
+
+                                    Spacer()
+                                }
+                            }
+                        } else {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("Tỉ lệ khung hình:")
+                                    .font(.caption.bold())
+                                    .foregroundColor(KinnectTheme.textSecondary)
+
+                                HStack(spacing: 8) {
+                                    ForEach(StudioCropRatio.allCases) { ratio in
+                                        Button {
+                                            photoProject.cropRatio = ratio
+                                            updatePhotoPreview()
+                                        } label: {
+                                            Text(ratio.rawValue)
+                                                .font(.caption.weight(photoProject.cropRatio == ratio ? .bold : .medium))
+                                                .padding(.horizontal, 12)
+                                                .padding(.vertical, 6)
+                                                .background(
+                                                    RoundedRectangle(cornerRadius: 8)
+                                                        .fill(photoProject.cropRatio == ratio ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
+                                                )
+                                                .foregroundColor(.white)
+                                        }
                                     }
                                 }
                             }
+                        }
 
                             Divider().background(KinnectTheme.border)
 
@@ -646,8 +718,17 @@ struct CameraStudioView: View {
             }
             Slider(value: value, in: range, step: 1.0) {
                 Text(name)
-            } onEditingChanged: { _ in
-                updatePhotoPreview()
+            } onEditingChanged: { editing in
+                if !editing {
+                    if isVideoActive {
+                        if let vp = videoProject ?? (capturedVideoTempURL.map { StudioVideoProject(sourceURL: $0) }) {
+                            syncVideoProjectSliders(to: vp)
+                            videoCompositionRevision = UUID().uuidString
+                        }
+                    } else {
+                        updatePhotoPreview()
+                    }
+                }
             }
             .tint(KinnectTheme.accentBright)
         }
@@ -817,7 +898,11 @@ struct CameraStudioView: View {
                 self.capturedVideoTempURL = destURL
                 self.videoDataURL = "data:video/mp4;base64,\(data.base64EncodedString())"
                 self.previewImage = nil
+                self.originalImage = nil
                 self.target = .shortVideo
+                let vp = StudioVideoProject(sourceURL: destURL)
+                self.videoProject = vp
+                self.syncVideoProjectSliders(to: vp)
             }
         }
     }
@@ -1297,6 +1382,8 @@ final class PhotoSaveCoordinator: NSObject {
 // MARK: - Dedicated Native Video Player with AVPlayer & Integrated Controls
 struct StudioVideoPlayerView: View {
     let videoURL: URL
+    var videoProject: StudioVideoProject? = nil
+    var revisionId: String = ""
     @State private var player: AVPlayer?
     @State private var isPlaying: Bool = true
     @State private var currentTime: Double = 0
@@ -1433,10 +1520,23 @@ struct StudioVideoPlayerView: View {
             teardownPlayer()
             setupPlayer()
         }
+        .onChange(of: revisionId) { _ in
+            guard let curItem = player?.currentItem else { return }
+            if let vp = videoProject, vp.hasEdits {
+                curItem.videoComposition = vp.makeVideoComposition(for: curItem.asset)
+            } else {
+                curItem.videoComposition = nil
+            }
+        }
     }
 
     private func setupPlayer() {
-        let p = AVPlayer(url: videoURL)
+        let asset = AVURLAsset(url: videoURL)
+        let item = AVPlayerItem(asset: asset)
+        if let vp = videoProject, vp.hasEdits {
+            item.videoComposition = vp.makeVideoComposition(for: asset)
+        }
+        let p = AVPlayer(playerItem: item)
         p.isMuted = isMuted
         self.player = p
 

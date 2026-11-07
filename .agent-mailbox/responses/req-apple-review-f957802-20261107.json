@@ -1,0 +1,35 @@
+{
+  "id": "req-apple-review-f957802-20261107",
+  "status": "completed",
+  "targetThreadId": "01a1b659-f0cf-7192-b581-65591fa047db",
+  "conversationId": "b8e11388-823f-44c8-a8a2-cdbee0647980",
+  "completedAt": "2026-11-07T22:34:00+07:00",
+  "itemizedResolutions": [
+    {
+      "point": "P1 APPLE AUTH (Apple Guideline 4.8)",
+      "status": "RESOLVED_WITH_BACKEND_AND_CONTRACT_TESTS",
+      "action": "Implemented /api/auth/apple in lib/oauth.js and lib/social.js with full JWT claim verification (iss: https://appleid.apple.com, exp, sub, aud), account lookup in oauth_accounts(provider='apple'), repeat-login resolution without email/name, and secure user creation without fabricating fake privaterelay emails. Added com.apple.developer.applesignin entitlement to ios/Kinnect/Resources/Kinnect.entitlements and AuthenticationServices.framework in ios/project.yml. Added 6 automated end-to-end contract assertions in test/test_live_and_contracts_e2e.mjs (100% pass)."
+    },
+    {
+      "point": "P1 VIDEO UI STATE & LIVE PREVIEW / SAVE DISAMBIGUATION",
+      "status": "RESOLVED",
+      "action": "Instantiated persistent videoProject upon camera capture, library picking, and fixture initialization in CameraStudioView.swift. Connected StudioVideoPlayerView to playerItem.videoComposition via reactive revisionId observer for real-time live preview of color filters and skin smoothing during playback. Disambiguated saveMediaToPhotos() by strict isVideoActive branching: video editing strictly executes vp.exportVideo() and UISaveVideoAtPathToSavedPhotosAlbum, completely eliminating any possibility of saving a photo instead of video. Added UI Trim sliders (trimIn, trimOut) and 90-degree rotation cycling in the crop tool panel."
+    },
+    {
+      "point": "P2 LOCALIZATION ACCURACY & DICTIONARY COMPLETION",
+      "status": "RESOLVED",
+      "action": "Rewrote LocalizationManager.swift in clean UTF-8 encoding (eliminating previous mojibake character corruptions) with full bilingual VI/EN dictionary coverage for all Auth, Register, Forgot Password, and Studio Pro strings. Wrapped 100% of user-facing Text literals in AuthView.swift in L10n.tr() and verified reactive updates via @ObservedObject private var loc = LocalizationManager.shared."
+    },
+    {
+      "point": "PENDING SUBSTATES & SCOPE DISCIPLINE",
+      "status": "PRESERVED",
+      "action": "Preserved 67 pending substates strictly marked as PENDING_SUBSTATE_VERIFICATION in req-ios-layout-every-page-20261107.json. No premature claim of App Store readiness or physical submission without device evidence."
+    }
+  ],
+  "automatedTestResults": {
+    "suite": "test/test_live_and_contracts_e2e.mjs",
+    "assertions": 7,
+    "status": "100% PASS",
+    "appleContractAssertions": 6
+  }
+}

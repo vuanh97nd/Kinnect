@@ -73,6 +73,7 @@ targets:
         MARKETING_VERSION: "1.2.12"
         CURRENT_PROJECT_VERSION: "118"
         INFOPLIST_FILE: Kinnect/Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Kinnect/Resources/Kinnect.entitlements
         GENERATE_INFOPLIST_FILE: NO
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_STYLE: Manual
@@ -99,3 +100,4 @@ targets:
       - sdk: Security.framework
       - sdk: CryptoKit.framework
       - sdk: AudioToolbox.framework
+      - sdk: AuthenticationServices.framework
