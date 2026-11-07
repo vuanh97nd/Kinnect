@@ -128,8 +128,8 @@ struct DiscoverView: View {
             }
         }
         .background(KinnectTheme.background)
-        .navigationTitle("Khám phá")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("")
+        .toolbar(.hidden, for: .navigationBar)
         .task {
             await loadCurrentSegment()
         }

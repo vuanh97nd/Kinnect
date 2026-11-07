@@ -17,7 +17,7 @@ struct LiveStreamView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            Color.black.ignoresSafeArea()
+            Color.black
 
             if appState.liveRooms.isEmpty && !isLoading {
                 VStack(spacing: 14) {
@@ -132,10 +132,8 @@ struct LiveStreamView: View {
             ZStack {
                 if appState.isCurrentLiveHost, let localTrack = webrtc.liveLocalVideoTrack {
                     WebRTCVideoRendererView(track: localTrack, mirror: webrtc.usingFrontCamera)
-                        .ignoresSafeArea()
                 } else if let remoteTrack = webrtc.liveRemoteVideoTrack {
                     WebRTCVideoRendererView(track: remoteTrack, mirror: false)
-                        .ignoresSafeArea()
                 } else {
                     Rectangle()
                         .fill(
@@ -174,7 +172,6 @@ struct LiveStreamView: View {
                                 }
                             }
                         )
-                        .ignoresSafeArea()
                 }
             }
 
@@ -366,6 +363,7 @@ struct LiveStreamView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
     }
 
     private func chatBubble(name: String, text: String, colorHex: String) -> some View {

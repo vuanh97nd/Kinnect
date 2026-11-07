@@ -6,6 +6,7 @@ struct ProfileView: View {
     let onOpenWallet: () -> Void
     let onOpenFriends: () -> Void
 
+    @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var pushKit = PushKitManager.shared
 
@@ -59,7 +60,6 @@ struct ProfileView: View {
                                     size: 76,
                                     isOnline: true
                                 )
-                                .overlay(Circle().stroke(KinnectTheme.surface, lineWidth: 3))
 
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(user.name)
@@ -128,8 +128,8 @@ struct ProfileView: View {
             .padding(14)
         }
         .background(KinnectTheme.background)
-        .navigationTitle("Hồ sơ cá nhân")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("")
+        .toolbar(.hidden, for: .navigationBar)
         .task {
             if let screen = UIReviewFixture.activeScreen {
                 switch screen {
@@ -743,7 +743,23 @@ struct PrivateAlbumManageSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Đóng") { dismiss() }
+                    KinnectIconButton(glyph: .close, label: "Đóng", tint: KinnectTheme.textPrimary) {
+                        dismiss()
+                    }
+                }
+            }
+            .task {
+                if photos.isEmpty, let uid = appState.currentUser?.id {
+                    if let privRes = try? await KinnectAPIClient.shared.requestJSON("/api/users/\(uid)/private") {
+                        let pList = privRes["photos"] as? [[String: Any]] ?? []
+                        photos = pList.map(PrivatePhotoItem.from)
+                    }
+                }
+                if requests.isEmpty {
+                    if let reqRes = try? await KinnectAPIClient.shared.requestJSON("/api/me/private/requests") {
+                        let rList = reqRes["requests"] as? [[String: Any]] ?? []
+                        requests = rList.map(PrivateAccessRequestItem.from)
+                    }
                 }
             }
         }
@@ -1063,7 +1079,9 @@ struct ActiveSessionsSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Đóng") { dismiss() }
+                    KinnectIconButton(glyph: .close, label: "Đóng", tint: KinnectTheme.textPrimary) {
+                        dismiss()
+                    }
                 }
             }
             .task {

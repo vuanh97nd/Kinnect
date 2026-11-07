@@ -8,7 +8,21 @@ struct NotificationsView: View {
     @State private var isLoading = false
 
     var body: some View {
-        List {
+        VStack(spacing: 0) {
+            if !notifications.isEmpty {
+                HStack {
+                    Spacer()
+                    Button("Đọc tất cả") {
+                        Task { await markAllRead() }
+                    }
+                    .font(.caption.bold())
+                    .foregroundColor(KinnectTheme.accentBright)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+            }
+
+            List {
             if notifications.isEmpty && !isLoading {
                 HStack(spacing: 10) {
                     KinnectIcon(glyph: .notifications, size: 24, tint: KinnectTheme.textSecondary)
@@ -62,20 +76,10 @@ struct NotificationsView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(KinnectTheme.background)
-        .navigationTitle("Thông báo")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                KinnectIconButton(glyph: .close, label: "Đóng", tint: KinnectTheme.textPrimary) {
-                    dismiss()
-                }
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Đọc tất cả") {
-                    Task { await markAllRead() }
-                }
-            }
         }
+        .background(KinnectTheme.background)
+        .navigationTitle("")
+        .toolbar(.hidden, for: .navigationBar)
         .task {
             await loadNotifications()
         }

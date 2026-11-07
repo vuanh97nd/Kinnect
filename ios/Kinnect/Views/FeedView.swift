@@ -102,10 +102,12 @@ struct FeedView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
+            .frame(maxWidth: 680)
+            .frame(maxWidth: .infinity)
         }
         .background(KinnectTheme.background)
         .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
         .refreshable {
             await loadFeedAndStories()
         }
@@ -261,10 +263,11 @@ struct FeedView: View {
                                     size: 54
                                 )
                             }
-                            Text(story.author.name.components(separatedBy: " ").last ?? story.author.name)
-                                .font(.caption2)
+                            Text(shortStoryDisplayName(story.author.name))
+                                .font(.caption2.weight(.medium))
                                 .foregroundColor(KinnectTheme.textPrimary)
                                 .lineLimit(1)
+                                .truncationMode(.tail)
                         }
                         .frame(width: 68)
                     }
@@ -272,6 +275,17 @@ struct FeedView: View {
             }
             .padding(.vertical, 6)
         }
+    }
+
+    private func shortStoryDisplayName(_ raw: String) -> String {
+        let cleaned = raw
+            .replacingOccurrences(of: "\\[.*?\\]", with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let words = cleaned.split(separator: " ").map(String.init)
+        if words.count >= 2 {
+            return words.suffix(2).joined(separator: " ")
+        }
+        return cleaned.isEmpty ? "Kinnect" : cleaned
     }
 
     private var categoryFilterStrip: some View {
@@ -294,7 +308,11 @@ struct FeedView: View {
                             Capsule()
                                 .fill(active ? AnyShapeStyle(KinnectTheme.primaryGradient) : AnyShapeStyle(KinnectTheme.surfaceElevated))
                         )
-                        .foregroundColor(.white)
+                        .overlay(
+                            Capsule()
+                                .stroke(active ? Color.clear : KinnectTheme.border, lineWidth: 1)
+                        )
+                        .foregroundColor(active ? .white : KinnectTheme.textPrimary)
                     }
                 }
             }

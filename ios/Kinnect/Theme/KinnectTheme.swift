@@ -161,6 +161,10 @@ struct KinnectAvatarView: View {
             }
             .frame(width: size, height: size)
             .clipShape(Circle())
+            .overlay(
+                Circle()
+                    .stroke(KinnectTheme.surface, lineWidth: size >= 64 ? 3 : 0)
+            )
 
             if isOnline {
                 Circle()

@@ -276,15 +276,8 @@ struct WalletStoreView: View {
             }
         }
         .background(KinnectTheme.background)
-        .navigationTitle("Ví & Cửa hàng")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                KinnectIconButton(glyph: .close, label: "Đóng", tint: KinnectTheme.textPrimary) {
-                    dismiss()
-                }
-            }
-        }
+        .navigationTitle("")
+        .toolbar(.hidden, for: .navigationBar)
         .task {
             await loadWalletAndStore()
         }

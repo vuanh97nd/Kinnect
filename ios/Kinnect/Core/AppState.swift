@@ -306,16 +306,19 @@ final class AppState: ObservableObject {
             let msg = LiveChatMessage.from(json)
             liveChatMessages.append(msg)
         case "live-reaction":
-            let senderName = (json["user"] as? [String: Any])?["name"] as? String ?? "Khán giả"
-            let label = json["label"] as? String ?? "Quà tặng"
+            let senderName = (json["name"] as? String) ?? (json["user"] as? [String: Any])?["name"] as? String ?? "Khán giả"
+            let label = (json["giftName"] as? String) ?? (json["label"] as? String) ?? "Quà tặng"
             let qty = json["quantity"] as? Int ?? 1
-            let isGift = json["isGift"] as? Bool ?? false
+            let isGift = (json["experience"] as? Bool) ?? (json["isGift"] as? Bool) ?? (json["giftId"] != nil)
             if isGift {
                 self.liveLastReactionBanner = "🎁 \(senderName) đã gửi \(qty)x \(label)"
             } else {
                 self.liveLastReactionBanner = "💜 \(senderName) thả cảm xúc \(label)"
             }
-            if let ranking = json["giftRanking"] as? [[String: Any]] {
+            if let rankingObj = json["ranking"] as? [String: Any],
+               let topSenders = rankingObj["topSenders"] as? [[String: Any]] {
+                self.liveGiftRanking = topSenders
+            } else if let ranking = json["giftRanking"] as? [[String: Any]] {
                 self.liveGiftRanking = ranking
             }
         case "live-gift-error":

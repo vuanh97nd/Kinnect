@@ -104,8 +104,8 @@ struct MessagesView: View {
             }
         }
         .background(KinnectTheme.background)
-        .navigationTitle("Tin nhắn")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("")
+        .toolbar(.hidden, for: .navigationBar)
         .task {
             await loadChats()
         }
@@ -230,6 +230,7 @@ struct MessagesView: View {
 
 struct DirectChatDetailView: View {
     let peer: KinnectUser
+    @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
 
     @State private var messages: [DirectMessageItem] = []
@@ -247,6 +248,114 @@ struct DirectChatDetailView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Conversational Header Bar (Back + Peer Avatar + Peer Name + Call/Video/More)
+            HStack(spacing: 8) {
+                KinnectIconButton(
+                    glyph: .back,
+                    label: "Quay lại",
+                    tint: KinnectTheme.textPrimary
+                ) {
+                    dismiss()
+                }
+
+                KinnectAvatarView(
+                    name: peer.name,
+                    avatarURL: peer.avatarUrl,
+                    colorHex: peer.avatarColor,
+                    size: 36,
+                    isOnline: true
+                )
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(peer.name)
+                        .font(.subheadline.bold())
+                        .foregroundColor(KinnectTheme.textPrimary)
+                        .lineLimit(1)
+                    Text("Đang hoạt động")
+                        .font(.caption2)
+                        .foregroundColor(KinnectTheme.online)
+                }
+
+                Spacer(minLength: 4)
+
+                KinnectIconButton(
+                    glyph: .phone,
+                    label: "Gọi thoại",
+                    tint: KinnectTheme.online
+                ) {
+                    Task { await NativeWebRTCManager.shared.startOutgoingCall(targetUser: peer, mode: "audio") }
+                }
+
+                KinnectIconButton(
+                    glyph: .videoCall,
+                    label: "Gọi video",
+                    tint: KinnectTheme.accentBright
+                ) {
+                    Task { await NativeWebRTCManager.shared.startOutgoingCall(targetUser: peer, mode: "video") }
+                }
+
+                Menu {
+                    Button {
+                        Task {
+                            isPinned.toggle()
+                            _ = try? await KinnectAPIClient.shared.requestJSON(
+                                "/api/chat-preferences/direct/\(peer.id)",
+                                method: "POST",
+                                body: ["pinned": isPinned]
+                            )
+                            appState.showToast(isPinned ? "Đã ghim hội thoại." : "Đã bỏ ghim.")
+                        }
+                    } label: {
+                        Label(isPinned ? "Bỏ ghim hội thoại" : "Ghim hội thoại", systemImage: isPinned ? "pin.slash" : "pin")
+                    }
+                    Button {
+                        Task {
+                            isMuted.toggle()
+                            _ = try? await KinnectAPIClient.shared.requestJSON(
+                                "/api/chat-preferences/direct/\(peer.id)",
+                                method: "POST",
+                                body: ["muted": isMuted]
+                            )
+                            appState.showToast(isMuted ? "Đã tắt thông báo." : "Đã bật thông báo.")
+                        }
+                    } label: {
+                        Label(isMuted ? "Bật thông báo" : "Tắt thông báo", systemImage: isMuted ? "bell" : "bell.slash")
+                    }
+                    Button(role: .destructive) {
+                        appState.activeReportContext = UGCReportContext(
+                            targetType: "user",
+                            targetId: peer.id,
+                            targetUserId: peer.id,
+                            targetTitle: peer.name
+                        )
+                    } label: {
+                        HStack {
+                            Text("Báo cáo người dùng")
+                            KinnectIcon(glyph: .report, size: 18, tint: KinnectTheme.danger)
+                        }
+                    }
+                    Button(role: .destructive) {
+                        Task { await appState.blockUser(userId: peer.id, userName: peer.name) }
+                    } label: {
+                        HStack {
+                            Text("Chặn người dùng")
+                            KinnectIcon(glyph: .block, size: 18, tint: KinnectTheme.danger)
+                        }
+                    }
+                } label: {
+                    KinnectIcon(glyph: .more, size: 22, tint: KinnectTheme.textSecondary)
+                        .frame(minWidth: 40, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("Tùy chọn cuộc trò chuyện")
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(KinnectTheme.surface)
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(KinnectTheme.border).frame(height: 1)
+            }
+
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 10) {
@@ -314,15 +423,23 @@ struct DirectChatDetailView: View {
                 }
 
                 if editingMessageId != nil {
-                    TextField("Nội dung tin nhắn mới...", text: $editingMessageText)
-                        .padding(10)
-                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                        .foregroundColor(.white)
+                    TextField(
+                        "",
+                        text: $editingMessageText,
+                        prompt: Text("Nội dung tin nhắn mới...").foregroundColor(KinnectTheme.textSecondary)
+                    )
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                    .foregroundColor(KinnectTheme.textPrimary)
                 } else {
-                    TextField("Nhắn tin cho \(peer.name)...", text: $text)
-                        .padding(10)
-                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                        .foregroundColor(.white)
+                    TextField(
+                        "",
+                        text: $text,
+                        prompt: Text("Nhắn tin...").foregroundColor(KinnectTheme.textSecondary)
+                    )
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                    .foregroundColor(KinnectTheme.textPrimary)
 
                     KinnectIconButton(
                         glyph: .send,
@@ -338,82 +455,8 @@ struct DirectChatDetailView: View {
             .background(KinnectTheme.surface)
         }
         .background(KinnectTheme.background)
-        .navigationTitle(peer.name)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItemGroup(placement: .navigationBarTrailing) {
-                KinnectIconButton(
-                    glyph: .phone,
-                    label: "Gọi thoại",
-                    tint: KinnectTheme.online
-                ) {
-                    Task { await NativeWebRTCManager.shared.startOutgoingCall(targetUser: peer, mode: "audio") }
-                }
-
-                KinnectIconButton(
-                    glyph: .videoCall,
-                    label: "Gọi video",
-                    tint: KinnectTheme.accentBright
-                ) {
-                    Task { await NativeWebRTCManager.shared.startOutgoingCall(targetUser: peer, mode: "video") }
-                }
-
-                Menu {
-                    Button {
-                        Task {
-                            isPinned.toggle()
-                            _ = try? await KinnectAPIClient.shared.requestJSON(
-                                "/api/chat-preferences/direct/\(peer.id)",
-                                method: "POST",
-                                body: ["pinned": isPinned]
-                            )
-                            appState.showToast(isPinned ? "Đã ghim hội thoại." : "Đã bỏ ghim.")
-                        }
-                    } label: {
-                        Label(isPinned ? "Bỏ ghim hội thoại" : "Ghim hội thoại", systemImage: isPinned ? "pin.slash" : "pin")
-                    }
-                    Button {
-                        Task {
-                            isMuted.toggle()
-                            _ = try? await KinnectAPIClient.shared.requestJSON(
-                                "/api/chat-preferences/direct/\(peer.id)",
-                                method: "POST",
-                                body: ["muted": isMuted]
-                            )
-                            appState.showToast(isMuted ? "Đã tắt thông báo." : "Đã bật thông báo.")
-                        }
-                    } label: {
-                        Label(isMuted ? "Bật thông báo" : "Tắt thông báo", systemImage: isMuted ? "bell" : "bell.slash")
-                    }
-                    Button(role: .destructive) {
-                        appState.activeReportContext = UGCReportContext(
-                            targetType: "user",
-                            targetId: peer.id,
-                            targetUserId: peer.id,
-                            targetTitle: peer.name
-                        )
-                    } label: {
-                        HStack {
-                            Text("Báo cáo người dùng")
-                            KinnectIcon(glyph: .report, size: 18, tint: KinnectTheme.danger)
-                        }
-                    }
-                    Button(role: .destructive) {
-                        Task { await appState.blockUser(userId: peer.id, userName: peer.name) }
-                    } label: {
-                        HStack {
-                            Text("Chặn người dùng")
-                            KinnectIcon(glyph: .block, size: 18, tint: KinnectTheme.danger)
-                        }
-                    }
-                } label: {
-                    KinnectIcon(glyph: .more, size: 22, tint: KinnectTheme.textSecondary)
-                        .frame(minWidth: 44, minHeight: 44)
-                        .contentShape(Rectangle())
-                }
-                .accessibilityLabel("Tùy chọn cuộc trò chuyện")
-            }
-        }
+        .navigationTitle("")
+        .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showForwardSheet) {
             ForwardMessageSheet(text: forwardText, imageUrl: forwardImageUrl)
         }
@@ -626,15 +669,20 @@ struct DirectChatDetailView: View {
         defer { isSending = false }
         self.text = ""
         let reqId = "dm_\(peer.id)_\(UUID().uuidString)"
+        var payload: [String: Any] = [
+            "body": clean,
+            "text": clean,
+            "imageUrl": imageDataURL,
+            "requestId": reqId
+        ]
+        if !imageDataURL.isEmpty {
+            payload["attachment"] = ["data": imageDataURL, "name": "photo.jpg"]
+        }
         do {
             _ = try await KinnectAPIClient.shared.requestJSON(
                 "/api/users/\(peer.id)/messages",
                 method: "POST",
-                body: [
-                    "text": clean,
-                    "imageUrl": imageDataURL,
-                    "requestId": reqId
-                ],
+                body: payload,
                 requestId: reqId
             )
             await loadMessages()
@@ -663,7 +711,7 @@ struct DirectChatDetailView: View {
         _ = try? await KinnectAPIClient.shared.requestJSON(
             "/api/users/\(peer.id)/messages/\(messageId)",
             method: "PATCH",
-            body: ["text": clean],
+            body: ["body": clean, "text": clean],
             requestId: reqId
         )
         await loadMessages()
@@ -947,7 +995,7 @@ struct GroupChatDetailView: View {
             _ = try await KinnectAPIClient.shared.requestJSON(
                 "/api/groups/\(group.id)/messages",
                 method: "POST",
-                body: ["text": clean],
+                body: ["body": clean, "text": clean],
                 requestId: reqId
             )
             await loadGroupMessages()
@@ -1164,6 +1212,7 @@ struct ForwardMessageSheet: View {
             "/api/users/\(userId)/messages",
             method: "POST",
             body: [
+                "body": text,
                 "text": text,
                 "imageUrl": imageUrl,
                 "requestId": reqId
@@ -1180,6 +1229,7 @@ struct ForwardMessageSheet: View {
             "/api/groups/\(groupId)/messages",
             method: "POST",
             body: [
+                "body": text,
                 "text": text,
                 "imageUrl": imageUrl,
                 "requestId": reqId

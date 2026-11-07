@@ -72,13 +72,8 @@ struct FriendsView: View {
             }
         }
         .background(KinnectTheme.background)
-        .navigationTitle("Bạn bè")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Đóng") { dismiss() }
-            }
-        }
+        .navigationTitle("")
+        .toolbar(.hidden, for: .navigationBar)
         .task {
             await loadAll()
         }
@@ -101,7 +96,7 @@ struct FriendsView: View {
     }
 
     private func friendRow(user: KinnectUser) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             KinnectAvatarView(
                 name: user.name,
                 avatarURL: user.avatarUrl,
@@ -113,57 +108,66 @@ struct FriendsView: View {
                 Text(user.name)
                     .font(.subheadline.bold())
                     .foregroundColor(KinnectTheme.textPrimary)
-                    .kinnectMultiline()
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 if !user.handle.isEmpty {
                     Text("@\(user.handle)")
                         .font(.caption)
                         .foregroundColor(KinnectTheme.textSecondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 }
             }
-            Spacer()
+            .layoutPriority(1)
 
-            KinnectIconButton(
-                glyph: .phone,
-                label: "Gọi thoại",
-                tint: KinnectTheme.online
-            ) {
-                Task {
-                    dismiss()
-                    await NativeWebRTCManager.shared.startOutgoingCall(targetUser: user, mode: "audio")
-                }
-            }
+            Spacer(minLength: 6)
 
-            KinnectIconButton(
-                glyph: .videoCall,
-                label: "Gọi video",
-                tint: KinnectTheme.accentBright
-            ) {
-                Task {
-                    dismiss()
-                    await NativeWebRTCManager.shared.startOutgoingCall(targetUser: user, mode: "video")
-                }
-            }
-
-            Menu {
-                Button(role: .destructive) {
-                    Task { await unfriend(user) }
-                } label: {
-                    Label("Hủy kết bạn", systemImage: "person.badge.minus")
-                }
-                Button(role: .destructive) {
-                    Task { await appState.blockUser(userId: user.id, userName: user.name) }
-                } label: {
-                    HStack {
-                        Text("Chặn người dùng")
-                        KinnectIcon(glyph: .block, size: 18, tint: KinnectTheme.danger)
+            HStack(spacing: 4) {
+                Button {
+                    Task {
+                        dismiss()
+                        await NativeWebRTCManager.shared.startOutgoingCall(targetUser: user, mode: "audio")
                     }
+                } label: {
+                    KinnectIcon(glyph: .phone, size: 19, tint: KinnectTheme.online)
+                        .frame(width: 36, height: 36)
+                        .background(Circle().fill(KinnectTheme.surfaceElevated))
                 }
-            } label: {
-                KinnectIcon(glyph: .more, size: 22, tint: KinnectTheme.textSecondary)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
+                .accessibilityLabel("Gọi thoại")
+
+                Button {
+                    Task {
+                        dismiss()
+                        await NativeWebRTCManager.shared.startOutgoingCall(targetUser: user, mode: "video")
+                    }
+                } label: {
+                    KinnectIcon(glyph: .videoCall, size: 19, tint: KinnectTheme.accentBright)
+                        .frame(width: 36, height: 36)
+                        .background(Circle().fill(KinnectTheme.surfaceElevated))
+                }
+                .accessibilityLabel("Gọi video")
+
+                Menu {
+                    Button(role: .destructive) {
+                        Task { await unfriend(user) }
+                    } label: {
+                        Label("Hủy kết bạn", systemImage: "person.badge.minus")
+                    }
+                    Button(role: .destructive) {
+                        Task { await appState.blockUser(userId: user.id, userName: user.name) }
+                    } label: {
+                        HStack {
+                            Text("Chặn người dùng")
+                            KinnectIcon(glyph: .block, size: 18, tint: KinnectTheme.danger)
+                        }
+                    }
+                } label: {
+                    KinnectIcon(glyph: .more, size: 20, tint: KinnectTheme.textSecondary)
+                        .frame(width: 32, height: 36)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("Tùy chọn bạn bè")
             }
-            .accessibilityLabel("Tùy chọn bạn bè")
         }
         .kinnectCard()
     }

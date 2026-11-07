@@ -22,10 +22,10 @@ enum UIReviewFixture {
 
     static let currentUserDict: [String: Any] = [
         "id": "fixture_user_me",
-        "name": "Minh Anh [Fixture UI]",
-        "handle": "minhanh_fixture",
-        "email": "fixture-ui@kinnect.local",
-        "bio": "[Dữ liệu Fixture UI kiểm thử giao diện native iOS — Không kết nối dữ liệu thật]",
+        "name": "Nguyễn Minh Anh",
+        "handle": "minhanh",
+        "email": "minhanh@kinnect.local",
+        "bio": "Thiết kế giao diện & nhiếp ảnh đường phố • Sài Gòn",
         "locationName": "Quận 1, TP. Hồ Chí Minh",
         "avatarColor": "#7C3AED",
         "friendsCount": 128,
@@ -36,9 +36,9 @@ enum UIReviewFixture {
 
     static let peerUserDict: [String: Any] = [
         "id": "fixture_user_peer",
-        "name": "Hoàng Nam [Fixture UI]",
-        "handle": "hoangnam_fixture",
-        "bio": "Thiết kế sản phẩm & nhiếp ảnh • Fixture UI Test",
+        "name": "Lê Hoàng Nam",
+        "handle": "hoangnam",
+        "bio": "Thiết kế sản phẩm & nhiếp ảnh • Đà Nẵng",
         "locationName": "Đà Nẵng",
         "avatarColor": "#2563EB",
         "distanceKm": 2.4,
@@ -48,9 +48,9 @@ enum UIReviewFixture {
 
     static let secondPeerDict: [String: Any] = [
         "id": "fixture_user_2",
-        "name": "Thanh Trúc [Fixture UI]",
-        "handle": "thanhtruc_fixture",
-        "bio": "Âm nhạc, du lịch & công nghệ • Fixture UI Test",
+        "name": "Trần Thanh Trúc",
+        "handle": "thanhtruc",
+        "bio": "Âm nhạc, du lịch & công nghệ • Hà Nội",
         "locationName": "Hà Nội",
         "avatarColor": "#EC4899",
         "distanceKm": 5.8,
@@ -74,9 +74,9 @@ enum UIReviewFixture {
                     [
                         "id": "fixture_post_1",
                         "author": peerUserDict,
-                        "text": "[Fixture UI Test] Giao diện Kinnect iOS Native SwiftUI mới với bộ 40 icon vector riêng. Kiểm tra hiển thị tiếng Việt có dấu, khoảng cách dòng và nút menu 3 chấm nền trong suốt.",
+                        "text": "Hoàng hôn trên cầu Rồng chiều cuối tuần. Giao diện Kinnect iOS Native SwiftUI mới mượt mà và sắc nét!",
                         "category": "community",
-                        "imageUrl": "",
+                        "imageUrl": sampleImageDataURL,
                         "likesCount": 42,
                         "commentsCount": 8,
                         "liked": true,
@@ -86,7 +86,7 @@ enum UIReviewFixture {
                     [
                         "id": "fixture_post_2",
                         "author": secondPeerDict,
-                        "text": "[Fixture UI Test] Buổi chiều cuối tuần cùng bạn bè tại Sài Gòn. Không cắt chữ trên màn hình nhỏ!",
+                        "text": "Buổi chiều cà phê cuối tuần cùng hội bạn thân tại trung tâm Sài Gòn.",
                         "category": "events",
                         "imageUrl": "",
                         "likesCount": 19,
@@ -419,23 +419,23 @@ enum UIReviewFixture {
                 "rooms": [
                     [
                         "id": "fixture_live_1",
-                        "title": "Giao lưu tối cuối tuần [Fixture UI]",
+                        "title": "Giao lưu âm nhạc tối cuối tuần",
                         "topic": "Trò chuyện & kết nối bạn mới",
                         "liveMode": "chat",
                         "gameTitle": "",
                         "hostUserId": "fixture_user_peer",
-                        "hostName": "Hoàng Nam [Fixture UI]",
+                        "hostName": "Lê Hoàng Nam",
                         "hostAvatarColor": "#2563EB",
                         "viewerCount": 64
                     ],
                     [
                         "id": "fixture_live_2",
-                        "title": "Leo rank Liên Quân cùng team [Fixture UI]",
+                        "title": "Leo rank Liên Quân cùng team",
                         "topic": "Chơi game trực tiếp",
                         "liveMode": "game",
                         "gameTitle": "Liên Quân Mobile",
                         "hostUserId": "fixture_user_2",
-                        "hostName": "Thanh Trúc [Fixture UI]",
+                        "hostName": "Trần Thanh Trúc",
                         "hostAvatarColor": "#EC4899",
                         "viewerCount": 142
                     ]
@@ -458,19 +458,21 @@ enum UIReviewFixture {
                 ]
             ]
 
-        case "/api/sessions":
+        case "/api/sessions", "/api/me/sessions":
             return [
                 "sessions": [
                     [
                         "id": "fixture_sess_1",
-                        "deviceName": "iPhone 16 Pro (Thiết bị này) [Fixture UI]",
+                        "userAgent": "iPhone 16 Pro • iOS 18.2 (Thiết bị hiện tại)",
+                        "deviceName": "iPhone 16 Pro (Thiết bị này)",
                         "ip": "127.0.0.1",
                         "current": true,
                         "lastActive": "Vừa xong"
                     ],
                     [
                         "id": "fixture_sess_2",
-                        "deviceName": "iPad Pro 11-inch [Fixture UI]",
+                        "userAgent": "iPad Pro 11-inch • iPadOS 18.2",
+                        "deviceName": "iPad Pro 11-inch",
                         "ip": "192.168.1.15",
                         "current": false,
                         "lastActive": "2 giờ trước"
@@ -487,12 +489,12 @@ enum UIReviewFixture {
                     "photos": [
                         [
                             "id": "fixture_priv_1",
-                            "url": "",
+                            "url": sampleImageDataURL,
                             "created": 1762500000000
                         ],
                         [
                             "id": "fixture_priv_2",
-                            "url": "",
+                            "url": sampleImageDataURL,
                             "created": 1762490000000
                         ]
                     ]
@@ -530,25 +532,58 @@ enum UIReviewFixture {
         }
     }
 
+    static var sampleImageDataURL: String = {
+        let img = samplePreviewImage()
+        if let jpeg = img.jpegData(compressionQuality: 0.82) {
+            return "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
+        }
+        return ""
+    }()
+
     static func samplePreviewImage() -> UIImage {
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 640, height: 420))
+        let size = CGSize(width: 640, height: 420)
+        let renderer = UIGraphicsImageRenderer(size: size)
         return renderer.image { ctx in
-            let colors = [
-                UIColor(red: 0.43, green: 0.29, blue: 1.0, alpha: 1.0).cgColor,
-                UIColor(red: 0.16, green: 0.09, blue: 0.36, alpha: 1.0).cgColor
+            let cg = ctx.cgContext
+            let skyColors = [
+                UIColor(red: 0.14, green: 0.06, blue: 0.34, alpha: 1.0).cgColor,
+                UIColor(red: 0.48, green: 0.18, blue: 0.68, alpha: 1.0).cgColor,
+                UIColor(red: 0.96, green: 0.45, blue: 0.38, alpha: 1.0).cgColor
             ] as CFArray
-            if let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1]) {
-                ctx.cgContext.drawLinearGradient(grad, start: .zero, end: CGPoint(x: 640, y: 420), options: [])
+            if let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: skyColors, locations: [0.0, 0.55, 1.0]) {
+                cg.drawLinearGradient(grad, start: .zero, end: CGPoint(x: 0, y: size.height), options: [])
             }
-            let paragraph = NSMutableParagraphStyle()
-            paragraph.alignment = .center
-            let attrs: [NSAttributedString.Key: Any] = [
-                .font: UIFont.boldSystemFont(ofSize: 26),
-                .foregroundColor: UIColor.white,
-                .paragraphStyle: paragraph
-            ]
-            let text = "KINNECT STUDIO PREVIEW\n[Fixture UI Test — Ảnh mẫu kiểm thử]"
-            text.draw(in: CGRect(x: 40, y: 170, width: 560, height: 100), withAttributes: attrs)
+
+            // Warm sunset sun disc
+            cg.setFillColor(UIColor(red: 1.0, green: 0.84, blue: 0.42, alpha: 0.92).cgColor)
+            cg.fillEllipse(in: CGRect(x: 420, y: 78, width: 96, height: 96))
+
+            // Distant mountain silhouette
+            let backMountains = UIBezierPath()
+            backMountains.move(to: CGPoint(x: 0, y: 290))
+            backMountains.addLine(to: CGPoint(x: 140, y: 190))
+            backMountains.addLine(to: CGPoint(x: 270, y: 255))
+            backMountains.addLine(to: CGPoint(x: 410, y: 165))
+            backMountains.addLine(to: CGPoint(x: 540, y: 245))
+            backMountains.addLine(to: CGPoint(x: 640, y: 205))
+            backMountains.addLine(to: CGPoint(x: 640, y: 420))
+            backMountains.addLine(to: CGPoint(x: 0, y: 420))
+            backMountains.close()
+            UIColor(red: 0.18, green: 0.08, blue: 0.32, alpha: 0.85).setFill()
+            backMountains.fill()
+
+            // Foreground mountain ridge
+            let frontMountains = UIBezierPath()
+            frontMountains.move(to: CGPoint(x: 0, y: 335))
+            frontMountains.addLine(to: CGPoint(x: 190, y: 235))
+            frontMountains.addLine(to: CGPoint(x: 340, y: 310))
+            frontMountains.addLine(to: CGPoint(x: 500, y: 225))
+            frontMountains.addLine(to: CGPoint(x: 640, y: 295))
+            frontMountains.addLine(to: CGPoint(x: 640, y: 420))
+            frontMountains.addLine(to: CGPoint(x: 0, y: 420))
+            frontMountains.close()
+            UIColor(red: 0.09, green: 0.04, blue: 0.18, alpha: 0.96).setFill()
+            frontMountains.fill()
         }
     }
 }
