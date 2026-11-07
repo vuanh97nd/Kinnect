@@ -34,18 +34,33 @@ struct LiveStreamView: View {
             } else if !appState.liveRooms.isEmpty {
                 // Unified native vertical swipe viewer for all Live streams (Parity Android 1.2.12 build 118)
                 GeometryReader { proxy in
-                    ScrollView(.vertical, showsIndicators: false) {
-                        LazyVStack(spacing: 0) {
+                    if #available(iOS 17.0, *) {
+                        ScrollView(.vertical, showsIndicators: false) {
+                            LazyVStack(spacing: 0) {
+                                ForEach(Array(appState.liveRooms.enumerated()), id: \.element.id) { index, room in
+                                    liveStreamPage(room)
+                                        .frame(width: proxy.size.width, height: proxy.size.height)
+                                        .id(index)
+                                        .onAppear {
+                                            selectedIndex = index
+                                        }
+                                }
+                            }
+                            .scrollTargetLayout()
+                        }
+                        .scrollTargetBehavior(.paging)
+                        .ignoresSafeArea()
+                    } else {
+                        TabView(selection: $selectedIndex) {
                             ForEach(Array(appState.liveRooms.enumerated()), id: \.element.id) { index, room in
                                 liveStreamPage(room)
                                     .frame(width: proxy.size.width, height: proxy.size.height)
-                                    .id(index)
+                                    .tag(index)
                             }
                         }
-                        .scrollTargetLayout()
+                        .tabViewStyle(.page(indexDisplayMode: .never))
+                        .ignoresSafeArea()
                     }
-                    .scrollTargetBehavior(.paging)
-                    .ignoresSafeArea()
                 }
             }
         }
@@ -58,9 +73,9 @@ struct LiveStreamView: View {
                 likesCount = initialRoom.likesCount
             }
         }
-        .onChange(of: selectedIndex) {
-            guard selectedIndex < appState.liveRooms.count else { return }
-            let room = appState.liveRooms[selectedIndex]
+        .onChange(of: selectedIndex) { newIndex in
+            guard newIndex < appState.liveRooms.count else { return }
+            let room = appState.liveRooms[newIndex]
             appState.joinLiveRoom(room)
             likesCount = room.likesCount
         }

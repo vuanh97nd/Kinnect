@@ -430,8 +430,8 @@ struct EditProfileSheet: View {
                             .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
                             .foregroundColor(KinnectTheme.accentBright)
                         }
-                        .onChange(of: selectedAvatarItem) {
-                            guard let item = selectedAvatarItem else { return }
+                        .onChange(of: selectedAvatarItem) { item in
+                            guard let item else { return }
                             Task { await uploadImage(item: item, endpoint: "/api/me/avatar", field: "avatarDataUrl") }
                         }
 
@@ -445,8 +445,8 @@ struct EditProfileSheet: View {
                             .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
                             .foregroundColor(KinnectTheme.accentBright)
                         }
-                        .onChange(of: selectedCoverItem) {
-                            guard let item = selectedCoverItem else { return }
+                        .onChange(of: selectedCoverItem) { item in
+                            guard let item else { return }
                             Task { await uploadImage(item: item, endpoint: "/api/me/cover", field: "coverDataUrl") }
                         }
                     }
