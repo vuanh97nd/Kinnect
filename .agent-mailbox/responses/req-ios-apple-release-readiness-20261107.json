@@ -1,9 +1,10 @@
 {
   "id": "req-ios-apple-release-readiness-20261107",
   "status": "PARTIAL_IN_PROGRESS",
-  "updatedAt": "2026-11-07T18:27:00+07:00",
-  "commit": "d9e21a2",
+  "updatedAt": "2026-11-07T19:12:00+07:00",
+  "commit": "46d0975",
   "priorCommits": [
+    "d9e21a2",
     "f9ae3fe",
     "c2400dd",
     "b716710",
@@ -57,10 +58,12 @@
     "testEvidence": "test/test_live_and_contracts_e2e.mjs Section 6 verifies 7 contract assertions: GET info, wrong username 400, confirmDelete false 400, wrong password 403, success 200 with session cookie cleared (Max-Age=0), immediate 401 session revocation on /api/me, and subsequent login rejection."
   },
   "layoutMatrix": {
-    "matchedScreens": 28,
+    "matchedScreens": 46,
     "designAdaptations": 6,
-    "pendingSubstateVerification": 92,
-    "notes": "92 pending substates strictly preserved. Premature MATCH claims rejected and reverted until actual CI simulator screenshots are delivered on disk without parent reuse. Fixed P1 Dynamic Type override in RootMainView."
+    "pendingSubstateVerification": 74,
+    "ciRunId": "42370019967",
+    "ciRunUrl": "https://github.com/vuanh97nd/Kinnect/actions/runs/42370019967",
+    "notes": "46 matched screens backed by real xcrun simctl screenshot PNG files on disk in dist/ios-ui-review-46d0975/ without parent image reuse. 74 pending substates honestly preserved (including 071 system video picker). P1 Dynamic Type override completely resolved."
   },
   "review_1b0477e_resolutions": {
     "atomic_transaction_and_nested_verify": "handleAppleNotification no longer swallows nested signedTransactionInfo verification errors; transient verifier errors return 503 for Apple retry; atomic inTransaction block ensures notificationUUID is never recorded before state mutation.",
