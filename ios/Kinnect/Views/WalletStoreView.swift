@@ -298,6 +298,13 @@ struct WalletStoreView: View {
                             .padding(.vertical, 8)
                             .frame(maxWidth: .infinity)
                         }
+
+                        Text("Lưu ý: Tính năng khôi phục StoreKit áp dụng cho các gói dịch vụ cố định và mẫu giao diện đã mua. Số dư xu Kinnect (vật phẩm tiêu hao) được lưu trữ an toàn trên máy chủ tài khoản Kinnect và tự động hiển thị lại khi bạn đăng nhập.")
+                            .font(.caption2)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 8)
+                            .padding(.top, 2)
                     }
                 }
                 .padding(14)

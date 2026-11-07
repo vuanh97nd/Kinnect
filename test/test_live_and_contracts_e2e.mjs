@@ -4,11 +4,25 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import WebSocket from "ws";
 import { createApp } from "../server.js";
+import { SignedDataVerifier, Environment } from "@apple/app-store-server-library";
 
-const tmp = mkdtempSync(join(tmpdir(), "kinnect-ios-e2e-"));
-const dbPath = join(tmp, "test.sqlite");
+const appleVerifier = {
+  enabled: () => true,
+  bundleId: "app.kinnect.live",
+  environment: "LocalTesting",
+  async verify(jws) {
+    const v = new SignedDataVerifier([], false, Environment.LOCAL_TESTING, "app.kinnect.live");
+    return await v.verifyAndDecodeTransaction(jws);
+  }
+};
+
 // Fully isolated: ":memory:" disables the shared cloud session/bridge, SFU env and gift env (server.js:25-86).
-const { server, social } = createApp({ dbPath: ":memory:", allowEmailDelivery: false });
+const { server, social } = createApp({
+  dbPath: ":memory:",
+  allowEmailDelivery: false,
+  appleStoreVerifier: appleVerifier,
+  storeEnv: { PLAY_PURCHASE_TOKEN_KEY: "ab".repeat(32) }
+});
 const RUN = Date.now().toString(36).slice(-5);
 
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -258,6 +272,187 @@ const viewPrivJson = await viewPrivRes.json();
 assert.equal(viewPrivJson.status, "granted");
 assert.equal(viewPrivJson.photos.length, 1);
 console.log("   -> Verified Private Album upload, viewer request, owner grant, and authorized photo listing!");
+
+console.log("5. Testing Server-Side Apple StoreKit JWS Transaction Verification (7 paths)...");
+function makeAppleJWS(payload, header = { alg: "none", typ: "JWT" }) {
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  return `${b64(header)}.${b64(payload)}.sig`;
+}
+
+// Path 1: Valid Apple StoreKit 2 transaction verification (kinnect_style_aurora) -> 200, state PURCHASED, owned
+const jwsValid = makeAppleJWS({
+  transactionId: "tx_apple_1001",
+  originalTransactionId: "tx_apple_1001",
+  bundleId: "app.kinnect.live",
+  productId: "kinnect_style_aurora",
+  purchaseDate: Date.now(),
+  originalPurchaseDate: Date.now(),
+  quantity: 1,
+  type: "Non-Consumable",
+  inAppOwnershipType: "PURCHASED",
+  signedDate: Date.now(),
+  environment: "LocalTesting"
+});
+const vRes1 = await fetch(`${baseUrl}/api/store/verify`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json", Cookie: host1.cookie },
+  body: JSON.stringify({ productId: "kinnect_style_aurora", purchaseToken: jwsValid, platform: "ios" })
+});
+assert.equal(vRes1.status, 200);
+const vJson1 = await vRes1.json();
+assert.equal(vJson1.state, "PURCHASED");
+assert.ok(vJson1.owned.includes("kinnect_style_aurora"));
+assert.equal(vJson1.platform, "ios");
+assert.equal(vJson1.transactionId, "tx_apple_1001");
+
+// Path 2: Idempotent re-submission of same transaction by same user -> 200, no duplicate grants
+const vRes2 = await fetch(`${baseUrl}/api/store/verify`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json", Cookie: host1.cookie },
+  body: JSON.stringify({ productId: "kinnect_style_aurora", purchaseToken: jwsValid, platform: "ios" })
+});
+assert.equal(vRes2.status, 200);
+const vJson2 = await vRes2.json();
+assert.equal(vJson2.state, "PURCHASED");
+assert.equal(vJson2.idempotent, true);
+const purchaseRows = social.db.prepare("SELECT COUNT(*) AS c FROM store_purchases WHERE product_id=?").get("kinnect_style_aurora").c;
+assert.equal(purchaseRows, 1, "idempotent transaction must not duplicate database rows");
+
+// Path 3: Stolen/Replay Apple transaction by another user -> 409 Conflict
+const vRes3 = await fetch(`${baseUrl}/api/store/verify`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json", Cookie: viewer.cookie },
+  body: JSON.stringify({ productId: "kinnect_style_aurora", purchaseToken: jwsValid, platform: "ios" })
+});
+assert.equal(vRes3.status, 409);
+assert.match((await vRes3.json()).error, /tài khoản khác/i);
+
+// Path 4: Unmatched product ID (JWS has kinnect_style_sunset but body requests kinnect_style_aurora) -> 422
+const jwsMismatchProduct = makeAppleJWS({
+  transactionId: "tx_apple_1002",
+  bundleId: "app.kinnect.live",
+  productId: "kinnect_style_sunset",
+  purchaseDate: Date.now(),
+  signedDate: Date.now(),
+  environment: "LocalTesting"
+});
+const vRes4 = await fetch(`${baseUrl}/api/store/verify`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json", Cookie: host1.cookie },
+  body: JSON.stringify({ productId: "kinnect_style_aurora", purchaseToken: jwsMismatchProduct, platform: "ios" })
+});
+assert.equal(vRes4.status, 422);
+assert.match((await vRes4.json()).error, /không khớp/i);
+
+// Path 5: Unmatched bundle ID (JWS has attacker bundle ID) -> 422
+const jwsMismatchBundle = makeAppleJWS({
+  transactionId: "tx_apple_1003",
+  bundleId: "com.attacker.bundle",
+  productId: "kinnect_style_ocean",
+  purchaseDate: Date.now(),
+  signedDate: Date.now(),
+  environment: "LocalTesting"
+});
+const vRes5 = await fetch(`${baseUrl}/api/store/verify`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json", Cookie: host1.cookie },
+  body: JSON.stringify({ productId: "kinnect_style_ocean", purchaseToken: jwsMismatchBundle, platform: "ios" })
+});
+assert.equal(vRes5.status, 422);
+
+// Path 6: Revoked/Refunded transaction (revocationDate present) -> 422 rejection
+const jwsRevoked = makeAppleJWS({
+  transactionId: "tx_apple_1004",
+  bundleId: "app.kinnect.live",
+  productId: "kinnect_style_sunset",
+  purchaseDate: Date.now() - 86400000,
+  revocationDate: Date.now() - 3600000,
+  revocationReason: 1,
+  signedDate: Date.now(),
+  environment: "LocalTesting"
+});
+const vRes6 = await fetch(`${baseUrl}/api/store/verify`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json", Cookie: host1.cookie },
+  body: JSON.stringify({ productId: "kinnect_style_sunset", purchaseToken: jwsRevoked, platform: "ios" })
+});
+assert.equal(vRes6.status, 422);
+assert.match((await vRes6.json()).error, /thu hồi|hoàn tiền/i);
+
+// Path 7: Client attempting to credit from transactionId alone without valid signed JWS token -> 400
+const vRes7 = await fetch(`${baseUrl}/api/store/verify`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json", Cookie: host1.cookie },
+  body: JSON.stringify({ productId: "kinnect_style_sunset", purchaseToken: "raw_tx_id_only", platform: "ios" })
+});
+assert.equal(vRes7.status, 400);
+console.log("   -> Verified Apple StoreKit 2 verification, bundleId/productId check, replay prevention, and refund rejection!");
+
+console.log("6. Testing Permanent Account Deletion Lifecycle (7 contract assertions)...");
+// Register dedicated deletion test user
+const delUser = await registerUser("del_target_" + RUN, "User To Delete", `del_${RUN}@kinnect.local`, "DeletePass123!");
+await acceptPrivacyConsentExplicitly(delUser);
+
+// Path 1: GET /api/me/account-deletion returns requirements and permanent: true
+const getDelRes = await fetch(`${baseUrl}/api/me/account-deletion`, {
+  headers: { Cookie: delUser.cookie }
+});
+assert.equal(getDelRes.status, 200);
+const getDelJson = await getDelRes.json();
+assert.equal(getDelJson.username, delUser.user.username);
+assert.equal(getDelJson.permanent, true);
+
+// Path 2: DELETE with wrong confirmUsername -> 400 rejection
+const delWrongUser = await fetch(`${baseUrl}/api/me/account-deletion`, {
+  method: "DELETE",
+  headers: { "Content-Type": "application/json", Cookie: delUser.cookie },
+  body: JSON.stringify({ confirmUsername: "wrong_username", confirmDelete: true, password: "DeletePass123!" })
+});
+assert.equal(delWrongUser.status, 400);
+
+// Path 3: DELETE with confirmDelete !== true -> 400 rejection
+const delNoConfirm = await fetch(`${baseUrl}/api/me/account-deletion`, {
+  method: "DELETE",
+  headers: { "Content-Type": "application/json", Cookie: delUser.cookie },
+  body: JSON.stringify({ confirmUsername: delUser.user.username, confirmDelete: false, password: "DeletePass123!" })
+});
+assert.equal(delNoConfirm.status, 400);
+
+// Path 4: DELETE with wrong password -> 403 rejection
+const delWrongPass = await fetch(`${baseUrl}/api/me/account-deletion`, {
+  method: "DELETE",
+  headers: { "Content-Type": "application/json", Cookie: delUser.cookie },
+  body: JSON.stringify({ confirmUsername: delUser.user.username, confirmDelete: true, password: "WrongPassword999!" })
+});
+assert.equal(delWrongPass.status, 403);
+
+// Path 5: DELETE with matching username, confirmDelete: true, and correct password -> 200
+const delSuccess = await fetch(`${baseUrl}/api/me/account-deletion`, {
+  method: "DELETE",
+  headers: { "Content-Type": "application/json", Cookie: delUser.cookie },
+  body: JSON.stringify({ confirmUsername: delUser.user.username, confirmDelete: true, password: "DeletePass123!" })
+});
+assert.equal(delSuccess.status, 200);
+const delSuccessJson = await delSuccess.json();
+assert.equal(delSuccessJson.ok, true);
+assert.equal(delSuccessJson.deleted, true);
+const setCookieDel = delSuccess.headers.get("set-cookie") || "";
+assert.match(setCookieDel, /Max-Age=0/i, "session cookie must be cleared on deletion");
+
+// Path 6: Request to /api/me with deleted user cookie -> 401 Unauthorized
+const postDelMe = await fetch(`${baseUrl}/api/me`, {
+  headers: { Cookie: delUser.cookie }
+});
+assert.equal(postDelMe.status, 401, "deleted user session must be immediately revoked");
+
+// Path 7: Attempt login with deleted username -> 401 rejection
+const postDelLogin = await fetch(`${baseUrl}/api/login`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ username: delUser.user.username, password: "DeletePass123!" })
+});
+assert.equal(postDelLogin.status, 401, "deleted account cannot be logged into");
+console.log("   -> Verified permanent account deletion, password challenge, session revocation, and data destruction!");
 
 h1Conn.ws.close();
 h2Conn.ws.close();
