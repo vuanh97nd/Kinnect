@@ -1,39 +1,12 @@
 import SwiftUI
 
-struct ShortVideoItem: Identifiable {
-    let id: String
-    let author: KinnectUser
-    let title: String
-    let caption: String
-    let videoUrl: String
-    let durationSec: Int
-    var likesCount: Int
-    var commentsCount: Int
-    var isLiked: Bool
-
-    static func from(_ dict: [String: Any]) -> ShortVideoItem {
-        let authDict = dict["author"] as? [String: Any] ?? [:]
-        return ShortVideoItem(
-            id: dict["id"] as? String ?? UUID().uuidString,
-            author: KinnectUser.from(authDict),
-            title: dict["title"] as? String ?? "",
-            caption: dict["caption"] as? String ?? "",
-            videoUrl: dict["videoUrl"] as? String ?? "",
-            durationSec: dict["durationSec"] as? Int ?? 15,
-            likesCount: dict["likesCount"] as? Int ?? 0,
-            commentsCount: dict["commentsCount"] as? Int ?? 0,
-            isLiked: dict["liked"] as? Bool ?? false
-        )
-    }
-}
-
 struct ShortsVideoView: View {
     @ObservedObject private var appState = AppState.shared
     @State private var shortsTab: String = "for" // "for" (Đề xuất) | "following" (Đang theo dõi)
-    @State private var items: [ShortVideoItem] = []
+    @State private var items: [ShortItem] = []
     @State private var currentIndex: Int = 0
     @State private var isLoading = false
-    @State private var showCommentsSheet = false
+    @State private var activeCommentShort: ShortItem?
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -85,9 +58,9 @@ struct ShortsVideoView: View {
         .task {
             await loadShorts()
         }
-        .sheet(isPresented: $showCommentsSheet) {
-            if currentIndex < items.count {
-                ShortCommentsSheet(item: items[currentIndex])
+        .sheet(item: $activeCommentShort) { short in
+            ShortCommentsSheet(short: short) {
+                Task { await loadShorts() }
             }
         }
     }
@@ -118,7 +91,7 @@ struct ShortsVideoView: View {
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 
-    private func shortVideoCard(_ item: ShortVideoItem, at index: Int) -> some View {
+    private func shortVideoCard(_ item: ShortItem, at index: Int) -> some View {
         ZStack(alignment: .bottomLeading) {
             // Background Video Stage / Preview placeholder
             Rectangle()
@@ -191,8 +164,8 @@ struct ShortsVideoView: View {
                             KinnectIcon(
                                 glyph: .heart,
                                 size: 28,
-                                selected: item.isLiked,
-                                tint: item.isLiked ? KinnectTheme.danger : .white
+                                selected: item.liked,
+                                tint: item.liked ? KinnectTheme.danger : .white
                             )
                             Text("\(item.likesCount)")
                                 .font(.caption.bold())
@@ -200,11 +173,11 @@ struct ShortsVideoView: View {
                         }
                         .frame(minWidth: 44, minHeight: 44)
                     }
-                    .accessibilityLabel(item.isLiked ? "Bỏ thích video" : "Thích video")
+                    .accessibilityLabel(item.liked ? "Bỏ thích video" : "Thích video")
 
                     // Comments button
                     Button {
-                        showCommentsSheet = true
+                        activeCommentShort = item
                     } label: {
                         VStack(spacing: 4) {
                             KinnectIcon(glyph: .comment, size: 28, selected: true, tint: .white)
@@ -239,8 +212,25 @@ struct ShortsVideoView: View {
 
     private func toggleLike(at index: Int) {
         guard index < items.count else { return }
-        items[index].isLiked.toggle()
-        items[index].likesCount += items[index].isLiked ? 1 : -1
+        let current = items[index]
+        let newLiked = !current.liked
+        items[index].liked = newLiked
+        items[index].likesCount = max(0, current.likesCount + (newLiked ? 1 : -1))
+
+        Task {
+            do {
+                _ = try await KinnectAPIClient.shared.requestJSON(
+                    "/api/shorts/\(current.id)/like",
+                    method: newLiked ? "POST" : "DELETE"
+                )
+            } catch {
+                // Revert on failure
+                if index < items.count {
+                    items[index].liked = current.liked
+                    items[index].likesCount = current.likesCount
+                }
+            }
+        }
     }
 
     private func loadShorts() async {
@@ -252,65 +242,10 @@ struct ShortsVideoView: View {
                 method: "GET"
             )
             if let arr = res["shorts"] as? [[String: Any]] {
-                self.items = arr.map(ShortVideoItem.from)
+                self.items = arr.map(ShortItem.from)
             }
         } catch {
             appState.showToast("Không thể tải video: \(error.localizedDescription)")
-        }
-    }
-}
-
-struct ShortCommentsSheet: View {
-    let item: ShortVideoItem
-    @Environment(\.dismiss) private var dismiss
-    @State private var commentText = ""
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                List {
-                    Section {
-                        HStack(alignment: .top, spacing: 10) {
-                            KinnectAvatarView(name: "Bạn bè", avatarURL: "", colorHex: "#9B51E0", size: 36, isOnline: false)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("kinnect_user")
-                                    .font(.caption.bold())
-                                    .foregroundColor(.white)
-                                Text("Video rất hay và sáng tạo!")
-                                    .font(.subheadline)
-                                    .foregroundColor(.white)
-                            }
-                        }
-                        .listRowBackground(KinnectTheme.surface)
-                    } header: {
-                        Text("\(item.commentsCount) bình luận")
-                            .foregroundColor(KinnectTheme.textSecondary)
-                    }
-                }
-                .scrollContentBackground(.hidden)
-                .background(KinnectTheme.background)
-
-                HStack(spacing: 8) {
-                    TextField("Thêm bình luận...", text: $commentText)
-                        .padding(10)
-                        .background(RoundedRectangle(cornerRadius: 18).fill(KinnectTheme.surfaceElevated))
-                        .foregroundColor(.white)
-
-                    KinnectIconButton(glyph: .send, label: "Gửi", tint: KinnectTheme.accentBright) {
-                        commentText = ""
-                    }
-                }
-                .padding(12)
-                .background(KinnectTheme.surface)
-            }
-            .navigationTitle("Bình luận")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Đóng") { dismiss() }
-                        .foregroundColor(KinnectTheme.accentBright)
-                }
-            }
         }
     }
 }
