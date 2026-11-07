@@ -461,8 +461,8 @@ struct CameraStudioView: View {
                 VStack(spacing: 12) {
                     switch selectedTool {
                     case .crop:
-                        if isVideoActive {
-                            VStack(alignment: .leading, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            if isVideoActive {
                                 HStack {
                                     Text("Cắt thời lượng video (Trim):")
                                         .font(.caption.bold())
@@ -515,12 +515,9 @@ struct CameraStudioView: View {
                                         .background(Capsule().fill(KinnectTheme.surfaceElevated))
                                         .foregroundColor(.white)
                                     }
-
                                     Spacer()
                                 }
-                            }
-                        } else {
-                            VStack(alignment: .leading, spacing: 10) {
+                            } else {
                                 Text("Tỉ lệ khung hình:")
                                     .font(.caption.bold())
                                     .foregroundColor(KinnectTheme.textSecondary)
@@ -543,40 +540,39 @@ struct CameraStudioView: View {
                                         }
                                     }
                                 }
-                            }
-                        }
 
-                            Divider().background(KinnectTheme.border)
+                                Divider().background(KinnectTheme.border)
 
-                            HStack(spacing: 16) {
-                                Button {
-                                    photoProject.rotation = (photoProject.rotation + 90) % 360
-                                    updatePhotoPreview()
-                                } label: {
-                                    HStack(spacing: 5) {
-                                        Image(systemName: "rotate.right.fill")
-                                        Text("Xoay 90° (\(photoProject.rotation)°)")
+                                HStack(spacing: 16) {
+                                    Button {
+                                        photoProject.rotation = (photoProject.rotation + 90) % 360
+                                        updatePhotoPreview()
+                                    } label: {
+                                        HStack(spacing: 5) {
+                                            Image(systemName: "rotate.right.fill")
+                                            Text("Xoay 90° (\(photoProject.rotation)°)")
+                                        }
+                                        .font(.caption.bold())
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                        .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
+                                        .foregroundColor(.white)
                                     }
-                                    .font(.caption.bold())
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
-                                    .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
-                                    .foregroundColor(.white)
-                                }
 
-                                Button {
-                                    photoProject.flipHorizontal.toggle()
-                                    updatePhotoPreview()
-                                } label: {
-                                    HStack(spacing: 5) {
-                                        Image(systemName: "arrow.left.and.right.righttriangle.left.righttriangle.right.fill")
-                                        Text(photoProject.flipHorizontal ? "Đã lật" : "Lật ảnh")
+                                    Button {
+                                        photoProject.flipHorizontal.toggle()
+                                        updatePhotoPreview()
+                                    } label: {
+                                        HStack(spacing: 5) {
+                                            Image(systemName: "arrow.left.and.right.righttriangle.left.righttriangle.right.fill")
+                                            Text(photoProject.flipHorizontal ? "Đã lật" : "Lật ảnh")
+                                        }
+                                        .font(.caption.bold())
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                        .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
+                                        .foregroundColor(.white)
                                     }
-                                    .font(.caption.bold())
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
-                                    .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
-                                    .foregroundColor(.white)
                                 }
                             }
                         }
