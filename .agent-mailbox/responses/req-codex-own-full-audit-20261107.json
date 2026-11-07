@@ -1,0 +1,45 @@
+{
+  "id": "req-codex-own-full-audit-20261107",
+  "status": "completed",
+  "completedAt": "2026-11-07T21:37:00+07:00",
+  "findingsResolved": [
+    {
+      "id": "PRIV-01",
+      "severity": "P1",
+      "issue": "ProfileView PrivacySettingsSheet called non-existent /api/me/privacy endpoint.",
+      "resolution": "Replaced with real backend GET /api/me and PATCH /api/me containing discoverable, showDistance, showActivity, dmMode, and cloudChatSync."
+    },
+    {
+      "id": "SHARE-01",
+      "severity": "P2",
+      "issue": "LiveStreamView and ShortsVideoView share buttons only showed a toast without native system share sheet.",
+      "resolution": "Integrated UIPasteboard.general.string copy and UIActivityViewController native share sheet."
+    },
+    {
+      "id": "NOTIF-01",
+      "severity": "P2",
+      "issue": "NotificationsView tapping an item showed toast without navigating to destination.",
+      "resolution": "Implemented notification payload routing by type (.messages, .profile, .shorts, .feed) via AppState."
+    },
+    {
+      "id": "CHAT-01",
+      "severity": "P2",
+      "issue": "MessagesView forwardToUser/forwardToGroup swallowed errors with try? and prematurely dismissed sheets.",
+      "resolution": "Replaced try? with do/catch blocks displaying error toasts to the user and keeping sheets open on failure."
+    },
+    {
+      "id": "CHAT-02",
+      "severity": "P2",
+      "issue": "RenameGroupSheet and AddGroupMembersSheet swallowed API failures.",
+      "resolution": "Added do/catch error handling and user feedback toasts."
+    },
+    {
+      "id": "CACHE-01",
+      "severity": "P2",
+      "issue": "ShortsVideoView lacked offline cache fallback.",
+      "resolution": "Integrated AccountCache.shared persistence for cached shorts list."
+    }
+  ],
+  "verifiedCommit": "45301c0",
+  "ciRunId": 42381036329
+}

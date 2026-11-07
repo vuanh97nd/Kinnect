@@ -1,0 +1,48 @@
+{
+  "id": "req-inspect-android-auth-before-ios-20261107",
+  "status": "completed",
+  "completedAt": "2026-11-07T21:37:00+07:00",
+  "referenceApk": {
+    "version": "1.2.12",
+    "build": 118,
+    "sha256": "6115E3F836D1AD0CAB9F141DC009B9990F9D00FB6E9544EA209DDEA1A4FC9AA4",
+    "emulator": "emulator-5554",
+    "mode": "dark",
+    "fontScale": 1.0
+  },
+  "androidCaptures": [
+    "dist/matched-screens/android-welcome-genuine-dark-vi.png",
+    "dist/matched-screens/android-login-genuine-dark-vi.png",
+    "dist/matched-screens/android-language-sheet-dark-vi.png",
+    "dist/matched-screens/android-register-genuine-dark-vi.png",
+    "dist/matched-screens/android-forgot-genuine-dark-vi.png"
+  ],
+  "iosVerifiedScreens": [
+    {
+      "id": "005",
+      "screen": "Chào mừng",
+      "iosPath": "dist/ios-ui-review-45301c0/01-iphone-auth-welcome-dark.png",
+      "status": "MATCH"
+    },
+    {
+      "id": "006",
+      "screen": "Đăng nhập",
+      "iosPath": "dist/ios-ui-review-45301c0/01b-iphone-auth-login-dark.png",
+      "status": "MATCH"
+    },
+    {
+      "id": "007",
+      "screen": "Đăng ký",
+      "iosPath": "dist/ios-ui-review-45301c0/01c-iphone-auth-register-dark.png",
+      "status": "MATCH"
+    },
+    {
+      "id": "008",
+      "screen": "Quên mật khẩu",
+      "iosPath": "dist/ios-ui-review-45301c0/01d-iphone-auth-forgot-dark.png",
+      "status": "MATCH"
+    }
+  ],
+  "verifiedCommit": "45301c0",
+  "ciRunId": 42381036329
+}
