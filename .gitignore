@@ -3,7 +3,11 @@ node_modules/
 *.log
 android/build/
 android/debug.keystore
+farm/android/build/
+farm/android/debug.keystore
+farm/android/app/src/main/assets/
 dist/
+toolchains/
 .env.*
 !.env.example
 *.keystore
