@@ -8,7 +8,7 @@ from pathlib import Path
 
 OUT_DIR = Path("dist/ios-ui-review")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
-BUNDLE_ID = "vn.kinnect.ios"
+DEFAULT_BUNDLE_ID = "app.kinnect.live"
 
 
 def run(cmd, check=True, capture=True):
@@ -19,6 +19,24 @@ def run(cmd, check=True, capture=True):
         print("STDERR:", res.stderr, flush=True)
         raise RuntimeError(f"Command failed ({res.returncode}): {' '.join(cmd)}")
     return res
+
+
+def get_bundle_id(app_path):
+    plist = Path(app_path) / "Info.plist"
+    if plist.exists():
+        try:
+            res = subprocess.run(
+                ["/usr/libexec/PlistBuddy", "-c", "Print :CFBundleIdentifier", str(plist)],
+                capture_output=True, text=True
+            )
+            val = res.stdout.strip()
+            if res.returncode == 0 and val:
+                print(f"Extracted CFBundleIdentifier from Info.plist: {val}", flush=True)
+                return val
+        except Exception as e:
+            print(f"Warning: could not read Info.plist via PlistBuddy: {e}", flush=True)
+    print(f"Using default bundle identifier: {DEFAULT_BUNDLE_ID}", flush=True)
+    return DEFAULT_BUNDLE_ID
 
 
 def get_available_simulators():
@@ -88,11 +106,11 @@ def boot_and_install(device, app_path):
     run(["xcrun", "simctl", "install", udid, str(app_path)])
 
 
-def capture_screen(device, slug, screen_arg, extra_args=None, wait_sec=2.8):
+def capture_screen(device, slug, screen_arg, bundle_id, extra_args=None, wait_sec=3.0):
     udid = device["udid"]
-    subprocess.run(["xcrun", "simctl", "terminate", udid, BUNDLE_ID], check=False)
+    subprocess.run(["xcrun", "simctl", "terminate", udid, bundle_id], check=False)
     time.sleep(0.4)
-    cmd = ["xcrun", "simctl", "launch", udid, BUNDLE_ID, "--ui-review-screen", screen_arg]
+    cmd = ["xcrun", "simctl", "launch", udid, bundle_id, "--ui-review-screen", screen_arg]
     if extra_args:
         cmd.extend(extra_args)
     run(cmd)
@@ -155,7 +173,8 @@ def main():
         "CURRENT_PROJECT_VERSION=118",
         "CODE_SIGN_IDENTITY=",
         "CODE_SIGNING_REQUIRED=NO",
-        "CODE_SIGNING_ALLOWED=NO"
+        "CODE_SIGNING_ALLOWED=NO",
+        "ENABLE_DEBUG_DYLIB=NO"
     ], capture=False)
 
     app_path = Path("build/SimDerivedData/Build/Products/Debug-iphonesimulator/Kinnect.app")
@@ -164,6 +183,12 @@ def main():
         if not found:
             raise RuntimeError("Kinnect.app not found in build/SimDerivedData")
         app_path = found[0]
+
+    bundle_id = get_bundle_id(app_path)
+    print(f"Target bundle identifier for simulator: {bundle_id}", flush=True)
+
+    print(f"Ad-hoc signing {app_path} for simulator...", flush=True)
+    subprocess.run(["codesign", "--force", "--deep", "--sign", "-", str(app_path)], check=False)
 
     standard_iphone, compact_iphone, ipad = pick_devices(devices)
     if not standard_iphone:
@@ -190,7 +215,7 @@ def main():
     ]
 
     for slug, screen_arg, extra, desc in iphone_screens:
-        f = capture_screen(standard_iphone, slug, screen_arg, extra)
+        f = capture_screen(standard_iphone, slug, screen_arg, bundle_id, extra, wait_sec=3.0)
         records.append({
             "slug": slug,
             "screen": screen_arg,
@@ -203,13 +228,15 @@ def main():
     # 2. Compact / second iPhone screenshots
     if compact_iphone:
         if compact_iphone["udid"] != standard_iphone["udid"]:
+            print(f"Shutting down previous standard simulator {standard_iphone['name']} to free resources...", flush=True)
+            subprocess.run(["xcrun", "simctl", "shutdown", standard_iphone["udid"]], check=False)
             boot_and_install(compact_iphone, app_path)
         for slug, screen_arg, desc in [
             ("14-compact-iphone-feed", "feed", "Màn hình nhỏ: Bảng tin & Tab bar 26pt"),
             ("15-compact-iphone-chat-detail", "chat-detail", "Màn hình nhỏ: Chi tiết Chat & hàng trạng thái dưới"),
             ("16-compact-iphone-wallet", "wallet", "Màn hình nhỏ: Ví & Cửa hàng không cắt số dư")
         ]:
-            f = capture_screen(compact_iphone, slug, screen_arg)
+            f = capture_screen(compact_iphone, slug, screen_arg, bundle_id, wait_sec=3.0)
             records.append({
                 "slug": slug,
                 "screen": screen_arg,
@@ -221,12 +248,16 @@ def main():
 
     # 3. iPad screenshots
     if ipad:
+        active_to_shutdown = compact_iphone if (compact_iphone and compact_iphone["udid"] != standard_iphone["udid"]) else standard_iphone
+        if active_to_shutdown and active_to_shutdown["udid"] != ipad["udid"]:
+            print(f"Shutting down previous simulator {active_to_shutdown['name']} to free resources...", flush=True)
+            subprocess.run(["xcrun", "simctl", "shutdown", active_to_shutdown["udid"]], check=False)
         boot_and_install(ipad, app_path)
         for slug, screen_arg, desc in [
             ("17-ipad-feed-splitview", "feed", "iPad NavigationSplitView: Sidebar + Bảng tin"),
             ("18-ipad-chat-detail", "chat-detail", "iPad: Chi tiết hội thoại")
         ]:
-            f = capture_screen(ipad, slug, screen_arg, wait_sec=3.2)
+            f = capture_screen(ipad, slug, screen_arg, bundle_id, wait_sec=3.5)
             records.append({
                 "slug": slug,
                 "screen": screen_arg,
@@ -235,6 +266,8 @@ def main():
                 "runtime": ipad["runtime"],
                 "file": str(f)
             })
+        print(f"Shutting down iPad simulator {ipad['name']}...", flush=True)
+        subprocess.run(["xcrun", "simctl", "shutdown", ipad["udid"]], check=False)
 
     contact_sheet = build_contact_sheet(records)
 
@@ -280,3 +313,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
