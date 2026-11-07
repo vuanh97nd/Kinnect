@@ -223,9 +223,12 @@ enum UIReviewFixture {
             return [
                 "wallet": [
                     "availableBalance": 12500,
+                    "purchasedCoins": 8500,
+                    "giftedCoins": 4000,
+                    "trialCoins": 4000,
                     "earnedBalance": 15000,
                     "spentBalance": 2500,
-                    "currencyLabel": "Xu Fixture UI"
+                    "currencyLabel": "Xu Kinnect"
                 ],
                 "entries": [
                     [
@@ -367,3 +370,4 @@ enum UIReviewFixture {
         }
     }
 }
+

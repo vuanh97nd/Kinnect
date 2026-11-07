@@ -3,9 +3,8 @@ import SwiftUI
 enum KinnectNavTab: String, CaseIterable, Identifiable {
     case feed
     case discover
+    case video
     case live
-    case messages
-    case profile
 
     var id: String { rawValue }
 
@@ -13,19 +12,8 @@ enum KinnectNavTab: String, CaseIterable, Identifiable {
         switch self {
         case .feed: return "Bảng tin"
         case .discover: return "Khám phá"
+        case .video: return "Video"
         case .live: return "Live"
-        case .messages: return "Tin nhắn"
-        case .profile: return "Hồ sơ"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .feed: return "sparkles.rectangle.stack.fill"
-        case .discover: return "safari.fill"
-        case .live: return "dot.radiowaves.left.and.right"
-        case .messages: return "bubble.left.and.bubble.right.fill"
-        case .profile: return "person.crop.circle.fill"
         }
     }
 
@@ -33,9 +21,8 @@ enum KinnectNavTab: String, CaseIterable, Identifiable {
         switch self {
         case .feed: return .feed
         case .discover: return .discover
+        case .video: return .video
         case .live: return .live
-        case .messages: return .messages
-        case .profile: return .profile
         }
     }
 }
@@ -50,6 +37,8 @@ struct RootMainView: View {
     @State private var showNotificationsSheet = false
     @State private var showCameraStudioSheet = false
     @State private var showWalletStoreSheet = false
+    @State private var showMessagesSheet = false
+    @State private var showProfileSheet = false
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -111,9 +100,10 @@ struct RootMainView: View {
                 switch screen {
                 case "feed": selectedTab = .feed
                 case "discover": selectedTab = .discover
+                case "shorts", "video": selectedTab = .video
                 case "live": selectedTab = .live
-                case "messages": selectedTab = .messages
-                case "profile": selectedTab = .profile
+                case "messages": showMessagesSheet = true
+                case "profile": showProfileSheet = true
                 case "friends": showFriendsSheet = true
                 case "notifications": showNotificationsSheet = true
                 case "wallet": showWalletStoreSheet = true
@@ -145,6 +135,28 @@ struct RootMainView: View {
                 WalletStoreView()
             }
         }
+        .sheet(isPresented: $showMessagesSheet) {
+            NavigationStack {
+                MessagesView(onOpenFriends: {
+                    showMessagesSheet = false
+                    showFriendsSheet = true
+                })
+            }
+        }
+        .sheet(isPresented: $showProfileSheet) {
+            NavigationStack {
+                ProfileView(
+                    onOpenWallet: {
+                        showProfileSheet = false
+                        showWalletStoreSheet = true
+                    },
+                    onOpenFriends: {
+                        showProfileSheet = false
+                        showFriendsSheet = true
+                    }
+                )
+            }
+        }
     }
 
     @ViewBuilder
@@ -171,9 +183,6 @@ struct RootMainView: View {
                                         .foregroundColor(isSelected ? KinnectTheme.accentBright : KinnectTheme.textPrimary)
                                         .kinnectMultiline()
                                     Spacer()
-                                    if tab == .messages && appState.unreadMessagesCount > 0 {
-                                        badgePill(appState.unreadMessagesCount)
-                                    }
                                     if isSelected {
                                         Capsule()
                                             .fill(KinnectTheme.accentBright)
@@ -187,6 +196,34 @@ struct RootMainView: View {
                             .accessibilityLabel(tab.title)
                             .accessibilityAddTraits(isSelected ? [.isSelected] : [])
                             .listRowBackground(isSelected ? KinnectTheme.accent.opacity(0.22) : Color.clear)
+                        }
+                    }
+
+                    Section("Liên lạc & Cá nhân") {
+                        Button {
+                            showMessagesSheet = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                KinnectIcon(glyph: .messages, size: 24, tint: KinnectTheme.accentBright)
+                                Text("Tin nhắn")
+                                    .foregroundColor(KinnectTheme.textPrimary)
+                                Spacer()
+                                if appState.unreadMessagesCount > 0 {
+                                    badgePill(appState.unreadMessagesCount)
+                                }
+                            }
+                            .frame(minHeight: 44)
+                        }
+
+                        Button {
+                            showProfileSheet = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                KinnectIcon(glyph: .profile, size: 24, tint: KinnectTheme.textPrimary)
+                                Text("Hồ sơ cá nhân")
+                                    .foregroundColor(KinnectTheme.textPrimary)
+                            }
+                            .frame(minHeight: 44)
                         }
                     }
 
@@ -249,7 +286,7 @@ struct RootMainView: View {
                 }
             }
         } else {
-            // iPhone compact layout with custom vector KinnectIcon bottom tab bar (26pt icons, 44pt+ hit target)
+            // iPhone compact layout with custom vector KinnectIcon bottom tab bar (5 tabs: Bảng tin, Khám phá, (+) Tạo, Video, Live)
             VStack(spacing: 0) {
                 NavigationStack {
                     tabContent(for: selectedTab)
@@ -266,42 +303,40 @@ struct RootMainView: View {
 
     private var compactBottomTabBar: some View {
         HStack(spacing: 0) {
-            ForEach(KinnectNavTab.allCases) { tab in
-                let isSelected = selectedTab == tab
-                Button {
-                    selectedTab = tab
-                } label: {
-                    VStack(spacing: 4) {
-                        Capsule()
-                            .fill(isSelected ? KinnectTheme.accentBright : Color.clear)
-                            .frame(width: 20, height: 3)
+            // Tab 1: Bảng tin
+            tabBarItem(tab: .feed)
 
-                        ZStack(alignment: .topTrailing) {
-                            KinnectIcon(
-                                glyph: tab.glyph,
-                                size: 26,
-                                selected: isSelected,
-                                tint: isSelected ? KinnectTheme.accentBright : KinnectTheme.textSecondary
-                            )
-                            if tab == .messages && appState.unreadMessagesCount > 0 {
-                                badgePill(appState.unreadMessagesCount)
-                                    .offset(x: 10, y: -6)
-                            }
-                        }
+            // Tab 2: Khám phá
+            tabBarItem(tab: .discover)
 
-                        Text(tab.title)
-                            .font(.system(size: 11, weight: isSelected ? .bold : .medium))
-                            .foregroundColor(isSelected ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
+            // Center (+): Camera & Studio Creation Button (Parity Android 1.2.12 MainActivity)
+            Button {
+                showCameraStudioSheet = true
+            } label: {
+                VStack(spacing: 2) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            .fill(KinnectTheme.primaryGradient)
+                            .frame(width: 46, height: 38)
+                            .shadow(color: KinnectTheme.accent.opacity(0.35), radius: 4, y: 2)
+
+                        KinnectIcon(glyph: .add, size: 22, selected: true, tint: .white)
                     }
-                    .frame(maxWidth: .infinity, minHeight: 52)
-                    .contentShape(Rectangle())
+                    Text("Tạo")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(KinnectTheme.accentBright)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(tab.title)
-                .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Tạo nội dung")
+
+            // Tab 3: Video (Shorts)
+            tabBarItem(tab: .video)
+
+            // Tab 4: Live
+            tabBarItem(tab: .live)
         }
         .padding(.horizontal, 6)
         .padding(.top, 4)
@@ -318,6 +353,37 @@ struct RootMainView: View {
         )
     }
 
+    private func tabBarItem(tab: KinnectNavTab) -> some View {
+        let isSelected = selectedTab == tab
+        return Button {
+            selectedTab = tab
+        } label: {
+            VStack(spacing: 4) {
+                Capsule()
+                    .fill(isSelected ? KinnectTheme.accentBright : Color.clear)
+                    .frame(width: 20, height: 3)
+
+                KinnectIcon(
+                    glyph: tab.glyph,
+                    size: 26,
+                    selected: isSelected,
+                    tint: isSelected ? KinnectTheme.accentBright : KinnectTheme.textSecondary
+                )
+
+                Text(tab.title)
+                    .font(.system(size: 11, weight: isSelected ? .bold : .medium))
+                    .foregroundColor(isSelected ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(tab.title)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+    }
+
     @ViewBuilder
     private func tabContent(for tab: KinnectNavTab) -> some View {
         switch tab {
@@ -328,29 +394,26 @@ struct RootMainView: View {
             )
         case .discover:
             DiscoverView(onOpenCamera: { showCameraStudioSheet = true })
+        case .video:
+            ShortsVideoView()
         case .live:
             LiveStreamView(onOpenWallet: { showWalletStoreSheet = true })
-        case .messages:
-            MessagesView(onOpenFriends: { showFriendsSheet = true })
-        case .profile:
-            ProfileView(
-                onOpenWallet: { showWalletStoreSheet = true },
-                onOpenFriends: { showFriendsSheet = true }
-            )
         }
     }
 
     @ToolbarContentBuilder
     private var topToolbarItems: some ToolbarContent {
         ToolbarItemGroup(placement: .navigationBarTrailing) {
+            // 1. Cửa hàng / Store
             KinnectIconButton(
-                glyph: .camera,
-                label: "Tạo nội dung",
-                tint: KinnectTheme.accentBright
+                glyph: .store,
+                label: "Ví & Cửa hàng",
+                tint: KinnectTheme.warning
             ) {
-                showCameraStudioSheet = true
+                showWalletStoreSheet = true
             }
 
+            // 2. Bạn bè / Friends
             KinnectIconButton(
                 glyph: .friends,
                 label: "Bạn bè",
@@ -359,14 +422,26 @@ struct RootMainView: View {
                 showFriendsSheet = true
             }
 
-            KinnectIconButton(
-                glyph: .wallet,
-                label: "Ví & Cửa hàng",
-                tint: KinnectTheme.warning
-            ) {
-                showWalletStoreSheet = true
+            // 3. Tin nhắn / Messages with unread badge
+            Button {
+                showMessagesSheet = true
+            } label: {
+                ZStack(alignment: .topTrailing) {
+                    KinnectIcon(glyph: .messages, size: 24, tint: KinnectTheme.textPrimary)
+                    if appState.unreadMessagesCount > 0 {
+                        Circle()
+                            .fill(KinnectTheme.danger)
+                            .frame(width: 9, height: 9)
+                            .offset(x: 3, y: -2)
+                    }
+                }
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Tin nhắn")
 
+            // 4. Thông báo / Notifications with unread dot
             Button {
                 showNotificationsSheet = true
             } label: {
@@ -384,6 +459,26 @@ struct RootMainView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Thông báo")
+
+            // 5. Hồ sơ / Profile avatar
+            Button {
+                showProfileSheet = true
+            } label: {
+                if let u = appState.currentUser {
+                    KinnectAvatarView(
+                        name: u.name,
+                        avatarURL: u.avatarUrl,
+                        colorHex: u.avatarColor,
+                        size: 30,
+                        isOnline: false
+                    )
+                } else {
+                    KinnectIcon(glyph: .profile, size: 24, tint: KinnectTheme.textPrimary)
+                }
+            }
+            .frame(minWidth: 44, minHeight: 44)
+            .buttonStyle(.plain)
+            .accessibilityLabel("Hồ sơ cá nhân")
         }
     }
 

@@ -15,7 +15,10 @@ struct WalletStoreView: View {
     @State private var availableBalance: Int = 0
     @State private var earnedBalance: Int = 0
     @State private var spentBalance: Int = 0
-    @State private var currencyLabel: String = "Xu thử nghiệm"
+    @State private var purchasedCoins: Int = 0
+    @State private var giftedCoins: Int = 0
+    @State private var isBalanceHidden: Bool = false
+    @State private var currencyLabel: String = "Xu Kinnect"
     @State private var entries: [WalletEntryItem] = []
     @State private var packages: [StorePackageItem] = []
     @State private var digitalProducts: [StoreDigitalProduct] = []
@@ -34,57 +37,85 @@ struct WalletStoreView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    // Balance Hero Card
-                    VStack(alignment: .leading, spacing: 10) {
+                    // Balance Hero Card (Strict Parity with Android 1.2.12 CoinBalanceCard)
+                    VStack(alignment: .leading, spacing: 12) {
                         HStack(spacing: 8) {
-                            KinnectIcon(glyph: .wallet, size: 22, selected: true, tint: .white)
-                            Text("Số dư khả dụng")
+                            Text("Số dư")
                                 .font(.caption.weight(.semibold))
-                                .foregroundColor(.white.opacity(0.9))
+                                .foregroundColor(Color(red: 0.95, green: 0.93, blue: 1.0))
                             Spacer()
-                            HStack(spacing: 4) {
-                                KinnectIcon(glyph: .coin, size: 16, selected: true, tint: .white)
-                                Text(currencyLabel)
-                                    .font(.caption2.bold())
+                            Button {
+                                isBalanceHidden.toggle()
+                            } label: {
+                                Image(systemName: isBalanceHidden ? "eye.slash" : "eye")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.white)
+                                    .frame(minWidth: 44, minHeight: 44)
                             }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Capsule().fill(Color.white.opacity(0.2)))
-                            .foregroundColor(.white)
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Ẩn / hiện số dư")
                         }
 
-                        HStack(spacing: 8) {
-                            KinnectIcon(glyph: .coin, size: 28, selected: true, tint: KinnectTheme.warning)
-                            Text("\(availableBalance) xu")
-                                .font(.system(size: 30, weight: .black, design: .rounded))
-                                .foregroundColor(.white)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.75)
-                        }
+                        HStack(spacing: 0) {
+                            // Column 1: Xu mua (purchasedCoins)
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack(spacing: 6) {
+                                    KinnectIcon(glyph: .coin, size: 18, selected: true, tint: .white)
+                                    Text("Xu mua")
+                                        .font(.caption.weight(.medium))
+                                        .foregroundColor(Color(red: 0.95, green: 0.93, blue: 1.0))
+                                }
+                                .frame(minHeight: 28)
 
-                        HStack(spacing: 16) {
-                            HStack(spacing: 5) {
-                                KinnectIcon(glyph: .coin, size: 16, tint: .white.opacity(0.9))
-                                Text("Xu mua / nhận: +\(earnedBalance)")
-                                    .font(.caption)
-                                    .foregroundColor(.white.opacity(0.95))
+                                Text(isBalanceHidden ? "••••" : "\(purchasedCoins) xu")
+                                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                                    .foregroundColor(.white)
                                     .lineLimit(1)
-                                    .minimumScaleFactor(0.75)
+                                    .minimumScaleFactor(0.6)
+                                    .accessibilityLabel("Xu mua · \(purchasedCoins)")
                             }
-                            HStack(spacing: 5) {
-                                KinnectIcon(glyph: .coin, size: 16, tint: .white.opacity(0.9))
-                                Text("Xu tặng / dùng: -\(spentBalance)")
-                                    .font(.caption)
-                                    .foregroundColor(.white.opacity(0.95))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                            // Vertical divider
+                            Rectangle()
+                                .fill(Color.white.opacity(0.35))
+                                .frame(width: 1, height: 42)
+                                .padding(.horizontal, 12)
+
+                            // Column 2: Xu tặng (giftedCoins)
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack(spacing: 6) {
+                                    KinnectIcon(glyph: .gift, size: 16, selected: true, tint: .white)
+                                    Text("Xu tặng")
+                                        .font(.caption.weight(.medium))
+                                        .foregroundColor(Color(red: 0.95, green: 0.93, blue: 1.0))
+                                }
+                                .frame(minHeight: 28)
+
+                                Text(isBalanceHidden ? "••••" : "\(giftedCoins) xu")
+                                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                                    .foregroundColor(.white)
                                     .lineLimit(1)
-                                    .minimumScaleFactor(0.75)
+                                    .minimumScaleFactor(0.6)
+                                    .accessibilityLabel("Xu tặng · \(giftedCoins)")
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
                     .padding(16)
                     .background(
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(KinnectTheme.primaryGradient)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 0x5D/255.0, green: 0x36/255.0, blue: 0xD6/255.0),
+                                        Color(red: 0x96/255.0, green: 0x55/255.0, blue: 0xEC/255.0),
+                                        Color(red: 0xD3/255.0, green: 0x5A/255.0, blue: 0xB6/255.0)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
                     )
 
                     switch tab {
@@ -271,7 +302,9 @@ struct WalletStoreView: View {
                 self.availableBalance = wallet["availableBalance"] as? Int ?? 0
                 self.earnedBalance = wallet["earnedBalance"] as? Int ?? 0
                 self.spentBalance = wallet["spentBalance"] as? Int ?? 0
-                self.currencyLabel = wallet["currencyLabel"] as? String ?? "Xu thử nghiệm"
+                self.purchasedCoins = wallet["purchasedCoins"] as? Int ?? (wallet["paidCoins"] as? Int ?? self.earnedBalance)
+                self.giftedCoins = wallet["giftedCoins"] as? Int ?? (wallet["trialCoins"] as? Int ?? max(0, self.availableBalance - self.purchasedCoins))
+                self.currencyLabel = wallet["currencyLabel"] as? String ?? "Xu Kinnect"
             }
             let rawEntries = wRes["entries"] as? [[String: Any]] ?? []
             self.entries = rawEntries.map(WalletEntryItem.from)

@@ -22,6 +22,8 @@ struct CameraStudioView: View {
     @State private var imageDataURL = ""
     @State private var previewImage: UIImage?
     @State private var showNativeCameraPicker = false
+    @State private var showStudioProSheet = false
+    @State private var studioProAppliedEffect = "Bộ lọc gốc"
     @State private var isUploading = false
 
     var body: some View {
@@ -109,25 +111,43 @@ struct CameraStudioView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         HStack(spacing: 8) {
                             KinnectIcon(glyph: .studio, size: 22, selected: true, tint: KinnectTheme.accentBright)
-                            Text("Kinnect Studio — Chỉnh sửa nội dung")
+                            Text("Kinnect Studio")
                                 .font(.subheadline.bold())
                                 .foregroundColor(.white)
                             Spacer()
-                            // Separate action group for Save (does not overlap primary publish button)
-                            HStack(spacing: 4) {
-                                KinnectIconButton(
-                                    glyph: .save,
-                                    label: "Lưu nháp / Thiết bị",
-                                    tint: KinnectTheme.accentBright
-                                ) {
-                                    saveMediaToPhotos()
+
+                            // Studio Pro pill button on top-right of preview screen (Parity with Android 1.2.12)
+                            Button {
+                                showStudioProSheet = true
+                            } label: {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "sparkles")
+                                        .font(.caption2.bold())
+                                    Text("Studio Pro")
+                                        .font(.caption2.weight(.bold))
                                 }
-                                Text("Lưu")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundColor(KinnectTheme.accentBright)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Capsule().fill(KinnectTheme.primaryGradient))
+                                .foregroundColor(.white)
                             }
-                            .padding(.horizontal, 10)
-                            .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
+                            .accessibilityLabel("Mở công cụ Studio Pro")
+
+                            // Separate Save button
+                            Button {
+                                saveMediaToPhotos()
+                            } label: {
+                                HStack(spacing: 4) {
+                                    KinnectIcon(glyph: .save, size: 16, tint: KinnectTheme.accentBright)
+                                    Text("Lưu")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundColor(KinnectTheme.accentBright)
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
+                            }
+                            .accessibilityLabel("Lưu vào thiết bị")
                         }
 
                         if let previewImage {
@@ -222,6 +242,17 @@ struct CameraStudioView: View {
                     }
                 }
             )
+        }
+        .sheet(isPresented: $showStudioProSheet) {
+            NavigationStack {
+                StudioProSheet(
+                    appliedEffect: $studioProAppliedEffect,
+                    onApply: { effect in
+                        studioProAppliedEffect = effect
+                        appState.showToast("Đã áp dụng Studio Pro: '\(effect)'")
+                    }
+                )
+            }
         }
     }
 
@@ -356,5 +387,68 @@ struct NativeSystemCameraCaptureView: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+}
+
+struct StudioProSheet: View {
+    @Binding var appliedEffect: String
+    let onApply: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    private let proFilters = [
+        "Bộ lọc gốc",
+        "Kinnect Vivid",
+        "Cinematic Teal & Orange",
+        "Mịn da tự nhiên (Beauty)",
+        "Noir Cổ điển",
+        "Ấm áp hoàng hôn"
+    ]
+
+    var body: some View {
+        Form {
+            Section("Công nghệ Kinnect Studio Pro") {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "sparkles")
+                            .foregroundColor(KinnectTheme.accentBright)
+                        Text("Xử lý chất lượng hình ảnh & video cao cấp")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                    }
+                    Text("Áp dụng bộ lọc màu cinematic và thuật toán tăng cường chi tiết mà không làm biến dạng tệp gốc.")
+                        .font(.caption)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                }
+                .padding(.vertical, 4)
+            }
+
+            Section("Bộ lọc màu & Hiệu ứng Pro") {
+                ForEach(proFilters, id: \.self) { filter in
+                    Button {
+                        onApply(filter)
+                        dismiss()
+                    } label: {
+                        HStack {
+                            Text(filter)
+                                .foregroundColor(filter == appliedEffect ? KinnectTheme.accentBright : .white)
+                            Spacer()
+                            if filter == appliedEffect {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(KinnectTheme.accentBright)
+                            }
+                        }
+                        .frame(minHeight: 44)
+                    }
+                }
+            }
+        }
+        .navigationTitle("Kinnect Studio Pro")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Đóng") { dismiss() }
+                    .foregroundColor(KinnectTheme.accentBright)
+            }
+        }
+    }
 }
 

@@ -1,0 +1,8 @@
+{
+  "id": "req-ios-design-parity-v2-followup",
+  "sender": "codex",
+  "targetConversationId": "b8e11388-823f-44c8-a8a2-cdbee0647980",
+  "prompt": "Cập nhật mới nhất từ chủ dự án cho yêu cầu req-ios-design-parity-v2 đang thực hiện. Lấy đúng APK Android D:\\Codex\\Kinnect\\dist\\google-play\\Kinnect-1.2.12-play-test.apk, app.kinnect.live, versionName 1.2.12, versionCode 118, SHA256 6115E3F836D1AD0CAB9F141DC009B9990F9D00FB6E9544EA209DDEA1A4FC9AA4 làm chuẩn về bố cục, điều hướng và thứ tự thao tác. Đối chiếu từng màn hình, tránh lấy bản 1.2.11, bản web hoặc ảnh iOS cũ làm chuẩn. iOS dùng SwiftUI/UIKit, giữ icon Kinnect và hoàn thiện màu sáng/tối, phân cấp chữ, vùng chạm và safe area; xử lý cắt chữ, đè nút, bàn phím. Ưu tiên thanh Bảng tin / Khám phá / + mở camera / Video / Live; Live xem vuốt chung, chỉ chọn Trò chuyện hoặc Chơi game khi tạo Live từ camera; Studio Pro góc phải màn xem trước sau khi chọn hoặc quay, giữ đúng media và tách Lưu/Thoát; Ví tách số dư Xu mua và Xu tặng; chat iPad hai cột khi đủ chỗ. Sau khi sửa, chụp lại bộ ảnh Simulator từ đúng commit trên iPhone thường, iPhone nhỏ và iPad; lưu riêng, ghi SHA commit, link CI, đường dẫn ảnh và phần còn lệch. Tiếp tục trong chính tác vụ hiện tại, không mở lượt triển khai trùng. Ghi ACK cho yêu cầu bổ sung và gửi trạng thái hoặc kết quả về Codex thread 01a1887d-0a8d-7b60-8a8c-25b9da8a1f93 bằng scripts/Send-Codex.ps1, đồng thời cập nhật hộp thư.",
+  "createdAt": "2026-11-07T03:50:34.996Z",
+  "status": "running"
+}

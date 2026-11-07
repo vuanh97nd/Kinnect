@@ -1,0 +1,8 @@
+{
+  "id": "req-ios-design-parity-v2",
+  "sender": "codex",
+  "targetConversationId": "b8e11388-823f-44c8-a8a2-cdbee0647980",
+  "prompt": "Yêu cầu của chủ dự án: thiết kế Kinnect iOS đẹp và chỉn chu, bám APK Android 1.2.12 build 118 tại D:\\Codex\\Kinnect\\dist\\google-play\\Kinnect-1.2.12-play-test.apk về điều hướng, thứ tự nội dung và luồng thao tác. Giữ thanh Bảng tin · Khám phá · + · Video · Live; + mở camera; Studio Pro ở góc phải màn xem trước; Live vuốt chung; Ví tách Xu mua và Xu tặng. Dùng SwiftUI/UIKit, chữ hệ thống hỗ trợ Dynamic Type, icon Kinnect đồng bộ, màu tím dùng làm điểm nhấn, phân cấp chữ rõ, nền sáng/tối nhất quán với thanh trạng thái, vùng chạm 44pt và nhãn VoiceOver. Tránh nhãn bị cắt, nút chồng, phần tử sát tai thỏ hoặc bị bàn phím che. iPad giới hạn chiều rộng cột đọc và dùng hai cột cho chat khi đủ chỗ. Rà từng màn chính và chụp lại Simulator từ commit mới, cả sáng/tối, iPhone nhỏ và iPad. Ghi rõ phiên bản Android tham chiếu và SHA bản chụp. Tránh sửa trùng nếu phiên IDE đang làm cùng tệp.",
+  "createdAt": "2026-11-07T03:36:00.954Z",
+  "status": "running"
+}

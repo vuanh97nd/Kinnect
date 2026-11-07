@@ -248,16 +248,17 @@ def main():
     iphone_screens = [
         ("01-iphone-auth-dark", "auth", [], "Đăng nhập / Đăng ký (Dark)"),
         ("02-iphone-feed-dark", "feed", [], "Bảng tin & Tin 24h (Dark)"),
-        ("03-iphone-discover-dark", "discover", [], "Khám phá & Shorts (Dark)"),
+        ("03-iphone-discover-dark", "discover", [], "Khám phá (Dark)"),
+        ("03b-iphone-shorts-video-dark", "shorts", [], "Tab Video Shorts (Android 1.2.12 build 118)"),
         ("04-iphone-messages-list-dark", "messages", [], "Danh sách Tin nhắn & Nhóm (Dark)"),
         ("05-iphone-chat-detail-dark", "chat-detail", [], "Chi tiết Chat: nội dung trên, giờ+seen+reaction+more dưới"),
         ("06-iphone-profile-dark", "profile", [], "Hồ sơ cá nhân & Chẩn đoán PushKit (Dark)"),
         ("07-iphone-friends-dark", "friends", [], "Bạn bè & Gọi thoại/video nền trong suốt"),
         ("08-iphone-notifications-dark", "notifications", [], "Thông báo"),
-        ("09-iphone-wallet-store-dark", "wallet", [], "Ví & Cửa hàng StoreKit 2 (Icon Xu chữ K)"),
+        ("09-iphone-wallet-store-dark", "wallet", [], "Ví & Cửa hàng: Tách Xu mua & Xu tặng chuẩn Android 1.2.12"),
         ("10-iphone-live-stream-dark", "live", [], "Phòng Live luồng thống nhất (Không thanh lọc đầu trang)"),
         ("11-iphone-camera-studio-empty", "camera-studio", [], "Camera & Studio trước khi chọn ảnh/video"),
-        ("12-iphone-camera-studio-edit", "camera-studio-edit", [], "Camera & Studio sau khi có ảnh (Hiện Studio + nút Lưu riêng)"),
+        ("12-iphone-camera-studio-edit", "camera-studio-edit", [], "Camera & Studio sau khi có ảnh (Hiện Studio Pro góc phải + nút Lưu riêng)"),
         ("13-iphone-feed-light", "feed", ["--ui-review-light"], "Bảng tin thử chế độ Light mode")
     ]
 

@@ -88,3 +88,4 @@ node D:\Codex\Kinnect\scripts\agent-mailbox.mjs status --id <mã_yêu_cầu>
   3. Luồng xem Live vuốt chung; tạo Live phân nhánh Trò chuyện/Chơi game từ Camera.
   4. Màn hình Ví tách bạch số dư `Xu mua` và `Xu tặng`.
   5. iPad tối ưu 2 cột chat khi đủ không gian màn hình.
+
