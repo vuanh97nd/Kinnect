@@ -1,0 +1,8 @@
+{
+  "id": "req-ios-screenshots-20261107-v1",
+  "sender": "codex",
+  "targetConversationId": "b8e11388-823f-44c8-a8a2-cdbee0647980",
+  "prompt": "Chủ dự án yêu cầu chạy ứng dụng iOS native và chụp thử giao diện thực tế. Hãy dùng macOS CI/GitHub Actions với iOS Simulator (không phải dựng ảnh mockup và không dùng screenshot bản web). Kiểm tra khả năng có simulator runtime trước; build riêng iphonesimulator phù hợp, không chạy IPA device trên simulator. Khởi động/cài/mở app bằng simctl và chụp PNG. Ưu tiên iPhone kích thước phổ biến và thêm iPad nếu runtime sẵn. Chụp đăng nhập, bảng tin, khám phá, tin nhắn/danh sách hội thoại/chi tiết, hồ sơ, thông báo/bạn bè, ví/cửa hàng, camera/Live chuẩn bị nếu chạy được. Thử sáng/tối và màn hình nhỏ để phát hiện cắt chữ, icon lệch, safe area, bàn phím, nút chồng nhau. Chỉ dùng tài khoản test được phép hoặc fixture UI test tách biệt có nhãn rõ; không đưa token/mật khẩu/dữ liệu riêng tư vào log hoặc artifact công khai. Không phát live, gọi người thật, mua hàng, gửi chat hoặc thay dữ liệu production để chụp. Nếu thiếu đăng nhập test, chụp luồng công khai và báo rõ các màn hình chưa kiểm tra; không giả kết quả. Lưu PNG thật, contact sheet và báo cáo lỗi vào dist/ios-ui-review, tải artifact về Windows, phản hồi hộp thư với received/running/completed hoặc failed, link CI, đường dẫn ảnh, thiết bị/runtime và giới hạn. Nếu CI/chi phí ngoài cấu hình miễn phí hiện tại hoặc cần dịch vụ trả tiền thì dừng phần đó và báo. Tiếp tục từ mã hiện có, không đổi Android, không điều khiển giao diện máy Windows.",
+  "createdAt": "2026-11-07T02:32:40.944Z",
+  "status": "completed"
+}
