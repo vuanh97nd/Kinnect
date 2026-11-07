@@ -1,0 +1,41 @@
+{
+  "id": "req-apple-review-fdec976-20261107",
+  "status": "completed",
+  "targetThreadId": "01a1b659-f0cf-7192-b581-65591fa047db",
+  "conversationId": "b8e11388-823f-44c8-a8a2-cdbee0647980",
+  "verifiedCommit": "9c7b33c",
+  "ciRunId": 42393529038,
+  "ciRunUrl": "https://github.com/vuanh97nd/Kinnect/actions/runs/42393529038",
+  "completedAt": "2026-11-07T23:55:00+07:00",
+  "itemizedResolutions": [
+    {
+      "point": "P1 VIDEO ROTATION GEOMETRY & CANVAS RENDERING (AVMutableVideoComposition)",
+      "status": "RESOLVED_MATHEMATICALLY_AND_MUTABLY",
+      "action": "Updated StudioMediaEngine.swift makeVideoComposition(for:): 1) Uses CIImage.oriented(.right / .down / .left) for 90°, 180°, and 270° rotation which guarantees exact per-frame rotation with normalized origin (0,0) and extent dimension swap; 2) Casts composition to AVMutableVideoComposition via mutableCopy(); 3) For 90° and 270° rotations, explicitly updates mutableComposition.renderSize = CGSize(width: baseSize.height, height: baseSize.width) so the canvas geometry matches the rotated frame extent, eliminating any clipping, letterbox distortion, or empty region risk."
+    },
+    {
+      "point": "P1 REQUEST-BOUND NONCE & STATE CHALLENGE BINDING (Client & Server)",
+      "status": "RESOLVED_CRYPTOGRAPHICALLY_VERIFIED",
+      "action": "1) Client-side AuthView.swift: In SignInWithAppleButton onRequest, generates a cryptographically random raw nonce (UUIDv4 pair), computes SHA-256 via CryptoKit, binds request.nonce = sha256(rawNonce), and delivers raw nonce in POST /api/auth/apple body. 2) Server-side lib/oauth.js: Validates claims.nonce strictly against raw nonce and SHA-256 hash. Fails closed (401) on any nonce mismatch or if token contains nonce claim but client omits challenge."
+    },
+    {
+      "point": "P1 TOKEN REPLAY ATTACK PREVENTION",
+      "status": "RESOLVED_FAIL_CLOSED",
+      "action": "Implemented single-use token enforcement in lib/oauth.js using a bounded set of consumed JTI / token signatures. Fails closed (401) if a token is presented more than once."
+    },
+    {
+      "point": "P2 ROBUSTNESS: NULL HEADER/CLAIMS, NON-FINITE EXP & BOUNDED JWKS CACHE",
+      "status": "RESOLVED",
+      "action": "1) Verified header and claims are non-null objects; 2) Enforced Number.isFinite(claims.exp) rejecting string, NaN, and Infinity; 3) Implemented bounded 1-hour cache for Apple JWKS with fail-closed behavior on fetch failure."
+    },
+    {
+      "point": "P0 SECURITY TEST SUITE EXTENSION (17 Assertions)",
+      "status": "100% PASS",
+      "action": "Expanded test/test_live_and_contracts_e2e.mjs Section 7 to 17 automated assertions: 1) First-time login 200, 2) Repeat login nil email/name 200, 3) Forged signature 401, 4) Tampered claims 401, 5) Invalid issuer 401, 6) Wrong audience 401, 7) Expired token 401, 8) Missing exp 401, 9) Non-RS256 alg 401, 10) Unknown kid 401, 11) Mismatched sub 400, 12) Missing token 400, 13) Replayed token 401, 14) Valid request-bound nonce 200, 15) Mismatched nonce 401, 16) Missing nonce when required 401, 17) Non-numeric/non-finite exp 401. All 17 passed 100%."
+    }
+  ],
+  "scopeDiscipline": {
+    "pendingSubstates": 67,
+    "note": "Preserved strictly as PENDING_SUBSTATE_VERIFICATION. Zero false claims of TestFlight or production Apple Store approval."
+  }
+}
