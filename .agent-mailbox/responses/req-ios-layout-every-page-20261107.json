@@ -14,7 +14,9 @@
     "designAdaptations": 6,
     "pendingSubstateVerification": 76,
     "visualCapturedCount": 50,
-    "functionTestedCount": 7
+    "functionTestedCount": 6,
+    "nativeFunctionTestedCount": 0,
+    "notes": "Strict separation between visual captures (50 PNGs on disk) and backend contract test suites (6 endpoints). Zero claim of native UI functional automation."
   },
   "rulesApplied": [
     "Android 1.2.12 build 118 real emulator APK reference used for all baseline controls",
@@ -36,7 +38,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "002",
@@ -50,7 +54,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "003",
@@ -64,7 +70,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "004",
@@ -78,7 +86,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "005",
@@ -92,7 +102,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "006",
@@ -106,7 +118,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "007",
@@ -120,7 +134,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "008",
@@ -134,7 +150,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "009",
@@ -148,7 +166,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "010",
@@ -162,8 +182,10 @@
       "visualCaptured": true,
       "functionTested": true,
       "testScope": "BACKEND_CONTRACT_E2E",
-      "testEvidence": "test/test_live_and_contracts_e2e.mjs (Suite 1: WS denied before consent, HTTP 428, allowed after consent)",
-      "testStatus": "PASSED_100_PERCENT"
+      "testEvidence": "test/test_live_and_contracts_e2e.mjs Suite 1: WS denied before consent, HTTP 428, allowed after explicit consent",
+      "testStatus": "PASSED_100_PERCENT",
+      "nativeFunctionTested": false,
+      "backendContractTested": true
     },
     {
       "id": "011",
@@ -177,7 +199,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "012",
@@ -191,7 +215,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "013",
@@ -205,7 +231,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "014",
@@ -219,7 +247,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "015",
@@ -233,7 +263,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "016",
@@ -247,7 +279,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "017",
@@ -261,7 +295,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "018",
@@ -275,7 +311,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "019",
@@ -289,7 +327,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "020",
@@ -303,7 +343,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "021",
@@ -317,7 +359,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "022",
@@ -331,7 +375,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "023",
@@ -345,7 +391,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "024",
@@ -359,7 +407,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "025",
@@ -373,7 +423,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "026",
@@ -387,7 +439,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "027",
@@ -401,7 +455,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "028",
@@ -415,7 +471,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "029",
@@ -429,7 +487,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "030",
@@ -443,7 +503,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "031",
@@ -457,7 +519,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "032",
@@ -471,7 +535,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "033",
@@ -485,7 +551,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "034",
@@ -499,7 +567,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "035",
@@ -513,7 +583,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "036",
@@ -527,7 +599,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "037",
@@ -541,7 +615,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "038",
@@ -555,7 +631,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "039",
@@ -569,7 +647,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "040",
@@ -583,8 +663,10 @@
       "visualCaptured": true,
       "functionTested": true,
       "testScope": "BACKEND_CONTRACT_E2E",
-      "testEvidence": "test/test_live_and_contracts_e2e.mjs (Suite 4: Private album upload, access request, owner grant/revoke)",
-      "testStatus": "PASSED_100_PERCENT"
+      "testEvidence": "test/test_live_and_contracts_e2e.mjs Suite 4: Private album upload, access request, owner grant/revoke",
+      "testStatus": "PASSED_100_PERCENT",
+      "nativeFunctionTested": false,
+      "backendContractTested": true
     },
     {
       "id": "041",
@@ -598,7 +680,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "042",
@@ -612,7 +696,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "043",
@@ -626,7 +712,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "044",
@@ -640,7 +728,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "045",
@@ -654,7 +744,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "046",
@@ -668,7 +760,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "047",
@@ -682,7 +776,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "048",
@@ -696,7 +792,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "049",
@@ -710,7 +808,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "050",
@@ -724,7 +824,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "051",
@@ -738,7 +840,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "052",
@@ -752,7 +856,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "053",
@@ -766,7 +872,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "054",
@@ -780,7 +888,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "055",
@@ -794,7 +904,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "056",
@@ -808,7 +920,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "057",
@@ -822,7 +936,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "058",
@@ -836,7 +952,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "059",
@@ -850,7 +968,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "060",
@@ -862,9 +982,11 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false,
-      "testScope": null,
-      "testEvidence": null
+      "functionTested": true,
+      "testScope": "BACKEND_CONTRACT_E2E",
+      "testEvidence": "test/test_live_and_contracts_e2e.mjs Suite 3: Canonical message reaction (love), 400 rejection on raw emoji, and null removal",
+      "nativeFunctionTested": false,
+      "backendContractTested": true
     },
     {
       "id": "061",
@@ -878,7 +1000,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "062",
@@ -892,7 +1016,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "063",
@@ -904,10 +1030,12 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": true,
-      "testScope": "BACKEND_CONTRACT_E2E",
-      "testEvidence": "test/test_live_and_contracts_e2e.mjs (Suite 3: Message reactions love/laugh/sad/like & null toggle removal)",
-      "testStatus": "PASSED_100_PERCENT"
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null,
+      "testStatus": "PASSED_100_PERCENT",
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "064",
@@ -921,7 +1049,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "065",
@@ -935,7 +1065,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "066",
@@ -949,7 +1081,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "067",
@@ -963,7 +1097,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "068",
@@ -977,7 +1113,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "069",
@@ -991,7 +1129,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "070",
@@ -1005,7 +1145,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "071",
@@ -1019,7 +1161,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "072",
@@ -1033,7 +1177,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "073",
@@ -1047,7 +1193,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "074",
@@ -1061,7 +1209,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "075",
@@ -1075,7 +1225,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "076",
@@ -1089,7 +1241,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "077",
@@ -1103,7 +1257,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "078",
@@ -1117,7 +1273,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "079",
@@ -1131,7 +1289,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "080",
@@ -1145,7 +1305,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "081",
@@ -1159,7 +1321,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "082",
@@ -1173,7 +1337,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "083",
@@ -1187,7 +1353,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "084",
@@ -1201,7 +1369,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "085",
@@ -1215,7 +1385,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "086",
@@ -1229,7 +1401,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "087",
@@ -1243,7 +1417,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "088",
@@ -1257,7 +1433,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "089",
@@ -1271,7 +1449,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "090",
@@ -1285,7 +1465,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "091",
@@ -1297,9 +1479,11 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false,
-      "testScope": null,
-      "testEvidence": null
+      "functionTested": true,
+      "testScope": "BACKEND_CONTRACT_E2E",
+      "testEvidence": "test/test_live_and_contracts_e2e.mjs Suite 2: Live Room viewer join, room switch Room A -> Room B, WebRTC P2P signaling",
+      "nativeFunctionTested": false,
+      "backendContractTested": true
     },
     {
       "id": "092",
@@ -1313,7 +1497,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "093",
@@ -1325,9 +1511,11 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false,
-      "testScope": null,
-      "testEvidence": null
+      "functionTested": true,
+      "testScope": "BACKEND_CONTRACT_E2E",
+      "testEvidence": "test/test_live_and_contracts_e2e.mjs Suite 2: Live Chat broadcast, Heart Reaction, and Rose Gift broadcast in Live Room",
+      "nativeFunctionTested": false,
+      "backendContractTested": true
     },
     {
       "id": "094",
@@ -1341,7 +1529,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "095",
@@ -1355,7 +1545,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "096",
@@ -1369,7 +1561,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "097",
@@ -1383,7 +1577,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "098",
@@ -1397,7 +1593,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "099",
@@ -1411,7 +1609,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "100",
@@ -1425,7 +1625,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "101",
@@ -1439,7 +1641,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "102",
@@ -1451,10 +1655,12 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": true,
-      "testScope": "BACKEND_CONTRACT_E2E",
-      "testEvidence": "test/test_live_and_contracts_e2e.mjs (Suite 2: Live Room lifecycle, chat, gift rose, heart reactions)",
-      "testStatus": "PASSED_100_PERCENT"
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null,
+      "testStatus": "PASSED_100_PERCENT",
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "103",
@@ -1466,10 +1672,12 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": true,
-      "testScope": "BACKEND_CONTRACT_E2E",
-      "testEvidence": "test/test_live_and_contracts_e2e.mjs (Suite 2: WebRTC P2P offer/answer signaling exchange between host and viewer)",
-      "testStatus": "PASSED_100_PERCENT"
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null,
+      "testStatus": "PASSED_100_PERCENT",
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "104",
@@ -1483,7 +1691,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "105",
@@ -1497,7 +1707,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "106",
@@ -1509,10 +1721,12 @@
       "notes": "Tab Nạp xu trong WalletStoreView hiển thị danh sách các gói StoreKit 2 (1.000 xu = 22.000đ) kèm nút Mua và nút Khôi phục gói mua.",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true,
-      "testScope": "BACKEND_CONTRACT_E2E",
-      "testEvidence": "test/test_live_and_contracts_e2e.mjs (Suite 5: StoreKit 2 JWS verification, appAccountToken UUID, 25h refresh, refund notifications, deduplication, production safeguards)",
-      "testStatus": "PASSED_100_PERCENT"
+      "functionTested": false,
+      "testScope": "BACKEND_STOREKIT_JWS_ONLY",
+      "testEvidence": "test/test_live_and_contracts_e2e.mjs Suite 5: StoreKit 2 JWS verification, appAccountToken UUID, 25h refresh, refund notifications, production safeguards (client topup UI flow remains pending client automation)",
+      "testStatus": "PASSED_100_PERCENT",
+      "nativeFunctionTested": false,
+      "backendContractTested": true
     },
     {
       "id": "107",
@@ -1526,7 +1740,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "108",
@@ -1540,7 +1756,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "109",
@@ -1554,7 +1772,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "110",
@@ -1568,7 +1788,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "111",
@@ -1582,7 +1804,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "112",
@@ -1596,7 +1820,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "113",
@@ -1610,7 +1836,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "114",
@@ -1624,7 +1852,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "115",
@@ -1638,7 +1868,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "116",
@@ -1652,7 +1884,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "117",
@@ -1666,7 +1900,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "118",
@@ -1680,7 +1916,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "119",
@@ -1694,7 +1932,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "120",
@@ -1708,7 +1948,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "121",
@@ -1722,7 +1964,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "122",
@@ -1736,8 +1980,10 @@
       "visualCaptured": true,
       "functionTested": true,
       "testScope": "BACKEND_CONTRACT_E2E",
-      "testEvidence": "test/test_live_and_contracts_e2e.mjs (Suite 6: Permanent account deletion, password challenge, session cookie Max-Age=0, data purge)",
-      "testStatus": "PASSED_100_PERCENT"
+      "testEvidence": "test/test_live_and_contracts_e2e.mjs Suite 6: 7 contract assertions: GET info, wrong username 400, confirmDelete false 400, wrong password 403, success 200 with cookie Max-Age=0, session revocation",
+      "testStatus": "PASSED_100_PERCENT",
+      "nativeFunctionTested": false,
+      "backendContractTested": true
     },
     {
       "id": "123",
@@ -1751,7 +1997,9 @@
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "124",
@@ -1765,7 +2013,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "125",
@@ -1779,7 +2029,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     },
     {
       "id": "126",
@@ -1793,7 +2045,9 @@
       "visualCaptured": false,
       "functionTested": false,
       "testScope": null,
-      "testEvidence": null
+      "testEvidence": null,
+      "nativeFunctionTested": false,
+      "backendContractTested": false
     }
   ],
   "ciRunId": "42370019967",

@@ -338,8 +338,8 @@ struct CameraStudioView: View {
                 }
                 .padding(.horizontal, 4)
 
-                // Large Media Preview (Native AVPlayer for Video or Photo Editor for Images)
-                if target == .shortVideo, let vURL = capturedVideoTempURL ?? (UIReviewFixture.activeScreen == "camera-studio-video-edit" ? UIReviewFixture.samplePlayableVideoURL() : nil) {
+                // Large Media Preview (Native AVPlayer for ANY video or Photo Editor for Images)
+                if let vURL = capturedVideoTempURL ?? (UIReviewFixture.activeScreen == "camera-studio-video-edit" ? UIReviewFixture.samplePlayableVideoURL() : nil) {
                     StudioVideoPlayerView(videoURL: vURL)
                 } else if let displayImg = previewImage ?? (UIReviewFixture.activeScreen == "camera-studio-edit" ? UIReviewFixture.samplePreviewImage() : nil) {
                     Image(uiImage: displayImg)
@@ -532,6 +532,8 @@ struct CameraStudioView: View {
             if let uiImg = UIImage(data: data) {
                 self.originalImage = uiImg
                 self.previewImage = uiImg
+                self.capturedVideoTempURL = nil
+                self.videoDataURL = ""
                 self.target = .feedPost
                 if let jpeg = uiImg.jpegData(compressionQuality: 0.75) {
                     self.imageDataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
@@ -541,7 +543,13 @@ struct CameraStudioView: View {
                     appState.showToast("Video vượt quá giới hạn 8MB.")
                     return
                 }
+                // Save to persistent local temp file so AVPlayer can play real local media
+                let tempDir = FileManager.default.temporaryDirectory
+                let destURL = tempDir.appendingPathComponent("picked_video_\(UUID().uuidString).mp4")
+                try? data.write(to: destURL)
+                self.capturedVideoTempURL = destURL
                 self.videoDataURL = "data:video/mp4;base64,\(data.base64EncodedString())"
+                self.previewImage = nil
                 self.target = .shortVideo
             }
         }
@@ -561,6 +569,16 @@ struct CameraStudioView: View {
                     appState.showToast("Vui lòng quay hoặc chọn một video MP4 (< 8MB).")
                     return
                 }
+                var durationToPublish = 15
+                if let tempURL = capturedVideoTempURL {
+                    let asset = AVURLAsset(url: tempURL)
+                    if let d = try? await asset.load(.duration) {
+                        let sec = CMTimeGetSeconds(d)
+                        if sec.isFinite && sec > 0 {
+                            durationToPublish = max(1, Int(round(sec)))
+                        }
+                    }
+                }
                 _ = try await KinnectAPIClient.shared.requestJSON(
                     "/api/shorts",
                     method: "POST",
@@ -568,7 +586,7 @@ struct CameraStudioView: View {
                         "title": title.trimmingCharacters(in: .whitespacesAndNewlines),
                         "caption": finalCaption,
                         "videoDataUrl": videoDataURL,
-                        "durationSec": 15
+                        "durationSec": durationToPublish
                     ],
                     requestId: reqId
                 )
@@ -995,6 +1013,8 @@ struct StudioVideoPlayerView: View {
     @State private var duration: Double = 0
     @State private var isMuted: Bool = false
     @State private var timeObserverToken: Any?
+    @State private var endObserverToken: (any NSObjectProtocol)? = nil
+    @State private var metadataTask: Task<Void, Never>? = nil
     @State private var videoResolution: String = ""
 
     var body: some View {
@@ -1119,6 +1139,10 @@ struct StudioVideoPlayerView: View {
         .onDisappear {
             teardownPlayer()
         }
+        .onChange(of: videoURL) { _ in
+            teardownPlayer()
+            setupPlayer()
+        }
     }
 
     private func setupPlayer() {
@@ -1127,42 +1151,51 @@ struct StudioVideoPlayerView: View {
         self.player = p
 
         // Load asset tracks metadata asynchronously
-        Task {
+        metadataTask = Task {
             let asset = AVURLAsset(url: videoURL)
             if let d = try? await asset.load(.duration) {
                 let sec = CMTimeGetSeconds(d)
-                if sec.isFinite && sec > 0 {
+                if sec.isFinite && sec > 0 && !Task.isCancelled {
                     await MainActor.run { self.duration = sec }
                 }
             }
             if let tracks = try? await asset.loadTracks(withMediaType: .video), let firstTrack = tracks.first {
+                var labels: [String] = []
                 if let size = try? await firstTrack.load(.naturalSize) {
                     let w = Int(size.width)
                     let h = Int(size.height)
-                    await MainActor.run {
-                        self.videoResolution = "\(min(w, h))p • 30fps"
+                    if w > 0 && h > 0 {
+                        labels.append("\(min(w, h))p")
                     }
+                }
+                if let fps = try? await firstTrack.load(.nominalFrameRate), fps > 0 {
+                    labels.append(String(format: "%.0ffps", fps))
+                }
+                if !labels.isEmpty && !Task.isCancelled {
+                    let fullLabel = labels.joined(separator: " • ")
+                    await MainActor.run { self.videoResolution = fullLabel }
                 }
             }
         }
 
         // Add periodic time observer (10Hz)
         let interval = CMTime(seconds: 0.1, preferredTimescale: 600)
-        timeObserverToken = p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
+        timeObserverToken = p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak p] time in
+            guard p != nil else { return }
             let sec = CMTimeGetSeconds(time)
             if sec.isFinite {
                 self.currentTime = sec
             }
         }
 
-        // Observe end of playback to loop cleanly
-        NotificationCenter.default.addObserver(
+        // Observe end of playback using retained token to prevent memory leak
+        endObserverToken = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
             object: p.currentItem,
             queue: .main
-        ) { _ in
-            p.seek(to: .zero)
-            p.play()
+        ) { [weak p] _ in
+            p?.seek(to: .zero)
+            p?.play()
             self.isPlaying = true
         }
 
@@ -1171,11 +1204,17 @@ struct StudioVideoPlayerView: View {
     }
 
     private func teardownPlayer() {
+        metadataTask?.cancel()
+        metadataTask = nil
+
+        if let token = endObserverToken {
+            NotificationCenter.default.removeObserver(token)
+            endObserverToken = nil
+        }
         if let token = timeObserverToken, let p = player {
             p.removeTimeObserver(token)
             timeObserverToken = nil
         }
-        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
         player?.pause()
         player = nil
     }
