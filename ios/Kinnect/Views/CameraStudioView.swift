@@ -374,6 +374,10 @@ struct CameraStudioView: View {
                 )
                 appState.showToast("Đã đăng tin 24h!")
                 dismiss()
+
+            case .live:
+                showCreateLiveSheet = true
+                return
             }
         } catch {
             appState.showToast(error.localizedDescription)

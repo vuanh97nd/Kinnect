@@ -332,3 +332,282 @@ struct CreateLiveRoomSheet: View {
         dismiss()
     }
 }
+
+struct LiveRoomFullScreenView: View {
+    @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var webrtc = NativeWebRTCManager.shared
+
+    @State private var chatInput = ""
+    @State private var giftCatalog: [LiveGiftCatalogItem] = []
+    @State private var giftPriceVersion: Int = 1
+    @State private var showGiftSheet = false
+
+    var body: some View {
+        if let room = appState.currentLiveRoom {
+            ZStack {
+                KinnectTheme.background.ignoresSafeArea()
+
+                // Video Canvas
+                if appState.isCurrentLiveHost, let localTrack = webrtc.liveLocalVideoTrack {
+                    WebRTCVideoRendererView(track: localTrack, mirror: webrtc.usingFrontCamera)
+                        .ignoresSafeArea()
+                } else if let remoteTrack = webrtc.liveRemoteVideoTrack {
+                    WebRTCVideoRendererView(track: remoteTrack, mirror: false)
+                        .ignoresSafeArea()
+                } else {
+                    VStack(spacing: 12) {
+                        KinnectAvatarView(
+                            name: room.hostName,
+                            avatarURL: room.hostAvatarUrl,
+                            colorHex: room.hostAvatarColor,
+                            size: 92
+                        )
+                        Text(room.gamePaused ? "Chủ phòng đang tạm dừng màn hình game" : "Đang kết nối luồng video Live...")
+                            .font(.subheadline)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                            .kinnectMultiline()
+                    }
+                }
+
+                VStack {
+                    // Top bar
+                    HStack(spacing: 10) {
+                        KinnectAvatarView(
+                            name: room.hostName,
+                            avatarURL: room.hostAvatarUrl,
+                            colorHex: room.hostAvatarColor,
+                            size: 38
+                        )
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(room.title)
+                                .font(.subheadline.bold())
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                            HStack(spacing: 6) {
+                                Text(room.liveMode == "game" ? "🎮 \(room.gameTitle)" : "💬 Trò chuyện")
+                                    .font(.caption2)
+                                    .foregroundColor(KinnectTheme.accentBright)
+                                Text("• 👁 \(room.viewerCount)")
+                                    .font(.caption2)
+                                    .foregroundColor(.white)
+                            }
+                        }
+
+                        Spacer()
+
+                        if appState.isCurrentLiveHost && room.liveMode == "game" {
+                            Button {
+                                let nextPaused = !room.gamePaused
+                                NativeSocketClient.shared.sendJSON([
+                                    "type": "live-game-state",
+                                    "paused": nextPaused,
+                                    "gameTitle": room.gameTitle
+                                ])
+                            } label: {
+                                Text(room.gamePaused ? "Tiếp tục Game" : "Tạm ẩn Game")
+                                    .font(.caption2.bold())
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(Capsule().fill(KinnectTheme.warning))
+                                    .foregroundColor(.black)
+                            }
+                        }
+
+                        if !appState.isCurrentLiveHost {
+                            Button {
+                                appState.activeReportContext = UGCReportContext(
+                                    targetType: "live",
+                                    targetId: room.id,
+                                    targetUserId: room.hostUserId,
+                                    targetTitle: room.title
+                                )
+                            } label: {
+                                Image(systemName: "flag.fill")
+                                    .foregroundColor(.white)
+                                    .padding(8)
+                                    .background(Circle().fill(Color.black.opacity(0.45)))
+                            }
+                        }
+
+                        Button {
+                            leaveLiveRoom()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .padding(10)
+                                .background(Circle().fill(KinnectTheme.danger))
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.top, 12)
+
+                    if let banner = appState.liveLastReactionBanner {
+                        Text(banner)
+                            .font(.caption.bold())
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                            .background(Capsule().fill(KinnectTheme.primaryGradient))
+                            .padding(.top, 4)
+                    }
+
+                    Spacer()
+
+                    // Chat list
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 6) {
+                            ForEach(appState.liveChatMessages.suffix(30)) { msg in
+                                HStack(alignment: .top, spacing: 6) {
+                                    Text("\(msg.user.name):")
+                                        .font(.caption.bold())
+                                        .foregroundColor(KinnectTheme.accentBright)
+                                    Text(msg.text)
+                                        .font(.caption)
+                                        .foregroundColor(.white)
+                                        .kinnectMultiline()
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(Color.black.opacity(0.5))
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 14)
+                    }
+                    .frame(maxHeight: 190)
+
+                    // Bottom controls
+                    HStack(spacing: 10) {
+                        TextField("Trò chuyện trong phòng Live...", text: $chatInput)
+                            .padding(10)
+                            .background(Capsule().fill(Color.black.opacity(0.55)))
+                            .foregroundColor(.white)
+
+                        Button {
+                            sendLiveChat()
+                        } label: {
+                            Image(systemName: "paperplane.fill")
+                                .foregroundColor(.white)
+                                .padding(10)
+                                .background(Circle().fill(KinnectTheme.accent))
+                        }
+
+                        Button {
+                            NativeSocketClient.shared.sendJSON([
+                                "type": "live-reaction",
+                                "reaction": "heart"
+                            ])
+                        } label: {
+                            Text("💜")
+                                .font(.title3)
+                                .padding(8)
+                                .background(Circle().fill(Color.black.opacity(0.55)))
+                        }
+
+                        Button {
+                            showGiftSheet = true
+                        } label: {
+                            Image(systemName: "gift.fill")
+                                .foregroundColor(KinnectTheme.warning)
+                                .padding(10)
+                                .background(Circle().fill(Color.black.opacity(0.55)))
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 20)
+                }
+            }
+            .task {
+                await loadGiftCatalog()
+            }
+            .sheet(isPresented: $showGiftSheet) {
+                LiveGiftDrawerSheet(
+                    gifts: giftCatalog,
+                    priceVersion: giftPriceVersion
+                )
+            }
+        }
+    }
+
+    private func sendLiveChat() {
+        let clean = chatInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return }
+        chatInput = ""
+        NativeSocketClient.shared.sendJSON([
+            "type": "chat",
+            "text": clean
+        ])
+    }
+
+    private func leaveLiveRoom() {
+        NativeSocketClient.shared.sendJSON(["type": "leave"])
+        webrtc.stopLiveSession()
+        appState.currentLiveRoom = nil
+    }
+
+    private func loadGiftCatalog() async {
+        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/live/gifts") {
+            let items = res["gifts"] as? [[String: Any]] ?? []
+            self.giftCatalog = items.map(LiveGiftCatalogItem.from)
+            self.giftPriceVersion = res["priceVersion"] as? Int ?? 1
+        }
+    }
+}
+
+struct LiveGiftDrawerSheet: View {
+    let gifts: [LiveGiftCatalogItem]
+    let priceVersion: Int
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 12)], spacing: 12) {
+                    ForEach(gifts) { gift in
+                        Button {
+                            sendGift(gift)
+                        } label: {
+                            VStack(spacing: 6) {
+                                Text(gift.emoji)
+                                    .font(.largeTitle)
+                                Text(gift.label)
+                                    .font(.caption.bold())
+                                    .foregroundColor(.white)
+                                Text("\(gift.coins) xu")
+                                    .font(.caption2)
+                                    .foregroundColor(KinnectTheme.warning)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(12)
+                            .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated))
+                        }
+                    }
+                }
+                .padding(16)
+            }
+            .background(KinnectTheme.background)
+            .navigationTitle("Gửi quà tặng thử nghiệm")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Đóng") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func sendGift(_ gift: LiveGiftCatalogItem) {
+        let reqId = "gift_\(gift.id)_\(UUID().uuidString)"
+        NativeSocketClient.shared.sendJSON([
+            "type": "live-reaction",
+            "reaction": gift.id,
+            "quantity": 1,
+            "requestId": reqId,
+            "priceVersion": priceVersion
+        ])
+        dismiss()
+    }
+}
