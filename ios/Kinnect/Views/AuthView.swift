@@ -15,7 +15,7 @@ struct AuthView: View {
     @State private var handle = ""
     @State private var password = ""
     @State private var showPassword = false
-    @State private var rememberMe = true
+    @State private var rememberMe: Bool = UserDefaults.standard.object(forKey: "kinnect_session_remembered") as? Bool ?? true
     @State private var agree18 = true
     @State private var acceptPrivacy = true
     @State private var isSubmitting = false
@@ -249,12 +249,13 @@ struct AuthView: View {
                     body: [
                         "identifier": cleanId,
                         "email": cleanId,
-                        "password": password
+                        "password": password,
+                        "remember": rememberMe
                     ]
                 )
                 if let userDict = res["user"] as? [String: Any] {
                     let user = KinnectUser.from(userDict)
-                    appState.applyAuthenticatedUser(user, rawDict: userDict)
+                    appState.applyAuthenticatedUser(user, rawDict: userDict, rememberMe: rememberMe)
                     await appState.refreshGlobalBadges()
                     await appState.refreshBlockedUsers()
                 }
@@ -288,6 +289,7 @@ struct AuthView: View {
                 if !cleanHandle.isEmpty {
                     payload["handle"] = cleanHandle
                 }
+                payload["remember"] = true
                 let res = try await KinnectAPIClient.shared.requestJSON(
                     "/api/register",
                     method: "POST",
@@ -295,7 +297,7 @@ struct AuthView: View {
                 )
                 if let userDict = res["user"] as? [String: Any] {
                     let user = KinnectUser.from(userDict)
-                    appState.applyAuthenticatedUser(user, rawDict: userDict)
+                    appState.applyAuthenticatedUser(user, rawDict: userDict, rememberMe: true)
                     await appState.refreshGlobalBadges()
                 }
 

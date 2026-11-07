@@ -78,6 +78,13 @@ final class AppState: ObservableObject {
             return
         }
 
+        // Check if user chose to remember session on this device
+        let isRemembered = UserDefaults.standard.object(forKey: "kinnect_session_remembered") as? Bool ?? true
+        if !isRemembered {
+            clearSessionState()
+            return
+        }
+
         // If cached user exists for active account, restore optimistically while verifying
         if let accountId = AccountCache.shared.activeAccountId,
            let cachedDict: [String: Any] = AccountCache.shared.loadJSONObject(forKey: "profile_me", accountId: accountId) {
@@ -108,10 +115,16 @@ final class AppState: ObservableObject {
         }
     }
 
-    func applyAuthenticatedUser(_ user: KinnectUser, rawDict: [String: Any]) {
+    func applyAuthenticatedUser(_ user: KinnectUser, rawDict: [String: Any], rememberMe: Bool = true) {
         self.currentUser = user
+        UserDefaults.standard.set(rememberMe, forKey: "kinnect_session_remembered")
         AccountCache.shared.setActiveAccount(user.id)
         AccountCache.shared.saveJSONObject(rawDict, forKey: "profile_me", accountId: user.id)
+        if rememberMe {
+            KeychainStore.shared.saveAccountId(user.id)
+        } else {
+            KeychainStore.shared.clearSession()
+        }
         NativeSocketClient.shared.connectWithKeychainSession()
         PushKitManager.shared.startRegistration()
     }

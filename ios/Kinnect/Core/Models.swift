@@ -31,6 +31,8 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
     var friendshipStatus: String
     var distanceKm: Double?
     var isActive: Bool
+    var age: Int
+    var gender: String
 
     var avatarURL: String? { avatarUrl.isEmpty ? nil : avatarUrl }
 
@@ -52,7 +54,9 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         isFollowing: Bool = false,
         friendshipStatus: String = "none",
         distanceKm: Double? = nil,
-        isActive: Bool = false
+        isActive: Bool = false,
+        age: Int = 0,
+        gender: String = ""
     ) {
         self.id = id
         self.name = name
@@ -72,6 +76,8 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         self.friendshipStatus = friendshipStatus
         self.distanceKm = distanceKm
         self.isActive = isActive
+        self.age = age
+        self.gender = gender
     }
 
     init(json: [String: Any]) {
@@ -104,7 +110,9 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
             isFollowing: (dict["isFollowing"] as? Bool) ?? (dict["following"] as? Bool) ?? false,
             friendshipStatus: (dict["friendshipStatus"] as? String) ?? (dict["friendship"] as? String) ?? "none",
             distanceKm: (dict["distanceKm"] as? NSNumber)?.doubleValue,
-            isActive: (dict["isActive"] as? Bool) ?? false
+            isActive: (dict["isActive"] as? Bool) ?? false,
+            age: (dict["age"] as? Int) ?? (dict["userAge"] as? Int) ?? 0,
+            gender: (dict["gender"] as? String) ?? ""
         )
     }
 }

@@ -474,15 +474,12 @@ private struct PostCardView: View {
                 }
                 .accessibilityLabel("Bình luận")
 
-                // Column 3: Chia sẻ (Share)
-                Button {
-                    let shareText = post.text.isEmpty ? "Kinnect Post" : post.text
-                    let av = UIActivityViewController(activityItems: [shareText], applicationActivities: nil)
-                    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                       let rootVC = windowScene.windows.first?.rootViewController {
-                        rootVC.present(av, animated: true)
-                    }
-                } label: {
+                // Column 3: Chia sẻ (Share) - Native SwiftUI ShareLink (safe on iPad popover & route permalink)
+                ShareLink(
+                    item: postShareURL,
+                    subject: Text(shareSubject),
+                    message: Text(post.text.isEmpty ? "Xem bài viết trên Kinnect" : post.text)
+                ) {
                     HStack(spacing: 6) {
                         KinnectIcon(glyph: .share, size: 18, tint: KinnectTheme.textSecondary)
                         Text("Chia sẻ")
@@ -492,10 +489,20 @@ private struct PostCardView: View {
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .contentShape(Rectangle())
                 }
-                .accessibilityLabel("Chia sẻ")
+                .buttonStyle(.plain)
+                .accessibilityLabel("Chia sẻ bài viết")
             }
         }
         .kinnectCard()
+    }
+
+    private var postShareURL: URL {
+        let route = "/?s=postDetail&post=\(post.id)"
+        return ServerConfig.resolveURL(route) ?? URL(string: "\(ServerConfig.defaultOrigin)\(route)") ?? URL(string: "https://app.kinnect.io.vn\(route)")!
+    }
+
+    private var shareSubject: String {
+        return "Bài viết từ \(post.author.name) trên Kinnect"
     }
 
     private func reactionTitle(for key: String) -> String {
