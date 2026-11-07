@@ -2,31 +2,35 @@
 
 - **Phiên Antigravity IDE hiện tại (`conversation-id`)**: `b8e11388-823f-44c8-a8a2-cdbee0647980`
 - **Phiên Antigravity CLI riêng đã xác minh (`conversation-id`)**: `2706868b-0eff-4b8f-b7d7-1aa6becb45e6` (`C:\Users\ANH\.gemini\bin\agy.exe`)
-- **Thời điểm cập nhật**: `2026-11-07T09:39:00+07:00`
+- **Phiên Codex đối tác đã xác minh (`codexThreadId`)**: `01a1887d-0a8d-7b60-8a8c-25b9da8a1f93` (xác nhận trong `.agent-mailbox/codex-session.json`)
+- **Thời điểm cập nhật**: `2026-11-07T10:50:00+07:00`
 - **Trạng thái kênh hộp thư (`.agent-mailbox`)**:
   - `req-ios-icons-20261107-v1`: **`completed`** (Đã tích hợp 40 icon vector gốc vào `ios/Kinnect/Theme/KinnectIcons.swift` + 12 màn hình SwiftUI, biên dịch thành công trên macOS CI `run 42328919799`, tải `Kinnect-1.2.12-ios.ipa` về `dist/ios/`).
-  - `req-ios-screenshots-20261107-v1`: **`running`** (Đã ACK `received` -> `running`; đang chạy job chụp ảnh thực tế trên iOS Simulator `iphonesimulator26.2` bằng `xcrun simctl io booted screenshot` với chế độ `--ui-review-fixture` tách biệt và tải về `dist/ios-ui-review/`).
+  - `req-ios-screenshots-20261107-v1`: **`completed`** (Đã hoàn thành 18 ảnh PNG thực tế từ iOS Simulator trên iPhone 16 Pro, iPhone 16e, iPad Pro 11-inch + `contact-sheet.png` + `manifest.json` tại `dist/ios-ui-review/`).
+  - `req-ios-design-parity-v2`: **`running`** (Đang đối chiếu giao diện với APK Android 1.2.12 build 118 tại `dist/google-play/Kinnect-1.2.12-play-test.apk`: thanh Bảng tin · Khám phá · + · Video · Live, Studio Pro góc phải preview, Ví tách Xu mua / Xu tặng, iPad 2 cột chat).
 
 ---
 
-## 0. Kênh CLI Antigravity đã kiểm chứng (`agy.exe`)
+## 0. Kênh Giao tiếp Nhanh 2 Chiều Codex ↔ Antigravity
 
-Ngày 07/11/2026, gọi `C:\Users\ANH\.gemini\bin\agy.exe` ở workspace Kinnect với `-p` và `--output-format json` đã nhận:
-
-```json
-{"conversation_id":"2706868b-0eff-4b8f-b7d7-1aa6becb45e6","status":"SUCCESS","response":"ACK-CODEX-20261107\n"}
+### Chiều 1: Antigravity ➔ Codex (Gửi vào phiên `01a1887d-0a8d-7b60-8a8c-25b9da8a1f93`)
+Sử dụng script helper hoặc gọi trực tiếp CLI Codex:
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "D:\Codex\Kinnect\scripts\Send-Codex.ps1" -Message "Nội dung cần gửi"
+```
+Hoặc gọi trực tiếp:
+```powershell
+& "C:\Users\ANH\AppData\Local\OpenAI\Codex\bin\a159911ff70742e9\codex.exe" queue --thread 01a1887d-0a8d-7b60-8a8c-25b9da8a1f93 --message "Nội dung" --resume
 ```
 
-### Sử dụng từ PowerShell/CMD
-
+### Chiều 2: Codex ➔ Antigravity (Gửi vào phiên `2706868b-0eff-4b8f-b7d7-1aa6becb45e6`)
+Sử dụng script helper hoặc gọi trực tiếp CLI Antigravity:
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "D:\Codex\Kinnect\scripts\Send-Antigravity.ps1" -Message "Nội dung yêu cầu"
 ```
-
 Hoặc gọi trực tiếp:
-
 ```powershell
-& 'C:\Users\ANH\.gemini\bin\agy.exe' --conversation 2706868b-0eff-4b8f-b7d7-1aa6becb45e6 -p 'Nội dung yêu cầu' --output-format json
+& "C:\Users\ANH\.gemini\bin\agy.exe" --conversation 2706868b-0eff-4b8f-b7d7-1aa6becb45e6 -p "Nội dung yêu cầu" --output-format json
 ```
 
 - Đọc `status`, `response`, `conversation_id` và `error` từ JSON; không dùng riêng exit code để khẳng định đã giao tin.

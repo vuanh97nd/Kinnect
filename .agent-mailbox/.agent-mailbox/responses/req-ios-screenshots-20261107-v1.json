@@ -1,0 +1,69 @@
+{
+  "id": "req-ios-screenshots-20261107-v1",
+  "conversationId": "b8e11388-823f-44c8-a8a2-cdbee0647980",
+  "status": "completed",
+  "updatedAt": "2026-11-07T03:30:00.000Z",
+  "ackAt": "2026-11-07T02:38:36.600Z",
+  "completedAt": "2026-11-07T03:30:00.000Z",
+  "summary": "Đã hoàn thành toàn bộ yêu cầu chụp thử giao diện thực tế ứng dụng Kinnect iOS Native SwiftUI trên môi trường giả lập (iOS Simulator) qua GitHub Actions macOS CI (Run 42332631938, Job 128282379092, commit 11473b0). Toàn bộ 18 ảnh chụp PNG thực tế, contact-sheet.png (bảng tổng hợp 4 cột), manifest.json và ui-review-report.md đã được tải về Windows tại D:\\Codex\\Kinnect\\dist\\ios-ui-review.",
+  "ciRun": {
+    "runId": 42332631938,
+    "jobId": 128282379092,
+    "htmlUrl": "https://github.com/vuanh97nd/Kinnect/actions/runs/42332631938/job/128282379092",
+    "artifactId": 13559130571,
+    "artifactName": "Kinnect-1.2.12-ios-ui-review",
+    "xcodeVersion": "Xcode 26.3 | Build version 17C529",
+    "sdk": "iPhoneSimulator26.2.sdk",
+    "devicesTested": [
+      {
+        "name": "iPhone 16 Pro",
+        "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+        "role": "Thiết bị iPhone chuẩn"
+      },
+      {
+        "name": "iPhone 16e",
+        "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+        "role": "Thiết bị iPhone màn hình nhỏ (compact)"
+      },
+      {
+        "name": "iPad Pro 11-inch (M4)",
+        "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+        "role": "Thiết bị iPad NavigationSplitView"
+      }
+    ]
+  },
+  "artifacts": [
+    "D:\\Codex\\Kinnect\\dist\\ios-ui-review\\contact-sheet.png",
+    "D:\\Codex\\Kinnect\\dist\\ios-ui-review\\01-iphone-auth-dark.png",
+    "D:\\Codex\\Kinnect\\dist\\ios-ui-review\\02-iphone-feed-dark.png",
+    "D:\\Codex\\Kinnect\\dist\\ios-ui-review\\03-iphone-discover-dark.png",
+    "D:\\Codex\\Kinnect\\dist\\ios-ui-review\\04-iphone-messages-list-dark.png",
+    "D:\\Codex\\Kinnect\\dist\\ios-ui-review\\05-iphone-chat-detail-dark.png",
+    "D:\\Codex\\Kinnect\\dist\\ios-ui-review\\06-iphone-profile-dark.png",
+    "D:\\Codex\\Kinnect\\dist\\ios-ui-review\\07-iphone-friends-dark.png",
+    "D:\\Codex\\Kinnect\\dist\\ios-ui-review\\08-iphone-notifications-dark.png",
+    "D:\\Codex\\Kinnect\\dist\\ios-ui-review\\09-iphone-wallet-store-dark.png",
+    "D:\\Codex\\Kinnect\\dist\\ios-ui-review\\10-iphone-live-stream-dark.png",
+    "D:\\Codex\\Kinnect\\dist\\ios-ui-review\\11-iphone-camera-studio-empty.png",
+    "D:\\Codex\\Kinnect\\dist\\ios-ui-review\\12-iphone-camera-studio-edit.png",
+    "D:\\Codex\\Kinnect\\dist\\ios-ui-review\\13-iphone-feed-light.png",
+    "D:\\Codex\\Kinnect\\dist\\ios-ui-review\\14-compact-iphone-feed.png",
+    "D:\\Codex\\Kinnect\\dist\\ios-ui-review\\15-compact-iphone-chat-detail.png",
+    "D:\\Codex\\Kinnect\\dist\\ios-ui-review\\16-compact-iphone-wallet.png",
+    "D:\\Codex\\Kinnect\\dist\\ios-ui-review\\17-ipad-feed-splitview.png",
+    "D:\\Codex\\Kinnect\\dist\\ios-ui-review\\18-ipad-chat-detail.png",
+    "D:\\Codex\\Kinnect\\dist\\ios-ui-review\\manifest.json",
+    "D:\\Codex\\Kinnect\\dist\\ios-ui-review\\ui-review-report.md"
+  ],
+  "reviewFindings": {
+    "vectorIcons": "Bộ 40 icon vector (KinnectIcons.swift) hiển thị sắc nét bằng SwiftUI Path native ở 24pt (26pt tab bar), không vỡ hạt hay mờ mép.",
+    "transparentButtons": "Nút gọi thoại, gọi video và nút menu 3 chấm (...) trong ChatDetail và Friends có nền trong suốt 100%, vùng chạm 44x44pt.",
+    "chatDetailLayout": "Nội dung tin nhắn nằm trọn vẹn ở khối trên; giờ gửi, icon đã xem, cảm xúc và nút 3 chấm được gom chung hàng ngang bên dưới.",
+    "cameraStudioLayout": "Khi chưa chọn media, màn hình ẩn toàn bộ trường biên tập Studio. Khi có ảnh/video, bảng Studio hiện lên với nút 'Lưu' tách riêng độc lập, không đè nút chính.",
+    "liveStreamUnified": "Phòng Live có luồng cuộn dọc thống nhất, không có thanh lọc Tất cả/Trò chuyện/Chơi game ở đầu trang.",
+    "walletCoin": "Màn hình Ví & Cửa hàng hiển thị icon xu chữ K màu vàng cam đặc trưng, số dư 12,500 xu không bị cắt số trên cả iPhone chuẩn và màn hình nhỏ.",
+    "colorTheme": "Giữ đúng bảng màu tím đêm chủ đạo của Kinnect (#0E0B18 và #181326), chữ và icon giữ độ tương phản cao kể cả khi chuyển Light mode.",
+    "simulatorSafety": "Sử dụng UIReviewFixture tách biệt hoàn toàn gắn nhãn [Fixture UI], không chạm dữ liệu production, không lộ token/mật khẩu, không gọi/phát live/mua hàng thật."
+  },
+  "error": null
+}

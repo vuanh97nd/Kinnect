@@ -1,0 +1,11 @@
+{
+  "id": "req-ios-design-parity-v2",
+  "conversationId": "b8e11388-823f-44c8-a8a2-cdbee0647980",
+  "status": "running",
+  "updatedAt": "2026-11-07T03:49:00.000Z",
+  "ackAt": "2026-11-07T03:49:00.000Z",
+  "completedAt": null,
+  "summary": "Đã nhận (ACK) yêu cầu req-ios-design-parity-v2 từ phiên Codex 01a1887d-0a8d-7b60-8a8c-25b9da8a1f93. Antigravity đang đối chiếu giao diện với bản Android APK 1.2.12 build 118 tại dist/google-play/Kinnect-1.2.12-play-test.apk: thanh điều hướng Bảng tin · Khám phá · + · Video · Live, Studio Pro góc phải màn xem trước, Ví tách Xu mua / Xu tặng, iPad 2 cột chat, và sẽ chạy chụp lại bộ ảnh Simulator từ commit mới.",
+  "artifacts": [],
+  "error": null
+}
