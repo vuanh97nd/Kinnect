@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import UIKit
 
@@ -724,6 +725,100 @@ enum UIReviewFixture {
             PrivateAccessRequestItem(status: "pending", user: KinnectUser.from(secondPeerDict)),
             PrivateAccessRequestItem(status: "granted", user: KinnectUser.from(peerUserDict))
         ]
+    }
+
+    /// Generates a genuine playable H.264 MP4 video file on disk for local video playback verification.
+    static func samplePlayableVideoURL() -> URL? {
+        let tempDir = FileManager.default.temporaryDirectory
+        let movieURL = tempDir.appendingPathComponent("ui_review_sample_shorts.mp4")
+        if FileManager.default.fileExists(atPath: movieURL.path) {
+            return movieURL
+        }
+
+        let width = 720
+        let height = 1280
+        let fps: Int32 = 30
+        let totalFrames = 60
+
+        guard let writer = try? AVAssetWriter(outputURL: movieURL, fileType: .mp4) else {
+            return nil
+        }
+
+        let videoSettings: [String: Any] = [
+            AVVideoCodecKey: AVVideoCodecType.h264,
+            AVVideoWidthKey: width,
+            AVVideoHeightKey: height
+        ]
+        let writerInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
+        writerInput.expectsMediaDataInRealTime = false
+
+        let sourceAttrs: [String: Any] = [
+            kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32ARGB),
+            kCVPixelBufferWidthKey as String: width,
+            kCVPixelBufferHeightKey as String: height
+        ]
+        let adaptor = AVAssetWriterInputPixelBufferAdaptor(
+            assetWriterInput: writerInput,
+            sourcePixelBufferAttributes: sourceAttrs
+        )
+
+        guard writer.canAdd(writerInput) else { return nil }
+        writer.add(writerInput)
+
+        guard writer.startWriting() else { return nil }
+        writer.startSession(atSourceTime: .zero)
+
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        for idx in 0..<totalFrames {
+            var pixelBuffer: CVPixelBuffer?
+            let status = CVPixelBufferCreate(
+                kCFAllocatorDefault,
+                width,
+                height,
+                kCVPixelFormatType_32ARGB,
+                nil,
+                &pixelBuffer
+            )
+            guard status == kCVReturnSuccess, let buffer = pixelBuffer else { continue }
+
+            CVPixelBufferLockBaseAddress(buffer, [])
+            if let pxdata = CVPixelBufferGetBaseAddress(buffer) {
+                let context = CGContext(
+                    data: pxdata,
+                    width: width,
+                    height: height,
+                    bitsPerComponent: 8,
+                    bytesPerRow: CVPixelBufferGetBytesPerRow(buffer),
+                    space: colorSpace,
+                    bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue
+                )
+                if let ctx = context {
+                    let progress = CGFloat(idx) / CGFloat(totalFrames)
+                    ctx.setFillColor(red: 0.12 + 0.35 * progress, green: 0.08 + 0.15 * progress, blue: 0.42, alpha: 1.0)
+                    ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+
+                    let circleY = CGFloat(height) * (0.3 + 0.4 * progress)
+                    ctx.setFillColor(red: 0.85, green: 0.35, blue: 0.95, alpha: 0.85)
+                    ctx.fillEllipse(in: CGRect(x: CGFloat(width)/2 - 60, y: circleY - 60, width: 120, height: 120))
+                }
+            }
+            CVPixelBufferUnlockBaseAddress(buffer, [])
+
+            let frameTime = CMTime(value: Int64(idx), timescale: fps)
+            while !writerInput.isReadyForMoreMediaData {
+                usleep(500)
+            }
+            adaptor.append(buffer, withPresentationTime: frameTime)
+        }
+
+        writerInput.markAsFinished()
+        let sema = DispatchSemaphore(value: 0)
+        writer.finishWriting {
+            sema.signal()
+        }
+        sema.wait()
+
+        return movieURL
     }
 }
 

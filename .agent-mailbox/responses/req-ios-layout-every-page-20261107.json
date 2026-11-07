@@ -14,7 +14,7 @@
     "designAdaptations": 6,
     "pendingSubstateVerification": 76,
     "visualCapturedCount": 50,
-    "functionTestedCount": 50
+    "functionTestedCount": 7
   },
   "rulesApplied": [
     "Android 1.2.12 build 118 real emulator APK reference used for all baseline controls",
@@ -34,7 +34,9 @@
       "notes": "Header K vector trái, 5 nút phải (chuông, cửa hàng, bạn bè, chat, avatar)",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "002",
@@ -46,7 +48,9 @@
       "notes": "Thanh điều hướng 5 tab dưới đáy: Bảng tin, Khám phá, +, Video, Live",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "003",
@@ -58,7 +62,9 @@
       "notes": "Badge số chưa đọc trên chuông và tin nhắn; avatar tròn cập nhật realtime",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "004",
@@ -70,7 +76,9 @@
       "notes": "Safe area notch/dynamic island và thanh trạng thái chuẩn iOS",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "005",
@@ -82,7 +90,9 @@
       "notes": "Màn hình chào mừng: Nút Bắt đầu kết nối, quy tắc cộng đồng chân trang",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "006",
@@ -94,7 +104,9 @@
       "notes": "Đăng nhập: Tên đăng nhập, Mật khẩu, Ghi nhớ, Quên mật khẩu",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "007",
@@ -106,7 +118,9 @@
       "notes": "Đăng ký: Chuyển qua segmented picker native iOS, điều khoản cộng đồng",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "008",
@@ -118,7 +132,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "009",
@@ -130,7 +146,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "010",
@@ -142,7 +160,10 @@
       "notes": "PrivacyConsentSheet hiển thị điều khoản dịch vụ & chính sách riêng tư bản 2026.11, xử lý phản hồi HTTP 428 / WS token_required, nút Đồng ý / Từ chối (Dark/Light mode).",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": true,
+      "testScope": "BACKEND_CONTRACT_E2E",
+      "testEvidence": "test/test_live_and_contracts_e2e.mjs (Suite 1: WS denied before consent, HTTP 428, allowed after consent)",
+      "testStatus": "PASSED_100_PERCENT"
     },
     {
       "id": "011",
@@ -154,7 +175,9 @@
       "notes": "Bảng tin chính với danh sách bài viết cuộn dọc mượt mà",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "012",
@@ -166,7 +189,9 @@
       "notes": "Bài viết hiển thị tác giả, avatar, thời gian tương đối, nội dung và ảnh đính kèm",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "013",
@@ -178,7 +203,9 @@
       "notes": "Thả cảm xúc bài viết: Tim, Bình luận, Chia sẻ",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "014",
@@ -190,7 +217,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "015",
@@ -202,7 +231,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "016",
@@ -214,7 +245,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "017",
@@ -226,7 +259,9 @@
       "notes": "Menu bài viết: Chỉnh sửa bài viết, Đổi đối tượng xem, Ẩn bài viết kèm Hoàn tác",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "018",
@@ -238,7 +273,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "019",
@@ -250,7 +287,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "020",
@@ -262,7 +301,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "021",
@@ -274,7 +315,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "022",
@@ -286,7 +329,9 @@
       "notes": "Thanh tin 24h trên đầu bảng tin với nút Tạo tin và avatar người dùng",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "023",
@@ -298,7 +343,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "024",
@@ -310,7 +357,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "025",
@@ -322,7 +371,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "026",
@@ -334,7 +385,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "027",
@@ -346,7 +399,9 @@
       "notes": "Lưới người dùng 3 cột tỉ lệ 1:1, tên tiếng Việt, tuổi, cự ly không bị cắt chữ",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "028",
@@ -358,7 +413,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "029",
@@ -370,7 +427,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "030",
@@ -382,7 +441,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "031",
@@ -394,7 +455,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "032",
@@ -406,7 +469,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "033",
@@ -418,7 +483,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "034",
@@ -430,7 +497,9 @@
       "notes": "Hồ sơ cá nhân: Ảnh bìa, avatar tròn, tên, handle @username, số liệu Bạn bè/Follower",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "035",
@@ -442,7 +511,9 @@
       "notes": "Nút Chỉnh sửa hồ sơ mở form cập nhật thông tin",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "036",
@@ -454,7 +525,9 @@
       "notes": "Tab Giới thiệu: Bio, Tham gia Kinnect từ 11/2026, huy hiệu Công khai/Riêng tư",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "037",
@@ -466,7 +539,9 @@
       "notes": "Tab bài viết cá nhân trên hồ sơ người dùng hiển thị danh sách bài viết thực tế.",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "038",
@@ -478,7 +553,9 @@
       "notes": "Tab Album ảnh: Lưới album công khai và album riêng tư có khóa bảo mật",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "039",
@@ -490,7 +567,9 @@
       "notes": "PublicAlbumManageSheet hiển thị lưới ảnh công khai và nút Đăng ảnh mới lên album cá nhân.",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "040",
@@ -502,7 +581,10 @@
       "notes": "PrivateAlbumManageSheet hiển thị số ảnh riêng tư (tối đa 24), nút tải ảnh mới, danh sách yêu cầu quyền xem với 2 nút Duyệt/Từ chối và nút Thu hồi quyền.",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": true,
+      "testScope": "BACKEND_CONTRACT_E2E",
+      "testEvidence": "test/test_live_and_contracts_e2e.mjs (Suite 4: Private album upload, access request, owner grant/revoke)",
+      "testStatus": "PASSED_100_PERCENT"
     },
     {
       "id": "041",
@@ -514,7 +596,9 @@
       "notes": "Tab Video cá nhân trong hồ sơ người dùng hiển thị danh sách video shorts đã đăng.",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "042",
@@ -526,7 +610,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "043",
@@ -538,7 +624,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "044",
@@ -550,7 +638,9 @@
       "notes": "Sheet Chỉnh sửa hồ sơ cá nhân: đổi avatar, họ tên, tiểu sử và thông tin liên hệ.",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "045",
@@ -562,7 +652,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "046",
@@ -574,7 +666,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "047",
@@ -586,7 +680,9 @@
       "notes": "Màn hình Bạn bè: 3 tab Bạn bè / Lời mời / Đã gửi, ô tìm kiếm, empty state",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "048",
@@ -598,7 +694,9 @@
       "notes": "Phần Lời mời kết bạn đến trong FriendsView hiển thị danh sách kèm nút Đồng ý và Từ chối.",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "049",
@@ -610,7 +708,9 @@
       "notes": "Phần Lời mời đã gửi trong FriendsView hiển thị danh sách lời mời đang chờ kèm nút Hủy lời mời.",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "050",
@@ -622,7 +722,9 @@
       "notes": "Phần Gợi ý bạn bè trong FriendsView hiển thị danh sách người dùng tiềm năng kèm khoảng cách km, bio và nút Kết bạn capsule.",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "051",
@@ -634,7 +736,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "052",
@@ -646,7 +750,9 @@
       "notes": "Danh sách hội thoại: Tab Tất cả / Chưa đọc, tìm kiếm, ghim, tắt chuông",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "053",
@@ -658,7 +764,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "054",
@@ -670,7 +778,9 @@
       "notes": "Chi tiết chat: Nội dung trên, dòng giờ+đã xem+cảm xúc+tùy chọn dưới",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "055",
@@ -682,7 +792,9 @@
       "notes": "Bong bóng cảm xúc: like/love/haha/wow/sad/angry đồng bộ chuẩn backend",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "056",
@@ -694,7 +806,9 @@
       "notes": "GroupChatDetailView hiển thị tiêu đề nhóm, nút gọi thoại/video và menu tùy chọn nhóm.",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "057",
@@ -706,7 +820,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "058",
@@ -718,7 +834,9 @@
       "notes": "DirectChatDetailView confirmationDialog mở menu tùy chọn hội thoại: Ghim hội thoại, Tắt thông báo, Báo cáo người dùng, Chặn người dùng.",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "059",
@@ -730,7 +848,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "060",
@@ -742,7 +862,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "061",
@@ -754,7 +876,9 @@
       "notes": "DirectChatDetailView confirmationDialog mở menu tùy chọn tin nhắn: Sửa tin nhắn (tin của mình), Chuyển tiếp tin nhắn, Thu hồi / Xóa tin nhắn.",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "062",
@@ -766,7 +890,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "063",
@@ -778,7 +904,10 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": true,
+      "testScope": "BACKEND_CONTRACT_E2E",
+      "testEvidence": "test/test_live_and_contracts_e2e.mjs (Suite 3: Message reactions love/laugh/sad/like & null toggle removal)",
+      "testStatus": "PASSED_100_PERCENT"
     },
     {
       "id": "064",
@@ -790,7 +919,9 @@
       "notes": "Hàng trạng thái dưới cùng của bubble tin nhắn hiển thị giờ, icon trạng thái gửi/đã xem (seen), reaction và nút more ba chấm.",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "065",
@@ -802,7 +933,9 @@
       "notes": "Thông báo: Tab Tất cả / Chưa đọc, chạm đánh dấu đọc qua API và điều hướng",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "066",
@@ -814,7 +947,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "067",
@@ -826,7 +961,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "068",
@@ -838,7 +975,9 @@
       "notes": "Giao diện Camera trực tiếp: Tỉ lệ 9:16, nút chụp, bộ chuyển ẢNH/VIDEO/LIVE, thư viện ảnh",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "069",
@@ -850,7 +989,9 @@
       "notes": "Bảng chỉnh sửa Studio: Studio Pro góc phải, nút Lưu riêng ghi vào Camera Roll, nút Thoát",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "070",
@@ -862,7 +1003,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "071",
@@ -874,7 +1017,9 @@
       "notes": "Bộ chọn video từ Thư viện PhotosPicker hệ thống cần kích hoạt tương tác Photos UI native (giữ trạng thái PENDING để đảm bảo tính xác thực).",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "072",
@@ -886,7 +1031,9 @@
       "notes": "Màn hình xem trước sau khi chụp/chọn ảnh: hiển thị ảnh lớn, nút Studio Pro góc phải, caption và nút Lưu tách riêng.",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "073",
@@ -898,7 +1045,9 @@
       "notes": "Màn hình xem trước video Shorts cần bằng chứng hiển thị thời lượng, timeline scrubber và nút điều khiển phát video (bảo lưu PENDING theo khuyến nghị Codex).",
       "verifiedCommit": "46d0975",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "074",
@@ -910,7 +1059,9 @@
       "notes": "Nút Studio Pro mở bảng điều khiển hiệu ứng chuyên nghiệp với gradient tím và các danh mục bộ lọc.",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "075",
@@ -922,7 +1073,9 @@
       "notes": "StudioProSheet tích hợp Core Image CIFilter native áp dụng bộ lọc trực tiếp lên media.",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "076",
@@ -934,7 +1087,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "077",
@@ -946,7 +1101,9 @@
       "notes": "Nút Lưu vào thiết bị được đặt riêng biệt dưới bảng điều khiển, không chồng lấn nút Đăng hay nút Đóng.",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "078",
@@ -958,7 +1115,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "079",
@@ -970,7 +1129,9 @@
       "notes": "Trình phát Video Shorts cuộn dọc toàn màn hình với tim, bình luận, chia sẻ",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "080",
@@ -982,7 +1143,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "081",
@@ -994,7 +1157,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "082",
@@ -1006,7 +1171,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "083",
@@ -1018,7 +1185,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "084",
@@ -1030,7 +1199,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "085",
@@ -1042,7 +1213,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "086",
@@ -1054,7 +1227,9 @@
       "notes": "Phòng Live Stream: WebRTC video stream, chat WebSocket, thả tim kind:heart, quà kind:gift.id",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "087",
@@ -1066,7 +1241,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "088",
@@ -1078,7 +1255,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "089",
@@ -1090,7 +1269,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "090",
@@ -1102,7 +1283,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "091",
@@ -1114,7 +1297,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "092",
@@ -1126,7 +1311,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "093",
@@ -1138,7 +1325,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "094",
@@ -1150,7 +1339,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "095",
@@ -1162,7 +1353,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "096",
@@ -1174,7 +1367,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "097",
@@ -1186,7 +1381,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "098",
@@ -1198,7 +1395,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "099",
@@ -1210,7 +1409,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "100",
@@ -1222,7 +1423,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "101",
@@ -1234,7 +1437,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "102",
@@ -1246,7 +1451,10 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": true,
+      "testScope": "BACKEND_CONTRACT_E2E",
+      "testEvidence": "test/test_live_and_contracts_e2e.mjs (Suite 2: Live Room lifecycle, chat, gift rose, heart reactions)",
+      "testStatus": "PASSED_100_PERCENT"
     },
     {
       "id": "103",
@@ -1258,7 +1466,10 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": true,
+      "testScope": "BACKEND_CONTRACT_E2E",
+      "testEvidence": "test/test_live_and_contracts_e2e.mjs (Suite 2: WebRTC P2P offer/answer signaling exchange between host and viewer)",
+      "testStatus": "PASSED_100_PERCENT"
     },
     {
       "id": "104",
@@ -1270,7 +1481,9 @@
       "notes": "Ví Kinnect: Tách biệt Xu mua và Xu tặng, gói nạp xu, lịch sử giao dịch",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "105",
@@ -1282,7 +1495,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "106",
@@ -1294,7 +1509,10 @@
       "notes": "Tab Nạp xu trong WalletStoreView hiển thị danh sách các gói StoreKit 2 (1.000 xu = 22.000đ) kèm nút Mua và nút Khôi phục gói mua.",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": true,
+      "testScope": "BACKEND_CONTRACT_E2E",
+      "testEvidence": "test/test_live_and_contracts_e2e.mjs (Suite 5: StoreKit 2 JWS verification, appAccountToken UUID, 25h refresh, refund notifications, deduplication, production safeguards)",
+      "testStatus": "PASSED_100_PERCENT"
     },
     {
       "id": "107",
@@ -1306,7 +1524,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "108",
@@ -1318,7 +1538,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "109",
@@ -1330,7 +1552,9 @@
       "notes": "Tab Cửa hàng vật phẩm hiển thị các gói Khung Avatar và Huy hiệu kèm giá xu và nút Mua.",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "110",
@@ -1342,7 +1566,9 @@
       "notes": "Gói Studio Pro chuyên biệt trong Cửa hàng cần fixture hiển thị riêng biệt gói Studio (bảo lưu trạng thái PENDING theo khuyến nghị Codex).",
       "verifiedCommit": "46d0975",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "111",
@@ -1354,7 +1580,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "112",
@@ -1366,7 +1594,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "113",
@@ -1378,7 +1608,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "114",
@@ -1390,7 +1622,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "115",
@@ -1402,7 +1636,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "116",
@@ -1414,7 +1650,9 @@
       "notes": "Menu Drawer tài khoản: Quản lý phiên, Đổi mật khẩu, Chặn, Giao diện Sáng/Tối, Đăng xuất",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "117",
@@ -1426,7 +1664,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "118",
@@ -1438,7 +1678,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "119",
@@ -1450,7 +1692,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "120",
@@ -1462,7 +1706,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "121",
@@ -1474,7 +1720,9 @@
       "notes": "Sheet Phiên đăng nhập: hiển thị thiết bị hiện tại (active) và danh sách phiên từ xa kèm nút Đăng xuất.",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "122",
@@ -1486,7 +1734,10 @@
       "notes": "DeleteAccountConfirmationSheet hiển thị cảnh báo đỏ không thể hoàn tác, ô nhập Username xác nhận, ô nhập Mật khẩu và nút Xóa vĩnh viễn tài khoản (Apple Guideline 5.1.1).",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": true,
+      "testScope": "BACKEND_CONTRACT_E2E",
+      "testEvidence": "test/test_live_and_contracts_e2e.mjs (Suite 6: Permanent account deletion, password challenge, session cookie Max-Age=0, data purge)",
+      "testStatus": "PASSED_100_PERCENT"
     },
     {
       "id": "123",
@@ -1498,7 +1749,9 @@
       "notes": "UGCReportSheet hiển thị 6 lý do vi phạm chuẩn Apple Guideline 1.2, ô nhập chi tiết, tùy chọn Chặn người dùng, và nút Gửi báo cáo.",
       "verifiedCommit": "46d0975",
       "visualCaptured": true,
-      "functionTested": true
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "124",
@@ -1510,7 +1763,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "125",
@@ -1522,7 +1777,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     },
     {
       "id": "126",
@@ -1534,7 +1791,9 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97",
       "visualCaptured": false,
-      "functionTested": false
+      "functionTested": false,
+      "testScope": null,
+      "testEvidence": null
     }
   ],
   "ciRunId": "42370019967",

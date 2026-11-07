@@ -1,4 +1,5 @@
 import AVFoundation
+import AVKit
 import CoreImage
 import CoreImage.CIFilterBuiltins
 import PhotosUI
@@ -83,14 +84,16 @@ struct CameraStudioView: View {
             if UIReviewFixture.activeScreen == "camera-studio-video" {
                 captureMode = .video
             }
-            if UIReviewFixture.activeScreen == "camera-studio-video-edit" && previewImage == nil {
-                let sample = UIReviewFixture.samplePreviewImage()
-                originalImage = sample
-                previewImage = sample
+            if UIReviewFixture.activeScreen == "camera-studio-video-edit" {
                 target = .shortVideo
-                videoDataURL = "data:video/mp4;base64,AAAA"
-                title = "[Fixture UI] Video ngắn kiểm thử"
-                caption = "Video ngắn quay bằng Kinnect Camera Studio với điều khiển xuất bản."
+                title = "Video ngắn Kinnect Shorts"
+                caption = "Video ngắn quay bằng Camera Studio và phát qua AVPlayer native."
+                if let movieURL = UIReviewFixture.samplePlayableVideoURL() {
+                    self.capturedVideoTempURL = movieURL
+                    if let d = try? Data(contentsOf: movieURL) {
+                        self.videoDataURL = "data:video/mp4;base64,\(d.base64EncodedString())"
+                    }
+                }
             }
             if UIReviewFixture.activeScreen == "camera-studio-edit" && previewImage == nil {
                 let sample = UIReviewFixture.samplePreviewImage()
@@ -335,83 +338,19 @@ struct CameraStudioView: View {
                 }
                 .padding(.horizontal, 4)
 
-                // Large Media Preview (Photo or Video Player Interface)
-                if let displayImg = previewImage ?? (UIReviewFixture.activeScreen == "camera-studio-edit" ? UIReviewFixture.samplePreviewImage() : nil) {
-                    ZStack(alignment: .bottom) {
-                        Image(uiImage: displayImg)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: .infinity, maxHeight: 320)
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(KinnectTheme.border, lineWidth: 1)
-                            )
-
-                        if target == .shortVideo || !videoDataURL.isEmpty {
-                            // Centered Video Playback Indicator
-                            VStack {
-                                Spacer()
-                                Image(systemName: "pause.circle.fill")
-                                    .font(.system(size: 48, weight: .light))
-                                    .foregroundColor(.white.opacity(0.9))
-                                    .shadow(color: .black.opacity(0.6), radius: 8)
-                                Spacer()
-                            }
-
-                            // Bottom Video Controls & Scrubber Timeline
-                            VStack(spacing: 6) {
-                                HStack(spacing: 8) {
-                                    // Progress Bar
-                                    GeometryReader { geo in
-                                        ZStack(alignment: .leading) {
-                                            Capsule()
-                                                .fill(Color.white.opacity(0.3))
-                                                .frame(height: 4)
-                                            Capsule()
-                                                .fill(KinnectTheme.primaryGradient)
-                                                .frame(width: geo.size.width * 0.53, height: 4)
-                                        }
-                                    }
-                                    .frame(height: 4)
-
-                                    Text("00:08 / 00:15")
-                                        .font(.caption2.monospacedDigit().weight(.semibold))
-                                        .foregroundColor(.white)
-                                }
-
-                                HStack {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "film.fill")
-                                            .font(.system(size: 10))
-                                        Text("HD 1080p • 30fps")
-                                            .font(.system(size: 10, weight: .medium))
-                                    }
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Capsule().fill(Color.black.opacity(0.6)))
-                                    .foregroundColor(.white.opacity(0.9))
-
-                                    Spacer()
-
-                                    Image(systemName: "speaker.wave.2.fill")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.white.opacity(0.9))
-                                }
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(
-                                LinearGradient(
-                                    colors: [Color.clear, Color.black.opacity(0.75)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: 320)
+                // Large Media Preview (Native AVPlayer for Video or Photo Editor for Images)
+                if target == .shortVideo, let vURL = capturedVideoTempURL ?? (UIReviewFixture.activeScreen == "camera-studio-video-edit" ? UIReviewFixture.samplePlayableVideoURL() : nil) {
+                    StudioVideoPlayerView(videoURL: vURL)
+                } else if let displayImg = previewImage ?? (UIReviewFixture.activeScreen == "camera-studio-edit" ? UIReviewFixture.samplePreviewImage() : nil) {
+                    Image(uiImage: displayImg)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity, maxHeight: 320)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(KinnectTheme.border, lineWidth: 1)
+                        )
                 } else if !videoDataURL.isEmpty {
                     HStack(spacing: 12) {
                         KinnectIcon(glyph: .video, size: 28, selected: true, tint: KinnectTheme.online)
@@ -1044,5 +983,226 @@ final class PhotoSaveCoordinator: NSObject {
                 self?.onComplete?(true, nil)
             }
         }
+    }
+}
+
+// MARK: - Dedicated Native Video Player with AVPlayer & Integrated Controls
+struct StudioVideoPlayerView: View {
+    let videoURL: URL
+    @State private var player: AVPlayer?
+    @State private var isPlaying: Bool = true
+    @State private var currentTime: Double = 0
+    @State private var duration: Double = 0
+    @State private var isMuted: Bool = false
+    @State private var timeObserverToken: Any?
+    @State private var videoResolution: String = ""
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            // Native AVPlayer Rendering Layer
+            if let p = player {
+                VideoPlayer(player: p)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(KinnectTheme.border, lineWidth: 1)
+                    )
+            } else {
+                Color.black
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .overlay(ProgressView().tint(.white))
+            }
+
+            // Integrated Interactive Controls
+            VStack(spacing: 8) {
+                // Top Metadata Bar (Derived from Asset Tracks)
+                HStack {
+                    if !videoResolution.isEmpty {
+                        HStack(spacing: 4) {
+                            Image(systemName: "film.fill")
+                                .font(.system(size: 10))
+                            Text(videoResolution)
+                                .font(.system(size: 10, weight: .semibold))
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(Color.black.opacity(0.65)))
+                        .foregroundColor(.white)
+                    }
+
+                    Spacer()
+
+                    Button {
+                        isMuted.toggle()
+                        player?.isMuted = isMuted
+                    } label: {
+                        Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(.white)
+                            .padding(6)
+                            .background(Circle().fill(Color.black.opacity(0.65)))
+                    }
+                    .accessibilityLabel(isMuted ? "Bật âm thanh" : "Tắt âm thanh")
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+
+                Spacer()
+
+                // Center Play/Pause Toggle
+                Button {
+                    togglePlayPause()
+                } label: {
+                    Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                        .font(.system(size: 50, weight: .light))
+                        .foregroundColor(.white.opacity(isPlaying ? 0.85 : 0.95))
+                        .shadow(color: .black.opacity(0.6), radius: 8)
+                }
+                .accessibilityLabel(isPlaying ? "Tạm dừng video" : "Phát video")
+
+                Spacer()
+
+                // Bottom Timeline Scrubber & Counter
+                VStack(spacing: 6) {
+                    // Scrubber Bar
+                    GeometryReader { geo in
+                        let progress = duration > 0 ? (currentTime / duration) : 0
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(Color.white.opacity(0.3))
+                                .frame(height: 5)
+
+                            Capsule()
+                                .fill(KinnectTheme.primaryGradient)
+                                .frame(width: max(0, min(geo.size.width, geo.size.width * CGFloat(progress))), height: 5)
+                        }
+                        .contentShape(Rectangle())
+                        .gesture(
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { val in
+                                    let fraction = max(0, min(1, val.location.x / geo.size.width))
+                                    let targetTime = fraction * duration
+                                    seek(to: targetTime)
+                                }
+                        )
+                    }
+                    .frame(height: 5)
+
+                    HStack {
+                        Text(formatDuration(currentTime))
+                            .font(.caption2.monospacedDigit().weight(.medium))
+                            .foregroundColor(.white)
+
+                        Spacer()
+
+                        Text(formatDuration(duration))
+                            .font(.caption2.monospacedDigit().weight(.medium))
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    LinearGradient(
+                        colors: [Color.clear, Color.black.opacity(0.75)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: 320)
+        .onAppear {
+            setupPlayer()
+        }
+        .onDisappear {
+            teardownPlayer()
+        }
+    }
+
+    private func setupPlayer() {
+        let p = AVPlayer(url: videoURL)
+        p.isMuted = isMuted
+        self.player = p
+
+        // Load asset tracks metadata asynchronously
+        Task {
+            let asset = AVURLAsset(url: videoURL)
+            if let d = try? await asset.load(.duration) {
+                let sec = CMTimeGetSeconds(d)
+                if sec.isFinite && sec > 0 {
+                    await MainActor.run { self.duration = sec }
+                }
+            }
+            if let tracks = try? await asset.loadTracks(withMediaType: .video), let firstTrack = tracks.first {
+                if let size = try? await firstTrack.load(.naturalSize) {
+                    let w = Int(size.width)
+                    let h = Int(size.height)
+                    await MainActor.run {
+                        self.videoResolution = "\(min(w, h))p • 30fps"
+                    }
+                }
+            }
+        }
+
+        // Add periodic time observer (10Hz)
+        let interval = CMTime(seconds: 0.1, preferredTimescale: 600)
+        timeObserverToken = p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
+            let sec = CMTimeGetSeconds(time)
+            if sec.isFinite {
+                self.currentTime = sec
+            }
+        }
+
+        // Observe end of playback to loop cleanly
+        NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: p.currentItem,
+            queue: .main
+        ) { _ in
+            p.seek(to: .zero)
+            p.play()
+            self.isPlaying = true
+        }
+
+        p.play()
+        isPlaying = true
+    }
+
+    private func teardownPlayer() {
+        if let token = timeObserverToken, let p = player {
+            p.removeTimeObserver(token)
+            timeObserverToken = nil
+        }
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
+        player?.pause()
+        player = nil
+    }
+
+    private func togglePlayPause() {
+        guard let p = player else { return }
+        if isPlaying {
+            p.pause()
+            isPlaying = false
+        } else {
+            p.play()
+            isPlaying = true
+        }
+    }
+
+    private func seek(to seconds: Double) {
+        guard let p = player, seconds.isFinite else { return }
+        let targetCM = CMTime(seconds: seconds, preferredTimescale: 600)
+        p.seek(to: targetCM, toleranceBefore: .zero, toleranceAfter: .zero)
+        currentTime = seconds
+    }
+
+    private func formatDuration(_ sec: Double) -> String {
+        guard sec.isFinite && sec >= 0 else { return "00:00" }
+        let total = Int(sec)
+        let m = total / 60
+        let s = total % 60
+        return String(format: "%02d:%02d", m, s)
     }
 }
