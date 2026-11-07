@@ -403,9 +403,36 @@ private struct PostCardView: View {
                 )
             }
 
+            // Statistics Summary Row (Android parity: ❤️ 2 cảm xúc ... 0 bình luận)
+            HStack {
+                if post.likesCount > 0 {
+                    HStack(spacing: 4) {
+                        Text(post.liked ? reactionEmoji(for: post.userReaction) : "❤️")
+                            .font(.caption)
+                        Text("\(post.likesCount) cảm xúc")
+                            .font(.caption)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                } else {
+                    Text("Chưa có cảm xúc")
+                        .font(.caption)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                }
+
+                Spacer()
+
+                Text("\(post.commentsCount) bình luận")
+                    .font(.caption)
+                    .foregroundColor(KinnectTheme.textSecondary)
+            }
+            .padding(.top, 2)
+            .padding(.bottom, 2)
+
             Divider().background(KinnectTheme.border)
 
-            HStack(spacing: 12) {
+            // Equal 3-Column Action Bar (Android parity: 33% Cảm xúc, 33% Bình luận, 33% Chia sẻ)
+            HStack(spacing: 0) {
+                // Column 1: Cảm xúc (Reaction)
                 Menu {
                     ForEach(reactionOptions, id: \.key) { item in
                         Button("\(item.emoji) \(item.key.capitalized)") {
@@ -416,43 +443,69 @@ private struct PostCardView: View {
                     HStack(spacing: 6) {
                         if post.liked {
                             Text(reactionEmoji(for: post.userReaction))
+                                .font(.subheadline)
+                            Text(reactionTitle(for: post.userReaction))
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(KinnectTheme.accentBright)
                         } else {
                             KinnectIcon(glyph: .reaction, size: 18, tint: KinnectTheme.textSecondary)
+                            Text("Cảm xúc")
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(KinnectTheme.textSecondary)
                         }
-                        Text("\(max(post.likesCount, 0))")
-                            .font(.caption.weight(.semibold))
-                            .foregroundColor(post.liked ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .frame(minHeight: 44)
-                    .background(
-                        Capsule()
-                            .fill(post.liked ? KinnectTheme.accent.opacity(0.24) : KinnectTheme.surfaceElevated)
-                    )
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .contentShape(Rectangle())
                 } primaryAction: {
-                    onReact("like")
+                    onReact(post.liked ? post.userReaction : "like")
                 }
-                .accessibilityLabel("Bày tỏ cảm xúc")
+                .accessibilityLabel("Cảm xúc")
 
+                // Column 2: Bình luận (Comment)
                 Button(action: onOpenComments) {
                     HStack(spacing: 6) {
                         KinnectIcon(glyph: .comment, size: 18, tint: KinnectTheme.textSecondary)
-                        Text("\(post.commentsCount) bình luận")
+                        Text("Bình luận")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(KinnectTheme.textSecondary)
                     }
-                    .font(.caption.weight(.semibold))
-                    .foregroundColor(KinnectTheme.textSecondary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .frame(minHeight: 44)
-                    .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .contentShape(Rectangle())
                 }
-                .accessibilityLabel("Mở bình luận")
+                .accessibilityLabel("Bình luận")
 
-                Spacer()
+                // Column 3: Chia sẻ (Share)
+                Button {
+                    let shareText = post.text.isEmpty ? "Kinnect Post" : post.text
+                    let av = UIActivityViewController(activityItems: [shareText], applicationActivities: nil)
+                    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                       let rootVC = windowScene.windows.first?.rootViewController {
+                        rootVC.present(av, animated: true)
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        KinnectIcon(glyph: .share, size: 18, tint: KinnectTheme.textSecondary)
+                        Text("Chia sẻ")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .accessibilityLabel("Chia sẻ")
             }
         }
         .kinnectCard()
+    }
+
+    private func reactionTitle(for key: String) -> String {
+        switch key {
+        case "love": return "Yêu thích"
+        case "haha": return "Haha"
+        case "wow": return "Wow"
+        case "sad": return "Buồn"
+        default: return "Thích"
+        }
     }
 
     private func reactionEmoji(for key: String) -> String {

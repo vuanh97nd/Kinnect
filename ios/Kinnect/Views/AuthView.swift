@@ -15,6 +15,7 @@ struct AuthView: View {
     @State private var handle = ""
     @State private var password = ""
     @State private var showPassword = false
+    @State private var rememberMe = true
     @State private var agree18 = true
     @State private var acceptPrivacy = true
     @State private var isSubmitting = false
@@ -107,6 +108,24 @@ struct AuthView: View {
                             }
                             .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
                         }
+
+                        if mode == .login {
+                            HStack {
+                                Toggle("Ghi nhớ", isOn: $rememberMe)
+                                    .toggleStyle(.switch)
+                                    .tint(KinnectTheme.accentBright)
+                                    .font(.footnote)
+                                    .foregroundColor(KinnectTheme.textPrimary)
+
+                                Spacer()
+
+                                Button("Quên mật khẩu?") {
+                                    mode = .reset
+                                }
+                                .font(.footnote.weight(.semibold))
+                                .foregroundColor(KinnectTheme.accentBright)
+                            }
+                        }
                     }
 
                     if mode == .register {
@@ -163,10 +182,17 @@ struct AuthView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
                     .disabled(isSubmitting)
+
+                    Text("Tiếp tục nghĩa là bạn đồng ý quy tắc cộng đồng.")
+                        .font(.caption2)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 4)
                 }
                 .kinnectCard()
 
-                // Server Origin status
+                #if DEBUG
+                // Server Origin status (visible in debug builds only)
                 HStack(spacing: 6) {
                     Circle()
                         .fill(KinnectTheme.online)
@@ -177,6 +203,7 @@ struct AuthView: View {
                         .kinnectMultiline()
                 }
                 .padding(.bottom, 24)
+                #endif
             }
             .padding(.horizontal, 18)
             .frame(maxWidth: 500)

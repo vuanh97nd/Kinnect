@@ -40,8 +40,8 @@ struct ShortsVideoView: View {
             // Top transparent floating bar (Đề xuất · Đang theo dõi) - Parity with Android 1.2.12
             HStack(spacing: 24) {
                 Spacer()
-                tabHeaderButton(id: "following", title: "Đang theo dõi")
                 tabHeaderButton(id: "for", title: "Đề xuất")
+                tabHeaderButton(id: "following", title: "Đang theo dõi")
                 Spacer()
             }
             .padding(.top, 8)
