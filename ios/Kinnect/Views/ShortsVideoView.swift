@@ -249,3 +249,88 @@ struct ShortsVideoView: View {
         }
     }
 }
+
+struct ShortCommentsSheet: View {
+    let short: ShortItem
+    let onUpdated: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
+
+    @State private var comments: [CommentItem] = []
+    @State private var text = ""
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                List(comments) { c in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(c.author.name)
+                            .font(.caption.bold())
+                            .foregroundColor(KinnectTheme.accentBright)
+                        Text(c.text)
+                            .font(.subheadline)
+                            .foregroundColor(.white)
+                            .kinnectMultiline()
+                    }
+                    .listRowBackground(KinnectTheme.surface)
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+
+                HStack(spacing: 8) {
+                    TextField("Bình luận video ngắn...", text: $text)
+                        .padding(10)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                        .foregroundColor(.white)
+                    KinnectIconButton(
+                        glyph: .send,
+                        label: "Gửi bình luận",
+                        tint: KinnectTheme.accentBright
+                    ) {
+                        Task { await postComment() }
+                    }
+                }
+                .padding(12)
+                .background(KinnectTheme.surface)
+            }
+            .background(KinnectTheme.background)
+            .navigationTitle("Bình luận Shorts")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    KinnectIconButton(glyph: .close, label: "Đóng", tint: KinnectTheme.textPrimary) {
+                        dismiss()
+                    }
+                }
+            }
+            .task {
+                await load()
+            }
+        }
+    }
+
+    private func load() async {
+        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/shorts/\(short.id)/comments") {
+            self.comments = (res["comments"] as? [[String: Any]] ?? []).map(CommentItem.from)
+        }
+    }
+
+    private func postComment() async {
+        let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return }
+        text = ""
+        let reqId = "short_cmt_\(short.id)_\(UUID().uuidString)"
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/shorts/\(short.id)/comments",
+                method: "POST",
+                body: ["text": clean],
+                requestId: reqId
+            )
+            await load()
+            onUpdated()
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+}

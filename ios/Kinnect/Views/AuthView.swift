@@ -243,6 +243,9 @@ struct AuthView: View {
                     errorMessage = "Vui lòng nhập mật khẩu."
                     return
                 }
+                // Pre-apply remember policy BEFORE request so any Set-Cookie headers in the response
+                // are ingested with the intended persistence mode (RAM-only vs Keychain).
+                KeychainStore.shared.setRememberMe(rememberMe)
                 let res = try await KinnectAPIClient.shared.requestJSON(
                     "/api/login",
                     method: "POST",
