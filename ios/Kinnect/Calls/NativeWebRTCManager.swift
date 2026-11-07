@@ -494,15 +494,15 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
             guard let sdp = sdp, err == nil else { return }
             box.pc.setLocalDescription(sdp) { setErr in
                 guard setErr == nil else { return }
+                let descPayload: [String: Any] = [
+                    "type": Self.sdpTypeString(sdp.type),
+                    "sdp": sdp.sdp
+                ]
                 NativeSocketClient.shared.sendJSON([
                     "type": "signal",
                     "to": peerId,
-                    "signal": [
-                        "description": [
-                            "type": Self.sdpTypeString(sdp.type),
-                            "sdp": sdp.sdp
-                        ]
-                    ]
+                    "description": descPayload,
+                    "signal": ["description": descPayload]
                 ])
             }
         }
@@ -545,15 +545,15 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
                         guard let answer = answer, ansErr == nil else { return }
                         box.pc.setLocalDescription(answer) { setErr in
                             guard setErr == nil else { return }
+                            let descPayload: [String: Any] = [
+                                "type": Self.sdpTypeString(answer.type),
+                                "sdp": answer.sdp
+                            ]
                             NativeSocketClient.shared.sendJSON([
                                 "type": "signal",
                                 "to": peerId,
-                                "signal": [
-                                    "description": [
-                                        "type": Self.sdpTypeString(answer.type),
-                                        "sdp": answer.sdp
-                                    ]
-                                ]
+                                "description": descPayload,
+                                "signal": ["description": descPayload]
                             ])
                         }
                     }
@@ -704,16 +704,16 @@ private final class PeerConnectionBox: NSObject, RTCPeerConnectionDelegate {
     func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCIceConnectionState) {}
     func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCIceGatheringState) {}
     func peerConnection(_ peerConnection: RTCPeerConnection, didGenerate candidate: RTCIceCandidate) {
+        let candPayload: [String: Any] = [
+            "candidate": candidate.sdp,
+            "sdpMid": candidate.sdpMid ?? "0",
+            "sdpMLineIndex": candidate.sdpMLineIndex
+        ]
         NativeSocketClient.shared.sendJSON([
             "type": "signal",
             "to": peerId,
-            "signal": [
-                "candidate": [
-                    "candidate": candidate.sdp,
-                    "sdpMid": candidate.sdpMid ?? "0",
-                    "sdpMLineIndex": candidate.sdpMLineIndex
-                ]
-            ]
+            "candidate": candPayload,
+            "signal": ["candidate": candPayload]
         ])
     }
     func peerConnection(_ peerConnection: RTCPeerConnection, didRemove candidates: [RTCIceCandidate]) {}

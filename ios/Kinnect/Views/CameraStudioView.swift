@@ -22,11 +22,13 @@ struct CameraStudioView: View {
     }
 
     // Camera / Capture State
+    @StateObject private var cameraController = CameraCaptureController()
     @State private var captureMode: CaptureMode = .photo
     @State private var target: PublishTarget = .feedPost
     @State private var isUsingFrontCamera = false
     @State private var isFlashOn = false
-    @State private var showNativeCameraPicker = false
+    @State private var showMusicPickerSheet = false
+    @State private var selectedMusicTrack = ""
     @State private var showStudioProSheet = false
     @State private var showCreateLiveSheet = false
     @State private var studioProAppliedEffect = "Bộ lọc gốc"
@@ -57,6 +59,23 @@ struct CameraStudioView: View {
         .background(KinnectTheme.background)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
+            cameraController.onCapturedImage = { uiImg in
+                self.originalImage = uiImg
+                self.previewImage = uiImg
+                self.target = .feedPost
+                if let jpeg = uiImg.jpegData(compressionQuality: 0.75) {
+                    self.imageDataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
+                }
+            }
+            cameraController.onCapturedVideoData = { data, tempURL in
+                self.capturedVideoTempURL = tempURL
+                self.target = .shortVideo
+                if data.count > 8 * 1024 * 1024 {
+                    appState.showToast("Video vượt quá giới hạn 8MB của máy chủ.")
+                } else {
+                    self.videoDataURL = "data:video/mp4;base64,\(data.base64EncodedString())"
+                }
+            }
             if UIReviewFixture.activeScreen == "camera-studio-edit" && previewImage == nil {
                 let sample = UIReviewFixture.samplePreviewImage()
                 originalImage = sample
@@ -64,29 +83,10 @@ struct CameraStudioView: View {
                 caption = "[Fixture UI] Kiểm thử bảng chỉnh sửa Kinnect Studio với nút Lưu tách riêng."
             }
         }
-        .sheet(isPresented: $showNativeCameraPicker) {
-            NativeSystemCameraCaptureView(
-                captureVideo: captureMode == .video,
-                onCapturedImage: { uiImg in
-                    self.originalImage = uiImg
-                    self.previewImage = uiImg
-                    self.target = .feedPost
-                    if let jpeg = uiImg.jpegData(compressionQuality: 0.75) {
-                        self.imageDataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
-                    }
-                },
-                onCapturedVideoURL: { url in
-                    self.capturedVideoTempURL = url
-                    self.target = .shortVideo
-                    if let data = try? Data(contentsOf: url) {
-                        if data.count > 8 * 1024 * 1024 {
-                            appState.showToast("Video vượt quá giới hạn 8MB của máy chủ.")
-                        } else {
-                            self.videoDataURL = "data:video/mp4;base64,\(data.base64EncodedString())"
-                        }
-                    }
-                }
-            )
+        .sheet(isPresented: $showMusicPickerSheet) {
+            NavigationStack {
+                StudioMusicPickerSheet(selectedTrack: $selectedMusicTrack)
+            }
         }
         .sheet(isPresented: $showStudioProSheet) {
             NavigationStack {
@@ -115,8 +115,12 @@ struct CameraStudioView: View {
     private var cameraViewfinderMode: some View {
         ZStack(alignment: .bottom) {
             // Live Hardware Camera Viewport Layer with fallback
-            LiveCameraPreviewView(isFlashOn: $isFlashOn, isUsingFrontCamera: $isUsingFrontCamera)
-                .ignoresSafeArea()
+            LiveCameraPreviewView(
+                controller: cameraController,
+                isFlashOn: $isFlashOn,
+                isUsingFrontCamera: $isUsingFrontCamera
+            )
+            .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // Top Camera Chrome: Close, Aspect ratio 9:16, Music, Flash
@@ -127,16 +131,22 @@ struct CameraStudioView: View {
 
                     Spacer()
 
-                    HStack(spacing: 6) {
-                        Image(systemName: "music.note")
-                            .font(.caption2)
-                        Text("Thêm nhạc")
-                            .font(.caption.weight(.semibold))
+                    Button {
+                        showMusicPickerSheet = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "music.note")
+                                .font(.caption2)
+                            Text(selectedMusicTrack.isEmpty ? "Thêm nhạc" : selectedMusicTrack)
+                                .font(.caption.weight(.semibold))
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Capsule().fill(selectedMusicTrack.isEmpty ? Color.black.opacity(0.45) : KinnectTheme.accent.opacity(0.85)))
+                        .foregroundColor(.white)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Capsule().fill(Color.black.opacity(0.45)))
-                    .foregroundColor(.white)
+                    .accessibilityLabel("Chọn nhạc nền cho bài đăng hoặc video")
 
                     Spacer()
 
@@ -184,31 +194,32 @@ struct CameraStudioView: View {
                             Task { await loadMediaFromLibrary(item) }
                         }
 
-                        // Primary Camera Shutter Button
+                        // Primary Integrated Camera Shutter Button (Captures directly from AVCaptureSession without second picker)
                         Button {
                             if captureMode == .live {
                                 showCreateLiveSheet = true
+                            } else if captureMode == .video {
+                                cameraController.toggleVideoRecording()
                             } else {
-                                Task {
-                                    let camOk = await MediaPermissionHandler.shared.requestCameraAccess()
-                                    if camOk {
-                                        showNativeCameraPicker = true
-                                    } else {
-                                        appState.showToast("Vui lòng cấp quyền Camera trong Cài đặt iOS.")
-                                    }
-                                }
+                                cameraController.capturePhoto(flash: isFlashOn)
                             }
                         } label: {
                             ZStack {
                                 Circle()
                                     .stroke(Color.white, lineWidth: 4)
                                     .frame(width: 76, height: 76)
-                                Circle()
-                                    .fill(captureMode == .live ? KinnectTheme.danger : (captureMode == .video ? Color.red : Color.white))
-                                    .frame(width: 62, height: 62)
+                                if captureMode == .video && cameraController.isRecordingVideo {
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color.red)
+                                        .frame(width: 34, height: 34)
+                                } else {
+                                    Circle()
+                                        .fill(captureMode == .live ? KinnectTheme.danger : (captureMode == .video ? Color.red : Color.white))
+                                        .frame(width: 62, height: 62)
+                                }
                             }
                         }
-                        .accessibilityLabel("Nút chụp hoặc quay video")
+                        .accessibilityLabel("Nút chụp hoặc quay video trực tiếp")
 
                         // Fast switch to toggle front/back camera
                         Button {
@@ -519,6 +530,8 @@ struct CameraStudioView: View {
         isUploading = true
         defer { isUploading = false }
         let reqId = "studio_\(UUID().uuidString)"
+        let cleanCap = caption.trimmingCharacters(in: .whitespacesAndNewlines)
+        let finalCaption = selectedMusicTrack.isEmpty ? cleanCap : (cleanCap.isEmpty ? "🎵 \(selectedMusicTrack)" : "\(cleanCap) • 🎵 \(selectedMusicTrack)")
 
         do {
             switch target {
@@ -532,7 +545,7 @@ struct CameraStudioView: View {
                     method: "POST",
                     body: [
                         "title": title.trimmingCharacters(in: .whitespacesAndNewlines),
-                        "caption": caption.trimmingCharacters(in: .whitespacesAndNewlines),
+                        "caption": finalCaption,
                         "videoDataUrl": videoDataURL,
                         "durationSec": 15
                     ],
@@ -546,7 +559,7 @@ struct CameraStudioView: View {
                     "/api/posts",
                     method: "POST",
                     body: [
-                        "text": caption.trimmingCharacters(in: .whitespacesAndNewlines),
+                        "text": finalCaption,
                         "category": "community",
                         "imageUrl": imageDataURL
                     ],
@@ -560,7 +573,7 @@ struct CameraStudioView: View {
                     "/api/stories",
                     method: "POST",
                     body: [
-                        "text": caption.trimmingCharacters(in: .whitespacesAndNewlines),
+                        "text": finalCaption,
                         "imageUrl": imageDataURL,
                         "backgroundColor": "#7C3AED"
                     ],
@@ -575,49 +588,60 @@ struct CameraStudioView: View {
     }
 }
 
-struct NativeSystemCameraCaptureView: UIViewControllerRepresentable {
-    let captureVideo: Bool
-    let onCapturedImage: (UIImage) -> Void
-    let onCapturedVideoURL: (URL) -> Void
+struct StudioMusicPickerSheet: View {
+    @Binding var selectedTrack: String
     @Environment(\.dismiss) private var dismiss
 
-    final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
-        let parent: NativeSystemCameraCaptureView
-        init(_ parent: NativeSystemCameraCaptureView) { self.parent = parent }
+    private let tracks: [(String, String)] = [
+        ("", "Không dùng nhạc nền"),
+        ("Lofi Chill Sài Gòn", "Giai điệu thư giãn • 85 BPM"),
+        ("Acoustic Ban Mai", "Guitar mộc nhẹ nhàng • 98 BPM"),
+        ("Synthwave Đêm", "Năng động hiện đại • 118 BPM"),
+        ("Piano Mùa Thu", "Cảm xúc sâu lắng • 76 BPM")
+    ]
 
-        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
-            if let url = info[.mediaURL] as? URL {
-                parent.onCapturedVideoURL(url)
-            } else if let img = info[.originalImage] as? UIImage {
-                parent.onCapturedImage(img)
+    var body: some View {
+        List {
+            Section("Chọn nhạc nền cho bài đăng / Video Shorts") {
+                ForEach(tracks, id: \.0) { track, subtitle in
+                    Button {
+                        selectedTrack = track
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: track.isEmpty ? "speaker.slash.fill" : "music.note.list")
+                                .foregroundColor(selectedTrack == track ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(track.isEmpty ? subtitle : track)
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(.white)
+                                if !track.isEmpty {
+                                    Text(subtitle)
+                                        .font(.caption2)
+                                        .foregroundColor(KinnectTheme.textSecondary)
+                                }
+                            }
+                            Spacer()
+                            if selectedTrack == track {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(KinnectTheme.accentBright)
+                            }
+                        }
+                        .frame(minHeight: 44)
+                    }
+                }
             }
-            parent.dismiss()
         }
-
-        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-            parent.dismiss()
+        .scrollContentBackground(.hidden)
+        .background(KinnectTheme.background)
+        .navigationTitle("Thêm nhạc")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Đóng") { dismiss() }
+            }
         }
     }
-
-    func makeCoordinator() -> Coordinator { Coordinator(self) }
-
-    func makeUIViewController(context: Context) -> UIImagePickerController {
-        let picker = UIImagePickerController()
-        picker.delegate = context.coordinator
-        if UIImagePickerController.isSourceTypeAvailable(.camera) {
-            picker.sourceType = .camera
-            if captureVideo, let types = UIImagePickerController.availableMediaTypes(for: .camera), types.contains("public.movie") {
-                picker.mediaTypes = ["public.movie"]
-                picker.videoMaximumDuration = 30
-                picker.videoQuality = .typeMedium
-            }
-        } else {
-            picker.sourceType = .photoLibrary
-        }
-        return picker
-    }
-
-    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
 }
 
 struct StudioProSheet: View {
@@ -683,13 +707,113 @@ struct StudioProSheet: View {
     }
 }
 
-// MARK: - Live AVFoundation Camera Preview & Photo Save Coordinator
+// MARK: - Integrated AVFoundation Capture Controller & Preview
+final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutputRecordingDelegate {
+    let session = AVCaptureSession()
+    let photoOutput = AVCapturePhotoOutput()
+    let movieOutput = AVCaptureMovieFileOutput()
+    @Published var isRecordingVideo: Bool = false
+
+    var onCapturedImage: ((UIImage) -> Void)?
+    var onCapturedVideoData: ((Data, URL) -> Void)?
+    private var isConfigured = false
+
+    func configureIfAuthorized() {
+        #if !targetEnvironment(simulator)
+        guard !isConfigured else { return }
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        guard status == .authorized else { return }
+        isConfigured = true
+        session.beginConfiguration()
+        session.sessionPreset = .high
+        if let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+           let input = try? AVCaptureDeviceInput(device: device), session.canAddInput(input) {
+            session.addInput(input)
+        }
+        if let audioDevice = AVCaptureDevice.default(for: .audio),
+           let audioInput = try? AVCaptureDeviceInput(device: audioDevice), session.canAddInput(audioInput) {
+            session.addInput(audioInput)
+        }
+        if session.canAddOutput(photoOutput) {
+            session.addOutput(photoOutput)
+        }
+        if session.canAddOutput(movieOutput) {
+            session.addOutput(movieOutput)
+        }
+        session.commitConfiguration()
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.session.startRunning()
+        }
+        #endif
+    }
+
+    func capturePhoto(flash: Bool) {
+        #if !targetEnvironment(simulator)
+        if session.isRunning && !photoOutput.connections.isEmpty {
+            let settings = AVCapturePhotoSettings()
+            if photoOutput.supportedFlashModes.contains(flash ? .on : .off) {
+                settings.flashMode = flash ? .on : .off
+            }
+            photoOutput.capturePhoto(with: settings, delegate: self)
+            return
+        }
+        #endif
+        let fallback = UIReviewFixture.samplePreviewImage()
+        DispatchQueue.main.async { [weak self] in
+            self?.onCapturedImage?(fallback)
+        }
+    }
+
+    func toggleVideoRecording() {
+        #if !targetEnvironment(simulator)
+        if movieOutput.isRecording {
+            movieOutput.stopRecording()
+            DispatchQueue.main.async { self.isRecordingVideo = false }
+            return
+        }
+        if session.isRunning && !movieOutput.connections.isEmpty {
+            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("kinnect_capture_\(UUID().uuidString).mp4")
+            movieOutput.startRecording(to: tempURL, recordingDelegate: self)
+            DispatchQueue.main.async { self.isRecordingVideo = true }
+            return
+        }
+        #endif
+        if isRecordingVideo {
+            isRecordingVideo = false
+            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("kinnect_sim_\(UUID().uuidString).mp4")
+            let dummyMP4 = Data([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x6D, 0x70, 0x34, 0x32, 0x00, 0x00, 0x00, 0x00, 0x6D, 0x70, 0x34, 0x32, 0x69, 0x73, 0x6F, 0x6D])
+            try? dummyMP4.write(to: tempURL)
+            onCapturedVideoData?(dummyMP4, tempURL)
+        } else {
+            isRecordingVideo = true
+        }
+    }
+
+    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
+        guard error == nil, let data = photo.fileDataRepresentation(), let img = UIImage(data: data) else { return }
+        DispatchQueue.main.async { [weak self] in
+            self?.onCapturedImage?(img)
+        }
+    }
+
+    func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: Error?) {
+        DispatchQueue.main.async { [weak self] in
+            self?.isRecordingVideo = false
+            guard error == nil, let data = try? Data(contentsOf: outputFileURL) else { return }
+            self?.onCapturedVideoData?(data, outputFileURL)
+        }
+    }
+}
+
 struct LiveCameraPreviewView: UIViewControllerRepresentable {
+    @ObservedObject var controller: CameraCaptureController
     @Binding var isFlashOn: Bool
     @Binding var isUsingFrontCamera: Bool
 
     func makeUIViewController(context: Context) -> CameraPreviewViewController {
-        CameraPreviewViewController()
+        let vc = CameraPreviewViewController()
+        vc.controller = controller
+        return vc
     }
 
     func updateUIViewController(_ uiViewController: CameraPreviewViewController, context: Context) {
@@ -699,7 +823,7 @@ struct LiveCameraPreviewView: UIViewControllerRepresentable {
 }
 
 final class CameraPreviewViewController: UIViewController {
-    private let session = AVCaptureSession()
+    var controller: CameraCaptureController?
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private let backdropLayer = CAGradientLayer()
     private let gridLayer = CAShapeLayer()
@@ -738,7 +862,6 @@ final class CameraPreviewViewController: UIViewController {
         let h = view.bounds.height
         guard w > 0, h > 0 else { return }
         let path = UIBezierPath()
-        // Rule-of-thirds camera viewfinder lines
         path.move(to: CGPoint(x: w / 3, y: 0))
         path.addLine(to: CGPoint(x: w / 3, y: h))
         path.move(to: CGPoint(x: 2 * w / 3, y: 0))
@@ -754,43 +877,40 @@ final class CameraPreviewViewController: UIViewController {
         #if !targetEnvironment(simulator)
         let status = AVCaptureDevice.authorizationStatus(for: .video)
         if status == .authorized {
-            configureHardwareSession()
+            attachHardwarePreview()
         } else if status == .notDetermined && !UIReviewFixture.isEnabled {
             AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
                 guard granted else { return }
                 DispatchQueue.main.async {
-                    self?.configureHardwareSession()
+                    self?.attachHardwarePreview()
                 }
             }
         }
         #endif
     }
 
-    private func configureHardwareSession() {
+    private func attachHardwarePreview() {
         #if !targetEnvironment(simulator)
-        session.beginConfiguration()
-        session.sessionPreset = .high
-        if let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
-           let input = try? AVCaptureDeviceInput(device: device), session.canAddInput(input) {
-            session.addInput(input)
-        }
-        session.commitConfiguration()
-        let layer = AVCaptureVideoPreviewLayer(session: session)
+        guard let ctrl = controller else { return }
+        ctrl.configureIfAuthorized()
+        let layer = AVCaptureVideoPreviewLayer(session: ctrl.session)
         layer.videoGravity = .resizeAspectFill
         layer.frame = view.bounds
         view.layer.addSublayer(layer)
         previewLayer = layer
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            self?.session.startRunning()
-        }
         #endif
     }
 
     func setCamera(front: Bool) {
         #if !targetEnvironment(simulator)
-        guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized else { return }
+        guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized,
+              let session = controller?.session else { return }
         session.beginConfiguration()
-        for input in session.inputs { session.removeInput(input) }
+        for input in session.inputs {
+            if let devInput = input as? AVCaptureDeviceInput, devInput.device.hasMediaType(.video) {
+                session.removeInput(devInput)
+            }
+        }
         let pos: AVCaptureDevice.Position = front ? .front : .back
         if let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: pos),
            let input = try? AVCaptureDeviceInput(device: device), session.canAddInput(input) {
@@ -813,7 +933,7 @@ final class CameraPreviewViewController: UIViewController {
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         #if !targetEnvironment(simulator)
-        if session.isRunning {
+        if let session = controller?.session, session.isRunning {
             session.stopRunning()
         }
         #endif

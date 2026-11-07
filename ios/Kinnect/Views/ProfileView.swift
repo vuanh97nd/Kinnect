@@ -18,6 +18,13 @@ struct ProfileView: View {
 
     @State private var selectedTab: ProfileTab = .about
     @State private var userPosts: [PostItem] = []
+    @State private var userShorts: [ShortItem] = []
+    @State private var privatePhotos: [PrivatePhotoItem] = []
+    @State private var privateAccessRequests: [PrivateAccessRequestItem] = []
+    @State private var pendingPrivateRequestsCount: Int = 0
+    @State private var showPublicAlbumSheet = false
+    @State private var showPrivateAlbumSheet = false
+    @State private var activeShortItem: ShortItem?
     @State private var showEditProfileSheet = false
     @State private var showSessionsSheet = false
     @State private var showPasswordSheet = false
@@ -124,12 +131,44 @@ struct ProfileView: View {
         .navigationTitle("Hồ sơ cá nhân")
         .navigationBarTitleDisplayMode(.inline)
         .task {
+            if let screen = UIReviewFixture.activeScreen {
+                switch screen {
+                case "profile-posts": selectedTab = .posts
+                case "profile-albums": selectedTab = .albums
+                case "profile-videos": selectedTab = .videos
+                case "profile-edit": showEditProfileSheet = true
+                case "profile-sessions": showSessionsSheet = true
+                case "profile-private-album":
+                    selectedTab = .albums
+                    showPrivateAlbumSheet = true
+                default: break
+                }
+            }
             await refreshMe()
         }
         .sheet(isPresented: $showEditProfileSheet) {
             EditProfileSheet(onSaved: {
                 Task { await refreshMe() }
             })
+        }
+        .sheet(isPresented: $showPublicAlbumSheet) {
+            PublicAlbumManageSheet(
+                posts: userPosts,
+                onRefresh: { Task { await refreshMe() } }
+            )
+        }
+        .sheet(isPresented: $showPrivateAlbumSheet) {
+            PrivateAlbumManageSheet(
+                photos: $privatePhotos,
+                requests: $privateAccessRequests,
+                onRefresh: { Task { await refreshMe() } }
+            )
+        }
+        .sheet(item: $activeShortItem) { short in
+            ProfileShortDetailSheet(
+                short: short,
+                onRefresh: { Task { await refreshMe() } }
+            )
         }
         .sheet(isPresented: $showSessionsSheet) {
             ActiveSessionsSheet()
@@ -297,64 +336,123 @@ struct ProfileView: View {
     }
 
     private func albumsTabContent(user: KinnectUser) -> some View {
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-            // Public Album Card
-            VStack(alignment: .leading, spacing: 6) {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(KinnectTheme.surfaceElevated)
-                    .frame(height: 120)
-                    .overlay(
-                        KinnectIcon(glyph: .photo, size: 32, tint: KinnectTheme.accentBright)
-                    )
-                Text("Ảnh công khai")
-                    .font(.subheadline.bold())
-                    .foregroundColor(.white)
-                Text("Công khai cho tất cả mọi người")
-                    .font(.caption2)
-                    .foregroundColor(KinnectTheme.textSecondary)
+        let publicPhotoCount = userPosts.filter { !$0.imageUrl.isEmpty }.count
+        return LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+            // Public Album Card (Interactive)
+            Button {
+                showPublicAlbumSheet = true
+            } label: {
+                VStack(alignment: .leading, spacing: 6) {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(KinnectTheme.surfaceElevated)
+                        .frame(height: 120)
+                        .overlay(
+                            VStack(spacing: 6) {
+                                KinnectIcon(glyph: .photo, size: 32, tint: KinnectTheme.accentBright)
+                                Text("\(publicPhotoCount) ảnh bài viết")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(KinnectTheme.accentBright)
+                            }
+                        )
+                    HStack {
+                        Text("Ảnh công khai")
+                            .font(.subheadline.bold())
+                            .foregroundColor(.white)
+                        Spacer()
+                        KinnectIcon(glyph: .chevronRight, size: 14, tint: KinnectTheme.textSecondary)
+                    }
+                    Text("Chạm để xem & tải ảnh mới")
+                        .font(.caption2)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                }
+                .padding(10)
+                .kinnectCard()
             }
-            .padding(10)
-            .kinnectCard()
+            .buttonStyle(.plain)
 
-            // Private Album Card (with secure lock badge)
-            VStack(alignment: .leading, spacing: 6) {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(KinnectTheme.surfaceElevated)
-                    .frame(height: 120)
-                    .overlay(
-                        VStack(spacing: 6) {
-                            KinnectIcon(glyph: .lock, size: 30, tint: KinnectTheme.warning)
-                            Text("Bảo mật PIN/FaceID")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundColor(KinnectTheme.warning)
-                        }
-                    )
-                Text("Album riêng tư")
-                    .font(.subheadline.bold())
-                    .foregroundColor(.white)
-                Text("Chỉ bạn và bạn bè được cấp quyền")
-                    .font(.caption2)
-                    .foregroundColor(KinnectTheme.textSecondary)
+            // Private Album Card (Interactive with real /api/users/:id/private & /api/me/private/requests)
+            Button {
+                showPrivateAlbumSheet = true
+            } label: {
+                VStack(alignment: .leading, spacing: 6) {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(KinnectTheme.surfaceElevated)
+                        .frame(height: 120)
+                        .overlay(
+                            VStack(spacing: 6) {
+                                KinnectIcon(glyph: .lock, size: 30, tint: KinnectTheme.warning)
+                                Text("\(privatePhotos.count)/24 ảnh • \(pendingPrivateRequestsCount) chờ duyệt")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(KinnectTheme.warning)
+                            }
+                        )
+                    HStack {
+                        Text("Album riêng tư")
+                            .font(.subheadline.bold())
+                            .foregroundColor(.white)
+                        Spacer()
+                        KinnectIcon(glyph: .chevronRight, size: 14, tint: KinnectTheme.textSecondary)
+                    }
+                    Text("Quản lý ảnh & duyệt quyền xem")
+                        .font(.caption2)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                }
+                .padding(10)
+                .kinnectCard()
             }
-            .padding(10)
-            .kinnectCard()
+            .buttonStyle(.plain)
         }
     }
 
     private func videosTabContent(user: KinnectUser) -> some View {
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-            ForEach(0..<6) { i in
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(KinnectTheme.surfaceElevated)
-                    .frame(height: 150)
-                    .overlay(
-                        VStack(spacing: 4) {
-                            KinnectIcon(glyph: .video, size: 24, tint: KinnectTheme.accentBright)
-                            Text("Shorts #\(i + 1)")
-                                .font(.caption2.bold())
-                                .foregroundColor(.white)
+        let myShorts = userShorts.filter { $0.author.id == user.id || userShorts.count <= 4 }
+        return VStack(spacing: 12) {
+            if myShorts.isEmpty {
+                VStack(spacing: 8) {
+                    KinnectIcon(glyph: .video, size: 36, tint: KinnectTheme.textSecondary)
+                    Text("Chưa có video ngắn nào")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                    Text("Các video ngắn bạn đăng trên luồng Shorts sẽ hiển thị tại đây.")
+                        .font(.caption)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.vertical, 32)
+                .frame(maxWidth: .infinity)
+                .kinnectCard()
+            } else {
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                    ForEach(myShorts) { short in
+                        Button {
+                            activeShortItem = short
+                        } label: {
+                            VStack(alignment: .leading, spacing: 6) {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(KinnectTheme.surfaceElevated)
+                                    .frame(height: 156)
+                                    .overlay(
+                                        VStack(spacing: 8) {
+                                            KinnectIcon(glyph: .video, size: 28, selected: true, tint: KinnectTheme.accentBright)
+                                            Text(short.title.isEmpty ? (short.caption.isEmpty ? "Video Shorts" : short.caption) : short.title)
+                                                .font(.caption.bold())
+                                                .foregroundColor(.white)
+                                                .lineLimit(2)
+                                                .multilineTextAlignment(.center)
+                                                .padding(.horizontal, 8)
+                                            HStack(spacing: 10) {
+                                                Label("\(short.likesCount)", systemImage: "heart.fill")
+                                                Label("\(short.commentsCount)", systemImage: "bubble.right.fill")
+                                            }
+                                            .font(.caption2)
+                                            .foregroundColor(KinnectTheme.textSecondary)
+                                        }
+                                    )
+                            }
                         }
-                    )
+                        .buttonStyle(.plain)
+                    }
+                }
             }
         }
     }
@@ -397,6 +495,389 @@ struct ProfileView: View {
         if let feedRes = try? await KinnectAPIClient.shared.requestJSON("/api/posts"),
            let items = feedRes["posts"] as? [[String: Any]] {
             self.userPosts = items.map(PostItem.from)
+        }
+        if let shortsRes = try? await KinnectAPIClient.shared.requestJSON("/api/shorts"),
+           let items = shortsRes["shorts"] as? [[String: Any]] {
+            self.userShorts = items.map(ShortItem.from)
+        }
+        let myId = appState.currentUser?.id ?? "fixture_user_me"
+        if let privRes = try? await KinnectAPIClient.shared.requestJSON("/api/users/\(myId)/private") {
+            let list = privRes["photos"] as? [[String: Any]] ?? []
+            self.privatePhotos = list.map(PrivatePhotoItem.from)
+            self.pendingPrivateRequestsCount = (privRes["pending"] as? Int) ?? 0
+        }
+        if let reqRes = try? await KinnectAPIClient.shared.requestJSON("/api/me/private/requests") {
+            let list = reqRes["requests"] as? [[String: Any]] ?? []
+            self.privateAccessRequests = list.map(PrivateAccessRequestItem.from)
+            self.pendingPrivateRequestsCount = self.privateAccessRequests.filter { $0.status == "pending" }.count
+        }
+    }
+}
+
+// MARK: - Private Album & Public Album Models & Sheets
+
+struct PrivatePhotoItem: Identifiable, Equatable {
+    var id: String
+    var url: String
+    var createdAt: String
+
+    static func from(_ dict: [String: Any]) -> PrivatePhotoItem {
+        PrivatePhotoItem(
+            id: (dict["id"] as? String) ?? UUID().uuidString,
+            url: (dict["url"] as? String) ?? "",
+            createdAt: "\((dict["created"] as? Int) ?? 0)"
+        )
+    }
+}
+
+struct PrivateAccessRequestItem: Identifiable, Equatable {
+    var id: String { user.id }
+    var status: String // "pending" | "granted"
+    var user: KinnectUser
+
+    static func from(_ dict: [String: Any]) -> PrivateAccessRequestItem {
+        let uDict = (dict["user"] as? [String: Any]) ?? [:]
+        return PrivateAccessRequestItem(
+            status: (dict["status"] as? String) ?? "pending",
+            user: KinnectUser.from(uDict)
+        )
+    }
+}
+
+struct PublicAlbumManageSheet: View {
+    let posts: [PostItem]
+    let onRefresh: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var captionText = ""
+    @State private var isUploading = false
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Đăng ảnh công khai mới") {
+                    TextField("Chú thích cho ảnh...", text: $captionText)
+                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                        HStack(spacing: 8) {
+                            KinnectIcon(glyph: .photo, size: 20, tint: KinnectTheme.accentBright)
+                            Text(isUploading ? "Đang tải ảnh lên..." : "Chọn ảnh từ thư viện & Đăng")
+                                .font(.subheadline.bold())
+                                .foregroundColor(KinnectTheme.accentBright)
+                        }
+                    }
+                    .disabled(isUploading)
+                    .onChange(of: selectedPhotoItem) { item in
+                        guard let item else { return }
+                        Task { await uploadPublicPhoto(item) }
+                    }
+                }
+
+                Section("Danh sách bài viết & ảnh công khai (\(posts.count))") {
+                    if posts.isEmpty {
+                        Text("Chưa có ảnh công khai nào.")
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    } else {
+                        ForEach(posts) { post in
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(post.text.isEmpty ? "Ảnh công khai" : post.text)
+                                    .font(.subheadline)
+                                    .foregroundColor(.white)
+                                if !post.imageUrl.isEmpty {
+                                    KinnectRemoteImageView(rawURL: post.imageUrl, contentMode: .fill, cornerRadius: 10, maxHeight: 160)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(KinnectTheme.background)
+            .navigationTitle("Ảnh công khai")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Đóng") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func uploadPublicPhoto(_ item: PhotosPickerItem) async {
+        guard let data = try? await item.loadTransferable(type: Data.self),
+              let uiImg = UIImage(data: data),
+              let jpeg = uiImg.jpegData(compressionQuality: 0.75) else { return }
+        isUploading = true
+        defer { isUploading = false }
+        let dataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/posts",
+                method: "POST",
+                body: [
+                    "text": captionText.trimmingCharacters(in: .whitespacesAndNewlines),
+                    "category": "community",
+                    "imageUrl": dataURL
+                ],
+                requestId: "pub_photo_\(UUID().uuidString)"
+            )
+            captionText = ""
+            appState.showToast("Đã đăng ảnh công khai mới!")
+            onRefresh()
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+}
+
+struct PrivateAlbumManageSheet: View {
+    @Binding var photos: [PrivatePhotoItem]
+    @Binding var requests: [PrivateAccessRequestItem]
+    let onRefresh: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
+    @State private var selectedItem: PhotosPickerItem?
+    @State private var isUploading = false
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Tải ảnh lên Album riêng tư (\(photos.count)/24)") {
+                    PhotosPicker(selection: $selectedItem, matching: .images) {
+                        HStack(spacing: 8) {
+                            KinnectIcon(glyph: .lock, size: 20, tint: KinnectTheme.warning)
+                            Text(isUploading ? "Đang mã hóa & tải lên..." : "Thêm ảnh riêng tư mới (< 4MB)")
+                                .font(.subheadline.bold())
+                                .foregroundColor(KinnectTheme.warning)
+                        }
+                    }
+                    .disabled(isUploading || photos.count >= 24)
+                    .onChange(of: selectedItem) { item in
+                        guard let item else { return }
+                        Task { await uploadPrivatePhoto(item) }
+                    }
+                }
+
+                Section("Yêu cầu & Quyền truy cập (\(requests.count))") {
+                    if requests.isEmpty {
+                        Text("Chưa có yêu cầu xem Album riêng tư nào.")
+                            .font(.caption)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    } else {
+                        ForEach(requests) { req in
+                            HStack(spacing: 10) {
+                                KinnectAvatarView(
+                                    name: req.user.name,
+                                    avatarURL: req.user.avatarUrl,
+                                    colorHex: req.user.avatarColor,
+                                    size: 36
+                                )
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(req.user.name)
+                                        .font(.subheadline.bold())
+                                        .foregroundColor(.white)
+                                    Text(req.status == "granted" ? "Đã cấp quyền xem" : "Đang chờ bạn duyệt")
+                                        .font(.caption2)
+                                        .foregroundColor(req.status == "granted" ? KinnectTheme.online : KinnectTheme.warning)
+                                }
+                                Spacer()
+                                if req.status == "pending" {
+                                    Button("Duyệt") {
+                                        Task { await handleAccessAction(viewerId: req.user.id, action: "grant") }
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(KinnectTheme.accent)
+                                    .controlSize(.small)
+
+                                    Button("Từ chối", role: .destructive) {
+                                        Task { await handleAccessAction(viewerId: req.user.id, action: "deny") }
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
+                                } else {
+                                    Button("Thu hồi", role: .destructive) {
+                                        Task { await handleAccessAction(viewerId: req.user.id, action: "revoke") }
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Section("Ảnh trong Album riêng tư (\(photos.count))") {
+                    if photos.isEmpty {
+                        Text("Album riêng tư hiện chưa có ảnh.")
+                            .font(.caption)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    } else {
+                        ForEach(photos) { photo in
+                            HStack(spacing: 12) {
+                                KinnectRemoteImageView(rawURL: photo.url, contentMode: .fill, cornerRadius: 8, maxHeight: 64)
+                                    .frame(width: 64, height: 64)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Ảnh bảo mật #\(photo.id.prefix(6))")
+                                        .font(.subheadline.bold())
+                                        .foregroundColor(.white)
+                                    Text("Chỉ người được duyệt mới xem được")
+                                        .font(.caption2)
+                                        .foregroundColor(KinnectTheme.textSecondary)
+                                }
+                                Spacer()
+                                Button(role: .destructive) {
+                                    Task { await deletePrivatePhoto(photo.id) }
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .foregroundColor(KinnectTheme.danger)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(KinnectTheme.background)
+            .navigationTitle("Album riêng tư")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Đóng") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func uploadPrivatePhoto(_ item: PhotosPickerItem) async {
+        guard let data = try? await item.loadTransferable(type: Data.self),
+              let uiImg = UIImage(data: data),
+              let jpeg = uiImg.jpegData(compressionQuality: 0.72) else { return }
+        isUploading = true
+        defer { isUploading = false }
+        let dataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
+        do {
+            let res = try await KinnectAPIClient.shared.requestJSON(
+                "/api/me/private-photos",
+                method: "POST",
+                body: ["data": dataURL],
+                requestId: "priv_up_\(UUID().uuidString)"
+            )
+            if let list = res["photos"] as? [[String: Any]] {
+                photos = list.map(PrivatePhotoItem.from)
+            }
+            appState.showToast("Đã thêm ảnh vào Album riêng tư.")
+            onRefresh()
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+
+    private func deletePrivatePhoto(_ photoId: String) async {
+        do {
+            let res = try await KinnectAPIClient.shared.requestJSON(
+                "/api/me/private-photos/\(photoId)",
+                method: "DELETE",
+                body: [:],
+                requestId: "priv_del_\(photoId)"
+            )
+            if let list = res["photos"] as? [[String: Any]] {
+                photos = list.map(PrivatePhotoItem.from)
+            }
+            appState.showToast("Đã xóa ảnh khỏi Album riêng tư.")
+            onRefresh()
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+
+    private func handleAccessAction(viewerId: String, action: String) async {
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/me/private/requests/\(viewerId)",
+                method: "POST",
+                body: ["action": action],
+                requestId: "priv_act_\(viewerId)_\(action)"
+            )
+            let msg = action == "grant" ? "Đã cấp quyền xem Album riêng tư." : (action == "deny" ? "Đã từ chối yêu cầu." : "Đã thu hồi quyền xem.")
+            appState.showToast(msg)
+            onRefresh()
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+}
+
+struct ProfileShortDetailSheet: View {
+    let short: ShortItem
+    let onRefresh: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(KinnectTheme.surfaceElevated)
+                    .frame(maxWidth: .infinity, maxHeight: 360)
+                    .overlay(
+                        VStack(spacing: 12) {
+                            KinnectIcon(glyph: .video, size: 48, selected: true, tint: KinnectTheme.accentBright)
+                            Text(short.title.isEmpty ? "Video Shorts" : short.title)
+                                .font(.headline.bold())
+                                .foregroundColor(.white)
+                            Text(short.caption)
+                                .font(.subheadline)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 20)
+                            HStack(spacing: 18) {
+                                Label("\(short.likesCount) lượt thích", systemImage: "heart.fill")
+                                Label("\(short.commentsCount) bình luận", systemImage: "bubble.right.fill")
+                            }
+                            .font(.caption.bold())
+                            .foregroundColor(KinnectTheme.accentBright)
+                        }
+                    )
+
+                if short.author.id == appState.currentUser?.id {
+                    Button(role: .destructive) {
+                        Task { await deleteShort() }
+                    } label: {
+                        Label("Xóa video ngắn này", systemImage: "trash.fill")
+                            .font(.subheadline.bold())
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.danger.opacity(0.18)))
+                            .foregroundColor(KinnectTheme.danger)
+                    }
+                }
+                Spacer()
+            }
+            .padding(16)
+            .background(KinnectTheme.background)
+            .navigationTitle("Chi tiết Video")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Đóng") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func deleteShort() async {
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/shorts/\(short.id)",
+                method: "DELETE",
+                body: [:],
+                requestId: "del_short_\(short.id)"
+            )
+            appState.showToast("Đã xóa video ngắn.")
+            onRefresh()
+            dismiss()
+        } catch {
+            appState.showToast(error.localizedDescription)
         }
     }
 }

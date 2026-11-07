@@ -6,6 +6,7 @@ struct LiveStreamView: View {
     @ObservedObject private var webrtc = NativeWebRTCManager.shared
 
     @State private var selectedIndex = 0
+    @State private var scrolledRoomId: String?
     @State private var isLoading = false
     @State private var chatText = ""
     @State private var likesCount = 0
@@ -37,29 +38,52 @@ struct LiveStreamView: View {
                     if #available(iOS 17.0, *) {
                         ScrollView(.vertical, showsIndicators: false) {
                             LazyVStack(spacing: 0) {
-                                ForEach(Array(appState.liveRooms.enumerated()), id: \.element.id) { index, room in
+                                ForEach(appState.liveRooms) { room in
                                     liveStreamPage(room)
                                         .frame(width: proxy.size.width, height: proxy.size.height)
-                                        .id(index)
-                                        .onAppear {
-                                            selectedIndex = index
-                                        }
+                                        .id(room.id)
                                 }
                             }
                             .scrollTargetLayout()
                         }
                         .scrollTargetBehavior(.paging)
-                        .ignoresSafeArea()
-                    } else {
-                        TabView(selection: $selectedIndex) {
-                            ForEach(Array(appState.liveRooms.enumerated()), id: \.element.id) { index, room in
-                                liveStreamPage(room)
-                                    .frame(width: proxy.size.width, height: proxy.size.height)
-                                    .tag(index)
+                        .scrollPosition(id: $scrolledRoomId)
+                        .onChange(of: scrolledRoomId) { newId in
+                            guard let newId,
+                                  let idx = appState.liveRooms.firstIndex(where: { $0.id == newId }) else { return }
+                            if selectedIndex != idx {
+                                selectedIndex = idx
                             }
                         }
-                        .tabViewStyle(.page(indexDisplayMode: .never))
-                        .ignoresSafeArea()
+                    } else {
+                        ScrollViewReader { scrollProxy in
+                            ScrollView(.vertical, showsIndicators: false) {
+                                LazyVStack(spacing: 0) {
+                                    ForEach(Array(appState.liveRooms.enumerated()), id: \.element.id) { index, room in
+                                        liveStreamPage(room)
+                                            .frame(width: proxy.size.width, height: proxy.size.height)
+                                            .id(index)
+                                    }
+                                }
+                            }
+                            .gesture(
+                                DragGesture(minimumDistance: 24)
+                                    .onEnded { value in
+                                        let dy = value.translation.height
+                                        if dy < -50 && selectedIndex + 1 < appState.liveRooms.count {
+                                            selectedIndex += 1
+                                            withAnimation(.easeOut(duration: 0.25)) {
+                                                scrollProxy.scrollTo(selectedIndex, anchor: .top)
+                                            }
+                                        } else if dy > 50 && selectedIndex > 0 {
+                                            selectedIndex -= 1
+                                            withAnimation(.easeOut(duration: 0.25)) {
+                                                scrollProxy.scrollTo(selectedIndex, anchor: .top)
+                                            }
+                                        }
+                                    }
+                            )
+                        }
                     }
                 }
             }
@@ -69,6 +93,7 @@ struct LiveStreamView: View {
             await loadGifts()
             if !appState.liveRooms.isEmpty && selectedIndex < appState.liveRooms.count {
                 let initialRoom = appState.liveRooms[selectedIndex]
+                scrolledRoomId = initialRoom.id
                 appState.joinLiveRoom(initialRoom)
                 likesCount = initialRoom.likesCount
             }
@@ -205,7 +230,7 @@ struct LiveStreamView: View {
                     Spacer()
                 }
                 .padding(.horizontal, 14)
-                .padding(.top, 54)
+                .padding(.top, 14)
 
                 Spacer()
 
@@ -213,9 +238,24 @@ struct LiveStreamView: View {
                 HStack(alignment: .bottom, spacing: 12) {
                     // Chat messages stream
                     VStack(alignment: .leading, spacing: 6) {
-                        chatBubble(name: "kinnect_mod", text: "Chào mừng bạn đến với phòng Live của \(room.hostName)!", colorHex: "#A855F7")
-                        chatBubble(name: "Thanh Trúc", text: "Chào anh Nam nhé! Chúc anh buổi live vui vẻ ❤️", colorHex: "#EC4899")
-                        chatBubble(name: "kinnect_user", text: "Âm thanh và hình ảnh rất nét ạ!", colorHex: "#22C55E")
+                        if let banner = appState.liveLastReactionBanner {
+                            Text(banner)
+                                .font(.caption2.bold())
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 5)
+                                .background(Capsule().fill(KinnectTheme.primaryGradient))
+                        }
+
+                        if appState.liveChatMessages.isEmpty {
+                            chatBubble(name: "kinnect_mod", text: "Chào mừng bạn đến với phòng Live của \(room.hostName)!", colorHex: "#A855F7")
+                            chatBubble(name: "Thanh Trúc", text: "Chào anh Nam nhé! Chúc anh buổi live vui vẻ ❤️", colorHex: "#EC4899")
+                            chatBubble(name: "kinnect_user", text: "Âm thanh và hình ảnh rất nét ạ!", colorHex: "#22C55E")
+                        } else {
+                            ForEach(appState.liveChatMessages.suffix(6)) { msg in
+                                chatBubble(name: msg.user.name, text: msg.text, colorHex: msg.user.avatarColor)
+                            }
+                        }
 
                         // Message input field
                         HStack(spacing: 8) {
@@ -229,6 +269,13 @@ struct LiveStreamView: View {
                                 let clean = chatText.trimmingCharacters(in: .whitespacesAndNewlines)
                                 if !clean.isEmpty {
                                     chatText = ""
+                                    let localMsg = LiveChatMessage(
+                                        id: UUID().uuidString,
+                                        user: appState.currentUser ?? KinnectUser.from(["name": "Bạn"]),
+                                        text: clean,
+                                        createdAt: ""
+                                    )
+                                    appState.liveChatMessages.append(localMsg)
                                     NativeSocketClient.shared.sendJSON([
                                         "type": "chat",
                                         "text": clean,
@@ -578,7 +625,8 @@ struct LiveRoomFullScreenView: View {
                         Button {
                             NativeSocketClient.shared.sendJSON([
                                 "type": "live-reaction",
-                                "reaction": "heart"
+                                "room": room.id,
+                                "kind": "heart"
                             ])
                         } label: {
                             Text("💜")

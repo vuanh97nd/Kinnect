@@ -82,6 +82,13 @@ struct RootMainView: View {
                 NavigationStack {
                     CameraStudioView()
                 }
+            } else if let screen = UIReviewFixture.activeScreen, screen.hasPrefix("profile-") {
+                NavigationStack {
+                    ProfileView(
+                        onOpenWallet: { showWalletStoreSheet = true },
+                        onOpenFriends: { showFriendsSheet = true }
+                    )
+                }
             } else {
                 authenticatedLayout
             }

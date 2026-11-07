@@ -442,7 +442,62 @@ enum UIReviewFixture {
                 ]
             ]
 
+        case "/api/me/private/requests":
+            return [
+                "requests": [
+                    [
+                        "status": "pending",
+                        "created": 1762500000000,
+                        "user": secondPeerDict
+                    ],
+                    [
+                        "status": "granted",
+                        "created": 1762490000000,
+                        "user": peerUserDict
+                    ]
+                ]
+            ]
+
+        case "/api/sessions":
+            return [
+                "sessions": [
+                    [
+                        "id": "fixture_sess_1",
+                        "deviceName": "iPhone 16 Pro (Thiết bị này) [Fixture UI]",
+                        "ip": "127.0.0.1",
+                        "current": true,
+                        "lastActive": "Vừa xong"
+                    ],
+                    [
+                        "id": "fixture_sess_2",
+                        "deviceName": "iPad Pro 11-inch [Fixture UI]",
+                        "ip": "192.168.1.15",
+                        "current": false,
+                        "lastActive": "2 giờ trước"
+                    ]
+                ]
+            ]
+
         default:
+            if cleanPath.hasSuffix("/private") {
+                return [
+                    "status": "owner",
+                    "count": 2,
+                    "pending": 1,
+                    "photos": [
+                        [
+                            "id": "fixture_priv_1",
+                            "url": "",
+                            "created": 1762500000000
+                        ],
+                        [
+                            "id": "fixture_priv_2",
+                            "url": "",
+                            "created": 1762490000000
+                        ]
+                    ]
+                ]
+            }
             if cleanPath.hasSuffix("/messages") {
                 return [
                     "messages": [

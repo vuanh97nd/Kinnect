@@ -42,11 +42,11 @@ enum KinnectGlyph: String, CaseIterable {
     case block
     case logout
     case refresh
+    case chevronRight
 
     // Semantic aliases used in Auth / Profile views
     static var lock: KinnectGlyph { .shield }
     static var eyeOff: KinnectGlyph { .eye }
-    static var chevronRight: KinnectGlyph { .send }
 
     var label: String {
         switch self {
@@ -90,6 +90,7 @@ enum KinnectGlyph: String, CaseIterable {
         case .block: return "Chặn"
         case .logout: return "Đăng xuất"
         case .refresh: return "Cập nhật"
+        case .chevronRight: return "Mở"
         }
     }
 
@@ -568,6 +569,10 @@ enum KinnectGlyph: String, CaseIterable {
             p.move(to: CGPoint(x: 3, y: 21))
             p.addLine(to: CGPoint(x: 3, y: 15))
             p.addLine(to: CGPoint(x: 9, y: 15))
+        case .chevronRight:
+            p.move(to: CGPoint(x: 9, y: 4))
+            p.addLine(to: CGPoint(x: 17, y: 12))
+            p.addLine(to: CGPoint(x: 9, y: 20))
         }
         return p
     }

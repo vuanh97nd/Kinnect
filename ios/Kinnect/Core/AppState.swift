@@ -32,13 +32,44 @@ final class AppState: ObservableObject {
     @Published var liveLastReactionBanner: String?
 
     func joinLiveRoom(_ room: LiveRoomItem) {
+        if currentLiveRoom?.id == room.id {
+            return
+        }
+        if currentLiveRoom != nil {
+            NativeSocketClient.shared.sendJSON(["type": "leave"])
+            NativeWebRTCManager.shared.stopLiveSession()
+        }
         currentLiveRoom = room
-        isCurrentLiveHost = (room.hostId == currentUser?.id)
+        let isHost = (!room.hostUserId.isEmpty && room.hostUserId == currentUser?.id)
+        isCurrentLiveHost = isHost
+        liveChatMessages = []
+        liveGiftRanking = []
+        liveLastReactionBanner = nil
+
+        if !UIReviewFixture.isEnabled && !isHost {
+            Task {
+                await NativeWebRTCManager.shared.refreshIceServers()
+                NativeSocketClient.shared.sendJSON([
+                    "type": "join",
+                    "room": room.id,
+                    "liveMode": room.liveMode,
+                    "multiGuest": false,
+                    "liveModes": true
+                ])
+            }
+        }
     }
 
     func leaveCurrentLiveRoom() {
+        if currentLiveRoom != nil && !UIReviewFixture.isEnabled {
+            NativeSocketClient.shared.sendJSON(["type": "leave"])
+        }
+        NativeWebRTCManager.shared.stopLiveSession()
         currentLiveRoom = nil
         isCurrentLiveHost = false
+        liveChatMessages = []
+        liveGiftRanking = []
+        liveLastReactionBanner = nil
     }
 
     private init() {
@@ -258,18 +289,18 @@ final class AppState: ObservableObject {
                 self.currentLiveRoom = room
                 let role = json["role"] as? String ?? "viewer"
                 self.isCurrentLiveHost = (role == "host")
-                let history = (roomDict["chatHistory"] as? [[String: Any]] ?? []).map(LiveChatMessage.from)
-                self.liveChatMessages = history
-                self.liveGiftRanking = roomDict["giftRanking"] as? [[String: Any]] ?? []
+                let historyRaw = (json["history"] as? [[String: Any]]) ?? (roomDict["chatHistory"] as? [[String: Any]]) ?? []
+                self.liveChatMessages = historyRaw.map(LiveChatMessage.from)
+                self.liveGiftRanking = (json["giftRanking"] as? [[String: Any]]) ?? (roomDict["giftRanking"] as? [[String: Any]]) ?? []
             }
         case "peer":
-            if isCurrentLiveHost, let peerId = json["peerId"] as? String {
+            if isCurrentLiveHost, let peerId = (json["id"] as? String) ?? (json["peerId"] as? String) {
                 NativeWebRTCManager.shared.handleLiveViewerJoined(peerId: peerId)
             }
         case "signal":
-            if let fromPeer = json["from"] as? String,
-               let signal = json["signal"] as? [String: Any] {
-                NativeWebRTCManager.shared.handleLiveSignal(from: fromPeer, signal: signal, isHost: isCurrentLiveHost)
+            if let fromPeer = json["from"] as? String {
+                let signalPayload = (json["signal"] as? [String: Any]) ?? json
+                NativeWebRTCManager.shared.handleLiveSignal(from: fromPeer, signal: signalPayload, isHost: isCurrentLiveHost)
             }
         case "chat":
             let msg = LiveChatMessage.from(json)
