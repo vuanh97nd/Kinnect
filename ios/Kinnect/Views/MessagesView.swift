@@ -1208,7 +1208,7 @@ struct ForwardMessageSheet: View {
     }
 
     private func loadTargets() async {
-        if UIReviewFixture.isActive {
+        if UIReviewFixture.activeScreen != nil {
             self.conversations = [
                 [
                     "peer": [
@@ -1228,25 +1228,23 @@ struct ForwardMessageSheet: View {
                 ]
             ]
             self.groups = [
-                ChatGroupItem(
-                    id: "group-fixture-01",
-                    name: "Gia đình Kinnect",
-                    description: "Nhóm trò chuyện chia sẻ",
-                    avatarUrl: "",
-                    memberCount: 5,
-                    role: "admin",
-                    createdAt: "2026-11-01"
-                )
+                ChatGroupItem.from([
+                    "id": "group-fixture-01",
+                    "name": "Gia đình Kinnect",
+                    "description": "Nhóm trò chuyện chia sẻ",
+                    "avatarColor": "#8A3FFC",
+                    "membersCount": 5,
+                    "lastMessageText": "Hẹn gặp mọi người tối nay nhé!",
+                    "unreadCount": 0
+                ])
             ]
             self.friends = [
-                KinnectUser(
-                    id: "fixture_user_fwd_3",
-                    name: "Võ Minh Khang",
-                    username: "minh_khang",
-                    avatarUrl: "",
-                    avatarColor: "#3B82F6",
-                    role: "member"
-                )
+                KinnectUser.from([
+                    "id": "fixture_user_fwd_3",
+                    "name": "Võ Minh Khang",
+                    "username": "minh_khang",
+                    "avatarColor": "#3B82F6"
+                ])
             ]
             return
         }

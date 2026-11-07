@@ -1222,24 +1222,20 @@ struct BlockedUsersSheet: View {
     }
 
     private func loadBlocks() async {
-        if UIReviewFixture.isActive {
+        if UIReviewFixture.activeScreen != nil {
             self.blockedUsers = [
-                KinnectUser(
-                    id: "fixture_blocked_01",
-                    name: "Trần Văn Bình",
-                    username: "binh_tran",
-                    avatarUrl: "",
-                    avatarColor: "#EF4444",
-                    role: "member"
-                ),
-                KinnectUser(
-                    id: "fixture_blocked_02",
-                    name: "Lê Hoàng Phúc",
-                    username: "phuc_le",
-                    avatarUrl: "",
-                    avatarColor: "#F59E0B",
-                    role: "member"
-                )
+                KinnectUser.from([
+                    "id": "fixture_blocked_01",
+                    "name": "Trần Văn Bình",
+                    "username": "binh_tran",
+                    "avatarColor": "#EF4444"
+                ]),
+                KinnectUser.from([
+                    "id": "fixture_blocked_02",
+                    "name": "Lê Hoàng Phúc",
+                    "username": "phuc_le",
+                    "avatarColor": "#F59E0B"
+                ])
             ]
             return
         }
