@@ -1208,6 +1208,48 @@ struct ForwardMessageSheet: View {
     }
 
     private func loadTargets() async {
+        if UIReviewFixture.isActive {
+            self.conversations = [
+                [
+                    "peer": [
+                        "id": "fixture_user_fwd_1",
+                        "name": "Hoàng Nam",
+                        "username": "hoang_nam",
+                        "avatarColor": "#7C3AED"
+                    ]
+                ],
+                [
+                    "peer": [
+                        "id": "fixture_user_fwd_2",
+                        "name": "Thanh Trúc",
+                        "username": "thanh_truc",
+                        "avatarColor": "#EC4899"
+                    ]
+                ]
+            ]
+            self.groups = [
+                ChatGroupItem(
+                    id: "group-fixture-01",
+                    name: "Gia đình Kinnect",
+                    description: "Nhóm trò chuyện chia sẻ",
+                    avatarUrl: "",
+                    memberCount: 5,
+                    role: "admin",
+                    createdAt: "2026-11-01"
+                )
+            ]
+            self.friends = [
+                KinnectUser(
+                    id: "fixture_user_fwd_3",
+                    name: "Võ Minh Khang",
+                    username: "minh_khang",
+                    avatarUrl: "",
+                    avatarColor: "#3B82F6",
+                    role: "member"
+                )
+            ]
+            return
+        }
         isLoading = true
         defer { isLoading = false }
         if let cRes = try? await KinnectAPIClient.shared.requestJSON("/api/conversations") {

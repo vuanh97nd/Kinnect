@@ -315,7 +315,10 @@ def main():
         ("13c-iphone-privacy-consent-light", "privacy-consent", ["--ui-review-light"], "Điều khoản & Quyền riêng tư HTTP 428 / WS (Light)"),
         ("13d-iphone-delete-account-dark", "delete-account", [], "Xóa tài khoản vĩnh viễn với xác nhận Username & Mật khẩu (Dark)"),
         ("13e-iphone-delete-account-light", "delete-account", ["--ui-review-light"], "Xóa tài khoản vĩnh viễn (Light)"),
-        ("13f-iphone-ugc-report-sheet", "ugc-report", [], "Báo cáo nội dung vi phạm UGC (Apple Guideline 1.2)")
+        ("13f-iphone-ugc-report-sheet", "ugc-report", [], "Báo cáo nội dung vi phạm UGC (Apple Guideline 1.2)"),
+        ("05e-iphone-forward-message", "forward-message", [], "Chuyển tiếp tin nhắn: Chọn người nhận hoặc nhóm trò chuyện"),
+        ("13g-iphone-change-password", "change-password", [], "Cài đặt: Đổi mật khẩu tài khoản"),
+        ("13h-iphone-blocked-users", "blocked-users", [], "Cài đặt & Quyền riêng tư: Danh sách người dùng đã chặn")
     ]
 
     for slug, screen_arg, extra, desc in iphone_screens:

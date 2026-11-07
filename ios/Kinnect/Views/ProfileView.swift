@@ -1222,6 +1222,27 @@ struct BlockedUsersSheet: View {
     }
 
     private func loadBlocks() async {
+        if UIReviewFixture.isActive {
+            self.blockedUsers = [
+                KinnectUser(
+                    id: "fixture_blocked_01",
+                    name: "Trần Văn Bình",
+                    username: "binh_tran",
+                    avatarUrl: "",
+                    avatarColor: "#EF4444",
+                    role: "member"
+                ),
+                KinnectUser(
+                    id: "fixture_blocked_02",
+                    name: "Lê Hoàng Phúc",
+                    username: "phuc_le",
+                    avatarUrl: "",
+                    avatarColor: "#F59E0B",
+                    role: "member"
+                )
+            ]
+            return
+        }
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/me/blocks") {
             let list = res["users"] as? [[String: Any]] ?? []
             self.blockedUsers = list.map(KinnectUser.from)

@@ -214,13 +214,13 @@ struct FeedView: View {
         }
     }
 
-    private var storyCellWidth: CGFloat {
-        dynamicTypeSize.isAccessibilitySize ? 96 : 68
+    private var storyCellWidth: CGFloat? {
+        dynamicTypeSize.isAccessibilitySize ? nil : 68
     }
 
     private var storiesStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: dynamicTypeSize.isAccessibilitySize ? 10 : 12) {
+            HStack(spacing: dynamicTypeSize.isAccessibilitySize ? 8 : 12) {
                 // Add Story Button
                 Button {
                     showCreateStorySheet = true
@@ -243,11 +243,13 @@ struct FeedView: View {
                             .foregroundColor(KinnectTheme.textPrimary)
                             .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
                             .multilineTextAlignment(.center)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
+                    .padding(.horizontal, dynamicTypeSize.isAccessibilitySize ? 8 : 0)
                     .frame(width: storyCellWidth)
                 }
-                .accessibilityLabel("Tạo tin 24h")
+                .accessibilityLabel("Tạo tin 24h mới")
+                .accessibilityHint("Nhấn đúp để mở trình tạo tin")
 
                 ForEach(stories.filter { !appState.blockedUserIds.contains($0.author.id) }) { story in
                     Button {
@@ -276,11 +278,13 @@ struct FeedView: View {
                                 .foregroundColor(KinnectTheme.textPrimary)
                                 .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
                                 .multilineTextAlignment(.center)
-                                .truncationMode(.tail)
-                                .fixedSize(horizontal: false, vertical: true)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
+                        .padding(.horizontal, dynamicTypeSize.isAccessibilitySize ? 8 : 0)
                         .frame(width: storyCellWidth)
                     }
+                    .accessibilityLabel("Tin 24h của \(story.author.name)")
+                    .accessibilityHint("Nhấn đúp để xem tin")
                 }
             }
             .padding(.vertical, 6)

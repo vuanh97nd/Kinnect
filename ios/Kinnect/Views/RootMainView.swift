@@ -144,6 +144,12 @@ struct RootMainView: View {
                         targetTitle: "Lê Hoàng Nam"
                     )
                 )
+            } else if UIReviewFixture.activeScreen == "forward-message" {
+                ForwardMessageSheet(text: "Tin nhắn chia sẻ từ Bảng tin Kinnect", imageUrl: "")
+            } else if UIReviewFixture.activeScreen == "change-password" {
+                ChangePasswordSheet()
+            } else if UIReviewFixture.activeScreen == "blocked-users" {
+                BlockedUsersSheet()
             } else {
                 authenticatedLayout
             }
