@@ -1,5 +1,6 @@
 import SwiftUI
 import AuthenticationServices
+import CryptoKit
 
 enum AuthStage {
     case welcome
@@ -14,6 +15,7 @@ struct AuthView: View {
     @ObservedObject private var loc = LocalizationManager.shared
 
     @State private var stage: AuthStage
+    @State private var currentAppleNonce: String = ""
 
     init(initialStage: AuthStage = .welcome) {
         _stage = State(initialValue: initialStage)
@@ -656,11 +658,15 @@ struct AuthView: View {
             }
             .padding(.vertical, 8)
 
-            // Native Sign In with Apple (Guideline 4.8)
+            // Native Sign In with Apple (Guideline 4.8) with cryptographic request-bound nonce
             SignInWithAppleButton(
                 .signIn,
                 onRequest: { request in
                     request.requestedScopes = [.fullName, .email]
+                    let rawNonce = UUID().uuidString + "-" + UUID().uuidString
+                    currentAppleNonce = rawNonce
+                    let hashedData = SHA256.hash(data: Data(rawNonce.utf8))
+                    request.nonce = hashedData.compactMap { String(format: "%02x", $0) }.joined()
                 },
                 onCompletion: handleAppleSignIn
             )
@@ -753,15 +759,19 @@ struct AuthView: View {
 
             Task {
                 do {
+                    var appleBody: [String: Any] = [
+                        "appleId": userIdentifier,
+                        "email": email,
+                        "fullName": nameToUse,
+                        "identityToken": identityTokenStr
+                    ]
+                    if !currentAppleNonce.isEmpty {
+                        appleBody["nonce"] = currentAppleNonce
+                    }
                     let res = try await KinnectAPIClient.shared.requestJSON(
                         "/api/auth/apple",
                         method: "POST",
-                        body: [
-                            "appleId": userIdentifier,
-                            "email": email,
-                            "fullName": nameToUse,
-                            "identityToken": identityTokenStr
-                        ]
+                        body: appleBody
                     )
                     if let userDict = res["user"] as? [String: Any] {
                         let user = KinnectUser.from(userDict)

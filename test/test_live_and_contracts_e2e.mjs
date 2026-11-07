@@ -820,7 +820,7 @@ h1Conn.ws.close();
 h2Conn.ws.close();
 vConn.ws.close();
 
-console.log("7. Testing Sign in with Apple (/api/auth/apple) Cryptographic RS256 Verification & Security (12 assertions)...");
+console.log("7. Testing Sign in with Apple (/api/auth/apple) Cryptographic RS256 Verification & Security (17 assertions)...");
 
 function makeSignedAppleIdToken({
   sub,
@@ -830,6 +830,8 @@ function makeSignedAppleIdToken({
   email,
   kid = "apple-test-key-1",
   alg = "RS256",
+  nonce,
+  jti,
   signKey = appleTestPrivateKey,
   tamperPayload = false,
   tamperSignature = false
@@ -837,6 +839,8 @@ function makeSignedAppleIdToken({
   const header = Buffer.from(JSON.stringify({ alg, kid })).toString("base64url");
   const claims = { iss, aud, exp, sub };
   if (email) claims.email = email;
+  if (nonce) claims.nonce = nonce;
+  claims.jti = jti || `jti-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
 
   let signatureBase = `${header}.${payload}`;
@@ -993,7 +997,66 @@ const missingTokenRes = await fetch(`${baseUrl}/api/auth/apple`, {
 });
 assert.equal(missingTokenRes.status, 400, "Missing identityToken must be rejected with 400");
 
-console.log("   -> Verified Sign in with Apple RS256 cryptographic verification, forged/tampered rejection, claims enforcement, and repeat logins!");
+// 7m. Reject token replay attack (using same token/JTI twice fails closed)
+const replaySub = "apple.sub.replay." + RUN;
+const replayToken = makeSignedAppleIdToken({ sub: replaySub });
+const firstUseRes = await fetch(`${baseUrl}/api/auth/apple`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ identityToken: replayToken, appleId: replaySub })
+});
+assert.equal(firstUseRes.status, 200, "First token use must succeed");
+
+const secondUseRes = await fetch(`${baseUrl}/api/auth/apple`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ identityToken: replayToken, appleId: replaySub })
+});
+assert.equal(secondUseRes.status, 401, "Replayed token must be rejected with 401");
+
+// 7n. Request-bound nonce verification (valid match)
+const rawNonceTest = "client-secure-random-nonce-" + RUN;
+const hashedNonceTest = createHash("sha256").update(rawNonceTest).digest("hex");
+const nonceSub = "apple.sub.nonce." + RUN;
+const nonceToken = makeSignedAppleIdToken({ sub: nonceSub, nonce: hashedNonceTest });
+const appleNonceValidRes = await fetch(`${baseUrl}/api/auth/apple`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ identityToken: nonceToken, appleId: nonceSub, nonce: rawNonceTest })
+});
+assert.equal(appleNonceValidRes.status, 200, "Valid request-bound nonce must succeed");
+
+// 7o. Reject request-bound nonce mismatch
+const appleNonceMismatchRes = await fetch(`${baseUrl}/api/auth/apple`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ identityToken: nonceToken, appleId: nonceSub, nonce: "tampered-wrong-nonce" })
+});
+assert.equal(appleNonceMismatchRes.status, 401, "Mismatched nonce must be rejected with 401");
+
+// 7p. Reject missing nonce when token demands it
+const appleMissingNonceRes = await fetch(`${baseUrl}/api/auth/apple`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ identityToken: nonceToken, appleId: nonceSub })
+});
+assert.equal(appleMissingNonceRes.status, 401, "Missing nonce when required by token must be rejected with 401");
+
+// 7q. Reject non-numeric/non-finite exp
+const nonFiniteExpToken = (() => {
+  const h = Buffer.from(JSON.stringify({ alg: "RS256", kid: "apple-test-key-1" })).toString("base64url");
+  const c = Buffer.from(JSON.stringify({ iss: "https://appleid.apple.com", aud: "app.kinnect.live", sub: "inf_exp_user", exp: "string_exp" })).toString("base64url");
+  const s = createSign("RSA-SHA256"); s.update(`${h}.${c}`);
+  return `${h}.${c}.${s.sign(appleTestPrivateKey, "base64url")}`;
+})();
+const appleInfExpRes = await fetch(`${baseUrl}/api/auth/apple`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ identityToken: nonFiniteExpToken, appleId: "inf_exp_user" })
+});
+assert.equal(appleInfExpRes.status, 401, "Non-numeric exp must be rejected with 401");
+
+console.log("   -> Verified Sign in with Apple RS256 cryptographic verification, nonce challenge binding, replay rejection, and repeat logins!");
 server.close();
 
 console.log("ALL END-TO-END FUNCTIONAL TESTS PASSED 100%!");

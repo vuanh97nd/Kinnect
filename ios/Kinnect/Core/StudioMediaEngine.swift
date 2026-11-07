@@ -1,4 +1,5 @@
 import AVFoundation
+import ImageIO
 import CoreImage
 import CoreImage.CIFilterBuiltins
 import Photos
@@ -349,7 +350,7 @@ final class StudioVideoProject: ObservableObject {
         let template = proTemplate
         let rot = rotation % 360
 
-        let composition = AVVideoComposition(asset: asset, applyingCIFiltersWithHandler: { request in
+        let baseComposition = AVVideoComposition(asset: asset, applyingCIFiltersWithHandler: { request in
             let source = request.sourceImage.clampedToExtent()
             var output = source
 
@@ -392,28 +393,32 @@ final class StudioVideoProject: ObservableObject {
                 output = output.cropped(to: request.sourceImage.extent)
             }
 
-            // 5. Video rotation geometry (90, 180, 270 degrees)
+            // 5. Video rotation geometry (90, 180, 270 degrees) with normalized origin
             if rot != 0 {
-                let extent = request.sourceImage.extent
-                var transform = CGAffineTransform.identity
                 switch rot {
                 case 90:
-                    transform = transform.translatedBy(x: extent.height, y: 0).rotated(by: .pi / 2)
+                    output = output.oriented(.right)
                 case 180:
-                    transform = transform.translatedBy(x: extent.width, y: extent.height).rotated(by: .pi)
+                    output = output.oriented(.down)
                 case 270:
-                    transform = transform.translatedBy(x: 0, y: extent.width).rotated(by: 3 * .pi / 2)
+                    output = output.oriented(.left)
                 default: break
                 }
-                output = output.transformed(by: transform)
             }
 
             request.finish(with: output, context: nil)
         })
 
+        guard let mutableComposition = baseComposition.mutableCopy() as? AVMutableVideoComposition else {
+            return baseComposition
+        }
 
+        if rot == 90 || rot == 270 {
+            let baseSize = baseComposition.renderSize
+            mutableComposition.renderSize = CGSize(width: baseSize.height, height: baseSize.width)
+        }
 
-        return composition
+        return mutableComposition
     }
 
     /// Real AVAssetExportSession export preserving source audio and trimmed time range
