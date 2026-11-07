@@ -10,6 +10,19 @@ struct PrivacyConsentSheet: View {
     @ObservedObject private var appState = AppState.shared
     @State private var isSubmitting = false
 
+    init(
+        request: PrivacyConsentRequest = PrivacyConsentRequest(
+            version: "2026.11",
+            notice: "Chính sách quyền riêng tư và điều khoản dịch vụ Kinnect. Cam kết bảo mật theo tiêu chuẩn Apple và pháp luật Việt Nam."
+        ),
+        recordOnServer: Bool = false,
+        onAccepted: @escaping () -> Void = {}
+    ) {
+        self.request = request
+        self.recordOnServer = recordOnServer
+        self.onAccepted = onAccepted
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {

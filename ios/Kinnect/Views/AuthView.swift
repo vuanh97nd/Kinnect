@@ -94,7 +94,16 @@ struct AuthView: View {
             }
         }
         .sheet(isPresented: $showPrivacySheet) {
-            PrivacyConsentSheet()
+            PrivacyConsentSheet(
+                request: PrivacyConsentRequest(
+                    version: "2026.11",
+                    notice: L10n.tr("Chính sách quyền riêng tư và bảo mật dữ liệu Kinnect. Cam kết bảo mật theo tiêu chuẩn Apple và pháp luật Việt Nam.")
+                ),
+                recordOnServer: false,
+                onAccepted: {
+                    showPrivacySheet = false
+                }
+            )
         }
     }
 
