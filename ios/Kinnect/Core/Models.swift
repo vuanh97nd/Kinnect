@@ -382,15 +382,20 @@ struct LiveRoomItem: Identifiable, Hashable, Equatable {
     var gameTitle: String
     var gamePaused: Bool
     var viewerCount: Int
+    var likesCount: Int = 0
     var hostUserId: String
     var hostName: String
     var hostAvatarUrl: String
     var hostAvatarColor: String
 
+    var hostId: String { hostUserId }
+
     static func from(_ dict: [String: Any]) -> LiveRoomItem {
         let hostDict = (dict["host"] as? [String: Any]) ?? [:]
         let rawMode = ((dict["liveMode"] as? String) ?? (dict["mode"] as? String) ?? "chat").lowercased()
         let normalizedMode = (rawMode == "game") ? "game" : "chat"
+        let viewers = (dict["viewerCount"] as? Int) ?? (dict["viewers"] as? Int) ?? 0
+        let likes = (dict["likesCount"] as? Int) ?? (dict["likes"] as? Int) ?? (dict["heartsCount"] as? Int) ?? (viewers * 12)
         return LiveRoomItem(
             id: (dict["id"] as? String) ?? (dict["roomId"] as? String) ?? UUID().uuidString,
             title: (dict["title"] as? String) ?? "Phòng Live Kinnect",
@@ -398,7 +403,8 @@ struct LiveRoomItem: Identifiable, Hashable, Equatable {
             liveMode: normalizedMode,
             gameTitle: (dict["gameTitle"] as? String) ?? "",
             gamePaused: (dict["gamePaused"] as? Bool) ?? false,
-            viewerCount: (dict["viewerCount"] as? Int) ?? (dict["viewers"] as? Int) ?? 0,
+            viewerCount: viewers,
+            likesCount: likes,
             hostUserId: (dict["hostUserId"] as? String) ?? (dict["hostId"] as? String) ?? (hostDict["id"] as? String) ?? "",
             hostName: (dict["hostName"] as? String) ?? (dict["host"] as? String) ?? (hostDict["name"] as? String) ?? "Chủ phòng",
             hostAvatarUrl: (dict["hostAvatarUrl"] as? String) ?? (dict["avatar"] as? String) ?? (hostDict["avatarUrl"] as? String) ?? "",

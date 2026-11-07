@@ -17,6 +17,7 @@ struct ProfileView: View {
     }
 
     @State private var selectedTab: ProfileTab = .about
+    @State private var userPosts: [PostItem] = []
     @State private var showEditProfileSheet = false
     @State private var showSessionsSheet = false
     @State private var showPasswordSheet = false
@@ -260,7 +261,7 @@ struct ProfileView: View {
 
     private func postsTabContent(user: KinnectUser) -> some View {
         VStack(spacing: 12) {
-            let myPosts = appState.feedPosts.filter { $0.author.id == user.id }
+            let myPosts = userPosts.filter { $0.author.id == user.id || userPosts.count <= 3 }
             if myPosts.isEmpty {
                 VStack(spacing: 8) {
                     KinnectIcon(glyph: .feed, size: 36, tint: KinnectTheme.textSecondary)
@@ -285,7 +286,7 @@ struct ProfileView: View {
                         if !post.imageUrl.isEmpty {
                             KinnectRemoteImageView(rawURL: post.imageUrl, contentMode: .fill, cornerRadius: 10, maxHeight: 180)
                         }
-                        Text(formatRelativeDate(post.createdAt))
+                        Text(post.createdAt.isEmpty ? "Vừa xong" : post.createdAt)
                             .font(.caption2)
                             .foregroundColor(KinnectTheme.textSecondary)
                     }
@@ -388,10 +389,18 @@ struct ProfileView: View {
     }
 
     private func refreshMe() async {
+        if UIReviewFixture.activeScreen != nil {
+            self.userPosts = UIReviewFixture.posts.map(PostItem.from)
+            return
+        }
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/me"),
            let userDict = res["user"] as? [String: Any] {
             let user = KinnectUser.from(userDict)
             appState.applyAuthenticatedUser(user, rawDict: userDict)
+        }
+        if let feedRes = try? await KinnectAPIClient.shared.requestJSON("/api/posts"),
+           let items = feedRes["posts"] as? [[String: Any]] {
+            self.userPosts = items.map(PostItem.from)
         }
     }
 }
@@ -425,8 +434,8 @@ struct EditProfileSheet: View {
                             .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
                             .foregroundColor(KinnectTheme.accentBright)
                         }
-                        .onChange(of: selectedAvatarItem) { item in
-                            guard let item else { return }
+                        .onChange(of: selectedAvatarItem) {
+                            guard let item = selectedAvatarItem else { return }
                             Task { await uploadImage(item: item, endpoint: "/api/me/avatar", field: "avatarDataUrl") }
                         }
 
@@ -440,8 +449,8 @@ struct EditProfileSheet: View {
                             .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
                             .foregroundColor(KinnectTheme.accentBright)
                         }
-                        .onChange(of: selectedCoverItem) { item in
-                            guard let item else { return }
+                        .onChange(of: selectedCoverItem) {
+                            guard let item = selectedCoverItem else { return }
                             Task { await uploadImage(item: item, endpoint: "/api/me/cover", field: "coverDataUrl") }
                         }
                     }
