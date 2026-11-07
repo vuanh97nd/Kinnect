@@ -78,6 +78,10 @@ struct RootMainView: View {
                         DirectChatDetailView(peer: KinnectUser.from(UIReviewFixture.peerUserDict))
                     }
                 }
+            } else if UIReviewFixture.activeScreen == "camera-studio" || UIReviewFixture.activeScreen == "camera-studio-edit" {
+                NavigationStack {
+                    CameraStudioView()
+                }
             } else {
                 authenticatedLayout
             }
@@ -88,7 +92,7 @@ struct RootMainView: View {
                     .zIndex(50)
             }
 
-            if appState.currentLiveRoom != nil {
+            if appState.currentLiveRoom != nil && appState.isCurrentLiveHost {
                 LiveRoomFullScreenView()
                     .transition(.move(edge: .bottom))
                     .zIndex(40)
@@ -125,7 +129,6 @@ struct RootMainView: View {
                 case "friends": showFriendsSheet = true
                 case "notifications": showNotificationsSheet = true
                 case "wallet": showWalletStoreSheet = true
-                case "camera-studio", "camera-studio-edit": showCameraStudioSheet = true
                 default: break
                 }
             }

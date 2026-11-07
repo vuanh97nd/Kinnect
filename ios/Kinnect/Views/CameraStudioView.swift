@@ -46,7 +46,7 @@ struct CameraStudioView: View {
 
     var body: some View {
         Group {
-            if previewImage == nil && videoDataURL.isEmpty {
+            if previewImage == nil && videoDataURL.isEmpty && UIReviewFixture.activeScreen != "camera-studio-edit" {
                 // 1. Direct-to-Camera Viewfinder Mode (100% Android StudioActivity Parity)
                 cameraViewfinderMode
             } else {
@@ -309,8 +309,8 @@ struct CameraStudioView: View {
                 .padding(.horizontal, 4)
 
                 // Large Media Preview
-                if let previewImage {
-                    Image(uiImage: previewImage)
+                if let displayImg = previewImage ?? (UIReviewFixture.activeScreen == "camera-studio-edit" ? UIReviewFixture.samplePreviewImage() : nil) {
+                    Image(uiImage: displayImg)
                         .resizable()
                         .scaledToFit()
                         .frame(maxWidth: .infinity, maxHeight: 320)
@@ -701,19 +701,73 @@ struct LiveCameraPreviewView: UIViewControllerRepresentable {
 final class CameraPreviewViewController: UIViewController {
     private let session = AVCaptureSession()
     private var previewLayer: AVCaptureVideoPreviewLayer?
+    private let backdropLayer = CAGradientLayer()
+    private let gridLayer = CAShapeLayer()
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .black
-        setupSession()
+        view.backgroundColor = UIColor(red: 0.05, green: 0.04, blue: 0.09, alpha: 1.0)
+        setupViewfinderBackdrop()
+        setupSessionIfAuthorized()
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        backdropLayer.frame = view.bounds
+        updateGridPath()
         previewLayer?.frame = view.bounds
     }
 
-    private func setupSession() {
+    private func setupViewfinderBackdrop() {
+        backdropLayer.colors = [
+            UIColor(red: 0.11, green: 0.07, blue: 0.22, alpha: 1.0).cgColor,
+            UIColor(red: 0.04, green: 0.03, blue: 0.08, alpha: 1.0).cgColor,
+            UIColor(red: 0.09, green: 0.05, blue: 0.16, alpha: 1.0).cgColor
+        ]
+        backdropLayer.locations = [0.0, 0.55, 1.0]
+        view.layer.addSublayer(backdropLayer)
+
+        gridLayer.strokeColor = UIColor.white.withAlphaComponent(0.12).cgColor
+        gridLayer.lineWidth = 0.8
+        gridLayer.fillColor = UIColor.clear.cgColor
+        view.layer.addSublayer(gridLayer)
+    }
+
+    private func updateGridPath() {
+        let w = view.bounds.width
+        let h = view.bounds.height
+        guard w > 0, h > 0 else { return }
+        let path = UIBezierPath()
+        // Rule-of-thirds camera viewfinder lines
+        path.move(to: CGPoint(x: w / 3, y: 0))
+        path.addLine(to: CGPoint(x: w / 3, y: h))
+        path.move(to: CGPoint(x: 2 * w / 3, y: 0))
+        path.addLine(to: CGPoint(x: 2 * w / 3, y: h))
+        path.move(to: CGPoint(x: 0, y: h / 3))
+        path.addLine(to: CGPoint(x: w, y: h / 3))
+        path.move(to: CGPoint(x: 0, y: 2 * h / 3))
+        path.addLine(to: CGPoint(x: w, y: 2 * h / 3))
+        gridLayer.path = path.cgPath
+    }
+
+    private func setupSessionIfAuthorized() {
+        #if !targetEnvironment(simulator)
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        if status == .authorized {
+            configureHardwareSession()
+        } else if status == .notDetermined && !UIReviewFixture.isEnabled {
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+                guard granted else { return }
+                DispatchQueue.main.async {
+                    self?.configureHardwareSession()
+                }
+            }
+        }
+        #endif
+    }
+
+    private func configureHardwareSession() {
+        #if !targetEnvironment(simulator)
         session.beginConfiguration()
         session.sessionPreset = .high
         if let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
@@ -723,14 +777,18 @@ final class CameraPreviewViewController: UIViewController {
         session.commitConfiguration()
         let layer = AVCaptureVideoPreviewLayer(session: session)
         layer.videoGravity = .resizeAspectFill
+        layer.frame = view.bounds
         view.layer.addSublayer(layer)
         previewLayer = layer
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             self?.session.startRunning()
         }
+        #endif
     }
 
     func setCamera(front: Bool) {
+        #if !targetEnvironment(simulator)
+        guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized else { return }
         session.beginConfiguration()
         for input in session.inputs { session.removeInput(input) }
         let pos: AVCaptureDevice.Position = front ? .front : .back
@@ -739,20 +797,26 @@ final class CameraPreviewViewController: UIViewController {
             session.addInput(input)
         }
         session.commitConfiguration()
+        #endif
     }
 
     func setFlash(on: Bool) {
-        guard let device = AVCaptureDevice.default(for: .video), device.hasTorch else { return }
+        #if !targetEnvironment(simulator)
+        guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized,
+              let device = AVCaptureDevice.default(for: .video), device.hasTorch else { return }
         try? device.lockForConfiguration()
         device.torchMode = on ? .on : .off
         device.unlockForConfiguration()
+        #endif
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        #if !targetEnvironment(simulator)
         if session.isRunning {
             session.stopRunning()
         }
+        #endif
     }
 }
 
