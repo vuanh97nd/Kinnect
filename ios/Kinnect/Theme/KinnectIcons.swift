@@ -43,6 +43,11 @@ enum KinnectGlyph: String, CaseIterable {
     case logout
     case refresh
 
+    // Semantic aliases used in Auth / Profile views
+    static var lock: KinnectGlyph { .shield }
+    static var eyeOff: KinnectGlyph { .eye }
+    static var chevronRight: KinnectGlyph { .send }
+
     var label: String {
         switch self {
         case .feed: return "Bảng tin"
@@ -583,11 +588,19 @@ struct KinnectIcon: View {
     let glyph: KinnectGlyph
     var size: CGFloat = 24
     var selected = false
+    var tint: Color? = nil
     var body: some View {
-        KinnectGlyphShape(glyph: glyph)
-            .stroke(style: StrokeStyle(lineWidth: (selected ? 2.05 : 1.65) * size / 28, lineCap: .round, lineJoin: .round))
-            .frame(width: size, height: size)
-            .accessibilityHidden(true)
+        Group {
+            if let tint = tint {
+                KinnectGlyphShape(glyph: glyph)
+                    .stroke(tint, style: StrokeStyle(lineWidth: (selected ? 2.05 : 1.65) * size / 28, lineCap: .round, lineJoin: .round))
+            } else {
+                KinnectGlyphShape(glyph: glyph)
+                    .stroke(style: StrokeStyle(lineWidth: (selected ? 2.05 : 1.65) * size / 28, lineCap: .round, lineJoin: .round))
+            }
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
     }
 }
 
@@ -595,13 +608,13 @@ struct KinnectIcon: View {
 struct KinnectIconButton: View {
     let glyph: KinnectGlyph
     var label: String? = nil
+    var size: CGFloat = 24
     var selected = false
     var tint: Color = .primary
     let action: () -> Void
     var body: some View {
         Button(action: action) {
-            KinnectIcon(glyph: glyph, selected: selected)
-                .foregroundColor(tint)
+            KinnectIcon(glyph: glyph, size: size, selected: selected, tint: tint)
                 .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
         }
@@ -609,3 +622,4 @@ struct KinnectIconButton: View {
         .accessibilityLabel(Text(label ?? glyph.label))
     }
 }
+
