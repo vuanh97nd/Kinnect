@@ -5,7 +5,7 @@ enum AuthStage {
     case welcome
     case login
     case register
-    case forgot
+    case forgotPassword
 }
 
 struct AuthView: View {
@@ -13,7 +13,11 @@ struct AuthView: View {
     @StateObject private var oauth = OAuthManager.shared
     @ObservedObject private var loc = LocalizationManager.shared
 
-    @State private var stage: AuthStage = .welcome
+    @State private var stage: AuthStage
+
+    init(initialStage: AuthStage = .welcome) {
+        _stage = State(initialValue: initialStage)
+    }
 
     // Login Form State
     @State private var loginUsername = ""
@@ -71,7 +75,7 @@ struct AuthView: View {
                     case .register:
                         registerView
                             .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
-                    case .forgot:
+                    case .forgotPassword:
                         forgotView
                             .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)))
                     }
@@ -86,11 +90,11 @@ struct AuthView: View {
             } else if UIReviewFixture.activeScreen == "auth-register" {
                 stage = .register
             } else if UIReviewFixture.activeScreen == "auth-forgot" {
-                stage = .forgot
+                stage = .forgotPassword
             }
         }
         .sheet(isPresented: $showPrivacySheet) {
-            PrivacyConsentView()
+            PrivacyConsentSheet()
         }
     }
 
@@ -320,7 +324,7 @@ struct AuthView: View {
                     errorMessage = nil
                     infoMessage = nil
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        stage = .forgot
+                        stage = .forgotPassword
                     }
                 } label: {
                     Text(L10n.tr("Quên mật khẩu?"))
@@ -593,7 +597,7 @@ struct AuthView: View {
             if let info = infoMessage {
                 Text(info)
                     .font(.caption)
-                    .foregroundColor(KinnectTheme.success)
+                    .foregroundColor(KinnectTheme.online)
             }
 
             Button {
@@ -659,7 +663,14 @@ struct AuthView: View {
             // Google & Facebook Social Login Buttons
             HStack(spacing: 12) {
                 Button {
-                    oauth.startOAuth(provider: "google")
+                    oauth.startOAuth(provider: "google") { res in
+                        switch res {
+                        case .success(let user):
+                            appState.applyAuthenticatedUser(user, rawDict: [:], rememberMe: true)
+                        case .failure(let err):
+                            errorMessage = err.localizedDescription
+                        }
+                    }
                 } label: {
                     HStack(spacing: 8) {
                         Text("G")
@@ -676,7 +687,14 @@ struct AuthView: View {
                 }
 
                 Button {
-                    oauth.startOAuth(provider: "facebook")
+                    oauth.startOAuth(provider: "facebook") { res in
+                        switch res {
+                        case .success(let user):
+                            appState.applyAuthenticatedUser(user, rawDict: [:], rememberMe: true)
+                        case .failure(let err):
+                            errorMessage = err.localizedDescription
+                        }
+                    }
                 } label: {
                     HStack(spacing: 8) {
                         Text("f")

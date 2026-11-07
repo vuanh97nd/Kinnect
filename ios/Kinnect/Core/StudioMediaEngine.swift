@@ -411,13 +411,7 @@ final class StudioVideoProject: ObservableObject {
             request.finish(with: output, context: nil)
         })
 
-        if let track = asset.tracks(withMediaType: .video).first {
-            var size = track.naturalSize
-            if rot == 90 || rot == 270 {
-                size = CGSize(width: size.height, height: size.width)
-            }
-            composition.renderSize = size
-        }
+
 
         return composition
     }

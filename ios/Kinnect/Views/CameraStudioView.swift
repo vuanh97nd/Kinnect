@@ -824,10 +824,7 @@ struct CameraStudioView: View {
                 )
             }
         } else {
-            guard let img = previewImage ?? photoProject.originalImage else {
-                appState.showToast(L10n.tr("Không tìm thấy ảnh để lưu."))
-                return
-            }
+            let img = previewImage ?? photoProject.originalImage
             PhotoSaveCoordinator.shared.onComplete = { success, error in
                 if success {
                     appState.showToast(L10n.tr("Đã lưu ảnh vào Album ảnh trên thiết bị."))
