@@ -19,12 +19,18 @@ struct FeedView: View {
     @State private var activeStoryItem: StoryItem?
     @State private var activeCommentPost: PostItem?
 
-    private let categories: [(id: String, label: String, icon: String)] = [
-        ("all", "Tất cả", "sparkles"),
-        ("community", "Cộng đồng", "person.3.fill"),
-        ("confessions", "Tâm sự", "heart.text.square.fill"),
-        ("questions", "Hỏi đáp", "questionmark.bubble.fill"),
-        ("events", "Sự kiện", "calendar.badge.clock")
+    private struct FeedCategoryOption: Identifiable {
+        let id: String
+        let label: String
+        let icon: String
+    }
+
+    private let categories: [FeedCategoryOption] = [
+        FeedCategoryOption(id: "all", label: "Tất cả", icon: "sparkles"),
+        FeedCategoryOption(id: "community", label: "Cộng đồng", icon: "person.3.fill"),
+        FeedCategoryOption(id: "confessions", label: "Tâm sự", icon: "heart.text.square.fill"),
+        FeedCategoryOption(id: "questions", label: "Hỏi đáp", icon: "questionmark.bubble.fill"),
+        FeedCategoryOption(id: "events", label: "Sự kiện", icon: "calendar.badge.clock")
     ]
 
     var body: some View {
@@ -186,7 +192,7 @@ struct FeedView: View {
     private var categoryFilterStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                ForEach(categories, id: \.id) { cat in
+                ForEach(categories) { cat in
                     let active = (selectedCategory == cat.id)
                     Button {
                         selectedCategory = cat.id
@@ -947,3 +953,4 @@ func formatRelativeDate(_ iso: String) -> String {
     rel.unitsStyle = .short
     return rel.localizedString(for: date, relativeTo: Date())
 }
+

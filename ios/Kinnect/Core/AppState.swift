@@ -300,3 +300,4 @@ extension Notification.Name {
     static let kinnectNotificationsChanged = Notification.Name("kinnectNotificationsChanged")
     static let kinnectContentModerated = Notification.Name("kinnectContentModerated")
 }
+

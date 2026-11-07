@@ -4,6 +4,7 @@ enum KinnectAPIError: LocalizedError {
     case invalidURL
     case networkError(String)
     case serverError(status: Int, message: String)
+    case serverMessage(String)
     case unauthorized
 
     var errorDescription: String? {
@@ -13,6 +14,8 @@ enum KinnectAPIError: LocalizedError {
         case .networkError(let msg):
             return msg
         case .serverError(_, let message):
+            return message
+        case .serverMessage(let message):
             return message
         case .unauthorized:
             return "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
@@ -59,6 +62,30 @@ final class KinnectAPIClient {
             return nil
         }
         return obj
+    }
+
+    @discardableResult
+    func requestJSON(
+        _ path: String,
+        method: String = "GET",
+        body: [String: Any]? = nil,
+        requestId: String? = nil
+    ) async throws -> [String: Any] {
+        var payload = body
+        if let requestId, !requestId.isEmpty {
+            var dict = payload ?? [:]
+            if dict["requestId"] == nil {
+                dict["requestId"] = requestId
+            }
+            payload = dict
+        }
+        let isIdempotent = (method == "GET" || method == "HEAD" || (requestId != nil && !requestId!.isEmpty))
+        return try await request(
+            method: method,
+            path: path,
+            body: payload,
+            isIdempotent: isIdempotent
+        )
     }
 
     /// Performs an authenticated HTTP request.
@@ -166,7 +193,7 @@ final class KinnectAPIClient {
         }
 
         guard (200...299).contains(http.statusCode) else {
-            let msg = json["error"] as? String ?? "Yêu cầu không thành công (mã \(http.statusCode))."
+            let msg = json["error"] as? String ?? (json["message"] as? String) ?? "Yêu cầu không thành công (mã \(http.statusCode))."
             throw KinnectAPIError.serverError(status: http.statusCode, message: msg)
         }
 
@@ -188,6 +215,11 @@ final class KinnectAPIClient {
     }
 
     func fetchBinaryData(path: String, maxAge: TimeInterval = 7 * 86400) async -> Data? {
+        if path.hasPrefix("data:"),
+           let commaIdx = path.firstIndex(of: ",") {
+            let b64 = String(path[path.index(after: commaIdx)...])
+            return Data(base64Encoded: b64)
+        }
         let uid = currentAccountId
         let cacheKey = "bin:\(path)"
         if !uid.isEmpty, let cached = AccountCache.shared.load(forKey: cacheKey, maxAge: maxAge, origin: activeOrigin, accountId: uid) {

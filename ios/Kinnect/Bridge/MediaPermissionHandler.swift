@@ -52,36 +52,42 @@ final class MediaPermissionHandler: NSObject, ObservableObject, CLLocationManage
         }
     }
 
+    func requestMicrophoneAccess() async -> Bool {
+        let status = AVCaptureDevice.authorizationStatus(for: .audio)
+        let granted: Bool
+        switch status {
+        case .authorized:
+            granted = true
+        case .notDetermined:
+            granted = await AVCaptureDevice.requestAccess(for: .audio)
+        default:
+            granted = false
+        }
+        await MainActor.run { self.microphoneAuthorized = granted }
+        return granted
+    }
+
+    func requestCameraAccess() async -> Bool {
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        let granted: Bool
+        switch status {
+        case .authorized:
+            granted = true
+        case .notDetermined:
+            granted = await AVCaptureDevice.requestAccess(for: .video)
+        default:
+            granted = false
+        }
+        await MainActor.run { self.cameraAuthorized = granted }
+        return granted
+    }
+
     /// Requests Microphone and (optionally) Camera permissions and returns the true authorization result.
     func ensureCallPermissions(requireVideo: Bool) async -> Bool {
-        let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-        let micGranted: Bool
-        switch micStatus {
-        case .authorized:
-            micGranted = true
-        case .notDetermined:
-            micGranted = await AVCaptureDevice.requestAccess(for: .audio)
-        default:
-            micGranted = false
-        }
-
-        await MainActor.run { self.microphoneAuthorized = micGranted }
-        guard micGranted else { return false }
+        let micOk = await requestMicrophoneAccess()
+        guard micOk else { return false }
         guard requireVideo else { return true }
-
-        let camStatus = AVCaptureDevice.authorizationStatus(for: .video)
-        let camGranted: Bool
-        switch camStatus {
-        case .authorized:
-            camGranted = true
-        case .notDetermined:
-            camGranted = await AVCaptureDevice.requestAccess(for: .video)
-        default:
-            camGranted = false
-        }
-
-        await MainActor.run { self.cameraAuthorized = camGranted }
-        return camGranted
+        return await requestCameraAccess()
     }
 
     func requestNotificationPermission() {
@@ -92,6 +98,10 @@ final class MediaPermissionHandler: NSObject, ObservableObject, CLLocationManage
                 }
             }
         }
+    }
+
+    func requestCurrentLocation() async -> CLLocationCoordinate2D? {
+        return await requestCurrentCoordinates()
     }
 
     func requestCurrentCoordinates() async -> CLLocationCoordinate2D? {

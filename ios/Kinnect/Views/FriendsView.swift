@@ -324,3 +324,4 @@ struct FriendsView: View {
         await loadAll()
     }
 }
+

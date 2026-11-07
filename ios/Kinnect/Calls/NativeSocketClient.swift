@@ -21,8 +21,8 @@ final class NativeSocketClient: NSObject, URLSessionWebSocketDelegate {
     }
 
     func connectWithKeychainSession() {
-        guard let cookieHeader = KeychainStore.shared.cookieJarHeader(for: ServerConfig.currentOrigin),
-              !cookieHeader.isEmpty else {
+        let cookieHeader = KeychainStore.shared.cookieJarHeader(for: ServerConfig.currentOrigin)
+        guard !cookieHeader.isEmpty else {
             disconnect()
             return
         }

@@ -641,3 +641,4 @@ struct DeleteAccountConfirmationSheet: View {
         }
     }
 }
+

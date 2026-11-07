@@ -9,6 +9,7 @@ final class AccountCache {
     private let memoryCache = NSCache<NSString, NSData>()
     private let fileManager = FileManager.default
     private let queue = DispatchQueue(label: "app.kinnect.live.cache", qos: .utility)
+    private let activeAccountDefaultsKey = "kinnect.active.account.id"
 
     private var rootDirectory: URL {
         let base = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first!
@@ -18,6 +19,32 @@ final class AccountCache {
     private init() {
         memoryCache.totalCostLimit = 32 * 1024 * 1024
         try? fileManager.createDirectory(at: rootDirectory, withIntermediateDirectories: true)
+    }
+
+    var activeAccountId: String? {
+        let uid = UserDefaults.standard.string(forKey: activeAccountDefaultsKey) ?? KeychainStore.shared.loadAccountId(for: ServerConfig.defaultOrigin)
+        return uid.isEmpty ? nil : uid
+    }
+
+    func setActiveAccount(_ accountId: String) {
+        UserDefaults.standard.set(accountId, forKey: activeAccountDefaultsKey)
+        KeychainStore.shared.saveAccountId(accountId, for: ServerConfig.defaultOrigin)
+    }
+
+    func saveJSONObject(_ object: Any, forKey key: String, accountId: String) {
+        guard !accountId.isEmpty,
+              JSONSerialization.isValidJSONObject(object),
+              let data = try? JSONSerialization.data(withJSONObject: object) else { return }
+        store(data, forKey: key, origin: ServerConfig.currentOrigin, accountId: accountId)
+    }
+
+    func loadJSONObject<T>(forKey key: String, accountId: String) -> T? {
+        guard !accountId.isEmpty,
+              let data = load(forKey: key, origin: ServerConfig.currentOrigin, accountId: accountId),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? T else {
+            return nil
+        }
+        return obj
     }
 
     private func scopeDirectory(origin: String, accountId: String) -> URL? {
@@ -79,6 +106,7 @@ final class AccountCache {
     }
 
     func wipeAllCaches() {
+        UserDefaults.standard.removeObject(forKey: activeAccountDefaultsKey)
         memoryCache.removeAllObjects()
         queue.sync {
             try? fileManager.removeItem(at: rootDirectory)

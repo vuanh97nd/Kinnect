@@ -92,3 +92,4 @@ struct NotificationsView: View {
         await appState.refreshGlobalBadges()
     }
 }
+

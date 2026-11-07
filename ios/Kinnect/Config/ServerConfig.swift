@@ -52,6 +52,12 @@ enum ServerConfig {
         return URL(string: origin + normalizedPath)
     }
 
+    static func resolveURL(_ raw: String) -> URL? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return url(for: trimmed)
+    }
+
     static var webSocketURL: URL {
         let wsBase = currentOrigin.replacingOccurrences(of: "https://", with: "wss://")
         return URL(string: wsBase + "/") ?? URL(string: "wss://app.kinnect.io.vn/")!

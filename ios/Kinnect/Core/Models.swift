@@ -1,443 +1,460 @@
 import Foundation
 
-struct KinnectUser: Identifiable, Hashable {
+private func isoString(from anyVal: Any?) -> String {
+    if let s = anyVal as? String, !s.isEmpty {
+        return s
+    }
+    if let n = anyVal as? NSNumber {
+        let ms = n.doubleValue
+        let sec = ms > 10_000_000_000 ? (ms / 1000.0) : ms
+        return ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: sec))
+    }
+    return ""
+}
+
+struct KinnectUser: Identifiable, Hashable, Equatable {
     var id: String
-    var username: String
     var name: String
+    var handle: String
+    var email: String
+    var phone: String
     var bio: String
-    var city: String
-    var gender: String
-    var orientation: String
-    var pronouns: String
-    var relationshipRole: String
-    var lookingFor: String
-    var communityRole: String
-    var occupation: String
-    var school: String
-    var birthDate: String
-    var age: Int?
-    var interests: [String]
-    var role: String
-    var avatarURL: String?
-    var coverURL: String?
+    var avatarUrl: String
+    var avatarColor: String
+    var coverUrl: String
+    var locationName: String
+    var isPrivate: Bool
+    var followersCount: Int
+    var followingCount: Int
+    var friendsCount: Int
     var isFollowing: Bool
-    var followsMe: Bool
     var friendshipStatus: String
-    var discoverable: Bool
-    var showDistance: Bool
-    var dmMode: String
-    var distanceLabel: String
+    var distanceKm: Double?
     var isActive: Bool
-    var unread: Int
-    var lastMessageBody: String?
-    var lastMessageCreated: Int64?
-    var lastMessageMine: Bool
+
+    var avatarURL: String? { avatarUrl.isEmpty ? nil : avatarUrl }
+
+    init(
+        id: String = "",
+        name: String = "Người dùng Kinnect",
+        handle: String = "",
+        email: String = "",
+        phone: String = "",
+        bio: String = "",
+        avatarUrl: String = "",
+        avatarColor: String = "#7C3AED",
+        coverUrl: String = "",
+        locationName: String = "",
+        isPrivate: Bool = false,
+        followersCount: Int = 0,
+        followingCount: Int = 0,
+        friendsCount: Int = 0,
+        isFollowing: Bool = false,
+        friendshipStatus: String = "none",
+        distanceKm: Double? = nil,
+        isActive: Bool = false
+    ) {
+        self.id = id
+        self.name = name
+        self.handle = handle
+        self.email = email
+        self.phone = phone
+        self.bio = bio
+        self.avatarUrl = avatarUrl
+        self.avatarColor = avatarColor
+        self.coverUrl = coverUrl
+        self.locationName = locationName
+        self.isPrivate = isPrivate
+        self.followersCount = followersCount
+        self.followingCount = followingCount
+        self.friendsCount = friendsCount
+        self.isFollowing = isFollowing
+        self.friendshipStatus = friendshipStatus
+        self.distanceKm = distanceKm
+        self.isActive = isActive
+    }
 
     init(json: [String: Any]) {
-        self.id = json["id"] as? String ?? ""
-        self.username = json["username"] as? String ?? ""
-        self.name = (json["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? (json["username"] as? String ?? "Thành viên")
-        self.bio = json["bio"] as? String ?? ""
-        self.city = json["city"] as? String ?? ""
-        self.gender = json["gender"] as? String ?? ""
-        self.orientation = json["orientation"] as? String ?? ""
-        self.pronouns = json["pronouns"] as? String ?? ""
-        self.relationshipRole = json["relationshipRole"] as? String ?? ""
-        self.lookingFor = json["lookingFor"] as? String ?? ""
-        self.communityRole = json["communityRole"] as? String ?? ""
-        self.occupation = json["occupation"] as? String ?? ""
-        self.school = json["school"] as? String ?? ""
-        self.birthDate = json["birthDate"] as? String ?? ""
-        self.age = json["age"] as? Int
-        if let arr = json["interests"] as? [String] {
-            self.interests = arr
-        } else {
-            self.interests = []
+        self = Self.from(json)
+    }
+
+    static func from(_ dict: [String: Any]) -> KinnectUser {
+        let uid = (dict["id"] as? String) ?? (dict["userId"] as? String) ?? ""
+        let rawName = (dict["name"] as? String) ?? (dict["displayName"] as? String) ?? (dict["username"] as? String) ?? "Người dùng Kinnect"
+        var av = (dict["avatarUrl"] as? String) ?? (dict["avatar"] as? String) ?? ""
+        if av.isEmpty, (dict["hasAvatar"] as? Bool) == true, !uid.isEmpty {
+            av = "/api/users/\(uid)/avatar"
         }
-        self.role = json["role"] as? String ?? "user"
-        if let av = json["avatar"] as? String, !av.isEmpty {
-            self.avatarURL = av
-        } else if (json["hasAvatar"] as? Bool) == true && !self.id.isEmpty {
-            self.avatarURL = "/api/users/\(self.id)/avatar"
-        } else {
-            self.avatarURL = nil
-        }
-        if let cv = json["cover"] as? String, !cv.isEmpty {
-            self.coverURL = cv
-        } else {
-            self.coverURL = nil
-        }
-        self.isFollowing = (json["following"] as? Bool) ?? false
-        self.followsMe = (json["followsYou"] as? Bool) ?? false
-        self.friendshipStatus = json["friendship"] as? String ?? (json["status"] as? String ?? "none")
-        self.discoverable = (json["discoverable"] as? Bool) ?? true
-        self.showDistance = (json["showDistance"] as? Bool) ?? true
-        self.dmMode = json["dmMode"] as? String ?? "everyone"
-        self.distanceLabel = json["distanceLabel"] as? String ?? (json["distanceBand"] as? String ?? "")
-        self.isActive = (json["isActive"] as? Bool) ?? false
-        self.unread = json["unread"] as? Int ?? 0
-        if let last = json["last"] as? [String: Any] {
-            self.lastMessageBody = last["body"] as? String
-            self.lastMessageCreated = (last["created"] as? NSNumber)?.int64Value
-            self.lastMessageMine = (last["mine"] as? Bool) ?? false
-        } else {
-            self.lastMessageBody = nil
-            self.lastMessageCreated = nil
-            self.lastMessageMine = false
-        }
+        let cov = (dict["coverUrl"] as? String) ?? (dict["cover"] as? String) ?? ""
+        return KinnectUser(
+            id: uid,
+            name: rawName.isEmpty ? "Người dùng Kinnect" : rawName,
+            handle: (dict["handle"] as? String) ?? (dict["username"] as? String) ?? "",
+            email: (dict["email"] as? String) ?? "",
+            phone: (dict["phone"] as? String) ?? "",
+            bio: (dict["bio"] as? String) ?? "",
+            avatarUrl: av,
+            avatarColor: (dict["avatarColor"] as? String) ?? (dict["color"] as? String) ?? "#7C3AED",
+            coverUrl: cov,
+            locationName: (dict["locationName"] as? String) ?? (dict["city"] as? String) ?? "",
+            isPrivate: (dict["isPrivate"] as? Bool) ?? false,
+            followersCount: (dict["followersCount"] as? Int) ?? (dict["followers"] as? Int) ?? 0,
+            followingCount: (dict["followingCount"] as? Int) ?? (dict["followingTotal"] as? Int) ?? 0,
+            friendsCount: (dict["friendsCount"] as? Int) ?? (dict["friends"] as? Int) ?? 0,
+            isFollowing: (dict["isFollowing"] as? Bool) ?? (dict["following"] as? Bool) ?? false,
+            friendshipStatus: (dict["friendshipStatus"] as? String) ?? (dict["friendship"] as? String) ?? "none",
+            distanceKm: (dict["distanceKm"] as? NSNumber)?.doubleValue,
+            isActive: (dict["isActive"] as? Bool) ?? false
+        )
     }
 }
 
-struct PostItem: Identifiable {
+struct PostItem: Identifiable, Equatable {
     var id: String
-    var userId: String
-    var body: String
-    var visibility: String
+    var author: KinnectUser
+    var text: String
+    var imageUrl: String
     var category: String
-    var created: Int64
-    var author: KinnectUser
-    var mediaKind: String?
-    var mediaURL: String?
-    var likes: Int
-    var liked: Bool
-    var myReaction: String?
+    var createdAt: String
+    var likesCount: Int
     var commentsCount: Int
+    var liked: Bool
+    var userReaction: String
 
-    init(json: [String: Any]) {
-        self.id = json["id"] as? String ?? UUID().uuidString
-        self.userId = json["user_id"] as? String ?? ""
-        self.body = json["body"] as? String ?? ""
-        self.visibility = json["visibility"] as? String ?? "public"
-        self.category = json["category"] as? String ?? "community"
-        self.created = (json["created"] as? NSNumber)?.int64Value ?? 0
-        self.author = KinnectUser(json: json["author"] as? [String: Any] ?? [:])
-        if let media = json["media"] as? [String: Any] {
-            self.mediaKind = media["kind"] as? String
-            self.mediaURL = media["url"] as? String
-        } else {
-            self.mediaKind = nil
-            self.mediaURL = nil
-        }
-        self.likes = json["likes"] as? Int ?? 0
-        self.liked = (json["liked"] as? Bool) ?? false
-        self.myReaction = json["myReaction"] as? String
-        self.commentsCount = json["comments"] as? Int ?? 0
+    static func from(_ dict: [String: Any]) -> PostItem {
+        let authorDict = (dict["author"] as? [String: Any]) ?? (dict["user"] as? [String: Any]) ?? dict
+        let mediaDict = dict["media"] as? [String: Any]
+        let img = (dict["imageUrl"] as? String) ?? (dict["image"] as? String) ?? (mediaDict?["url"] as? String) ?? ""
+        return PostItem(
+            id: (dict["id"] as? String) ?? UUID().uuidString,
+            author: KinnectUser.from(authorDict),
+            text: (dict["text"] as? String) ?? (dict["body"] as? String) ?? (dict["content"] as? String) ?? "",
+            imageUrl: img,
+            category: (dict["category"] as? String) ?? "community",
+            createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
+            likesCount: (dict["likesCount"] as? Int) ?? (dict["likes"] as? Int) ?? 0,
+            commentsCount: (dict["commentsCount"] as? Int) ?? (dict["comments"] as? Int) ?? 0,
+            liked: (dict["liked"] as? Bool) ?? false,
+            userReaction: (dict["userReaction"] as? String) ?? (dict["myReaction"] as? String) ?? "like"
+        )
     }
 }
 
-struct StoryItem: Identifiable {
+struct StoryItem: Identifiable, Equatable {
     var id: String
-    var userId: String
-    var body: String
-    var background: String
-    var created: Int64
-    var expires: Int64
-    var viewCount: Int?
     var author: KinnectUser
-    var mediaKind: String?
-    var mediaURL: String?
+    var text: String
+    var imageUrl: String
+    var backgroundColor: String
+    var createdAt: String
+    var viewsCount: Int
+    var viewed: Bool
 
-    init(json: [String: Any]) {
-        self.id = json["id"] as? String ?? UUID().uuidString
-        self.userId = json["user_id"] as? String ?? ""
-        self.body = json["body"] as? String ?? ""
-        self.background = json["background"] as? String ?? "purple"
-        self.created = (json["created"] as? NSNumber)?.int64Value ?? 0
-        self.expires = (json["expires"] as? NSNumber)?.int64Value ?? 0
-        self.viewCount = json["viewCount"] as? Int
-        self.author = KinnectUser(json: json["author"] as? [String: Any] ?? [:])
-        if let media = json["media"] as? [String: Any] {
-            self.mediaKind = media["kind"] as? String
-            self.mediaURL = media["url"] as? String
-        } else {
-            self.mediaKind = nil
-            self.mediaURL = nil
-        }
+    static func from(_ dict: [String: Any]) -> StoryItem {
+        let authorDict = (dict["author"] as? [String: Any]) ?? (dict["user"] as? [String: Any]) ?? dict
+        let mediaDict = dict["media"] as? [String: Any]
+        let img = (dict["imageUrl"] as? String) ?? (dict["image"] as? String) ?? (mediaDict?["url"] as? String) ?? ""
+        return StoryItem(
+            id: (dict["id"] as? String) ?? UUID().uuidString,
+            author: KinnectUser.from(authorDict),
+            text: (dict["text"] as? String) ?? (dict["body"] as? String) ?? (dict["caption"] as? String) ?? "",
+            imageUrl: img,
+            backgroundColor: (dict["backgroundColor"] as? String) ?? (dict["bgColor"] as? String) ?? "#7C3AED",
+            createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
+            viewsCount: (dict["viewsCount"] as? Int) ?? (dict["viewCount"] as? Int) ?? 0,
+            viewed: (dict["viewed"] as? Bool) ?? false
+        )
     }
 }
 
-struct CommentItem: Identifiable {
+struct CommentItem: Identifiable, Equatable {
     var id: String
-    var userId: String
-    var body: String
-    var created: Int64
-    var parentId: String?
     var author: KinnectUser
+    var text: String
+    var createdAt: String
 
-    init(json: [String: Any]) {
-        self.id = json["id"] as? String ?? UUID().uuidString
-        self.userId = json["user_id"] as? String ?? ""
-        self.body = json["body"] as? String ?? ""
-        self.created = (json["created"] as? NSNumber)?.int64Value ?? 0
-        self.parentId = json["parentId"] as? String
-        self.author = KinnectUser(json: json["author"] as? [String: Any] ?? [:])
+    static func from(_ dict: [String: Any]) -> CommentItem {
+        let authorDict = (dict["author"] as? [String: Any]) ?? (dict["user"] as? [String: Any]) ?? dict
+        return CommentItem(
+            id: (dict["id"] as? String) ?? UUID().uuidString,
+            author: KinnectUser.from(authorDict),
+            text: (dict["text"] as? String) ?? (dict["body"] as? String) ?? (dict["content"] as? String) ?? "",
+            createdAt: isoString(from: dict["createdAt"] ?? dict["created"])
+        )
     }
 }
 
-struct ShortItem: Identifiable {
+struct ShortItem: Identifiable, Equatable {
     var id: String
-    var userId: String
+    var author: KinnectUser
+    var title: String
     var caption: String
-    var duration: Double
-    var created: Int64
-    var videoPath: String
-    var likes: Int
+    var videoUrl: String
+    var durationSec: Double
+    var likesCount: Int
     var commentsCount: Int
+    var viewsCount: Int
     var liked: Bool
-    var author: KinnectUser
+    var createdAt: String
 
-    init(json: [String: Any]) {
-        self.id = json["id"] as? String ?? UUID().uuidString
-        self.userId = json["user_id"] as? String ?? ""
-        self.caption = json["caption"] as? String ?? ""
-        self.duration = (json["duration"] as? NSNumber)?.doubleValue ?? 0
-        self.created = (json["created"] as? NSNumber)?.int64Value ?? 0
-        self.videoPath = json["video"] as? String ?? "/api/shorts/\(self.id)/video"
-        self.likes = json["likes"] as? Int ?? 0
-        self.commentsCount = json["comments"] as? Int ?? 0
-        self.liked = (json["liked"] as? Bool) ?? false
-        self.author = KinnectUser(json: json["author"] as? [String: Any] ?? [:])
+    static func from(_ dict: [String: Any]) -> ShortItem {
+        let sid = (dict["id"] as? String) ?? UUID().uuidString
+        let authorDict = (dict["author"] as? [String: Any]) ?? (dict["user"] as? [String: Any]) ?? dict
+        let vUrl = (dict["videoUrl"] as? String) ?? (dict["video"] as? String) ?? "/api/shorts/\(sid)/video"
+        return ShortItem(
+            id: sid,
+            author: KinnectUser.from(authorDict),
+            title: (dict["title"] as? String) ?? "",
+            caption: (dict["caption"] as? String) ?? (dict["description"] as? String) ?? "",
+            videoUrl: vUrl,
+            durationSec: (dict["durationSec"] as? NSNumber)?.doubleValue ?? (dict["duration"] as? NSNumber)?.doubleValue ?? 0,
+            likesCount: (dict["likesCount"] as? Int) ?? (dict["likes"] as? Int) ?? 0,
+            commentsCount: (dict["commentsCount"] as? Int) ?? (dict["comments"] as? Int) ?? 0,
+            viewsCount: (dict["viewsCount"] as? Int) ?? (dict["views"] as? Int) ?? 0,
+            liked: (dict["liked"] as? Bool) ?? false,
+            createdAt: isoString(from: dict["createdAt"] ?? dict["created"])
+        )
     }
 }
 
-struct DirectMessageItem: Identifiable {
+struct DirectMessageItem: Identifiable, Equatable {
     var id: String
-    var sender: String
-    var recipient: String
-    var body: String
-    var created: Int64
-    var deliveredAt: Int64?
-    var seenAt: Int64?
-    var recalled: Bool
-    var attachmentURL: String?
-    var attachmentType: String?
-    var attachmentName: String?
+    var fromUserId: String
+    var toUserId: String
+    var text: String
+    var imageUrl: String
+    var createdAt: String
+    var deliveredAt: String
+    var seenAt: String
 
-    init(json: [String: Any]) {
-        self.id = json["id"] as? String ?? UUID().uuidString
-        self.sender = json["sender"] as? String ?? ""
-        self.recipient = json["recipient"] as? String ?? ""
-        self.body = json["body"] as? String ?? ""
-        self.created = (json["created"] as? NSNumber)?.int64Value ?? 0
-        self.recalled = (json["recalled"] as? Bool) ?? false
-        if let receipt = json["receipt"] as? [String: Any] {
-            self.deliveredAt = (receipt["deliveredAt"] as? NSNumber)?.int64Value
-            self.seenAt = (receipt["seenAt"] as? NSNumber)?.int64Value
-        }
-        if let att = json["attachment"] as? [String: Any] {
-            self.attachmentURL = att["url"] as? String
-            self.attachmentType = att["type"] as? String
-            self.attachmentName = att["name"] as? String
-        }
+    var isSeen: Bool { !seenAt.isEmpty }
+
+    static func from(_ dict: [String: Any]) -> DirectMessageItem {
+        let receipt = dict["receipt"] as? [String: Any]
+        let att = dict["attachment"] as? [String: Any]
+        let deliv = isoString(from: dict["deliveredAt"] ?? receipt?["deliveredAt"])
+        let seen = isoString(from: dict["seenAt"] ?? dict["readAt"] ?? receipt?["seenAt"])
+        let img = (dict["imageUrl"] as? String) ?? (dict["attachmentUrl"] as? String) ?? (att?["url"] as? String) ?? ""
+        return DirectMessageItem(
+            id: (dict["id"] as? String) ?? UUID().uuidString,
+            fromUserId: (dict["fromUserId"] as? String) ?? (dict["senderId"] as? String) ?? (dict["sender"] as? String) ?? "",
+            toUserId: (dict["toUserId"] as? String) ?? (dict["recipientId"] as? String) ?? (dict["recipient"] as? String) ?? "",
+            text: (dict["text"] as? String) ?? (dict["body"] as? String) ?? (dict["content"] as? String) ?? "",
+            imageUrl: img,
+            createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
+            deliveredAt: deliv,
+            seenAt: seen
+        )
     }
 }
 
-struct ChatGroupItem: Identifiable, Hashable {
+struct ChatGroupItem: Identifiable, Hashable, Equatable {
     var id: String
     var name: String
-    var owner: String
-    var created: Int64
-    var unread: Int
-    var lastBody: String?
-    var lastSenderName: String?
-    var lastCreated: Int64?
-    var members: [KinnectUser]
+    var description: String
+    var avatarColor: String
+    var membersCount: Int
+    var lastMessageText: String
+    var unreadCount: Int
 
-    init(json: [String: Any]) {
-        self.id = json["id"] as? String ?? UUID().uuidString
-        self.name = json["name"] as? String ?? "Nhóm trò chuyện"
-        self.owner = json["owner"] as? String ?? ""
-        self.created = (json["created"] as? NSNumber)?.int64Value ?? 0
-        self.unread = json["unread"] as? Int ?? 0
-        if let last = json["last"] as? [String: Any] {
-            self.lastBody = last["body"] as? String
-            self.lastSenderName = last["name"] as? String
-            self.lastCreated = (last["created"] as? NSNumber)?.int64Value
-        }
-        if let mems = json["members"] as? [[String: Any]] {
-            self.members = mems.map { KinnectUser(json: $0) }
-        } else {
-            self.members = []
-        }
+    static func from(_ dict: [String: Any]) -> ChatGroupItem {
+        let members = dict["members"] as? [Any]
+        let lastObj = (dict["lastMessage"] as? [String: Any]) ?? (dict["last"] as? [String: Any])
+        let lastText = (lastObj?["text"] as? String) ?? (lastObj?["body"] as? String) ?? (dict["lastMessageText"] as? String) ?? ""
+        return ChatGroupItem(
+            id: (dict["id"] as? String) ?? UUID().uuidString,
+            name: (dict["name"] as? String) ?? "Nhóm Kinnect",
+            description: (dict["description"] as? String) ?? "",
+            avatarColor: (dict["avatarColor"] as? String) ?? "#7C3AED",
+            membersCount: (dict["membersCount"] as? Int) ?? members?.count ?? 1,
+            lastMessageText: lastText,
+            unreadCount: (dict["unreadCount"] as? Int) ?? (dict["unread"] as? Int) ?? 0
+        )
     }
 }
 
-struct GroupMessageItem: Identifiable {
+struct GroupMessageItem: Identifiable, Equatable {
     var id: String
     var groupId: String
-    var sender: String
-    var body: String
-    var created: Int64
-    var author: KinnectUser
-    var deliveredCount: Int
+    var sender: KinnectUser
+    var text: String
+    var imageUrl: String
+    var createdAt: String
     var seenCount: Int
 
-    init(json: [String: Any]) {
-        self.id = json["id"] as? String ?? UUID().uuidString
-        self.groupId = json["group_id"] as? String ?? ""
-        self.sender = json["sender"] as? String ?? ""
-        self.body = json["body"] as? String ?? ""
-        self.created = (json["created"] as? NSNumber)?.int64Value ?? 0
-        self.author = KinnectUser(json: json["author"] as? [String: Any] ?? [:])
-        if let receipt = json["receipt"] as? [String: Any] {
-            self.deliveredCount = receipt["deliveredCount"] as? Int ?? 0
-            self.seenCount = receipt["seenCount"] as? Int ?? 0
-        } else {
-            self.deliveredCount = 0
-            self.seenCount = 0
-        }
+    static func from(_ dict: [String: Any]) -> GroupMessageItem {
+        let senderDict = (dict["sender"] as? [String: Any]) ?? (dict["author"] as? [String: Any]) ?? (dict["user"] as? [String: Any]) ?? dict
+        let receipt = dict["receipt"] as? [String: Any]
+        let seenBy = dict["seenBy"] as? [Any]
+        return GroupMessageItem(
+            id: (dict["id"] as? String) ?? UUID().uuidString,
+            groupId: (dict["groupId"] as? String) ?? (dict["group_id"] as? String) ?? "",
+            sender: KinnectUser.from(senderDict),
+            text: (dict["text"] as? String) ?? (dict["body"] as? String) ?? (dict["content"] as? String) ?? "",
+            imageUrl: (dict["imageUrl"] as? String) ?? "",
+            createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
+            seenCount: (dict["seenCount"] as? Int) ?? (receipt?["seenCount"] as? Int) ?? seenBy?.count ?? 0
+        )
     }
 }
 
-struct NotificationItem: Identifiable {
+struct NotificationItem: Identifiable, Equatable {
     var id: String
-    var kind: String
-    var ref: String
+    var type: String
     var preview: String
-    var created: Int64
-    var seen: Bool
+    var read: Bool
+    var createdAt: String
     var actor: KinnectUser
 
-    init(json: [String: Any]) {
-        self.id = json["id"] as? String ?? UUID().uuidString
-        self.kind = json["kind"] as? String ?? ""
-        self.ref = json["ref"] as? String ?? ""
-        self.preview = json["preview"] as? String ?? ""
-        self.created = (json["created"] as? NSNumber)?.int64Value ?? 0
-        self.seen = ((json["seen"] as? Int) ?? 0) != 0 || ((json["seen"] as? Bool) == true)
-        self.actor = KinnectUser(json: json["actor"] as? [String: Any] ?? [:])
-    }
-
-    var summaryText: String {
-        switch kind {
-        case "like": return "đã bày tỏ cảm xúc về bài viết của bạn"
-        case "comment": return "đã bình luận bài viết của bạn"
-        case "comment_reply": return "đã phản hồi bình luận của bạn"
-        case "follow": return "đã bắt đầu theo dõi bạn"
-        case "friend_request": return "đã gửi lời mời kết bạn"
-        case "friend_accepted": return "đã chấp nhận lời mời kết bạn"
-        case "message": return "đã gửi tin nhắn cho bạn"
-        case "group_message": return "đã nhắn tin trong nhóm"
-        case "missed_call": return "Cuộc gọi nhỡ"
-        case "gift": return "đã tặng quà Live cho bạn"
-        default: return "Thông báo mới từ Kinnect"
-        }
+    static func from(_ dict: [String: Any]) -> NotificationItem {
+        let actorDict = (dict["actor"] as? [String: Any]) ?? [:]
+        let isSeen = ((dict["seen"] as? Int) ?? 0) != 0 || ((dict["seen"] as? Bool) == true) || ((dict["read"] as? Bool) == true)
+        return NotificationItem(
+            id: (dict["id"] as? String) ?? UUID().uuidString,
+            type: (dict["type"] as? String) ?? (dict["kind"] as? String) ?? "info",
+            preview: (dict["preview"] as? String) ?? (dict["text"] as? String) ?? "",
+            read: isSeen,
+            createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
+            actor: KinnectUser.from(actorDict)
+        )
     }
 }
 
-struct LiveRoomItem: Identifiable, Hashable {
+struct LiveRoomItem: Identifiable, Hashable, Equatable {
     var id: String
     var title: String
-    var hostName: String
-    var hostId: String
-    var hostUsername: String
-    var avatarURL: String?
-    var liveMode: String
+    var topic: String
+    var liveMode: String // "chat" | "game" (no karaoke)
     var gameTitle: String
-    var viewers: Int
+    var gamePaused: Bool
+    var viewerCount: Int
+    var hostUserId: String
+    var hostName: String
+    var hostAvatarUrl: String
+    var hostAvatarColor: String
 
-    init(json: [String: Any]) {
-        self.id = json["id"] as? String ?? ""
-        self.title = (json["title"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Phòng Live Kinnect"
-        self.hostName = json["host"] as? String ?? "Chủ phòng"
-        self.hostId = json["hostId"] as? String ?? ""
-        self.hostUsername = json["hostUsername"] as? String ?? ""
-        self.avatarURL = json["avatar"] as? String
-        let mode = json["liveMode"] as? String ?? "chat"
-        self.liveMode = (mode == "game") ? "game" : "chat"
-        self.gameTitle = json["gameTitle"] as? String ?? ""
-        self.viewers = json["viewers"] as? Int ?? 0
+    static func from(_ dict: [String: Any]) -> LiveRoomItem {
+        let hostDict = (dict["host"] as? [String: Any]) ?? [:]
+        let rawMode = ((dict["liveMode"] as? String) ?? (dict["mode"] as? String) ?? "chat").lowercased()
+        let normalizedMode = (rawMode == "game") ? "game" : "chat"
+        return LiveRoomItem(
+            id: (dict["id"] as? String) ?? (dict["roomId"] as? String) ?? UUID().uuidString,
+            title: (dict["title"] as? String) ?? "Phòng Live Kinnect",
+            topic: (dict["topic"] as? String) ?? "",
+            liveMode: normalizedMode,
+            gameTitle: (dict["gameTitle"] as? String) ?? "",
+            gamePaused: (dict["gamePaused"] as? Bool) ?? false,
+            viewerCount: (dict["viewerCount"] as? Int) ?? (dict["viewers"] as? Int) ?? 0,
+            hostUserId: (dict["hostUserId"] as? String) ?? (dict["hostId"] as? String) ?? (hostDict["id"] as? String) ?? "",
+            hostName: (dict["hostName"] as? String) ?? (dict["host"] as? String) ?? (hostDict["name"] as? String) ?? "Chủ phòng",
+            hostAvatarUrl: (dict["hostAvatarUrl"] as? String) ?? (dict["avatar"] as? String) ?? (hostDict["avatarUrl"] as? String) ?? "",
+            hostAvatarColor: (dict["hostAvatarColor"] as? String) ?? (hostDict["avatarColor"] as? String) ?? "#7C3AED"
+        )
     }
 }
 
-struct LiveChatMessage: Identifiable {
+struct LiveChatMessage: Identifiable, Equatable {
     var id: String
-    var senderId: String
-    var senderName: String
+    var user: KinnectUser
     var text: String
-    var isGift: Bool
-    var giftName: String?
-    var quantity: Int
+    var createdAt: String
 
-    init(id: String = UUID().uuidString, senderId: String, senderName: String, text: String, isGift: Bool = false, giftName: String? = nil, quantity: Int = 1) {
-        self.id = id
-        self.senderId = senderId
-        self.senderName = senderName
-        self.text = text
-        self.isGift = isGift
-        self.giftName = giftName
-        self.quantity = quantity
+    static func from(_ dict: [String: Any]) -> LiveChatMessage {
+        let uDict = (dict["user"] as? [String: Any]) ?? dict
+        return LiveChatMessage(
+            id: (dict["id"] as? String) ?? UUID().uuidString,
+            user: KinnectUser.from(uDict),
+            text: (dict["text"] as? String) ?? (dict["message"] as? String) ?? "",
+            createdAt: isoString(from: dict["createdAt"] ?? dict["created"])
+        )
     }
 }
 
-struct LiveGiftCatalogItem: Identifiable {
+struct LiveGiftCatalogItem: Identifiable, Equatable {
     var id: String
-    var name: String
+    var label: String
+    var emoji: String
+    var coins: Int
     var tier: String
-    var priceCoins: Int
-    var comboable: Bool
+
+    static func from(_ dict: [String: Any]) -> LiveGiftCatalogItem {
+        LiveGiftCatalogItem(
+            id: (dict["id"] as? String) ?? (dict["reaction"] as? String) ?? UUID().uuidString,
+            label: (dict["label"] as? String) ?? (dict["name"] as? String) ?? "Quà tặng",
+            emoji: (dict["emoji"] as? String) ?? (dict["icon"] as? String) ?? "🎁",
+            coins: (dict["coins"] as? Int) ?? (dict["priceCoins"] as? Int) ?? (dict["price"] as? Int) ?? 10,
+            tier: (dict["tier"] as? String) ?? "standard"
+        )
+    }
 }
 
-struct WalletEntryItem: Identifiable {
+struct WalletEntryItem: Identifiable, Equatable {
     var id: String
     var kind: String
+    var direction: String
+    var amount: Int
+    var title: String
+    var note: String
+    var createdAt: String
+
+    static func from(_ dict: [String: Any]) -> WalletEntryItem {
+        let rawAmount = (dict["amount"] as? Int) ?? (dict["coins"] as? Int) ?? 0
+        let dir = (dict["direction"] as? String) ?? (rawAmount >= 0 ? "credit" : "debit")
+        return WalletEntryItem(
+            id: (dict["id"] as? String) ?? UUID().uuidString,
+            kind: (dict["kind"] as? String) ?? (dict["type"] as? String) ?? "entry",
+            direction: dir,
+            amount: abs(rawAmount),
+            title: (dict["title"] as? String) ?? (dict["label"] as? String) ?? "Giao dịch ví",
+            note: (dict["note"] as? String) ?? (dict["subtitle"] as? String) ?? "",
+            createdAt: isoString(from: dict["createdAt"] ?? dict["created"])
+        )
+    }
+}
+
+struct StorePackageItem: Identifiable, Equatable {
+    var id: String
     var title: String
     var subtitle: String
     var category: String
-    var currency: String
-    var coins: Int
-    var created: Int64
-
-    init(json: [String: Any]) {
-        self.id = json["id"] as? String ?? UUID().uuidString
-        self.kind = json["kind"] as? String ?? ""
-        self.title = json["title"] as? String ?? "Giao dịch ví"
-        self.subtitle = json["subtitle"] as? String ?? ""
-        self.category = json["category"] as? String ?? "other"
-        self.currency = json["currency"] as? String ?? "trial"
-        self.coins = json["coins"] as? Int ?? 0
-        self.created = (json["created"] as? NSNumber)?.int64Value ?? 0
-    }
-}
-
-struct StorePackageItem: Identifiable {
-    var id: String
-    var kind: String
-    var name: String
-    var description: String
-    var period: String
-    var tier: String
     var priceCoins: Int
-    var colors: [String]
+    var badgeText: String
+    var accentColor: String
     var owned: Bool
+    var equipped: Bool
 
-    init(json: [String: Any], ownedIds: Set<String>) {
-        self.id = json["id"] as? String ?? ""
-        self.kind = json["kind"] as? String ?? "style"
-        self.name = json["name"] as? String ?? ""
-        self.description = json["description"] as? String ?? ""
-        self.period = json["period"] as? String ?? "Vĩnh viễn"
-        self.tier = json["tier"] as? String ?? "rare"
-        self.priceCoins = json["priceCoins"] as? Int ?? 0
-        self.colors = json["colors"] as? [String] ?? ["#7c3aed", "#ec4899"]
-        self.owned = ownedIds.contains(self.id)
+    static func from(_ dict: [String: Any]) -> StorePackageItem {
+        let colors = dict["colors"] as? [String]
+        return StorePackageItem(
+            id: (dict["id"] as? String) ?? UUID().uuidString,
+            title: (dict["title"] as? String) ?? (dict["name"] as? String) ?? "Gói Kinnect",
+            subtitle: (dict["subtitle"] as? String) ?? (dict["description"] as? String) ?? "",
+            category: (dict["category"] as? String) ?? (dict["kind"] as? String) ?? "frame",
+            priceCoins: (dict["priceCoins"] as? Int) ?? (dict["price"] as? Int) ?? 0,
+            badgeText: (dict["badgeText"] as? String) ?? (dict["tier"] as? String) ?? "",
+            accentColor: (dict["accentColor"] as? String) ?? colors?.first ?? "#7C3AED",
+            owned: (dict["owned"] as? Bool) ?? false,
+            equipped: (dict["equipped"] as? Bool) ?? false
+        )
     }
 }
 
-struct StoreDigitalProduct: Identifiable {
+struct StoreDigitalProduct: Identifiable, Equatable {
     var id: String
-    var kind: String
-    var name: String
+    var title: String
     var description: String
-    var referenceVnd: Int
-    var owned: Bool
+    var priceLabel: String
+    var coinsGranted: Int
 
-    init(json: [String: Any], ownedIds: Set<String>) {
-        self.id = json["id"] as? String ?? ""
-        self.kind = json["kind"] as? String ?? "style"
-        self.name = json["name"] as? String ?? ""
-        self.description = json["description"] as? String ?? ""
-        self.referenceVnd = json["referenceVnd"] as? Int ?? 0
-        self.owned = ownedIds.contains(self.id)
+    static func from(_ dict: [String: Any]) -> StoreDigitalProduct {
+        let vnd = (dict["referenceVnd"] as? Int) ?? 0
+        let fallbackPrice = vnd > 0 ? "\(vnd)đ" : "StoreKit 2"
+        return StoreDigitalProduct(
+            id: (dict["id"] as? String) ?? (dict["productId"] as? String) ?? "",
+            title: (dict["title"] as? String) ?? (dict["name"] as? String) ?? "Gói nạp",
+            description: (dict["description"] as? String) ?? "",
+            priceLabel: (dict["priceLabel"] as? String) ?? fallbackPrice,
+            coinsGranted: (dict["coinsGranted"] as? Int) ?? (dict["coins"] as? Int) ?? 0
+        )
     }
 }
