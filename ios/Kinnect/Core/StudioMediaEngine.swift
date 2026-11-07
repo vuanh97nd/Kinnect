@@ -383,7 +383,7 @@ final class StudioVideoProject: ObservableObject {
                 output = output.cropped(to: request.sourceImage.extent)
             }
 
-            request.finish(at: output, context: nil)
+            request.finish(with: output, context: nil)
         })
     }
 

@@ -375,6 +375,10 @@ final class AppState: ObservableObject {
         }
     }
 
+    func navigate(to route: String) {
+        NotificationCenter.default.post(name: .kinnectNavigateRoute, object: route)
+    }
+
     /// Presents the explicit privacy consent sheet. If the version or full notice is unknown
     /// (e.g. WebSocket errors carry only a message), fetch the authoritative values from
     /// GET /api/me/privacy-consent so the POST sends the exact current server version.
@@ -400,6 +404,7 @@ final class AppState: ObservableObject {
 }
 
 extension Notification.Name {
+    static let kinnectNavigateRoute = Notification.Name("kinnectNavigateRoute")
     static let kinnectMessagesChanged = Notification.Name("kinnectMessagesChanged")
     static let kinnectNotificationsChanged = Notification.Name("kinnectNotificationsChanged")
     static let kinnectContentModerated = Notification.Name("kinnectContentModerated")

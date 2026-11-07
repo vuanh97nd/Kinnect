@@ -227,6 +227,25 @@ struct RootMainView: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .kinnectNavigateRoute)) { notif in
+            guard let route = notif.object as? String else { return }
+            switch route {
+            case "messages":
+                activeTopSection = .messages
+            case "profile":
+                activeTopSection = .profile
+            case "friends":
+                activeTopSection = .friends
+            case "video", "shorts":
+                activeTopSection = nil
+                selectedTab = .video
+            case "feed":
+                activeTopSection = nil
+                selectedTab = .feed
+            default:
+                break
+            }
+        }
         .sheet(item: $appState.activeReportContext) { context in
             UGCReportSheet(context: context)
         }

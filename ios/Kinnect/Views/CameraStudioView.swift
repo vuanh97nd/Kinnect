@@ -376,9 +376,10 @@ struct CameraStudioView: View {
                         StudioVideoPlayerView(videoURL: vURL)
                             .frame(maxWidth: .infinity, minHeight: 280, maxHeight: 340)
                             .clipShape(RoundedRectangle(cornerRadius: 16))
-                    } else if let displayImg = isComparingOriginal
-                        ? (originalImage ?? UIReviewFixture.samplePreviewImage())
-                        : (previewImage ?? UIReviewFixture.samplePreviewImage()) {
+                    } else {
+                        let displayImg = isComparingOriginal
+                            ? (originalImage ?? UIReviewFixture.samplePreviewImage())
+                            : (previewImage ?? UIReviewFixture.samplePreviewImage())
                         Image(uiImage: displayImg)
                             .resizable()
                             .scaledToFit()

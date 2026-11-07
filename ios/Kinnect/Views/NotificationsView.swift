@@ -116,13 +116,13 @@ struct NotificationsView: View {
         // Route by actual notification payload type (Parity NOTIF-01)
         let t = item.type.lowercased()
         if t.contains("message") || t.contains("chat") || t.contains("group") {
-            appState.selectedTab = .messages
+            appState.navigate(to: "messages")
         } else if t.contains("friend") || t.contains("follow") || t.contains("profile") {
-            appState.selectedTab = .profile
+            appState.navigate(to: "profile")
         } else if t.contains("short") || t.contains("video") {
-            appState.selectedTab = .shorts
+            appState.navigate(to: "video")
         } else if t.contains("post") || t.contains("comment") || t.contains("like") || t.contains("reaction") {
-            appState.selectedTab = .feed
+            appState.navigate(to: "feed")
         }
         dismiss()
     }
