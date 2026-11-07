@@ -176,23 +176,14 @@ final class KinnectAPIClient {
 
         let json = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
 
-        // Handle 428 Precondition Required (Privacy Consent needed before content write)
-        if http.statusCode == 428 && allowPrivacyAutoRetry {
+        // Handle 428 Precondition Required (Explicit Privacy Consent needed - Apple Guideline 5.1.1)
+        if http.statusCode == 428 {
             let version = json["version"] as? Int ?? 1
-            _ = try? await performSingleRequest(
-                origin: origin,
-                method: "POST",
-                path: "/api/me/privacy-consent",
-                body: ["accepted": true, "version": version],
-                allowPrivacyAutoRetry: false
-            )
-            return try await performSingleRequest(
-                origin: origin,
-                method: method,
-                path: path,
-                body: body,
-                allowPrivacyAutoRetry: false
-            )
+            let noticeText = (json["error"] as? String) ?? "Cần đồng ý điều khoản bảo vệ dữ liệu cá nhân trước khi thực hiện thao tác này."
+            await MainActor.run {
+                AppState.shared.pendingPrivacyConsent = PrivacyConsentRequest(version: version, notice: noticeText)
+            }
+            throw KinnectAPIError.serverError(status: 428, message: noticeText)
         }
 
         if http.statusCode == 401 && path != "/api/login" && path != "/api/me/password" {

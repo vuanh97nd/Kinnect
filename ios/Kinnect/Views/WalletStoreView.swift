@@ -228,10 +228,10 @@ struct WalletStoreView: View {
 
                     case .storeKit:
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Mua hàng số qua Apple StoreKit 2")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                            Text("Mọi giao dịch hàng số đều thông qua StoreKit 2 chính thức và xác minh chữ ký JWS trực tiếp tại máy chủ `/api/store/verify` (không bao giờ giả lập mua thành công).")
+                            Text("Nạp xu Kinnect")
+                                .font(.headline.bold())
+                                .foregroundColor(KinnectTheme.textPrimary)
+                            Text("Xu nạp được sử dụng để tặng quà trải nghiệm cho thần tượng trong phòng Live và mở khóa các gói trang trí hồ sơ độc quyền.")
                                 .font(.caption)
                                 .foregroundColor(KinnectTheme.textSecondary)
                                 .kinnectMultiline()
@@ -242,15 +242,18 @@ struct WalletStoreView: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(prod.title)
                                         .font(.subheadline.bold())
-                                        .foregroundColor(.white)
+                                        .foregroundColor(KinnectTheme.textPrimary)
                                         .kinnectMultiline()
                                     Text(prod.description)
                                         .font(.caption)
                                         .foregroundColor(KinnectTheme.textSecondary)
                                         .kinnectMultiline()
-                                    Text("Mã StoreKit: \(prod.id)")
-                                        .font(.caption2)
-                                        .foregroundColor(KinnectTheme.accentBright)
+                                    HStack(spacing: 4) {
+                                        KinnectIcon(glyph: .coin, size: 14, selected: true, tint: KinnectTheme.warning)
+                                        Text("Gói xu chính thức")
+                                            .font(.caption2.bold())
+                                            .foregroundColor(KinnectTheme.warning)
+                                    }
                                 }
                                 Spacer()
                                 Button {
@@ -266,6 +269,27 @@ struct WalletStoreView: View {
                                 .disabled(storeKit.isPurchasing)
                             }
                             .kinnectCard()
+                        }
+
+                        Button {
+                            Task {
+                                do {
+                                    try await storeKit.restorePurchases()
+                                    appState.showToast("Đã đồng bộ giao dịch từ App Store.")
+                                } catch {
+                                    appState.showToast("Không thể đồng bộ: \(error.localizedDescription)")
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.caption)
+                                Text("Khôi phục gói mua đã thanh toán")
+                                    .font(.caption.bold())
+                            }
+                            .foregroundColor(KinnectTheme.accentBright)
+                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity)
                         }
                     }
                 }

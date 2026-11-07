@@ -1230,10 +1230,10 @@ struct DeleteAccountConfirmationSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
 
-    @State private var confirmPhrase = ""
+    @State private var confirmUsername = ""
     @State private var password = ""
-    @State private var requiredPhrase = "XOA TAI KHOAN"
-    @State private var summaryInfo: String = "Đang kiểm tra dữ liệu tài khoản..."
+    @State private var requiredUsername = ""
+    @State private var summaryInfo: String = "Xóa tài khoản là hành động không thể đảo ngược."
     @State private var isDeleting = false
 
     var body: some View {
@@ -1251,11 +1251,12 @@ struct DeleteAccountConfirmationSheet: View {
                         .kinnectMultiline()
 
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Nhập chính xác cụm từ xác nhận: \(requiredPhrase)")
+                        Text("Nhập chính xác tên đăng nhập của bạn để xác nhận (\(requiredUsername.isEmpty ? (appState.currentUser?.handle ?? "") : requiredUsername)):")
                             .font(.caption.bold())
                             .foregroundColor(.white)
-                        TextField(requiredPhrase, text: $confirmPhrase)
-                            .textInputAutocapitalization(.characters)
+                        TextField("Tên đăng nhập", text: $confirmUsername)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
                             .padding(12)
                             .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
                             .foregroundColor(.white)
@@ -1289,7 +1290,7 @@ struct DeleteAccountConfirmationSheet: View {
                         .foregroundColor(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
-                    .disabled(isDeleting || confirmPhrase.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() != requiredPhrase)
+                    .disabled(isDeleting || confirmUsername.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() != targetUsername.lowercased())
                 }
                 .padding(16)
             }
@@ -1303,18 +1304,17 @@ struct DeleteAccountConfirmationSheet: View {
             }
             .task {
                 if let res = try? await KinnectAPIClient.shared.requestJSON("/api/me/account-deletion") {
-                    if let phrase = res["confirmText"] as? String, !phrase.isEmpty {
-                        self.requiredPhrase = phrase
-                    }
-                    if let summary = res["summary"] as? [String: Any] {
-                        let posts = summary["posts"] as? Int ?? 0
-                        let messages = summary["messages"] as? Int ?? 0
-                        let friends = summary["friends"] as? Int ?? 0
-                        self.summaryInfo = "Dữ liệu sẽ bị xóa vĩnh viễn: \(posts) bài viết, \(messages) tin nhắn, \(friends) liên kết bạn bè."
+                    if let u = res["username"] as? String, !u.isEmpty {
+                        self.requiredUsername = u
                     }
                 }
             }
         }
+    }
+
+    private var targetUsername: String {
+        if !requiredUsername.isEmpty { return requiredUsername }
+        return appState.currentUser?.handle ?? ""
     }
 
     private func performAccountDeletion() async {
@@ -1325,7 +1325,8 @@ struct DeleteAccountConfirmationSheet: View {
                 "/api/me/account-deletion",
                 method: "DELETE",
                 body: [
-                    "confirmText": confirmPhrase.trimmingCharacters(in: .whitespacesAndNewlines),
+                    "confirmUsername": confirmUsername.trimmingCharacters(in: .whitespacesAndNewlines),
+                    "confirmDelete": true,
                     "password": password
                 ]
             )

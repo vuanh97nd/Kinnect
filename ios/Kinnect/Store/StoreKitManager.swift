@@ -40,6 +40,12 @@ final class StoreKitManager: ObservableObject {
         }
     }
 
+    /// Restores non-consumable and auto-renewable subscriptions through App Store sync.
+    /// Note: Consumable coin balances are managed directly on the Kinnect account server.
+    func restorePurchases() async throws {
+        try await AppStore.sync()
+    }
+
     /// Initiates a real StoreKit 2 purchase and verifies the signed transaction on the Kinnect server.
     /// Never mocks or fabricates purchase success when StoreKit products are unavailable.
     func purchaseDigitalProduct(productId: String) async throws -> [String: Any] {
@@ -49,7 +55,7 @@ final class StoreKitManager: ObservableObject {
 
         guard let product = storeKitProducts[productId] else {
             throw KinnectAPIError.serverMessage(
-                "Sản phẩm '\(productId)' chưa được cấu hình trên App Store Connect hoặc bản cài thử chưa ký tài khoản Apple Developer trả phí. Không thể giả lập giao dịch StoreKit."
+                "Gói dịch vụ hiện chưa sẵn sàng trên App Store. Vui lòng thử lại sau."
             )
         }
 

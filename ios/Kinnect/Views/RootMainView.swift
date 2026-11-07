@@ -172,6 +172,9 @@ struct RootMainView: View {
         .sheet(item: $appState.activeReportContext) { context in
             UGCReportSheet(context: context)
         }
+        .sheet(item: $appState.pendingPrivacyConsent) { req in
+            PrivacyConsentSheet(request: req, onAccepted: {})
+        }
         .sheet(isPresented: $showCameraStudioSheet) {
             NavigationStack {
                 CameraStudioView()

@@ -18,6 +18,7 @@ struct AuthView: View {
     @State private var rememberMe: Bool = UserDefaults.standard.object(forKey: "kinnect_session_remembered") as? Bool ?? true
     @State private var agree18 = true
     @State private var acceptPrivacy = true
+    @State private var showPrivacyNotice = false
     @State private var isSubmitting = false
     @State private var errorMessage: String?
     @State private var infoMessage: String?
@@ -140,13 +141,24 @@ struct AuthView: View {
                         Toggle(isOn: $acceptPrivacy) {
                             HStack(spacing: 6) {
                                 KinnectIcon(glyph: .shield, size: 16, tint: KinnectTheme.accentBright)
-                                Text("Tôi đồng ý với Chính sách quyền riêng tư & Điều khoản cộng đồng Kinnect")
+                                Text("Tôi đồng ý với Chính sách quyền riêng tư & Điều khoản Kinnect")
                                     .font(.footnote)
                                     .foregroundColor(KinnectTheme.textPrimary)
                                     .kinnectMultiline()
                             }
                         }
                         .tint(KinnectTheme.accentBright)
+
+                        Button {
+                            showPrivacyNotice = true
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text("Đọc toàn văn chính sách bảo vệ dữ liệu")
+                                    .font(.caption.bold())
+                                KinnectIcon(glyph: .chevronRight, size: 12)
+                            }
+                            .foregroundColor(KinnectTheme.accentBright)
+                        }
                     }
 
                     if let errorMessage {
@@ -212,6 +224,17 @@ struct AuthView: View {
             .frame(maxWidth: .infinity)
         }
         .background(KinnectTheme.background.ignoresSafeArea())
+        .sheet(isPresented: $showPrivacyNotice) {
+            PrivacyConsentSheet(
+                request: PrivacyConsentRequest(
+                    version: 1,
+                    notice: "Kinnect lưu hồ sơ, nội dung và tin nhắn trên máy chủ; không có mã hóa đầu cuối. Ảnh hồ sơ, bài đăng, ảnh/video và nội dung công khai có thể được gửi tới Cloudflare hoặc NVIDIA để kiểm duyệt. Tin nhắn hỗ trợ chỉ được gửi tới AI khi bạn chủ động bật trợ lý AI. Bạn có thể ẩn thông tin, báo cáo, chặn và xóa tài khoản cùng dữ liệu trong Cài đặt. Không gửi mật khẩu hoặc OTP. Chính sách đầy đủ: https://kinnect.io.vn/privacy. Liên hệ: anhvn53@wru.vn."
+                ),
+                onAccepted: {
+                    acceptPrivacy = true
+                }
+            )
+        }
     }
 
     private func fieldBlock(title: String, placeholder: String, text: Binding<String>) -> some View {

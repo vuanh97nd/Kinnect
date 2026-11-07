@@ -10,6 +10,12 @@ struct UGCReportContext: Identifiable {
     let targetTitle: String
 }
 
+struct PrivacyConsentRequest: Identifiable {
+    let id = UUID()
+    let version: Int
+    let notice: String
+}
+
 @MainActor
 final class AppState: ObservableObject {
     static let shared = AppState()
@@ -21,6 +27,7 @@ final class AppState: ObservableObject {
     @Published var onlineUserIds: Set<String> = []
     @Published var liveRooms: [LiveRoomItem] = []
     @Published var activeReportContext: UGCReportContext?
+    @Published var pendingPrivacyConsent: PrivacyConsentRequest?
     @Published var toastMessage: String?
     @Published var blockedUserIds: Set<String> = []
 
