@@ -258,7 +258,7 @@ struct ProfileView: View {
                 actionRow(glyph: .shield, title: "Cài đặt Quyền riêng tư", color: .purple) {
                     showPrivacySheet = true
                 }
-                actionRow(glyph: .bell, title: "Trung tâm Hỗ trợ & Trợ giúp", color: .blue) {
+                actionRow(glyph: .notifications, title: "Trung tâm Hỗ trợ & Trợ giúp", color: .blue) {
                     showSupportSheet = true
                 }
             }
@@ -1254,7 +1254,7 @@ struct ChangePasswordSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    KinnectIconButton(glyph: .xmark, label: "Đóng", tint: KinnectTheme.textSecondary) {
+                    KinnectIconButton(glyph: .close, label: "Đóng", tint: KinnectTheme.textSecondary) {
                         dismiss()
                     }
                 }
@@ -1335,7 +1335,7 @@ struct BlockedUsersSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    KinnectIconButton(glyph: .xmark, label: "Đóng", tint: KinnectTheme.textSecondary) {
+                    KinnectIconButton(glyph: .close, label: "Đóng", tint: KinnectTheme.textSecondary) {
                         dismiss()
                     }
                 }
@@ -1497,10 +1497,11 @@ struct PrivacySettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
 
-    @State private var hideDistance: Bool = false
-    @State private var friendOnlyMessages: Bool = false
-    @State private var followedDiscovery: Bool = true
-    @State private var discoveryRadiusKm: Double = 50.0
+    @State private var discoverable: Bool = true
+    @State private var showDistance: Bool = true
+    @State private var showActivity: Bool = true
+    @State private var dmFriendsOnly: Bool = false
+    @State private var cloudChatSync: Bool = true
     @State private var isSaving = false
 
     var body: some View {
@@ -1519,12 +1520,12 @@ struct PrivacySettingsSheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                     VStack(spacing: 14) {
-                        Toggle(isOn: $hideDistance) {
+                        Toggle(isOn: $discoverable) {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Ẩn khoảng cách chính xác")
+                                Text("Cho phép tìm thấy tôi")
                                     .font(.subheadline.bold())
                                     .foregroundColor(KinnectTheme.textPrimary)
-                                Text("Chỉ hiển thị thành phố/tỉnh, không hiển thị số km cụ thể.")
+                                Text("Xuất hiện trong Khám phá và danh sách người dùng Quanh đây.")
                                     .font(.caption)
                                     .foregroundColor(KinnectTheme.textSecondary)
                             }
@@ -1533,7 +1534,35 @@ struct PrivacySettingsSheet: View {
 
                         Divider().background(KinnectTheme.surfaceElevated)
 
-                        Toggle(isOn: $friendOnlyMessages) {
+                        Toggle(isOn: $showDistance) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Hiển thị khoảng cách")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(KinnectTheme.textPrimary)
+                                Text("Chỉ hiển thị khoảng cách gần đúng để bảo vệ vị trí chính xác của bạn.")
+                                    .font(.caption)
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                            }
+                        }
+                        .tint(KinnectTheme.accentBright)
+
+                        Divider().background(KinnectTheme.surfaceElevated)
+
+                        Toggle(isOn: $showActivity) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Trạng thái hoạt động")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(KinnectTheme.textPrimary)
+                                Text("Hiển thị chấm xanh khi bạn đang trực tuyến trên Kinnect.")
+                                    .font(.caption)
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                            }
+                        }
+                        .tint(KinnectTheme.accentBright)
+
+                        Divider().background(KinnectTheme.surfaceElevated)
+
+                        Toggle(isOn: $dmFriendsOnly) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Chỉ nhận tin nhắn từ bạn bè")
                                     .font(.subheadline.bold())
@@ -1547,33 +1576,17 @@ struct PrivacySettingsSheet: View {
 
                         Divider().background(KinnectTheme.surfaceElevated)
 
-                        Toggle(isOn: $followedDiscovery) {
+                        Toggle(isOn: $cloudChatSync) {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Cho phép xuất hiện trong Khám phá")
+                                Text("Đồng bộ tin nhắn đám mây")
                                     .font(.subheadline.bold())
                                     .foregroundColor(KinnectTheme.textPrimary)
-                                Text("Hiển thị hồ sơ của bạn trong danh sách tìm kiếm bạn mới.")
+                                Text("Lưu trữ và đồng bộ lịch sử hội thoại an toàn qua máy chủ Kinnect.")
                                     .font(.caption)
                                     .foregroundColor(KinnectTheme.textSecondary)
                             }
                         }
                         .tint(KinnectTheme.accentBright)
-
-                        Divider().background(KinnectTheme.surfaceElevated)
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("Bán kính tìm kiếm quanh đây")
-                                    .font(.subheadline.bold())
-                                    .foregroundColor(KinnectTheme.textPrimary)
-                                Spacer()
-                                Text("\(Int(discoveryRadiusKm)) km")
-                                    .font(.subheadline.bold())
-                                    .foregroundColor(KinnectTheme.accentBright)
-                            }
-                            Slider(value: $discoveryRadiusKm, in: 5...200, step: 5)
-                                .tint(KinnectTheme.accentBright)
-                        }
                     }
                     .padding(16)
                     .background(RoundedRectangle(cornerRadius: 16).fill(KinnectTheme.surface))
@@ -1603,7 +1616,7 @@ struct PrivacySettingsSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    KinnectIconButton(glyph: .xmark, label: "Đóng", tint: KinnectTheme.textSecondary) {
+                    KinnectIconButton(glyph: .close, label: "Đóng", tint: KinnectTheme.textSecondary) {
                         dismiss()
                     }
                 }
@@ -1616,17 +1629,21 @@ struct PrivacySettingsSheet: View {
 
     private func loadSettings() async {
         if UIReviewFixture.activeScreen != nil {
-            self.hideDistance = false
-            self.friendOnlyMessages = false
-            self.followedDiscovery = true
-            self.discoveryRadiusKm = 50.0
+            self.discoverable = true
+            self.showDistance = true
+            self.showActivity = true
+            self.dmFriendsOnly = false
+            self.cloudChatSync = true
             return
         }
-        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/me/privacy") {
-            self.hideDistance = (res["hideDistance"] as? Bool) ?? false
-            self.friendOnlyMessages = (res["friendOnlyMessages"] as? Bool) ?? false
-            self.followedDiscovery = (res["followedDiscovery"] as? Bool) ?? true
-            self.discoveryRadiusKm = (res["discoveryRadius"] as? Double) ?? 50.0
+        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/me") {
+            let user = (res["user"] as? [String: Any]) ?? res
+            self.discoverable = (user["discoverable"] as? Bool) ?? ((user["discoverable"] as? Int) == 1)
+            self.showDistance = (user["showDistance"] as? Bool) ?? ((user["show_distance"] as? Int) == 1)
+            self.showActivity = (user["showActivity"] as? Bool) ?? ((user["show_activity"] as? Int) == 1)
+            let dm = user["dmMode"] as? String ?? user["dm_mode"] as? String ?? "everyone"
+            self.dmFriendsOnly = (dm == "friends")
+            self.cloudChatSync = (user["cloudChatSync"] as? Bool) ?? ((user["cloud_chat_sync"] as? Int) == 1)
         }
     }
 
@@ -1640,13 +1657,14 @@ struct PrivacySettingsSheet: View {
         defer { isSaving = false }
         do {
             _ = try await KinnectAPIClient.shared.requestJSON(
-                "/api/me/privacy",
-                method: "POST",
+                "/api/me",
+                method: "PATCH",
                 body: [
-                    "hideDistance": hideDistance,
-                    "friendOnlyMessages": friendOnlyMessages,
-                    "followedDiscovery": followedDiscovery,
-                    "discoveryRadius": discoveryRadiusKm
+                    "discoverable": discoverable,
+                    "showDistance": showDistance,
+                    "showActivity": showActivity,
+                    "dmMode": dmFriendsOnly ? "friends" : "everyone",
+                    "cloudChatSync": cloudChatSync
                 ]
             )
             appState.showToast("Đã cập nhật quyền riêng tư.")
@@ -1757,7 +1775,7 @@ struct SupportContactSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    KinnectIconButton(glyph: .xmark, label: "Đóng", tint: KinnectTheme.textSecondary) {
+                    KinnectIconButton(glyph: .close, label: "Đóng", tint: KinnectTheme.textSecondary) {
                         dismiss()
                     }
                 }

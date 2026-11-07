@@ -6,6 +6,15 @@ import PhotosUI
 import SwiftUI
 import UIKit
 
+enum StudioEditTool: String, CaseIterable, Identifiable {
+    case crop = "Cắt & xoay"
+    case color = "Điều chỉnh"
+    case beauty = "Làm mịn"
+    case filters = "Bộ lọc Pro"
+
+    var id: String { rawValue }
+}
+
 struct CameraStudioView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
@@ -44,6 +53,11 @@ struct CameraStudioView: View {
     @State private var title = ""
     @State private var caption = ""
 
+    // Studio Pro Project Models (Real Photo & Video Editors)
+    @StateObject private var photoProject = StudioPhotoProject(originalImage: UIImage())
+    @State private var selectedTool: StudioEditTool = .color
+    @State private var isComparingOriginal = false
+
     // Pickers
     @State private var selectedLibraryItem: PhotosPickerItem?
 
@@ -66,9 +80,11 @@ struct CameraStudioView: View {
         .onAppear {
             cameraController.onCapturedImage = { uiImg in
                 self.originalImage = uiImg
-                self.previewImage = uiImg
+                self.photoProject.originalImage = uiImg
+                self.photoProject.resetAll()
+                self.previewImage = self.photoProject.render(maxDimension: 900)
                 self.target = .feedPost
-                if let jpeg = uiImg.jpegData(compressionQuality: 0.75) {
+                if let jpeg = (self.previewImage ?? uiImg).jpegData(compressionQuality: 0.85) {
                     self.imageDataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
                 }
             }
@@ -98,7 +114,9 @@ struct CameraStudioView: View {
             if UIReviewFixture.activeScreen == "camera-studio-edit" && previewImage == nil {
                 let sample = UIReviewFixture.samplePreviewImage()
                 originalImage = sample
-                previewImage = sample
+                photoProject.originalImage = sample
+                photoProject.resetAll()
+                previewImage = photoProject.render(maxDimension: 900)
                 caption = "[Fixture UI] Kiểm thử bảng chỉnh sửa Kinnect Studio với nút Lưu tách riêng."
             }
         }
@@ -113,10 +131,13 @@ struct CameraStudioView: View {
                     appliedEffect: $studioProAppliedEffect,
                     onApply: { effect in
                         studioProAppliedEffect = effect
-                        if let base = originalImage {
+                        if let template = StudioProTemplate.allCases.first(where: { $0.rawValue == effect }) {
+                            photoProject.proTemplate = template
+                            updatePhotoPreview()
+                        } else if let base = originalImage {
                             let filtered = applyProFilter(named: effect, to: base)
                             self.previewImage = filtered
-                            if let jpeg = filtered.jpegData(compressionQuality: 0.75) {
+                            if let jpeg = filtered.jpegData(compressionQuality: 0.85) {
                                 self.imageDataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
                             }
                         }
@@ -290,82 +311,269 @@ struct CameraStudioView: View {
         .navigationBarHidden(true)
     }
 
-    // MARK: - Media Edit Mode
+    // MARK: - Media Edit Mode (Real Mobile Editor with Parity to Android PhotoEditActivity)
     private var mediaEditMode: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                // Header with Studio Pro in Top-Right + Distinct Save Button
-                HStack(spacing: 10) {
-                    KinnectIcon(glyph: .studio, size: 22, selected: true, tint: KinnectTheme.accentBright)
-                    Text("Kinnect Studio")
-                        .font(.headline.bold())
-                        .foregroundColor(.white)
+                // Header: Exit (top-left), Studio Pro Heading, Save to Photos, Studio Pro badge
+                HStack(spacing: 8) {
+                    KinnectIconButton(glyph: .close, label: "Thoát", tint: KinnectTheme.textPrimary) {
+                        originalImage = nil
+                        previewImage = nil
+                        videoDataURL = ""
+                        capturedVideoTempURL = nil
+                    }
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Studio Pro")
+                            .font(.headline.bold())
+                            .foregroundColor(.white)
+                        Text(capturedVideoTempURL != nil || !videoDataURL.isEmpty ? "Video" : "Ảnh")
+                            .font(.caption2)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
 
                     Spacer()
 
-                    // Studio Pro pill button on top-right (Parity Android 1.2.12 StudioActivity)
+                    // Studio Pro Template Sheet Trigger
                     Button {
                         showStudioProSheet = true
                     } label: {
-                        HStack(spacing: 5) {
+                        HStack(spacing: 4) {
                             Image(systemName: "sparkles")
                                 .font(.caption.bold())
                             Text("Studio Pro")
-                                .font(.caption.weight(.bold))
+                                .font(.caption2.bold())
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
                         .background(Capsule().fill(KinnectTheme.primaryGradient))
                         .foregroundColor(.white)
                     }
                     .accessibilityLabel("Mở bảng bộ lọc Studio Pro")
 
-                    // Distinct Save Button (actually writes to device Photos Library)
+                    // Distinct Save Button (directly saves to Photos Library)
                     Button {
                         saveMediaToPhotos()
                     } label: {
                         HStack(spacing: 4) {
-                            KinnectIcon(glyph: .save, size: 16, tint: KinnectTheme.accentBright)
-                            Text("Lưu")
-                                .font(.caption.weight(.semibold))
+                            KinnectIcon(glyph: .save, size: 14, tint: KinnectTheme.accentBright)
+                            Text("Lưu về máy")
+                                .font(.caption2.weight(.semibold))
                                 .foregroundColor(KinnectTheme.accentBright)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
                         .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
                     }
                     .accessibilityLabel("Lưu vào thiết bị")
                 }
                 .padding(.horizontal, 4)
 
-                // Large Media Preview (Native AVPlayer for ANY video or Photo Editor for Images)
-                if let vURL = capturedVideoTempURL ?? (UIReviewFixture.activeScreen == "camera-studio-video-edit" ? UIReviewFixture.samplePlayableVideoURL() : nil) {
-                    StudioVideoPlayerView(videoURL: vURL)
-                } else if let displayImg = previewImage ?? (UIReviewFixture.activeScreen == "camera-studio-edit" ? UIReviewFixture.samplePreviewImage() : nil) {
-                    Image(uiImage: displayImg)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: .infinity, maxHeight: 320)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(KinnectTheme.border, lineWidth: 1)
-                        )
-                } else if !videoDataURL.isEmpty {
-                    HStack(spacing: 12) {
-                        KinnectIcon(glyph: .video, size: 28, selected: true, tint: KinnectTheme.online)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Đã tải video MP4 thành công (\(videoDataURL.count / 1024) KB)")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundColor(.white)
-                            Text("Sẵn sàng đăng lên luồng Video Shorts.")
+                // Large Media Stage (Zoomable Photo Canvas or Native AVPlayer)
+                ZStack(alignment: .bottom) {
+                    if let vURL = capturedVideoTempURL ?? (UIReviewFixture.activeScreen == "camera-studio-video-edit" ? UIReviewFixture.samplePlayableVideoURL() : nil) {
+                        StudioVideoPlayerView(videoURL: vURL)
+                            .frame(maxWidth: .infinity, minHeight: 280, maxHeight: 340)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                    } else if let displayImg = isComparingOriginal
+                        ? (originalImage ?? UIReviewFixture.samplePreviewImage())
+                        : (previewImage ?? UIReviewFixture.samplePreviewImage()) {
+                        Image(uiImage: displayImg)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: .infinity, minHeight: 240, maxHeight: 340)
+                            .background(Color(red: 0.05, green: 0.04, blue: 0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(KinnectTheme.border, lineWidth: 1)
+                            )
+                    }
+
+                    // Floating On-Stage Controls (Compare Original & Fit)
+                    if capturedVideoTempURL == nil && videoDataURL.isEmpty {
+                        HStack {
+                            Button {
+                                // Tap or hold to compare
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "eye.fill")
+                                        .font(.caption2)
+                                    Text(isComparingOriginal ? "Đang xem ảnh gốc" : "Giữ xem gốc")
+                                        .font(.caption2.bold())
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Capsule().fill(Color.black.opacity(0.75)))
+                                .foregroundColor(isComparingOriginal ? KinnectTheme.accentBright : .white)
+                            }
+                            .simultaneousGesture(
+                                DragGesture(minimumDistance: 0)
+                                    .onChanged { _ in isComparingOriginal = true }
+                                    .onEnded { _ in isComparingOriginal = false }
+                            )
+                            .accessibilityLabel("Giữ để xem ảnh gốc")
+
+                            Spacer()
+
+                            Button {
+                                photoProject.cropRatio = .original
+                                photoProject.rotation = 0
+                                photoProject.flipHorizontal = false
+                                updatePhotoPreview()
+                            } label: {
+                                Text("Vừa khung")
+                                    .font(.caption2.bold())
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(Capsule().fill(Color.black.opacity(0.75)))
+                                    .foregroundColor(.white)
+                            }
+                            .accessibilityLabel("Vừa khung hình ảnh")
+                        }
+                        .padding(12)
+                    }
+                }
+
+                // Studio Editor Tool Selector Strip (Crop & Rotate, Adjust, Smooth, Pro Filters)
+                Picker("Công cụ chỉnh sửa", selection: $selectedTool) {
+                    ForEach(StudioEditTool.allCases) { tool in
+                        Text(tool.rawValue).tag(tool)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                // Tool Control Panel
+                VStack(spacing: 12) {
+                    switch selectedTool {
+                    case .crop:
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Tỉ lệ khung hình:")
+                                .font(.caption.bold())
+                                .foregroundColor(KinnectTheme.textSecondary)
+
+                            HStack(spacing: 8) {
+                                ForEach(StudioCropRatio.allCases) { ratio in
+                                    Button {
+                                        photoProject.cropRatio = ratio
+                                        updatePhotoPreview()
+                                    } label: {
+                                        Text(ratio.rawValue)
+                                            .font(.caption.weight(photoProject.cropRatio == ratio ? .bold : .medium))
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 6)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .fill(photoProject.cropRatio == ratio ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
+                                            )
+                                            .foregroundColor(.white)
+                                    }
+                                }
+                            }
+
+                            Divider().background(KinnectTheme.border)
+
+                            HStack(spacing: 16) {
+                                Button {
+                                    photoProject.rotation = (photoProject.rotation + 90) % 360
+                                    updatePhotoPreview()
+                                } label: {
+                                    HStack(spacing: 5) {
+                                        Image(systemName: "rotate.right.fill")
+                                        Text("Xoay 90° (\(photoProject.rotation)°)")
+                                    }
+                                    .font(.caption.bold())
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
+                                    .foregroundColor(.white)
+                                }
+
+                                Button {
+                                    photoProject.flipHorizontal.toggle()
+                                    updatePhotoPreview()
+                                } label: {
+                                    HStack(spacing: 5) {
+                                        Image(systemName: "arrow.left.and.right.righttriangle.left.righttriangle.right.fill")
+                                        Text(photoProject.flipHorizontal ? "Đã lật" : "Lật ảnh")
+                                    }
+                                    .font(.caption.bold())
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
+                                    .foregroundColor(.white)
+                                }
+                            }
+                        }
+                        .padding(14)
+                        .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated.opacity(0.6)))
+
+                    case .color:
+                        VStack(spacing: 10) {
+                            studioSliderRow(name: "Độ sáng", value: $photoProject.brightness, range: -100...100)
+                            studioSliderRow(name: "Tương phản", value: $photoProject.contrast, range: -80...100)
+                            studioSliderRow(name: "Độ rực màu", value: $photoProject.saturation, range: -100...100)
+                            studioSliderRow(name: "Nhiệt độ màu", value: $photoProject.warmth, range: -100...100)
+
+                            HStack {
+                                Spacer()
+                                Button("Đặt lại màu") {
+                                    photoProject.resetColor()
+                                    updatePhotoPreview()
+                                }
+                                .font(.caption.bold())
+                                .foregroundColor(KinnectTheme.accentBright)
+                            }
+                        }
+                        .padding(14)
+                        .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated.opacity(0.6)))
+
+                    case .beauty:
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Làm mịn da tự nhiên:")
+                                .font(.caption.bold())
+                                .foregroundColor(KinnectTheme.textSecondary)
+
+                            Text("Thuật toán làm mịn CoreImage lọc tần số cao để làm dịu khuyết điểm trên da, đồng thời bảo toàn độ sắc nét tự nhiên của mắt, môi và tóc.")
                                 .font(.caption2)
                                 .foregroundColor(KinnectTheme.textSecondary)
+
+                            studioSliderRow(name: "Mức làm mịn", value: $photoProject.smooth, range: 0...100)
                         }
-                        Spacer()
+                        .padding(14)
+                        .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated.opacity(0.6)))
+
+                    case .filters:
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Mẫu màu Studio Pro:")
+                                .font(.caption.bold())
+                                .foregroundColor(KinnectTheme.textSecondary)
+
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(StudioProTemplate.allCases) { template in
+                                        Button {
+                                            photoProject.proTemplate = template
+                                            updatePhotoPreview()
+                                        } label: {
+                                            Text(template.rawValue)
+                                                .font(.caption.weight(photoProject.proTemplate == template ? .bold : .medium))
+                                                .padding(.horizontal, 14)
+                                                .padding(.vertical, 8)
+                                                .background(
+                                                    RoundedRectangle(cornerRadius: 10)
+                                                        .fill(photoProject.proTemplate == template ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
+                                                )
+                                                .foregroundColor(.white)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .padding(14)
+                        .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated.opacity(0.6)))
                     }
-                    .padding(14)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated))
                 }
 
                 // Target Selector
@@ -420,16 +628,33 @@ struct CameraStudioView: View {
             }
             .padding(16)
         }
-        .navigationTitle("Chỉnh sửa Studio")
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                KinnectIconButton(glyph: .close, label: "Hủy bỏ", tint: KinnectTheme.textPrimary) {
-                    // Reset back to viewfinder or dismiss
-                    originalImage = nil
-                    previewImage = nil
-                    videoDataURL = ""
-                }
+        .navigationTitle("Chỉnh sửa Studio Pro")
+    }
+
+    private func studioSliderRow(name: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
+        VStack(spacing: 2) {
+            HStack {
+                Text(name)
+                    .font(.caption)
+                    .foregroundColor(KinnectTheme.textSecondary)
+                Spacer()
+                Text("\(Int(value.wrappedValue))")
+                    .font(.caption.bold())
+                    .foregroundColor(.white)
             }
+            Slider(value: value, in: range, step: 1.0) {
+                Text(name)
+            } onEditingChanged: { _ in
+                updatePhotoPreview()
+            }
+            .tint(KinnectTheme.accentBright)
+        }
+    }
+
+    private func updatePhotoPreview() {
+        self.previewImage = self.photoProject.render(maxDimension: 900)
+        if let jpeg = (self.previewImage ?? self.photoProject.originalImage).jpegData(compressionQuality: 0.85) {
+            self.imageDataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
         }
     }
 
@@ -452,9 +677,13 @@ struct CameraStudioView: View {
                 "inputTargetNeutral": CIVector(x: 5200, y: 0)
             ])
         case "Mịn da tự nhiên (Beauty)":
-            output = ciInput.applyingFilter("CIColorControls", parameters: [
-                kCIInputBrightnessKey: 0.05,
-                kCIInputContrastKey: 1.05
+            let blurred = ciInput.clampedToExtent().applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 4.5]).cropped(to: ciInput.extent)
+            let diff = ciInput.applyingFilter("CIDifferenceBlendMode", parameters: [kCIInputBackgroundImageKey: blurred])
+            let edgeMask = diff.applyingFilter("CIColorControls", parameters: [kCIInputContrastKey: 2.0, kCIInputBrightnessKey: -0.1])
+            output = ciInput.applyingFilter("CIBlendWithMask", parameters: [
+                kCIInputBackgroundImageKey: blurred,
+                kCIInputImageKey: ciInput,
+                kCIInputMaskImageKey: edgeMask
             ])
         case "Noir Cổ điển":
             output = ciInput.applyingFilter("CIPhotoEffectNoir")

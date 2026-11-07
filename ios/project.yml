@@ -36,6 +36,11 @@ targets:
         CFBundleShortVersionString: "1.2.12"
         CFBundleVersion: "118"
         LSRequiresIPhoneOS: true
+        CFBundleURLTypes:
+          - CFBundleTypeRole: Editor
+            CFBundleURLName: app.kinnect.live
+            CFBundleURLSchemes:
+              - kinnect
         NSCameraUsageDescription: "Kinnect cần quyền truy cập Camera để gọi video, phát trực tiếp (Livestream) và chụp ảnh/quay video đăng bài."
         NSMicrophoneUsageDescription: "Kinnect cần quyền truy cập Micro để truyền âm thanh trong cuộc gọi thoại, video call và livestream."
         NSLocationWhenInUseUsageDescription: "Kinnect sử dụng vị trí khi bạn bật tính năng Quanh đây để tìm bạn bè ở gần."

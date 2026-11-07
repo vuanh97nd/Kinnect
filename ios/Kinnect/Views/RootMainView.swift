@@ -53,10 +53,14 @@ struct RootMainView: View {
         ZStack(alignment: .top) {
             KinnectTheme.background.ignoresSafeArea()
 
-            if UIReviewFixture.activeScreen == "auth" {
-                AuthView()
-            } else if UIReviewFixture.activeScreen == "auth-reset" || UIReviewFixture.activeScreen == "forgot-password" {
-                AuthView(initialMode: .reset)
+            if UIReviewFixture.activeScreen == "auth" || UIReviewFixture.activeScreen == "auth-welcome" {
+                AuthView(initialStage: .welcome)
+            } else if UIReviewFixture.activeScreen == "auth-login" {
+                AuthView(initialStage: .login)
+            } else if UIReviewFixture.activeScreen == "auth-register" {
+                AuthView(initialStage: .register)
+            } else if UIReviewFixture.activeScreen == "auth-reset" || UIReviewFixture.activeScreen == "auth-forgot" || UIReviewFixture.activeScreen == "forgot-password" {
+                AuthView(initialStage: .forgotPassword)
             } else if appState.isRestoringSession && appState.currentUser == nil {
                 VStack(spacing: 16) {
                     ProgressView()
@@ -68,7 +72,7 @@ struct RootMainView: View {
                         .kinnectMultiline()
                 }
             } else if appState.currentUser == nil {
-                AuthView()
+                AuthView(initialStage: .welcome)
             } else if UIReviewFixture.activeScreen == "chat-detail" || UIReviewFixture.activeScreen == "chat-menu" || UIReviewFixture.activeScreen == "message-menu" {
                 if horizontalSizeClass == .regular {
                     // iPad two-column layout: Conversation List on left + Chat Detail on right

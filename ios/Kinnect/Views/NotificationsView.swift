@@ -112,7 +112,19 @@ struct NotificationsView: View {
             }
             await appState.refreshGlobalBadges()
         }
-        appState.showToast("Đã xem thông báo: \(item.preview.isEmpty ? item.type : item.preview)")
+
+        // Route by actual notification payload type (Parity NOTIF-01)
+        let t = item.type.lowercased()
+        if t.contains("message") || t.contains("chat") || t.contains("group") {
+            appState.selectedTab = .messages
+        } else if t.contains("friend") || t.contains("follow") || t.contains("profile") {
+            appState.selectedTab = .profile
+        } else if t.contains("short") || t.contains("video") {
+            appState.selectedTab = .shorts
+        } else if t.contains("post") || t.contains("comment") || t.contains("like") || t.contains("reaction") {
+            appState.selectedTab = .feed
+        }
+        dismiss()
     }
 
     private func markAllRead() async {

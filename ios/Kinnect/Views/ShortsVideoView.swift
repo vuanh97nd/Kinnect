@@ -189,9 +189,17 @@ struct ShortsVideoView: View {
                     }
                     .accessibilityLabel("Bình luận")
 
-                    // Share button
+                    // Share button (Real permalink copy + UIActivityViewController presentation)
                     Button {
+                        let permalink = "https://kinnect.io.vn/shorts/\(item.id)"
+                        UIPasteboard.general.string = permalink
                         appState.showToast("Đã sao chép liên kết video!")
+                        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                           let rootVC = windowScene.windows.first?.rootViewController {
+                            let items: [Any] = [URL(string: permalink) ?? permalink]
+                            let av = UIActivityViewController(activityItems: items, applicationActivities: nil)
+                            rootVC.present(av, animated: true)
+                        }
                     } label: {
                         VStack(spacing: 4) {
                             KinnectIcon(glyph: .share, size: 28, tint: .white)
@@ -234,6 +242,12 @@ struct ShortsVideoView: View {
     }
 
     private func loadShorts() async {
+        let cacheKey = "shorts_feed_\(shortsTab)"
+        if let accountId = AccountCache.shared.activeAccountId {
+            if let cached: [[String: Any]] = AccountCache.shared.loadJSONObject(forKey: cacheKey, accountId: accountId), items.isEmpty {
+                self.items = cached.map(ShortItem.from)
+            }
+        }
         isLoading = true
         defer { isLoading = false }
         do {
@@ -243,9 +257,14 @@ struct ShortsVideoView: View {
             )
             if let arr = res["shorts"] as? [[String: Any]] {
                 self.items = arr.map(ShortItem.from)
+                if let accountId = AccountCache.shared.activeAccountId {
+                    AccountCache.shared.saveJSONObject(arr, forKey: cacheKey, accountId: accountId)
+                }
             }
         } catch {
-            appState.showToast("Không thể tải video: \(error.localizedDescription)")
+            if items.isEmpty {
+                appState.showToast("Không thể tải video: \(error.localizedDescription)")
+            }
         }
     }
 }

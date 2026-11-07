@@ -1191,7 +1191,7 @@ struct ForwardMessageSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    KinnectIconButton(glyph: .xmark, label: "Đóng", tint: KinnectTheme.textSecondary) {
+                    KinnectIconButton(glyph: .close, label: "Đóng", tint: KinnectTheme.textSecondary) {
                         dismiss()
                     }
                 }
@@ -1265,36 +1265,44 @@ struct ForwardMessageSheet: View {
 
     private func forwardToUser(_ userId: String, name: String) async {
         let reqId = "fwd_u_\(userId)_\(UUID().uuidString)"
-        _ = try? await KinnectAPIClient.shared.requestJSON(
-            "/api/users/\(userId)/messages",
-            method: "POST",
-            body: [
-                "body": text,
-                "text": text,
-                "imageUrl": imageUrl,
-                "requestId": reqId
-            ],
-            requestId: reqId
-        )
-        appState.showToast("Đã chuyển tiếp tới \(name)!")
-        dismiss()
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/users/\(userId)/messages",
+                method: "POST",
+                body: [
+                    "body": text,
+                    "text": text,
+                    "imageUrl": imageUrl,
+                    "requestId": reqId
+                ],
+                requestId: reqId
+            )
+            appState.showToast("Đã chuyển tiếp tới \(name)!")
+            dismiss()
+        } catch {
+            appState.showToast("Không thể chuyển tiếp: \(error.localizedDescription)")
+        }
     }
 
     private func forwardToGroup(_ groupId: String, name: String) async {
         let reqId = "fwd_g_\(groupId)_\(UUID().uuidString)"
-        _ = try? await KinnectAPIClient.shared.requestJSON(
-            "/api/groups/\(groupId)/messages",
-            method: "POST",
-            body: [
-                "body": text,
-                "text": text,
-                "imageUrl": imageUrl,
-                "requestId": reqId
-            ],
-            requestId: reqId
-        )
-        appState.showToast("Đã chuyển tiếp tới nhóm \(name)!")
-        dismiss()
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/groups/\(groupId)/messages",
+                method: "POST",
+                body: [
+                    "body": text,
+                    "text": text,
+                    "imageUrl": imageUrl,
+                    "requestId": reqId
+                ],
+                requestId: reqId
+            )
+            appState.showToast("Đã chuyển tiếp tới nhóm \(name)!")
+            dismiss()
+        } catch {
+            appState.showToast("Không thể chuyển tiếp: \(error.localizedDescription)")
+        }
     }
 }
 
@@ -1340,14 +1348,18 @@ struct RenameGroupSheet: View {
         isSaving = true
         defer { isSaving = false }
         let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        _ = try? await KinnectAPIClient.shared.requestJSON(
-            "/api/groups/\(groupId)",
-            method: "PATCH",
-            body: ["name": clean]
-        )
-        appState.showToast("Đã đổi tên nhóm thành '\(clean)'.")
-        onRenamed()
-        dismiss()
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/groups/\(groupId)",
+                method: "PATCH",
+                body: ["name": clean]
+            )
+            appState.showToast("Đã đổi tên nhóm thành '\(clean)'.")
+            onRenamed()
+            dismiss()
+        } catch {
+            appState.showToast("Lỗi đổi tên: \(error.localizedDescription)")
+        }
     }
 }
 
@@ -1406,14 +1418,18 @@ struct AddGroupMembersSheet: View {
     private func add() async {
         isAdding = true
         defer { isAdding = false }
-        _ = try? await KinnectAPIClient.shared.requestJSON(
-            "/api/groups/\(groupId)/members",
-            method: "POST",
-            body: ["members": Array(selectedIds)]
-        )
-        appState.showToast("Đã thêm thành viên vào nhóm!")
-        onAdded()
-        dismiss()
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/groups/\(groupId)/members",
+                method: "POST",
+                body: ["members": Array(selectedIds)]
+            )
+            appState.showToast("Đã thêm thành viên vào nhóm!")
+            onAdded()
+            dismiss()
+        } catch {
+            appState.showToast("Lỗi thêm thành viên: \(error.localizedDescription)")
+        }
     }
 }
 

@@ -11,7 +11,6 @@ struct FeedView: View {
 
     @State private var stories: [StoryItem] = []
     @State private var posts: [PostItem] = []
-    @State private var selectedCategory: String = "all"
     @State private var isLoading = false
 
     // Composer state
@@ -25,26 +24,10 @@ struct FeedView: View {
     @State private var showAudienceDialog = false
     @State private var hiddenPostIds: Set<String> = []
 
-    private struct FeedCategoryOption: Identifiable {
-        let id: String
-        let label: String
-        let icon: String
-    }
-
-    private let categories: [FeedCategoryOption] = [
-        FeedCategoryOption(id: "all", label: "Tất cả", icon: "sparkles"),
-        FeedCategoryOption(id: "community", label: "Cộng đồng", icon: "person.3.fill"),
-        FeedCategoryOption(id: "confessions", label: "Tâm sự", icon: "heart.text.square.fill"),
-        FeedCategoryOption(id: "questions", label: "Hỏi đáp", icon: "questionmark.bubble.fill"),
-        FeedCategoryOption(id: "events", label: "Sự kiện", icon: "calendar.badge.clock")
-    ]
-
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 14) {
                 storiesStrip
-
-                categoryFilterStrip
 
                 quickComposeRow
 
@@ -52,18 +35,18 @@ struct FeedView: View {
                     ProgressView()
                         .tint(KinnectTheme.accentBright)
                         .padding(.vertical, 32)
-                } else if filteredPosts.isEmpty {
+                } else if visiblePosts.isEmpty {
                     VStack(spacing: 10) {
                         Image(systemName: "newspaper.fill")
                             .font(.largeTitle)
                             .foregroundColor(KinnectTheme.textSecondary)
-                        Text("Chưa có bài viết trong mục này")
+                        Text("Chưa có bài viết nào")
                             .font(.subheadline.weight(.medium))
                             .foregroundColor(KinnectTheme.textSecondary)
                     }
                     .padding(.vertical, 36)
                 } else {
-                    ForEach(filteredPosts) { post in
+                    ForEach(visiblePosts) { post in
                         PostCardView(
                             post: post,
                             currentUserId: appState.currentUser?.id ?? "",
@@ -205,12 +188,11 @@ struct FeedView: View {
         }
     }
 
-    private var filteredPosts: [PostItem] {
+    private var visiblePosts: [PostItem] {
         posts.filter { post in
             guard !hiddenPostIds.contains(post.id) else { return false }
             guard !appState.blockedUserIds.contains(post.author.id) else { return false }
-            if selectedCategory == "all" { return true }
-            return post.category == selectedCategory
+            return true
         }
     }
 
@@ -306,37 +288,6 @@ struct FeedView: View {
             return words.suffix(2).joined(separator: " ")
         }
         return cleaned.isEmpty ? "Kinnect" : cleaned
-    }
-
-    private var categoryFilterStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(categories) { cat in
-                    let active = (selectedCategory == cat.id)
-                    Button {
-                        selectedCategory = cat.id
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: cat.icon)
-                                .font(.caption)
-                            Text(cat.label)
-                                .font(.caption.weight(.semibold))
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(
-                            Capsule()
-                                .fill(active ? AnyShapeStyle(KinnectTheme.primaryGradient) : AnyShapeStyle(KinnectTheme.surfaceElevated))
-                        )
-                        .overlay(
-                            Capsule()
-                                .stroke(active ? Color.clear : KinnectTheme.border, lineWidth: 1)
-                        )
-                        .foregroundColor(active ? .white : KinnectTheme.textPrimary)
-                    }
-                }
-            }
-        }
     }
 
     private var quickComposeRow: some View {

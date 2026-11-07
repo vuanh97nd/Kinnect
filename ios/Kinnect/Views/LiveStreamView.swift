@@ -338,9 +338,17 @@ struct LiveStreamView: View {
                         }
                         .accessibilityLabel(isLiked ? "Bỏ thích" : "Thả tim")
 
-                        // Share button
+                        // Share button (Real permalink copy + UIActivityViewController presentation)
                         Button {
+                            let permalink = "https://kinnect.io.vn/live/\(room.id)"
+                            UIPasteboard.general.string = permalink
                             appState.showToast("Đã sao chép liên kết phòng Live!")
+                            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                               let rootVC = windowScene.windows.first?.rootViewController {
+                                let items: [Any] = [URL(string: permalink) ?? permalink]
+                                let av = UIActivityViewController(activityItems: items, applicationActivities: nil)
+                                rootVC.present(av, animated: true)
+                            }
                         } label: {
                             VStack(spacing: 4) {
                                 ZStack {
@@ -416,7 +424,17 @@ struct CreateLiveRoomSheet: View {
                     TextField("Tiêu đề phòng Live", text: $title)
                     TextField("Chủ đề", text: $topic)
                     if liveMode == "game" {
-                        TextField("Tên tựa game đang chơi", text: $gameTitle)
+                        Picker("Tựa game", selection: $gameTitle) {
+                            Text("Liên Quân Mobile").tag("Liên Quân Mobile")
+                            Text("Free Fire").tag("Free Fire")
+                            Text("PUBG Mobile").tag("PUBG Mobile")
+                            Text("Tốc Chiến").tag("Tốc Chiến")
+                            Text("Play Together").tag("Play Together")
+                            Text("Khác").tag("Khác")
+                        }
+                        Text("Lưu ý: Phát trực tiếp game sử dụng luồng âm thanh và camera native. Để truyền toàn màn hình ứng dụng bên ngoài trên iOS cần ReplayKit Broadcast Extension theo cơ chế bảo mật của Apple.")
+                            .font(.caption2)
+                            .foregroundColor(KinnectTheme.textSecondary)
                     }
                 }
             }

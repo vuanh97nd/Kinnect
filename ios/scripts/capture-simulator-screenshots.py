@@ -280,8 +280,12 @@ def main():
     # 1. Standard iPhone screenshots
     boot_and_install(standard_iphone, app_path, bundle_id)
     iphone_screens = [
-        ("01-iphone-auth-dark", "auth", [], "Đăng nhập / Đăng ký (Dark)"),
-        ("02-iphone-feed-dark", "feed", [], "Bảng tin & Tin 24h (Dark)"),
+        ("01-iphone-auth-welcome-dark", "auth-welcome", [], "Màn hình chào mừng đầu tiên với logo và VI/EN (Dark)"),
+        ("01b-iphone-auth-login-dark", "auth-login", [], "Đăng nhập chính với Ghi nhớ & Quên mật khẩu"),
+        ("01c-iphone-auth-register-dark", "auth-register", [], "Đăng ký tài khoản với checkbox 18+ và Quyền riêng tư"),
+        ("01d-iphone-auth-forgot-dark", "auth-reset", [], "Quên mật khẩu: Khôi phục mật khẩu tài khoản (008)"),
+        ("01e-iphone-auth-welcome-light", "auth-welcome", ["--ui-review-light"], "Màn hình chào mừng đầu tiên (Light)"),
+        ("02-iphone-feed-dark", "feed", [], "Bảng tin không có category strip (Dark)"),
         ("03-iphone-discover-dark", "discover", [], "Khám phá (Dark)"),
         ("03b-iphone-shorts-video-dark", "shorts", [], "Tab Video Shorts (Android 1.2.12 build 118)"),
         ("04-iphone-messages-list-dark", "messages", [], "Danh sách Tin nhắn & Nhóm (Dark)"),
@@ -307,7 +311,7 @@ def main():
         ("10-iphone-live-stream-dark", "live", [], "Phòng Live: Luồng vuốt xem trực tiếp"),
         ("11-iphone-camera-studio-empty", "camera-studio", [], "Camera & Studio: Chế độ chụp ảnh"),
         ("11b-iphone-camera-studio-video", "camera-studio-video", [], "Camera & Studio: Chế độ quay video với nút bấm đỏ"),
-        ("12-iphone-camera-studio-edit", "camera-studio-edit", [], "Camera & Studio: Studio Pro góc phải + nút Lưu riêng"),
+        ("12-iphone-camera-studio-edit", "camera-studio-edit", [], "Camera & Studio Pro: Thanh công cụ Cắt/Màu/Mịn da + Lưu riêng"),
         ("12b-iphone-studio-pro-sheet", "studio-pro-sheet", [], "Camera & Studio: Bảng hiệu ứng Studio Pro (Cinematic, Vivid, Noir, Sepia)"),
         ("12c-iphone-camera-studio-video-preview", "camera-studio-video-edit", [], "Camera & Studio: Xem trước video đã quay & xuất bản Shorts"),
         ("13-iphone-feed-light", "feed", ["--ui-review-light"], "Bảng tin chế độ Light mode"),
@@ -319,8 +323,7 @@ def main():
         ("05e-iphone-forward-message", "forward-message", [], "Chuyển tiếp tin nhắn: Chọn người nhận hoặc nhóm trò chuyện"),
         ("13g-iphone-change-password", "change-password", [], "Cài đặt: Đổi mật khẩu tài khoản"),
         ("13h-iphone-blocked-users", "blocked-users", [], "Cài đặt & Quyền riêng tư: Danh sách người dùng đã chặn"),
-        ("01b-iphone-auth-forgot-password", "auth-reset", [], "Quên mật khẩu: Khôi phục mật khẩu tài khoản (008)"),
-        ("13i-iphone-privacy-settings", "privacy-settings", [], "Cài đặt: Quyền riêng tư & Định vị (118)"),
+        ("13i-iphone-privacy-settings", "privacy-settings", [], "Cài đặt: Quyền riêng tư & Định vị chuẩn PATCH /api/me (118)"),
         ("13j-iphone-support", "support", [], "Trung tâm Hỗ trợ & Trợ giúp người dùng (124)"),
         ("13k-iphone-change-password-light", "change-password", ["--ui-review-light"], "Cài đặt: Đổi mật khẩu tài khoản (Light)")
     ]
