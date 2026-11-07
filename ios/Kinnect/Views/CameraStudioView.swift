@@ -8,9 +8,10 @@ struct CameraStudioView: View {
     @ObservedObject private var appState = AppState.shared
 
     enum PublishTarget: String, CaseIterable {
-        case shortVideo = "Video ngắn (Shorts)"
+        case shortVideo = "Video"
         case feedPost = "Bài viết"
         case story = "Tin 24h"
+        case live = "Phát Live"
     }
 
     @State private var target: PublishTarget = .shortVideo
@@ -23,6 +24,7 @@ struct CameraStudioView: View {
     @State private var previewImage: UIImage?
     @State private var showNativeCameraPicker = false
     @State private var showStudioProSheet = false
+    @State private var showCreateLiveSheet = false
     @State private var studioProAppliedEffect = "Bộ lọc gốc"
     @State private var isUploading = false
 
@@ -36,173 +38,205 @@ struct CameraStudioView: View {
                 }
                 .pickerStyle(.segmented)
 
-                // Native Camera Capture + Library Buttons
-                HStack(spacing: 12) {
-                    Button {
-                        Task {
-                            let camOk = await MediaPermissionHandler.shared.requestCameraAccess()
-                            if camOk {
-                                showNativeCameraPicker = true
-                            } else {
-                                appState.showToast("Vui lòng cấp quyền Camera trong Cài đặt iOS.")
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 8) {
-                            KinnectIcon(glyph: .camera, size: 22, selected: true, tint: .white)
-                            Text("Mở Camera quay/chụp")
-                                .font(.subheadline.weight(.semibold))
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .padding(.vertical, 6)
-                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.primaryGradient))
-                        .foregroundColor(.white)
-                    }
-
-                    if target == .shortVideo {
-                        PhotosPicker(selection: $selectedVideoItem, matching: .videos) {
-                            HStack(spacing: 8) {
-                                KinnectIcon(glyph: .video, size: 22, tint: KinnectTheme.accentBright)
-                                Text("Chọn MP4")
-                                    .font(.subheadline.weight(.semibold))
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .padding(.vertical, 6)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                            .foregroundColor(KinnectTheme.accentBright)
-                        }
-                        .onChange(of: selectedVideoItem) { newItem in
-                            guard let newItem else { return }
-                            Task { await loadVideoFromPicker(newItem) }
-                        }
-                    } else {
-                        PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                            HStack(spacing: 8) {
-                                KinnectIcon(glyph: .photo, size: 22, tint: KinnectTheme.accentBright)
-                                Text("Chọn Ảnh")
-                                    .font(.subheadline.weight(.semibold))
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .padding(.vertical, 6)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                            .foregroundColor(KinnectTheme.accentBright)
-                        }
-                        .onChange(of: selectedPhotoItem) { newItem in
-                            guard let newItem else { return }
-                            Task { await loadImageFromPicker(newItem) }
-                        }
-                    }
-                }
-
-                if previewImage == nil && videoDataURL.isEmpty {
-                    VStack(spacing: 10) {
-                        KinnectIcon(glyph: .studio, size: 32, tint: KinnectTheme.textSecondary)
-                        Text("Hãy chụp ảnh, quay video hoặc chọn tệp từ thư viện để mở bảng chỉnh sửa Studio.")
-                            .font(.subheadline)
+                if target == .live {
+                    VStack(spacing: 14) {
+                        KinnectIcon(glyph: .live, size: 38, selected: true, tint: KinnectTheme.danger)
+                        Text("Phát trực tiếp Kinnect Live")
+                            .font(.headline)
+                            .foregroundColor(KinnectTheme.textPrimary)
+                        Text("Phát Live từ Camera với chế độ Trò chuyện hoặc Chơi game.")
+                            .font(.caption)
                             .foregroundColor(KinnectTheme.textSecondary)
                             .multilineTextAlignment(.center)
                             .kinnectMultiline()
+
+                        Button {
+                            showCreateLiveSheet = true
+                        } label: {
+                            HStack(spacing: 8) {
+                                KinnectIcon(glyph: .live, size: 20, selected: true, tint: .white)
+                                Text("Bắt đầu phát Live")
+                                    .font(.subheadline.bold())
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .background(Capsule().fill(KinnectTheme.primaryGradient))
+                            .foregroundColor(.white)
+                        }
+                        .frame(minHeight: 44)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 28)
                     .kinnectCard()
                 } else {
-                    // Only show Studio preview, editing fields, separate Save group, and primary Use/Publish button after media is selected/captured
-                    VStack(alignment: .leading, spacing: 14) {
-                        HStack(spacing: 8) {
-                            KinnectIcon(glyph: .studio, size: 22, selected: true, tint: KinnectTheme.accentBright)
-                            Text("Kinnect Studio")
-                                .font(.subheadline.bold())
-                                .foregroundColor(.white)
-                            Spacer()
-
-                            // Studio Pro pill button on top-right of preview screen (Parity with Android 1.2.12)
-                            Button {
-                                showStudioProSheet = true
-                            } label: {
-                                HStack(spacing: 5) {
-                                    Image(systemName: "sparkles")
-                                        .font(.caption2.bold())
-                                    Text("Studio Pro")
-                                        .font(.caption2.weight(.bold))
+                    // Native Camera Capture + Library Buttons
+                    HStack(spacing: 12) {
+                        Button {
+                            Task {
+                                let camOk = await MediaPermissionHandler.shared.requestCameraAccess()
+                                if camOk {
+                                    showNativeCameraPicker = true
+                                } else {
+                                    appState.showToast("Vui lòng cấp quyền Camera trong Cài đặt iOS.")
                                 }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Capsule().fill(KinnectTheme.primaryGradient))
-                                .foregroundColor(.white)
                             }
-                            .accessibilityLabel("Mở công cụ Studio Pro")
-
-                            // Separate Save button
-                            Button {
-                                saveMediaToPhotos()
-                            } label: {
-                                HStack(spacing: 4) {
-                                    KinnectIcon(glyph: .save, size: 16, tint: KinnectTheme.accentBright)
-                                    Text("Lưu")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundColor(KinnectTheme.accentBright)
-                                }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
+                        } label: {
+                            HStack(spacing: 8) {
+                                KinnectIcon(glyph: .camera, size: 22, selected: true, tint: .white)
+                                Text("Mở Camera quay/chụp")
+                                    .font(.subheadline.weight(.semibold))
                             }
-                            .accessibilityLabel("Lưu vào thiết bị")
-                        }
-
-                        if let previewImage {
-                            Image(uiImage: previewImage)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(maxHeight: 240)
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
-                        } else if !videoDataURL.isEmpty {
-                            HStack(spacing: 10) {
-                                KinnectIcon(glyph: .video, size: 22, selected: true, tint: KinnectTheme.online)
-                                Text("Đã sẵn sàng tải lên video MP4 (\(videoDataURL.count / 1024) KB)")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundColor(.white)
-                                    .kinnectMultiline()
-                            }
-                            .padding(12)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .padding(.vertical, 6)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.primaryGradient))
+                            .foregroundColor(.white)
                         }
 
                         if target == .shortVideo {
-                            TextField("Tiêu đề video ngắn...", text: $title)
+                            PhotosPicker(selection: $selectedVideoItem, matching: .videos) {
+                                HStack(spacing: 8) {
+                                    KinnectIcon(glyph: .video, size: 22, tint: KinnectTheme.accentBright)
+                                    Text("Chọn MP4")
+                                        .font(.subheadline.weight(.semibold))
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .padding(.vertical, 6)
+                                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                                .foregroundColor(KinnectTheme.accentBright)
+                            }
+                            .onChange(of: selectedVideoItem) { newItem in
+                                guard let newItem else { return }
+                                Task { await loadVideoFromPicker(newItem) }
+                            }
+                        } else {
+                            PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                                HStack(spacing: 8) {
+                                    KinnectIcon(glyph: .photo, size: 22, tint: KinnectTheme.accentBright)
+                                    Text("Chọn Ảnh")
+                                        .font(.subheadline.weight(.semibold))
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .padding(.vertical, 6)
+                                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                                .foregroundColor(KinnectTheme.accentBright)
+                            }
+                            .onChange(of: selectedPhotoItem) { newItem in
+                                guard let newItem else { return }
+                                Task { await loadImageFromPicker(newItem) }
+                            }
+                        }
+                    }
+
+                    if previewImage == nil && videoDataURL.isEmpty {
+                        VStack(spacing: 10) {
+                            KinnectIcon(glyph: .studio, size: 32, tint: KinnectTheme.textSecondary)
+                            Text("Hãy chụp ảnh, quay video hoặc chọn tệp từ thư viện để mở bảng chỉnh sửa Studio.")
+                                .font(.subheadline)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                                .multilineTextAlignment(.center)
+                                .kinnectMultiline()
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 28)
+                        .kinnectCard()
+                    } else {
+                        // Only show Studio preview, editing fields, separate Save group, and primary Use/Publish button after media is selected/captured
+                        VStack(alignment: .leading, spacing: 14) {
+                            HStack(spacing: 8) {
+                                KinnectIcon(glyph: .studio, size: 22, selected: true, tint: KinnectTheme.accentBright)
+                                Text("Kinnect Studio")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(.white)
+                                Spacer()
+
+                                // Studio Pro pill button on top-right of preview screen (Parity with Android 1.2.12)
+                                Button {
+                                    showStudioProSheet = true
+                                } label: {
+                                    HStack(spacing: 5) {
+                                        Image(systemName: "sparkles")
+                                            .font(.caption2.bold())
+                                        Text("Studio Pro")
+                                            .font(.caption2.weight(.bold))
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(Capsule().fill(KinnectTheme.primaryGradient))
+                                    .foregroundColor(.white)
+                                }
+                                .accessibilityLabel("Mở công cụ Studio Pro")
+
+                                // Separate Save button
+                                Button {
+                                    saveMediaToPhotos()
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        KinnectIcon(glyph: .save, size: 16, tint: KinnectTheme.accentBright)
+                                        Text("Lưu")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundColor(KinnectTheme.accentBright)
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
+                                }
+                                .accessibilityLabel("Lưu vào thiết bị")
+                            }
+
+                            if let previewImage {
+                                Image(uiImage: previewImage)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(maxHeight: 240)
+                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                            } else if !videoDataURL.isEmpty {
+                                HStack(spacing: 10) {
+                                    KinnectIcon(glyph: .video, size: 22, selected: true, tint: KinnectTheme.online)
+                                    Text("Đã sẵn sàng tải lên video MP4 (\(videoDataURL.count / 1024) KB)")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundColor(.white)
+                                        .kinnectMultiline()
+                                }
+                                .padding(12)
+                                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                            }
+
+                            if target == .shortVideo {
+                                TextField("Tiêu đề video ngắn...", text: $title)
+                                    .padding(12)
+                                    .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                                    .foregroundColor(.white)
+                            }
+
+                            TextField("Mô tả / Nội dung...", text: $caption, axis: .vertical)
+                                .lineLimit(3...7)
                                 .padding(12)
                                 .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
                                 .foregroundColor(.white)
-                        }
 
-                        TextField("Mô tả / Nội dung...", text: $caption, axis: .vertical)
-                            .lineLimit(3...7)
-                            .padding(12)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                            .foregroundColor(.white)
-
-                        Button {
-                            Task { await publishContent() }
-                        } label: {
-                            HStack(spacing: 8) {
-                                Spacer()
-                                if isUploading {
-                                    ProgressView().tint(.white)
-                                } else {
-                                    KinnectIcon(glyph: .send, size: 20, selected: true, tint: .white)
-                                    Text("Dùng ảnh/video & Đăng ngay")
-                                        .font(.headline)
+                            Button {
+                                Task { await publishContent() }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Spacer()
+                                    if isUploading {
+                                        ProgressView().tint(.white)
+                                    } else {
+                                        KinnectIcon(glyph: .send, size: 20, selected: true, tint: .white)
+                                        Text("Dùng ảnh/video & Đăng ngay")
+                                            .font(.headline)
+                                    }
+                                    Spacer()
                                 }
-                                Spacer()
+                                .padding(.vertical, 14)
+                                .background(KinnectTheme.primaryGradient)
+                                .foregroundColor(.white)
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
                             }
-                            .padding(.vertical, 14)
-                            .background(KinnectTheme.primaryGradient)
-                            .foregroundColor(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .disabled(isUploading)
                         }
-                        .disabled(isUploading)
+                        .kinnectCard()
                     }
-                    .kinnectCard()
                 }
             }
             .padding(16)
@@ -253,6 +287,9 @@ struct CameraStudioView: View {
                     }
                 )
             }
+        }
+        .sheet(isPresented: $showCreateLiveSheet) {
+            CreateLiveRoomSheet()
         }
     }
 

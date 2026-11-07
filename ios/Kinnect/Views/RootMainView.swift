@@ -44,7 +44,9 @@ struct RootMainView: View {
         ZStack(alignment: .top) {
             KinnectTheme.background.ignoresSafeArea()
 
-            if appState.isRestoringSession && appState.currentUser == nil {
+            if UIReviewFixture.activeScreen == "auth" {
+                AuthView()
+            } else if appState.isRestoringSession && appState.currentUser == nil {
                 VStack(spacing: 16) {
                     ProgressView()
                         .tint(KinnectTheme.accentBright)
@@ -57,8 +59,22 @@ struct RootMainView: View {
             } else if appState.currentUser == nil {
                 AuthView()
             } else if UIReviewFixture.activeScreen == "chat-detail" {
-                NavigationStack {
-                    DirectChatDetailView(peer: KinnectUser.from(UIReviewFixture.peerUserDict))
+                if horizontalSizeClass == .regular {
+                    // iPad two-column layout: Conversation List on left + Chat Detail on right
+                    NavigationSplitView {
+                        NavigationStack {
+                            MessagesView(onOpenFriends: { showFriendsSheet = true })
+                        }
+                        .navigationTitle("Tin nhắn")
+                    } detail: {
+                        NavigationStack {
+                            DirectChatDetailView(peer: KinnectUser.from(UIReviewFixture.peerUserDict))
+                        }
+                    }
+                } else {
+                    NavigationStack {
+                        DirectChatDetailView(peer: KinnectUser.from(UIReviewFixture.peerUserDict))
+                    }
                 }
             } else {
                 authenticatedLayout

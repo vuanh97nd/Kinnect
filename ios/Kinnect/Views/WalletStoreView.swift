@@ -8,7 +8,7 @@ struct WalletStoreView: View {
     enum SectionTab: String, CaseIterable {
         case wallet = "Ví của tôi"
         case packages = "Gói trang trí"
-        case storeKit = "Nạp hàng số (StoreKit 2)"
+        case storeKit = "Nạp xu"
     }
 
     @State private var tab: SectionTab = .wallet

@@ -2,18 +2,58 @@ import SwiftUI
 import UIKit
 
 enum KinnectTheme {
-    static let background = Color(red: 0.05, green: 0.04, blue: 0.11)       // #0D0A1C
-    static let surface = Color(red: 0.10, green: 0.08, blue: 0.19)          // #191430
-    static let surfaceElevated = Color(red: 0.15, green: 0.12, blue: 0.27)  // #261F45
-    static let border = Color.white.opacity(0.10)
+    static var background: Color {
+        Color(UIColor { trait in
+            trait.userInterfaceStyle == .light
+                ? UIColor(red: 0.96, green: 0.95, blue: 0.98, alpha: 1.0)
+                : UIColor(red: 0.05, green: 0.04, blue: 0.11, alpha: 1.0)
+        })
+    }
+
+    static var surface: Color {
+        Color(UIColor { trait in
+            trait.userInterfaceStyle == .light
+                ? UIColor.white
+                : UIColor(red: 0.10, green: 0.08, blue: 0.19, alpha: 1.0)
+        })
+    }
+
+    static var surfaceElevated: Color {
+        Color(UIColor { trait in
+            trait.userInterfaceStyle == .light
+                ? UIColor(red: 0.92, green: 0.90, blue: 0.96, alpha: 1.0)
+                : UIColor(red: 0.15, green: 0.12, blue: 0.27, alpha: 1.0)
+        })
+    }
+
+    static var border: Color {
+        Color(UIColor { trait in
+            trait.userInterfaceStyle == .light
+                ? UIColor.black.withAlphaComponent(0.08)
+                : UIColor.white.withAlphaComponent(0.10)
+        })
+    }
 
     static let accent = Color(red: 0.49, green: 0.23, blue: 0.93)           // #7C3AED
     static let accentBright = Color(red: 0.65, green: 0.33, blue: 0.97)     // #A855F7
     static let accentLight = Color(red: 0.58, green: 0.44, blue: 1.00)
     static let accentSoft = Color(red: 0.93, green: 0.91, blue: 1.00)
 
-    static let textPrimary = Color.white
-    static let textSecondary = Color(red: 0.72, green: 0.69, blue: 0.84)
+    static var textPrimary: Color {
+        Color(UIColor { trait in
+            trait.userInterfaceStyle == .light
+                ? UIColor(red: 0.11, green: 0.08, blue: 0.22, alpha: 1.0)
+                : UIColor.white
+        })
+    }
+
+    static var textSecondary: Color {
+        Color(UIColor { trait in
+            trait.userInterfaceStyle == .light
+                ? UIColor(red: 0.45, green: 0.40, blue: 0.55, alpha: 1.0)
+                : UIColor(red: 0.72, green: 0.69, blue: 0.84, alpha: 1.0)
+        })
+    }
 
     static let rose = Color(red: 0.93, green: 0.28, blue: 0.60)
     static let emerald = Color(red: 0.09, green: 0.64, blue: 0.45)
@@ -22,8 +62,8 @@ enum KinnectTheme {
     static let warning = Color(red: 0.96, green: 0.62, blue: 0.04)
     static let danger = Color(red: 0.94, green: 0.27, blue: 0.27)
 
-    static let surfaceBg = background
-    static let cardBg = surface
+    static var surfaceBg: Color { background }
+    static var cardBg: Color { surface }
 
     static let primaryGradient = LinearGradient(
         colors: [

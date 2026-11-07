@@ -90,12 +90,14 @@ def pick_devices(devices):
     return standard_iphone, compact_iphone, ipad
 
 
-def boot_and_install(device, app_path):
+def boot_and_install(device, app_path, bundle_id):
     udid = device["udid"]
     name = device["name"]
     print(f"Booting simulator {name} ({udid})...", flush=True)
     subprocess.run(["xcrun", "simctl", "boot", udid], check=False)
     run(["xcrun", "simctl", "bootstatus", udid, "-b"])
+    # Set default dark appearance initially
+    subprocess.run(["xcrun", "simctl", "ui", udid, "appearance", "dark"], check=False)
     # Set clean status bar
     subprocess.run([
         "xcrun", "simctl", "status_bar", udid, "override",
@@ -104,19 +106,51 @@ def boot_and_install(device, app_path):
         "--batteryLevel", "100"
     ], check=False)
     run(["xcrun", "simctl", "install", udid, str(app_path)])
+    # Warm-up app launch to ensure Dyld, SpringBoard, and Metal render caches are ready
+    print(f"Warming up app on {name}...", flush=True)
+    subprocess.run(["xcrun", "simctl", "launch", udid, bundle_id, "--ui-review-screen", "feed"], check=False)
+    time.sleep(4.0)
+    subprocess.run(["xcrun", "simctl", "terminate", udid, bundle_id], check=False)
+    time.sleep(1.0)
 
 
 def capture_screen(device, slug, screen_arg, bundle_id, extra_args=None, wait_sec=3.0):
     udid = device["udid"]
     subprocess.run(["xcrun", "simctl", "terminate", udid, bundle_id], check=False)
-    time.sleep(0.4)
+    time.sleep(0.5)
+
+    is_light = extra_args and "--ui-review-light" in extra_args
+    if is_light:
+        subprocess.run(["xcrun", "simctl", "ui", udid, "appearance", "light"], check=False)
+        subprocess.run([
+            "xcrun", "simctl", "status_bar", udid, "override",
+            "--time", "09:41",
+            "--batteryState", "charged",
+            "--batteryLevel", "100"
+        ], check=False)
+    else:
+        subprocess.run(["xcrun", "simctl", "ui", udid, "appearance", "dark"], check=False)
+        subprocess.run([
+            "xcrun", "simctl", "status_bar", udid, "override",
+            "--time", "09:41",
+            "--batteryState", "charged",
+            "--batteryLevel", "100"
+        ], check=False)
+
     cmd = ["xcrun", "simctl", "launch", udid, bundle_id, "--ui-review-screen", screen_arg]
     if extra_args:
         cmd.extend(extra_args)
     run(cmd)
-    time.sleep(wait_sec)
+
+    actual_wait = 5.5 if screen_arg == "auth" else wait_sec
+    time.sleep(actual_wait)
+
     out_file = OUT_DIR / f"{slug}.png"
     run(["xcrun", "simctl", "io", udid, "screenshot", str(out_file)])
+
+    if is_light:
+        subprocess.run(["xcrun", "simctl", "ui", udid, "appearance", "dark"], check=False)
+
     return out_file
 
 
@@ -244,7 +278,7 @@ def main():
     records = []
 
     # 1. Standard iPhone screenshots
-    boot_and_install(standard_iphone, app_path)
+    boot_and_install(standard_iphone, app_path, bundle_id)
     iphone_screens = [
         ("01-iphone-auth-dark", "auth", [], "Đăng nhập / Đăng ký (Dark)"),
         ("02-iphone-feed-dark", "feed", [], "Bảng tin & Tin 24h (Dark)"),
@@ -255,11 +289,11 @@ def main():
         ("06-iphone-profile-dark", "profile", [], "Hồ sơ cá nhân & Chẩn đoán PushKit (Dark)"),
         ("07-iphone-friends-dark", "friends", [], "Bạn bè & Gọi thoại/video nền trong suốt"),
         ("08-iphone-notifications-dark", "notifications", [], "Thông báo"),
-        ("09-iphone-wallet-store-dark", "wallet", [], "Ví & Cửa hàng: Tách Xu mua & Xu tặng chuẩn Android 1.2.12"),
-        ("10-iphone-live-stream-dark", "live", [], "Phòng Live luồng thống nhất (Không thanh lọc đầu trang)"),
-        ("11-iphone-camera-studio-empty", "camera-studio", [], "Camera & Studio trước khi chọn ảnh/video"),
-        ("12-iphone-camera-studio-edit", "camera-studio-edit", [], "Camera & Studio sau khi có ảnh (Hiện Studio Pro góc phải + nút Lưu riêng)"),
-        ("13-iphone-feed-light", "feed", ["--ui-review-light"], "Bảng tin thử chế độ Light mode")
+        ("09-iphone-wallet-store-dark", "wallet", [], "Ví & Cửa hàng: Tách Xu mua & Xu tặng, Nạp xu"),
+        ("10-iphone-live-stream-dark", "live", [], "Phòng Live: Luồng vuốt xem trực tiếp"),
+        ("11-iphone-camera-studio-empty", "camera-studio", [], "Camera & Studio: Tạo Video/Bài viết/Tin/Live"),
+        ("12-iphone-camera-studio-edit", "camera-studio-edit", [], "Camera & Studio: Studio Pro góc phải + nút Lưu riêng"),
+        ("13-iphone-feed-light", "feed", ["--ui-review-light"], "Bảng tin chế độ Light mode (Đồng bộ nền & thanh trạng thái)")
     ]
 
     for slug, screen_arg, extra, desc in iphone_screens:
@@ -278,11 +312,11 @@ def main():
         if compact_iphone["udid"] != standard_iphone["udid"]:
             print(f"Shutting down previous standard simulator {standard_iphone['name']} to free resources...", flush=True)
             subprocess.run(["xcrun", "simctl", "shutdown", standard_iphone["udid"]], check=False)
-            boot_and_install(compact_iphone, app_path)
+            boot_and_install(compact_iphone, app_path, bundle_id)
         for slug, screen_arg, desc in [
-            ("14-compact-iphone-feed", "feed", "Màn hình nhỏ: Bảng tin & Tab bar 26pt"),
+            ("14-compact-iphone-feed", "feed", "Màn hình nhỏ: Bảng tin & Tab bar 5 tab 26pt"),
             ("15-compact-iphone-chat-detail", "chat-detail", "Màn hình nhỏ: Chi tiết Chat & hàng trạng thái dưới"),
-            ("16-compact-iphone-wallet", "wallet", "Màn hình nhỏ: Ví & Cửa hàng không cắt số dư")
+            ("16-compact-iphone-wallet", "wallet", "Màn hình nhỏ: Ví & Cửa hàng không cắt số dư / Nạp xu")
         ]:
             f = capture_screen(compact_iphone, slug, screen_arg, bundle_id, wait_sec=3.0)
             records.append({
@@ -300,10 +334,10 @@ def main():
         if active_to_shutdown and active_to_shutdown["udid"] != ipad["udid"]:
             print(f"Shutting down previous simulator {active_to_shutdown['name']} to free resources...", flush=True)
             subprocess.run(["xcrun", "simctl", "shutdown", active_to_shutdown["udid"]], check=False)
-        boot_and_install(ipad, app_path)
+        boot_and_install(ipad, app_path, bundle_id)
         for slug, screen_arg, desc in [
             ("17-ipad-feed-splitview", "feed", "iPad NavigationSplitView: Sidebar + Bảng tin"),
-            ("18-ipad-chat-detail", "chat-detail", "iPad: Chi tiết hội thoại")
+            ("18-ipad-chat-detail", "chat-detail", "iPad NavigationSplitView: Danh sách Hội thoại (trái) + Chi tiết Chat (phải)")
         ]:
             f = capture_screen(ipad, slug, screen_arg, bundle_id, wait_sec=3.5)
             records.append({
