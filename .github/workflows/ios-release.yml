@@ -1,0 +1,88 @@
+name: Build Kinnect iOS IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - '**'
+    paths:
+      - 'ios/**'
+      - 'scripts/prepare-ios-assets.py'
+      - '.github/workflows/ios-release.yml'
+    tags:
+      - 'v[0-9]*'
+      - 'ios-v[0-9]*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-ios:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Ensure XcodeGen is installed
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+          xcodegen --version
+
+      - name: Generate Xcode project from ios/project.yml
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build unsigned iOS Archive
+        run: |
+          xcodebuild archive \
+            -project ios/Kinnect.xcodeproj \
+            -scheme Kinnect \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath build/Kinnect.xcarchive \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
+
+      - name: Ad-hoc sign and package IPA for Sideloadly / AltStore
+        run: |
+          mkdir -p build/Payload dist
+          cp -R build/Kinnect.xcarchive/Products/Applications/Kinnect.app build/Payload/Kinnect.app
+          codesign --force --deep --sign - build/Payload/Kinnect.app
+          cd build
+          zip -qry "../dist/Kinnect-1.2.12-ios.ipa" Payload
+          cd ../dist
+          shasum -a 256 "Kinnect-1.2.12-ios.ipa" > "Kinnect-1.2.12-ios.ipa.sha256"
+          ls -lh "Kinnect-1.2.12-ios.ipa"
+
+      - name: Upload IPA to GitHub Actions Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kinnect-1.2.12-ios-ipa
+          path: |
+            dist/Kinnect-1.2.12-ios.ipa
+            dist/Kinnect-1.2.12-ios.ipa.sha256
+          if-no-files-found: error
+
+      - name: Publish downloadable IPA to GitHub Release (ios-v1.2.12)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="ios-v1.2.12"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              "dist/Kinnect-1.2.12-ios.ipa" \
+              "dist/Kinnect-1.2.12-ios.ipa.sha256" \
+              --clobber
+          else
+            gh release create "$TAG" \
+              "dist/Kinnect-1.2.12-ios.ipa" \
+              "dist/Kinnect-1.2.12-ios.ipa.sha256" \
+              --title "Kinnect iOS 1.2.12 (Build 118)" \
+              --notes "Gói cài đặt Kinnect iOS (.ipa) — Cài đặt lên iPhone/iPad từ Windows qua Sideloadly hoặc AltStore bằng Apple ID cá nhân miễn phí." \
+              --prerelease
+          fi
