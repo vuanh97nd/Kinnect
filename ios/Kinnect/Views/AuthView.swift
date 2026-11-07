@@ -14,6 +14,7 @@ struct AuthView: View {
     @State private var fullName = ""
     @State private var handle = ""
     @State private var password = ""
+    @State private var showPassword = false
     @State private var agree18 = true
     @State private var acceptPrivacy = true
     @State private var isSubmitting = false
@@ -78,13 +79,33 @@ struct AuthView: View {
 
                     if mode != .reset {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Mật khẩu")
-                                .font(.caption.weight(.semibold))
-                                .foregroundColor(KinnectTheme.textSecondary)
-                            SecureField("Nhập mật khẩu (tối thiểu 6 ký tự)", text: $password)
-                                .padding(12)
-                                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                            HStack(spacing: 6) {
+                                KinnectIcon(glyph: .lock, size: 16, tint: KinnectTheme.textSecondary)
+                                Text("Mật khẩu")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                            }
+                            HStack(spacing: 4) {
+                                Group {
+                                    if showPassword {
+                                        TextField("Nhập mật khẩu (tối thiểu 6 ký tự)", text: $password)
+                                    } else {
+                                        SecureField("Nhập mật khẩu (tối thiểu 6 ký tự)", text: $password)
+                                    }
+                                }
+                                .padding(.leading, 12)
+                                .padding(.vertical, 12)
                                 .foregroundColor(KinnectTheme.textPrimary)
+
+                                KinnectIconButton(
+                                    glyph: showPassword ? .eyeOff : .eye,
+                                    label: showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu",
+                                    tint: KinnectTheme.textSecondary
+                                ) {
+                                    showPassword.toggle()
+                                }
+                            }
+                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
                         }
                     }
 
@@ -98,10 +119,13 @@ struct AuthView: View {
                         .tint(KinnectTheme.accentBright)
 
                         Toggle(isOn: $acceptPrivacy) {
-                            Text("Tôi đồng ý với Chính sách quyền riêng tư & Điều khoản cộng đồng Kinnect")
-                                .font(.footnote)
-                                .foregroundColor(KinnectTheme.textPrimary)
-                                .kinnectMultiline()
+                            HStack(spacing: 6) {
+                                KinnectIcon(glyph: .shield, size: 16, tint: KinnectTheme.accentBright)
+                                Text("Tôi đồng ý với Chính sách quyền riêng tư & Điều khoản cộng đồng Kinnect")
+                                    .font(.footnote)
+                                    .foregroundColor(KinnectTheme.textPrimary)
+                                    .kinnectMultiline()
+                            }
                         }
                         .tint(KinnectTheme.accentBright)
                     }

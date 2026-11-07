@@ -145,7 +145,7 @@ struct FeedView: View {
                             Circle()
                                 .fill(KinnectTheme.accentBright)
                                 .frame(width: 22, height: 22)
-                                .overlay(Image(systemName: "plus").font(.caption.bold()).foregroundColor(.white))
+                                .overlay(KinnectIcon(glyph: .add, size: 14, selected: true, tint: .white))
                         }
                         Text("Tạo tin")
                             .font(.caption2.weight(.semibold))
@@ -153,6 +153,7 @@ struct FeedView: View {
                     }
                     .frame(width: 68)
                 }
+                .accessibilityLabel("Tạo tin 24h")
 
                 ForEach(stories.filter { !appState.blockedUserIds.contains($0.author.id) }) { story in
                     Button {
@@ -239,13 +240,12 @@ struct FeedView: View {
                 .background(Capsule().fill(KinnectTheme.surfaceElevated))
             }
 
-            Button(action: onOpenCamera) {
-                Image(systemName: "camera.fill")
-                    .font(.subheadline.bold())
-                    .foregroundColor(.white)
-                    .frame(width: 40, height: 40)
-                    .background(Circle().fill(KinnectTheme.accent))
-            }
+            KinnectIconButton(
+                glyph: .camera,
+                label: "Mở Camera & Studio",
+                tint: KinnectTheme.accentBright,
+                action: onOpenCamera
+            )
         }
         .kinnectCard()
     }
@@ -373,14 +373,18 @@ private struct PostCardView: View {
                         }
                     } else {
                         Button(role: .destructive, action: onReport) {
-                            Label("Báo cáo / Chặn UGC", systemImage: "exclamationmark.Bubble")
+                            HStack {
+                                Text("Báo cáo / Chặn UGC")
+                                KinnectIcon(glyph: .report, size: 18, tint: KinnectTheme.danger)
+                            }
                         }
                     }
                 } label: {
-                    Image(systemName: "ellipsis")
-                        .foregroundColor(KinnectTheme.textSecondary)
-                        .padding(8)
+                    KinnectIcon(glyph: .more, size: 22, tint: KinnectTheme.textSecondary)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
+                .accessibilityLabel("Tùy chọn bài viết")
             }
 
             if !post.text.isEmpty {
@@ -410,13 +414,18 @@ private struct PostCardView: View {
                     }
                 } label: {
                     HStack(spacing: 6) {
-                        Text(reactionEmoji(for: post.userReaction))
+                        if post.liked {
+                            Text(reactionEmoji(for: post.userReaction))
+                        } else {
+                            KinnectIcon(glyph: .reaction, size: 18, tint: KinnectTheme.textSecondary)
+                        }
                         Text("\(max(post.likesCount, 0))")
                             .font(.caption.weight(.semibold))
                             .foregroundColor(post.liked ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
                     }
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+                    .padding(.vertical, 8)
+                    .frame(minHeight: 44)
                     .background(
                         Capsule()
                             .fill(post.liked ? KinnectTheme.accent.opacity(0.24) : KinnectTheme.surfaceElevated)
@@ -424,18 +433,21 @@ private struct PostCardView: View {
                 } primaryAction: {
                     onReact("like")
                 }
+                .accessibilityLabel("Bày tỏ cảm xúc")
 
                 Button(action: onOpenComments) {
                     HStack(spacing: 6) {
-                        Image(systemName: "bubble.right")
+                        KinnectIcon(glyph: .comment, size: 18, tint: KinnectTheme.textSecondary)
                         Text("\(post.commentsCount) bình luận")
                     }
                     .font(.caption.weight(.semibold))
                     .foregroundColor(KinnectTheme.textSecondary)
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+                    .padding(.vertical, 8)
+                    .frame(minHeight: 44)
                     .background(Capsule().fill(KinnectTheme.surfaceElevated))
                 }
+                .accessibilityLabel("Mở bình luận")
 
                 Spacer()
             }
@@ -874,13 +886,12 @@ struct PostCommentsSheet: View {
                         .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
                         .foregroundColor(.white)
 
-                    Button {
+                    KinnectIconButton(
+                        glyph: .send,
+                        label: "Gửi bình luận",
+                        tint: KinnectTheme.accentBright
+                    ) {
                         Task { await sendComment() }
-                    } label: {
-                        Image(systemName: "paperplane.fill")
-                            .foregroundColor(.white)
-                            .padding(10)
-                            .background(Circle().fill(KinnectTheme.accent))
                     }
                     .disabled(newComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
@@ -892,7 +903,9 @@ struct PostCommentsSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Đóng") { dismiss() }
+                    KinnectIconButton(glyph: .close, label: "Đóng", tint: KinnectTheme.textPrimary) {
+                        dismiss()
+                    }
                 }
             }
             .task {

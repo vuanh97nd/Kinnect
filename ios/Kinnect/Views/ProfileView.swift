@@ -72,12 +72,14 @@ struct ProfileView: View {
                         // Upload Avatar & Cover pickers
                         HStack(spacing: 10) {
                             PhotosPicker(selection: $selectedAvatarItem, matching: .images) {
-                                Label("Đổi Avatar", systemImage: "person.crop.circle.badge.plus")
-                                    .font(.caption.weight(.semibold))
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 9)
-                                    .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
-                                    .foregroundColor(KinnectTheme.accentBright)
+                                HStack(spacing: 6) {
+                                    KinnectIcon(glyph: .profile, size: 18, tint: KinnectTheme.accentBright)
+                                    Text("Đổi Avatar")
+                                        .font(.caption.weight(.semibold))
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 40)
+                                .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
+                                .foregroundColor(KinnectTheme.accentBright)
                             }
                             .onChange(of: selectedAvatarItem) { item in
                                 guard let item else { return }
@@ -85,12 +87,14 @@ struct ProfileView: View {
                             }
 
                             PhotosPicker(selection: $selectedCoverItem, matching: .images) {
-                                Label("Đổi Ảnh bìa", systemImage: "photo.badge.plus")
-                                    .font(.caption.weight(.semibold))
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 9)
-                                    .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
-                                    .foregroundColor(KinnectTheme.accentBright)
+                                HStack(spacing: 6) {
+                                    KinnectIcon(glyph: .photo, size: 18, tint: KinnectTheme.accentBright)
+                                    Text("Đổi Ảnh bìa")
+                                        .font(.caption.weight(.semibold))
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 40)
+                                .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
+                                .foregroundColor(KinnectTheme.accentBright)
                             }
                             .onChange(of: selectedCoverItem) { item in
                                 guard let item else { return }
@@ -112,9 +116,12 @@ struct ProfileView: View {
 
                     // Edit Profile Info
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Chỉnh sửa hồ sơ")
-                            .font(.headline)
-                            .foregroundColor(.white)
+                        HStack(spacing: 8) {
+                            KinnectIcon(glyph: .edit, size: 20, selected: true, tint: KinnectTheme.accentBright)
+                            Text("Chỉnh sửa hồ sơ")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                        }
 
                         TextField("Tên hiển thị", text: $name)
                             .padding(11)
@@ -140,11 +147,12 @@ struct ProfileView: View {
                         Button {
                             Task { await saveProfile() }
                         } label: {
-                            HStack {
+                            HStack(spacing: 8) {
                                 Spacer()
                                 if isSavingProfile {
                                     ProgressView().tint(.white)
                                 } else {
+                                    KinnectIcon(glyph: .save, size: 18, selected: true, tint: .white)
                                     Text("Lưu thay đổi")
                                         .font(.subheadline.bold())
                                 }
@@ -161,15 +169,15 @@ struct ProfileView: View {
 
                     // Quick Actions & Security
                     VStack(spacing: 10) {
-                        actionRow(icon: "creditcard.fill", title: "Ví thử nghiệm & Cửa hàng", color: KinnectTheme.warning, action: onOpenWallet)
-                        actionRow(icon: "person.2.fill", title: "Danh sách Bạn bè & Lời mời", color: KinnectTheme.accentBright, action: onOpenFriends)
-                        actionRow(icon: "laptopcomputer.and.iphone", title: "Quản lý phiên đăng nhập", color: .cyan) {
+                        actionRow(glyph: .wallet, title: "Ví thử nghiệm & Cửa hàng", color: KinnectTheme.warning, action: onOpenWallet)
+                        actionRow(glyph: .friends, title: "Danh sách Bạn bè & Lời mời", color: KinnectTheme.accentBright, action: onOpenFriends)
+                        actionRow(glyph: .shield, title: "Quản lý phiên đăng nhập", color: .cyan) {
                             showSessionsSheet = true
                         }
-                        actionRow(icon: "key.fill", title: "Đổi mật khẩu", color: .green) {
+                        actionRow(glyph: .lock, title: "Đổi mật khẩu", color: .green) {
                             showPasswordSheet = true
                         }
-                        actionRow(icon: "hand.raised.fill", title: "Danh sách người dùng đã chặn", color: .orange) {
+                        actionRow(glyph: .block, title: "Danh sách người dùng đã chặn", color: .orange) {
                             showBlocksSheet = true
                         }
                     }
@@ -177,9 +185,12 @@ struct ProfileView: View {
 
                     // Native PushKit / CallKit / Build Diagnostic Card
                     VStack(alignment: .leading, spacing: 8) {
-                        Label("Trạng thái Cuộc gọi Native & PushKit", systemImage: "phone.badge.waveform.fill")
-                            .font(.subheadline.bold())
-                            .foregroundColor(.white)
+                        HStack(spacing: 8) {
+                            KinnectIcon(glyph: .phone, size: 20, selected: true, tint: KinnectTheme.online)
+                            Text("Trạng thái Cuộc gọi Native & PushKit")
+                                .font(.subheadline.bold())
+                                .foregroundColor(.white)
+                        }
                         Text(pushKit.voipRegistrationStatus)
                             .font(.caption)
                             .foregroundColor(KinnectTheme.textSecondary)
@@ -196,12 +207,14 @@ struct ProfileView: View {
                         Button {
                             Task { await appState.logout() }
                         } label: {
-                            Label("Đăng xuất (Xóa Keychain & Cache)", systemImage: "rectangle.portrait.and.arrow.right")
-                                .font(.subheadline.bold())
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                                .foregroundColor(.white)
+                            HStack(spacing: 8) {
+                                KinnectIcon(glyph: .logout, size: 20, tint: .white)
+                                Text("Đăng xuất (Xóa Keychain & Cache)")
+                                    .font(.subheadline.bold())
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                            .foregroundColor(.white)
                         }
 
                         Button(role: .destructive) {
@@ -209,8 +222,7 @@ struct ProfileView: View {
                         } label: {
                             Label("Xóa vĩnh viễn tài khoản Kinnect", systemImage: "trash.fill")
                                 .font(.subheadline.bold())
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
+                                .frame(maxWidth: .infinity, minHeight: 44)
                                 .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.danger.opacity(0.18)))
                                 .foregroundColor(KinnectTheme.danger)
                         }
@@ -253,22 +265,20 @@ struct ProfileView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func actionRow(icon: String, title: String, color: Color, action: @escaping () -> Void) -> some View {
+    private func actionRow(glyph: KinnectGlyph, title: String, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .foregroundColor(color)
-                    .frame(width: 24)
+                KinnectIcon(glyph: glyph, size: 22, tint: color)
                 Text(title)
                     .font(.subheadline.weight(.medium))
                     .foregroundColor(.white)
                     .kinnectMultiline()
                 Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(KinnectTheme.textSecondary)
+                KinnectIcon(glyph: .chevronRight, size: 18, tint: KinnectTheme.textSecondary)
             }
             .padding(.vertical, 6)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
     }
 

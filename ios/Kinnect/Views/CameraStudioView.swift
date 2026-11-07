@@ -46,22 +46,28 @@ struct CameraStudioView: View {
                             }
                         }
                     } label: {
-                        Label("Mở Camera quay/chụp", systemImage: "camera.viewfinder")
-                            .font(.subheadline.weight(.semibold))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.primaryGradient))
-                            .foregroundColor(.white)
+                        HStack(spacing: 8) {
+                            KinnectIcon(glyph: .camera, size: 22, selected: true, tint: .white)
+                            Text("Mở Camera quay/chụp")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .padding(.vertical, 6)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.primaryGradient))
+                        .foregroundColor(.white)
                     }
 
                     if target == .shortVideo {
                         PhotosPicker(selection: $selectedVideoItem, matching: .videos) {
-                            Label("Chọn MP4", systemImage: "film.fill")
-                                .font(.subheadline.weight(.semibold))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                                .foregroundColor(KinnectTheme.accentBright)
+                            HStack(spacing: 8) {
+                                KinnectIcon(glyph: .video, size: 22, tint: KinnectTheme.accentBright)
+                                Text("Chọn MP4")
+                                    .font(.subheadline.weight(.semibold))
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .padding(.vertical, 6)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                            .foregroundColor(KinnectTheme.accentBright)
                         }
                         .onChange(of: selectedVideoItem) { newItem in
                             guard let newItem else { return }
@@ -69,12 +75,15 @@ struct CameraStudioView: View {
                         }
                     } else {
                         PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                            Label("Chọn Ảnh", systemImage: "photo.fill")
-                                .font(.subheadline.weight(.semibold))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                                .foregroundColor(KinnectTheme.accentBright)
+                            HStack(spacing: 8) {
+                                KinnectIcon(glyph: .photo, size: 22, tint: KinnectTheme.accentBright)
+                                Text("Chọn Ảnh")
+                                    .font(.subheadline.weight(.semibold))
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .padding(.vertical, 6)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                            .foregroundColor(KinnectTheme.accentBright)
                         }
                         .onChange(of: selectedPhotoItem) { newItem in
                             guard let newItem else { return }
@@ -83,66 +92,109 @@ struct CameraStudioView: View {
                     }
                 }
 
-                if let previewImage {
-                    Image(uiImage: previewImage)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxHeight: 240)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                } else if !videoDataURL.isEmpty {
-                    HStack(spacing: 10) {
-                        Image(systemName: "checkmark.seal.fill")
-                            .foregroundColor(KinnectTheme.online)
-                        Text("Đã sẵn sàng tải lên video MP4 (\(videoDataURL.count / 1024) KB)")
-                            .font(.caption.weight(.semibold))
-                            .foregroundColor(.white)
+                if previewImage == nil && videoDataURL.isEmpty {
+                    VStack(spacing: 10) {
+                        KinnectIcon(glyph: .studio, size: 32, tint: KinnectTheme.textSecondary)
+                        Text("Hãy chụp ảnh, quay video hoặc chọn tệp từ thư viện để mở bảng chỉnh sửa Studio.")
+                            .font(.subheadline)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                            .multilineTextAlignment(.center)
                             .kinnectMultiline()
                     }
-                    .padding(12)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                }
-
-                if target == .shortVideo {
-                    TextField("Tiêu đề video ngắn...", text: $title)
-                        .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                        .foregroundColor(.white)
-                }
-
-                TextField("Mô tả / Nội dung...", text: $caption, axis: .vertical)
-                    .lineLimit(3...7)
-                    .padding(12)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                    .foregroundColor(.white)
-
-                Button {
-                    Task { await publishContent() }
-                } label: {
-                    HStack {
-                        Spacer()
-                        if isUploading {
-                            ProgressView().tint(.white)
-                        } else {
-                            Text("Đăng ngay")
-                                .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 28)
+                    .kinnectCard()
+                } else {
+                    // Only show Studio preview, editing fields, separate Save group, and primary Use/Publish button after media is selected/captured
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack(spacing: 8) {
+                            KinnectIcon(glyph: .studio, size: 22, selected: true, tint: KinnectTheme.accentBright)
+                            Text("Kinnect Studio — Chỉnh sửa nội dung")
+                                .font(.subheadline.bold())
+                                .foregroundColor(.white)
+                            Spacer()
+                            // Separate action group for Save (does not overlap primary publish button)
+                            HStack(spacing: 4) {
+                                KinnectIconButton(
+                                    glyph: .save,
+                                    label: "Lưu nháp / Thiết bị",
+                                    tint: KinnectTheme.accentBright
+                                ) {
+                                    saveMediaToPhotos()
+                                }
+                                Text("Lưu")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundColor(KinnectTheme.accentBright)
+                            }
+                            .padding(.horizontal, 10)
+                            .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
                         }
-                        Spacer()
+
+                        if let previewImage {
+                            Image(uiImage: previewImage)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxHeight: 240)
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                        } else if !videoDataURL.isEmpty {
+                            HStack(spacing: 10) {
+                                KinnectIcon(glyph: .video, size: 22, selected: true, tint: KinnectTheme.online)
+                                Text("Đã sẵn sàng tải lên video MP4 (\(videoDataURL.count / 1024) KB)")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundColor(.white)
+                                    .kinnectMultiline()
+                            }
+                            .padding(12)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                        }
+
+                        if target == .shortVideo {
+                            TextField("Tiêu đề video ngắn...", text: $title)
+                                .padding(12)
+                                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                                .foregroundColor(.white)
+                        }
+
+                        TextField("Mô tả / Nội dung...", text: $caption, axis: .vertical)
+                            .lineLimit(3...7)
+                            .padding(12)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                            .foregroundColor(.white)
+
+                        Button {
+                            Task { await publishContent() }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Spacer()
+                                if isUploading {
+                                    ProgressView().tint(.white)
+                                } else {
+                                    KinnectIcon(glyph: .send, size: 20, selected: true, tint: .white)
+                                    Text("Dùng ảnh/video & Đăng ngay")
+                                        .font(.headline)
+                                }
+                                Spacer()
+                            }
+                            .padding(.vertical, 14)
+                            .background(KinnectTheme.primaryGradient)
+                            .foregroundColor(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                        .disabled(isUploading)
                     }
-                    .padding(.vertical, 14)
-                    .background(KinnectTheme.primaryGradient)
-                    .foregroundColor(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .kinnectCard()
                 }
-                .disabled(isUploading)
             }
             .padding(16)
         }
         .background(KinnectTheme.background)
-        .navigationTitle("Camera & Đăng tải")
+        .navigationTitle("Camera & Studio")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Đóng") { dismiss() }
+            ToolbarItem(placement: .navigationBarLeading) {
+                KinnectIconButton(glyph: .close, label: "Thoát", tint: KinnectTheme.textPrimary) {
+                    dismiss()
+                }
             }
         }
         .sheet(isPresented: $showNativeCameraPicker) {
@@ -183,6 +235,15 @@ struct CameraStudioView: View {
            let jpeg = uiImg.jpegData(compressionQuality: 0.72) {
             self.previewImage = uiImg
             self.imageDataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
+        }
+    }
+
+    private func saveMediaToPhotos() {
+        if let img = previewImage {
+            UIImageWriteToSavedPhotosAlbum(img, nil, nil, nil)
+            appState.showToast("Đã lưu ảnh vào Thư viện ảnh trên thiết bị.")
+        } else if !videoDataURL.isEmpty {
+            appState.showToast("Đã lưu bản nháp video trong phiên Studio.")
         }
     }
 

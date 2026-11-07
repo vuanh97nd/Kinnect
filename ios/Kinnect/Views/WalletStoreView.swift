@@ -36,30 +36,49 @@ struct WalletStoreView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     // Balance Hero Card
                     VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Label("Số dư khả dụng", systemImage: "creditcard.and.123")
+                        HStack(spacing: 8) {
+                            KinnectIcon(glyph: .wallet, size: 22, selected: true, tint: .white)
+                            Text("Số dư khả dụng")
                                 .font(.caption.weight(.semibold))
-                                .foregroundColor(.white.opacity(0.85))
+                                .foregroundColor(.white.opacity(0.9))
                             Spacer()
-                            Text(currencyLabel)
-                                .font(.caption2.bold())
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Capsule().fill(Color.white.opacity(0.2)))
-                                .foregroundColor(.white)
+                            HStack(spacing: 4) {
+                                KinnectIcon(glyph: .coin, size: 16, selected: true, tint: .white)
+                                Text(currencyLabel)
+                                    .font(.caption2.bold())
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(Color.white.opacity(0.2)))
+                            .foregroundColor(.white)
                         }
 
-                        Text("\(availableBalance) xu")
-                            .font(.system(size: 30, weight: .black, design: .rounded))
-                            .foregroundColor(.white)
+                        HStack(spacing: 8) {
+                            KinnectIcon(glyph: .coin, size: 28, selected: true, tint: KinnectTheme.warning)
+                            Text("\(availableBalance) xu")
+                                .font(.system(size: 30, weight: .black, design: .rounded))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
+                        }
 
                         HStack(spacing: 16) {
-                            Text("Đã nhận: +\(earnedBalance)")
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.9))
-                            Text("Đã dùng: -\(spentBalance)")
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.9))
+                            HStack(spacing: 5) {
+                                KinnectIcon(glyph: .coin, size: 16, tint: .white.opacity(0.9))
+                                Text("Xu mua / nhận: +\(earnedBalance)")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.95))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.75)
+                            }
+                            HStack(spacing: 5) {
+                                KinnectIcon(glyph: .coin, size: 16, tint: .white.opacity(0.9))
+                                Text("Xu tặng / dùng: -\(spentBalance)")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.95))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.75)
+                            }
                         }
                     }
                     .padding(16)
@@ -117,8 +136,7 @@ struct WalletStoreView: View {
                                     .fill(Color(hex: pkg.accentColor))
                                     .frame(width: 44, height: 44)
                                     .overlay(
-                                        Image(systemName: "sparkles")
-                                            .foregroundColor(.white)
+                                        KinnectIcon(glyph: .store, size: 22, selected: true, tint: .white)
                                     )
 
                                 VStack(alignment: .leading, spacing: 4) {
@@ -140,9 +158,13 @@ struct WalletStoreView: View {
                                         .font(.caption)
                                         .foregroundColor(KinnectTheme.textSecondary)
                                         .kinnectMultiline()
-                                    Text("\(pkg.priceCoins) xu")
-                                        .font(.caption.bold())
-                                        .foregroundColor(KinnectTheme.warning)
+                                    HStack(spacing: 4) {
+                                        KinnectIcon(glyph: .coin, size: 16, selected: true, tint: KinnectTheme.warning)
+                                        Text("\(pkg.priceCoins) xu")
+                                            .font(.caption.bold())
+                                            .foregroundColor(KinnectTheme.warning)
+                                            .minimumScaleFactor(0.75)
+                                    }
                                 }
 
                                 Spacer()
@@ -227,7 +249,9 @@ struct WalletStoreView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Đóng") { dismiss() }
+                KinnectIconButton(glyph: .close, label: "Đóng", tint: KinnectTheme.textPrimary) {
+                    dismiss()
+                }
             }
         }
         .task {

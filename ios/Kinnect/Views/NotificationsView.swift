@@ -10,10 +10,13 @@ struct NotificationsView: View {
     var body: some View {
         List {
             if notifications.isEmpty && !isLoading {
-                Text("Chưa có thông báo mới")
-                    .font(.subheadline)
-                    .foregroundColor(KinnectTheme.textSecondary)
-                    .listRowBackground(Color.clear)
+                HStack(spacing: 10) {
+                    KinnectIcon(glyph: .notifications, size: 24, tint: KinnectTheme.textSecondary)
+                    Text("Chưa có thông báo mới")
+                        .font(.subheadline)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                }
+                .listRowBackground(Color.clear)
             }
 
             ForEach(notifications) { item in
@@ -58,7 +61,9 @@ struct NotificationsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Đóng") { dismiss() }
+                KinnectIconButton(glyph: .close, label: "Đóng", tint: KinnectTheme.textPrimary) {
+                    dismiss()
+                }
             }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button("Đọc tất cả") {

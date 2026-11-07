@@ -37,8 +37,7 @@ struct DiscoverView: View {
 
             if let locationStatusText, segment == .nearby {
                 HStack(spacing: 6) {
-                    Image(systemName: "location.fill")
-                        .foregroundColor(KinnectTheme.accentBright)
+                    KinnectIcon(glyph: .nearby, size: 18, selected: true, tint: KinnectTheme.accentBright)
                     Text(locationStatusText)
                         .font(.caption)
                         .foregroundColor(KinnectTheme.textSecondary)
@@ -54,15 +53,23 @@ struct DiscoverView: View {
                     if !visibleShorts.isEmpty {
                         VStack(alignment: .leading, spacing: 10) {
                             HStack {
-                                Label("Video ngắn (Shorts)", systemImage: "play.rectangle.fill")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
+                                HStack(spacing: 8) {
+                                    KinnectIcon(glyph: .video, size: 22, selected: true, tint: KinnectTheme.accentBright)
+                                    Text("Video ngắn (Shorts)")
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+                                }
                                 Spacer()
                                 Button(action: onOpenCamera) {
-                                    Label("Đăng video", systemImage: "plus.circle.fill")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundColor(KinnectTheme.accentBright)
+                                    HStack(spacing: 4) {
+                                        KinnectIcon(glyph: .add, size: 16, selected: true, tint: KinnectTheme.accentBright)
+                                        Text("Đăng video")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundColor(KinnectTheme.accentBright)
+                                    }
+                                    .frame(minHeight: 44)
                                 }
+                                .accessibilityLabel("Đăng video ngắn")
                             }
 
                             ForEach(visibleShorts) { short in
@@ -315,12 +322,12 @@ private struct ShortVideoCard: View {
                     }
                 }
                 Spacer()
-                Button(action: onReport) {
-                    Image(systemName: "flag.fill")
-                        .font(.caption)
-                        .foregroundColor(KinnectTheme.textSecondary)
-                        .padding(8)
-                }
+                KinnectIconButton(
+                    glyph: .report,
+                    label: "Báo cáo video",
+                    tint: KinnectTheme.textSecondary,
+                    action: onReport
+                )
             }
 
             if let player {
@@ -360,15 +367,31 @@ private struct ShortVideoCard: View {
 
             HStack(spacing: 16) {
                 Button(action: onLike) {
-                    Label("\(short.likesCount)", systemImage: short.liked ? "heart.fill" : "heart")
-                        .font(.caption.weight(.semibold))
-                        .foregroundColor(short.liked ? KinnectTheme.danger : KinnectTheme.textSecondary)
+                    HStack(spacing: 6) {
+                        KinnectIcon(
+                            glyph: .heart,
+                            size: 20,
+                            selected: short.liked,
+                            tint: short.liked ? KinnectTheme.danger : KinnectTheme.textSecondary
+                        )
+                        Text("\(short.likesCount)")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(short.liked ? KinnectTheme.danger : KinnectTheme.textSecondary)
+                    }
+                    .frame(minHeight: 44)
                 }
+                .accessibilityLabel("Thích video")
+
                 Button(action: onComment) {
-                    Label("\(short.commentsCount) bình luận", systemImage: "bubble.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundColor(KinnectTheme.textSecondary)
+                    HStack(spacing: 6) {
+                        KinnectIcon(glyph: .comment, size: 20, tint: KinnectTheme.textSecondary)
+                        Text("\(short.commentsCount) bình luận")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                    .frame(minHeight: 44)
                 }
+                .accessibilityLabel("Bình luận video")
                 Spacer()
             }
         }
@@ -425,13 +448,12 @@ private struct DiscoverPersonCard: View {
 
             Spacer()
 
-            Button(action: onCallVideo) {
-                Image(systemName: "video.fill")
-                    .font(.caption.bold())
-                    .foregroundColor(.white)
-                    .padding(10)
-                    .background(Circle().fill(KinnectTheme.surfaceElevated))
-            }
+            KinnectIconButton(
+                glyph: .videoCall,
+                label: "Gọi video",
+                tint: KinnectTheme.accentBright,
+                action: onCallVideo
+            )
 
             Button(action: onFollowToggle) {
                 Text(person.isFollowing ? "Đang theo dõi" : "Theo dõi")
@@ -481,13 +503,12 @@ struct ShortCommentsSheet: View {
                         .padding(10)
                         .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
                         .foregroundColor(.white)
-                    Button {
+                    KinnectIconButton(
+                        glyph: .send,
+                        label: "Gửi bình luận",
+                        tint: KinnectTheme.accentBright
+                    ) {
                         Task { await postComment() }
-                    } label: {
-                        Image(systemName: "paperplane.fill")
-                            .foregroundColor(.white)
-                            .padding(10)
-                            .background(Circle().fill(KinnectTheme.accent))
                     }
                 }
                 .padding(12)
@@ -498,7 +519,9 @@ struct ShortCommentsSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Đóng") { dismiss() }
+                    KinnectIconButton(glyph: .close, label: "Đóng", tint: KinnectTheme.textPrimary) {
+                        dismiss()
+                    }
                 }
             }
             .task {

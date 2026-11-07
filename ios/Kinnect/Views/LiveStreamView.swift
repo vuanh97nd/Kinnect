@@ -5,20 +5,19 @@ struct LiveStreamView: View {
     @ObservedObject private var appState = AppState.shared
 
     @State private var showCreateLiveSheet = false
-    @State private var selectedModeFilter: String = "all" // "all" | "chat" | "game"
     @State private var isLoading = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                // Header CTA to start Live (Trò chuyện / Chơi game — NO Karaoke)
+                // Header CTA to start Live (mode selected inside CreateLiveRoomSheet — no top filter bar)
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Phát trực tiếp Kinnect Live")
                             .font(.headline)
                             .foregroundColor(.white)
                             .kinnectMultiline()
-                        Text("Chế độ Trò chuyện hoặc Chơi game trực tiếp cùng bạn bè")
+                        Text("Chọn chế độ Trò chuyện hoặc Chơi game khi bắt đầu phát")
                             .font(.caption)
                             .foregroundColor(KinnectTheme.textSecondary)
                             .kinnectMultiline()
@@ -27,29 +26,23 @@ struct LiveStreamView: View {
                     Button {
                         showCreateLiveSheet = true
                     } label: {
-                        Label("Phát Live", systemImage: "dot.radiowaves.left.and.right")
-                            .font(.subheadline.bold())
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
-                            .background(Capsule().fill(KinnectTheme.primaryGradient))
-                            .foregroundColor(.white)
+                        HStack(spacing: 6) {
+                            KinnectIcon(glyph: .live, size: 20, selected: true, tint: .white)
+                            Text("Phát Live")
+                                .font(.subheadline.bold())
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(Capsule().fill(KinnectTheme.primaryGradient))
+                        .foregroundColor(.white)
                     }
+                    .accessibilityLabel("Bắt đầu phát Live")
                 }
                 .kinnectCard()
 
-                // Mode filter (No Karaoke)
-                HStack(spacing: 8) {
-                    modeFilterButton(id: "all", label: "Tất cả", icon: "sparkles")
-                    modeFilterButton(id: "chat", label: "Trò chuyện", icon: "bubble.left.and.bubble.right.fill")
-                    modeFilterButton(id: "game", label: "Chơi game", icon: "gamecontroller.fill")
-                    Spacer()
-                }
-
-                if filteredRooms.isEmpty && !isLoading {
+                if appState.liveRooms.isEmpty && !isLoading {
                     VStack(spacing: 12) {
-                        Image(systemName: "video.badge.waveform.fill")
-                            .font(.system(size: 40))
-                            .foregroundColor(KinnectTheme.textSecondary)
+                        KinnectIcon(glyph: .live, size: 40, tint: KinnectTheme.textSecondary)
                         Text("Hiện chưa có phòng Live nào đang phát")
                             .font(.subheadline)
                             .foregroundColor(KinnectTheme.textSecondary)
@@ -57,13 +50,15 @@ struct LiveStreamView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 44)
                 } else {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 12)], spacing: 12) {
-                        ForEach(filteredRooms) { room in
+                    // Unified scrollable stream of Live rooms
+                    LazyVStack(spacing: 12) {
+                        ForEach(appState.liveRooms) { room in
                             Button {
                                 joinLiveRoom(room)
                             } label: {
                                 liveRoomCard(room)
                             }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -84,49 +79,34 @@ struct LiveStreamView: View {
         }
     }
 
-    private var filteredRooms: [LiveRoomItem] {
-        appState.liveRooms.filter { room in
-            if selectedModeFilter == "all" { return true }
-            return room.liveMode == selectedModeFilter
-        }
-    }
-
-    private func modeFilterButton(id: String, label: String, icon: String) -> some View {
-        let active = (selectedModeFilter == id)
-        return Button {
-            selectedModeFilter = id
-        } label: {
-            Label(label, systemImage: icon)
-                .font(.caption.weight(.semibold))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(
-                    Capsule()
-                        .fill(active ? AnyShapeStyle(KinnectTheme.primaryGradient) : AnyShapeStyle(KinnectTheme.surfaceElevated))
-                )
-                .foregroundColor(.white)
-        }
-    }
-
     private func liveRoomCard(_ room: LiveRoomItem) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("LIVE")
-                    .font(.caption2.bold())
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(Capsule().fill(KinnectTheme.danger))
-                    .foregroundColor(.white)
+                HStack(spacing: 4) {
+                    KinnectIcon(glyph: .live, size: 14, selected: true, tint: .white)
+                    Text("LIVE")
+                        .font(.caption2.bold())
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(KinnectTheme.danger))
+                .foregroundColor(.white)
 
-                Text(room.liveMode == "game" ? "🎮 Game" : "💬 Trò chuyện")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundColor(KinnectTheme.accentBright)
+                HStack(spacing: 4) {
+                    KinnectIcon(glyph: room.liveMode == "game" ? .game : .messages, size: 15, tint: KinnectTheme.accentBright)
+                    Text(room.liveMode == "game" ? "Chơi game" : "Trò chuyện")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(KinnectTheme.accentBright)
+                }
 
                 Spacer()
 
-                Label("\(room.viewerCount)", systemImage: "eye.fill")
-                    .font(.caption2)
-                    .foregroundColor(KinnectTheme.textSecondary)
+                HStack(spacing: 4) {
+                    KinnectIcon(glyph: .eye, size: 15, tint: KinnectTheme.textSecondary)
+                    Text("\(room.viewerCount)")
+                        .font(.caption2)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                }
             }
 
             HStack(spacing: 10) {
@@ -326,29 +306,26 @@ struct LiveRoomFullScreenView: View {
                         }
 
                         if !appState.isCurrentLiveHost {
-                            Button {
+                            KinnectIconButton(
+                                glyph: .report,
+                                label: "Báo cáo phòng Live",
+                                tint: .white
+                            ) {
                                 appState.activeReportContext = UGCReportContext(
                                     targetType: "live",
                                     targetId: room.id,
                                     targetUserId: room.hostUserId,
                                     targetTitle: room.title
                                 )
-                            } label: {
-                                Image(systemName: "flag.fill")
-                                    .foregroundColor(.white)
-                                    .padding(8)
-                                    .background(Circle().fill(Color.black.opacity(0.45)))
                             }
                         }
 
-                        Button {
+                        KinnectIconButton(
+                            glyph: .close,
+                            label: "Rời phòng Live",
+                            tint: .white
+                        ) {
                             leaveLiveRoom()
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .padding(10)
-                                .background(Circle().fill(KinnectTheme.danger))
                         }
                     }
                     .padding(.horizontal, 14)
@@ -392,40 +369,37 @@ struct LiveRoomFullScreenView: View {
                     .frame(maxHeight: 190)
 
                     // Bottom controls
-                    HStack(spacing: 10) {
+                    HStack(spacing: 8) {
                         TextField("Trò chuyện trong phòng Live...", text: $chatInput)
                             .padding(10)
                             .background(Capsule().fill(Color.black.opacity(0.55)))
                             .foregroundColor(.white)
 
-                        Button {
+                        KinnectIconButton(
+                            glyph: .send,
+                            label: "Gửi bình luận Live",
+                            tint: KinnectTheme.accentBright
+                        ) {
                             sendLiveChat()
-                        } label: {
-                            Image(systemName: "paperplane.fill")
-                                .foregroundColor(.white)
-                                .padding(10)
-                                .background(Circle().fill(KinnectTheme.accent))
                         }
 
-                        Button {
+                        KinnectIconButton(
+                            glyph: .heart,
+                            label: "Thả tim Live",
+                            tint: KinnectTheme.accentBright
+                        ) {
                             NativeSocketClient.shared.sendJSON([
                                 "type": "live-reaction",
                                 "reaction": "heart"
                             ])
-                        } label: {
-                            Text("💜")
-                                .font(.title3)
-                                .padding(8)
-                                .background(Circle().fill(Color.black.opacity(0.55)))
                         }
 
-                        Button {
+                        KinnectIconButton(
+                            glyph: .gift,
+                            label: "Tặng quà Live",
+                            tint: KinnectTheme.warning
+                        ) {
                             showGiftSheet = true
-                        } label: {
-                            Image(systemName: "gift.fill")
-                                .foregroundColor(KinnectTheme.warning)
-                                .padding(10)
-                                .background(Circle().fill(Color.black.opacity(0.55)))
                         }
                     }
                     .padding(.horizontal, 14)

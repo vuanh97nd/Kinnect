@@ -122,28 +122,26 @@ struct FriendsView: View {
             }
             Spacer()
 
-            Button {
+            KinnectIconButton(
+                glyph: .phone,
+                label: "Gọi thoại",
+                tint: KinnectTheme.online
+            ) {
                 Task {
                     dismiss()
                     await NativeWebRTCManager.shared.startOutgoingCall(targetUser: user, mode: "audio")
                 }
-            } label: {
-                Image(systemName: "phone.fill")
-                    .foregroundColor(KinnectTheme.online)
-                    .padding(9)
-                    .background(Circle().fill(KinnectTheme.surfaceElevated))
             }
 
-            Button {
+            KinnectIconButton(
+                glyph: .videoCall,
+                label: "Gọi video",
+                tint: KinnectTheme.accentBright
+            ) {
                 Task {
                     dismiss()
                     await NativeWebRTCManager.shared.startOutgoingCall(targetUser: user, mode: "video")
                 }
-            } label: {
-                Image(systemName: "video.fill")
-                    .foregroundColor(KinnectTheme.accentBright)
-                    .padding(9)
-                    .background(Circle().fill(KinnectTheme.surfaceElevated))
             }
 
             Menu {
@@ -155,13 +153,17 @@ struct FriendsView: View {
                 Button(role: .destructive) {
                     Task { await appState.blockUser(userId: user.id, userName: user.name) }
                 } label: {
-                    Label("Chặn người dùng", systemImage: "hand.raised.fill")
+                    HStack {
+                        Text("Chặn người dùng")
+                        KinnectIcon(glyph: .block, size: 18, tint: KinnectTheme.danger)
+                    }
                 }
             } label: {
-                Image(systemName: "ellipsis")
-                    .foregroundColor(KinnectTheme.textSecondary)
-                    .padding(8)
+                KinnectIcon(glyph: .more, size: 22, tint: KinnectTheme.textSecondary)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
+            .accessibilityLabel("Tùy chọn bạn bè")
         }
         .kinnectCard()
     }
