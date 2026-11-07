@@ -57,7 +57,7 @@ struct ProfileView: View {
                                     Text(user.name)
                                         .font(.title3.bold())
                                         .foregroundColor(.white)
-                                    Text("@\(user.username)")
+                                    Text("@\(user.handle.isEmpty ? user.name : user.handle)")
                                         .font(.subheadline)
                                         .foregroundColor(KinnectTheme.accentBright)
                                 }
@@ -528,6 +528,305 @@ struct EditProfileSheet: View {
             )
             appState.showToast("Đã cập nhật hình ảnh hồ sơ.")
             onSaved()
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+}
+
+// MARK: - Account & Security Sheets
+struct ActiveSessionsSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
+    @State private var sessions: [[String: Any]] = []
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(Array(sessions.enumerated()), id: \.offset) { _, s in
+                    let sid = s["id"] as? String ?? ""
+                    let ua = s["userAgent"] as? String ?? "Thiết bị Kinnect"
+                    let current = s["current"] as? Bool ?? false
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(ua)
+                                .font(.subheadline.bold())
+                                .foregroundColor(.white)
+                                .kinnectMultiline()
+                            Text(current ? "Phiên hiện tại trên thiết bị này" : "Phiên hoạt động")
+                                .font(.caption)
+                                .foregroundColor(current ? KinnectTheme.online : KinnectTheme.textSecondary)
+                        }
+                        Spacer()
+                        if !current && !sid.isEmpty {
+                            Button(role: .destructive) {
+                                Task { await revokeSession(sid) }
+                            } label: {
+                                Text("Đăng xuất")
+                                    .font(.caption.bold())
+                            }
+                        }
+                    }
+                    .listRowBackground(KinnectTheme.surface)
+                }
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(KinnectTheme.background)
+            .navigationTitle("Phiên đăng nhập")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Đóng") { dismiss() }
+                }
+            }
+            .task {
+                await loadSessions()
+            }
+        }
+    }
+
+    private func loadSessions() async {
+        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/me/sessions") {
+            self.sessions = res["sessions"] as? [[String: Any]] ?? []
+        }
+    }
+
+    private func revokeSession(_ id: String) async {
+        _ = try? await KinnectAPIClient.shared.requestJSON(
+            "/api/me/sessions/\(id)",
+            method: "DELETE",
+            body: [:],
+            requestId: "revoke_\(id)"
+        )
+        await loadSessions()
+    }
+}
+
+struct ChangePasswordSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
+
+    @State private var currentPassword = ""
+    @State private var newPassword = ""
+    @State private var isSubmitting = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Bảo mật mật khẩu") {
+                    SecureField("Mật khẩu hiện tại", text: $currentPassword)
+                    SecureField("Mật khẩu mới (tối thiểu 6 ký tự)", text: $newPassword)
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(KinnectTheme.background)
+            .navigationTitle("Đổi mật khẩu")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Hủy") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Lưu") {
+                        Task { await updatePassword() }
+                    }
+                    .disabled(isSubmitting || newPassword.count < 6)
+                }
+            }
+        }
+    }
+
+    private func updatePassword() async {
+        isSubmitting = true
+        defer { isSubmitting = false }
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/me/password",
+                method: "POST",
+                body: [
+                    "currentPassword": currentPassword,
+                    "newPassword": newPassword
+                ]
+            )
+            appState.showToast("Đã đổi mật khẩu thành công.")
+            dismiss()
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+}
+
+struct BlockedUsersSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
+    @State private var blockedUsers: [KinnectUser] = []
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if blockedUsers.isEmpty {
+                    Text("Bạn chưa chặn người dùng nào.")
+                        .font(.subheadline)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                        .listRowBackground(KinnectTheme.surface)
+                } else {
+                    ForEach(blockedUsers) { u in
+                        HStack(spacing: 12) {
+                            KinnectAvatarView(name: u.name, avatarURL: u.avatarUrl, colorHex: u.avatarColor, size: 36)
+                            Text(u.name)
+                                .font(.subheadline.bold())
+                                .foregroundColor(.white)
+                            Spacer()
+                            Button("Bỏ chặn") {
+                                Task { await unblock(u) }
+                            }
+                            .font(.caption.bold())
+                            .foregroundColor(KinnectTheme.accentBright)
+                        }
+                        .listRowBackground(KinnectTheme.surface)
+                    }
+                }
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(KinnectTheme.background)
+            .navigationTitle("Người dùng đã chặn")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Đóng") { dismiss() }
+                }
+            }
+            .task {
+                await loadBlocks()
+            }
+        }
+    }
+
+    private func loadBlocks() async {
+        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/me/blocks") {
+            let list = res["users"] as? [[String: Any]] ?? []
+            self.blockedUsers = list.map(KinnectUser.from)
+        }
+    }
+
+    private func unblock(_ u: KinnectUser) async {
+        _ = try? await KinnectAPIClient.shared.requestJSON(
+            "/api/me/blocks/\(u.id)",
+            method: "DELETE",
+            body: [:],
+            requestId: "unblock_\(u.id)"
+        )
+        await loadBlocks()
+    }
+}
+
+struct DeleteAccountConfirmationSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
+
+    @State private var confirmPhrase = ""
+    @State private var password = ""
+    @State private var requiredPhrase = "XOA TAI KHOAN"
+    @State private var summaryInfo: String = "Đang kiểm tra dữ liệu tài khoản..."
+    @State private var isDeleting = false
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Cảnh báo: Hành động này sẽ xóa vĩnh viễn tài khoản Kinnect, bài viết, video ngắn, tin nhắn, ví và toàn bộ phiên đăng nhập của bạn. Không thể khôi phục sau khi xóa.")
+                        .font(.subheadline)
+                        .foregroundColor(KinnectTheme.danger)
+                        .kinnectMultiline()
+
+                    Text(summaryInfo)
+                        .font(.caption)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                        .kinnectMultiline()
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Nhập chính xác cụm từ xác nhận: \(requiredPhrase)")
+                            .font(.caption.bold())
+                            .foregroundColor(.white)
+                        TextField(requiredPhrase, text: $confirmPhrase)
+                            .textInputAutocapitalization(.characters)
+                            .padding(12)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                            .foregroundColor(.white)
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Nhập mật khẩu hiện tại")
+                            .font(.caption.bold())
+                            .foregroundColor(.white)
+                        SecureField("Mật khẩu của bạn", text: $password)
+                            .padding(12)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                            .foregroundColor(.white)
+                    }
+
+                    Button(role: .destructive) {
+                        Task { await performAccountDeletion() }
+                    } label: {
+                        HStack {
+                            Spacer()
+                            if isDeleting {
+                                ProgressView().tint(.white)
+                            } else {
+                                Text("Xác nhận xóa vĩnh viễn tài khoản")
+                                    .font(.headline)
+                            }
+                            Spacer()
+                        }
+                        .padding(.vertical, 14)
+                        .background(KinnectTheme.danger)
+                        .foregroundColor(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                    .disabled(isDeleting || confirmPhrase.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() != requiredPhrase)
+                }
+                .padding(16)
+            }
+            .background(KinnectTheme.background)
+            .navigationTitle("Xóa tài khoản")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Hủy") { dismiss() }
+                }
+            }
+            .task {
+                if let res = try? await KinnectAPIClient.shared.requestJSON("/api/me/account-deletion") {
+                    if let phrase = res["confirmText"] as? String, !phrase.isEmpty {
+                        self.requiredPhrase = phrase
+                    }
+                    if let summary = res["summary"] as? [String: Any] {
+                        let posts = summary["posts"] as? Int ?? 0
+                        let messages = summary["messages"] as? Int ?? 0
+                        let friends = summary["friends"] as? Int ?? 0
+                        self.summaryInfo = "Dữ liệu sẽ bị xóa vĩnh viễn: \(posts) bài viết, \(messages) tin nhắn, \(friends) liên kết bạn bè."
+                    }
+                }
+            }
+        }
+    }
+
+    private func performAccountDeletion() async {
+        isDeleting = true
+        defer { isDeleting = false }
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/me/account-deletion",
+                method: "DELETE",
+                body: [
+                    "confirmText": confirmPhrase.trimmingCharacters(in: .whitespacesAndNewlines),
+                    "password": password
+                ]
+            )
+            dismiss()
+            appState.clearSessionState()
         } catch {
             appState.showToast(error.localizedDescription)
         }

@@ -31,6 +31,16 @@ final class AppState: ObservableObject {
     @Published var liveGiftRanking: [[String: Any]] = []
     @Published var liveLastReactionBanner: String?
 
+    func joinLiveRoom(_ room: LiveRoomItem) {
+        currentLiveRoom = room
+        isCurrentLiveHost = (room.hostId == currentUser?.id)
+    }
+
+    func leaveCurrentLiveRoom() {
+        currentLiveRoom = nil
+        isCurrentLiveHost = false
+    }
+
     private init() {
         setupCallKitCallbacks()
         setupSocketCallbacks()

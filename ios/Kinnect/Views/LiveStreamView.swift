@@ -58,9 +58,9 @@ struct LiveStreamView: View {
                 likesCount = initialRoom.likesCount
             }
         }
-        .onChange(of: selectedIndex) { newIdx in
-            guard newIdx < appState.liveRooms.count else { return }
-            let room = appState.liveRooms[newIdx]
+        .onChange(of: selectedIndex) {
+            guard selectedIndex < appState.liveRooms.count else { return }
+            let room = appState.liveRooms[selectedIndex]
             appState.joinLiveRoom(room)
             likesCount = room.likesCount
         }
@@ -590,6 +590,7 @@ struct LiveRoomFullScreenView: View {
             }
             .sheet(isPresented: $showGiftSheet) {
                 LiveGiftDrawerSheet(
+                    roomId: room.id,
                     gifts: giftCatalog,
                     priceVersion: giftPriceVersion
                 )

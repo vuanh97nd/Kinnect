@@ -24,6 +24,8 @@ struct CameraStudioView: View {
     // Camera / Capture State
     @State private var captureMode: CaptureMode = .photo
     @State private var target: PublishTarget = .feedPost
+    @State private var isUsingFrontCamera = false
+    @State private var isFlashOn = false
     @State private var showNativeCameraPicker = false
     @State private var showStudioProSheet = false
     @State private var showCreateLiveSheet = false
@@ -112,8 +114,9 @@ struct CameraStudioView: View {
     // MARK: - Direct Camera Viewfinder Mode
     private var cameraViewfinderMode: some View {
         ZStack(alignment: .bottom) {
-            // Simulated live camera viewport / background canvas
-            Color.black.ignoresSafeArea()
+            // Live Hardware Camera Viewport Layer with fallback
+            LiveCameraPreviewView(isFlashOn: $isFlashOn, isUsingFrontCamera: $isUsingFrontCamera)
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // Top Camera Chrome: Close, Aspect ratio 9:16, Music, Flash
@@ -137,6 +140,16 @@ struct CameraStudioView: View {
 
                     Spacer()
 
+                    Button {
+                        isFlashOn.toggle()
+                    } label: {
+                        Image(systemName: isFlashOn ? "bolt.fill" : "bolt.slash.fill")
+                            .font(.caption)
+                            .foregroundColor(isFlashOn ? KinnectTheme.warning : .white)
+                            .padding(8)
+                            .background(Circle().fill(Color.black.opacity(0.4)))
+                    }
+
                     Text("9:16")
                         .font(.caption2.bold())
                         .padding(.horizontal, 8)
@@ -146,16 +159,6 @@ struct CameraStudioView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 10)
-
-                Spacer()
-
-                // Center viewfinder guidelines
-                VStack(spacing: 12) {
-                    KinnectIcon(glyph: .camera, size: 48, tint: .white.opacity(0.6))
-                    Text("Chạm nút chụp hoặc mở Camera hệ thống")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
-                }
 
                 Spacer()
 
@@ -207,9 +210,9 @@ struct CameraStudioView: View {
                         }
                         .accessibilityLabel("Nút chụp hoặc quay video")
 
-                        // Fast switch to native capture
+                        // Fast switch to toggle front/back camera
                         Button {
-                            showNativeCameraPicker = true
+                            isUsingFrontCamera.toggle()
                         } label: {
                             VStack(spacing: 4) {
                                 ZStack {
@@ -225,7 +228,7 @@ struct CameraStudioView: View {
                                     .foregroundColor(.white)
                             }
                         }
-                        .accessibilityLabel("Chuyển camera")
+                        .accessibilityLabel("Chuyển camera trước/sau")
                     }
 
                     // Mode Selector: ẢNH | VIDEO | LIVE (Android 1.2.12 build 118 Parity)
@@ -441,19 +444,52 @@ struct CameraStudioView: View {
     // MARK: - Save Media to Device Camera Roll
     private func saveMediaToPhotos() {
         if let img = previewImage {
-            UIImageWriteToSavedPhotosAlbum(img, nil, nil, nil)
-            appState.showToast("Đã lưu ảnh vào Album ảnh trên thiết bị.")
+            PhotoSaveCoordinator.shared.onComplete = { success, error in
+                if success {
+                    appState.showToast("Đã lưu ảnh vào Album ảnh trên thiết bị.")
+                } else {
+                    appState.showToast("Không thể lưu ảnh: \(error?.localizedDescription ?? "Lỗi quyền truy cập")")
+                }
+            }
+            UIImageWriteToSavedPhotosAlbum(
+                img,
+                PhotoSaveCoordinator.shared,
+                #selector(PhotoSaveCoordinator.image(_:didFinishSavingWithError:contextInfo:)),
+                nil
+            )
         } else if let tempURL = capturedVideoTempURL {
-            UISaveVideoAtPathToSavedPhotosAlbum(tempURL.path, nil, nil, nil)
-            appState.showToast("Đã lưu video vào Album ảnh trên thiết bị.")
+            PhotoSaveCoordinator.shared.onComplete = { success, error in
+                if success {
+                    appState.showToast("Đã lưu video vào Album ảnh trên thiết bị.")
+                } else {
+                    appState.showToast("Không thể lưu video: \(error?.localizedDescription ?? "Lỗi quyền truy cập")")
+                }
+            }
+            UISaveVideoAtPathToSavedPhotosAlbum(
+                tempURL.path,
+                PhotoSaveCoordinator.shared,
+                #selector(PhotoSaveCoordinator.video(_:didFinishSavingWithError:contextInfo:)),
+                nil
+            )
         } else if !videoDataURL.isEmpty {
             if let range = videoDataURL.range(of: "base64,") {
                 let b64 = String(videoDataURL[range.upperBound...])
                 if let data = Data(base64Encoded: b64) {
                     let tempFile = FileManager.default.temporaryDirectory.appendingPathComponent("kinnect_saved_\(UUID().uuidString).mp4")
                     try? data.write(to: tempFile)
-                    UISaveVideoAtPathToSavedPhotosAlbum(tempFile.path, nil, nil, nil)
-                    appState.showToast("Đã lưu video vào Album ảnh trên thiết bị.")
+                    PhotoSaveCoordinator.shared.onComplete = { success, error in
+                        if success {
+                            appState.showToast("Đã lưu video vào Album ảnh trên thiết bị.")
+                        } else {
+                            appState.showToast("Không thể lưu video: \(error?.localizedDescription ?? "Lỗi quyền truy cập")")
+                        }
+                    }
+                    UISaveVideoAtPathToSavedPhotosAlbum(
+                        tempFile.path,
+                        PhotoSaveCoordinator.shared,
+                        #selector(PhotoSaveCoordinator.video(_:didFinishSavingWithError:contextInfo:)),
+                        nil
+                    )
                 }
             }
         }
@@ -642,6 +678,104 @@ struct StudioProSheet: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button("Đóng") { dismiss() }
                     .foregroundColor(KinnectTheme.accentBright)
+            }
+        }
+    }
+}
+
+// MARK: - Live AVFoundation Camera Preview & Photo Save Coordinator
+struct LiveCameraPreviewView: UIViewControllerRepresentable {
+    @Binding var isFlashOn: Bool
+    @Binding var isUsingFrontCamera: Bool
+
+    func makeUIViewController(context: Context) -> CameraPreviewViewController {
+        CameraPreviewViewController()
+    }
+
+    func updateUIViewController(_ uiViewController: CameraPreviewViewController, context: Context) {
+        uiViewController.setCamera(front: isUsingFrontCamera)
+        uiViewController.setFlash(on: isFlashOn)
+    }
+}
+
+final class CameraPreviewViewController: UIViewController {
+    private let session = AVCaptureSession()
+    private var previewLayer: AVCaptureVideoPreviewLayer?
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .black
+        setupSession()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        previewLayer?.frame = view.bounds
+    }
+
+    private func setupSession() {
+        session.beginConfiguration()
+        session.sessionPreset = .high
+        if let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+           let input = try? AVCaptureDeviceInput(device: device), session.canAddInput(input) {
+            session.addInput(input)
+        }
+        session.commitConfiguration()
+        let layer = AVCaptureVideoPreviewLayer(session: session)
+        layer.videoGravity = .resizeAspectFill
+        view.layer.addSublayer(layer)
+        previewLayer = layer
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.session.startRunning()
+        }
+    }
+
+    func setCamera(front: Bool) {
+        session.beginConfiguration()
+        for input in session.inputs { session.removeInput(input) }
+        let pos: AVCaptureDevice.Position = front ? .front : .back
+        if let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: pos),
+           let input = try? AVCaptureDeviceInput(device: device), session.canAddInput(input) {
+            session.addInput(input)
+        }
+        session.commitConfiguration()
+    }
+
+    func setFlash(on: Bool) {
+        guard let device = AVCaptureDevice.default(for: .video), device.hasTorch else { return }
+        try? device.lockForConfiguration()
+        device.torchMode = on ? .on : .off
+        device.unlockForConfiguration()
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        if session.isRunning {
+            session.stopRunning()
+        }
+    }
+}
+
+final class PhotoSaveCoordinator: NSObject {
+    static let shared = PhotoSaveCoordinator()
+    var onComplete: ((Bool, Error?) -> Void)?
+
+    @objc func image(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
+        DispatchQueue.main.async { [weak self] in
+            if let error {
+                self?.onComplete?(false, error)
+            } else {
+                self?.onComplete?(true, nil)
+            }
+        }
+    }
+
+    @objc func video(_ videoPath: String, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
+        DispatchQueue.main.async { [weak self] in
+            if let error {
+                self?.onComplete?(false, error)
+            } else {
+                self?.onComplete?(true, nil)
             }
         }
     }
