@@ -58,12 +58,22 @@
     "testEvidence": "test/test_live_and_contracts_e2e.mjs Section 6 verifies 7 contract assertions: GET info, wrong username 400, confirmDelete false 400, wrong password 403, success 200 with session cookie cleared (Max-Age=0), immediate 401 session revocation on /api/me, and subsequent login rejection."
   },
   "layoutMatrix": {
-    "matchedScreens": 46,
+    "matchedScreens": 44,
     "designAdaptations": 6,
-    "pendingSubstateVerification": 74,
+    "pendingSubstateVerification": 76,
+    "visualCapturedCount": 50,
+    "functionTestedCount": 50,
+    "screenshotInventory": {
+      "totalScreensCaptured": 43,
+      "contactSheets": 1,
+      "totalPngFiles": 44,
+      "standardIPhone": 36,
+      "compactIPhone": 4,
+      "iPad": 3
+    },
     "ciRunId": "42370019967",
     "ciRunUrl": "https://github.com/vuanh97nd/Kinnect/actions/runs/42370019967",
-    "notes": "46 matched screens backed by real xcrun simctl screenshot PNG files on disk in dist/ios-ui-review-46d0975/ without parent image reuse. 74 pending substates honestly preserved (including 071 system video picker). P1 Dynamic Type override completely resolved."
+    "notes": "44 matched screens backed by real xcrun simctl screenshot PNG files on disk in dist/ios-ui-review-46d0975/ without parent image reuse. 76 pending substates preserved (including 110 Studio Store and 073 Video Preview reverted to pending per Codex review). P1 Dynamic Type override completely resolved."
   },
   "review_1b0477e_resolutions": {
     "atomic_transaction_and_nested_verify": "handleAppleNotification no longer swallows nested signedTransactionInfo verification errors; transient verifier errors return 503 for Apple retry; atomic inTransaction block ensures notificationUUID is never recorded before state mutation.",

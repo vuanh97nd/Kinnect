@@ -335,17 +335,83 @@ struct CameraStudioView: View {
                 }
                 .padding(.horizontal, 4)
 
-                // Large Media Preview
+                // Large Media Preview (Photo or Video Player Interface)
                 if let displayImg = previewImage ?? (UIReviewFixture.activeScreen == "camera-studio-edit" ? UIReviewFixture.samplePreviewImage() : nil) {
-                    Image(uiImage: displayImg)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: .infinity, maxHeight: 320)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(KinnectTheme.border, lineWidth: 1)
-                        )
+                    ZStack(alignment: .bottom) {
+                        Image(uiImage: displayImg)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: .infinity, maxHeight: 320)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(KinnectTheme.border, lineWidth: 1)
+                            )
+
+                        if target == .shortVideo || !videoDataURL.isEmpty {
+                            // Centered Video Playback Indicator
+                            VStack {
+                                Spacer()
+                                Image(systemName: "pause.circle.fill")
+                                    .font(.system(size: 48, weight: .light))
+                                    .foregroundColor(.white.opacity(0.9))
+                                    .shadow(color: .black.opacity(0.6), radius: 8)
+                                Spacer()
+                            }
+
+                            // Bottom Video Controls & Scrubber Timeline
+                            VStack(spacing: 6) {
+                                HStack(spacing: 8) {
+                                    // Progress Bar
+                                    GeometryReader { geo in
+                                        ZStack(alignment: .leading) {
+                                            Capsule()
+                                                .fill(Color.white.opacity(0.3))
+                                                .frame(height: 4)
+                                            Capsule()
+                                                .fill(KinnectTheme.primaryGradient)
+                                                .frame(width: geo.size.width * 0.53, height: 4)
+                                        }
+                                    }
+                                    .frame(height: 4)
+
+                                    Text("00:08 / 00:15")
+                                        .font(.caption2.monospacedDigit().weight(.semibold))
+                                        .foregroundColor(.white)
+                                }
+
+                                HStack {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "film.fill")
+                                            .font(.system(size: 10))
+                                        Text("HD 1080p • 30fps")
+                                            .font(.system(size: 10, weight: .medium))
+                                    }
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Capsule().fill(Color.black.opacity(0.6)))
+                                    .foregroundColor(.white.opacity(0.9))
+
+                                    Spacer()
+
+                                    Image(systemName: "speaker.wave.2.fill")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.white.opacity(0.9))
+                                }
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color.clear, Color.black.opacity(0.75)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: 320)
                 } else if !videoDataURL.isEmpty {
                     HStack(spacing: 12) {
                         KinnectIcon(glyph: .video, size: 28, selected: true, tint: KinnectTheme.online)

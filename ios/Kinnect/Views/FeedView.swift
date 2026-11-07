@@ -7,6 +7,7 @@ struct FeedView: View {
     let onOpenFriends: () -> Void
 
     @ObservedObject private var appState = AppState.shared
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var stories: [StoryItem] = []
     @State private var posts: [PostItem] = []
@@ -213,9 +214,13 @@ struct FeedView: View {
         }
     }
 
+    private var storyCellWidth: CGFloat {
+        dynamicTypeSize.isAccessibilitySize ? 116 : 68
+    }
+
     private var storiesStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
+            HStack(spacing: dynamicTypeSize.isAccessibilitySize ? 16 : 12) {
                 // Add Story Button
                 Button {
                     showCreateStorySheet = true
@@ -226,7 +231,7 @@ struct FeedView: View {
                                 name: appState.currentUser?.name ?? "Tôi",
                                 avatarURL: appState.currentUser?.avatarUrl ?? "",
                                 colorHex: appState.currentUser?.avatarColor ?? "#7C3AED",
-                                size: 58
+                                size: dynamicTypeSize.isAccessibilitySize ? 64 : 58
                             )
                             Circle()
                                 .fill(KinnectTheme.accentBright)
@@ -236,8 +241,10 @@ struct FeedView: View {
                         Text("Tạo tin")
                             .font(.caption2.weight(.semibold))
                             .foregroundColor(KinnectTheme.textPrimary)
+                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                            .multilineTextAlignment(.center)
                     }
-                    .frame(width: 68)
+                    .frame(width: storyCellWidth)
                 }
                 .accessibilityLabel("Tạo tin 24h")
 
@@ -254,22 +261,23 @@ struct FeedView: View {
                                             : KinnectTheme.primaryGradient,
                                         lineWidth: 2.5
                                     )
-                                    .frame(width: 62, height: 62)
+                                    .frame(width: dynamicTypeSize.isAccessibilitySize ? 68 : 62, height: dynamicTypeSize.isAccessibilitySize ? 68 : 62)
 
                                 KinnectAvatarView(
                                     name: story.author.name,
                                     avatarURL: story.author.avatarUrl,
                                     colorHex: story.author.avatarColor,
-                                    size: 54
+                                    size: dynamicTypeSize.isAccessibilitySize ? 60 : 54
                                 )
                             }
                             Text(shortStoryDisplayName(story.author.name))
                                 .font(.caption2.weight(.medium))
                                 .foregroundColor(KinnectTheme.textPrimary)
-                                .lineLimit(1)
+                                .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                                .multilineTextAlignment(.center)
                                 .truncationMode(.tail)
                         }
-                        .frame(width: 68)
+                        .frame(width: storyCellWidth)
                     }
                 }
             }
@@ -320,36 +328,78 @@ struct FeedView: View {
     }
 
     private var quickComposeRow: some View {
-        HStack(spacing: 10) {
-            KinnectAvatarView(
-                name: appState.currentUser?.name ?? "K",
-                avatarURL: appState.currentUser?.avatarUrl ?? "",
-                colorHex: appState.currentUser?.avatarColor ?? "#7C3AED",
-                size: 40
-            )
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 10) {
+                        KinnectAvatarView(
+                            name: appState.currentUser?.name ?? "K",
+                            avatarURL: appState.currentUser?.avatarUrl ?? "",
+                            colorHex: appState.currentUser?.avatarColor ?? "#7C3AED",
+                            size: 40
+                        )
+                        Spacer()
+                        KinnectIconButton(
+                            glyph: .camera,
+                            label: "Mở Camera & Studio",
+                            tint: KinnectTheme.accentBright,
+                            action: onOpenCamera
+                        )
+                    }
 
-            Button {
-                showComposerSheet = true
-            } label: {
-                HStack {
-                    Text("Bạn đang nghĩ gì?")
-                        .font(.subheadline)
-                        .foregroundColor(KinnectTheme.textSecondary)
-                    Spacer()
+                    Button {
+                        showComposerSheet = true
+                    } label: {
+                        HStack {
+                            Text("Đăng bài viết mới...")
+                                .font(.subheadline)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                                .lineLimit(1)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(KinnectTheme.surfaceElevated)
+                        )
+                    }
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(Capsule().fill(KinnectTheme.surfaceElevated))
-            }
+                .kinnectCard()
+            } else {
+                HStack(spacing: 10) {
+                    KinnectAvatarView(
+                        name: appState.currentUser?.name ?? "K",
+                        avatarURL: appState.currentUser?.avatarUrl ?? "",
+                        colorHex: appState.currentUser?.avatarColor ?? "#7C3AED",
+                        size: 40
+                    )
 
-            KinnectIconButton(
-                glyph: .camera,
-                label: "Mở Camera & Studio",
-                tint: KinnectTheme.accentBright,
-                action: onOpenCamera
-            )
+                    Button {
+                        showComposerSheet = true
+                    } label: {
+                        HStack {
+                            Text("Bạn đang nghĩ gì?")
+                                .font(.subheadline)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                                .lineLimit(1)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                    }
+
+                    KinnectIconButton(
+                        glyph: .camera,
+                        label: "Mở Camera & Studio",
+                        tint: KinnectTheme.accentBright,
+                        action: onOpenCamera
+                    )
+                }
+                .kinnectCard()
+            }
         }
-        .kinnectCard()
     }
 
     private func restoreCachedFeed() {
@@ -664,6 +714,7 @@ struct PostComposerSheet: View {
     let onPosted: () -> Void
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var text = ""
     @State private var category = "community"
@@ -778,6 +829,7 @@ struct StoryComposerSheet: View {
     let onCreated: () -> Void
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var text = ""
     @State private var backgroundColor = "#7C3AED"
@@ -906,6 +958,7 @@ struct StoryDetailSheet: View {
     let story: StoryItem
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var viewers: [KinnectUser] = []
 
     var body: some View {
@@ -1021,6 +1074,7 @@ struct PostCommentsSheet: View {
     let onChanged: () -> Void
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var comments: [CommentItem] = []
     @State private var newComment = ""

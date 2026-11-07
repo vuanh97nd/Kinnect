@@ -339,8 +339,8 @@ enum UIReviewFixture {
 
         case "/api/me/privacy-consent":
             return [
-                "version": "2026.11",
-                "notice": "Chính sách quyền riêng tư và điều khoản dịch vụ Kinnect. Cam kết bảo mật theo tiêu chuẩn Apple và pháp luật Việt Nam.",
+                "version": "2026-10-29",
+                "notice": "Kinnect cam kết bảo vệ dữ liệu cá nhân, mã hóa dữ liệu truyền tải và lưu trữ an toàn theo quy định pháp luật về an toàn thông tin. Người dùng toàn quyền quản lý, kiểm soát và yêu cầu xóa thông tin cá nhân bất kỳ lúc nào.",
                 "accepted": false
             ]
 
@@ -432,7 +432,7 @@ enum UIReviewFixture {
                 "packages": [
                     [
                         "id": "fixture_pkg_1",
-                        "title": "Khung Avatar Tím Tinh Vân [Fixture]",
+                        "title": "Khung Avatar Tím Tinh Vân",
                         "subtitle": "Hiệu ứng viền tím Kinnect nổi bật trên hồ sơ & phòng Live",
                         "category": "frame",
                         "priceCoins": 500,
@@ -443,23 +443,69 @@ enum UIReviewFixture {
                     ],
                     [
                         "id": "fixture_pkg_2",
-                        "title": "Huy Hiệu Tiên Phong [Fixture]",
-                        "subtitle": "Huy hiệu hiển thị cạnh tên trên bảng tin",
+                        "title": "Huy Hiệu Tiên Phong",
+                        "subtitle": "Huy hiệu hiển thị cạnh tên trên bảng tin và phòng Live",
                         "category": "badge",
                         "priceCoins": 800,
                         "badgeText": "MỚI",
                         "accentColor": "#2563EB",
                         "owned": false,
                         "equipped": false
+                    ],
+                    [
+                        "id": "fixture_pkg_studio",
+                        "title": "Gói Mở Khóa Studio Pro",
+                        "subtitle": "Mở khóa toàn bộ bộ lọc điện ảnh, LUTs màu chuyên nghiệp & xuất video HD",
+                        "category": "studio",
+                        "priceCoins": 1200,
+                        "badgeText": "PRO",
+                        "accentColor": "#EC4899",
+                        "owned": false,
+                        "equipped": false
                     ]
                 ],
                 "products": [
                     [
+                        "id": "vn.kinnect.coins.100",
+                        "title": "Gói 100 Xu Kinnect",
+                        "description": "Nạp 100 xu vào số dư tài khoản Kinnect",
+                        "priceLabel": "10.000 ₫",
+                        "coins": 100
+                    ],
+                    [
+                        "id": "vn.kinnect.coins.500",
+                        "title": "Gói 500 Xu Kinnect",
+                        "description": "Nạp 500 xu vào số dư tài khoản Kinnect",
+                        "priceLabel": "50.000 ₫",
+                        "coins": 500
+                    ],
+                    [
                         "id": "vn.kinnect.coins.1000",
-                        "title": "Gói 1.000 Xu Kinnect [Fixture StoreKit 2]",
-                        "description": "Xác minh JWS trực tiếp qua StoreKit 2 & /api/store/verify",
-                        "priceLabel": "22.000 ₫",
+                        "title": "Gói 1.000 Xu Kinnect",
+                        "description": "Nạp 1.000 xu vào số dư tài khoản Kinnect",
+                        "priceLabel": "100.000 ₫",
                         "coins": 1000
+                    ],
+                    [
+                        "id": "vn.kinnect.coins.2000",
+                        "title": "Gói 2.000 Xu Kinnect",
+                        "description": "Nạp 2.000 xu vào số dư tài khoản Kinnect",
+                        "priceLabel": "200.000 ₫",
+                        "coins": 2000
+                    ],
+                    [
+                        "id": "vn.kinnect.coins.5000",
+                        "title": "Gói 5.000 Xu Kinnect",
+                        "description": "Nạp 5.000 xu vào số dư tài khoản Kinnect",
+                        "priceLabel": "500.000 ₫",
+                        "coins": 5000
+                    ],
+                    [
+                        "id": "vn.kinnect.coins.10000",
+                        "title": "Gói 10.000 Xu Kinnect",
+                        "description": "Nạp 10.000 xu vào số dư tài khoản Kinnect",
+                        "priceLabel": "1.000.000 ₫",
+                        "coins": 10000
                     ]
                 ]
             ]

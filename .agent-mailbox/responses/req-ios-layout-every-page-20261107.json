@@ -1,7 +1,7 @@
 {
   "id": "req-ios-layout-every-page-20261107",
   "status": "HONEST_GRANULAR_RECLASSIFICATION_APPLIED",
-  "completedAt": "2026-11-07T12:08:43.000Z",
+  "completedAt": "2026-11-07T12:25:00.000Z",
   "commitSha": "46d0975",
   "branches": [
     "release/ios-1.2.12",
@@ -10,9 +10,11 @@
   "ciRunUrl": "https://github.com/vuanh97nd/Kinnect/actions/runs/42370019967",
   "summary": {
     "totalScreens": 126,
-    "matchedScreens": 46,
+    "matchedScreens": 44,
     "designAdaptations": 6,
-    "pendingSubstateVerification": 74
+    "pendingSubstateVerification": 76,
+    "visualCapturedCount": 50,
+    "functionTestedCount": 50
   },
   "rulesApplied": [
     "Android 1.2.12 build 118 real emulator APK reference used for all baseline controls",
@@ -30,7 +32,9 @@
       "androidImage": "dist/android-real-captures-b118/02-feed-screen-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/02-iphone-feed-dark.png",
       "notes": "Header K vector trái, 5 nút phải (chuông, cửa hàng, bạn bè, chat, avatar)",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "002",
@@ -40,7 +44,9 @@
       "androidImage": "dist/android-real-captures-b118/02-feed-screen-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/02-iphone-feed-dark.png",
       "notes": "Thanh điều hướng 5 tab dưới đáy: Bảng tin, Khám phá, +, Video, Live",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "003",
@@ -50,7 +56,9 @@
       "androidImage": "dist/android-real-captures-b118/02-feed-screen-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/02-iphone-feed-dark.png",
       "notes": "Badge số chưa đọc trên chuông và tin nhắn; avatar tròn cập nhật realtime",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "004",
@@ -60,7 +68,9 @@
       "androidImage": "dist/android-real-captures-b118/02-feed-screen-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/02-iphone-feed-dark.png",
       "notes": "Safe area notch/dynamic island và thanh trạng thái chuẩn iOS",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "005",
@@ -70,7 +80,9 @@
       "androidImage": "dist/android-real-captures-b118/01-auth-welcome-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/01-iphone-auth-dark.png",
       "notes": "Màn hình chào mừng: Nút Bắt đầu kết nối, quy tắc cộng đồng chân trang",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "006",
@@ -80,7 +92,9 @@
       "androidImage": "dist/android-real-captures-b118/01-auth-login-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/01-iphone-auth-dark.png",
       "notes": "Đăng nhập: Tên đăng nhập, Mật khẩu, Ghi nhớ, Quên mật khẩu",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "007",
@@ -90,7 +104,9 @@
       "androidImage": "dist/android-real-captures-b118/01-auth-login-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/01-iphone-auth-dark.png",
       "notes": "Đăng ký: Chuyển qua segmented picker native iOS, điều khoản cộng đồng",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "008",
@@ -100,7 +116,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": true
     },
     {
       "id": "009",
@@ -110,7 +128,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": true
     },
     {
       "id": "010",
@@ -120,7 +140,9 @@
       "androidImage": null,
       "iosImage": "dist/ios-ui-review-46d0975/13b-iphone-privacy-consent-dark.png",
       "notes": "PrivacyConsentSheet hiển thị điều khoản dịch vụ & chính sách riêng tư bản 2026.11, xử lý phản hồi HTTP 428 / WS token_required, nút Đồng ý / Từ chối (Dark/Light mode).",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "011",
@@ -130,7 +152,9 @@
       "androidImage": "dist/android-real-captures-b118/02-feed-screen-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/02-iphone-feed-dark.png",
       "notes": "Bảng tin chính với danh sách bài viết cuộn dọc mượt mà",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "012",
@@ -140,7 +164,9 @@
       "androidImage": "dist/android-real-captures-b118/02-feed-screen-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/02-iphone-feed-dark.png",
       "notes": "Bài viết hiển thị tác giả, avatar, thời gian tương đối, nội dung và ảnh đính kèm",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "013",
@@ -150,7 +176,9 @@
       "androidImage": "dist/android-real-captures-b118/02-feed-screen-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/02-iphone-feed-dark.png",
       "notes": "Thả cảm xúc bài viết: Tim, Bình luận, Chia sẻ",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "014",
@@ -160,7 +188,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "015",
@@ -170,7 +200,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "016",
@@ -180,7 +212,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "017",
@@ -190,7 +224,9 @@
       "androidImage": "dist/android-real-captures-b118/02-feed-screen-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/02-iphone-feed-dark.png",
       "notes": "Menu bài viết: Chỉnh sửa bài viết, Đổi đối tượng xem, Ẩn bài viết kèm Hoàn tác",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "018",
@@ -200,7 +236,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "019",
@@ -210,7 +248,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "020",
@@ -220,7 +260,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "021",
@@ -230,7 +272,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "022",
@@ -240,7 +284,9 @@
       "androidImage": "dist/android-real-captures-b118/02-feed-screen-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/02-iphone-feed-dark.png",
       "notes": "Thanh tin 24h trên đầu bảng tin với nút Tạo tin và avatar người dùng",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "023",
@@ -250,7 +296,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "024",
@@ -260,7 +308,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "025",
@@ -270,7 +320,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "026",
@@ -280,7 +332,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "027",
@@ -290,7 +344,9 @@
       "androidImage": "dist/android-real-captures-b118/03-discover-screen-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/03-iphone-discover-dark.png",
       "notes": "Lưới người dùng 3 cột tỉ lệ 1:1, tên tiếng Việt, tuổi, cự ly không bị cắt chữ",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "028",
@@ -300,7 +356,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "029",
@@ -310,7 +368,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "030",
@@ -320,7 +380,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "031",
@@ -330,7 +392,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "032",
@@ -340,7 +404,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "033",
@@ -350,7 +416,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "034",
@@ -360,7 +428,9 @@
       "androidImage": "dist/android-real-captures-b118/07-profile-screen-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/06-iphone-profile-dark.png",
       "notes": "Hồ sơ cá nhân: Ảnh bìa, avatar tròn, tên, handle @username, số liệu Bạn bè/Follower",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "035",
@@ -370,7 +440,9 @@
       "androidImage": "dist/android-real-captures-b118/07-profile-screen-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/06-iphone-profile-dark.png",
       "notes": "Nút Chỉnh sửa hồ sơ mở form cập nhật thông tin",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "036",
@@ -380,7 +452,9 @@
       "androidImage": "dist/android-real-captures-b118/07-profile-screen-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/06-iphone-profile-dark.png",
       "notes": "Tab Giới thiệu: Bio, Tham gia Kinnect từ 11/2026, huy hiệu Công khai/Riêng tư",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "037",
@@ -390,7 +464,9 @@
       "androidImage": "dist/android-real-captures-b118/07-profile-screen-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/06b-iphone-profile-posts.png",
       "notes": "Tab bài viết cá nhân trên hồ sơ người dùng hiển thị danh sách bài viết thực tế.",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "038",
@@ -400,7 +476,9 @@
       "androidImage": "dist/android-real-captures-b118/07-profile-screen-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/06-iphone-profile-dark.png",
       "notes": "Tab Album ảnh: Lưới album công khai và album riêng tư có khóa bảo mật",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "039",
@@ -410,7 +488,9 @@
       "androidImage": "dist/android-real-captures-b118/07-profile-screen-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/06h-iphone-profile-public-album.png",
       "notes": "PublicAlbumManageSheet hiển thị lưới ảnh công khai và nút Đăng ảnh mới lên album cá nhân.",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "040",
@@ -420,7 +500,9 @@
       "androidImage": null,
       "iosImage": "dist/ios-ui-review-46d0975/06f-iphone-profile-private-album.png",
       "notes": "PrivateAlbumManageSheet hiển thị số ảnh riêng tư (tối đa 24), nút tải ảnh mới, danh sách yêu cầu quyền xem với 2 nút Duyệt/Từ chối và nút Thu hồi quyền.",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "041",
@@ -430,7 +512,9 @@
       "androidImage": null,
       "iosImage": "dist/ios-ui-review-46d0975/06d-iphone-profile-videos.png",
       "notes": "Tab Video cá nhân trong hồ sơ người dùng hiển thị danh sách video shorts đã đăng.",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "042",
@@ -440,7 +524,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "043",
@@ -450,7 +536,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "044",
@@ -460,7 +548,9 @@
       "androidImage": null,
       "iosImage": "dist/ios-ui-review-46d0975/06e-iphone-profile-edit.png",
       "notes": "Sheet Chỉnh sửa hồ sơ cá nhân: đổi avatar, họ tên, tiểu sử và thông tin liên hệ.",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "045",
@@ -470,7 +560,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "046",
@@ -480,7 +572,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "047",
@@ -490,7 +584,9 @@
       "androidImage": "dist/android-real-captures-b118/06-friends-screen-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/07-iphone-friends-dark.png",
       "notes": "Màn hình Bạn bè: 3 tab Bạn bè / Lời mời / Đã gửi, ô tìm kiếm, empty state",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "048",
@@ -500,7 +596,9 @@
       "androidImage": null,
       "iosImage": "dist/ios-ui-review-46d0975/07b-iphone-friends-requests.png",
       "notes": "Phần Lời mời kết bạn đến trong FriendsView hiển thị danh sách kèm nút Đồng ý và Từ chối.",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "049",
@@ -510,7 +608,9 @@
       "androidImage": null,
       "iosImage": "dist/ios-ui-review-46d0975/07b-iphone-friends-requests.png",
       "notes": "Phần Lời mời đã gửi trong FriendsView hiển thị danh sách lời mời đang chờ kèm nút Hủy lời mời.",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "050",
@@ -520,7 +620,9 @@
       "androidImage": null,
       "iosImage": "dist/ios-ui-review-46d0975/07c-iphone-friends-suggestions.png",
       "notes": "Phần Gợi ý bạn bè trong FriendsView hiển thị danh sách người dùng tiềm năng kèm khoảng cách km, bio và nút Kết bạn capsule.",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "051",
@@ -530,7 +632,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "052",
@@ -540,7 +644,9 @@
       "androidImage": "dist/android-real-captures-b118/06-messages-screen-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/04-iphone-messages-list-dark.png",
       "notes": "Danh sách hội thoại: Tab Tất cả / Chưa đọc, tìm kiếm, ghim, tắt chuông",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "053",
@@ -550,7 +656,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "054",
@@ -560,7 +668,9 @@
       "androidImage": "dist/android-real-captures-b118/06-messages-screen-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/05-iphone-chat-detail-dark.png",
       "notes": "Chi tiết chat: Nội dung trên, dòng giờ+đã xem+cảm xúc+tùy chọn dưới",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "055",
@@ -570,7 +680,9 @@
       "androidImage": "dist/android-real-captures-b118/06-messages-screen-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/05-iphone-chat-detail-dark.png",
       "notes": "Bong bóng cảm xúc: like/love/haha/wow/sad/angry đồng bộ chuẩn backend",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "056",
@@ -580,7 +692,9 @@
       "androidImage": null,
       "iosImage": "dist/ios-ui-review-46d0975/05d-iphone-group-chat-dark.png",
       "notes": "GroupChatDetailView hiển thị tiêu đề nhóm, nút gọi thoại/video và menu tùy chọn nhóm.",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "057",
@@ -590,7 +704,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "058",
@@ -600,7 +716,9 @@
       "androidImage": null,
       "iosImage": "dist/ios-ui-review-46d0975/05b-iphone-chat-menu-dark.png",
       "notes": "DirectChatDetailView confirmationDialog mở menu tùy chọn hội thoại: Ghim hội thoại, Tắt thông báo, Báo cáo người dùng, Chặn người dùng.",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "059",
@@ -610,7 +728,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "060",
@@ -620,7 +740,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "061",
@@ -630,7 +752,9 @@
       "androidImage": null,
       "iosImage": "dist/ios-ui-review-46d0975/05c-iphone-message-menu-dark.png",
       "notes": "DirectChatDetailView confirmationDialog mở menu tùy chọn tin nhắn: Sửa tin nhắn (tin của mình), Chuyển tiếp tin nhắn, Thu hồi / Xóa tin nhắn.",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "062",
@@ -640,7 +764,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "063",
@@ -650,7 +776,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "064",
@@ -660,7 +788,9 @@
       "androidImage": null,
       "iosImage": "dist/ios-ui-review-46d0975/05-iphone-chat-detail-dark.png",
       "notes": "Hàng trạng thái dưới cùng của bubble tin nhắn hiển thị giờ, icon trạng thái gửi/đã xem (seen), reaction và nút more ba chấm.",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "065",
@@ -670,7 +800,9 @@
       "androidImage": "dist/android-real-captures-b118/08-notifications-screen-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/08-iphone-notifications-dark.png",
       "notes": "Thông báo: Tab Tất cả / Chưa đọc, chạm đánh dấu đọc qua API và điều hướng",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "066",
@@ -680,7 +812,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "067",
@@ -690,7 +824,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "068",
@@ -700,7 +836,9 @@
       "androidImage": "dist/android-real-captures-b118/09-create-studio-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/11-iphone-camera-studio-empty.png",
       "notes": "Giao diện Camera trực tiếp: Tỉ lệ 9:16, nút chụp, bộ chuyển ẢNH/VIDEO/LIVE, thư viện ảnh",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": false
     },
     {
       "id": "069",
@@ -710,7 +848,9 @@
       "androidImage": "dist/android-real-captures-b118/09-create-studio-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/11-iphone-camera-studio-empty.png",
       "notes": "Bảng chỉnh sửa Studio: Studio Pro góc phải, nút Lưu riêng ghi vào Camera Roll, nút Thoát",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": false
     },
     {
       "id": "070",
@@ -720,7 +860,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "071",
@@ -730,7 +872,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Bộ chọn video từ Thư viện PhotosPicker hệ thống cần kích hoạt tương tác Photos UI native (giữ trạng thái PENDING để đảm bảo tính xác thực).",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "072",
@@ -740,17 +884,21 @@
       "androidImage": null,
       "iosImage": "dist/ios-ui-review-46d0975/12-iphone-camera-studio-edit.png",
       "notes": "Màn hình xem trước sau khi chụp/chọn ảnh: hiển thị ảnh lớn, nút Studio Pro góc phải, caption và nút Lưu tách riêng.",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "073",
       "group": "10 Camera và Studio",
       "screen": "Preview sau quay/chọn video",
-      "visualStatus": "MATCH",
+      "visualStatus": "PENDING_SUBSTATE_VERIFICATION",
       "androidImage": null,
-      "iosImage": "dist/ios-ui-review-46d0975/12c-iphone-camera-studio-video-preview.png",
-      "notes": "CameraStudioView chế độ xem trước video: hiển thị video preview với caption và nút Đăng Shorts.",
-      "verifiedCommit": "46d0975"
+      "iosImage": null,
+      "notes": "Màn hình xem trước video Shorts cần bằng chứng hiển thị thời lượng, timeline scrubber và nút điều khiển phát video (bảo lưu PENDING theo khuyến nghị Codex).",
+      "verifiedCommit": "46d0975",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "074",
@@ -760,7 +908,9 @@
       "androidImage": null,
       "iosImage": "dist/ios-ui-review-46d0975/12b-iphone-studio-pro-sheet.png",
       "notes": "Nút Studio Pro mở bảng điều khiển hiệu ứng chuyên nghiệp với gradient tím và các danh mục bộ lọc.",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "075",
@@ -770,7 +920,9 @@
       "androidImage": null,
       "iosImage": "dist/ios-ui-review-46d0975/12b-iphone-studio-pro-sheet.png",
       "notes": "StudioProSheet tích hợp Core Image CIFilter native áp dụng bộ lọc trực tiếp lên media.",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "076",
@@ -780,7 +932,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "077",
@@ -790,7 +944,9 @@
       "androidImage": null,
       "iosImage": "dist/ios-ui-review-46d0975/12-iphone-camera-studio-edit.png",
       "notes": "Nút Lưu vào thiết bị được đặt riêng biệt dưới bảng điều khiển, không chồng lấn nút Đăng hay nút Đóng.",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "078",
@@ -800,7 +956,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "079",
@@ -810,7 +968,9 @@
       "androidImage": "dist/android-real-captures-b118/04-shorts-video-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/03b-iphone-shorts-video-dark.png",
       "notes": "Trình phát Video Shorts cuộn dọc toàn màn hình với tim, bình luận, chia sẻ",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "080",
@@ -820,7 +980,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "081",
@@ -830,7 +992,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "082",
@@ -840,7 +1004,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "083",
@@ -850,7 +1016,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "084",
@@ -860,7 +1028,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "085",
@@ -870,7 +1040,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "086",
@@ -880,7 +1052,9 @@
       "androidImage": "dist/android-real-captures-b118/05-live-stream-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/10-iphone-live-stream-dark.png",
       "notes": "Phòng Live Stream: WebRTC video stream, chat WebSocket, thả tim kind:heart, quà kind:gift.id",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "087",
@@ -890,7 +1064,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "088",
@@ -900,7 +1076,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "089",
@@ -910,7 +1088,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "090",
@@ -920,7 +1100,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "091",
@@ -930,7 +1112,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "092",
@@ -940,7 +1124,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "093",
@@ -950,7 +1136,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "094",
@@ -960,7 +1148,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "095",
@@ -970,7 +1160,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "096",
@@ -980,7 +1172,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "097",
@@ -990,7 +1184,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "098",
@@ -1000,7 +1196,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "099",
@@ -1010,7 +1208,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "100",
@@ -1020,7 +1220,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "101",
@@ -1030,7 +1232,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "102",
@@ -1040,7 +1244,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "103",
@@ -1050,7 +1256,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "104",
@@ -1060,7 +1268,9 @@
       "androidImage": "dist/android-real-captures-b118/08-wallet-screen-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/09-iphone-wallet-store-dark.png",
       "notes": "Ví Kinnect: Tách biệt Xu mua và Xu tặng, gói nạp xu, lịch sử giao dịch",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "105",
@@ -1070,7 +1280,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "106",
@@ -1080,7 +1292,9 @@
       "androidImage": null,
       "iosImage": "dist/ios-ui-review-46d0975/09b-iphone-wallet-topup.png",
       "notes": "Tab Nạp xu trong WalletStoreView hiển thị danh sách các gói StoreKit 2 (1.000 xu = 22.000đ) kèm nút Mua và nút Khôi phục gói mua.",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "107",
@@ -1090,7 +1304,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "108",
@@ -1100,7 +1316,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "109",
@@ -1110,17 +1328,21 @@
       "androidImage": null,
       "iosImage": "dist/ios-ui-review-46d0975/09c-iphone-store-packages.png",
       "notes": "Tab Cửa hàng vật phẩm hiển thị các gói Khung Avatar và Huy hiệu kèm giá xu và nút Mua.",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "110",
       "group": "14 Ví và Cửa hàng",
       "screen": "Cửa hàng Studio",
-      "visualStatus": "MATCH",
+      "visualStatus": "PENDING_SUBSTATE_VERIFICATION",
       "androidImage": null,
-      "iosImage": "dist/ios-ui-review-46d0975/09c-iphone-store-packages.png",
-      "notes": "Tab Cửa hàng vật phẩm hiển thị các gói hiệu ứng Studio và mở khóa tính năng.",
-      "verifiedCommit": "46d0975"
+      "iosImage": null,
+      "notes": "Gói Studio Pro chuyên biệt trong Cửa hàng cần fixture hiển thị riêng biệt gói Studio (bảo lưu trạng thái PENDING theo khuyến nghị Codex).",
+      "verifiedCommit": "46d0975",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "111",
@@ -1130,7 +1352,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "112",
@@ -1140,7 +1364,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "113",
@@ -1150,7 +1376,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "114",
@@ -1160,7 +1388,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "115",
@@ -1170,7 +1400,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "116",
@@ -1180,7 +1412,9 @@
       "androidImage": "dist/android-real-captures-b118/07-profile-menu-real-b118.png",
       "iosImage": "dist/ios-ui-review-46d0975/06-iphone-profile-dark.png",
       "notes": "Menu Drawer tài khoản: Quản lý phiên, Đổi mật khẩu, Chặn, Giao diện Sáng/Tối, Đăng xuất",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "117",
@@ -1190,7 +1424,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "118",
@@ -1200,7 +1436,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "119",
@@ -1210,7 +1448,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "120",
@@ -1220,7 +1460,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "121",
@@ -1230,7 +1472,9 @@
       "androidImage": null,
       "iosImage": "dist/ios-ui-review-46d0975/06g-iphone-profile-sessions.png",
       "notes": "Sheet Phiên đăng nhập: hiển thị thiết bị hiện tại (active) và danh sách phiên từ xa kèm nút Đăng xuất.",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "122",
@@ -1240,7 +1484,9 @@
       "androidImage": null,
       "iosImage": "dist/ios-ui-review-46d0975/13d-iphone-delete-account-dark.png",
       "notes": "DeleteAccountConfirmationSheet hiển thị cảnh báo đỏ không thể hoàn tác, ô nhập Username xác nhận, ô nhập Mật khẩu và nút Xóa vĩnh viễn tài khoản (Apple Guideline 5.1.1).",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "123",
@@ -1250,7 +1496,9 @@
       "androidImage": null,
       "iosImage": "dist/ios-ui-review-46d0975/13f-iphone-ugc-report-sheet.png",
       "notes": "UGCReportSheet hiển thị 6 lý do vi phạm chuẩn Apple Guideline 1.2, ô nhập chi tiết, tùy chọn Chặn người dùng, và nút Gửi báo cáo.",
-      "verifiedCommit": "46d0975"
+      "verifiedCommit": "46d0975",
+      "visualCaptured": true,
+      "functionTested": true
     },
     {
       "id": "124",
@@ -1260,7 +1508,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "125",
@@ -1270,7 +1520,9 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     },
     {
       "id": "126",
@@ -1280,8 +1532,19 @@
       "androidImage": null,
       "iosImage": null,
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
-      "verifiedCommit": "a509b97"
+      "verifiedCommit": "a509b97",
+      "visualCaptured": false,
+      "functionTested": false
     }
   ],
-  "ciRunId": "42370019967"
+  "ciRunId": "42370019967",
+  "screenshotInventory": {
+    "totalScreensCaptured": 43,
+    "contactSheets": 1,
+    "totalPngFiles": 44,
+    "standardIPhone": 36,
+    "compactIPhone": 4,
+    "iPad": 3,
+    "directory": "dist/ios-ui-review-46d0975"
+  }
 }
