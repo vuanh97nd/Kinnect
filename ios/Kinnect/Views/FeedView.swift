@@ -18,6 +18,11 @@ struct FeedView: View {
     @State private var showCreateStorySheet = false
     @State private var activeStoryItem: StoryItem?
     @State private var activeCommentPost: PostItem?
+    @State private var editingPost: PostItem?
+    @State private var editingPostText = ""
+    @State private var audiencePost: PostItem?
+    @State private var showAudienceDialog = false
+    @State private var hiddenPostIds: Set<String> = []
 
     private struct FeedCategoryOption: Identifiable {
         let id: String
@@ -68,6 +73,18 @@ struct FeedView: View {
                             onOpenComments: {
                                 activeCommentPost = post
                             },
+                            onEdit: {
+                                editingPost = post
+                                editingPostText = post.text
+                            },
+                            onChangeAudience: {
+                                audiencePost = post
+                                showAudienceDialog = true
+                            },
+                            onHide: {
+                                hiddenPostIds.insert(post.id)
+                                appState.showToast("Đã ẩn bài viết.")
+                            },
                             onDelete: {
                                 Task { await deletePost(post) }
                             },
@@ -87,7 +104,7 @@ struct FeedView: View {
             .padding(.vertical, 10)
         }
         .background(KinnectTheme.background)
-        .navigationTitle("Kinnect")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable {
             await loadFeedAndStories()
@@ -117,10 +134,77 @@ struct FeedView: View {
                 Task { await loadFeedAndStories() }
             }
         }
+        .sheet(item: $editingPost) { post in
+            NavigationStack {
+                VStack(spacing: 16) {
+                    TextEditor(text: $editingPostText)
+                        .padding(12)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                        .foregroundColor(KinnectTheme.textPrimary)
+                        .frame(minHeight: 180)
+                    Spacer()
+                }
+                .padding(16)
+                .background(KinnectTheme.background.ignoresSafeArea())
+                .navigationTitle("Chỉnh sửa bài viết")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Hủy") { editingPost = nil }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Lưu") {
+                            Task {
+                                _ = try? await KinnectAPIClient.shared.requestJSON(
+                                    "/api/posts/\(post.id)",
+                                    method: "PATCH",
+                                    body: ["body": editingPostText]
+                                )
+                                editingPost = nil
+                                await loadFeedAndStories()
+                                appState.showToast("Đã lưu bài viết!")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .confirmationDialog(
+            "Ai có thể xem bài viết?",
+            isPresented: $showAudienceDialog,
+            titleVisibility: .visible
+        ) {
+            if let p = audiencePost {
+                Button("Mọi thành viên (Công khai)") {
+                    Task {
+                        _ = try? await KinnectAPIClient.shared.requestJSON(
+                            "/api/posts/\(p.id)",
+                            method: "PATCH",
+                            body: ["visibility": "public"]
+                        )
+                        appState.showToast("Đã đổi đối tượng xem thành Mọi thành viên.")
+                        await loadFeedAndStories()
+                    }
+                }
+                Button("Người theo dõi (Bạn bè)") {
+                    Task {
+                        _ = try? await KinnectAPIClient.shared.requestJSON(
+                            "/api/posts/\(p.id)",
+                            method: "PATCH",
+                            body: ["visibility": "followers"]
+                        )
+                        appState.showToast("Đã đổi đối tượng xem thành Người theo dõi.")
+                        await loadFeedAndStories()
+                    }
+                }
+                Button("Hủy", role: .cancel) {}
+            }
+        }
     }
 
     private var filteredPosts: [PostItem] {
         posts.filter { post in
+            guard !hiddenPostIds.contains(post.id) else { return false }
             guard !appState.blockedUserIds.contains(post.author.id) else { return false }
             if selectedCategory == "all" { return true }
             return post.category == selectedCategory
@@ -324,6 +408,9 @@ private struct PostCardView: View {
     let isAuthorOnline: Bool
     let onReact: (String) -> Void
     let onOpenComments: () -> Void
+    var onEdit: (() -> Void)? = nil
+    var onChangeAudience: (() -> Void)? = nil
+    var onHide: (() -> Void)? = nil
     let onDelete: () -> Void
     let onReport: () -> Void
 
@@ -368,10 +455,30 @@ private struct PostCardView: View {
 
                 Menu {
                     if post.author.id == currentUserId {
+                        if let onEdit {
+                            Button(action: onEdit) {
+                                Label("Chỉnh sửa bài viết", systemImage: "pencil")
+                            }
+                        }
+                        if let onChangeAudience {
+                            Button(action: onChangeAudience) {
+                                Label("Thay đổi đối tượng xem", systemImage: "globe")
+                            }
+                        }
+                        if let onHide {
+                            Button(action: onHide) {
+                                Label("Ẩn bài viết", systemImage: "eye.slash")
+                            }
+                        }
                         Button(role: .destructive, action: onDelete) {
                             Label("Xóa bài viết", systemImage: "trash")
                         }
                     } else {
+                        if let onHide {
+                            Button(action: onHide) {
+                                Label("Ẩn bài viết", systemImage: "eye.slash")
+                            }
+                        }
                         Button(role: .destructive, action: onReport) {
                             HStack {
                                 Text("Báo cáo / Chặn UGC")

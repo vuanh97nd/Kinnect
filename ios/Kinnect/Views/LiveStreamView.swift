@@ -9,6 +9,9 @@ struct LiveStreamView: View {
     @State private var chatText = ""
     @State private var likesCount = 142
     @State private var isLiked = false
+    @State private var showGiftDrawer = false
+    @State private var giftCatalog: [LiveGiftCatalogItem] = []
+    @State private var giftPriceVersion = 1
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -41,6 +44,18 @@ struct LiveStreamView: View {
         }
         .task {
             await fetchLiveRooms()
+            await loadGifts()
+        }
+        .sheet(isPresented: $showGiftDrawer) {
+            LiveGiftDrawerSheet(gifts: giftCatalog, priceVersion: giftPriceVersion)
+        }
+    }
+
+    private func loadGifts() async {
+        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/live/gifts") {
+            let items = res["gifts"] as? [[String: Any]] ?? []
+            self.giftCatalog = items.map(LiveGiftCatalogItem.from)
+            self.giftPriceVersion = res["priceVersion"] as? Int ?? 1
         }
     }
 
@@ -159,8 +174,14 @@ struct LiveStreamView: View {
                                 .foregroundColor(.white)
 
                             Button {
-                                if !chatText.isEmpty {
+                                let clean = chatText.trimmingCharacters(in: .whitespacesAndNewlines)
+                                if !clean.isEmpty {
                                     chatText = ""
+                                    NativeSocketClient.shared.sendJSON([
+                                        "type": "chat",
+                                        "text": clean,
+                                        "roomId": room.id
+                                    ])
                                 }
                             } label: {
                                 KinnectIcon(glyph: .send, size: 20, selected: true, tint: KinnectTheme.accentBright)
@@ -174,8 +195,10 @@ struct LiveStreamView: View {
 
                     // Right Floating Action Sidebar
                     VStack(spacing: 16) {
-                        // Gift / Wallet button
-                        Button(action: onOpenWallet) {
+                        // Gift Drawer button
+                        Button {
+                            showGiftDrawer = true
+                        } label: {
                             VStack(spacing: 4) {
                                 ZStack {
                                     Circle()
@@ -194,6 +217,11 @@ struct LiveStreamView: View {
                         Button {
                             isLiked.toggle()
                             likesCount += isLiked ? 1 : -1
+                            NativeSocketClient.shared.sendJSON([
+                                "type": "live-reaction",
+                                "roomId": room.id,
+                                "reaction": "heart"
+                            ])
                         } label: {
                             VStack(spacing: 4) {
                                 ZStack {

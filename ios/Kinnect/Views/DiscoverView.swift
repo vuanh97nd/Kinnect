@@ -119,48 +119,6 @@ struct DiscoverView: View {
                             }
                         }
                     }
-
-                    // Optional Posts Feed below people grid if available
-                    if !visiblePosts.isEmpty {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Bài viết nổi bật")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .padding(.top, 10)
-
-                            ForEach(visiblePosts) { post in
-                                VStack(alignment: .leading, spacing: 8) {
-                                    HStack(spacing: 10) {
-                                        KinnectAvatarView(
-                                            name: post.author.name,
-                                            avatarURL: post.author.avatarUrl,
-                                            colorHex: post.author.avatarColor,
-                                            size: 36
-                                        )
-                                        VStack(alignment: .leading) {
-                                            Text(post.author.name)
-                                                .font(.subheadline.bold())
-                                                .foregroundColor(.white)
-                                            Text(formatRelativeDate(post.createdAt))
-                                                .font(.caption2)
-                                                .foregroundColor(KinnectTheme.textSecondary)
-                                        }
-                                        Spacer()
-                                    }
-                                    if !post.text.isEmpty {
-                                        Text(post.text)
-                                            .font(.subheadline)
-                                            .foregroundColor(KinnectTheme.textPrimary)
-                                            .kinnectMultiline()
-                                    }
-                                    if !post.imageUrl.isEmpty {
-                                        KinnectRemoteImageView(rawURL: post.imageUrl, cornerRadius: 12, maxHeight: 240)
-                                    }
-                                }
-                                .kinnectCard()
-                            }
-                        }
-                    }
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)

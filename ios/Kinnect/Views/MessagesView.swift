@@ -144,11 +144,11 @@ struct MessagesView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(peer.name)
                     .font(.subheadline.bold())
-                    .foregroundColor(.white)
+                    .foregroundColor(KinnectTheme.textPrimary)
                     .kinnectMultiline()
                 Text(lastMsg)
                     .font(.caption)
-                    .foregroundColor(unread > 0 ? .white : KinnectTheme.textSecondary)
+                    .foregroundColor(unread > 0 ? KinnectTheme.textPrimary : KinnectTheme.textSecondary)
                     .lineLimit(2)
             }
 
@@ -178,7 +178,7 @@ struct MessagesView: View {
                 HStack(spacing: 6) {
                     Text(group.name)
                         .font(.subheadline.bold())
-                        .foregroundColor(.white)
+                        .foregroundColor(KinnectTheme.textPrimary)
                         .kinnectMultiline()
                     Text("(\(group.membersCount) TV)")
                         .font(.caption2)
@@ -203,6 +203,16 @@ struct MessagesView: View {
     }
 
     private func loadChats() async {
+        if conversations.isEmpty,
+           let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/conversations"),
+           let convs = cached["conversations"] as? [[String: Any]] {
+            self.conversations = convs
+        }
+        if groups.isEmpty,
+           let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/groups"),
+           let grps = cached["groups"] as? [[String: Any]] {
+            self.groups = grps.map(ChatGroupItem.from)
+        }
         isLoading = true
         defer { isLoading = false }
         async let cTask = KinnectAPIClient.shared.requestJSON("/api/conversations")
@@ -229,6 +239,11 @@ struct DirectChatDetailView: View {
     @State private var editingMessageId: String?
     @State private var editingMessageText: String = ""
     @State private var messageReactions: [String: String] = [:]
+    @State private var forwardText: String = ""
+    @State private var forwardImageUrl: String = ""
+    @State private var showForwardSheet = false
+    @State private var isPinned = false
+    @State private var isMuted = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -344,6 +359,32 @@ struct DirectChatDetailView: View {
                 }
 
                 Menu {
+                    Button {
+                        Task {
+                            isPinned.toggle()
+                            _ = try? await KinnectAPIClient.shared.requestJSON(
+                                "/api/chat-preferences/direct/\(peer.id)",
+                                method: "POST",
+                                body: ["pinned": isPinned]
+                            )
+                            appState.showToast(isPinned ? "Đã ghim hội thoại." : "Đã bỏ ghim.")
+                        }
+                    } label: {
+                        Label(isPinned ? "Bỏ ghim hội thoại" : "Ghim hội thoại", systemImage: isPinned ? "pin.slash" : "pin")
+                    }
+                    Button {
+                        Task {
+                            isMuted.toggle()
+                            _ = try? await KinnectAPIClient.shared.requestJSON(
+                                "/api/chat-preferences/direct/\(peer.id)",
+                                method: "POST",
+                                body: ["muted": isMuted]
+                            )
+                            appState.showToast(isMuted ? "Đã tắt thông báo." : "Đã bật thông báo.")
+                        }
+                    } label: {
+                        Label(isMuted ? "Bật thông báo" : "Tắt thông báo", systemImage: isMuted ? "bell" : "bell.slash")
+                    }
                     Button(role: .destructive) {
                         appState.activeReportContext = UGCReportContext(
                             targetType: "user",
@@ -373,6 +414,9 @@ struct DirectChatDetailView: View {
                 .accessibilityLabel("Tùy chọn cuộc trò chuyện")
             }
         }
+        .sheet(isPresented: $showForwardSheet) {
+            ForwardMessageSheet(text: forwardText, imageUrl: forwardImageUrl)
+        }
         .task {
             await loadMessages()
         }
@@ -392,7 +436,7 @@ struct DirectChatDetailView: View {
                 if !msg.text.isEmpty {
                     Text(msg.text)
                         .font(.subheadline)
-                        .foregroundColor(.white)
+                        .foregroundColor(isMine ? .white : KinnectTheme.textPrimary)
                         .kinnectMultiline()
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
@@ -425,7 +469,7 @@ struct DirectChatDetailView: View {
                     Menu {
                         ForEach(["❤️", "👍", "😆", "😮", "😢"], id: \.self) { emoji in
                             Button(emoji) {
-                                messageReactions[msg.id] = emoji
+                                Task { await reactToMessage(msgId: msg.id, emoji: emoji) }
                             }
                         }
                     } label: {
@@ -458,11 +502,12 @@ struct DirectChatDetailView: View {
                         }
 
                         Button {
-                            UIPasteboard.general.string = msg.text
-                            appState.showToast("Đã sao chép để chuyển tiếp tin nhắn.")
+                            forwardText = msg.text
+                            forwardImageUrl = msg.imageUrl
+                            showForwardSheet = true
                         } label: {
                             HStack {
-                                Text("Chuyển tiếp / Sao chép")
+                                Text("Chuyển tiếp tin nhắn")
                                 KinnectIcon(glyph: .share, size: 18)
                             }
                         }
@@ -511,12 +556,37 @@ struct DirectChatDetailView: View {
     }
 
     private func loadMessages() async {
+        if messages.isEmpty,
+           let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/users/\(peer.id)/messages"),
+           let list = cached["messages"] as? [[String: Any]] {
+            self.messages = list.map(DirectMessageItem.from)
+            for m in self.messages where !m.reaction.isEmpty {
+                messageReactions[m.id] = m.reaction
+            }
+        }
         // Fetching GET /api/users/:id/messages marks incoming messages as seen on backend
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/users/\(peer.id)/messages") {
             let list = res["messages"] as? [[String: Any]] ?? []
             self.messages = list.map(DirectMessageItem.from)
+            for m in self.messages where !m.reaction.isEmpty {
+                messageReactions[m.id] = m.reaction
+            }
             await appState.refreshGlobalBadges()
         }
+    }
+
+    private func reactToMessage(msgId: String, emoji: String) async {
+        messageReactions[msgId] = emoji
+        _ = try? await KinnectAPIClient.shared.requestJSON(
+            "/api/chat-messages/direct/\(msgId)/reaction",
+            method: "POST",
+            body: ["reaction": emoji]
+        )
+        NativeSocketClient.shared.sendJSON([
+            "type": "chat-reaction",
+            "messageId": msgId,
+            "reaction": emoji
+        ])
     }
 
     private func sendMessage(text: String, imageDataURL: String) async {
@@ -579,6 +649,12 @@ struct GroupChatDetailView: View {
     @State private var messages: [GroupMessageItem] = []
     @State private var text = ""
     @State private var groupReactions: [String: String] = [:]
+    @State private var forwardText = ""
+    @State private var forwardImageUrl = ""
+    @State private var showForwardSheet = false
+    @State private var showRenameSheet = false
+    @State private var showAddMemberSheet = false
+    @State private var newGroupName = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -605,7 +681,7 @@ struct GroupChatDetailView: View {
                                 // Content on top
                                 Text(msg.text)
                                     .font(.subheadline)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(isMine ? .white : KinnectTheme.textPrimary)
                                     .kinnectMultiline()
                                     .padding(.horizontal, 14)
                                     .padding(.vertical, 10)
@@ -629,7 +705,7 @@ struct GroupChatDetailView: View {
                                     Menu {
                                         ForEach(["❤️", "👍", "😆", "😮", "😢"], id: \.self) { emoji in
                                             Button(emoji) {
-                                                groupReactions[msg.id] = emoji
+                                                Task { await reactToGroupMessage(msgId: msg.id, emoji: emoji) }
                                             }
                                         }
                                     } label: {
@@ -649,11 +725,12 @@ struct GroupChatDetailView: View {
 
                                     Menu {
                                         Button {
-                                            UIPasteboard.general.string = msg.text
-                                            appState.showToast("Đã sao chép để chuyển tiếp tin nhắn.")
+                                            forwardText = msg.text
+                                            forwardImageUrl = msg.imageUrl
+                                            showForwardSheet = true
                                         } label: {
                                             HStack {
-                                                Text("Chuyển tiếp / Sao chép")
+                                                Text("Chuyển tiếp tin nhắn")
                                                 KinnectIcon(glyph: .share, size: 18)
                                             }
                                         }
@@ -701,7 +778,7 @@ struct GroupChatDetailView: View {
                 TextField("Nhắn vào nhóm \(group.name)...", text: $text)
                     .padding(10)
                     .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                    .foregroundColor(.white)
+                    .foregroundColor(KinnectTheme.textPrimary)
 
                 KinnectIconButton(
                     glyph: .send,
@@ -720,13 +797,45 @@ struct GroupChatDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                KinnectIconButton(
-                    glyph: .logout,
-                    label: "Rời nhóm",
-                    tint: KinnectTheme.danger
-                ) {
-                    Task { await leaveGroup() }
+                Menu {
+                    Button {
+                        newGroupName = group.name
+                        showRenameSheet = true
+                    } label: {
+                        Label("Đổi tên nhóm", systemImage: "pencil")
+                    }
+                    Button {
+                        showAddMemberSheet = true
+                    } label: {
+                        Label("Thêm thành viên", systemImage: "person.badge.plus")
+                    }
+                    Button(role: .destructive) {
+                        Task { await leaveGroup() }
+                    } label: {
+                        HStack {
+                            Text("Rời nhóm")
+                            KinnectIcon(glyph: .logout, size: 18, tint: KinnectTheme.danger)
+                        }
+                    }
+                } label: {
+                    KinnectIcon(glyph: .more, size: 22, tint: KinnectTheme.textSecondary)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
+                .accessibilityLabel("Tùy chọn nhóm")
+            }
+        }
+        .sheet(isPresented: $showForwardSheet) {
+            ForwardMessageSheet(text: forwardText, imageUrl: forwardImageUrl)
+        }
+        .sheet(isPresented: $showRenameSheet) {
+            RenameGroupSheet(groupId: group.id, currentName: group.name) {
+                Task { await loadGroupMessages() }
+            }
+        }
+        .sheet(isPresented: $showAddMemberSheet) {
+            AddGroupMembersSheet(groupId: group.id) {
+                Task { await loadGroupMessages() }
             }
         }
         .task {
@@ -738,10 +847,35 @@ struct GroupChatDetailView: View {
     }
 
     private func loadGroupMessages() async {
+        if messages.isEmpty,
+           let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/groups/\(group.id)/messages"),
+           let list = cached["messages"] as? [[String: Any]] {
+            self.messages = list.map(GroupMessageItem.from)
+            for m in self.messages where !m.reaction.isEmpty {
+                groupReactions[m.id] = m.reaction
+            }
+        }
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/groups/\(group.id)/messages") {
             let list = res["messages"] as? [[String: Any]] ?? []
             self.messages = list.map(GroupMessageItem.from)
+            for m in self.messages where !m.reaction.isEmpty {
+                groupReactions[m.id] = m.reaction
+            }
         }
+    }
+
+    private func reactToGroupMessage(msgId: String, emoji: String) async {
+        groupReactions[msgId] = emoji
+        _ = try? await KinnectAPIClient.shared.requestJSON(
+            "/api/chat-messages/group/\(msgId)/reaction",
+            method: "POST",
+            body: ["reaction": emoji]
+        )
+        NativeSocketClient.shared.sendJSON([
+            "type": "group-reaction",
+            "messageId": msgId,
+            "reaction": emoji
+        ])
     }
 
     private func sendGroupMessage() async {
@@ -805,7 +939,7 @@ struct CreateGroupSheet: View {
                         } label: {
                             HStack {
                                 Text(friend.name)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(KinnectTheme.textPrimary)
                                 Spacer()
                                 Image(systemName: selectedIds.contains(friend.id) ? "checkmark.circle.fill" : "circle")
                                     .foregroundColor(KinnectTheme.accentBright)
@@ -857,6 +991,262 @@ struct CreateGroupSheet: View {
         } catch {
             appState.showToast(error.localizedDescription)
         }
+    }
+}
+
+struct ForwardMessageSheet: View {
+    let text: String
+    let imageUrl: String
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
+
+    @State private var conversations: [[String: Any]] = []
+    @State private var groups: [ChatGroupItem] = []
+    @State private var friends: [KinnectUser] = []
+    @State private var isLoading = false
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if !conversations.isEmpty {
+                    Section("Hội thoại gần đây") {
+                        ForEach(Array(conversations.enumerated()), id: \.offset) { _, conv in
+                            let peer = extractPeer(from: conv)
+                            if !peer.id.isEmpty {
+                                Button {
+                                    Task { await forwardToUser(peer.id, name: peer.name) }
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        KinnectAvatarView(name: peer.name, avatarURL: peer.avatarUrl, colorHex: peer.avatarColor, size: 36)
+                                        Text(peer.name).foregroundColor(KinnectTheme.textPrimary)
+                                        Spacer()
+                                        Image(systemName: "paperplane.fill").foregroundColor(KinnectTheme.accentBright)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if !groups.isEmpty {
+                    Section("Nhóm trò chuyện") {
+                        ForEach(groups) { g in
+                            Button {
+                                Task { await forwardToGroup(g.id, name: g.name) }
+                            } label: {
+                                HStack(spacing: 12) {
+                                    KinnectAvatarView(name: g.name, avatarURL: "", colorHex: g.avatarColor, size: 36)
+                                    Text(g.name).foregroundColor(KinnectTheme.textPrimary)
+                                    Spacer()
+                                    Image(systemName: "paperplane.fill").foregroundColor(KinnectTheme.accentBright)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if !friends.isEmpty {
+                    Section("Bạn bè") {
+                        ForEach(friends) { f in
+                            Button {
+                                Task { await forwardToUser(f.id, name: f.name) }
+                            } label: {
+                                HStack(spacing: 12) {
+                                    KinnectAvatarView(name: f.name, avatarURL: f.avatarUrl, colorHex: f.avatarColor, size: 36)
+                                    Text(f.name).foregroundColor(KinnectTheme.textPrimary)
+                                    Spacer()
+                                    Image(systemName: "paperplane.fill").foregroundColor(KinnectTheme.accentBright)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(KinnectTheme.background)
+            .navigationTitle("Chuyển tiếp tin nhắn")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Hủy") { dismiss() }
+                }
+            }
+            .task {
+                await loadTargets()
+            }
+        }
+    }
+
+    private func extractPeer(from conv: [String: Any]) -> KinnectUser {
+        if let u = conv["user"] as? [String: Any] ?? conv["peer"] as? [String: Any] {
+            return KinnectUser.from(u)
+        }
+        return KinnectUser.from(conv)
+    }
+
+    private func loadTargets() async {
+        isLoading = true
+        defer { isLoading = false }
+        if let cRes = try? await KinnectAPIClient.shared.requestJSON("/api/conversations") {
+            self.conversations = cRes["conversations"] as? [[String: Any]] ?? []
+        }
+        if let gRes = try? await KinnectAPIClient.shared.requestJSON("/api/groups") {
+            self.groups = (gRes["groups"] as? [[String: Any]] ?? []).map(ChatGroupItem.from)
+        }
+        if let fRes = try? await KinnectAPIClient.shared.requestJSON("/api/friends") {
+            self.friends = (fRes["friends"] as? [[String: Any]] ?? []).map(KinnectUser.from)
+        }
+    }
+
+    private func forwardToUser(_ userId: String, name: String) async {
+        let reqId = "fwd_u_\(userId)_\(UUID().uuidString)"
+        _ = try? await KinnectAPIClient.shared.requestJSON(
+            "/api/users/\(userId)/messages",
+            method: "POST",
+            body: [
+                "text": text,
+                "imageUrl": imageUrl,
+                "requestId": reqId
+            ],
+            requestId: reqId
+        )
+        appState.showToast("Đã chuyển tiếp tới \(name)!")
+        dismiss()
+    }
+
+    private func forwardToGroup(_ groupId: String, name: String) async {
+        let reqId = "fwd_g_\(groupId)_\(UUID().uuidString)"
+        _ = try? await KinnectAPIClient.shared.requestJSON(
+            "/api/groups/\(groupId)/messages",
+            method: "POST",
+            body: [
+                "text": text,
+                "imageUrl": imageUrl,
+                "requestId": reqId
+            ],
+            requestId: reqId
+        )
+        appState.showToast("Đã chuyển tiếp tới nhóm \(name)!")
+        dismiss()
+    }
+}
+
+struct RenameGroupSheet: View {
+    let groupId: String
+    let currentName: String
+    let onRenamed: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
+
+    @State private var name: String = ""
+    @State private var isSaving = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Tên nhóm mới") {
+                    TextField("Nhập tên nhóm", text: $name)
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(KinnectTheme.background)
+            .navigationTitle("Đổi tên nhóm")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Hủy") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Lưu") {
+                        Task { await save() }
+                    }
+                    .disabled(isSaving || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .onAppear {
+                name = currentName
+            }
+        }
+    }
+
+    private func save() async {
+        isSaving = true
+        defer { isSaving = false }
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        _ = try? await KinnectAPIClient.shared.requestJSON(
+            "/api/groups/\(groupId)",
+            method: "PATCH",
+            body: ["name": clean]
+        )
+        appState.showToast("Đã đổi tên nhóm thành '\(clean)'.")
+        onRenamed()
+        dismiss()
+    }
+}
+
+struct AddGroupMembersSheet: View {
+    let groupId: String
+    let onAdded: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
+
+    @State private var friends: [KinnectUser] = []
+    @State private var selectedIds: Set<String> = []
+    @State private var isAdding = false
+
+    var body: some View {
+        NavigationStack {
+            List(friends) { friend in
+                Button {
+                    if selectedIds.contains(friend.id) {
+                        selectedIds.remove(friend.id)
+                    } else {
+                        selectedIds.insert(friend.id)
+                    }
+                } label: {
+                    HStack {
+                        KinnectAvatarView(name: friend.name, avatarURL: friend.avatarUrl, colorHex: friend.avatarColor, size: 36)
+                        Text(friend.name).foregroundColor(KinnectTheme.textPrimary)
+                        Spacer()
+                        Image(systemName: selectedIds.contains(friend.id) ? "checkmark.circle.fill" : "circle")
+                            .foregroundColor(KinnectTheme.accentBright)
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(KinnectTheme.background)
+            .navigationTitle("Thêm thành viên")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Hủy") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Thêm (\(selectedIds.count))") {
+                        Task { await add() }
+                    }
+                    .disabled(isAdding || selectedIds.isEmpty)
+                }
+            }
+            .task {
+                if let res = try? await KinnectAPIClient.shared.requestJSON("/api/friends") {
+                    self.friends = (res["friends"] as? [[String: Any]] ?? []).map(KinnectUser.from)
+                }
+            }
+        }
+    }
+
+    private func add() async {
+        isAdding = true
+        defer { isAdding = false }
+        _ = try? await KinnectAPIClient.shared.requestJSON(
+            "/api/groups/\(groupId)/members",
+            method: "POST",
+            body: ["members": Array(selectedIds)]
+        )
+        appState.showToast("Đã thêm thành viên vào nhóm!")
+        onAdded()
+        dismiss()
     }
 }
 

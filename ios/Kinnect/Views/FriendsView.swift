@@ -112,7 +112,7 @@ struct FriendsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(user.name)
                     .font(.subheadline.bold())
-                    .foregroundColor(.white)
+                    .foregroundColor(KinnectTheme.textPrimary)
                     .kinnectMultiline()
                 if !user.handle.isEmpty {
                     Text("@\(user.handle)")
@@ -174,7 +174,7 @@ struct FriendsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(user.name)
                     .font(.subheadline.bold())
-                    .foregroundColor(.white)
+                    .foregroundColor(KinnectTheme.textPrimary)
                     .kinnectMultiline()
                 Text("Muốn kết bạn với bạn")
                     .font(.caption)
@@ -207,7 +207,7 @@ struct FriendsView: View {
             KinnectAvatarView(name: user.name, avatarURL: user.avatarUrl, colorHex: user.avatarColor, size: 44)
             Text(user.name)
                 .font(.subheadline.bold())
-                .foregroundColor(.white)
+                .foregroundColor(KinnectTheme.textPrimary)
                 .kinnectMultiline()
             Spacer()
             Button("Thu hồi") {
@@ -228,7 +228,7 @@ struct FriendsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(user.name)
                     .font(.subheadline.bold())
-                    .foregroundColor(.white)
+                    .foregroundColor(KinnectTheme.textPrimary)
                     .kinnectMultiline()
                 if !user.bio.isEmpty {
                     Text(user.bio)
@@ -251,6 +251,11 @@ struct FriendsView: View {
     }
 
     private func loadAll() async {
+        if friends.isEmpty,
+           let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/friends"),
+           let list = cached["friends"] as? [[String: Any]] {
+            self.friends = list.map(KinnectUser.from)
+        }
         isLoading = true
         defer { isLoading = false }
 

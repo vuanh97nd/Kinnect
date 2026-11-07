@@ -20,37 +20,42 @@ struct NotificationsView: View {
             }
 
             ForEach(notifications) { item in
-                HStack(alignment: .top, spacing: 12) {
-                    KinnectAvatarView(
-                        name: item.actor.name.isEmpty ? "K" : item.actor.name,
-                        avatarURL: item.actor.avatarUrl,
-                        colorHex: item.actor.avatarColor,
-                        size: 42
-                    )
+                Button {
+                    Task { await handleNotificationTap(item) }
+                } label: {
+                    HStack(alignment: .top, spacing: 12) {
+                        KinnectAvatarView(
+                            name: item.actor.name.isEmpty ? "K" : item.actor.name,
+                            avatarURL: item.actor.avatarUrl,
+                            colorHex: item.actor.avatarColor,
+                            size: 42
+                        )
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text(item.actor.name.isEmpty ? "Kinnect" : item.actor.name)
-                                .font(.subheadline.bold())
-                                .foregroundColor(.white)
-                            Spacer()
-                            Text(formatRelativeDate(item.createdAt))
-                                .font(.caption2)
-                                .foregroundColor(KinnectTheme.textSecondary)
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(item.actor.name.isEmpty ? "Kinnect" : item.actor.name)
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(KinnectTheme.textPrimary)
+                                Spacer()
+                                Text(formatRelativeDate(item.createdAt))
+                                    .font(.caption2)
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                            }
+                            Text(item.preview.isEmpty ? "Bạn có tương tác mới" : item.preview)
+                                .font(.subheadline)
+                                .foregroundColor(item.read ? KinnectTheme.textSecondary : KinnectTheme.textPrimary)
+                                .kinnectMultiline()
                         }
-                        Text(item.preview.isEmpty ? "Bạn có tương tác mới" : item.preview)
-                            .font(.subheadline)
-                            .foregroundColor(item.read ? KinnectTheme.textSecondary : KinnectTheme.textPrimary)
-                            .kinnectMultiline()
-                    }
 
-                    if !item.read {
-                        Circle()
-                            .fill(KinnectTheme.accentBright)
-                            .frame(width: 8, height: 8)
+                        if !item.read {
+                            Circle()
+                                .fill(KinnectTheme.accentBright)
+                                .frame(width: 8, height: 8)
+                        }
                     }
+                    .padding(.vertical, 4)
                 }
-                .padding(.vertical, 4)
+                .buttonStyle(.plain)
                 .listRowBackground(item.read ? KinnectTheme.surface : KinnectTheme.surfaceElevated)
             }
         }
@@ -77,12 +82,33 @@ struct NotificationsView: View {
     }
 
     private func loadNotifications() async {
+        if notifications.isEmpty,
+           let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/notifications"),
+           let list = cached["notifications"] as? [[String: Any]] {
+            self.notifications = list.map(NotificationItem.from)
+        }
         isLoading = true
         defer { isLoading = false }
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/notifications") {
             let list = res["notifications"] as? [[String: Any]] ?? []
             self.notifications = list.map(NotificationItem.from)
         }
+    }
+
+    private func handleNotificationTap(_ item: NotificationItem) async {
+        if !item.read {
+            _ = try? await KinnectAPIClient.shared.requestJSON(
+                "/api/notifications",
+                method: "POST",
+                body: ["ids": [item.id]],
+                requestId: "read_\(item.id)"
+            )
+            if let idx = notifications.firstIndex(where: { $0.id == item.id }) {
+                notifications[idx].read = true
+            }
+            await appState.refreshGlobalBadges()
+        }
+        appState.showToast("Đã xem thông báo: \(item.preview.isEmpty ? item.type : item.preview)")
     }
 
     private func markAllRead() async {

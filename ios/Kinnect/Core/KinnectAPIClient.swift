@@ -45,13 +45,17 @@ final class KinnectAPIClient {
 
     private func isCacheableGET(_ path: String) -> Bool {
         let base = path.components(separatedBy: "?").first ?? path
-        let allowed: Set<String> = [
+        let allowedExact: Set<String> = [
             "/api/me", "/api/posts", "/api/stories", "/api/discover", "/api/shorts",
             "/api/conversations", "/api/groups", "/api/notifications",
             "/api/friends", "/api/friend-requests", "/api/friend-suggestions",
             "/api/store", "/api/wallet", "/api/live/gifts"
         ]
-        return allowed.contains(base)
+        if allowedExact.contains(base) { return true }
+        if base.hasPrefix("/api/users/") || base.hasPrefix("/api/groups/") || base.hasPrefix("/api/chat-preferences/") {
+            return true
+        }
+        return false
     }
 
     func cachedJSON(for path: String) -> [String: Any]? {

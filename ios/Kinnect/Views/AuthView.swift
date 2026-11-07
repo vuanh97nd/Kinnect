@@ -192,17 +192,19 @@ struct AuthView: View {
                 .kinnectCard()
 
                 #if DEBUG
-                // Server Origin status (visible in debug builds only)
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(KinnectTheme.online)
-                        .frame(width: 8, height: 8)
-                    Text("Máy chủ: \(ServerConfig.currentOrigin)")
-                        .font(.caption2)
-                        .foregroundColor(KinnectTheme.textSecondary)
-                        .kinnectMultiline()
+                if !UIReviewFixture.isEnabled {
+                    // Server Origin status (visible in debug builds only when fixture review is not active)
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(KinnectTheme.online)
+                            .frame(width: 8, height: 8)
+                        Text("Máy chủ: \(ServerConfig.currentOrigin)")
+                            .font(.caption2)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                            .kinnectMultiline()
+                    }
+                    .padding(.bottom, 24)
                 }
-                .padding(.bottom, 24)
                 #endif
             }
             .padding(.horizontal, 18)

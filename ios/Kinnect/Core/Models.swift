@@ -234,6 +234,7 @@ struct DirectMessageItem: Identifiable, Equatable {
     var createdAt: String
     var deliveredAt: String
     var seenAt: String
+    var reaction: String = ""
 
     var isSeen: Bool { !seenAt.isEmpty }
 
@@ -243,6 +244,7 @@ struct DirectMessageItem: Identifiable, Equatable {
         let deliv = isoString(from: dict["deliveredAt"] ?? receipt?["deliveredAt"])
         let seen = isoString(from: dict["seenAt"] ?? dict["readAt"] ?? receipt?["seenAt"])
         let img = (dict["imageUrl"] as? String) ?? (dict["attachmentUrl"] as? String) ?? (att?["url"] as? String) ?? ""
+        let rx = (dict["reaction"] as? String) ?? (dict["rx"] as? String) ?? ""
         return DirectMessageItem(
             id: (dict["id"] as? String) ?? UUID().uuidString,
             fromUserId: (dict["fromUserId"] as? String) ?? (dict["senderId"] as? String) ?? (dict["sender"] as? String) ?? "",
@@ -251,7 +253,8 @@ struct DirectMessageItem: Identifiable, Equatable {
             imageUrl: img,
             createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
             deliveredAt: deliv,
-            seenAt: seen
+            seenAt: seen,
+            reaction: rx
         )
     }
 }
@@ -289,11 +292,13 @@ struct GroupMessageItem: Identifiable, Equatable {
     var imageUrl: String
     var createdAt: String
     var seenCount: Int
+    var reaction: String = ""
 
     static func from(_ dict: [String: Any]) -> GroupMessageItem {
         let senderDict = (dict["sender"] as? [String: Any]) ?? (dict["author"] as? [String: Any]) ?? (dict["user"] as? [String: Any]) ?? dict
         let receipt = dict["receipt"] as? [String: Any]
         let seenBy = dict["seenBy"] as? [Any]
+        let rx = (dict["reaction"] as? String) ?? (dict["rx"] as? String) ?? ""
         return GroupMessageItem(
             id: (dict["id"] as? String) ?? UUID().uuidString,
             groupId: (dict["groupId"] as? String) ?? (dict["group_id"] as? String) ?? "",
@@ -301,7 +306,8 @@ struct GroupMessageItem: Identifiable, Equatable {
             text: (dict["text"] as? String) ?? (dict["body"] as? String) ?? (dict["content"] as? String) ?? "",
             imageUrl: (dict["imageUrl"] as? String) ?? "",
             createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
-            seenCount: (dict["seenCount"] as? Int) ?? (receipt?["seenCount"] as? Int) ?? seenBy?.count ?? 0
+            seenCount: (dict["seenCount"] as? Int) ?? (receipt?["seenCount"] as? Int) ?? seenBy?.count ?? 0,
+            reaction: rx
         )
     }
 }
@@ -313,6 +319,8 @@ struct NotificationItem: Identifiable, Equatable {
     var read: Bool
     var createdAt: String
     var actor: KinnectUser
+    var ref: String = ""
+    var commentId: String = ""
 
     static func from(_ dict: [String: Any]) -> NotificationItem {
         let actorDict = (dict["actor"] as? [String: Any]) ?? [:]
@@ -323,7 +331,9 @@ struct NotificationItem: Identifiable, Equatable {
             preview: (dict["preview"] as? String) ?? (dict["text"] as? String) ?? "",
             read: isSeen,
             createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
-            actor: KinnectUser.from(actorDict)
+            actor: KinnectUser.from(actorDict),
+            ref: (dict["ref"] as? String) ?? (dict["targetId"] as? String) ?? "",
+            commentId: (dict["commentId"] as? String) ?? ""
         )
     }
 }

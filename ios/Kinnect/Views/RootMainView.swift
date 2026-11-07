@@ -39,6 +39,7 @@ struct RootMainView: View {
     @State private var showWalletStoreSheet = false
     @State private var showMessagesSheet = false
     @State private var showProfileSheet = false
+    @State private var splitColumnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -61,7 +62,7 @@ struct RootMainView: View {
             } else if UIReviewFixture.activeScreen == "chat-detail" {
                 if horizontalSizeClass == .regular {
                     // iPad two-column layout: Conversation List on left + Chat Detail on right
-                    NavigationSplitView {
+                    NavigationSplitView(columnVisibility: $splitColumnVisibility) {
                         NavigationStack {
                             MessagesView(onOpenFriends: { showFriendsSheet = true })
                         }
@@ -71,6 +72,7 @@ struct RootMainView: View {
                             DirectChatDetailView(peer: KinnectUser.from(UIReviewFixture.peerUserDict))
                         }
                     }
+                    .navigationSplitViewStyle(.balanced)
                 } else {
                     NavigationStack {
                         DirectChatDetailView(peer: KinnectUser.from(UIReviewFixture.peerUserDict))
@@ -292,7 +294,7 @@ struct RootMainView: View {
                 }
                 .scrollContentBackground(.hidden)
                 .background(KinnectTheme.surface)
-                .navigationTitle("Kinnect")
+                .navigationTitle("")
             } detail: {
                 NavigationStack {
                     tabContent(for: selectedTab)
@@ -419,82 +421,92 @@ struct RootMainView: View {
 
     @ToolbarContentBuilder
     private var topToolbarItems: some ToolbarContent {
-        ToolbarItemGroup(placement: .navigationBarTrailing) {
-            // 1. Cửa hàng / Store
-            KinnectIconButton(
-                glyph: .store,
-                label: "Ví & Cửa hàng",
-                tint: KinnectTheme.warning
-            ) {
-                showWalletStoreSheet = true
-            }
+        ToolbarItem(placement: .navigationBarLeading) {
+            KinnectBrandLogo(size: 34)
+        }
 
-            // 2. Bạn bè / Friends
-            KinnectIconButton(
-                glyph: .friends,
-                label: "Bạn bè",
-                tint: KinnectTheme.textPrimary
-            ) {
-                showFriendsSheet = true
-            }
+        ToolbarItem(placement: .navigationBarTrailing) {
+            HStack(spacing: 4) {
+                // 1. Thông báo / Notifications (bell) with unread badge
+                Button {
+                    showNotificationsSheet = true
+                } label: {
+                    ZStack(alignment: .topTrailing) {
+                        KinnectIcon(glyph: .notifications, size: 22, tint: KinnectTheme.textPrimary)
+                        if appState.unreadNotificationsCount > 0 {
+                            Circle()
+                                .fill(KinnectTheme.danger)
+                                .frame(width: 8, height: 8)
+                                .offset(x: 2, y: -2)
+                        }
+                    }
+                    .frame(width: 38, height: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Thông báo")
 
-            // 3. Tin nhắn / Messages with unread badge
-            Button {
-                showMessagesSheet = true
-            } label: {
-                ZStack(alignment: .topTrailing) {
-                    KinnectIcon(glyph: .messages, size: 24, tint: KinnectTheme.textPrimary)
-                    if appState.unreadMessagesCount > 0 {
-                        Circle()
-                            .fill(KinnectTheme.danger)
-                            .frame(width: 9, height: 9)
-                            .offset(x: 3, y: -2)
+                // 2. Cửa hàng / Store
+                Button {
+                    showWalletStoreSheet = true
+                } label: {
+                    KinnectIcon(glyph: .store, size: 22, tint: KinnectTheme.textPrimary)
+                        .frame(width: 38, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Ví & Cửa hàng")
+
+                // 3. Bạn bè / Friends
+                Button {
+                    showFriendsSheet = true
+                } label: {
+                    KinnectIcon(glyph: .friends, size: 22, tint: KinnectTheme.textPrimary)
+                        .frame(width: 38, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Bạn bè")
+
+                // 4. Tin nhắn / Messages with unread badge
+                Button {
+                    showMessagesSheet = true
+                } label: {
+                    ZStack(alignment: .topTrailing) {
+                        KinnectIcon(glyph: .messages, size: 22, tint: KinnectTheme.textPrimary)
+                        if appState.unreadMessagesCount > 0 {
+                            Circle()
+                                .fill(KinnectTheme.danger)
+                                .frame(width: 8, height: 8)
+                                .offset(x: 2, y: -2)
+                        }
+                    }
+                    .frame(width: 38, height: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Tin nhắn")
+
+                // 5. Tài khoản / Current User circular Avatar
+                Button {
+                    showProfileSheet = true
+                } label: {
+                    if let u = appState.currentUser {
+                        KinnectAvatarView(
+                            name: u.name,
+                            avatarURL: u.avatarUrl,
+                            colorHex: u.avatarColor,
+                            size: 28,
+                            isOnline: false
+                        )
+                    } else {
+                        KinnectIcon(glyph: .profile, size: 22, tint: KinnectTheme.textPrimary)
                     }
                 }
-                .frame(minWidth: 44, minHeight: 44)
-                .contentShape(Rectangle())
+                .frame(width: 36, height: 44)
+                .buttonStyle(.plain)
+                .accessibilityLabel("Tài khoản")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Tin nhắn")
-
-            // 4. Thông báo / Notifications with unread dot
-            Button {
-                showNotificationsSheet = true
-            } label: {
-                ZStack(alignment: .topTrailing) {
-                    KinnectIcon(glyph: .notifications, size: 24, tint: KinnectTheme.textPrimary)
-                    if appState.unreadNotificationsCount > 0 {
-                        Circle()
-                            .fill(KinnectTheme.danger)
-                            .frame(width: 9, height: 9)
-                            .offset(x: 3, y: -2)
-                    }
-                }
-                .frame(minWidth: 44, minHeight: 44)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Thông báo")
-
-            // 5. Hồ sơ / Profile avatar
-            Button {
-                showProfileSheet = true
-            } label: {
-                if let u = appState.currentUser {
-                    KinnectAvatarView(
-                        name: u.name,
-                        avatarURL: u.avatarUrl,
-                        colorHex: u.avatarColor,
-                        size: 30,
-                        isOnline: false
-                    )
-                } else {
-                    KinnectIcon(glyph: .profile, size: 24, tint: KinnectTheme.textPrimary)
-                }
-            }
-            .frame(minWidth: 44, minHeight: 44)
-            .buttonStyle(.plain)
-            .accessibilityLabel("Hồ sơ cá nhân")
         }
     }
 

@@ -123,19 +123,146 @@ enum UIReviewFixture {
             ]
 
         case "/api/discover":
-            return [
-                "people": [peerUserDict, secondPeerDict],
-                "posts": [
-                    [
-                        "id": "fixture_disc_post_1",
-                        "author": peerUserDict,
-                        "text": "[Fixture UI] Khám phá cộng đồng Kinnect quanh bạn (Dành cho bạn - Quanh đây - Đang theo dõi).",
-                        "category": "community",
-                        "likesCount": 31,
-                        "commentsCount": 5,
-                        "createdAt": "2026-11-07T01:15:00.000Z"
-                    ]
+            let users: [[String: Any]] = [
+                [
+                    "id": "fixture_user_1",
+                    "name": "Trần Hoàng Nam",
+                    "handle": "hoangnam_dn",
+                    "bio": "Thiết kế & Nhiếp ảnh",
+                    "locationName": "Đà Nẵng",
+                    "avatarColor": "#2563EB",
+                    "age": 24,
+                    "height": 175,
+                    "weight": 68,
+                    "gender": "nam",
+                    "distanceKm": 1.8,
+                    "isFollowing": true,
+                    "isFriend": true
+                ],
+                [
+                    "id": "fixture_user_2",
+                    "name": "Nguyễn Thị Thanh Trúc",
+                    "handle": "thanhtruc_hn",
+                    "bio": "Âm nhạc, du lịch & công nghệ",
+                    "locationName": "Hà Nội",
+                    "avatarColor": "#EC4899",
+                    "age": 22,
+                    "height": 162,
+                    "weight": 48,
+                    "gender": "nu",
+                    "distanceKm": 3.2,
+                    "isFollowing": false,
+                    "isFriend": false
+                ],
+                [
+                    "id": "fixture_user_3",
+                    "name": "Lê Văn Minh",
+                    "handle": "minhle_sg",
+                    "bio": "Kỹ sư phần mềm • Thể thao",
+                    "locationName": "TP. Hồ Chí Minh",
+                    "avatarColor": "#10B981",
+                    "age": 26,
+                    "height": 178,
+                    "weight": 72,
+                    "gender": "nam",
+                    "distanceKm": 4.5,
+                    "isFollowing": true,
+                    "isFriend": false
+                ],
+                [
+                    "id": "fixture_user_4",
+                    "name": "Đặng Phương Anh",
+                    "handle": "phuonganh_hp",
+                    "bio": "Sáng tạo nội dung • Hội họa",
+                    "locationName": "Hải Phòng",
+                    "avatarColor": "#F59E0B",
+                    "age": 23,
+                    "height": 165,
+                    "weight": 50,
+                    "gender": "nu",
+                    "distanceKm": 5.1,
+                    "isFollowing": false,
+                    "isFriend": false
+                ],
+                [
+                    "id": "fixture_user_5",
+                    "name": "Phạm Quốc Bảo",
+                    "handle": "quocbao_ct",
+                    "bio": "Kiến trúc sư • Cà phê",
+                    "locationName": "Cần Thơ",
+                    "avatarColor": "#8B5CF6",
+                    "age": 28,
+                    "height": 172,
+                    "weight": 65,
+                    "gender": "nam",
+                    "distanceKm": 6.8,
+                    "isFollowing": false,
+                    "isFriend": true
+                ],
+                [
+                    "id": "fixture_user_6",
+                    "name": "Vũ Hoàng Khánh My",
+                    "handle": "khanhmy_nt",
+                    "bio": "Thời trang & Phong cách sống",
+                    "locationName": "Nha Trang",
+                    "avatarColor": "#06B6D4",
+                    "age": 25,
+                    "height": 168,
+                    "weight": 52,
+                    "gender": "nu",
+                    "distanceKm": 7.4,
+                    "isFollowing": true,
+                    "isFriend": false
+                ],
+                [
+                    "id": "fixture_user_7",
+                    "name": "Nguyễn Hải Đăng",
+                    "handle": "haidang_hue",
+                    "bio": "Ẩm thực truyền thống • Guitar",
+                    "locationName": "Huế",
+                    "avatarColor": "#3B82F6",
+                    "age": 27,
+                    "height": 180,
+                    "weight": 75,
+                    "gender": "nam",
+                    "distanceKm": 8.0,
+                    "isFollowing": false,
+                    "isFriend": false
+                ],
+                [
+                    "id": "fixture_user_8",
+                    "name": "Hoàng Bích Thảo",
+                    "handle": "bichthao_dl",
+                    "bio": "Vườn hoa • Sách • Trà",
+                    "locationName": "Đà Lạt",
+                    "avatarColor": "#E11D48",
+                    "age": 21,
+                    "height": 160,
+                    "weight": 46,
+                    "gender": "nu",
+                    "distanceKm": 9.3,
+                    "isFollowing": false,
+                    "isFriend": false
+                ],
+                [
+                    "id": "fixture_user_9",
+                    "name": "Đỗ Thành Long",
+                    "handle": "thanhlong_vt",
+                    "bio": "Lướt sóng & Khám phá biển",
+                    "locationName": "Vũng Tàu",
+                    "avatarColor": "#6366F1",
+                    "age": 29,
+                    "height": 174,
+                    "weight": 70,
+                    "gender": "nam",
+                    "distanceKm": 11.2,
+                    "isFollowing": true,
+                    "isFriend": true
                 ]
+            ]
+            return [
+                "people": users,
+                "users": users
             ]
 
         case "/api/shorts":
