@@ -1,0 +1,57 @@
+{
+  "id": "req-ios-apple-release-readiness-20261107",
+  "status": "PARTIAL_IN_PROGRESS",
+  "updatedAt": "2026-11-07T18:04:00+07:00",
+  "commit": "c2400dd",
+  "priorCommits": [
+    "50849b6",
+    "cbedc48",
+    "7da4c50",
+    "20aae20"
+  ],
+  "branches": [
+    "release/ios-1.2.12",
+    "main"
+  ],
+  "evidence": {
+    "e2eOutput": "dist/e2e-evidence-c2400dd.txt (EXIT=0, 6 major suites pass 100%, node v24.22.1, Windows 10.0.26200)",
+    "storeTestOutput": "node --test test/store.test.js (EXIT=0, 4 backwards-compatible tests pass)",
+    "scope": "Isolated in-memory backend testing (dbPath ':memory:'). Covers backend signaling, StoreKit JWS verification contracts, and account deletion contracts. Does NOT cover native iOS UI rendering, real WebRTC decoded media, or live production deployment."
+  },
+  "commerce_3_1": {
+    "status": "SERVER_VERIFIER_IMPLEMENTED_AND_TESTED",
+    "implementation": [
+      "Added official Apple App Store Server Library (@apple/app-store-server-library v3.1.0) with SignedDataVerifier in lib/store.js.",
+      "Separate verification routing: platform === 'ios' or token containing '.' routes to verifyApple(); Google Play verification routes to verifyGoogle() with 100% backwards compatibility.",
+      "Product allowlist enforcement against STORE_PRODUCTS (kinnect_style_aurora, ocean, sunset, studio_pro); mismatched products fail 422.",
+      "Bundle ID enforcement against appleVerifier.bundleId ('app.kinnect.live'); foreign bundle IDs fail 422.",
+      "Account binding verification: transactions with appAccountToken must match storeAccountId(userId) or userId, else 403.",
+      "Transaction uniqueness & idempotency: token_hash = hash('apple:' + transactionId). Replay by another account rejected with 409; replay by same user returns 200 existing state idempotently without duplicate rows.",
+      "Revocation & refund lifecycle: transactions with revocationDate are updated to CANCELLED and rejected with 422.",
+      "Never credits from client transactionId alone: raw string without signed JWS fails 400 immediately.",
+      "StoreKit restoration UI in WalletStoreView.swift explicitly clarifies that StoreKit restore applies to non-consumable packages/styles, while consumable coins are restored via account ledger upon login."
+    ],
+    "externalBlockers": {
+      "APPLE_APP_STORE_ENABLED": "Requires true in production environment",
+      "APPLE_BUNDLE_ID": "Must be set to production App Store bundle ID (app.kinnect.live)",
+      "APPLE_ENVIRONMENT": "Set to Production or Sandbox depending on deployment stage",
+      "APPLE_ROOT_CERT_FILE": "Path to DER-encoded Apple Root CA certificate (AppleRootCA-G3.cer) for live X.509 chain trust verification",
+      "APPLE_KEY_ID_AND_PRIVATE_KEY": "App Store Connect API key credentials required for server-to-server notifications and server API lookup",
+      "APP_STORE_CONNECT_PRODUCTS": "Configured in-app purchase product IDs on App Store Connect must match STORE_PRODUCTS IDs"
+    }
+  },
+  "delete_account_lifecycle": {
+    "status": "INTEGRATION_TESTED_AND_VERIFIED",
+    "testEvidence": "test/test_live_and_contracts_e2e.mjs Section 6 verifies 7 distinct contract assertions: GET info, wrong username 400, confirmDelete false 400, wrong password 403, success 200 with session cookie cleared (Max-Age=0), immediate 401 session revocation on /api/me, and subsequent login rejection."
+  },
+  "privacy_5_1": {
+    "status": "RESOLVED_IN_CODE_PENDING_SIMULATOR_EVIDENCE",
+    "summary": "String privacy version ('2026-10-29') enforced; WebSocket consent error opens PrivacyConsentSheet; pre-auth mode for AuthView; explicit consent before/after tested."
+  },
+  "layoutMatrix": {
+    "matchedScreens": 28,
+    "designAdaptations": 6,
+    "pendingSubstateVerification": 92,
+    "notes": "92 pending substates strictly preserved until dedicated screenshot evidence is captured."
+  }
+}
