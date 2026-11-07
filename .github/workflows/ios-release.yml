@@ -236,6 +236,7 @@ jobs:
 
       - name: Build Simulator App & Capture Native Screenshots via simctl
         run: |
+          python3 -m pip install --break-system-packages pillow || true
           python3 ios/scripts/capture-simulator-screenshots.py
           ls -lh dist/ios-ui-review
 

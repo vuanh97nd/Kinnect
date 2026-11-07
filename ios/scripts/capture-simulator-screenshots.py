@@ -124,36 +124,83 @@ def build_contact_sheet(records):
     try:
         from PIL import Image, ImageDraw, ImageFont
     except ImportError:
-        subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "pillow"], check=True)
-        from PIL import Image, ImageDraw, ImageFont
+        try:
+            subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "--break-system-packages", "pillow"], check=False)
+            from PIL import Image, ImageDraw, ImageFont
+        except Exception as e:
+            print(f"Pillow install skipped/failed: {e}", flush=True)
+            Image = None
 
-    cols = 4
-    rows = (len(records) + cols - 1) // cols
-    cell_w, cell_h = 340, 680
-    sheet = Image.new("RGB", (cols * cell_w + 40, rows * cell_h + 80), (14, 11, 24))
-    draw = ImageDraw.Draw(sheet)
-    draw.text((24, 20), "Kinnect iOS Native SwiftUI — Actual iOS Simulator UI Review Contact Sheet", fill=(255, 255, 255))
+    if Image is not None:
+        try:
+            cols = 4
+            rows = (len(records) + cols - 1) // cols
+            cell_w, cell_h = 340, 680
+            sheet = Image.new("RGB", (cols * cell_w + 40, rows * cell_h + 80), (14, 11, 24))
+            draw = ImageDraw.Draw(sheet)
+            draw.text((24, 20), "Kinnect iOS Native SwiftUI — Actual iOS Simulator UI Review Contact Sheet", fill=(255, 255, 255))
 
-    for idx, rec in enumerate(records):
-        r = idx // cols
-        c = idx % cols
-        x0 = 20 + c * cell_w
-        y0 = 60 + r * cell_h
-        img_path = Path(rec["file"])
-        if not img_path.exists():
-            continue
-        with Image.open(img_path) as im:
-            im_copy = im.convert("RGB")
-            im_copy.thumbnail((cell_w - 28, cell_h - 70))
-            ox = x0 + (cell_w - im_copy.width) // 2
-            oy = y0 + 10
-            sheet.paste(im_copy, (ox, oy))
-            label = f"{rec['slug']} ({rec['device']})"
-            draw.text((x0 + 14, y0 + cell_h - 48), label[:42], fill=(210, 195, 255))
+            for idx, rec in enumerate(records):
+                r = idx // cols
+                c = idx % cols
+                x0 = 20 + c * cell_w
+                y0 = 60 + r * cell_h
+                img_path = Path(rec["file"])
+                if not img_path.exists():
+                    continue
+                with Image.open(img_path) as im:
+                    im_copy = im.convert("RGB")
+                    im_copy.thumbnail((cell_w - 28, cell_h - 70))
+                    ox = x0 + (cell_w - im_copy.width) // 2
+                    oy = y0 + 10
+                    sheet.paste(im_copy, (ox, oy))
+                    label = f"{rec['slug']} ({rec['device']})"
+                    draw.text((x0 + 14, y0 + cell_h - 48), label[:42], fill=(210, 195, 255))
 
-    contact_path = OUT_DIR / "contact-sheet.png"
-    sheet.save(contact_path)
-    return contact_path
+            contact_path = OUT_DIR / "contact-sheet.png"
+            sheet.save(contact_path)
+            print(f"Generated PNG contact sheet: {contact_path}", flush=True)
+            return contact_path
+        except Exception as err:
+            print(f"Warning generating PNG contact sheet: {err}", flush=True)
+
+    # Fallback HTML contact sheet so a single view of all screens is always available
+    html_lines = [
+        "<!DOCTYPE html>",
+        "<html lang='vi'>",
+        "<head>",
+        "  <meta charset='utf-8'>",
+        "  <title>Kinnect iOS Native SwiftUI — UI Review Contact Sheet</title>",
+        "  <style>",
+        "    body { background: #0E0B18; color: #fff; font-family: -apple-system, sans-serif; margin: 24px; }",
+        "    h1 { color: #8A3FFC; margin-bottom: 8px; }",
+        "    p.sub { color: #A8A29E; margin-bottom: 24px; font-size: 14px; }",
+        "    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }",
+        "    .card { background: #181326; border: 1px solid #332454; border-radius: 12px; padding: 12px; }",
+        "    .card img { width: 100%; height: auto; border-radius: 8px; border: 1px solid #231B3A; }",
+        "    .card h4 { margin: 8px 0 4px 0; font-size: 14px; color: #D4BBFF; }",
+        "    .card p { margin: 0 0 4px 0; font-size: 12px; color: #E0E0E0; }",
+        "    .card small { font-size: 11px; color: #A8A29E; }",
+        "  </style>",
+        "</head>",
+        "<body>",
+        "  <h1>Kinnect iOS Native SwiftUI — Actual Simulator UI Review</h1>",
+        f"  <p class='sub'>Tập hợp {len(records)} ảnh chụp thực tế từ iPhone 16 Pro, iPhone 16e và iPad Pro 11-inch.</p>",
+        "  <div class='grid'>"
+    ]
+    for r in records:
+        f_name = Path(r["file"]).name
+        html_lines.append(f"    <div class='card'>")
+        html_lines.append(f"      <img src='{f_name}' alt='{r['slug']}'>")
+        html_lines.append(f"      <h4>{r['slug']}</h4>")
+        html_lines.append(f"      <p>{r['description']}</p>")
+        html_lines.append(f"      <small>{r['device']}</small>")
+        html_lines.append(f"    </div>")
+    html_lines.extend(["  </div>", "</body>", "</html>"])
+    html_path = OUT_DIR / "contact-sheet.html"
+    html_path.write_text("\n".join(html_lines), encoding="utf-8")
+    print(f"Generated HTML contact sheet: {html_path}", flush=True)
+    return html_path
 
 
 def main():
