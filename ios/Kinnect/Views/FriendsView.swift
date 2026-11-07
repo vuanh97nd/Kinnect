@@ -77,6 +77,13 @@ struct FriendsView: View {
         .task {
             await loadAll()
         }
+        .onAppear {
+            if UIReviewFixture.activeScreen == "friends-requests" {
+                tab = .requests
+            } else if UIReviewFixture.activeScreen == "friends-suggestions" {
+                tab = .suggestions
+            }
+        }
     }
 
     private func sectionHeader(_ text: String) -> some View {

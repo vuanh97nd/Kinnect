@@ -45,8 +45,8 @@ struct RootMainView: View {
     @State private var selectedTab: KinnectNavTab = .feed
     @State private var activeTopSection: KinnectTopSection? = nil
     @State private var showCameraStudioSheet = false
-    @State private var fixturePrivatePhotos: [PrivatePhotoItem] = []
-    @State private var fixturePrivateRequests: [PrivateAccessRequestItem] = []
+    @State private var fixturePrivatePhotos: [PrivatePhotoItem] = UIReviewFixture.mockPrivatePhotos()
+    @State private var fixturePrivateRequests: [PrivateAccessRequestItem] = UIReviewFixture.mockPrivateRequests()
     @State private var splitColumnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
@@ -94,8 +94,28 @@ struct RootMainView: View {
                 NavigationStack {
                     CameraStudioView()
                 }
+            } else if UIReviewFixture.activeScreen == "camera-studio-video" {
+                NavigationStack {
+                    CameraStudioView(initialMode: .video)
+                }
+            } else if UIReviewFixture.activeScreen == "studio-pro-sheet" {
+                NavigationStack {
+                    StudioProSheet(
+                        appliedEffect: .constant("Cinematic Teal & Orange"),
+                        onApply: { _ in }
+                    )
+                }
+            } else if UIReviewFixture.activeScreen == "group-chat-detail" {
+                NavigationStack {
+                    GroupChatDetailView(group: ChatGroupItem.from(UIReviewFixture.fixtureGroupDict), onLeftGroup: {})
+                }
             } else if UIReviewFixture.activeScreen == "profile-edit" {
                 EditProfileSheet(onSaved: {})
+            } else if UIReviewFixture.activeScreen == "profile-public-album" {
+                PublicAlbumManageSheet(
+                    posts: UIReviewFixture.mockPosts(),
+                    onRefresh: {}
+                )
             } else if UIReviewFixture.activeScreen == "profile-private-album" {
                 PrivateAlbumManageSheet(
                     photos: $fixturePrivatePhotos,
@@ -104,6 +124,26 @@ struct RootMainView: View {
                 )
             } else if UIReviewFixture.activeScreen == "profile-sessions" {
                 ActiveSessionsSheet()
+            } else if UIReviewFixture.activeScreen == "privacy-consent" {
+                PrivacyConsentSheet(
+                    request: PrivacyConsentRequest(
+                        version: "2026.11",
+                        notice: "Chính sách quyền riêng tư và điều khoản dịch vụ Kinnect. Cam kết bảo mật theo tiêu chuẩn Apple và pháp luật Việt Nam."
+                    ),
+                    recordOnServer: false,
+                    onAccepted: {}
+                )
+            } else if UIReviewFixture.activeScreen == "delete-account" {
+                DeleteAccountConfirmationSheet()
+            } else if UIReviewFixture.activeScreen == "ugc-report" {
+                UGCReportSheet(
+                    context: UGCReportContext(
+                        targetType: "user",
+                        targetId: "fixture_user_peer",
+                        targetUserId: "fixture_user_peer",
+                        targetTitle: "Lê Hoàng Nam"
+                    )
+                )
             } else {
                 authenticatedLayout
             }
@@ -138,6 +178,7 @@ struct RootMainView: View {
             }
         }
         .preferredColorScheme(UIReviewFixture.forceLightMode ? .light : .dark)
+        .dynamicTypeSize(UIReviewFixture.forceMaxDynamicType ? .accessibility3 : (UIReviewFixture.isEnabled ? .large : .medium))
         .task {
             await appState.bootstrapSession()
             if let screen = UIReviewFixture.activeScreen {
@@ -158,7 +199,7 @@ struct RootMainView: View {
                     activeTopSection = .messages
                 case "profile", "profile-posts", "profile-albums", "profile-videos":
                     activeTopSection = .profile
-                case "friends":
+                case "friends", "friends-requests", "friends-suggestions":
                     activeTopSection = .friends
                 case "notifications":
                     activeTopSection = .notifications

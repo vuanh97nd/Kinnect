@@ -46,6 +46,10 @@ struct CameraStudioView: View {
     // Pickers
     @State private var selectedLibraryItem: PhotosPickerItem?
 
+    init(initialMode: CaptureMode = .photo) {
+        _captureMode = State(initialValue: initialMode)
+    }
+
     var body: some View {
         Group {
             if previewImage == nil && videoDataURL.isEmpty && UIReviewFixture.activeScreen != "camera-studio-edit" {
@@ -75,6 +79,9 @@ struct CameraStudioView: View {
                 } else {
                     self.videoDataURL = "data:video/mp4;base64,\(data.base64EncodedString())"
                 }
+            }
+            if UIReviewFixture.activeScreen == "camera-studio-video" {
+                captureMode = .video
             }
             if UIReviewFixture.activeScreen == "camera-studio-edit" && previewImage == nil {
                 let sample = UIReviewFixture.samplePreviewImage()

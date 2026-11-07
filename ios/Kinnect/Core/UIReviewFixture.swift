@@ -16,6 +16,10 @@ enum UIReviewFixture {
         CommandLine.arguments.contains("--ui-review-light")
     }
 
+    static var forceMaxDynamicType: Bool {
+        CommandLine.arguments.contains("--ui-review-dynamictype-max")
+    }
+
     static var isEnabled: Bool {
         activeScreen != nil
     }
@@ -56,6 +60,16 @@ enum UIReviewFixture {
         "distanceKm": 5.8,
         "isFollowing": false,
         "isFriend": false
+    ]
+
+    static let fixtureGroupDict: [String: Any] = [
+        "id": "fixture_group_1",
+        "name": "Nhóm Thiết Kế Kinnect [Fixture]",
+        "description": "Trao đổi giao diện iOS & Android",
+        "avatarColor": "#6D4AFF",
+        "membersCount": 6,
+        "lastMessageText": "Bộ 40 icon vector đã lên chuẩn 24pt!",
+        "unreadCount": 1
     ]
 
     static func mockResponse(for path: String) -> [String: Any] {
@@ -320,7 +334,43 @@ enum UIReviewFixture {
         case "/api/friend-requests":
             return [
                 "incoming": [["fromUser": secondPeerDict]],
-                "outgoing": []
+                "outgoing": [["toUser": secondPeerDict]]
+            ]
+
+        case "/api/me/privacy-consent":
+            return [
+                "version": "2026.11",
+                "notice": "Chính sách quyền riêng tư và điều khoản dịch vụ Kinnect. Cam kết bảo mật theo tiêu chuẩn Apple và pháp luật Việt Nam.",
+                "accepted": false
+            ]
+
+        case "/api/me/account-deletion":
+            return [
+                "requiresPassword": true,
+                "username": "minhanh",
+                "permanent": true
+            ]
+
+        case "/api/groups/fixture_group_1/messages":
+            return [
+                "messages": [
+                    [
+                        "id": "fixture_gmsg_1",
+                        "groupId": "fixture_group_1",
+                        "sender": peerUserDict,
+                        "text": "[Fixture UI] Chào cả nhóm! Giao diện chat nhóm trên iOS hiển thị thanh công cụ, icon vector và avatar thành viên rất chuẩn.",
+                        "createdAt": "2026-11-07T01:30:00.000Z",
+                        "seenCount": 4
+                    ],
+                    [
+                        "id": "fixture_gmsg_2",
+                        "groupId": "fixture_group_1",
+                        "sender": currentUserDict,
+                        "text": "[Fixture UI] Menu 3 chấm ở góc phải gồm Đổi tên nhóm, Thêm thành viên, Rời nhóm.",
+                        "createdAt": "2026-11-07T01:31:00.000Z",
+                        "seenCount": 3
+                    ]
+                ]
             ]
 
         case "/api/friend-suggestions":
@@ -585,6 +635,49 @@ enum UIReviewFixture {
             UIColor(red: 0.09, green: 0.04, blue: 0.18, alpha: 0.96).setFill()
             frontMountains.fill()
         }
+    }
+
+    static func mockPosts() -> [PostItem] {
+        return [
+            PostItem(
+                id: "fixture_post_1",
+                author: KinnectUser.from(currentUserDict),
+                text: "Hoàng hôn trên cầu Rồng. Album ảnh công khai Kinnect iOS.",
+                imageUrl: sampleImageDataURL,
+                category: "community",
+                createdAt: "2026-11-07T01:30:00.000Z",
+                likesCount: 42,
+                commentsCount: 8,
+                liked: true,
+                userReaction: "love"
+            ),
+            PostItem(
+                id: "fixture_post_2",
+                author: KinnectUser.from(currentUserDict),
+                text: "Cà phê chiều cuối tuần cùng hội bạn thân tại Quận 1.",
+                imageUrl: sampleImageDataURL,
+                category: "events",
+                createdAt: "2026-11-07T01:00:00.000Z",
+                likesCount: 19,
+                commentsCount: 3,
+                liked: false,
+                userReaction: ""
+            )
+        ]
+    }
+
+    static func mockPrivatePhotos() -> [PrivatePhotoItem] {
+        return [
+            PrivatePhotoItem(id: "fixture_priv_1", url: sampleImageDataURL, createdAt: "1762500000000"),
+            PrivatePhotoItem(id: "fixture_priv_2", url: sampleImageDataURL, createdAt: "1762490000000")
+        ]
+    }
+
+    static func mockPrivateRequests() -> [PrivateAccessRequestItem] {
+        return [
+            PrivateAccessRequestItem(status: "pending", user: KinnectUser.from(secondPeerDict)),
+            PrivateAccessRequestItem(status: "granted", user: KinnectUser.from(peerUserDict))
+        ]
     }
 }
 

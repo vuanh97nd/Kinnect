@@ -286,6 +286,7 @@ def main():
         ("03b-iphone-shorts-video-dark", "shorts", [], "Tab Video Shorts (Android 1.2.12 build 118)"),
         ("04-iphone-messages-list-dark", "messages", [], "Danh sách Tin nhắn & Nhóm (Dark)"),
         ("05-iphone-chat-detail-dark", "chat-detail", [], "Chi tiết Chat: nội dung trên, giờ+seen+reaction+more dưới"),
+        ("05b-iphone-group-chat-dark", "group-chat-detail", [], "Chi tiết Nhóm chat: thanh công cụ, icon vector & menu tùy chọn"),
         ("06-iphone-profile-dark", "profile", [], "Hồ sơ cá nhân & Chẩn đoán PushKit (Dark)"),
         ("06b-iphone-profile-posts", "profile-posts", [], "Hồ sơ cá nhân: Tab Bài viết"),
         ("06c-iphone-profile-albums", "profile-albums", [], "Hồ sơ cá nhân: Tab Album ảnh (Công khai & Riêng tư)"),
@@ -293,13 +294,23 @@ def main():
         ("06e-iphone-profile-edit", "profile-edit", [], "Hồ sơ cá nhân: Sheet Chỉnh sửa hồ sơ"),
         ("06f-iphone-profile-private-album", "profile-private-album", [], "Hồ sơ cá nhân: Quản lý Album riêng tư & Duyệt quyền xem"),
         ("06g-iphone-profile-sessions", "profile-sessions", [], "Hồ sơ cá nhân: Quản lý phiên đăng nhập"),
+        ("06h-iphone-profile-public-album", "profile-public-album", [], "Hồ sơ cá nhân: Quản lý Album công khai & Đăng ảnh mới"),
         ("07-iphone-friends-dark", "friends", [], "Bạn bè & Gọi thoại/video nền trong suốt"),
+        ("07b-iphone-friends-requests", "friends-requests", [], "Bạn bè: Danh sách Lời mời đến & Lời mời đã gửi"),
+        ("07c-iphone-friends-suggestions", "friends-suggestions", [], "Bạn bè: Gợi ý kết bạn theo vị trí & khoảng cách"),
         ("08-iphone-notifications-dark", "notifications", [], "Thông báo"),
         ("09-iphone-wallet-store-dark", "wallet", [], "Ví & Cửa hàng: Tách Xu mua & Xu tặng, Nạp xu"),
         ("10-iphone-live-stream-dark", "live", [], "Phòng Live: Luồng vuốt xem trực tiếp"),
-        ("11-iphone-camera-studio-empty", "camera-studio", [], "Camera & Studio: Tạo Video/Bài viết/Tin/Live"),
+        ("11-iphone-camera-studio-empty", "camera-studio", [], "Camera & Studio: Chế độ chụp ảnh"),
+        ("11b-iphone-camera-studio-video", "camera-studio-video", [], "Camera & Studio: Chế độ quay video với nút bấm đỏ"),
         ("12-iphone-camera-studio-edit", "camera-studio-edit", [], "Camera & Studio: Studio Pro góc phải + nút Lưu riêng"),
-        ("13-iphone-feed-light", "feed", ["--ui-review-light"], "Bảng tin chế độ Light mode (Đồng bộ nền & thanh trạng thái)")
+        ("12b-iphone-studio-pro-sheet", "studio-pro-sheet", [], "Camera & Studio: Bảng hiệu ứng Studio Pro (Cinematic, Curves, Beauty)"),
+        ("13-iphone-feed-light", "feed", ["--ui-review-light"], "Bảng tin chế độ Light mode"),
+        ("13b-iphone-privacy-consent-dark", "privacy-consent", [], "Điều khoản & Quyền riêng tư HTTP 428 / WS (Dark)"),
+        ("13c-iphone-privacy-consent-light", "privacy-consent", ["--ui-review-light"], "Điều khoản & Quyền riêng tư HTTP 428 / WS (Light)"),
+        ("13d-iphone-delete-account-dark", "delete-account", [], "Xóa tài khoản vĩnh viễn với xác nhận Username & Mật khẩu (Dark)"),
+        ("13e-iphone-delete-account-light", "delete-account", ["--ui-review-light"], "Xóa tài khoản vĩnh viễn (Light)"),
+        ("13f-iphone-ugc-report-sheet", "ugc-report", [], "Báo cáo nội dung vi phạm UGC (Apple Guideline 1.2)")
     ]
 
     for slug, screen_arg, extra, desc in iphone_screens:
@@ -319,12 +330,13 @@ def main():
             print(f"Shutting down previous standard simulator {standard_iphone['name']} to free resources...", flush=True)
             subprocess.run(["xcrun", "simctl", "shutdown", standard_iphone["udid"]], check=False)
             boot_and_install(compact_iphone, app_path, bundle_id)
-        for slug, screen_arg, desc in [
-            ("14-compact-iphone-feed", "feed", "Màn hình nhỏ: Bảng tin & Tab bar 5 tab 26pt"),
-            ("15-compact-iphone-chat-detail", "chat-detail", "Màn hình nhỏ: Chi tiết Chat & hàng trạng thái dưới"),
-            ("16-compact-iphone-wallet", "wallet", "Màn hình nhỏ: Ví & Cửa hàng không cắt số dư / Nạp xu")
+        for slug, screen_arg, extra, desc in [
+            ("14-compact-iphone-feed", "feed", [], "Màn hình nhỏ: Bảng tin & Tab bar 5 tab 26pt"),
+            ("15-compact-iphone-chat-detail", "chat-detail", [], "Màn hình nhỏ: Chi tiết Chat & hàng trạng thái dưới"),
+            ("16-compact-iphone-wallet", "wallet", [], "Màn hình nhỏ: Ví & Cửa hàng không cắt số dư / Nạp xu"),
+            ("16b-compact-iphone-dynamictype-max", "feed", ["--ui-review-dynamictype-max"], "Màn hình nhỏ: Dynamic Type kích thước tối đa Accessibility 3")
         ]:
-            f = capture_screen(compact_iphone, slug, screen_arg, bundle_id, wait_sec=3.0)
+            f = capture_screen(compact_iphone, slug, screen_arg, bundle_id, extra_args=extra, wait_sec=3.0)
             records.append({
                 "slug": slug,
                 "screen": screen_arg,
@@ -341,11 +353,12 @@ def main():
             print(f"Shutting down previous simulator {active_to_shutdown['name']} to free resources...", flush=True)
             subprocess.run(["xcrun", "simctl", "shutdown", active_to_shutdown["udid"]], check=False)
         boot_and_install(ipad, app_path, bundle_id)
-        for slug, screen_arg, desc in [
-            ("17-ipad-feed-splitview", "feed", "iPad NavigationSplitView: Sidebar + Bảng tin"),
-            ("18-ipad-chat-detail", "chat-detail", "iPad NavigationSplitView: Danh sách Hội thoại (trái) + Chi tiết Chat (phải)")
+        for slug, screen_arg, extra, desc in [
+            ("17-ipad-feed-splitview", "feed", [], "iPad NavigationSplitView: Sidebar + Bảng tin"),
+            ("18-ipad-chat-detail", "chat-detail", [], "iPad NavigationSplitView: Danh sách Hội thoại (trái) + Chi tiết Chat (phải)"),
+            ("18b-ipad-dynamictype-max", "feed", ["--ui-review-dynamictype-max"], "iPad: NavigationSplitView với Dynamic Type tối đa Accessibility 3")
         ]:
-            f = capture_screen(ipad, slug, screen_arg, bundle_id, wait_sec=3.5)
+            f = capture_screen(ipad, slug, screen_arg, bundle_id, extra_args=extra, wait_sec=3.5)
             records.append({
                 "slug": slug,
                 "screen": screen_arg,
