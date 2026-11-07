@@ -1,4 +1,4 @@
-const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+const isStandalone = () => window.KinnectIOSNative === true || /KinnectiOS/i.test(navigator.userAgent) || window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const dialog = document.createElement('dialog');
 dialog.className = 'ios-help';
