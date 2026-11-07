@@ -456,7 +456,7 @@ enum UIReviewFixture {
                     [
                         "id": "fixture_pkg_studio",
                         "title": "Gói Mở Khóa Studio Pro",
-                        "subtitle": "Mở khóa toàn bộ bộ lọc điện ảnh, LUTs màu chuyên nghiệp & xuất video HD",
+                        "subtitle": "Mở khóa bộ lọc màu điện ảnh CIFilter, hiệu ứng Pro & xuất video HD",
                         "category": "studio",
                         "priceCoins": 1200,
                         "badgeText": "PRO",

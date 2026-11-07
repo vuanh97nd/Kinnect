@@ -308,7 +308,7 @@ def main():
         ("11-iphone-camera-studio-empty", "camera-studio", [], "Camera & Studio: Chế độ chụp ảnh"),
         ("11b-iphone-camera-studio-video", "camera-studio-video", [], "Camera & Studio: Chế độ quay video với nút bấm đỏ"),
         ("12-iphone-camera-studio-edit", "camera-studio-edit", [], "Camera & Studio: Studio Pro góc phải + nút Lưu riêng"),
-        ("12b-iphone-studio-pro-sheet", "studio-pro-sheet", [], "Camera & Studio: Bảng hiệu ứng Studio Pro (Cinematic, Curves, Beauty)"),
+        ("12b-iphone-studio-pro-sheet", "studio-pro-sheet", [], "Camera & Studio: Bảng hiệu ứng Studio Pro (Cinematic, Vivid, Noir, Sepia)"),
         ("12c-iphone-camera-studio-video-preview", "camera-studio-video-edit", [], "Camera & Studio: Xem trước video đã quay & xuất bản Shorts"),
         ("13-iphone-feed-light", "feed", ["--ui-review-light"], "Bảng tin chế độ Light mode"),
         ("13b-iphone-privacy-consent-dark", "privacy-consent", [], "Điều khoản & Quyền riêng tư HTTP 428 / WS (Dark)"),

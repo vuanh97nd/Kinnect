@@ -215,12 +215,12 @@ struct FeedView: View {
     }
 
     private var storyCellWidth: CGFloat {
-        dynamicTypeSize.isAccessibilitySize ? 116 : 68
+        dynamicTypeSize.isAccessibilitySize ? 96 : 68
     }
 
     private var storiesStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: dynamicTypeSize.isAccessibilitySize ? 16 : 12) {
+            HStack(spacing: dynamicTypeSize.isAccessibilitySize ? 10 : 12) {
                 // Add Story Button
                 Button {
                     showCreateStorySheet = true
@@ -231,18 +231,19 @@ struct FeedView: View {
                                 name: appState.currentUser?.name ?? "Tôi",
                                 avatarURL: appState.currentUser?.avatarUrl ?? "",
                                 colorHex: appState.currentUser?.avatarColor ?? "#7C3AED",
-                                size: dynamicTypeSize.isAccessibilitySize ? 64 : 58
+                                size: dynamicTypeSize.isAccessibilitySize ? 58 : 58
                             )
                             Circle()
                                 .fill(KinnectTheme.accentBright)
                                 .frame(width: 22, height: 22)
                                 .overlay(KinnectIcon(glyph: .add, size: 14, selected: true, tint: .white))
                         }
-                        Text("Tạo tin")
+                        Text(dynamicTypeSize.isAccessibilitySize ? "Tạo\ntin" : "Tạo tin")
                             .font(.caption2.weight(.semibold))
                             .foregroundColor(KinnectTheme.textPrimary)
                             .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
                             .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .frame(width: storyCellWidth)
                 }
@@ -261,13 +262,13 @@ struct FeedView: View {
                                             : KinnectTheme.primaryGradient,
                                         lineWidth: 2.5
                                     )
-                                    .frame(width: dynamicTypeSize.isAccessibilitySize ? 68 : 62, height: dynamicTypeSize.isAccessibilitySize ? 68 : 62)
+                                    .frame(width: 62, height: 62)
 
                                 KinnectAvatarView(
                                     name: story.author.name,
                                     avatarURL: story.author.avatarUrl,
                                     colorHex: story.author.avatarColor,
-                                    size: dynamicTypeSize.isAccessibilitySize ? 60 : 54
+                                    size: 54
                                 )
                             }
                             Text(shortStoryDisplayName(story.author.name))
@@ -276,6 +277,7 @@ struct FeedView: View {
                                 .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
                                 .multilineTextAlignment(.center)
                                 .truncationMode(.tail)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                         .frame(width: storyCellWidth)
                     }
@@ -290,6 +292,12 @@ struct FeedView: View {
             .replacingOccurrences(of: "\\[.*?\\]", with: "", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let words = cleaned.split(separator: " ").map(String.init)
+        if dynamicTypeSize.isAccessibilitySize {
+            if words.count >= 2 {
+                return words.suffix(2).joined(separator: "\n")
+            }
+            return cleaned.isEmpty ? "Kinnect" : cleaned
+        }
         if words.count >= 2 {
             return words.suffix(2).joined(separator: " ")
         }
@@ -351,10 +359,11 @@ struct FeedView: View {
                         showComposerSheet = true
                     } label: {
                         HStack {
-                            Text("Đăng bài viết mới...")
+                            Text("Đăng bài...")
                                 .font(.subheadline)
                                 .foregroundColor(KinnectTheme.textSecondary)
-                                .lineLimit(1)
+                                .lineLimit(nil)
+                                .fixedSize(horizontal: false, vertical: true)
                             Spacer()
                         }
                         .padding(.horizontal, 14)
