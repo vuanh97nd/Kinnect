@@ -3,11 +3,12 @@ import SwiftUI
 struct LiveStreamView: View {
     let onOpenWallet: () -> Void
     @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var webrtc = NativeWebRTCManager.shared
 
     @State private var selectedIndex = 0
     @State private var isLoading = false
     @State private var chatText = ""
-    @State private var likesCount = 142
+    @State private var likesCount = 0
     @State private var isLiked = false
     @State private var showGiftDrawer = false
     @State private var giftCatalog: [LiveGiftCatalogItem] = []
@@ -31,23 +32,49 @@ struct LiveStreamView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if !appState.liveRooms.isEmpty {
-                // Unified vertical swipe viewer for all Live streams (Parity Android 1.2.12 build 118)
-                TabView(selection: $selectedIndex) {
-                    ForEach(Array(appState.liveRooms.enumerated()), id: \.element.id) { index, room in
-                        liveStreamPage(room)
-                            .tag(index)
+                // Unified native vertical swipe viewer for all Live streams (Parity Android 1.2.12 build 118)
+                GeometryReader { proxy in
+                    ScrollView(.vertical, showsIndicators: false) {
+                        LazyVStack(spacing: 0) {
+                            ForEach(Array(appState.liveRooms.enumerated()), id: \.element.id) { index, room in
+                                liveStreamPage(room)
+                                    .frame(width: proxy.size.width, height: proxy.size.height)
+                                    .id(index)
+                            }
+                        }
+                        .scrollTargetLayout()
                     }
+                    .scrollTargetBehavior(.paging)
+                    .ignoresSafeArea()
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .ignoresSafeArea(edges: .top)
             }
         }
         .task {
             await fetchLiveRooms()
             await loadGifts()
+            if !appState.liveRooms.isEmpty && selectedIndex < appState.liveRooms.count {
+                let initialRoom = appState.liveRooms[selectedIndex]
+                appState.joinLiveRoom(initialRoom)
+                likesCount = initialRoom.likesCount
+            }
+        }
+        .onChange(of: selectedIndex) { newIdx in
+            guard newIdx < appState.liveRooms.count else { return }
+            let room = appState.liveRooms[newIdx]
+            appState.joinLiveRoom(room)
+            likesCount = room.likesCount
+        }
+        .onDisappear {
+            appState.leaveCurrentLiveRoom()
         }
         .sheet(isPresented: $showGiftDrawer) {
-            LiveGiftDrawerSheet(gifts: giftCatalog, priceVersion: giftPriceVersion)
+            if !appState.liveRooms.isEmpty && selectedIndex < appState.liveRooms.count {
+                LiveGiftDrawerSheet(
+                    roomId: appState.liveRooms[selectedIndex].id,
+                    gifts: giftCatalog,
+                    priceVersion: giftPriceVersion
+                )
+            }
         }
     }
 
@@ -61,45 +88,55 @@ struct LiveStreamView: View {
 
     private func liveStreamPage(_ room: LiveRoomItem) -> some View {
         ZStack(alignment: .bottomLeading) {
-            // Live Stream Video Canvas
-            Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.12, green: 0.05, blue: 0.22),
-                            Color(red: 0.04, green: 0.02, blue: 0.10)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .overlay(
-                    VStack(spacing: 16) {
-                        ZStack {
-                            Circle()
-                                .fill(KinnectTheme.accent.opacity(0.2))
-                                .frame(width: 110, height: 110)
-                            KinnectAvatarView(
-                                name: room.hostName,
-                                avatarURL: room.hostAvatarUrl,
-                                colorHex: room.hostAvatarColor,
-                                size: 84
+            // WebRTC Video Canvas with Fallback connecting state
+            ZStack {
+                if appState.isCurrentLiveHost, let localTrack = webrtc.liveLocalVideoTrack {
+                    WebRTCVideoRendererView(track: localTrack, mirror: webrtc.usingFrontCamera)
+                        .ignoresSafeArea()
+                } else if let remoteTrack = webrtc.liveRemoteVideoTrack {
+                    WebRTCVideoRendererView(track: remoteTrack, mirror: false)
+                        .ignoresSafeArea()
+                } else {
+                    Rectangle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.12, green: 0.05, blue: 0.22),
+                                    Color(red: 0.04, green: 0.02, blue: 0.10)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
                             )
-                        }
-                        Text(room.title)
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 24)
-                            .multilineTextAlignment(.center)
-                        HStack(spacing: 6) {
-                            Circle().fill(KinnectTheme.online).frame(width: 8, height: 8)
-                            Text("Đang kết nối luồng phát trực tiếp HD")
-                                .font(.caption)
-                                .foregroundColor(KinnectTheme.textSecondary)
-                        }
-                    }
-                )
-                .ignoresSafeArea()
+                        )
+                        .overlay(
+                            VStack(spacing: 16) {
+                                ZStack {
+                                    Circle()
+                                        .fill(KinnectTheme.accent.opacity(0.2))
+                                        .frame(width: 110, height: 110)
+                                    KinnectAvatarView(
+                                        name: room.hostName,
+                                        avatarURL: room.hostAvatarUrl,
+                                        colorHex: room.hostAvatarColor,
+                                        size: 84
+                                    )
+                                }
+                                Text(room.title)
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 24)
+                                    .multilineTextAlignment(.center)
+                                HStack(spacing: 6) {
+                                    Circle().fill(KinnectTheme.online).frame(width: 8, height: 8)
+                                    Text(room.gamePaused ? "Chủ phòng tạm dừng" : "Đang kết nối luồng Live WebRTC HD...")
+                                        .font(.caption)
+                                        .foregroundColor(KinnectTheme.textSecondary)
+                                }
+                            }
+                        )
+                        .ignoresSafeArea()
+                }
+            }
 
             // Overlays Container
             VStack {
@@ -180,7 +217,7 @@ struct LiveStreamView: View {
                                     NativeSocketClient.shared.sendJSON([
                                         "type": "chat",
                                         "text": clean,
-                                        "roomId": room.id
+                                        "room": room.id
                                     ])
                                 }
                             } label: {
@@ -215,12 +252,12 @@ struct LiveStreamView: View {
 
                         // Like button
                         Button {
-                            isLiked.toggle()
-                            likesCount += isLiked ? 1 : -1
+                            isLiked = true
+                            likesCount += 1
                             NativeSocketClient.shared.sendJSON([
                                 "type": "live-reaction",
-                                "roomId": room.id,
-                                "reaction": "heart"
+                                "room": room.id,
+                                "kind": "heart"
                             ])
                         } label: {
                             VStack(spacing: 4) {
@@ -586,6 +623,7 @@ struct LiveRoomFullScreenView: View {
 }
 
 struct LiveGiftDrawerSheet: View {
+    let roomId: String
     let gifts: [LiveGiftCatalogItem]
     let priceVersion: Int
     @Environment(\.dismiss) private var dismiss
@@ -631,8 +669,10 @@ struct LiveGiftDrawerSheet: View {
         let reqId = "gift_\(gift.id)_\(UUID().uuidString)"
         NativeSocketClient.shared.sendJSON([
             "type": "live-reaction",
-            "reaction": gift.id,
+            "room": roomId,
+            "kind": gift.id,
             "quantity": 1,
+            "fundingSource": "gifted",
             "requestId": reqId,
             "priceVersion": priceVersion
         ])

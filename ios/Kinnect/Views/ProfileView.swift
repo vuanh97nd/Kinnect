@@ -9,15 +9,15 @@ struct ProfileView: View {
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var pushKit = PushKitManager.shared
 
-    @State private var name = ""
-    @State private var bio = ""
-    @State private var locationName = ""
-    @State private var isPrivate = false
-    @State private var isSavingProfile = false
+    enum ProfileTab: String, CaseIterable {
+        case about = "Giới thiệu"
+        case posts = "Bài viết"
+        case albums = "Album ảnh"
+        case videos = "Video"
+    }
 
-    @State private var selectedAvatarItem: PhotosPickerItem?
-    @State private var selectedCoverItem: PhotosPickerItem?
-
+    @State private var selectedTab: ProfileTab = .about
+    @State private var showEditProfileSheet = false
     @State private var showSessionsSheet = false
     @State private var showPasswordSheet = false
     @State private var showBlocksSheet = false
@@ -27,7 +27,7 @@ struct ProfileView: View {
         ScrollView {
             VStack(spacing: 16) {
                 if let user = appState.currentUser {
-                    // Cover & Avatar Card
+                    // 1. Cover & Avatar Card with Handle & Stats (Parity Android 1.2.12 build 118)
                     VStack(spacing: 12) {
                         ZStack(alignment: .bottomLeading) {
                             if !user.coverUrl.isEmpty {
@@ -57,50 +57,31 @@ struct ProfileView: View {
                                     Text(user.name)
                                         .font(.title3.bold())
                                         .foregroundColor(.white)
-                                        .kinnectMultiline()
-                                    if !user.handle.isEmpty {
-                                        Text("@\(user.handle)")
-                                            .font(.caption)
-                                            .foregroundColor(KinnectTheme.textSecondary)
-                                    }
+                                    Text("@\(user.username)")
+                                        .font(.subheadline)
+                                        .foregroundColor(KinnectTheme.accentBright)
                                 }
-                                Spacer()
+                                .padding(.bottom, 6)
                             }
-                            .padding(12)
+                            .padding(.horizontal, 14)
+                            .padding(.bottom, -20)
                         }
+                        .padding(.bottom, 22)
 
-                        // Upload Avatar & Cover pickers
-                        HStack(spacing: 10) {
-                            PhotosPicker(selection: $selectedAvatarItem, matching: .images) {
-                                HStack(spacing: 6) {
-                                    KinnectIcon(glyph: .profile, size: 18, tint: KinnectTheme.accentBright)
-                                    Text("Đổi Avatar")
-                                        .font(.caption.weight(.semibold))
-                                }
-                                .frame(maxWidth: .infinity, minHeight: 40)
-                                .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
-                                .foregroundColor(KinnectTheme.accentBright)
+                        // Prominent "Chỉnh sửa hồ sơ" Button (Matching Android 1.2.12 MainActivity bounds 413,771 -> 705,818)
+                        Button {
+                            showEditProfileSheet = true
+                        } label: {
+                            HStack(spacing: 8) {
+                                KinnectIcon(glyph: .edit, size: 18, tint: KinnectTheme.accentBright)
+                                Text("Chỉnh sửa hồ sơ")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(KinnectTheme.accentBright)
                             }
-                            .onChange(of: selectedAvatarItem) { item in
-                                guard let item else { return }
-                                Task { await uploadImage(item: item, endpoint: "/api/me/avatar", field: "avatarDataUrl") }
-                            }
-
-                            PhotosPicker(selection: $selectedCoverItem, matching: .images) {
-                                HStack(spacing: 6) {
-                                    KinnectIcon(glyph: .photo, size: 18, tint: KinnectTheme.accentBright)
-                                    Text("Đổi Ảnh bìa")
-                                        .font(.caption.weight(.semibold))
-                                }
-                                .frame(maxWidth: .infinity, minHeight: 40)
-                                .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
-                                .foregroundColor(KinnectTheme.accentBright)
-                            }
-                            .onChange(of: selectedCoverItem) { item in
-                                guard let item else { return }
-                                Task { await uploadImage(item: item, endpoint: "/api/me/cover", field: "coverDataUrl") }
-                            }
+                            .frame(maxWidth: .infinity, minHeight: 40)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
                         }
+                        .padding(.horizontal, 14)
 
                         // Stats bar
                         HStack {
@@ -114,120 +95,26 @@ struct ProfileView: View {
                     }
                     .kinnectCard()
 
-                    // Edit Profile Info
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(spacing: 8) {
-                            KinnectIcon(glyph: .edit, size: 20, selected: true, tint: KinnectTheme.accentBright)
-                            Text("Chỉnh sửa hồ sơ")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                        }
-
-                        TextField("Tên hiển thị", text: $name)
-                            .padding(11)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                            .foregroundColor(.white)
-
-                        TextField("Tiểu sử (Bio)", text: $bio, axis: .vertical)
-                            .lineLimit(2...4)
-                            .padding(11)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                            .foregroundColor(.white)
-
-                        TextField("Thành phố / Khu vực", text: $locationName)
-                            .padding(11)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                            .foregroundColor(.white)
-
-                        Toggle("Tài khoản riêng tư", isOn: $isPrivate)
-                            .font(.subheadline)
-                            .foregroundColor(.white)
-                            .tint(KinnectTheme.accentBright)
-
-                        Button {
-                            Task { await saveProfile() }
-                        } label: {
-                            HStack(spacing: 8) {
-                                Spacer()
-                                if isSavingProfile {
-                                    ProgressView().tint(.white)
-                                } else {
-                                    KinnectIcon(glyph: .save, size: 18, selected: true, tint: .white)
-                                    Text("Lưu thay đổi")
-                                        .font(.subheadline.bold())
-                                }
-                                Spacer()
-                            }
-                            .padding(.vertical, 12)
-                            .background(KinnectTheme.primaryGradient)
-                            .foregroundColor(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        .disabled(isSavingProfile)
-                    }
-                    .kinnectCard()
-
-                    // Quick Actions & Security
-                    VStack(spacing: 10) {
-                        actionRow(glyph: .wallet, title: "Ví thử nghiệm & Cửa hàng", color: KinnectTheme.warning, action: onOpenWallet)
-                        actionRow(glyph: .friends, title: "Danh sách Bạn bè & Lời mời", color: KinnectTheme.accentBright, action: onOpenFriends)
-                        actionRow(glyph: .shield, title: "Quản lý phiên đăng nhập", color: .cyan) {
-                            showSessionsSheet = true
-                        }
-                        actionRow(glyph: .lock, title: "Đổi mật khẩu", color: .green) {
-                            showPasswordSheet = true
-                        }
-                        actionRow(glyph: .block, title: "Danh sách người dùng đã chặn", color: .orange) {
-                            showBlocksSheet = true
+                    // 2. 4 Profile Tabs: Giới thiệu | Bài viết | Album ảnh | Video (Exact Android 1.2.12 Parity)
+                    Picker("Mục hồ sơ", selection: $selectedTab) {
+                        ForEach(ProfileTab.allCases, id: \.self) { t in
+                            Text(t.rawValue).tag(t)
                         }
                     }
-                    .kinnectCard()
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal, 4)
 
-                    // Native PushKit / CallKit / Build Diagnostic Card
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 8) {
-                            KinnectIcon(glyph: .phone, size: 20, selected: true, tint: KinnectTheme.online)
-                            Text("Trạng thái Cuộc gọi Native & PushKit")
-                                .font(.subheadline.bold())
-                                .foregroundColor(.white)
-                        }
-                        Text(pushKit.voipRegistrationStatus)
-                            .font(.caption)
-                            .foregroundColor(KinnectTheme.textSecondary)
-                            .kinnectMultiline()
-                        Text("Phiên bản: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.12") (Build \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "118"))")
-                            .font(.caption2)
-                            .foregroundColor(KinnectTheme.accentBright)
+                    // 3. Tab Content
+                    switch selectedTab {
+                    case .about:
+                        aboutTabContent(user: user)
+                    case .posts:
+                        postsTabContent(user: user)
+                    case .albums:
+                        albumsTabContent(user: user)
+                    case .videos:
+                        videosTabContent(user: user)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .kinnectCard()
-
-                    // Logout & Permanent Account Deletion
-                    VStack(spacing: 10) {
-                        Button {
-                            Task { await appState.logout() }
-                        } label: {
-                            HStack(spacing: 8) {
-                                KinnectIcon(glyph: .logout, size: 20, tint: .white)
-                                Text("Đăng xuất (Xóa Keychain & Cache)")
-                                    .font(.subheadline.bold())
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                            .foregroundColor(.white)
-                        }
-
-                        Button(role: .destructive) {
-                            showDeleteAccountSheet = true
-                        } label: {
-                            Label("Xóa vĩnh viễn tài khoản Kinnect", systemImage: "trash.fill")
-                                .font(.subheadline.bold())
-                                .frame(maxWidth: .infinity, minHeight: 44)
-                                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.danger.opacity(0.18)))
-                                .foregroundColor(KinnectTheme.danger)
-                        }
-                    }
-                    .kinnectCard()
                 }
             }
             .padding(14)
@@ -236,8 +123,12 @@ struct ProfileView: View {
         .navigationTitle("Hồ sơ cá nhân")
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            syncFieldsFromUser()
             await refreshMe()
+        }
+        .sheet(isPresented: $showEditProfileSheet) {
+            EditProfileSheet(onSaved: {
+                Task { await refreshMe() }
+            })
         }
         .sheet(isPresented: $showSessionsSheet) {
             ActiveSessionsSheet()
@@ -250,6 +141,220 @@ struct ProfileView: View {
         }
         .sheet(isPresented: $showDeleteAccountSheet) {
             DeleteAccountConfirmationSheet()
+        }
+    }
+
+    // MARK: - Tab Contents
+    private func aboutTabContent(user: KinnectUser) -> some View {
+        VStack(spacing: 14) {
+            // Bio & Details Card
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("Giới thiệu")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                    Spacer()
+                    Text(user.isPrivate ? "Riêng tư" : "Công khai")
+                        .font(.caption2.bold())
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(user.isPrivate ? KinnectTheme.warning.opacity(0.2) : KinnectTheme.online.opacity(0.2)))
+                        .foregroundColor(user.isPrivate ? KinnectTheme.warning : KinnectTheme.online)
+                }
+
+                if !user.bio.isEmpty {
+                    Text(user.bio)
+                        .font(.subheadline)
+                        .foregroundColor(KinnectTheme.textPrimary)
+                        .kinnectMultiline()
+                } else {
+                    Text("Chưa có thông tin công khai. Cập nhật hồ sơ để mọi người hiểu bạn hơn.")
+                        .font(.subheadline)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                        .kinnectMultiline()
+                }
+
+                if !user.locationName.isEmpty {
+                    HStack(spacing: 6) {
+                        Image(systemName: "mappin.circle.fill")
+                            .foregroundColor(KinnectTheme.accentBright)
+                        Text(user.locationName)
+                            .font(.caption)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                }
+
+                HStack(spacing: 6) {
+                    Image(systemName: "calendar")
+                        .foregroundColor(KinnectTheme.textSecondary)
+                    Text("Tham gia Kinnect từ 11/2026")
+                        .font(.caption2)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                }
+            }
+            .kinnectCard()
+
+            // Quick Actions & Security
+            VStack(spacing: 10) {
+                actionRow(glyph: .wallet, title: "Ví thử nghiệm & Cửa hàng", color: KinnectTheme.warning, action: onOpenWallet)
+                actionRow(glyph: .friends, title: "Danh sách Bạn bè & Lời mời", color: KinnectTheme.accentBright, action: onOpenFriends)
+                actionRow(glyph: .shield, title: "Quản lý phiên đăng nhập", color: .cyan) {
+                    showSessionsSheet = true
+                }
+                actionRow(glyph: .lock, title: "Đổi mật khẩu", color: .green) {
+                    showPasswordSheet = true
+                }
+                actionRow(glyph: .block, title: "Danh sách người dùng đã chặn", color: .orange) {
+                    showBlocksSheet = true
+                }
+            }
+            .kinnectCard()
+
+            // PushKit / Native Diagnostic Card
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    KinnectIcon(glyph: .phone, size: 20, selected: true, tint: KinnectTheme.online)
+                    Text("Trạng thái Cuộc gọi Native & PushKit")
+                        .font(.subheadline.bold())
+                        .foregroundColor(.white)
+                }
+                Text(pushKit.voipRegistrationStatus)
+                    .font(.caption)
+                    .foregroundColor(KinnectTheme.textSecondary)
+                    .kinnectMultiline()
+                Text("Phiên bản: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.12") (Build \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "118"))")
+                    .font(.caption2)
+                    .foregroundColor(KinnectTheme.accentBright)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .kinnectCard()
+
+            // Logout & Delete Card
+            VStack(spacing: 10) {
+                Button {
+                    Task { await appState.logout() }
+                } label: {
+                    HStack(spacing: 8) {
+                        KinnectIcon(glyph: .logout, size: 20, tint: .white)
+                        Text("Đăng xuất (Xóa Keychain & Cache)")
+                            .font(.subheadline.bold())
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                    .foregroundColor(.white)
+                }
+
+                Button(role: .destructive) {
+                    showDeleteAccountSheet = true
+                } label: {
+                    Label("Xóa vĩnh viễn tài khoản Kinnect", systemImage: "trash.fill")
+                        .font(.subheadline.bold())
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.danger.opacity(0.18)))
+                        .foregroundColor(KinnectTheme.danger)
+                }
+            }
+            .kinnectCard()
+        }
+    }
+
+    private func postsTabContent(user: KinnectUser) -> some View {
+        VStack(spacing: 12) {
+            let myPosts = appState.feedPosts.filter { $0.author.id == user.id }
+            if myPosts.isEmpty {
+                VStack(spacing: 8) {
+                    KinnectIcon(glyph: .feed, size: 36, tint: KinnectTheme.textSecondary)
+                    Text("Chưa có bài viết nào")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                    Text("Những bài viết bạn chia sẻ trên Bảng tin sẽ xuất hiện tại đây.")
+                        .font(.caption)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.vertical, 32)
+                .frame(maxWidth: .infinity)
+                .kinnectCard()
+            } else {
+                ForEach(myPosts) { post in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(post.text)
+                            .font(.subheadline)
+                            .foregroundColor(KinnectTheme.textPrimary)
+                            .kinnectMultiline()
+                        if !post.imageUrl.isEmpty {
+                            KinnectRemoteImageView(rawURL: post.imageUrl, contentMode: .fill, cornerRadius: 10, maxHeight: 180)
+                        }
+                        Text(formatRelativeDate(post.createdAt))
+                            .font(.caption2)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                    .kinnectCard()
+                }
+            }
+        }
+    }
+
+    private func albumsTabContent(user: KinnectUser) -> some View {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+            // Public Album Card
+            VStack(alignment: .leading, spacing: 6) {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(KinnectTheme.surfaceElevated)
+                    .frame(height: 120)
+                    .overlay(
+                        KinnectIcon(glyph: .photo, size: 32, tint: KinnectTheme.accentBright)
+                    )
+                Text("Ảnh công khai")
+                    .font(.subheadline.bold())
+                    .foregroundColor(.white)
+                Text("Công khai cho tất cả mọi người")
+                    .font(.caption2)
+                    .foregroundColor(KinnectTheme.textSecondary)
+            }
+            .padding(10)
+            .kinnectCard()
+
+            // Private Album Card (with secure lock badge)
+            VStack(alignment: .leading, spacing: 6) {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(KinnectTheme.surfaceElevated)
+                    .frame(height: 120)
+                    .overlay(
+                        VStack(spacing: 6) {
+                            KinnectIcon(glyph: .lock, size: 30, tint: KinnectTheme.warning)
+                            Text("Bảo mật PIN/FaceID")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(KinnectTheme.warning)
+                        }
+                    )
+                Text("Album riêng tư")
+                    .font(.subheadline.bold())
+                    .foregroundColor(.white)
+                Text("Chỉ bạn và bạn bè được cấp quyền")
+                    .font(.caption2)
+                    .foregroundColor(KinnectTheme.textSecondary)
+            }
+            .padding(10)
+            .kinnectCard()
+        }
+    }
+
+    private func videosTabContent(user: KinnectUser) -> some View {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+            ForEach(0..<6) { i in
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(KinnectTheme.surfaceElevated)
+                    .frame(height: 150)
+                    .overlay(
+                        VStack(spacing: 4) {
+                            KinnectIcon(glyph: .video, size: 24, tint: KinnectTheme.accentBright)
+                            Text("Shorts #\(i + 1)")
+                                .font(.caption2.bold())
+                                .foregroundColor(.white)
+                        }
+                    )
+            }
         }
     }
 
@@ -282,26 +387,105 @@ struct ProfileView: View {
         }
     }
 
-    private func syncFieldsFromUser() {
-        guard let u = appState.currentUser else { return }
-        name = u.name
-        bio = u.bio
-        locationName = u.locationName
-        isPrivate = u.isPrivate
-    }
-
     private func refreshMe() async {
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/me"),
            let userDict = res["user"] as? [String: Any] {
             let user = KinnectUser.from(userDict)
             appState.applyAuthenticatedUser(user, rawDict: userDict)
-            syncFieldsFromUser()
+        }
+    }
+}
+
+// MARK: - Dedicated Edit Profile Sheet
+struct EditProfileSheet: View {
+    let onSaved: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
+
+    @State private var name = ""
+    @State private var bio = ""
+    @State private var locationName = ""
+    @State private var isPrivate = false
+    @State private var isSaving = false
+    @State private var selectedAvatarItem: PhotosPickerItem?
+    @State private var selectedCoverItem: PhotosPickerItem?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Hình ảnh đại diện") {
+                    HStack(spacing: 16) {
+                        PhotosPicker(selection: $selectedAvatarItem, matching: .images) {
+                            HStack(spacing: 6) {
+                                KinnectIcon(glyph: .profile, size: 18, tint: KinnectTheme.accentBright)
+                                Text("Đổi Avatar")
+                                    .font(.caption.bold())
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 38)
+                            .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
+                            .foregroundColor(KinnectTheme.accentBright)
+                        }
+                        .onChange(of: selectedAvatarItem) { item in
+                            guard let item else { return }
+                            Task { await uploadImage(item: item, endpoint: "/api/me/avatar", field: "avatarDataUrl") }
+                        }
+
+                        PhotosPicker(selection: $selectedCoverItem, matching: .images) {
+                            HStack(spacing: 6) {
+                                KinnectIcon(glyph: .photo, size: 18, tint: KinnectTheme.accentBright)
+                                Text("Đổi Ảnh bìa")
+                                    .font(.caption.bold())
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 38)
+                            .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
+                            .foregroundColor(KinnectTheme.accentBright)
+                        }
+                        .onChange(of: selectedCoverItem) { item in
+                            guard let item else { return }
+                            Task { await uploadImage(item: item, endpoint: "/api/me/cover", field: "coverDataUrl") }
+                        }
+                    }
+                }
+
+                Section("Thông tin cá nhân") {
+                    TextField("Tên hiển thị", text: $name)
+                    TextField("Tiểu sử (Bio)", text: $bio, axis: .vertical)
+                        .lineLimit(2...4)
+                    TextField("Thành phố / Khu vực", text: $locationName)
+                    Toggle("Tài khoản riêng tư", isOn: $isPrivate)
+                        .tint(KinnectTheme.accentBright)
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(KinnectTheme.background)
+            .navigationTitle("Chỉnh sửa hồ sơ")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Hủy") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Lưu") {
+                        Task { await saveProfile() }
+                    }
+                    .bold()
+                    .disabled(isSaving)
+                }
+            }
+            .onAppear {
+                if let u = appState.currentUser {
+                    name = u.name
+                    bio = u.bio
+                    locationName = u.locationName
+                    isPrivate = u.isPrivate
+                }
+            }
         }
     }
 
     private func saveProfile() async {
-        isSavingProfile = true
-        defer { isSavingProfile = false }
+        isSaving = true
+        defer { isSaving = false }
         let reqId = "patch_me_\(Int(Date().timeIntervalSince1970))"
         do {
             let res = try await KinnectAPIClient.shared.requestJSON(
@@ -319,6 +503,8 @@ struct ProfileView: View {
                 appState.applyAuthenticatedUser(KinnectUser.from(userDict), rawDict: userDict)
             }
             appState.showToast("Đã cập nhật hồ sơ cá nhân.")
+            onSaved()
+            dismiss()
         } catch {
             appState.showToast(error.localizedDescription)
         }
@@ -327,7 +513,7 @@ struct ProfileView: View {
     private func uploadImage(item: PhotosPickerItem, endpoint: String, field: String) async {
         guard let data = try? await item.loadTransferable(type: Data.self),
               let uiImg = UIImage(data: data),
-              let jpeg = compressUnderOneMegabyte(uiImg) else {
+              let jpeg = uiImg.jpegData(compressionQuality: 0.72) else {
             appState.showToast("Không thể xử lý ảnh đã chọn.")
             return
         }
@@ -340,315 +526,10 @@ struct ProfileView: View {
                 body: [field: dataURL],
                 requestId: reqId
             )
-            await refreshMe()
             appState.showToast("Đã cập nhật hình ảnh hồ sơ.")
-        } catch {
-            appState.showToast(error.localizedDescription)
-        }
-    }
-
-    private func compressUnderOneMegabyte(_ image: UIImage) -> Data? {
-        var quality: CGFloat = 0.75
-        while quality >= 0.25 {
-            if let data = image.jpegData(compressionQuality: quality), data.count < 900_000 {
-                return data
-            }
-            quality -= 0.15
-        }
-        return image.jpegData(compressionQuality: 0.2)
-    }
-}
-
-struct ActiveSessionsSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @ObservedObject private var appState = AppState.shared
-    @State private var sessions: [[String: Any]] = []
-
-    var body: some View {
-        NavigationStack {
-            List {
-                ForEach(Array(sessions.enumerated()), id: \.offset) { _, s in
-                    let sid = s["id"] as? String ?? ""
-                    let ua = s["userAgent"] as? String ?? "Thiết bị Kinnect"
-                    let current = s["current"] as? Bool ?? false
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(ua)
-                                .font(.subheadline.bold())
-                                .foregroundColor(.white)
-                                .kinnectMultiline()
-                            Text(current ? "Phiên hiện tại trên thiết bị này" : "Phiên hoạt động")
-                                .font(.caption)
-                                .foregroundColor(current ? KinnectTheme.online : KinnectTheme.textSecondary)
-                        }
-                        Spacer()
-                        if !current && !sid.isEmpty {
-                            Button(role: .destructive) {
-                                Task { await revokeSession(sid) }
-                            } label: {
-                                Text("Đăng xuất")
-                                    .font(.caption.bold())
-                            }
-                        }
-                    }
-                    .listRowBackground(KinnectTheme.surface)
-                }
-            }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .background(KinnectTheme.background)
-            .navigationTitle("Phiên đăng nhập")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Đóng") { dismiss() }
-                }
-            }
-            .task {
-                await loadSessions()
-            }
-        }
-    }
-
-    private func loadSessions() async {
-        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/me/sessions") {
-            self.sessions = res["sessions"] as? [[String: Any]] ?? []
-        }
-    }
-
-    private func revokeSession(_ id: String) async {
-        _ = try? await KinnectAPIClient.shared.requestJSON(
-            "/api/me/sessions/\(id)",
-            method: "DELETE",
-            body: [:],
-            requestId: "revoke_\(id)"
-        )
-        await loadSessions()
-    }
-}
-
-struct ChangePasswordSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @ObservedObject private var appState = AppState.shared
-
-    @State private var currentPassword = ""
-    @State private var newPassword = ""
-    @State private var isSubmitting = false
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Bảo mật mật khẩu") {
-                    SecureField("Mật khẩu hiện tại", text: $currentPassword)
-                    SecureField("Mật khẩu mới (tối thiểu 6 ký tự)", text: $newPassword)
-                }
-            }
-            .scrollContentBackground(.hidden)
-            .background(KinnectTheme.background)
-            .navigationTitle("Đổi mật khẩu")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Hủy") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Lưu") {
-                        Task { await updatePassword() }
-                    }
-                    .disabled(isSubmitting || newPassword.count < 6)
-                }
-            }
-        }
-    }
-
-    private func updatePassword() async {
-        isSubmitting = true
-        defer { isSubmitting = false }
-        do {
-            _ = try await KinnectAPIClient.shared.requestJSON(
-                "/api/me/password",
-                method: "POST",
-                body: [
-                    "currentPassword": currentPassword,
-                    "newPassword": newPassword
-                ]
-            )
-            appState.showToast("Đã đổi mật khẩu thành công.")
-            dismiss()
+            onSaved()
         } catch {
             appState.showToast(error.localizedDescription)
         }
     }
 }
-
-struct BlockedUsersSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @ObservedObject private var appState = AppState.shared
-    @State private var blockedUsers: [KinnectUser] = []
-
-    var body: some View {
-        NavigationStack {
-            List {
-                if blockedUsers.isEmpty {
-                    Text("Bạn chưa chặn người dùng nào.")
-                        .foregroundColor(KinnectTheme.textSecondary)
-                        .listRowBackground(Color.clear)
-                }
-                ForEach(blockedUsers) { u in
-                    HStack {
-                        KinnectAvatarView(name: u.name, avatarURL: u.avatarUrl, colorHex: u.avatarColor, size: 38)
-                        Text(u.name)
-                            .foregroundColor(.white)
-                        Spacer()
-                        Button("Bỏ chặn") {
-                            Task {
-                                await appState.unblockUser(userId: u.id)
-                                await loadBlocks()
-                            }
-                        }
-                        .font(.caption.bold())
-                        .foregroundColor(KinnectTheme.accentBright)
-                    }
-                    .listRowBackground(KinnectTheme.surface)
-                }
-            }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .background(KinnectTheme.background)
-            .navigationTitle("Người dùng đã chặn")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Đóng") { dismiss() }
-                }
-            }
-            .task {
-                await loadBlocks()
-            }
-        }
-    }
-
-    private func loadBlocks() async {
-        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/blocks") {
-            let list = res["blocks"] as? [[String: Any]] ?? []
-            self.blockedUsers = list.map { entry in
-                if let u = entry["user"] as? [String: Any] {
-                    return KinnectUser.from(u)
-                }
-                return KinnectUser.from(entry)
-            }
-        }
-    }
-}
-
-struct DeleteAccountConfirmationSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @ObservedObject private var appState = AppState.shared
-
-    @State private var confirmPhrase = ""
-    @State private var password = ""
-    @State private var requiredPhrase = "XOA TAI KHOAN"
-    @State private var summaryInfo: String = "Đang kiểm tra dữ liệu tài khoản..."
-    @State private var isDeleting = false
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Cảnh báo: Hành động này sẽ xóa vĩnh viễn tài khoản Kinnect, bài viết, video ngắn, tin nhắn, ví và toàn bộ phiên đăng nhập của bạn. Không thể khôi phục sau khi xóa.")
-                        .font(.subheadline)
-                        .foregroundColor(KinnectTheme.danger)
-                        .kinnectMultiline()
-
-                    Text(summaryInfo)
-                        .font(.caption)
-                        .foregroundColor(KinnectTheme.textSecondary)
-                        .kinnectMultiline()
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Nhập chính xác cụm từ xác nhận: \(requiredPhrase)")
-                            .font(.caption.bold())
-                            .foregroundColor(.white)
-                        TextField(requiredPhrase, text: $confirmPhrase)
-                            .textInputAutocapitalization(.characters)
-                            .padding(12)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                            .foregroundColor(.white)
-                    }
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Nhập mật khẩu hiện tại")
-                            .font(.caption.bold())
-                            .foregroundColor(.white)
-                        SecureField("Mật khẩu của bạn", text: $password)
-                            .padding(12)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                            .foregroundColor(.white)
-                    }
-
-                    Button(role: .destructive) {
-                        Task { await performAccountDeletion() }
-                    } label: {
-                        HStack {
-                            Spacer()
-                            if isDeleting {
-                                ProgressView().tint(.white)
-                            } else {
-                                Text("Xác nhận xóa vĩnh viễn tài khoản")
-                                    .font(.headline)
-                            }
-                            Spacer()
-                        }
-                        .padding(.vertical, 14)
-                        .background(KinnectTheme.danger)
-                        .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                    }
-                    .disabled(isDeleting || confirmPhrase.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() != requiredPhrase)
-                }
-                .padding(16)
-            }
-            .background(KinnectTheme.background)
-            .navigationTitle("Xóa tài khoản")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Hủy") { dismiss() }
-                }
-            }
-            .task {
-                if let res = try? await KinnectAPIClient.shared.requestJSON("/api/me/account-deletion") {
-                    if let phrase = res["confirmText"] as? String, !phrase.isEmpty {
-                        self.requiredPhrase = phrase
-                    }
-                    if let summary = res["summary"] as? [String: Any] {
-                        let posts = summary["posts"] as? Int ?? 0
-                        let messages = summary["messages"] as? Int ?? 0
-                        let friends = summary["friends"] as? Int ?? 0
-                        self.summaryInfo = "Dữ liệu sẽ bị xóa vĩnh viễn: \(posts) bài viết, \(messages) tin nhắn, \(friends) liên kết bạn bè."
-                    }
-                }
-            }
-        }
-    }
-
-    private func performAccountDeletion() async {
-        isDeleting = true
-        defer { isDeleting = false }
-        do {
-            _ = try await KinnectAPIClient.shared.requestJSON(
-                "/api/me/account-deletion",
-                method: "DELETE",
-                body: [
-                    "confirmText": confirmPhrase.trimmingCharacters(in: .whitespacesAndNewlines),
-                    "password": password
-                ]
-            )
-            dismiss()
-            appState.clearSessionState()
-        } catch {
-            appState.showToast(error.localizedDescription)
-        }
-    }
-}
-

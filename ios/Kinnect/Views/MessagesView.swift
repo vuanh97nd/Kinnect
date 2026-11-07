@@ -467,7 +467,7 @@ struct DirectChatDetailView: View {
                     }
 
                     Menu {
-                        ForEach(["❤️", "👍", "😆", "😮", "😢"], id: \.self) { emoji in
+                        ForEach(["👍", "❤️", "😂", "😮", "😢", "😡"], id: \.self) { emoji in
                             Button(emoji) {
                                 Task { await reactToMessage(msgId: msg.id, emoji: emoji) }
                             }
@@ -481,7 +481,7 @@ struct DirectChatDetailView: View {
                                 tint: messageReactions[msg.id] != nil ? KinnectTheme.accentBright : KinnectTheme.textSecondary
                             )
                             if let reacted = messageReactions[msg.id] {
-                                Text(reacted).font(.caption2)
+                                Text(DirectMessageItem.emoji(for: reacted)).font(.caption2)
                             }
                         }
                         .padding(.vertical, 4)
@@ -576,17 +576,47 @@ struct DirectChatDetailView: View {
     }
 
     private func reactToMessage(msgId: String, emoji: String) async {
-        messageReactions[msgId] = emoji
-        _ = try? await KinnectAPIClient.shared.requestJSON(
-            "/api/chat-messages/direct/\(msgId)/reaction",
-            method: "POST",
-            body: ["reaction": emoji]
-        )
-        NativeSocketClient.shared.sendJSON([
-            "type": "chat-reaction",
-            "messageId": msgId,
-            "reaction": emoji
-        ])
+        guard let canonicalKey = DirectMessageItem.canonical(for: emoji) else { return }
+        let previous = messageReactions[msgId]
+        let isTogglingOff = (previous == canonicalKey)
+        let newKey: String? = isTogglingOff ? nil : canonicalKey
+
+        // Optimistic update
+        if let newKey {
+            messageReactions[msgId] = newKey
+        } else {
+            messageReactions.removeValue(forKey: msgId)
+        }
+
+        do {
+            let bodyVal: Any = newKey ?? NSNull()
+            let res = try await KinnectAPIClient.shared.requestJSON(
+                "/api/chat-messages/direct/\(msgId)/reaction",
+                method: "POST",
+                body: ["reaction": bodyVal]
+            )
+            if let msgObj = res["message"] as? [String: Any] {
+                let myRx = (msgObj["myReaction"] as? String) ?? ""
+                if !myRx.isEmpty {
+                    messageReactions[msgId] = myRx
+                } else {
+                    messageReactions.removeValue(forKey: msgId)
+                }
+            }
+            NativeSocketClient.shared.sendJSON([
+                "type": "chat-reaction",
+                "messageId": msgId,
+                "reaction": newKey ?? ""
+            ])
+        } catch {
+            // Revert on failure
+            if let previous {
+                messageReactions[msgId] = previous
+            } else {
+                messageReactions.removeValue(forKey: msgId)
+            }
+            appState.showToast("Không thể gửi cảm xúc: \(error.localizedDescription)")
+        }
     }
 
     private func sendMessage(text: String, imageDataURL: String) async {
@@ -703,7 +733,7 @@ struct GroupChatDetailView: View {
                                     }
 
                                     Menu {
-                                        ForEach(["❤️", "👍", "😆", "😮", "😢"], id: \.self) { emoji in
+                                        ForEach(["👍", "❤️", "😂", "😮", "😢", "😡"], id: \.self) { emoji in
                                             Button(emoji) {
                                                 Task { await reactToGroupMessage(msgId: msg.id, emoji: emoji) }
                                             }
@@ -717,7 +747,7 @@ struct GroupChatDetailView: View {
                                                 tint: groupReactions[msg.id] != nil ? KinnectTheme.accentBright : KinnectTheme.textSecondary
                                             )
                                             if let reacted = groupReactions[msg.id] {
-                                                Text(reacted).font(.caption2)
+                                                Text(DirectMessageItem.emoji(for: reacted)).font(.caption2)
                                             }
                                         }
                                     }
@@ -865,17 +895,47 @@ struct GroupChatDetailView: View {
     }
 
     private func reactToGroupMessage(msgId: String, emoji: String) async {
-        groupReactions[msgId] = emoji
-        _ = try? await KinnectAPIClient.shared.requestJSON(
-            "/api/chat-messages/group/\(msgId)/reaction",
-            method: "POST",
-            body: ["reaction": emoji]
-        )
-        NativeSocketClient.shared.sendJSON([
-            "type": "group-reaction",
-            "messageId": msgId,
-            "reaction": emoji
-        ])
+        guard let canonicalKey = DirectMessageItem.canonical(for: emoji) else { return }
+        let previous = groupReactions[msgId]
+        let isTogglingOff = (previous == canonicalKey)
+        let newKey: String? = isTogglingOff ? nil : canonicalKey
+
+        // Optimistic update
+        if let newKey {
+            groupReactions[msgId] = newKey
+        } else {
+            groupReactions.removeValue(forKey: msgId)
+        }
+
+        do {
+            let bodyVal: Any = newKey ?? NSNull()
+            let res = try await KinnectAPIClient.shared.requestJSON(
+                "/api/chat-messages/group/\(msgId)/reaction",
+                method: "POST",
+                body: ["reaction": bodyVal]
+            )
+            if let msgObj = res["message"] as? [String: Any] {
+                let myRx = (msgObj["myReaction"] as? String) ?? ""
+                if !myRx.isEmpty {
+                    groupReactions[msgId] = myRx
+                } else {
+                    groupReactions.removeValue(forKey: msgId)
+                }
+            }
+            NativeSocketClient.shared.sendJSON([
+                "type": "group-reaction",
+                "messageId": msgId,
+                "reaction": newKey ?? ""
+            ])
+        } catch {
+            // Revert on failure
+            if let previous {
+                groupReactions[msgId] = previous
+            } else {
+                groupReactions.removeValue(forKey: msgId)
+            }
+            appState.showToast("Không thể gửi cảm xúc: \(error.localizedDescription)")
+        }
     }
 
     private func sendGroupMessage() async {

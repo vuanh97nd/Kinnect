@@ -235,8 +235,34 @@ struct DirectMessageItem: Identifiable, Equatable {
     var deliveredAt: String
     var seenAt: String
     var reaction: String = ""
+    var reactions: [String: Int] = [:]
+    var myReaction: String = ""
 
     var isSeen: Bool { !seenAt.isEmpty }
+
+    static func emoji(for canonical: String) -> String {
+        switch canonical {
+        case "like": return "👍"
+        case "love": return "❤️"
+        case "haha": return "😂"
+        case "wow": return "😮"
+        case "sad": return "😢"
+        case "angry": return "😡"
+        default: return canonical
+        }
+    }
+
+    static func canonical(for emoji: String) -> String? {
+        switch emoji {
+        case "👍", "like": return "like"
+        case "❤️", "love": return "love"
+        case "😂", "haha": return "haha"
+        case "😮", "wow": return "wow"
+        case "😢", "sad": return "sad"
+        case "😡", "angry": return "angry"
+        default: return nil
+        }
+    }
 
     static func from(_ dict: [String: Any]) -> DirectMessageItem {
         let receipt = dict["receipt"] as? [String: Any]
@@ -244,7 +270,9 @@ struct DirectMessageItem: Identifiable, Equatable {
         let deliv = isoString(from: dict["deliveredAt"] ?? receipt?["deliveredAt"])
         let seen = isoString(from: dict["seenAt"] ?? dict["readAt"] ?? receipt?["seenAt"])
         let img = (dict["imageUrl"] as? String) ?? (dict["attachmentUrl"] as? String) ?? (att?["url"] as? String) ?? ""
-        let rx = (dict["reaction"] as? String) ?? (dict["rx"] as? String) ?? ""
+        let myRx = (dict["myReaction"] as? String) ?? (dict["reaction"] as? String) ?? (dict["rx"] as? String) ?? ""
+        let rxDict = (dict["reactions"] as? [String: Int]) ?? [:]
+        let effectiveRx = !myRx.isEmpty ? myRx : (rxDict.keys.first ?? "")
         return DirectMessageItem(
             id: (dict["id"] as? String) ?? UUID().uuidString,
             fromUserId: (dict["fromUserId"] as? String) ?? (dict["senderId"] as? String) ?? (dict["sender"] as? String) ?? "",
@@ -254,7 +282,9 @@ struct DirectMessageItem: Identifiable, Equatable {
             createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
             deliveredAt: deliv,
             seenAt: seen,
-            reaction: rx
+            reaction: effectiveRx,
+            reactions: rxDict,
+            myReaction: myRx
         )
     }
 }
@@ -293,12 +323,16 @@ struct GroupMessageItem: Identifiable, Equatable {
     var createdAt: String
     var seenCount: Int
     var reaction: String = ""
+    var reactions: [String: Int] = [:]
+    var myReaction: String = ""
 
     static func from(_ dict: [String: Any]) -> GroupMessageItem {
         let senderDict = (dict["sender"] as? [String: Any]) ?? (dict["author"] as? [String: Any]) ?? (dict["user"] as? [String: Any]) ?? dict
         let receipt = dict["receipt"] as? [String: Any]
         let seenBy = dict["seenBy"] as? [Any]
-        let rx = (dict["reaction"] as? String) ?? (dict["rx"] as? String) ?? ""
+        let myRx = (dict["myReaction"] as? String) ?? (dict["reaction"] as? String) ?? (dict["rx"] as? String) ?? ""
+        let rxDict = (dict["reactions"] as? [String: Int]) ?? [:]
+        let effectiveRx = !myRx.isEmpty ? myRx : (rxDict.keys.first ?? "")
         return GroupMessageItem(
             id: (dict["id"] as? String) ?? UUID().uuidString,
             groupId: (dict["groupId"] as? String) ?? (dict["group_id"] as? String) ?? "",
@@ -307,7 +341,9 @@ struct GroupMessageItem: Identifiable, Equatable {
             imageUrl: (dict["imageUrl"] as? String) ?? "",
             createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
             seenCount: (dict["seenCount"] as? Int) ?? (receipt?["seenCount"] as? Int) ?? seenBy?.count ?? 0,
-            reaction: rx
+            reaction: effectiveRx,
+            reactions: rxDict,
+            myReaction: myRx
         )
     }
 }
