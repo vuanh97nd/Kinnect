@@ -66,6 +66,18 @@ final class AppState: ObservableObject {
         isRestoringSession = true
         defer { isRestoringSession = false }
 
+        if let reviewScreen = UIReviewFixture.activeScreen {
+            if reviewScreen == "auth" {
+                self.currentUser = nil
+            } else {
+                self.currentUser = KinnectUser.from(UIReviewFixture.currentUserDict)
+                self.onlineUserIds = ["fixture_user_peer"]
+                self.unreadNotificationsCount = 1
+                self.unreadMessagesCount = 2
+            }
+            return
+        }
+
         // If cached user exists for active account, restore optimistically while verifying
         if let accountId = AccountCache.shared.activeAccountId,
            let cachedDict: [String: Any] = AccountCache.shared.loadJSONObject(forKey: "profile_me", accountId: accountId) {

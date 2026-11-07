@@ -67,6 +67,10 @@ struct RootMainView: View {
                 }
             } else if appState.currentUser == nil {
                 AuthView()
+            } else if UIReviewFixture.activeScreen == "chat-detail" {
+                NavigationStack {
+                    DirectChatDetailView(peer: KinnectUser.from(UIReviewFixture.peerUserDict))
+                }
             } else {
                 authenticatedLayout
             }
@@ -100,9 +104,23 @@ struct RootMainView: View {
                     .zIndex(100)
             }
         }
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(UIReviewFixture.forceLightMode ? .light : .dark)
         .task {
             await appState.bootstrapSession()
+            if let screen = UIReviewFixture.activeScreen {
+                switch screen {
+                case "feed": selectedTab = .feed
+                case "discover": selectedTab = .discover
+                case "live": selectedTab = .live
+                case "messages": selectedTab = .messages
+                case "profile": selectedTab = .profile
+                case "friends": showFriendsSheet = true
+                case "notifications": showNotificationsSheet = true
+                case "wallet": showWalletStoreSheet = true
+                case "camera-studio", "camera-studio-edit": showCameraStudioSheet = true
+                default: break
+                }
+            }
         }
         .sheet(item: $appState.activeReportContext) { context in
             UGCReportSheet(context: context)

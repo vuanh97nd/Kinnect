@@ -208,3 +208,40 @@ jobs:
         with:
           name: Kinnect-${{ env.APP_VERSION }}-appstore-ipa
           path: dist/appstore/*.ipa
+
+  simulator-ui-review:
+    name: Capture Native iOS Simulator UI Review Screenshots (iPhone & iPad)
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 26+ (or Xcode with available iOS Simulator runtime)
+        run: |
+          XCODE_26=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)
+          if [ -n "$XCODE_26" ]; then
+            sudo xcode-select -s "$XCODE_26/Contents/Developer"
+          fi
+          xcodebuild -version
+          xcrun simctl list runtimes
+
+      - name: Ensure XcodeGen is installed and generate project
+        working-directory: ios
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+          xcodegen generate
+
+      - name: Build Simulator App & Capture Native Screenshots via simctl
+        run: |
+          python3 ios/scripts/capture-simulator-screenshots.py
+          ls -lh dist/ios-ui-review
+
+      - name: Upload Native iOS UI Review Screenshots Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kinnect-${{ env.APP_VERSION }}-ios-ui-review
+          path: dist/ios-ui-review/**
+          if-no-files-found: error

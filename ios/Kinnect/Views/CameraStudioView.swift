@@ -197,6 +197,12 @@ struct CameraStudioView: View {
                 }
             }
         }
+        .onAppear {
+            if UIReviewFixture.activeScreen == "camera-studio-edit" && previewImage == nil {
+                previewImage = UIReviewFixture.samplePreviewImage()
+                caption = "[Fixture UI] Kiểm thử bảng chỉnh sửa Kinnect Studio với nút Lưu tách riêng."
+            }
+        }
         .sheet(isPresented: $showNativeCameraPicker) {
             NativeSystemCameraCaptureView(
                 captureVideo: target == .shortVideo,
