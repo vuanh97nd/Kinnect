@@ -120,11 +120,8 @@ final class AppState: ObservableObject {
         UserDefaults.standard.set(rememberMe, forKey: "kinnect_session_remembered")
         AccountCache.shared.setActiveAccount(user.id)
         AccountCache.shared.saveJSONObject(rawDict, forKey: "profile_me", accountId: user.id)
-        if rememberMe {
-            KeychainStore.shared.saveAccountId(user.id)
-        } else {
-            KeychainStore.shared.clearSession()
-        }
+        KeychainStore.shared.setRememberMe(rememberMe)
+        KeychainStore.shared.saveAccountId(user.id)
         NativeSocketClient.shared.connectWithKeychainSession()
         PushKitManager.shared.startRegistration()
     }

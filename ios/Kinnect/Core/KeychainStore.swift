@@ -1,38 +1,161 @@
 import Foundation
 import Security
 
-/// Native Keychain storage for session and remembered-device cookies.
-/// Credentials never touch plain UserDefaults or logs.
+/// Native Keychain & Shared In-Memory Session Storage.
+/// - When rememberMe = true: Session cookies & account IDs persist securely in Keychain across app restarts.
+/// - When rememberMe = false: Session cookies & account IDs are held in memory for the active lifecycle only
+///   (enabling HTTP calls, uploads, and WebSocket connection in the current session), while persistent Keychain
+///   items and device cookies are wiped. Upon restart, the user returns cleanly to Login.
 final class KeychainStore {
     static let shared = KeychainStore()
 
     private let service = "app.kinnect.live.session.v2"
     private let lock = NSLock()
 
-    private init() {}
+    // Shared In-Memory Session Store
+    private var memorySessionCookie: [String: String] = [:]
+    private var memoryDeviceCookie: [String: String] = [:]
+    private var memoryAccountId: [String: String] = [:]
+    private(set) var isPersistent: Bool = true
+
+    private init() {
+        let remembered = UserDefaults.standard.object(forKey: "kinnect_session_remembered") as? Bool ?? true
+        self.isPersistent = remembered
+    }
+
+    func setRememberMe(_ remember: Bool, for origin: String = ServerConfig.defaultOrigin) {
+        lock.lock()
+        defer { lock.unlock() }
+        self.isPersistent = remember
+        let key = originKey(origin)
+
+        if !remember {
+            // Delete persistent items from Keychain for this origin
+            deleteItemLocked(account: "session:\(key)")
+            deleteItemLocked(account: "device:\(key)")
+            deleteItemLocked(account: "uid:\(key)")
+
+            // Clean HTTPCookieStorage to avoid leaking persistent session cookies across relaunch
+            if let url = URL(string: origin) ?? URL(string: ServerConfig.defaultOrigin) {
+                if let cookies = HTTPCookieStorage.shared.cookies(for: url) {
+                    for cookie in cookies {
+                        if cookie.name == "kinnect_session" || cookie.name == "kinnect_device" {
+                            HTTPCookieStorage.shared.deleteCookie(cookie)
+                        }
+                    }
+                }
+            }
+        } else {
+            // Flush active in-memory session into Keychain
+            if let s = memorySessionCookie[key], !s.isEmpty {
+                setStringLocked(s, account: "session:\(key)")
+            }
+            if let d = memoryDeviceCookie[key], !d.isEmpty {
+                setStringLocked(d, account: "device:\(key)")
+            }
+            if let u = memoryAccountId[key], !u.isEmpty {
+                setStringLocked(u, account: "uid:\(key)")
+            }
+        }
+    }
 
     func saveSessionCookie(_ value: String, for origin: String = ServerConfig.defaultOrigin) {
-        setString(value, account: "session:\(originKey(origin))")
+        let key = originKey(origin)
+        lock.lock()
+        memorySessionCookie[key] = value
+        let persistent = isPersistent
+        if persistent {
+            setStringLocked(value, account: "session:\(key)")
+        } else {
+            deleteItemLocked(account: "session:\(key)")
+        }
+        lock.unlock()
     }
 
     func loadSessionCookie(for origin: String = ServerConfig.defaultOrigin) -> String {
-        return getString(account: "session:\(originKey(origin))") ?? ""
+        let key = originKey(origin)
+        lock.lock()
+        if let mem = memorySessionCookie[key], !mem.isEmpty {
+            lock.unlock()
+            return mem
+        }
+        let persistent = isPersistent
+        if persistent {
+            let val = getStringLocked(account: "session:\(key)") ?? ""
+            if !val.isEmpty {
+                memorySessionCookie[key] = val
+            }
+            lock.unlock()
+            return val
+        }
+        lock.unlock()
+        return ""
     }
 
     func saveDeviceCookie(_ value: String, for origin: String = ServerConfig.defaultOrigin) {
-        setString(value, account: "device:\(originKey(origin))")
+        let key = originKey(origin)
+        lock.lock()
+        memoryDeviceCookie[key] = value
+        let persistent = isPersistent
+        if persistent {
+            setStringLocked(value, account: "device:\(key)")
+        } else {
+            deleteItemLocked(account: "device:\(key)")
+        }
+        lock.unlock()
     }
 
     func loadDeviceCookie(for origin: String = ServerConfig.defaultOrigin) -> String {
-        return getString(account: "device:\(originKey(origin))") ?? ""
+        let key = originKey(origin)
+        lock.lock()
+        if let mem = memoryDeviceCookie[key], !mem.isEmpty {
+            lock.unlock()
+            return mem
+        }
+        let persistent = isPersistent
+        if persistent {
+            let val = getStringLocked(account: "device:\(key)") ?? ""
+            if !val.isEmpty {
+                memoryDeviceCookie[key] = val
+            }
+            lock.unlock()
+            return val
+        }
+        lock.unlock()
+        return ""
     }
 
     func saveAccountId(_ userId: String, for origin: String = ServerConfig.defaultOrigin) {
-        setString(userId, account: "uid:\(originKey(origin))")
+        let key = originKey(origin)
+        lock.lock()
+        memoryAccountId[key] = userId
+        let persistent = isPersistent
+        if persistent {
+            setStringLocked(userId, account: "uid:\(key)")
+        } else {
+            deleteItemLocked(account: "uid:\(key)")
+        }
+        lock.unlock()
     }
 
     func loadAccountId(for origin: String = ServerConfig.defaultOrigin) -> String {
-        return getString(account: "uid:\(originKey(origin))") ?? ""
+        let key = originKey(origin)
+        lock.lock()
+        if let mem = memoryAccountId[key], !mem.isEmpty {
+            lock.unlock()
+            return mem
+        }
+        let persistent = isPersistent
+        if persistent {
+            let val = getStringLocked(account: "uid:\(key)") ?? ""
+            if !val.isEmpty {
+                memoryAccountId[key] = val
+            }
+            lock.unlock()
+            return val
+        }
+        lock.unlock()
+        return ""
     }
 
     func cookieJarHeader(for origin: String = ServerConfig.defaultOrigin) -> String {
@@ -52,7 +175,7 @@ final class KeychainStore {
         for cookie in cookies {
             if cookie.name == "kinnect_session" {
                 if cookie.value.isEmpty || (cookie.expiresDate != nil && cookie.expiresDate! <= Date()) {
-                    deleteItem(account: "session:\(originKey(origin))")
+                    clearSession(for: origin)
                 } else {
                     saveSessionCookie("kinnect_session=\(cookie.value)", for: origin)
                 }
@@ -65,13 +188,21 @@ final class KeychainStore {
     }
 
     func clearSession(for origin: String = ServerConfig.defaultOrigin) {
-        deleteItem(account: "session:\(originKey(origin))")
-        deleteItem(account: "uid:\(originKey(origin))")
+        let key = originKey(origin)
+        lock.lock()
+        memorySessionCookie.removeValue(forKey: key)
+        memoryAccountId.removeValue(forKey: key)
+        deleteItemLocked(account: "session:\(key)")
+        deleteItemLocked(account: "uid:\(key)")
+        lock.unlock()
     }
 
     func clearAll() {
         lock.lock()
         defer { lock.unlock() }
+        memorySessionCookie.removeAll()
+        memoryDeviceCookie.removeAll()
+        memoryAccountId.removeAll()
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service
@@ -86,9 +217,7 @@ final class KeychainStore {
         return ServerConfig.normalize(origin) ?? ServerConfig.defaultOrigin
     }
 
-    private func setString(_ value: String, account: String) {
-        lock.lock()
-        defer { lock.unlock() }
+    private func setStringLocked(_ value: String, account: String) {
         guard let data = value.data(using: .utf8) else { return }
         let baseQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -102,9 +231,7 @@ final class KeychainStore {
         SecItemAdd(addQuery as CFDictionary, nil)
     }
 
-    private func getString(account: String) -> String? {
-        lock.lock()
-        defer { lock.unlock() }
+    private func getStringLocked(account: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -118,9 +245,7 @@ final class KeychainStore {
         return String(data: data, encoding: .utf8)
     }
 
-    private func deleteItem(account: String) {
-        lock.lock()
-        defer { lock.unlock() }
+    private func deleteItemLocked(account: String) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -129,4 +254,3 @@ final class KeychainStore {
         SecItemDelete(query as CFDictionary)
     }
 }
-
