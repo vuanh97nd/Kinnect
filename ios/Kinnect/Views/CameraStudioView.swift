@@ -796,27 +796,17 @@ struct CameraStudioView: View {
     }
 
     private func saveMediaToPhotos() {
-        if let img = previewImage {
-            PhotoSaveCoordinator.shared.onComplete = { success, error in
-                if success {
-                    appState.showToast("Đã lưu ảnh vào Album ảnh trên thiết bị.")
-                } else {
-                    appState.showToast("Không thể lưu ảnh: \(error?.localizedDescription ?? "Lỗi quyền truy cập")")
-                }
+        if isVideoActive {
+            guard let vp = videoProject ?? (capturedVideoTempURL.map { StudioVideoProject(sourceURL: $0) }) else {
+                appState.showToast(L10n.tr("Không tìm thấy video để lưu."))
+                return
             }
-            UIImageWriteToSavedPhotosAlbum(
-                img,
-                PhotoSaveCoordinator.shared,
-                #selector(PhotoSaveCoordinator.image(_:didFinishSavingWithError:contextInfo:)),
-                nil
-            )
-        } else if let vp = videoProject ?? (capturedVideoTempURL.map { StudioVideoProject(sourceURL: $0) }) {
             syncVideoProjectSliders(to: vp)
             Task {
                 var targetURL = vp.sourceURL
                 if vp.hasEdits {
                     do {
-                        appState.showToast("Đang xuất video qua Studio Pro...")
+                        appState.showToast(L10n.tr("Đang xuất video qua Studio Pro..."))
                         targetURL = try await vp.exportVideo()
                     } catch {
                         appState.showToast("Không thể xuất video: \(error.localizedDescription)")
@@ -825,7 +815,7 @@ struct CameraStudioView: View {
                 }
                 PhotoSaveCoordinator.shared.onComplete = { success, error in
                     if success {
-                        appState.showToast("Đã lưu video đã chỉnh sửa vào Album ảnh trên thiết bị.")
+                        appState.showToast(L10n.tr("Đã lưu video đã chỉnh sửa vào Album ảnh trên thiết bị."))
                     } else {
                         appState.showToast("Không thể lưu video: \(error?.localizedDescription ?? "Lỗi quyền truy cập")")
                     }
@@ -837,41 +827,24 @@ struct CameraStudioView: View {
                     nil
                 )
             }
-        } else if let tempURL = capturedVideoTempURL {
+        } else {
+            guard let img = previewImage ?? photoProject.originalImage else {
+                appState.showToast(L10n.tr("Không tìm thấy ảnh để lưu."))
+                return
+            }
             PhotoSaveCoordinator.shared.onComplete = { success, error in
                 if success {
-                    appState.showToast("Đã lưu video vào Album ảnh trên thiết bị.")
+                    appState.showToast(L10n.tr("Đã lưu ảnh vào Album ảnh trên thiết bị."))
                 } else {
-                    appState.showToast("Không thể lưu video: \(error?.localizedDescription ?? "Lỗi quyền truy cập")")
+                    appState.showToast("Không thể lưu ảnh: \(error?.localizedDescription ?? "Lỗi quyền truy cập")")
                 }
             }
-            UISaveVideoAtPathToSavedPhotosAlbum(
-                tempURL.path,
+            UIImageWriteToSavedPhotosAlbum(
+                img,
                 PhotoSaveCoordinator.shared,
-                #selector(PhotoSaveCoordinator.video(_:didFinishSavingWithError:contextInfo:)),
+                #selector(PhotoSaveCoordinator.image(_:didFinishSavingWithError:contextInfo:)),
                 nil
             )
-        } else if !videoDataURL.isEmpty {
-            if let range = videoDataURL.range(of: "base64,") {
-                let b64 = String(videoDataURL[range.upperBound...])
-                if let data = Data(base64Encoded: b64) {
-                    let tempFile = FileManager.default.temporaryDirectory.appendingPathComponent("kinnect_saved_\(UUID().uuidString).mp4")
-                    try? data.write(to: tempFile)
-                    PhotoSaveCoordinator.shared.onComplete = { success, error in
-                        if success {
-                            appState.showToast("Đã lưu video vào Album ảnh trên thiết bị.")
-                        } else {
-                            appState.showToast("Không thể lưu video: \(error?.localizedDescription ?? "Lỗi quyền truy cập")")
-                        }
-                    }
-                    UISaveVideoAtPathToSavedPhotosAlbum(
-                        tempFile.path,
-                        PhotoSaveCoordinator.shared,
-                        #selector(PhotoSaveCoordinator.video(_:didFinishSavingWithError:contextInfo:)),
-                        nil
-                    )
-                }
-            }
         }
     }
 

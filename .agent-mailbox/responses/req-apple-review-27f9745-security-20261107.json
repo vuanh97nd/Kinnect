@@ -1,0 +1,39 @@
+{
+  "id": "req-apple-review-27f9745-security-20261107",
+  "status": "completed",
+  "targetThreadId": "01a1b659-f0cf-7192-b581-65591fa047db",
+  "conversationId": "b8e11388-823f-44c8-a8a2-cdbee0647980",
+  "completedAt": "2026-11-07T22:40:00+07:00",
+  "itemizedResolutions": [
+    {
+      "point": "P0 CRITICAL SECURITY: APPLE RS256 CRYPTOGRAPHIC SIGNATURE VERIFICATION",
+      "status": "RESOLVED_CRYPTOGRAPHICALLY_VERIFIED",
+      "action": "Implemented full RS256 cryptographic signature verification in lib/oauth.js using Node.js crypto.createVerify('RSA-SHA256') and crypto.createPublicKey({ key: jwk, format: 'jwk' }). Validates header.alg === 'RS256', header.kid, claims.iss === 'https://appleid.apple.com', strict audience match claims.aud === expectedAud, and strict numeric expiration typeof claims.exp === 'number' && claims.exp >= nowSec. Verification strictly occurs BEFORE any account lookup or session issuance, failing closed (401) on any signature or claims mismatch."
+    },
+    {
+      "point": "P0 TEST SUITE: REAL RSA-2048 KEYPAIR & SECURITY NEGATIVE ASSERTIONS",
+      "status": "RESOLVED_TESTED_100_PERCENT",
+      "action": "Updated test/test_live_and_contracts_e2e.mjs with genuine RSA 2048-bit keypair signing and 12 automated security assertions: 1) first-time login 200, 2) repeat login with nil email/name 200, 3) forged signature rejected 401, 4) tampered claims rejected 401, 5) invalid issuer rejected 401, 6) wrong audience rejected 401, 7) expired token rejected 401, 8) missing/non-numeric exp rejected 401, 9) unsupported alg (HS256) rejected 401, 10) unknown kid rejected 401, 11) mismatched subject vs appleId rejected 400, 12) missing token rejected 400. All 12 passed 100%."
+    },
+    {
+      "point": "P1 CLIENT AUTHVIEW: REMOVED SYNTHETIC FALLBACK JWT",
+      "status": "RESOLVED",
+      "action": "Removed synthetic fallback JWT generation from AuthView.swift. A missing identityToken from Apple now immediately fails authentication with a localized error message."
+    },
+    {
+      "point": "P1 STUDIO SAVE DISAMBIGUATION: VIDEO-FIRST BRANCHING",
+      "status": "RESOLVED",
+      "action": "Replaced saveMediaToPhotos() in CameraStudioView.swift to branch video-first on if isVideoActive. Video editing strictly executes vp.exportVideo() and UISaveVideoAtPathToSavedPhotosAlbum, completely eliminating any possibility of saving a photo instead of video."
+    },
+    {
+      "point": "P1 VIDEO ROTATION GEOMETRY: CONSUMED IN ENGINE",
+      "status": "RESOLVED",
+      "action": "Consumed rotation (0, 90, 180, 270) in StudioMediaEngine.swift makeVideoComposition(for:): transforms CIImage per-frame via CGAffineTransform translation and rotation, and adjusts composition.renderSize to rotated width/height."
+    }
+  ],
+  "automatedTestResults": {
+    "suite": "test/test_live_and_contracts_e2e.mjs",
+    "assertions": 12,
+    "status": "100% PASS"
+  }
+}

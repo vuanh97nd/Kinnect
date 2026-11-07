@@ -22,7 +22,7 @@ import { randomUUID } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { fileURLToPath } from "node:url";
 
-export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSender, emailReady, allowEmailDelivery = false, storeVerifier,appleStoreVerifier,storeEnv,liveEnv,clock,apkDirectory=fileURLToPath(new URL("./dist/",import.meta.url)) } = {}) {
+export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSender, emailReady, allowEmailDelivery = false, storeVerifier,appleStoreVerifier,appleKeyResolver,storeEnv,liveEnv,clock,apkDirectory=fileURLToPath(new URL("./dist/",import.meta.url)) } = {}) {
   loadMailEnv();
   loadMailEnv("oauth.env");
   loadMailEnv("turn.env");
@@ -42,7 +42,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     onNotification: ({ userId, id }) => { notifyNotifications(userId); if (id) pushNotification(userId, id); },
     onAIStream: event => notifyAIStream(event),
     onCallMessage: ({ userIds }) => notifyCallMessage(userIds),
-    fetchImpl,authLimit,storeVerifier,appleStoreVerifier,storeEnv,clock,
+    fetchImpl,authLimit,storeVerifier,appleStoreVerifier,appleKeyResolver,storeEnv,clock,
     sharedSession: (dbPath===":memory:"||process.env.NODE_TEST_CONTEXT)?null:createSharedSession(),
     sendEmail:deliverEmail,mailReady:emailAvailable,
     // Báo về email quản trị khi có người gửi yêu cầu quên mật khẩu.

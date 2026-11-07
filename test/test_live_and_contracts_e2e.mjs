@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync, createSign } from "node:crypto";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -32,10 +32,22 @@ const appleVerifier = {
 };
 
 // Fully isolated: ":memory:" disables the shared cloud session/bridge, SFU env and gift env (server.js:25-86).
+
+const { publicKey: appleTestPublicKey, privateKey: appleTestPrivateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+const appleTestJwk = appleTestPublicKey.export({ format: "jwk" });
+appleTestJwk.kid = "apple-test-key-1";
+
+const testAppleKeyResolver = async (kid) => {
+  if (kid === "apple-test-key-1") return appleTestJwk;
+  return null;
+};
+
 const { server, social } = createApp({
   dbPath: ":memory:",
   allowEmailDelivery: false,
   appleStoreVerifier: appleVerifier,
+  appleKeyResolver: testAppleKeyResolver,
+  authLimit: 100,
   clock: testClock,
   storeEnv: { PLAY_PURCHASE_TOKEN_KEY: "ab".repeat(32) }
 });
@@ -808,32 +820,56 @@ h1Conn.ws.close();
 h2Conn.ws.close();
 vConn.ws.close();
 
-console.log("7. Testing Sign in with Apple (/api/auth/apple) and Guideline 4.8 Contract Parity (6 assertions)...");
+console.log("7. Testing Sign in with Apple (/api/auth/apple) Cryptographic RS256 Verification & Security (12 assertions)...");
 
-function makeAppleIdToken({ sub, iss = "https://appleid.apple.com", aud = "app.kinnect.live", exp = Math.floor(Date.now() / 1000) + 3600, email }) {
-  const header = Buffer.from(JSON.stringify({ alg: "RS256", kid: "apple-test-key-1" })).toString("base64url");
+function makeSignedAppleIdToken({
+  sub,
+  iss = "https://appleid.apple.com",
+  aud = "app.kinnect.live",
+  exp = Math.floor(Date.now() / 1000) + 3600,
+  email,
+  kid = "apple-test-key-1",
+  alg = "RS256",
+  signKey = appleTestPrivateKey,
+  tamperPayload = false,
+  tamperSignature = false
+}) {
+  const header = Buffer.from(JSON.stringify({ alg, kid })).toString("base64url");
   const claims = { iss, aud, exp, sub };
   if (email) claims.email = email;
   const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
-  return `${header}.${payload}.mockSignatureBytes`;
+
+  let signatureBase = `${header}.${payload}`;
+  const signer = createSign("RSA-SHA256");
+  signer.update(signatureBase);
+  let sig = signer.sign(signKey, "base64url");
+
+  if (tamperSignature) {
+    sig = sig.slice(0, -6) + "xxxxxx";
+  }
+  if (tamperPayload) {
+    const altered = Buffer.from(JSON.stringify({ ...claims, sub: "attacker_impostor" })).toString("base64url");
+    return `${header}.${altered}.${sig}`;
+  }
+  return `${header}.${payload}.${sig}`;
 }
 
-// 7a. First-time Sign in with Apple (creates new user, associates oauth_accounts)
+// 7a. First-time Sign in with Apple with genuine RS256 signature
 const appleSub1 = "apple.sub.user." + RUN;
 const appleEmail1 = `apple_${RUN}@privaterelay.example.com`;
-const appleToken1 = makeAppleIdToken({ sub: appleSub1, email: appleEmail1 });
+const validAppleToken1 = makeSignedAppleIdToken({ sub: appleSub1, email: appleEmail1 });
 
 const appleRes1 = await fetch(`${baseUrl}/api/auth/apple`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({
-    identityToken: appleToken1,
+    identityToken: validAppleToken1,
     appleId: appleSub1,
     fullName: { givenName: "Anh", familyName: "Vu" },
     email: appleEmail1
   })
 });
-assert.equal(appleRes1.status, 200, "First Apple sign-in must succeed");
+assert.equal(appleRes1.status, 200, "First Apple sign-in must succeed with genuine RS256 signature");
 const appleJson1 = await appleRes1.json();
 assert.equal(appleJson1.success, true);
 assert.equal(appleJson1.user.name, "Vu Anh");
@@ -846,31 +882,39 @@ assert.equal(meApple1.status, 200);
 assert.equal((await meApple1.json()).user.id, appleJson1.user.id);
 
 // 7b. Repeat Sign in with Apple (Apple omits fullName and email on subsequent logins)
-const appleToken1Repeat = makeAppleIdToken({ sub: appleSub1 }); // no email in claims
+const validAppleToken1Repeat = makeSignedAppleIdToken({ sub: appleSub1 });
 const appleRes1Repeat = await fetch(`${baseUrl}/api/auth/apple`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({
-    identityToken: appleToken1Repeat,
+    identityToken: validAppleToken1Repeat,
     appleId: appleSub1
-    // Notice: no fullName or email provided by Apple on repeat logins
   })
 });
 assert.equal(appleRes1Repeat.status, 200, "Repeat Apple sign-in must succeed without email/fullName");
 const appleJson1Repeat = await appleRes1Repeat.json();
 assert.equal(appleJson1Repeat.user.id, appleJson1.user.id, "Must return existing linked user account");
 
-// 7c. Reject expired Apple token
-const expiredAppleToken = makeAppleIdToken({ sub: "apple.sub.expired", exp: Math.floor(Date.now() / 1000) - 600 });
-const appleExpiredRes = await fetch(`${baseUrl}/api/auth/apple`, {
+// 7c. Reject forged cryptographic signature
+const forgedToken = makeSignedAppleIdToken({ sub: "apple.sub.forged", tamperSignature: true });
+const appleForgedRes = await fetch(`${baseUrl}/api/auth/apple`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ identityToken: expiredAppleToken, appleId: "apple.sub.expired" })
+  body: JSON.stringify({ identityToken: forgedToken, appleId: "apple.sub.forged" })
 });
-assert.equal(appleExpiredRes.status, 401, "Expired Apple token must be rejected with 401");
+assert.equal(appleForgedRes.status, 401, "Forged signature must be rejected with 401");
 
-// 7d. Reject invalid issuer
-const badIssuerToken = makeAppleIdToken({ sub: "apple.sub.badiss", iss: "https://evil.issuer.com" });
+// 7d. Reject tampered payload (signature does not match altered payload)
+const tamperedToken = makeSignedAppleIdToken({ sub: "apple.sub.original", tamperPayload: true });
+const appleTamperedRes = await fetch(`${baseUrl}/api/auth/apple`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ identityToken: tamperedToken, appleId: "attacker_impostor" })
+});
+assert.equal(appleTamperedRes.status, 401, "Tampered payload must be rejected with 401");
+
+// 7e. Reject wrong issuer
+const badIssuerToken = makeSignedAppleIdToken({ sub: "apple.sub.badiss", iss: "https://evil.issuer.com" });
 const appleBadIssRes = await fetch(`${baseUrl}/api/auth/apple`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
@@ -878,8 +922,62 @@ const appleBadIssRes = await fetch(`${baseUrl}/api/auth/apple`, {
 });
 assert.equal(appleBadIssRes.status, 401, "Invalid issuer must be rejected with 401");
 
-// 7e. Reject mismatched subject vs appleId parameter
-const mismatchToken = makeAppleIdToken({ sub: "apple.sub.real" });
+// 7f. Reject wrong audience
+const badAudToken = makeSignedAppleIdToken({ sub: "apple.sub.badaud", aud: "com.other.app" });
+const appleBadAudRes = await fetch(`${baseUrl}/api/auth/apple`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ identityToken: badAudToken, appleId: "apple.sub.badaud" })
+});
+assert.equal(appleBadAudRes.status, 401, "Wrong audience must be rejected with 401");
+
+// 7g. Reject expired Apple token
+const expiredAppleToken = makeSignedAppleIdToken({ sub: "apple.sub.expired", exp: Math.floor(Date.now() / 1000) - 600 });
+const appleExpiredRes = await fetch(`${baseUrl}/api/auth/apple`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ identityToken: expiredAppleToken, appleId: "apple.sub.expired" })
+});
+assert.equal(appleExpiredRes.status, 401, "Expired Apple token must be rejected with 401");
+
+// 7h. Reject missing or non-numeric exp
+const missingExpToken = (() => {
+  const h = Buffer.from(JSON.stringify({ alg: "RS256", kid: "apple-test-key-1" })).toString("base64url");
+  const c = Buffer.from(JSON.stringify({ iss: "https://appleid.apple.com", aud: "app.kinnect.live", sub: "no_exp_user" })).toString("base64url");
+  const s = createSign("RSA-SHA256"); s.update(`${h}.${c}`);
+  return `${h}.${c}.${s.sign(appleTestPrivateKey, "base64url")}`;
+})();
+const appleNoExpRes = await fetch(`${baseUrl}/api/auth/apple`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ identityToken: missingExpToken, appleId: "no_exp_user" })
+});
+assert.equal(appleNoExpRes.status, 401, "Missing exp must be rejected with 401");
+
+// 7i. Reject unsupported algorithm (e.g. HS256)
+const hsToken = (() => {
+  const h = Buffer.from(JSON.stringify({ alg: "HS256", kid: "apple-test-key-1" })).toString("base64url");
+  const c = Buffer.from(JSON.stringify({ iss: "https://appleid.apple.com", aud: "app.kinnect.live", exp: Math.floor(Date.now() / 1000) + 3600, sub: "hs_user" })).toString("base64url");
+  return `${h}.${c}.some_hs_sig`;
+})();
+const appleHsRes = await fetch(`${baseUrl}/api/auth/apple`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ identityToken: hsToken, appleId: "hs_user" })
+});
+assert.equal(appleHsRes.status, 401, "Non-RS256 alg must be rejected with 401");
+
+// 7j. Reject unknown key ID
+const unknownKidToken = makeSignedAppleIdToken({ sub: "apple.sub.unknownkid", kid: "unregistered-kid" });
+const appleUnknownKidRes = await fetch(`${baseUrl}/api/auth/apple`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ identityToken: unknownKidToken, appleId: "apple.sub.unknownkid" })
+});
+assert.equal(appleUnknownKidRes.status, 401, "Unknown kid must be rejected with 401");
+
+// 7k. Reject mismatched subject vs appleId parameter
+const mismatchToken = makeSignedAppleIdToken({ sub: "apple.sub.real" });
 const appleMismatchRes = await fetch(`${baseUrl}/api/auth/apple`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
@@ -887,7 +985,7 @@ const appleMismatchRes = await fetch(`${baseUrl}/api/auth/apple`, {
 });
 assert.equal(appleMismatchRes.status, 400, "Mismatched subject vs appleId must be rejected with 400");
 
-// 7f. Reject missing identityToken
+// 7l. Reject missing identityToken
 const missingTokenRes = await fetch(`${baseUrl}/api/auth/apple`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
@@ -895,7 +993,7 @@ const missingTokenRes = await fetch(`${baseUrl}/api/auth/apple`, {
 });
 assert.equal(missingTokenRes.status, 400, "Missing identityToken must be rejected with 400");
 
-console.log("   -> Verified Sign in with Apple native contract, repeat login resolution, token expiry, issuer and sub validation!");
+console.log("   -> Verified Sign in with Apple RS256 cryptographic verification, forged/tampered rejection, claims enforcement, and repeat logins!");
 server.close();
 
 console.log("ALL END-TO-END FUNCTIONAL TESTS PASSED 100%!");

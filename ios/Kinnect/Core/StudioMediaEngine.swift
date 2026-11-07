@@ -347,8 +347,9 @@ final class StudioVideoProject: ObservableObject {
         let w = warmth
         let sm = smooth
         let template = proTemplate
+        let rot = rotation % 360
 
-        return AVVideoComposition(asset: asset, applyingCIFiltersWithHandler: { request in
+        let composition = AVVideoComposition(asset: asset, applyingCIFiltersWithHandler: { request in
             let source = request.sourceImage.clampedToExtent()
             var output = source
 
@@ -391,8 +392,34 @@ final class StudioVideoProject: ObservableObject {
                 output = output.cropped(to: request.sourceImage.extent)
             }
 
+            // 5. Video rotation geometry (90, 180, 270 degrees)
+            if rot != 0 {
+                let extent = request.sourceImage.extent
+                var transform = CGAffineTransform.identity
+                switch rot {
+                case 90:
+                    transform = transform.translatedBy(x: extent.height, y: 0).rotated(by: .pi / 2)
+                case 180:
+                    transform = transform.translatedBy(x: extent.width, y: extent.height).rotated(by: .pi)
+                case 270:
+                    transform = transform.translatedBy(x: 0, y: extent.width).rotated(by: 3 * .pi / 2)
+                default: break
+                }
+                output = output.transformed(by: transform)
+            }
+
             request.finish(with: output, context: nil)
         })
+
+        if let track = asset.tracks(withMediaType: .video).first {
+            var size = track.naturalSize
+            if rot == 90 || rot == 270 {
+                size = CGSize(width: size.height, height: size.width)
+            }
+            composition.renderSize = size
+        }
+
+        return composition
     }
 
     /// Real AVAssetExportSession export preserving source audio and trimmed time range

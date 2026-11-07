@@ -717,19 +717,12 @@ struct AuthView: View {
             let fullName = [givenName, familyName].filter { !$0.isEmpty }.joined(separator: " ")
             let nameToUse = fullName.isEmpty ? (email.isEmpty ? "Apple User" : email.components(separatedBy: "@").first ?? "Apple User") : fullName
 
-            let identityTokenStr: String = {
-                if let t = appleIDCredential.identityToken, let s = String(data: t, encoding: .utf8) {
-                    return s
-                }
-                // Construct structured Apple JWT format for UI Review / simulator testing
-                let header = "{\"alg\":\"RS256\",\"kid\":\"apple-key-1\"}"
-                let exp = Int(Date().timeIntervalSince1970) + 3600
-                let aud = "app.kinnect.live"
-                let payload = "{\"iss\":\"https://appleid.apple.com\",\"sub\":\"\(userIdentifier)\",\"aud\":\"\(aud)\",\"exp\":\(exp)}"
-                let hB64 = Data(header.utf8).base64EncodedString().replacingOccurrences(of: "=", with: "").replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
-                let pB64 = Data(payload.utf8).base64EncodedString().replacingOccurrences(of: "=", with: "").replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
-                return "\(hB64).\(pB64).mockSignature"
-            }()
+            guard let identityTokenData = appleIDCredential.identityToken,
+                  let identityTokenStr = String(data: identityTokenData, encoding: .utf8),
+                  !identityTokenStr.isEmpty else {
+                errorMessage = L10n.tr("Không nhận được token xác thực từ Apple.")
+                return
+            }
 
             Task {
                 do {
