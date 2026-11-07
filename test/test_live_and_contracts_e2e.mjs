@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,11 +11,17 @@ import { storeAccountUuid } from "../lib/store.js";
 let simulatedTime = Date.now();
 const testClock = () => simulatedTime;
 
+let verifierTransientError = null;
 const appleVerifier = {
   enabled: () => true,
   bundleId: "app.kinnect.live",
   environment: "LocalTesting",
   async verify(jws) {
+    if (verifierTransientError) {
+      const err = verifierTransientError;
+      verifierTransientError = null;
+      throw err;
+    }
     const v = new SignedDataVerifier([], false, Environment.LOCAL_TESTING, "app.kinnect.live");
     return await v.verifyAndDecodeTransaction(jws);
   },
@@ -495,6 +502,156 @@ const dupNotifRes = await fetch(`${baseUrl}/api/store/apple-notifications`, {
 assert.equal(dupNotifRes.status, 200);
 assert.equal((await dupNotifRes.json()).duplicate, true);
 
+// Path 8b: Malformed nested signedTransactionInfo -> 422 error, notification UUID is NOT recorded
+const notifMalformedNested = makeAppleJWS({
+  notificationType: "REFUND",
+  notificationUUID: "test-notif-malformed-" + RUN,
+  version: "2.0",
+  signedDate: simulatedTime,
+  data: {
+    bundleId: "app.kinnect.live",
+    environment: "LocalTesting",
+    signedTransactionInfo: "corrupted.jws.payload"
+  }
+});
+const malformedNotifRes = await fetch(`${baseUrl}/api/store/apple-notifications`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ signedPayload: notifMalformedNested })
+});
+assert.equal(malformedNotifRes.status, 422);
+const malformedRecorded = social.db.prepare("SELECT 1 FROM store_apple_notifications WHERE notification_uuid=?").get("test-notif-malformed-" + RUN);
+assert.equal(malformedRecorded, undefined, "malformed notification must not be recorded");
+
+// Path 8c: Transient verifier error on notification -> 503 error, not marked processed, retried successfully
+verifierTransientError = Object.assign(new Error("Apple verification service temporarily unreachable"), { status: 503 });
+const notifTransient = makeAppleJWS({
+  notificationType: "REVOKE",
+  notificationUUID: "test-notif-transient-" + RUN,
+  version: "2.0",
+  signedDate: simulatedTime,
+  data: {
+    bundleId: "app.kinnect.live",
+    environment: "LocalTesting",
+    signedTransactionInfo: makeAppleJWS({
+      transactionId: "tx_apple_transient_1",
+      productId: "kinnect_style_ocean",
+      bundleId: "app.kinnect.live",
+      environment: "LocalTesting",
+      revocationDate: simulatedTime
+    })
+  }
+});
+const transientRes1 = await fetch(`${baseUrl}/api/store/apple-notifications`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ signedPayload: notifTransient })
+});
+assert.equal(transientRes1.status, 503, "transient verifier error must return 503 for Apple retry");
+const transientRecorded = social.db.prepare("SELECT 1 FROM store_apple_notifications WHERE notification_uuid=?").get("test-notif-transient-" + RUN);
+assert.equal(transientRecorded, undefined, "failed notification must not be marked processed before successful mutation");
+
+// Immediate retry without verifier error -> 200 OK, processed
+const transientRes2 = await fetch(`${baseUrl}/api/store/apple-notifications`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ signedPayload: notifTransient })
+});
+assert.equal(transientRes2.status, 200);
+assert.equal((await transientRes2.json()).processed, true);
+assert.ok(social.db.prepare("SELECT 1 FROM store_apple_notifications WHERE notification_uuid=?").get("test-notif-transient-" + RUN));
+
+// Path 8d: Refund-before-client-verify (tombstone recorded before purchase row exists; later client verify rejected with 422)
+const notifPreRefund = makeAppleJWS({
+  notificationType: "REFUND",
+  notificationUUID: "test-notif-prerefund-" + RUN,
+  version: "2.0",
+  signedDate: simulatedTime,
+  data: {
+    bundleId: "app.kinnect.live",
+    environment: "LocalTesting",
+    signedTransactionInfo: makeAppleJWS({
+      transactionId: "tx_apple_unseen_888",
+      productId: "kinnect_style_sunset",
+      bundleId: "app.kinnect.live",
+      environment: "LocalTesting",
+      revocationDate: simulatedTime
+    })
+  }
+});
+const preRefundRes = await fetch(`${baseUrl}/api/store/apple-notifications`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ signedPayload: notifPreRefund })
+});
+assert.equal(preRefundRes.status, 200);
+// Verify tombstone was created in store_apple_revocations
+const tombstone = social.db.prepare("SELECT * FROM store_apple_revocations WHERE transaction_id=?").get("tx_apple_unseen_888");
+assert.ok(tombstone, "revocation tombstone must be persisted even when purchase row does not exist yet");
+
+// Client attempts to verify using original non-revoked purchase JWS for tx_apple_unseen_888
+const jwsStalePreRefund = makeAppleJWS({
+  transactionId: "tx_apple_unseen_888",
+  bundleId: "app.kinnect.live",
+  productId: "kinnect_style_sunset",
+  appAccountToken: storeAccountUuid(host1.user.id),
+  purchaseDate: simulatedTime - 3600000,
+  signedDate: simulatedTime - 3600000,
+  environment: "LocalTesting"
+});
+const verifyStalePreRefund = await fetch(`${baseUrl}/api/store/verify`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json", Cookie: host1.cookie },
+  body: JSON.stringify({ productId: "kinnect_style_sunset", purchaseToken: jwsStalePreRefund, platform: "ios" })
+});
+assert.equal(verifyStalePreRefund.status, 422, "original JWS presented after refund notification must be rejected with 422");
+assert.match((await verifyStalePreRefund.json()).error, /thu hồi|hoàn tiền/i);
+// Ensure store_purchases never recorded PURCHASED for this product
+const unseenRows = social.db.prepare("SELECT COUNT(*) AS c FROM store_purchases WHERE product_id=?").get("kinnect_style_sunset").c;
+assert.equal(unseenRows, 0, "refunded-before-verify transaction must never create a purchased row");
+
+// Path 8e: Duplicate concurrency (parallel deliveries with identical notificationUUID)
+const concurrentNotifUuid = "test-notif-concurrent-" + RUN;
+const notifConcurrent = makeAppleJWS({
+  notificationType: "REVOKE",
+  notificationUUID: concurrentNotifUuid,
+  version: "2.0",
+  signedDate: simulatedTime,
+  data: {
+    bundleId: "app.kinnect.live",
+    environment: "LocalTesting",
+    signedTransactionInfo: makeAppleJWS({
+      transactionId: "tx_apple_concurrent_999",
+      productId: "kinnect_style_ocean",
+      bundleId: "app.kinnect.live",
+      environment: "LocalTesting",
+      revocationDate: simulatedTime
+    })
+  }
+});
+const [cRes1, cRes2] = await Promise.all([
+  fetch(`${baseUrl}/api/store/apple-notifications`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ signedPayload: notifConcurrent })
+  }),
+  fetch(`${baseUrl}/api/store/apple-notifications`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ signedPayload: notifConcurrent })
+  })
+]);
+assert.equal(cRes1.status, 200);
+assert.equal(cRes2.status, 200);
+const cJson1 = await cRes1.json();
+const cJson2 = await cRes2.json();
+const processedCount = (cJson1.processed ? 1 : 0) + (cJson2.processed ? 1 : 0);
+const duplicateCount = (cJson1.duplicate ? 1 : 0) + (cJson2.duplicate ? 1 : 0);
+assert.equal(processedCount, 1, "exactly one concurrent request must be processed");
+assert.equal(duplicateCount, 1, "exactly one concurrent request must be flagged duplicate");
+const notifRowCount = social.db.prepare("SELECT COUNT(*) AS c FROM store_apple_notifications WHERE notification_uuid=?").get(concurrentNotifUuid).c;
+assert.equal(notifRowCount, 1, "database must contain exactly one notification record");
+
 // Path 9: Production safeguard - rejection of Xcode/LocalTesting environments in production mode
 const prodEnvApp = createApp({
   dbPath: ":memory:",
@@ -528,6 +685,56 @@ const prodVerifyRes = await fetch(`http://127.0.0.1:${prodPort}/api/store/verify
 assert.equal(prodVerifyRes.status, 403);
 assert.match((await prodVerifyRes.json()).error, /Xcode\/LocalTesting bị từ chối trên production/i);
 prodEnvApp.server.close();
+
+// Path 10: Legacy unbound flag security rule: only allows preexisting securely owned records, NEVER first-claim acceptance
+const legacyApp = createApp({
+  dbPath: ":memory:",
+  allowEmailDelivery: false,
+  appleStoreVerifier: appleVerifier,
+  storeEnv: { PLAY_PURCHASE_TOKEN_KEY: "ab".repeat(32), APPLE_ALLOW_LEGACY_UNBOUND: "true" }
+});
+await new Promise((resolve) => legacyApp.server.listen(0, "127.0.0.1", resolve));
+const legacyPort = legacyApp.server.address().port;
+const legUserReg = await fetch(`http://127.0.0.1:${legacyPort}/api/register`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ username: "leg_user_" + RUN, name: "Leg User", email: `leg_${RUN}@kinnect.local`, password: "PassWord123!", gender: "nam", birthYear: 1998, agree18: true, acceptPrivacyNotice: true })
+});
+const legCookie = (legUserReg.headers.get("set-cookie") || "").split(";")[0];
+const legUserId = (await legUserReg.json()).user.id;
+
+// Path 10a: First-claim with missing appAccountToken -> 403 Forbidden even with APPLE_ALLOW_LEGACY_UNBOUND=true
+const legUnboundFirstClaimJws = makeAppleJWS({
+  transactionId: "tx_apple_legacy_unbound_1",
+  bundleId: "app.kinnect.live",
+  productId: "kinnect_style_ocean",
+  purchaseDate: simulatedTime,
+  signedDate: simulatedTime,
+  environment: "LocalTesting"
+});
+const legFirstClaimRes = await fetch(`http://127.0.0.1:${legacyPort}/api/store/verify`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json", Cookie: legCookie },
+  body: JSON.stringify({ productId: "kinnect_style_ocean", purchaseToken: legUnboundFirstClaimJws, platform: "ios" })
+});
+assert.equal(legFirstClaimRes.status, 403, "first claim of unbound token must be rejected even with legacy flag");
+assert.match((await legFirstClaimRes.json()).error, /thiếu thông tin ràng buộc appAccountToken/i);
+
+// Path 10b: Preexisting securely owned record allows re-verification under APPLE_ALLOW_LEGACY_UNBOUND=true
+// Insert preexisting purchase row belonging to legUserId
+const legTokenHash = "apple:tx_apple_legacy_unbound_1";
+const legDigest = createHash("sha256").update(legTokenHash).digest("hex");
+legacyApp.social.db.prepare("INSERT INTO store_purchases VALUES(?,?,?,?,?,?,?,?)").run(
+  legDigest, legUserId, "kinnect_style_ocean", "dummy_cipher", "PURCHASED", simulatedTime, simulatedTime, "ios"
+);
+const legReverifyRes = await fetch(`http://127.0.0.1:${legacyPort}/api/store/verify`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json", Cookie: legCookie },
+  body: JSON.stringify({ productId: "kinnect_style_ocean", purchaseToken: legUnboundFirstClaimJws, platform: "ios" })
+});
+assert.equal(legReverifyRes.status, 200, "preexisting secure purchase record is allowed to re-verify under legacy flag");
+assert.equal((await legReverifyRes.json()).idempotent, true);
+legacyApp.server.close();
 
 console.log("   -> Verified Apple StoreKit 2 verification, appAccountToken binding, 25h time passage refresh, refund notifications, replay prevention, and production safeguards!");
 

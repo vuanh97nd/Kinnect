@@ -1,9 +1,10 @@
 {
   "id": "req-ios-apple-release-readiness-20261107",
   "status": "PARTIAL_IN_PROGRESS",
-  "updatedAt": "2026-11-07T18:25:00+07:00",
-  "commit": "f9ae3fe",
+  "updatedAt": "2026-11-07T18:27:00+07:00",
+  "commit": "d9e21a2",
   "priorCommits": [
+    "f9ae3fe",
     "c2400dd",
     "b716710",
     "50849b6",
@@ -60,5 +61,12 @@
     "designAdaptations": 6,
     "pendingSubstateVerification": 92,
     "notes": "92 pending substates strictly preserved until dedicated screenshot evidence is captured."
+  },
+  "review_1b0477e_resolutions": {
+    "atomic_transaction_and_nested_verify": "handleAppleNotification no longer swallows nested signedTransactionInfo verification errors; transient verifier errors return 503 for Apple retry; atomic inTransaction block ensures notificationUUID is never recorded before state mutation.",
+    "revocation_tombstones": "store_apple_revocations table records transactionId tombstones when refund/revocation notifications arrive, including before any store_purchases row exists; verifyApple checks tombstone table and rejects original/stale JWS with 422.",
+    "notification_uuid_concurrency": "INSERT INTO store_apple_notifications ... ON CONFLICT(notification_uuid) DO NOTHING inside inTransaction guarantees race-free duplicate parallel delivery idempotency.",
+    "legacy_unbound_token_restriction": "APPLE_ALLOW_LEGACY_UNBOUND only allows pre-existing securely owned records (prior.user_id === userId); first-claim of unbound token is strictly rejected with 403.",
+    "injected_verifier_tests": "E2E suite tests malformed nested signatures (422), transient 503 retry, refund-before-client-verify rejection (422), stale JWS re-verify rejection (422), duplicate parallel concurrency (1 processed, 1 duplicate), and legacy unbound first-claim rejection (403)."
   }
 }
