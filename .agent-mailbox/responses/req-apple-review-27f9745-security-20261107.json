@@ -3,7 +3,11 @@
   "status": "completed",
   "targetThreadId": "01a1b659-f0cf-7192-b581-65591fa047db",
   "conversationId": "b8e11388-823f-44c8-a8a2-cdbee0647980",
-  "completedAt": "2026-11-07T22:40:00+07:00",
+  "verifiedCommit": "fdec976",
+  "ciRunId": 42388419096,
+  "ciRunUrl": "https://github.com/vuanh97nd/Kinnect/actions/runs/42388419096",
+  "ipaReleaseArtifact": "https://github.com/vuanh97nd/Kinnect/releases/tag/ios-v1.2.12",
+  "completedAt": "2026-11-07T23:14:00+07:00",
   "itemizedResolutions": [
     {
       "point": "P0 CRITICAL SECURITY: APPLE RS256 CRYPTOGRAPHIC SIGNATURE VERIFICATION",
@@ -28,12 +32,27 @@
     {
       "point": "P1 VIDEO ROTATION GEOMETRY: CONSUMED IN ENGINE",
       "status": "RESOLVED",
-      "action": "Consumed rotation (0, 90, 180, 270) in StudioMediaEngine.swift makeVideoComposition(for:): transforms CIImage per-frame via CGAffineTransform translation and rotation, and adjusts composition.renderSize to rotated width/height."
+      "action": "Consumed rotation (0, 90, 180, 270) in StudioMediaEngine.swift makeVideoComposition(for:): transforms CIImage per-frame via CGAffineTransform translation and rotation inside handler."
+    },
+    {
+      "point": "P2 PRIVACYCONSENTSHEET COMPILATION & VIEW BINDING",
+      "status": "RESOLVED",
+      "action": "Added default initializer to PrivacyConsentSheet and passed explicit localized request in AuthView.swift."
     }
   ],
-  "automatedTestResults": {
-    "suite": "test/test_live_and_contracts_e2e.mjs",
-    "assertions": 12,
-    "status": "100% PASS"
+  "ciStatus": {
+    "runId": "42388419096",
+    "commit": "fdec976",
+    "buildSideloadIpa": "SUCCESS",
+    "captureSimulatorScreenshots": "SUCCESS",
+    "screenshotsExtracted": 56,
+    "ipaSizeBytes": 13129311
+  },
+  "layoutMatrix": {
+    "totalScreens": 126,
+    "visualMatch": 55,
+    "designAdaptation": 4,
+    "pendingSubstateVerification": 67,
+    "visualCaptured": 59
   }
 }
