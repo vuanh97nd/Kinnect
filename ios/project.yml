@@ -2,16 +2,21 @@ name: Kinnect
 options:
   bundleIdPrefix: app.kinnect
   deploymentTarget:
-    iOS: "15.0"
+    iOS: "16.0"
   xcodeVersion: "16.0"
   generateEmptyDirectories: true
+
+packages:
+  WebRTC:
+    url: https://github.com/stasel/WebRTC.git
+    from: "125.0.0"
 
 settings:
   base:
     MARKETING_VERSION: "1.2.12"
     CURRENT_PROJECT_VERSION: "118"
     SWIFT_VERSION: "5.0"
-    IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
     TARGETED_DEVICE_FAMILY: "1,2"
     ENABLE_BITCODE: NO
 
@@ -19,17 +24,49 @@ targets:
   Kinnect:
     type: application
     platform: iOS
-    deploymentTarget: "15.0"
+    deploymentTarget: "16.0"
     sources:
       - path: Kinnect
         excludes:
           - "**/*.md"
     info:
       path: Kinnect/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Kinnect
+        CFBundleShortVersionString: "1.2.12"
+        CFBundleVersion: "118"
+        LSRequiresIPhoneOS: true
+        NSCameraUsageDescription: "Kinnect cần quyền truy cập Camera để gọi video, phát trực tiếp (Livestream) và chụp ảnh/quay video đăng bài."
+        NSMicrophoneUsageDescription: "Kinnect cần quyền truy cập Micro để truyền âm thanh trong cuộc gọi thoại, video call và livestream."
+        NSLocationWhenInUseUsageDescription: "Kinnect sử dụng vị trí khi bạn bật tính năng Quanh đây để tìm bạn bè ở gần."
+        NSPhotoLibraryUsageDescription: "Kinnect cần quyền truy cập Thư viện ảnh để bạn chọn ảnh đại diện, ảnh bài viết và video ngắn."
+        NSPhotoLibraryAddUsageDescription: "Kinnect cần quyền lưu ảnh và video vào Thư viện ảnh của bạn."
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+          UISceneConfigurations:
+            UIWindowSceneSessionRoleApplication:
+              - UISceneConfigurationName: Default Configuration
+                UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).SceneDelegate
+        UIBackgroundModes:
+          - audio
+          - voip
+          - remote-notification
+        UILaunchScreen: {}
+        UIRequiredDeviceCapabilities:
+          - arm64
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.kinnect.live
         PRODUCT_NAME: Kinnect
+        MARKETING_VERSION: "1.2.12"
+        CURRENT_PROJECT_VERSION: "118"
         INFOPLIST_FILE: Kinnect/Resources/Info.plist
         GENERATE_INFOPLIST_FILE: NO
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -42,10 +79,18 @@ targets:
         SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
         SUPPORTS_MACCATALYST: NO
     dependencies:
+      - package: WebRTC
+        product: WebRTC
       - sdk: UIKit.framework
-      - sdk: WebKit.framework
+      - sdk: SwiftUI.framework
       - sdk: AVFoundation.framework
+      - sdk: AVKit.framework
+      - sdk: PhotosUI.framework
       - sdk: CallKit.framework
+      - sdk: PushKit.framework
       - sdk: UserNotifications.framework
+      - sdk: StoreKit.framework
       - sdk: CoreLocation.framework
+      - sdk: Security.framework
+      - sdk: CryptoKit.framework
       - sdk: AudioToolbox.framework

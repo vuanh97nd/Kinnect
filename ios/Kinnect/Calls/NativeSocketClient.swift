@@ -1,7 +1,6 @@
 import Foundation
 import UIKit
 import UserNotifications
-import WebKit
 
 final class NativeSocketClient: NSObject, URLSessionWebSocketDelegate {
     static let shared = NativeSocketClient()
@@ -9,9 +8,10 @@ final class NativeSocketClient: NSObject, URLSessionWebSocketDelegate {
     private var webSocketTask: URLSessionWebSocketTask?
     private var session: URLSession?
     private var pingTimer: Timer?
-    private var cookieHeader: String = ""
-    private var isConnected = false
+    private(set) var isConnected = false
     private var shouldReconnect = false
+
+    var onEvent: (([String: Any]) -> Void)?
 
     private override init() {
         super.init()
@@ -20,26 +20,19 @@ final class NativeSocketClient: NSObject, URLSessionWebSocketDelegate {
         self.session = URLSession(configuration: config, delegate: self, delegateQueue: .main)
     }
 
-    func syncCookiesAndConnect(from cookieStore: WKHTTPCookieStore) {
-        cookieStore.getAllCookies { [weak self] cookies in
-            guard let self = self else { return }
-            let relevant = cookies.filter {
-                $0.domain.contains("kinnect") && ($0.name == "kinnect_session" || $0.name == "kinnect_device")
-            }
-            guard !relevant.isEmpty else {
-                self.disconnect()
-                return
-            }
-            self.cookieHeader = relevant.map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
-            self.shouldReconnect = true
-            if !self.isConnected {
-                self.connect()
-            }
+    func connectWithKeychainSession() {
+        guard let cookieHeader = KeychainStore.shared.cookieJarHeader(for: ServerConfig.currentOrigin),
+              !cookieHeader.isEmpty else {
+            disconnect()
+            return
         }
-    }
+        shouldReconnect = true
+        if webSocketTask != nil && isConnected {
+            return
+        }
+        webSocketTask?.cancel(with: .goingAway, reason: nil)
+        webSocketTask = nil
 
-    func connect() {
-        guard !cookieHeader.isEmpty, webSocketTask == nil else { return }
         var request = URLRequest(url: ServerConfig.webSocketURL)
         request.setValue(ServerConfig.currentOrigin, forHTTPHeaderField: "Origin")
         request.setValue(cookieHeader, forHTTPHeaderField: "Cookie")
@@ -93,48 +86,13 @@ final class NativeSocketClient: NSObject, URLSessionWebSocketDelegate {
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let type = json["type"] as? String else { return }
 
-        switch type {
-        case "welcome":
+        if type == "welcome" {
             isConnected = true
-        case "call-incoming":
-            let callId = json["callId"] as? String ?? ""
-            let mode = json["mode"] as? String ?? "video"
-            let fromObj = json["from"] as? [String: Any]
-            let callerName = fromObj?["name"] as? String ?? "Kinnect"
-            let isVideo = (mode != "audio")
-            if UIApplication.shared.applicationState != .active {
-                CallKitManager.shared.reportIncomingCall(callId: callId, callerName: callerName, isVideo: isVideo)
-            }
-        case "call-ended":
-            if let callId = json["callId"] as? String, !callId.isEmpty {
-                CallKitManager.shared.reportCallEnded(callId: callId, reason: .remoteEnded)
-            }
-        case "call-accepted":
-            if let callId = json["callId"] as? String, !callId.isEmpty {
-                CallKitManager.shared.reportCallConnected(callId: callId)
-            }
-        case "notification":
-            if UIApplication.shared.applicationState != .active {
-                postLocalNotification(from: json)
-            }
-        default:
-            break
         }
-    }
 
-    private func postLocalNotification(from json: [String: Any]) {
-        let actor = json["actor"] as? [String: Any]
-        let sender = actor?["name"] as? String ?? "Kinnect"
-        let preview = json["preview"] as? String ?? "Bạn có thông báo mới trên Kinnect"
-
-        let content = UNMutableNotificationContent()
-        content.title = sender
-        content.body = preview
-        content.sound = .default
-
-        let id = json["id"] as? String ?? UUID().uuidString
-        let req = UNNotificationRequest(identifier: "msg-\(id)", content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(req, withCompletionHandler: nil)
+        DispatchQueue.main.async { [weak self] in
+            self?.onEvent?(json)
+        }
     }
 
     private func startPingTimer() {
@@ -149,11 +107,10 @@ final class NativeSocketClient: NSObject, URLSessionWebSocketDelegate {
         pingTimer?.invalidate()
         pingTimer = nil
         webSocketTask = nil
-        if shouldReconnect {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
-                guard let self = self, self.shouldReconnect, self.webSocketTask == nil else { return }
-                self.connect()
-            }
+        guard shouldReconnect, UIApplication.shared.applicationState == .active else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+            guard let self = self, self.shouldReconnect, self.webSocketTask == nil else { return }
+            self.connectWithKeychainSession()
         }
     }
 

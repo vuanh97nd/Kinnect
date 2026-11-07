@@ -17,21 +17,21 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>$(MARKETING_VERSION)</string>
+	<string>1.2.12</string>
 	<key>CFBundleVersion</key>
-	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<string>118</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Kinnect cần quyền truy cập Camera để thực hiện cuộc gọi video, phát trực tiếp (Livestream) và chụp ảnh chia sẻ lên bảng tin.</string>
+	<string>Kinnect cần quyền truy cập Camera để gọi video, phát trực tiếp (Livestream) và chụp ảnh/quay video đăng bài.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Kinnect cần quyền truy cập Micro để truyền âm thanh trong cuộc gọi thoại, video call, livestream và tin nhắn thoại.</string>
+	<string>Kinnect cần quyền truy cập Micro để truyền âm thanh trong cuộc gọi thoại, video call và livestream.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Kinnect sử dụng vị trí của bạn để tìm kiếm và kết nối với bạn bè ở gần bạn.</string>
+	<string>Kinnect sử dụng vị trí khi bạn bật tính năng Quanh đây để tìm bạn bè ở gần.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Kinnect cần quyền truy cập Thư viện ảnh để bạn chọn ảnh và video đăng lên bảng tin, câu chuyện hoặc gửi trong tin nhắn.</string>
+	<string>Kinnect cần quyền truy cập Thư viện ảnh để bạn chọn ảnh đại diện, ảnh bài viết và video ngắn.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Kinnect cần quyền lưu ảnh và video đã chỉnh sửa vào Thư viện ảnh của bạn.</string>
+	<string>Kinnect cần quyền lưu ảnh và video vào Thư viện ảnh của bạn.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -53,7 +53,6 @@
 	<array>
 		<string>audio</string>
 		<string>voip</string>
-		<string>fetch</string>
 		<string>remote-notification</string>
 	</array>
 	<key>UILaunchScreen</key>
@@ -62,8 +61,6 @@
 	<array>
 		<string>arm64</string>
 	</array>
-	<key>UIStatusBarStyle</key>
-	<string>UIStatusBarStyleDefault</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
@@ -75,7 +72,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>UIViewControllerBasedStatusBarAppearance</key>
-	<true/>
 </dict>
 </plist>

@@ -1,4 +1,4 @@
-name: Build Kinnect iOS IPA
+name: Build Kinnect Native iOS IPA
 
 on:
   workflow_dispatch:
@@ -16,13 +16,37 @@ on:
 permissions:
   contents: write
 
+env:
+  APP_VERSION: "1.2.12"
+  APP_BUILD: "118"
+
 jobs:
-  build-ios:
+  build-sideload:
+    name: Build Native iOS Sideload IPA (Free Apple ID / AltStore / Sideloadly)
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Select Xcode 26+ / iOS 26+ SDK (or highest available Xcode on runner)
+        run: |
+          echo "Available Xcode installations on runner:"
+          ls -d /Applications/Xcode*.app || true
+          XCODE_26=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)
+          if [ -n "$XCODE_26" ]; then
+            echo "Selecting Xcode 26+: $XCODE_26"
+            sudo xcode-select -s "$XCODE_26/Contents/Developer"
+          else
+            LATEST_XCODE=$(ls -d /Applications/Xcode*.app | grep -v -i beta | sort -V | tail -n 1)
+            if [ -z "$LATEST_XCODE" ]; then
+              LATEST_XCODE=$(ls -d /Applications/Xcode*.app | sort -V | tail -n 1)
+            fi
+            echo "Xcode 26+ image not yet preinstalled on this runner; selecting highest installed Xcode: $LATEST_XCODE"
+            sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+          fi
+          xcodebuild -version
+          xcodebuild -showsdks
 
       - name: Ensure XcodeGen is installed
         run: |
@@ -35,7 +59,13 @@ jobs:
         working-directory: ios
         run: xcodegen generate
 
-      - name: Build unsigned iOS Archive
+      - name: Resolve Swift Package dependencies (WebRTC)
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project ios/Kinnect.xcodeproj \
+            -scheme Kinnect
+
+      - name: Build unsigned Native iOS Archive
         run: |
           xcodebuild archive \
             -project ios/Kinnect.xcodeproj \
@@ -43,46 +73,138 @@ jobs:
             -configuration Release \
             -destination "generic/platform=iOS" \
             -archivePath build/Kinnect.xcarchive \
+            MARKETING_VERSION="${{ env.APP_VERSION }}" \
+            CURRENT_PROJECT_VERSION="${{ env.APP_BUILD }}" \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             AD_HOC_CODE_SIGNING_ALLOWED=YES
 
-      - name: Ad-hoc sign and package IPA for Sideloadly / AltStore
+      - name: Verify compiled Info.plist version and package Sideload IPA
         run: |
           mkdir -p build/Payload dist
           cp -R build/Kinnect.xcarchive/Products/Applications/Kinnect.app build/Payload/Kinnect.app
+
+          PLIST="build/Payload/Kinnect.app/Info.plist"
+          ACTUAL_VER=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST")
+          ACTUAL_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$PLIST")
+          echo "Compiled Info.plist CFBundleShortVersionString=$ACTUAL_VER CFBundleVersion=$ACTUAL_BUILD"
+
+          if [ "$ACTUAL_VER" != "${{ env.APP_VERSION }}" ] || [ "$ACTUAL_BUILD" != "${{ env.APP_BUILD }}" ]; then
+            echo "ERROR: Info.plist version mismatch! Expected ${{ env.APP_VERSION }} (${{ env.APP_BUILD }}), got $ACTUAL_VER ($ACTUAL_BUILD)"
+            exit 1
+          fi
+
           codesign --force --deep --sign - build/Payload/Kinnect.app
           cd build
-          zip -qry "../dist/Kinnect-1.2.12-ios.ipa" Payload
+          zip -qry "../dist/Kinnect-${{ env.APP_VERSION }}-ios.ipa" Payload
+          cp "../dist/Kinnect-${{ env.APP_VERSION }}-ios.ipa" "../dist/Kinnect-${{ env.APP_VERSION }}-sideload.ipa"
           cd ../dist
-          shasum -a 256 "Kinnect-1.2.12-ios.ipa" > "Kinnect-1.2.12-ios.ipa.sha256"
-          ls -lh "Kinnect-1.2.12-ios.ipa"
+          shasum -a 256 "Kinnect-${{ env.APP_VERSION }}-ios.ipa" > "Kinnect-${{ env.APP_VERSION }}-ios.ipa.sha256"
+          shasum -a 256 "Kinnect-${{ env.APP_VERSION }}-sideload.ipa" > "Kinnect-${{ env.APP_VERSION }}-sideload.ipa.sha256"
+          ls -lh
 
-      - name: Upload IPA to GitHub Actions Artifacts
+      - name: Upload Sideload IPA to GitHub Actions Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Kinnect-1.2.12-ios-ipa
+          name: Kinnect-${{ env.APP_VERSION }}-ios-ipa
           path: |
-            dist/Kinnect-1.2.12-ios.ipa
-            dist/Kinnect-1.2.12-ios.ipa.sha256
+            dist/Kinnect-${{ env.APP_VERSION }}-ios.ipa
+            dist/Kinnect-${{ env.APP_VERSION }}-ios.ipa.sha256
+            dist/Kinnect-${{ env.APP_VERSION }}-sideload.ipa
+            dist/Kinnect-${{ env.APP_VERSION }}-sideload.ipa.sha256
           if-no-files-found: error
 
-      - name: Publish downloadable IPA to GitHub Release (ios-v1.2.12)
+      - name: Publish downloadable Sideload IPA to GitHub Release (ios-v1.2.12)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="ios-v1.2.12"
+          TAG="ios-v${{ env.APP_VERSION }}"
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" \
-              "dist/Kinnect-1.2.12-ios.ipa" \
-              "dist/Kinnect-1.2.12-ios.ipa.sha256" \
+              "dist/Kinnect-${{ env.APP_VERSION }}-ios.ipa" \
+              "dist/Kinnect-${{ env.APP_VERSION }}-ios.ipa.sha256" \
+              "dist/Kinnect-${{ env.APP_VERSION }}-sideload.ipa" \
+              "dist/Kinnect-${{ env.APP_VERSION }}-sideload.ipa.sha256" \
               --clobber
           else
             gh release create "$TAG" \
-              "dist/Kinnect-1.2.12-ios.ipa" \
-              "dist/Kinnect-1.2.12-ios.ipa.sha256" \
-              --title "Kinnect iOS 1.2.12 (Build 118)" \
-              --notes "Gói cài đặt Kinnect iOS (.ipa) — Cài đặt lên iPhone/iPad từ Windows qua Sideloadly hoặc AltStore bằng Apple ID cá nhân miễn phí." \
+              "dist/Kinnect-${{ env.APP_VERSION }}-ios.ipa" \
+              "dist/Kinnect-${{ env.APP_VERSION }}-ios.ipa.sha256" \
+              "dist/Kinnect-${{ env.APP_VERSION }}-sideload.ipa" \
+              "dist/Kinnect-${{ env.APP_VERSION }}-sideload.ipa.sha256" \
+              --title "Kinnect Native iOS ${{ env.APP_VERSION }} (Build ${{ env.APP_BUILD }})" \
+              --notes "Bản Native SwiftUI/UIKit + WebRTC + CallKit/PushKit + StoreKit 2 (CFBundleShortVersionString=${{ env.APP_VERSION }}, CFBundleVersion=${{ env.APP_BUILD }})." \
               --prerelease
           fi
+
+  build-appstore:
+    name: Build Signed App Store IPA (When Apple Developer Cert Secrets Exist)
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_PROVISIONING_PROFILE_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - name: Check if Apple Developer Signing Secrets are configured
+        id: check_secrets
+        run: |
+          if [ -n "$APPLE_CERTIFICATE_P12_BASE64" ] && [ -n "$APPLE_PROVISIONING_PROFILE_BASE64" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            echo "signed_available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Skipping signed App Store build because Apple Developer secrets are not configured yet."
+            echo "signed_available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout repository
+        if: steps.check_secrets.outputs.signed_available == 'true'
+        uses: actions/checkout@v4
+
+      - name: Generate Xcode project
+        if: steps.check_secrets.outputs.signed_available == 'true'
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Import Apple Distribution Certificate & Provisioning Profile
+        if: steps.check_secrets.outputs.signed_available == 'true'
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          KEYCHAIN_PASS="$(uuidgen)"
+          security create-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN_PATH"
+
+          echo "$APPLE_CERTIFICATE_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/dist.p12"
+          security import "$RUNNER_TEMP/dist.p12" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          rm -f "$RUNNER_TEMP/dist.p12"
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "$APPLE_PROVISIONING_PROFILE_BASE64" | base64 --decode > "$HOME/Library/MobileDevice/Provisioning Profiles/kinnect_appstore.mobileprovision"
+
+      - name: Archive & Export Signed App Store IPA
+        if: steps.check_secrets.outputs.signed_available == 'true'
+        run: |
+          sed "s/REPLACE_WITH_APPLE_TEAM_ID/$APPLE_TEAM_ID/g" ios/ExportOptions-AppStore.plist > "$RUNNER_TEMP/ExportOptions.plist"
+          xcodebuild archive \
+            -project ios/Kinnect.xcodeproj \
+            -scheme Kinnect \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath build/Kinnect-AppStore.xcarchive \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Manual
+
+          xcodebuild -exportArchive \
+            -archivePath build/Kinnect-AppStore.xcarchive \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath dist/appstore
+
+      - name: Upload Signed App Store IPA Artifact
+        if: steps.check_secrets.outputs.signed_available == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kinnect-${{ env.APP_VERSION }}-appstore-ipa
+          path: dist/appstore/*.ipa
