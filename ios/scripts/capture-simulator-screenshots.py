@@ -318,7 +318,11 @@ def main():
         ("13f-iphone-ugc-report-sheet", "ugc-report", [], "Báo cáo nội dung vi phạm UGC (Apple Guideline 1.2)"),
         ("05e-iphone-forward-message", "forward-message", [], "Chuyển tiếp tin nhắn: Chọn người nhận hoặc nhóm trò chuyện"),
         ("13g-iphone-change-password", "change-password", [], "Cài đặt: Đổi mật khẩu tài khoản"),
-        ("13h-iphone-blocked-users", "blocked-users", [], "Cài đặt & Quyền riêng tư: Danh sách người dùng đã chặn")
+        ("13h-iphone-blocked-users", "blocked-users", [], "Cài đặt & Quyền riêng tư: Danh sách người dùng đã chặn"),
+        ("01b-iphone-auth-forgot-password", "auth-reset", [], "Quên mật khẩu: Khôi phục mật khẩu tài khoản (008)"),
+        ("13i-iphone-privacy-settings", "privacy-settings", [], "Cài đặt: Quyền riêng tư & Định vị (118)"),
+        ("13j-iphone-support", "support", [], "Trung tâm Hỗ trợ & Trợ giúp người dùng (124)"),
+        ("13k-iphone-change-password-light", "change-password", ["--ui-review-light"], "Cài đặt: Đổi mật khẩu tài khoản (Light)")
     ]
 
     for slug, screen_arg, extra, desc in iphone_screens:

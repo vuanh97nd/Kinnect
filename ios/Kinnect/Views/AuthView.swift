@@ -23,6 +23,10 @@ struct AuthView: View {
     @State private var errorMessage: String?
     @State private var infoMessage: String?
 
+    init(initialMode: AuthMode = .login) {
+        _mode = State(initialValue: initialMode)
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 22) {
@@ -235,6 +239,11 @@ struct AuthView: View {
                     acceptPrivacy = true
                 }
             )
+        }
+        .task {
+            if UIReviewFixture.activeScreen == "auth-reset" && identifier.isEmpty {
+                identifier = "minhanh@kinnect.vn"
+            }
         }
     }
 

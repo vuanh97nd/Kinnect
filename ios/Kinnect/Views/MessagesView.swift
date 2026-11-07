@@ -1191,7 +1191,9 @@ struct ForwardMessageSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Hủy") { dismiss() }
+                    KinnectIconButton(glyph: .xmark, label: "Đóng", tint: KinnectTheme.textSecondary) {
+                        dismiss()
+                    }
                 }
             }
             .task {

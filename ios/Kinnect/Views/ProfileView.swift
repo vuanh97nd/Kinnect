@@ -30,6 +30,8 @@ struct ProfileView: View {
     @State private var showSessionsSheet = false
     @State private var showPasswordSheet = false
     @State private var showBlocksSheet = false
+    @State private var showPrivacySheet = false
+    @State private var showSupportSheet = false
     @State private var showDeleteAccountSheet = false
 
     var body: some View {
@@ -179,6 +181,12 @@ struct ProfileView: View {
         .sheet(isPresented: $showBlocksSheet) {
             BlockedUsersSheet()
         }
+        .sheet(isPresented: $showPrivacySheet) {
+            PrivacySettingsSheet()
+        }
+        .sheet(isPresented: $showSupportSheet) {
+            SupportContactSheet()
+        }
         .sheet(isPresented: $showDeleteAccountSheet) {
             DeleteAccountConfirmationSheet()
         }
@@ -246,6 +254,12 @@ struct ProfileView: View {
                 }
                 actionRow(glyph: .block, title: "Danh sách người dùng đã chặn", color: .orange) {
                     showBlocksSheet = true
+                }
+                actionRow(glyph: .shield, title: "Cài đặt Quyền riêng tư", color: .purple) {
+                    showPrivacySheet = true
+                }
+                actionRow(glyph: .bell, title: "Trung tâm Hỗ trợ & Trợ giúp", color: .blue) {
+                    showSupportSheet = true
                 }
             }
             .kinnectCard()
@@ -1126,35 +1140,143 @@ struct ChangePasswordSheet: View {
 
     @State private var currentPassword = ""
     @State private var newPassword = ""
+    @State private var confirmPassword = ""
+    @State private var showCurrentPassword = false
+    @State private var showNewPassword = false
     @State private var isSubmitting = false
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Bảo mật mật khẩu") {
-                    SecureField("Mật khẩu hiện tại", text: $currentPassword)
-                    SecureField("Mật khẩu mới (tối thiểu 6 ký tự)", text: $newPassword)
+            ScrollView {
+                VStack(spacing: 20) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Bảo mật mật khẩu")
+                            .font(.headline)
+                            .foregroundColor(KinnectTheme.textPrimary)
+                        Text("Mật khẩu mới cần tối thiểu 6 ký tự. Sau khi đổi mật khẩu, phiên đăng nhập trên thiết bị hiện tại sẽ được duy trì và các thiết bị khác sẽ cần đăng nhập lại.")
+                            .font(.footnote)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                            .kinnectMultiline()
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 4)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Mật khẩu hiện tại")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(KinnectTheme.textSecondary)
+                        HStack {
+                            if showCurrentPassword {
+                                TextField("Nhập mật khẩu hiện tại", text: $currentPassword)
+                            } else {
+                                SecureField("Nhập mật khẩu hiện tại", text: $currentPassword)
+                            }
+                            KinnectIconButton(
+                                glyph: showCurrentPassword ? .eyeOff : .eye,
+                                label: showCurrentPassword ? "Ẩn" : "Hiện",
+                                tint: KinnectTheme.textSecondary
+                            ) {
+                                showCurrentPassword.toggle()
+                            }
+                        }
+                        .padding(12)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                        .foregroundColor(KinnectTheme.textPrimary)
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Mật khẩu mới")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(KinnectTheme.textSecondary)
+                        HStack {
+                            if showNewPassword {
+                                TextField("Tối thiểu 6 ký tự", text: $newPassword)
+                            } else {
+                                SecureField("Tối thiểu 6 ký tự", text: $newPassword)
+                            }
+                            KinnectIconButton(
+                                glyph: showNewPassword ? .eyeOff : .eye,
+                                label: showNewPassword ? "Ẩn" : "Hiện",
+                                tint: KinnectTheme.textSecondary
+                            ) {
+                                showNewPassword.toggle()
+                            }
+                        }
+                        .padding(12)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                        .foregroundColor(KinnectTheme.textPrimary)
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Xác nhận mật khẩu mới")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(KinnectTheme.textSecondary)
+                        SecureField("Nhập lại mật khẩu mới", text: $confirmPassword)
+                            .padding(12)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                            .foregroundColor(KinnectTheme.textPrimary)
+                    }
+
+                    if let err = errorMessage {
+                        Text(err)
+                            .font(.footnote.weight(.medium))
+                            .foregroundColor(KinnectTheme.danger)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    Button {
+                        Task { await updatePassword() }
+                    } label: {
+                        HStack(spacing: 8) {
+                            if isSubmitting {
+                                ProgressView().tint(.white)
+                            }
+                            Text("Cập nhật mật khẩu")
+                                .font(.headline)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .background(
+                            canSubmit
+                                ? KinnectTheme.primaryGradient
+                                : LinearGradient(colors: [Color.gray.opacity(0.3)], startPoint: .leading, endPoint: .trailing)
+                        )
+                        .foregroundColor(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                    .disabled(!canSubmit || isSubmitting)
+                    .padding(.top, 8)
                 }
+                .padding(20)
             }
-            .scrollContentBackground(.hidden)
             .background(KinnectTheme.background)
             .navigationTitle("Đổi mật khẩu")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Hủy") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Lưu") {
-                        Task { await updatePassword() }
+                    KinnectIconButton(glyph: .xmark, label: "Đóng", tint: KinnectTheme.textSecondary) {
+                        dismiss()
                     }
-                    .disabled(isSubmitting || newPassword.count < 6)
                 }
             }
         }
     }
 
+    private var canSubmit: Bool {
+        !currentPassword.isEmpty && newPassword.count >= 6 && (confirmPassword.isEmpty || confirmPassword == newPassword)
+    }
+
     private func updatePassword() async {
+        errorMessage = nil
+        guard newPassword == confirmPassword || confirmPassword.isEmpty else {
+            errorMessage = "Mật khẩu xác nhận không khớp."
+            return
+        }
+        if UIReviewFixture.activeScreen != nil {
+            appState.showToast("Đã đổi mật khẩu thành công.")
+            dismiss()
+            return
+        }
         isSubmitting = true
         defer { isSubmitting = false }
         do {
@@ -1169,6 +1291,7 @@ struct ChangePasswordSheet: View {
             appState.showToast("Đã đổi mật khẩu thành công.")
             dismiss()
         } catch {
+            errorMessage = error.localizedDescription
             appState.showToast(error.localizedDescription)
         }
     }
@@ -1212,7 +1335,9 @@ struct BlockedUsersSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Đóng") { dismiss() }
+                    KinnectIconButton(glyph: .xmark, label: "Đóng", tint: KinnectTheme.textSecondary) {
+                        dismiss()
+                    }
                 }
             }
             .task {
@@ -1362,6 +1487,314 @@ struct DeleteAccountConfirmationSheet: View {
             )
             dismiss()
             appState.clearSessionState()
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+}
+
+struct PrivacySettingsSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
+
+    @State private var hideDistance: Bool = false
+    @State private var friendOnlyMessages: Bool = false
+    @State private var followedDiscovery: Bool = true
+    @State private var discoveryRadiusKm: Double = 50.0
+    @State private var isSaving = false
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Quyền riêng tư & Định vị")
+                            .font(.headline)
+                            .foregroundColor(KinnectTheme.textPrimary)
+                        Text("Quản lý thông tin hiển thị với người dùng khác và mức độ khám phá tài khoản của bạn trên Kinnect.")
+                            .font(.footnote)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                            .kinnectMultiline()
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    VStack(spacing: 14) {
+                        Toggle(isOn: $hideDistance) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Ẩn khoảng cách chính xác")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(KinnectTheme.textPrimary)
+                                Text("Chỉ hiển thị thành phố/tỉnh, không hiển thị số km cụ thể.")
+                                    .font(.caption)
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                            }
+                        }
+                        .tint(KinnectTheme.accentBright)
+
+                        Divider().background(KinnectTheme.surfaceElevated)
+
+                        Toggle(isOn: $friendOnlyMessages) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Chỉ nhận tin nhắn từ bạn bè")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(KinnectTheme.textPrimary)
+                                Text("Người lạ cần gửi lời mời kết bạn trước khi nhắn tin trực tiếp.")
+                                    .font(.caption)
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                            }
+                        }
+                        .tint(KinnectTheme.accentBright)
+
+                        Divider().background(KinnectTheme.surfaceElevated)
+
+                        Toggle(isOn: $followedDiscovery) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Cho phép xuất hiện trong Khám phá")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(KinnectTheme.textPrimary)
+                                Text("Hiển thị hồ sơ của bạn trong danh sách tìm kiếm bạn mới.")
+                                    .font(.caption)
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                            }
+                        }
+                        .tint(KinnectTheme.accentBright)
+
+                        Divider().background(KinnectTheme.surfaceElevated)
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("Bán kính tìm kiếm quanh đây")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(KinnectTheme.textPrimary)
+                                Spacer()
+                                Text("\(Int(discoveryRadiusKm)) km")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(KinnectTheme.accentBright)
+                            }
+                            Slider(value: $discoveryRadiusKm, in: 5...200, step: 5)
+                                .tint(KinnectTheme.accentBright)
+                        }
+                    }
+                    .padding(16)
+                    .background(RoundedRectangle(cornerRadius: 16).fill(KinnectTheme.surface))
+
+                    Button {
+                        Task { await saveSettings() }
+                    } label: {
+                        HStack(spacing: 8) {
+                            if isSaving {
+                                ProgressView().tint(.white)
+                            }
+                            Text("Lưu cài đặt")
+                                .font(.headline)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .background(KinnectTheme.primaryGradient)
+                        .foregroundColor(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                    .disabled(isSaving)
+                    .padding(.top, 4)
+                }
+                .padding(20)
+            }
+            .background(KinnectTheme.background)
+            .navigationTitle("Quyền riêng tư")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    KinnectIconButton(glyph: .xmark, label: "Đóng", tint: KinnectTheme.textSecondary) {
+                        dismiss()
+                    }
+                }
+            }
+            .task {
+                await loadSettings()
+            }
+        }
+    }
+
+    private func loadSettings() async {
+        if UIReviewFixture.activeScreen != nil {
+            self.hideDistance = false
+            self.friendOnlyMessages = false
+            self.followedDiscovery = true
+            self.discoveryRadiusKm = 50.0
+            return
+        }
+        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/me/privacy") {
+            self.hideDistance = (res["hideDistance"] as? Bool) ?? false
+            self.friendOnlyMessages = (res["friendOnlyMessages"] as? Bool) ?? false
+            self.followedDiscovery = (res["followedDiscovery"] as? Bool) ?? true
+            self.discoveryRadiusKm = (res["discoveryRadius"] as? Double) ?? 50.0
+        }
+    }
+
+    private func saveSettings() async {
+        if UIReviewFixture.activeScreen != nil {
+            appState.showToast("Đã cập nhật quyền riêng tư.")
+            dismiss()
+            return
+        }
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/me/privacy",
+                method: "POST",
+                body: [
+                    "hideDistance": hideDistance,
+                    "friendOnlyMessages": friendOnlyMessages,
+                    "followedDiscovery": followedDiscovery,
+                    "discoveryRadius": discoveryRadiusKm
+                ]
+            )
+            appState.showToast("Đã cập nhật quyền riêng tư.")
+            dismiss()
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+}
+
+struct SupportContactSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
+
+    @State private var contactText = ""
+    @State private var noteText = ""
+    @State private var isSubmitting = false
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Trung tâm Hỗ trợ & Trợ giúp")
+                            .font(.headline)
+                            .foregroundColor(KinnectTheme.textPrimary)
+                        Text("Gửi phản hồi, báo cáo sự cố hoặc yêu cầu trợ giúp kỹ thuật từ đội ngũ phát triển Kinnect.")
+                            .font(.footnote)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                            .kinnectMultiline()
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Thông tin liên hệ (Email hoặc SĐT)")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(KinnectTheme.textSecondary)
+                        TextField("nhap@email.com hoặc 09xxxxxxxx", text: $contactText)
+                            .padding(12)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                            .foregroundColor(KinnectTheme.textPrimary)
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Mô tả yêu cầu / Báo cáo sự cố")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(KinnectTheme.textSecondary)
+                        TextEditor(text: $noteText)
+                            .frame(minHeight: 120)
+                            .padding(8)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                            .foregroundColor(KinnectTheme.textPrimary)
+                            .scrollContentBackground(.hidden)
+                    }
+
+                    Button {
+                        Task { await submitSupport() }
+                    } label: {
+                        HStack(spacing: 8) {
+                            if isSubmitting {
+                                ProgressView().tint(.white)
+                            }
+                            Text("Gửi yêu cầu hỗ trợ")
+                                .font(.headline)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .background(canSubmit ? KinnectTheme.primaryGradient : LinearGradient(colors: [Color.gray.opacity(0.3)], startPoint: .leading, endPoint: .trailing))
+                        .foregroundColor(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                    .disabled(!canSubmit || isSubmitting)
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Thông tin hữu ích")
+                            .font(.caption.bold())
+                            .foregroundColor(KinnectTheme.textSecondary)
+                        Link(destination: URL(string: "https://kinnect.io.vn/privacy")!) {
+                            HStack {
+                                Text("Chính sách quyền riêng tư")
+                                    .font(.subheadline)
+                                    .foregroundColor(KinnectTheme.accentBright)
+                                Spacer()
+                                Image(systemName: "arrow.up.right")
+                                    .font(.caption)
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                            }
+                        }
+                        Link(destination: URL(string: "https://kinnect.io.vn/community")!) {
+                            HStack {
+                                Text("Quy tắc cộng đồng")
+                                    .font(.subheadline)
+                                    .foregroundColor(KinnectTheme.accentBright)
+                                Spacer()
+                                Image(systemName: "arrow.up.right")
+                                    .font(.caption)
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                            }
+                        }
+                    }
+                    .padding(16)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surface))
+                    .padding(.top, 10)
+                }
+                .padding(20)
+            }
+            .background(KinnectTheme.background)
+            .navigationTitle("Hỗ trợ")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    KinnectIconButton(glyph: .xmark, label: "Đóng", tint: KinnectTheme.textSecondary) {
+                        dismiss()
+                    }
+                }
+            }
+            .task {
+                if UIReviewFixture.activeScreen != nil {
+                    contactText = "minhanh@kinnect.vn"
+                    noteText = "Cần hỗ trợ hướng dẫn kích hoạt gói Studio Pro trên thiết bị mới."
+                }
+            }
+        }
+    }
+
+    private var canSubmit: Bool {
+        !contactText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func submitSupport() async {
+        if UIReviewFixture.activeScreen != nil {
+            appState.showToast("Đã gửi yêu cầu hỗ trợ thành công.")
+            dismiss()
+            return
+        }
+        isSubmitting = true
+        defer { isSubmitting = false }
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/support/request",
+                method: "POST",
+                body: [
+                    "contact": contactText,
+                    "note": noteText
+                ]
+            )
+            appState.showToast("Đã gửi yêu cầu hỗ trợ thành công.")
+            dismiss()
         } catch {
             appState.showToast(error.localizedDescription)
         }

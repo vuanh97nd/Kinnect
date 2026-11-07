@@ -55,6 +55,8 @@ struct RootMainView: View {
 
             if UIReviewFixture.activeScreen == "auth" {
                 AuthView()
+            } else if UIReviewFixture.activeScreen == "auth-reset" || UIReviewFixture.activeScreen == "forgot-password" {
+                AuthView(initialMode: .reset)
             } else if appState.isRestoringSession && appState.currentUser == nil {
                 VStack(spacing: 16) {
                     ProgressView()
@@ -150,6 +152,10 @@ struct RootMainView: View {
                 ChangePasswordSheet()
             } else if UIReviewFixture.activeScreen == "blocked-users" {
                 BlockedUsersSheet()
+            } else if UIReviewFixture.activeScreen == "privacy-settings" {
+                PrivacySettingsSheet()
+            } else if UIReviewFixture.activeScreen == "support" {
+                SupportContactSheet()
             } else {
                 authenticatedLayout
             }

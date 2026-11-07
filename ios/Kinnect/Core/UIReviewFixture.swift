@@ -78,7 +78,7 @@ enum UIReviewFixture {
 
         switch cleanPath {
         case "/api/me":
-            if activeScreen == "auth" {
+            if activeScreen == "auth" || activeScreen == "auth-reset" || activeScreen == "forgot-password" {
                 return [:]
             }
             return ["user": currentUserDict]
