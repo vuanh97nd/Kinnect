@@ -1,18 +1,18 @@
 {
   "id": "req-ios-layout-every-page-20261107",
   "status": "HONEST_GRANULAR_RECLASSIFICATION_APPLIED",
-  "completedAt": "2026-11-07T11:43:38.228Z",
-  "commitSha": "e39a73e",
+  "completedAt": "2026-11-07T11:51:28.852Z",
+  "commitSha": "20aae20",
   "branches": [
     "release/ios-1.2.12",
     "main"
   ],
-  "ciRunUrl": "https://github.com/vuanh97nd/Kinnect/actions/runs/42363346082",
+  "ciRunUrl": "https://github.com/vuanh97nd/Kinnect/actions/runs/42354897596",
   "summary": {
     "totalScreens": 126,
-    "matchedScreens": 48,
-    "designAdaptations": 5,
-    "pendingSubstateVerification": 73
+    "matchedScreens": 28,
+    "designAdaptations": 6,
+    "pendingSubstateVerification": 92
   },
   "rulesApplied": [
     "Android 1.2.12 build 118 real emulator APK reference used for all baseline controls",
@@ -116,11 +116,11 @@
       "id": "010",
       "group": "02 Tài khoản",
       "screen": "Điều khoản và quyền riêng tư",
-      "visualStatus": "MATCH",
+      "visualStatus": "PENDING_SUBSTATE_VERIFICATION",
       "androidImage": null,
-      "iosImage": "dist/ios-ui-review/13b-iphone-privacy-consent-dark.png",
-      "notes": "Bảng chấp thuận điều khoản và quyền riêng tư (PrivacyConsentSheet) hiển thị đầy đủ phiên bản 2026.11, nội dung bảo mật dữ liệu, nút Đồng ý và Từ chối/Đóng, hỗ trợ cả Dark và Light mode.",
-      "verifiedCommit": "e39a73e"
+      "iosImage": null,
+      "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
+      "verifiedCommit": "a509b97"
     },
     {
       "id": "011",
@@ -389,7 +389,7 @@
       "visualStatus": "MATCH",
       "androidImage": "dist/android-real-captures-b118/07-profile-screen-real-b118.png",
       "iosImage": "dist/ios-ui-review-20aae20/06b-iphone-profile-posts.png",
-      "notes": "Tab bài viết cá nhân trên hồ sơ người dùng hiển thị danh sách bài viết thực tế.",
+      "notes": "Tab Bài viết: Danh sách bài viết cá nhân",
       "verifiedCommit": "20aae20"
     },
     {
@@ -409,28 +409,28 @@
       "visualStatus": "MATCH",
       "androidImage": "dist/android-real-captures-b118/07-profile-screen-real-b118.png",
       "iosImage": "dist/ios-ui-review-20aae20/06c-iphone-profile-albums.png",
-      "notes": "Tab Album công khai hiển thị lưới album ảnh người dùng.",
+      "notes": "Tab Video: Lưới video ngắn cá nhân",
       "verifiedCommit": "20aae20"
     },
     {
       "id": "040",
       "group": "06 Hồ sơ",
       "screen": "Album riêng và xin quyền",
-      "visualStatus": "MATCH",
+      "visualStatus": "PENDING_SUBSTATE_VERIFICATION",
       "androidImage": null,
-      "iosImage": "dist/ios-ui-review/06c-iphone-profile-albums.png",
-      "notes": "Tab Album ảnh trong hồ sơ cá nhân hiển thị cả Album công khai và Album riêng tư; PublicAlbumManageSheet (06h) hỗ trợ đăng ảnh công khai mới từ thư viện ảnh native.",
-      "verifiedCommit": "e39a73e"
+      "iosImage": null,
+      "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
+      "verifiedCommit": "a509b97"
     },
     {
       "id": "041",
       "group": "06 Hồ sơ",
       "screen": "Video cá nhân",
-      "visualStatus": "MATCH",
+      "visualStatus": "PENDING_SUBSTATE_VERIFICATION",
       "androidImage": null,
-      "iosImage": "dist/ios-ui-review/06f-iphone-profile-private-album.png",
-      "notes": "PrivateAlbumManageSheet hiển thị số ảnh riêng tư (24 ảnh tối đa), nút tải ảnh riêng tư mới (<4MB), danh sách yêu cầu quyền truy cập với 2 nút Cấp quyền / Từ chối (pending) và nút Thu hồi (granted), danh sách ảnh kèm nút Xóa riêng tư.",
-      "verifiedCommit": "e39a73e"
+      "iosImage": null,
+      "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
+      "verifiedCommit": "a509b97"
     },
     {
       "id": "042",
@@ -459,7 +459,7 @@
       "visualStatus": "MATCH",
       "androidImage": null,
       "iosImage": "dist/ios-ui-review-20aae20/06e-iphone-profile-edit.png",
-      "notes": "Sheet Chỉnh sửa hồ sơ cá nhân: đổi avatar, họ tên, tiểu sử và thông tin liên hệ.",
+      "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "20aae20"
     },
     {
@@ -496,31 +496,31 @@
       "id": "048",
       "group": "07 Bạn bè",
       "screen": "Lời mời đến",
-      "visualStatus": "MATCH",
+      "visualStatus": "PENDING_SUBSTATE_VERIFICATION",
       "androidImage": null,
-      "iosImage": "dist/ios-ui-review/07b-iphone-friends-requests.png",
-      "notes": "Mục Lời mời trong FriendsView hiển thị danh sách Lời mời kết bạn đến với nút Đồng ý và Từ chối.",
-      "verifiedCommit": "e39a73e"
+      "iosImage": null,
+      "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
+      "verifiedCommit": "a509b97"
     },
     {
       "id": "049",
       "group": "07 Bạn bè",
       "screen": "Lời mời đã gửi",
-      "visualStatus": "MATCH",
+      "visualStatus": "PENDING_SUBSTATE_VERIFICATION",
       "androidImage": null,
-      "iosImage": "dist/ios-ui-review/07b-iphone-friends-requests.png",
-      "notes": "Mục Lời mời trong FriendsView hiển thị danh sách Lời mời đã gửi kèm nút Hủy lời mời.",
-      "verifiedCommit": "e39a73e"
+      "iosImage": null,
+      "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
+      "verifiedCommit": "a509b97"
     },
     {
       "id": "050",
       "group": "07 Bạn bè",
       "screen": "Gợi ý",
-      "visualStatus": "MATCH",
+      "visualStatus": "PENDING_SUBSTATE_VERIFICATION",
       "androidImage": null,
-      "iosImage": "dist/ios-ui-review/07c-iphone-friends-suggestions.png",
-      "notes": "Mục Gợi ý trong FriendsView hiển thị danh sách bạn bè tiềm năng kèm khoảng cách km, bio và nút Kết bạn dạng capsule.",
-      "verifiedCommit": "e39a73e"
+      "iosImage": null,
+      "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
+      "verifiedCommit": "a509b97"
     },
     {
       "id": "051",
@@ -576,31 +576,31 @@
       "id": "056",
       "group": "08 Tin nhắn",
       "screen": "Thông tin/đổi ảnh/đổi tên nhóm",
-      "visualStatus": "MATCH",
+      "visualStatus": "PENDING_SUBSTATE_VERIFICATION",
       "androidImage": null,
-      "iosImage": "dist/ios-ui-review/05b-iphone-group-chat-dark.png",
-      "notes": "Màn hình chi tiết chat nhóm hiển thị tên nhóm trên navigation bar, menu 3 chấm góc phải mở sheet Đổi tên nhóm và Thêm thành viên.",
-      "verifiedCommit": "e39a73e"
+      "iosImage": null,
+      "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
+      "verifiedCommit": "a509b97"
     },
     {
       "id": "057",
       "group": "08 Tin nhắn",
       "screen": "Thành viên và phân quyền",
-      "visualStatus": "MATCH",
+      "visualStatus": "PENDING_SUBSTATE_VERIFICATION",
       "androidImage": null,
-      "iosImage": "dist/ios-ui-review/05b-iphone-group-chat-dark.png",
-      "notes": "GroupChatDetailView và AddGroupMembersSheet hỗ trợ xem và thêm thành viên vào nhóm.",
-      "verifiedCommit": "e39a73e"
+      "iosImage": null,
+      "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
+      "verifiedCommit": "a509b97"
     },
     {
       "id": "058",
       "group": "08 Tin nhắn",
       "screen": "Menu hội thoại/ghim/tắt thông báo",
-      "visualStatus": "MATCH",
+      "visualStatus": "PENDING_SUBSTATE_VERIFICATION",
       "androidImage": null,
-      "iosImage": "dist/ios-ui-review/05-iphone-chat-detail-dark.png",
-      "notes": "Thanh công cụ chat riêng có menu 3 chấm góc phải với các tùy chọn Ghim hội thoại, Tắt thông báo, Báo cáo và Chặn người dùng.",
-      "verifiedCommit": "e39a73e"
+      "iosImage": null,
+      "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
+      "verifiedCommit": "a509b97"
     },
     {
       "id": "059",
@@ -626,11 +626,11 @@
       "id": "061",
       "group": "08 Tin nhắn",
       "screen": "Menu sửa/thu hồi/xóa",
-      "visualStatus": "MATCH",
+      "visualStatus": "PENDING_SUBSTATE_VERIFICATION",
       "androidImage": null,
-      "iosImage": "dist/ios-ui-review/05-iphone-chat-detail-dark.png",
-      "notes": "Hàng dưới của bong bóng tin nhắn có menu 3 chấm mở menu Sửa tin nhắn (tin của mình), Chuyển tiếp tin nhắn, và Thu hồi / Xóa tin nhắn.",
-      "verifiedCommit": "e39a73e"
+      "iosImage": null,
+      "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
+      "verifiedCommit": "a509b97"
     },
     {
       "id": "062",
@@ -656,11 +656,11 @@
       "id": "064",
       "group": "08 Tin nhắn",
       "screen": "Trạng thái gửi/đã xem",
-      "visualStatus": "MATCH",
+      "visualStatus": "PENDING_SUBSTATE_VERIFICATION",
       "androidImage": null,
-      "iosImage": "dist/ios-ui-review/05-iphone-chat-detail-dark.png",
-      "notes": "Hàng dưới tin nhắn hiển thị giờ gửi, icon trạng thái gửi (đang gửi / đã gửi), và icon seen (2 dấu tích xanh hoặc nhãn đã xem).",
-      "verifiedCommit": "e39a73e"
+      "iosImage": null,
+      "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
+      "verifiedCommit": "a509b97"
     },
     {
       "id": "065",
@@ -706,11 +706,11 @@
       "id": "069",
       "group": "10 Camera và Studio",
       "screen": "Chế độ ảnh/video/live",
-      "visualStatus": "MATCH",
+      "visualStatus": "DESIGN_ADAPTATION",
       "androidImage": "dist/android-real-captures-b118/09-create-studio-real-b118.png",
-      "iosImage": "dist/ios-ui-review/11b-iphone-camera-studio-video.png",
-      "notes": "CameraStudioView hỗ trợ chuyển đổi giữa chế độ ẢNH (shutter tròn trắng) và VIDEO (shutter tròn đỏ), Android 1.2.12 build 118 parity.",
-      "verifiedCommit": "e39a73e"
+      "iosImage": "dist/ios-ui-review-20aae20/11-iphone-camera-studio-empty.png",
+      "notes": "Bảng chỉnh sửa Studio: Studio Pro góc phải, nút Lưu riêng ghi vào Camera Roll, nút Thoát",
+      "verifiedCommit": "20aae20"
     },
     {
       "id": "070",
@@ -726,11 +726,11 @@
       "id": "071",
       "group": "10 Camera và Studio",
       "screen": "Thư viện video",
-      "visualStatus": "MATCH",
+      "visualStatus": "PENDING_SUBSTATE_VERIFICATION",
       "androidImage": null,
-      "iosImage": "dist/ios-ui-review/11b-iphone-camera-studio-video.png",
-      "notes": "Nút Thư viện (PhotosPicker) hỗ trợ chọn cả ảnh và video từ Photos library.",
-      "verifiedCommit": "e39a73e"
+      "iosImage": null,
+      "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
+      "verifiedCommit": "a509b97"
     },
     {
       "id": "072",
@@ -738,9 +738,9 @@
       "screen": "Preview sau chụp/chọn ảnh",
       "visualStatus": "MATCH",
       "androidImage": null,
-      "iosImage": "dist/ios-ui-review/12-iphone-camera-studio-edit.png",
-      "notes": "Sau khi chụp hoặc chọn ảnh, màn hình chuyển sang chế độ chỉnh sửa media với ảnh preview lớn, nút Studio Pro góc phải, caption, và nút Lưu tách riêng.",
-      "verifiedCommit": "e39a73e"
+      "iosImage": "dist/ios-ui-review-20aae20/12-iphone-camera-studio-edit.png",
+      "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
+      "verifiedCommit": "20aae20"
     },
     {
       "id": "073",
@@ -756,21 +756,21 @@
       "id": "074",
       "group": "10 Camera và Studio",
       "screen": "Studio Pro góc phải",
-      "visualStatus": "MATCH",
+      "visualStatus": "PENDING_SUBSTATE_VERIFICATION",
       "androidImage": null,
-      "iosImage": "dist/ios-ui-review/12b-iphone-studio-pro-sheet.png",
-      "notes": "Nút Studio Pro dạng pill màu tím gradient mở sheet StudioProSheet chứa danh sách bộ lọc chuyên nghiệp (Kinnect Vivid, Cinematic Teal & Orange, Mịn da tự nhiên, Noir Cổ điển).",
-      "verifiedCommit": "e39a73e"
+      "iosImage": null,
+      "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
+      "verifiedCommit": "a509b97"
     },
     {
       "id": "075",
       "group": "10 Camera và Studio",
       "screen": "Công cụ chỉnh ảnh",
-      "visualStatus": "MATCH",
+      "visualStatus": "PENDING_SUBSTATE_VERIFICATION",
       "androidImage": null,
-      "iosImage": "dist/ios-ui-review/12b-iphone-studio-pro-sheet.png",
-      "notes": "StudioProSheet tích hợp Core Image CIFilter native áp dụng hiệu ứng trực tiếp lên ảnh xem trước.",
-      "verifiedCommit": "e39a73e"
+      "iosImage": null,
+      "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
+      "verifiedCommit": "a509b97"
     },
     {
       "id": "076",
@@ -788,9 +788,9 @@
       "screen": "Lưu/xuất/thoát không chồng chữ",
       "visualStatus": "MATCH",
       "androidImage": null,
-      "iosImage": "dist/ios-ui-review/12-iphone-camera-studio-edit.png",
-      "notes": "Nút Lưu vào thiết bị được tách thành nút riêng biệt, không chồng lấp nút Đăng bài hay nút Đóng.",
-      "verifiedCommit": "e39a73e"
+      "iosImage": "dist/ios-ui-review-20aae20/12-iphone-camera-studio-edit.png",
+      "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
+      "verifiedCommit": "20aae20"
     },
     {
       "id": "078",
@@ -1076,11 +1076,11 @@
       "id": "106",
       "group": "14 Ví và Cửa hàng",
       "screen": "Nạp xu/mệnh giá",
-      "visualStatus": "MATCH",
+      "visualStatus": "PENDING_SUBSTATE_VERIFICATION",
       "androidImage": null,
-      "iosImage": "dist/ios-ui-review/09-iphone-wallet-store-dark.png",
-      "notes": "WalletStoreView hiển thị danh sách các gói nạp xu StoreKit 2 (1.000 xu = 22.000đ) kèm nút Mua và nút Khôi phục gói mua.",
-      "verifiedCommit": "e39a73e"
+      "iosImage": null,
+      "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
+      "verifiedCommit": "a509b97"
     },
     {
       "id": "107",
@@ -1106,21 +1106,21 @@
       "id": "109",
       "group": "14 Ví và Cửa hàng",
       "screen": "Cửa hàng Phong cách",
-      "visualStatus": "MATCH",
+      "visualStatus": "PENDING_SUBSTATE_VERIFICATION",
       "androidImage": null,
-      "iosImage": "dist/ios-ui-review/09-iphone-wallet-store-dark.png",
-      "notes": "Mục Cửa hàng trong WalletStoreView hiển thị các gói vật phẩm Phong cách (khung avatar, huy hiệu) kèm giá xu.",
-      "verifiedCommit": "e39a73e"
+      "iosImage": null,
+      "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
+      "verifiedCommit": "a509b97"
     },
     {
       "id": "110",
       "group": "14 Ví và Cửa hàng",
       "screen": "Cửa hàng Studio",
-      "visualStatus": "MATCH",
+      "visualStatus": "PENDING_SUBSTATE_VERIFICATION",
       "androidImage": null,
-      "iosImage": "dist/ios-ui-review/09-iphone-wallet-store-dark.png",
-      "notes": "Các gói Studio Pro và hiệu ứng được quản lý và mở khóa thông qua cửa hàng vật phẩm Kinnect.",
-      "verifiedCommit": "e39a73e"
+      "iosImage": null,
+      "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
+      "verifiedCommit": "a509b97"
     },
     {
       "id": "111",
@@ -1229,28 +1229,28 @@
       "visualStatus": "MATCH",
       "androidImage": null,
       "iosImage": "dist/ios-ui-review-20aae20/06g-iphone-profile-sessions.png",
-      "notes": "Sheet Phiên đăng nhập: hiển thị thiết bị hiện tại (active) và danh sách phiên từ xa kèm nút Đăng xuất.",
+      "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "20aae20"
     },
     {
       "id": "122",
       "group": "15 Cài đặt và quản trị",
       "screen": "Xóa tài khoản",
-      "visualStatus": "MATCH",
+      "visualStatus": "PENDING_SUBSTATE_VERIFICATION",
       "androidImage": null,
-      "iosImage": "dist/ios-ui-review/13d-iphone-delete-account-dark.png",
-      "notes": "DeleteAccountConfirmationSheet hiển thị cảnh báo đỏ không thể đảo ngược, yêu cầu nhập chính xác username, yêu cầu nhập mật khẩu xác nhận (hoặc cảnh báo đăng nhập gần đây), và nút Xóa vĩnh viễn tài khoản; hỗ trợ Dark/Light mode.",
-      "verifiedCommit": "e39a73e"
+      "iosImage": null,
+      "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
+      "verifiedCommit": "a509b97"
     },
     {
       "id": "123",
       "group": "15 Cài đặt và quản trị",
       "screen": "Báo cáo nội dung",
-      "visualStatus": "MATCH",
+      "visualStatus": "PENDING_SUBSTATE_VERIFICATION",
       "androidImage": null,
-      "iosImage": "dist/ios-ui-review/13f-iphone-ugc-report-sheet.png",
-      "notes": "UGCReportSheet hiển thị 6 lý do vi phạm chuẩn Apple Guideline 1.2, ô nhập chi tiết, tùy chọn Chặn người dùng, và nút Gửi báo cáo.",
-      "verifiedCommit": "e39a73e"
+      "iosImage": null,
+      "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
+      "verifiedCommit": "a509b97"
     },
     {
       "id": "124",
@@ -1282,6 +1282,5 @@
       "notes": "Trạng thái con / kịch bản biên cần chụp ảnh màn hình riêng biệt theo từng state cụ thể, không ghép chung ảnh màn hình cha.",
       "verifiedCommit": "a509b97"
     }
-  ],
-  "ciRunId": "42363346082"
+  ]
 }

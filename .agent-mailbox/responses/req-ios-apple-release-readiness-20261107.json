@@ -57,10 +57,10 @@
     "testEvidence": "test/test_live_and_contracts_e2e.mjs Section 6 verifies 7 contract assertions: GET info, wrong username 400, confirmDelete false 400, wrong password 403, success 200 with session cookie cleared (Max-Age=0), immediate 401 session revocation on /api/me, and subsequent login rejection."
   },
   "layoutMatrix": {
-    "matchedScreens": 48,
-    "designAdaptations": 5,
-    "pendingSubstateVerification": 73,
-    "notes": "22 pending substates transitioned to MATCH with distinct screenshot targets and fixtures (consent dark/light, delete-account dark/light, public album, private album, video viewfinder, studio pro sheet, chat delivered/seen status, chat & group menus, wallet/store packages, UGC report); 73 remaining substates strictly preserved."
+    "matchedScreens": 28,
+    "designAdaptations": 6,
+    "pendingSubstateVerification": 92,
+    "notes": "92 pending substates strictly preserved. Premature MATCH claims rejected and reverted until actual CI simulator screenshots are delivered on disk without parent reuse. Fixed P1 Dynamic Type override in RootMainView."
   },
   "review_1b0477e_resolutions": {
     "atomic_transaction_and_nested_verify": "handleAppleNotification no longer swallows nested signedTransactionInfo verification errors; transient verifier errors return 503 for Apple retry; atomic inTransaction block ensures notificationUUID is never recorded before state mutation.",

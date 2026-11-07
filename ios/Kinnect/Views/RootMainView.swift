@@ -67,7 +67,7 @@ struct RootMainView: View {
                 }
             } else if appState.currentUser == nil {
                 AuthView()
-            } else if UIReviewFixture.activeScreen == "chat-detail" {
+            } else if UIReviewFixture.activeScreen == "chat-detail" || UIReviewFixture.activeScreen == "chat-menu" || UIReviewFixture.activeScreen == "message-menu" {
                 if horizontalSizeClass == .regular {
                     // iPad two-column layout: Conversation List on left + Chat Detail on right
                     VStack(spacing: 0) {
@@ -90,7 +90,7 @@ struct RootMainView: View {
                         DirectChatDetailView(peer: KinnectUser.from(UIReviewFixture.peerUserDict))
                     }
                 }
-            } else if UIReviewFixture.activeScreen == "camera-studio" || UIReviewFixture.activeScreen == "camera-studio-edit" {
+            } else if UIReviewFixture.activeScreen == "camera-studio" || UIReviewFixture.activeScreen == "camera-studio-edit" || UIReviewFixture.activeScreen == "camera-studio-video-edit" {
                 NavigationStack {
                     CameraStudioView()
                 }
@@ -178,7 +178,7 @@ struct RootMainView: View {
             }
         }
         .preferredColorScheme(UIReviewFixture.forceLightMode ? .light : .dark)
-        .dynamicTypeSize(UIReviewFixture.forceMaxDynamicType ? .accessibility3 : (UIReviewFixture.isEnabled ? .large : .medium))
+        .modifier(UIReviewDynamicTypeModifier())
         .task {
             await appState.bootstrapSession()
             if let screen = UIReviewFixture.activeScreen {
@@ -203,7 +203,8 @@ struct RootMainView: View {
                     activeTopSection = .friends
                 case "notifications":
                     activeTopSection = .notifications
-                case "wallet":
+                case "wallet", "wallet-topup", "wallet-packages":
+                    activeTopSection = .wallet
                     activeTopSection = .wallet
                 default:
                     break
@@ -780,6 +781,18 @@ struct UGCReportSheet: View {
             dismiss()
         } catch {
             appState.showToast(error.localizedDescription)
+        }
+    }
+}
+
+private struct UIReviewDynamicTypeModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if UIReviewFixture.forceMaxDynamicType {
+            content.dynamicTypeSize(.accessibility5)
+        } else if UIReviewFixture.isEnabled {
+            content.dynamicTypeSize(.large)
+        } else {
+            content
         }
     }
 }

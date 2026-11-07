@@ -245,6 +245,8 @@ struct DirectChatDetailView: View {
     @State private var showForwardSheet = false
     @State private var isPinned = false
     @State private var isMuted = false
+    @State private var showReviewChatMenu = (UIReviewFixture.activeScreen == "chat-menu")
+    @State private var showReviewMessageMenu = (UIReviewFixture.activeScreen == "message-menu")
 
     var body: some View {
         VStack(spacing: 0) {
@@ -459,6 +461,19 @@ struct DirectChatDetailView: View {
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showForwardSheet) {
             ForwardMessageSheet(text: forwardText, imageUrl: forwardImageUrl)
+        }
+        .confirmationDialog("Tùy chọn hội thoại", isPresented: $showReviewChatMenu, titleVisibility: .visible) {
+            Button(isPinned ? "Bỏ ghim hội thoại" : "Ghim hội thoại") {}
+            Button(isMuted ? "Bật thông báo" : "Tắt thông báo") {}
+            Button("Báo cáo người dùng", role: .destructive) {}
+            Button("Chặn người dùng", role: .destructive) {}
+            Button("Hủy", role: .cancel) {}
+        }
+        .confirmationDialog("Tùy chọn tin nhắn", isPresented: $showReviewMessageMenu, titleVisibility: .visible) {
+            Button("Sửa tin nhắn") {}
+            Button("Chuyển tiếp tin nhắn") {}
+            Button("Thu hồi / Xóa tin nhắn", role: .destructive) {}
+            Button("Hủy", role: .cancel) {}
         }
         .task {
             await loadMessages()

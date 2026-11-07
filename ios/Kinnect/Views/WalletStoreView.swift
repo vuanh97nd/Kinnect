@@ -320,6 +320,13 @@ struct WalletStoreView: View {
         .task {
             await loadWalletAndStore()
         }
+        .onAppear {
+            if UIReviewFixture.activeScreen == "wallet-topup" {
+                tab = .storeKit
+            } else if UIReviewFixture.activeScreen == "wallet-packages" {
+                tab = .packages
+            }
+        }
     }
 
     private func loadWalletAndStore() async {

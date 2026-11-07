@@ -83,6 +83,15 @@ struct CameraStudioView: View {
             if UIReviewFixture.activeScreen == "camera-studio-video" {
                 captureMode = .video
             }
+            if UIReviewFixture.activeScreen == "camera-studio-video-edit" && previewImage == nil {
+                let sample = UIReviewFixture.samplePreviewImage()
+                originalImage = sample
+                previewImage = sample
+                target = .shortVideo
+                videoDataURL = "data:video/mp4;base64,AAAA"
+                title = "[Fixture UI] Video ngắn kiểm thử"
+                caption = "Video ngắn quay bằng Kinnect Camera Studio với điều khiển xuất bản."
+            }
             if UIReviewFixture.activeScreen == "camera-studio-edit" && previewImage == nil {
                 let sample = UIReviewFixture.samplePreviewImage()
                 originalImage = sample
