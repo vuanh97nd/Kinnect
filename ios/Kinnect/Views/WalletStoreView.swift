@@ -22,6 +22,7 @@ struct WalletStoreView: View {
     @State private var entries: [WalletEntryItem] = []
     @State private var packages: [StorePackageItem] = []
     @State private var digitalProducts: [StoreDigitalProduct] = []
+    @State private var accountUuid: UUID? = nil
     @State private var isLoading = false
 
     var body: some View {
@@ -342,6 +343,9 @@ struct WalletStoreView: View {
         }
 
         if let sRes = try? await sTask {
+            if let uuidStr = sRes["accountUuid"] as? String, let uuid = UUID(uuidString: uuidStr) {
+                self.accountUuid = uuid
+            }
             let rawPkgs = sRes["packages"] as? [[String: Any]] ?? []
             self.packages = rawPkgs.map(StorePackageItem.from)
             let rawProds = sRes["products"] as? [[String: Any]] ?? []
@@ -391,7 +395,7 @@ struct WalletStoreView: View {
 
     private func purchaseStoreKitProduct(_ prod: StoreDigitalProduct) async {
         do {
-            _ = try await storeKit.purchaseDigitalProduct(productId: prod.id)
+            _ = try await storeKit.purchaseDigitalProduct(productId: prod.id, accountUuid: self.accountUuid)
             appState.showToast("Xác minh giao dịch StoreKit thành công!")
             await loadWalletAndStore()
         } catch {

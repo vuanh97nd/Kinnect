@@ -72,8 +72,9 @@ final class StoreKitManager: ObservableObject {
     }
 
     /// Initiates a real StoreKit 2 purchase and verifies the signed transaction on the Kinnect server.
+    /// Binds deterministic appAccountToken UUID to ensure account ownership integrity.
     /// Never mocks or fabricates purchase success when StoreKit products are unavailable.
-    func purchaseDigitalProduct(productId: String) async throws -> [String: Any] {
+    func purchaseDigitalProduct(productId: String, accountUuid: UUID? = nil) async throws -> [String: Any] {
         if storeKitProducts[productId] == nil {
             await loadProducts(productIds: [productId])
         }
@@ -87,7 +88,12 @@ final class StoreKitManager: ObservableObject {
         isPurchasing = true
         defer { isPurchasing = false }
 
-        let purchaseResult = try await product.purchase()
+        var options: Set<Product.PurchaseOption> = []
+        if let accountUuid = accountUuid {
+            options.insert(.appAccountToken(accountUuid))
+        }
+
+        let purchaseResult = try await product.purchase(options: options)
         switch purchaseResult {
         case .success(let verificationResult):
             switch verificationResult {

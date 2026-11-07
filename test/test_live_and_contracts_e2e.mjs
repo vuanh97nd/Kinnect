@@ -5,6 +5,10 @@ import { join } from "node:path";
 import WebSocket from "ws";
 import { createApp } from "../server.js";
 import { SignedDataVerifier, Environment } from "@apple/app-store-server-library";
+import { storeAccountUuid } from "../lib/store.js";
+
+let simulatedTime = Date.now();
+const testClock = () => simulatedTime;
 
 const appleVerifier = {
   enabled: () => true,
@@ -13,6 +17,10 @@ const appleVerifier = {
   async verify(jws) {
     const v = new SignedDataVerifier([], false, Environment.LOCAL_TESTING, "app.kinnect.live");
     return await v.verifyAndDecodeTransaction(jws);
+  },
+  async verifyNotification(jws) {
+    const v = new SignedDataVerifier([], false, Environment.LOCAL_TESTING, "app.kinnect.live");
+    return await v.verifyAndDecodeNotification(jws);
   }
 };
 
@@ -21,6 +29,7 @@ const { server, social } = createApp({
   dbPath: ":memory:",
   allowEmailDelivery: false,
   appleStoreVerifier: appleVerifier,
+  clock: testClock,
   storeEnv: { PLAY_PURCHASE_TOKEN_KEY: "ab".repeat(32) }
 });
 const RUN = Date.now().toString(36).slice(-5);
@@ -273,24 +282,60 @@ assert.equal(viewPrivJson.status, "granted");
 assert.equal(viewPrivJson.photos.length, 1);
 console.log("   -> Verified Private Album upload, viewer request, owner grant, and authorized photo listing!");
 
-console.log("5. Testing Server-Side Apple StoreKit JWS Transaction Verification (7 paths)...");
+console.log("5. Testing Server-Side Apple StoreKit JWS Transaction Verification (11 paths)...");
 function makeAppleJWS(payload, header = { alg: "none", typ: "JWT" }) {
   const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
   return `${b64(header)}.${b64(payload)}.sig`;
 }
 
-// Path 1: Valid Apple StoreKit 2 transaction verification (kinnect_style_aurora) -> 200, state PURCHASED, owned
+// Path 1a: Missing appAccountToken -> 403 Forbidden
+const jwsNoToken = makeAppleJWS({
+  transactionId: "tx_apple_no_token",
+  bundleId: "app.kinnect.live",
+  productId: "kinnect_style_aurora",
+  purchaseDate: simulatedTime,
+  signedDate: simulatedTime,
+  environment: "LocalTesting"
+});
+const vResNoToken = await fetch(`${baseUrl}/api/store/verify`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json", Cookie: host1.cookie },
+  body: JSON.stringify({ productId: "kinnect_style_aurora", purchaseToken: jwsNoToken, platform: "ios" })
+});
+assert.equal(vResNoToken.status, 403);
+assert.match((await vResNoToken.json()).error, /thiếu thông tin ràng buộc appAccountToken/i);
+
+// Path 1b: Mismatched appAccountToken (bound to another account's UUID) -> 403 Forbidden
+const jwsMismatchToken = makeAppleJWS({
+  transactionId: "tx_apple_bad_token",
+  bundleId: "app.kinnect.live",
+  productId: "kinnect_style_aurora",
+  appAccountToken: "00000000-0000-4000-8000-000000000000",
+  purchaseDate: simulatedTime,
+  signedDate: simulatedTime,
+  environment: "LocalTesting"
+});
+const vResMismatchToken = await fetch(`${baseUrl}/api/store/verify`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json", Cookie: host1.cookie },
+  body: JSON.stringify({ productId: "kinnect_style_aurora", purchaseToken: jwsMismatchToken, platform: "ios" })
+});
+assert.equal(vResMismatchToken.status, 403);
+assert.match((await vResMismatchToken.json()).error, /appAccountToken không khớp/i);
+
+// Path 1c: Valid Apple StoreKit 2 transaction verification (kinnect_style_aurora) -> 200, state PURCHASED, owned
 const jwsValid = makeAppleJWS({
   transactionId: "tx_apple_1001",
   originalTransactionId: "tx_apple_1001",
   bundleId: "app.kinnect.live",
   productId: "kinnect_style_aurora",
-  purchaseDate: Date.now(),
-  originalPurchaseDate: Date.now(),
+  appAccountToken: storeAccountUuid(host1.user.id),
+  purchaseDate: simulatedTime,
+  originalPurchaseDate: simulatedTime,
   quantity: 1,
   type: "Non-Consumable",
   inAppOwnershipType: "PURCHASED",
-  signedDate: Date.now(),
+  signedDate: simulatedTime,
   environment: "LocalTesting"
 });
 const vRes1 = await fetch(`${baseUrl}/api/store/verify`, {
@@ -318,6 +363,17 @@ assert.equal(vJson2.idempotent, true);
 const purchaseRows = social.db.prepare("SELECT COUNT(*) AS c FROM store_purchases WHERE product_id=?").get("kinnect_style_aurora").c;
 assert.equal(purchaseRows, 1, "idempotent transaction must not duplicate database rows");
 
+// Path 2b: Passage of time (25 hours later) -> refresh() updates verified timestamp, maintains owned entitlement without duplicate grants
+simulatedTime += 25 * 3600 * 1000;
+const getStoreAfter25h = await fetch(`${baseUrl}/api/store`, {
+  headers: { Cookie: host1.cookie }
+});
+assert.equal(getStoreAfter25h.status, 200);
+const storeAfter25hJson = await getStoreAfter25h.json();
+assert.ok(storeAfter25hJson.owned.includes("kinnect_style_aurora"), "refresh() must maintain owned entitlement across 24h boundary");
+const purchaseRowsAfterTime = social.db.prepare("SELECT COUNT(*) AS c FROM store_purchases WHERE product_id=?").get("kinnect_style_aurora").c;
+assert.equal(purchaseRowsAfterTime, 1, "refresh after 25h must not create duplicate purchase rows");
+
 // Path 3: Stolen/Replay Apple transaction by another user -> 409 Conflict
 const vRes3 = await fetch(`${baseUrl}/api/store/verify`, {
   method: "POST",
@@ -332,8 +388,9 @@ const jwsMismatchProduct = makeAppleJWS({
   transactionId: "tx_apple_1002",
   bundleId: "app.kinnect.live",
   productId: "kinnect_style_sunset",
-  purchaseDate: Date.now(),
-  signedDate: Date.now(),
+  appAccountToken: storeAccountUuid(host1.user.id),
+  purchaseDate: simulatedTime,
+  signedDate: simulatedTime,
   environment: "LocalTesting"
 });
 const vRes4 = await fetch(`${baseUrl}/api/store/verify`, {
@@ -349,8 +406,9 @@ const jwsMismatchBundle = makeAppleJWS({
   transactionId: "tx_apple_1003",
   bundleId: "com.attacker.bundle",
   productId: "kinnect_style_ocean",
-  purchaseDate: Date.now(),
-  signedDate: Date.now(),
+  appAccountToken: storeAccountUuid(host1.user.id),
+  purchaseDate: simulatedTime,
+  signedDate: simulatedTime,
   environment: "LocalTesting"
 });
 const vRes5 = await fetch(`${baseUrl}/api/store/verify`, {
@@ -365,10 +423,11 @@ const jwsRevoked = makeAppleJWS({
   transactionId: "tx_apple_1004",
   bundleId: "app.kinnect.live",
   productId: "kinnect_style_sunset",
-  purchaseDate: Date.now() - 86400000,
-  revocationDate: Date.now() - 3600000,
+  appAccountToken: storeAccountUuid(host1.user.id),
+  purchaseDate: simulatedTime - 86400000,
+  revocationDate: simulatedTime - 3600000,
   revocationReason: 1,
-  signedDate: Date.now(),
+  signedDate: simulatedTime,
   environment: "LocalTesting"
 });
 const vRes6 = await fetch(`${baseUrl}/api/store/verify`, {
@@ -386,7 +445,91 @@ const vRes7 = await fetch(`${baseUrl}/api/store/verify`, {
   body: JSON.stringify({ productId: "kinnect_style_sunset", purchaseToken: "raw_tx_id_only", platform: "ios" })
 });
 assert.equal(vRes7.status, 400);
-console.log("   -> Verified Apple StoreKit 2 verification, bundleId/productId check, replay prevention, and refund rejection!");
+
+// Path 8: App Store Server Notifications V2 (POST /api/store/apple-notifications) refund reconciliation & deduplication
+const notifPayload = {
+  notificationType: "REFUND",
+  notificationUUID: "test-apple-notif-uuid-" + RUN,
+  version: "2.0",
+  signedDate: simulatedTime,
+  data: {
+    bundleId: "app.kinnect.live",
+    environment: "LocalTesting",
+    signedTransactionInfo: makeAppleJWS({
+      transactionId: "tx_apple_1001",
+      productId: "kinnect_style_aurora",
+      bundleId: "app.kinnect.live",
+      appAccountToken: storeAccountUuid(host1.user.id),
+      environment: "LocalTesting",
+      revocationDate: simulatedTime,
+      revocationReason: 1
+    })
+  }
+};
+const signedNotif = makeAppleJWS(notifPayload);
+const notifRes = await fetch(`${baseUrl}/api/store/apple-notifications`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ signedPayload: signedNotif })
+});
+assert.equal(notifRes.status, 200);
+const notifJson = await notifRes.json();
+assert.equal(notifJson.ok, true);
+assert.equal(notifJson.processed, true);
+assert.equal(notifJson.transactionId, "tx_apple_1001");
+
+// Verify purchase state is now CANCELLED in database and no longer owned
+const cancelledRow = social.db.prepare("SELECT state FROM store_purchases WHERE product_id=?").get("kinnect_style_aurora");
+assert.equal(cancelledRow.state, "CANCELLED");
+const getStoreAfterRefund = await fetch(`${baseUrl}/api/store`, {
+  headers: { Cookie: host1.cookie }
+});
+assert.ok(!(await getStoreAfterRefund.json()).owned.includes("kinnect_style_aurora"), "refunded product must no longer be owned");
+
+// Duplicate notification returns duplicate: true
+const dupNotifRes = await fetch(`${baseUrl}/api/store/apple-notifications`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ signedPayload: signedNotif })
+});
+assert.equal(dupNotifRes.status, 200);
+assert.equal((await dupNotifRes.json()).duplicate, true);
+
+// Path 9: Production safeguard - rejection of Xcode/LocalTesting environments in production mode
+const prodEnvApp = createApp({
+  dbPath: ":memory:",
+  allowEmailDelivery: false,
+  appleStoreVerifier: appleVerifier,
+  storeEnv: { PLAY_PURCHASE_TOKEN_KEY: "ab".repeat(32), NODE_ENV: "production" }
+});
+await new Promise((resolve) => prodEnvApp.server.listen(0, "127.0.0.1", resolve));
+const prodPort = prodEnvApp.server.address().port;
+const prodUserReg = await fetch(`http://127.0.0.1:${prodPort}/api/register`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ username: "prod_user_" + RUN, name: "Prod User", email: `prod_${RUN}@kinnect.local`, password: "PassWord123!", gender: "nam", birthYear: 1998, agree18: true, acceptPrivacyNotice: true })
+});
+const prodCookie = (prodUserReg.headers.get("set-cookie") || "").split(";")[0];
+const prodUserId = (await prodUserReg.json()).user.id;
+const prodJws = makeAppleJWS({
+  transactionId: "tx_apple_prod_test",
+  bundleId: "app.kinnect.live",
+  productId: "kinnect_style_aurora",
+  appAccountToken: storeAccountUuid(prodUserId),
+  purchaseDate: simulatedTime,
+  signedDate: simulatedTime,
+  environment: "LocalTesting"
+});
+const prodVerifyRes = await fetch(`http://127.0.0.1:${prodPort}/api/store/verify`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json", Cookie: prodCookie },
+  body: JSON.stringify({ productId: "kinnect_style_aurora", purchaseToken: prodJws, platform: "ios" })
+});
+assert.equal(prodVerifyRes.status, 403);
+assert.match((await prodVerifyRes.json()).error, /Xcode\/LocalTesting bị từ chối trên production/i);
+prodEnvApp.server.close();
+
+console.log("   -> Verified Apple StoreKit 2 verification, appAccountToken binding, 25h time passage refresh, refund notifications, replay prevention, and production safeguards!");
 
 console.log("6. Testing Permanent Account Deletion Lifecycle (7 contract assertions)...");
 // Register dedicated deletion test user
