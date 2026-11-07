@@ -389,10 +389,6 @@ struct ProfileView: View {
     }
 
     private func refreshMe() async {
-        if UIReviewFixture.activeScreen != nil {
-            self.userPosts = UIReviewFixture.posts.map(PostItem.from)
-            return
-        }
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/me"),
            let userDict = res["user"] as? [String: Any] {
             let user = KinnectUser.from(userDict)
