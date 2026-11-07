@@ -2,12 +2,12 @@
   "id": "req-ios-layout-every-page-20261107",
   "status": "HONEST_GRANULAR_RECLASSIFICATION_APPLIED",
   "completedAt": "2026-11-07T12:25:00.000Z",
-  "commitSha": "fdec976",
+  "commitSha": "9c7b33c",
   "branches": [
     "release/ios-1.2.12",
     "main"
   ],
-  "ciRunUrl": "https://github.com/vuanh97nd/Kinnect/actions/runs/42388419096",
+  "ciRunUrl": "https://github.com/vuanh97nd/Kinnect/actions/runs/42393529038",
   "summary": {
     "totalScreens": 126,
     "visualMatch": 55,
@@ -111,9 +111,9 @@
       "screen": "Đăng nhập",
       "visualStatus": "MATCH",
       "androidImage": "dist/android-real-captures-b118/01-auth-login-real-b118.png",
-      "iosImage": "dist/ios-ui-review-fdec976/01b-iphone-auth-login-dark.png",
-      "notes": "Đăng nhập chính (Login): Tích hợp Sign in with Apple (Guideline 4.8), Google, Facebook, ô tài khoản, ô mật khẩu có icon ẩn/hiện, checkbox Ghi nhớ + Quên mật khẩu, nút Đăng nhập và Tạo tài khoản mới. (Verified in CI Run 42388419096).",
-      "verifiedCommit": "fdec976",
+      "iosImage": "dist/ios-ui-review-9c7b33c/01b-iphone-auth-login-dark.png",
+      "notes": "Đăng nhập chính (Login): Tích hợp Sign in with Apple (Guideline 4.8), Google, Facebook, request-bound cryptographic nonce binding, và single-use replay protection. (Verified in CI Run 42393529038).",
+      "verifiedCommit": "9c7b33c",
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
@@ -1234,9 +1234,9 @@
       "screen": "Công cụ chỉnh video",
       "visualStatus": "MATCH",
       "androidImage": null,
-      "iosImage": "dist/ios-ui-review-fdec976/12c-iphone-camera-studio-video-preview.png",
-      "notes": "Studio Video Pro: Trình phát video, cắt thời lượng trimIn..trimOut, làm mịn da bảo toàn cạnh biên CoreImage, xuất video AVAssetExportSession đấu nối hoàn chỉnh vào cả Lưu về máy (Photos) và Đăng ngay (Shorts). (Verified in CI Run 42388419096).",
-      "verifiedCommit": "fdec976",
+      "iosImage": "dist/ios-ui-review-9c7b33c/12c-iphone-camera-studio-video-preview.png",
+      "notes": "Studio Video Pro: Trình phát video, cắt thời lượng trimIn..trimOut, làm mịn da CoreImage, xoay video hình học AVMutableVideoComposition renderSize (0/90/180/270 độ), xuất video AVAssetExportSession hoàn chỉnh. (Verified in CI Run 42393529038).",
+      "verifiedCommit": "9c7b33c",
       "visualCaptured": true,
       "functionTested": false,
       "testScope": null,
@@ -2049,7 +2049,7 @@
       "backendContractTested": false
     }
   ],
-  "ciRunId": 42388419096,
+  "ciRunId": 42393529038,
   "screenshotInventory": {
     "totalScreensCaptured": 43,
     "contactSheets": 1,
