@@ -53,7 +53,7 @@ struct RootMainView: View {
         ZStack(alignment: .top) {
             KinnectTheme.background.ignoresSafeArea()
 
-            if UIReviewFixture.activeScreen == "auth" || UIReviewFixture.activeScreen == "auth-welcome" {
+            if UIReviewFixture.activeScreen == "auth" || UIReviewFixture.activeScreen?.hasPrefix("auth-welcome") == true {
                 AuthView(initialStage: .welcome)
             } else if UIReviewFixture.activeScreen?.hasPrefix("auth-login") == true {
                 AuthView(initialStage: .login)

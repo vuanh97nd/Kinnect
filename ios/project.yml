@@ -33,6 +33,11 @@ targets:
       path: Kinnect/Resources/Info.plist
       properties:
         CFBundleDisplayName: Kinnect
+        CFBundleDevelopmentRegion: vi
+        CFBundleLocalizations:
+          - vi
+          - en
+        ITSAppUsesNonExemptEncryption: false
         CFBundleShortVersionString: "1.2.12"
         CFBundleVersion: "118"
         LSRequiresIPhoneOS: true

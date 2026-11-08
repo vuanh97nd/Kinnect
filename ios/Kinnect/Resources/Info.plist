@@ -4,6 +4,11 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>vi</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>vi</string>
+		<string>en</string>
+	</array>
 	<key>CFBundleDisplayName</key>
 	<string>Kinnect</string>
 	<key>CFBundleExecutable</key>
@@ -45,6 +50,8 @@
 	<string>Kinnect cần quyền truy cập Thư viện ảnh để bạn chọn ảnh đại diện, ảnh bài viết và video ngắn.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Kinnect cần quyền lưu ảnh và video vào Thư viện ảnh của bạn.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

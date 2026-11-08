@@ -139,12 +139,13 @@ def capture_screen(device, slug, screen_arg, bundle_id, extra_args=None, wait_se
             "--batteryLevel", "100"
         ], check=False)
 
-    cmd = ["xcrun", "simctl", "launch", udid, bundle_id, "--ui-review-screen", screen_arg]
+    lang_arg = "(en)" if screen_arg.endswith("-en") else "(vi)"
+    cmd = ["xcrun", "simctl", "launch", udid, bundle_id, "-AppleLanguages", lang_arg, "--ui-review-screen", screen_arg]
     if extra_args:
         cmd.extend(extra_args)
     run(cmd)
 
-    if screen_arg in ("auth", "auth-login-keyboard", "auth-login-lang-sheet"):
+    if screen_arg in ("auth", "auth-login-keyboard", "auth-login-password-keyboard", "auth-login-lang-sheet"):
         actual_wait = 4.8
     else:
         actual_wait = wait_sec
@@ -287,7 +288,8 @@ def main():
     # 1. Standard iPhone screenshots
     boot_and_install(standard_iphone, app_path, bundle_id)
     login_iphone_screens = [
-        ("01-iphone-auth-welcome-dark", "auth-welcome", [], "Màn hình chào mừng đầu tiên với logo và VI/EN (Dark)"),
+        ("01-iphone-auth-welcome-dark", "auth-welcome", [], "Màn hình chào mừng đầu tiên tiếng Việt (Dark) — Standard iPhone"),
+        ("01a-iphone-auth-welcome-en-dark", "auth-welcome-en", [], "Màn hình chào mừng đầu tiên tiếng Anh (English Dark) — Standard iPhone"),
         ("01b-iphone-auth-login-dark", "auth-login", [], "Đăng nhập chính tiếng Việt trống (Dark)"),
         ("01b2-iphone-auth-login-populated-dark", "auth-login-populated", [], "Đăng nhập đã điền tài khoản & mật khẩu (Dark)"),
         ("01b3-iphone-auth-login-error-dark", "auth-login-error", [], "Đăng nhập hiển thị lỗi xác thực (Dark)"),
@@ -361,8 +363,11 @@ def main():
             subprocess.run(["xcrun", "simctl", "shutdown", standard_iphone["udid"]], check=False)
             boot_and_install(compact_iphone, app_path, bundle_id)
         compact_login_screens = [
+            ("14-compact-iphone-auth-welcome-dark", "auth-welcome", [], "Màn hình nhỏ: Chào mừng tiếng Việt (Dark)"),
+            ("14en-compact-iphone-auth-welcome-en-dark", "auth-welcome-en", [], "Màn hình nhỏ: Chào mừng tiếng Anh (English Dark)"),
             ("14a-compact-iphone-auth-login-dark", "auth-login", [], "Màn hình nhỏ: Đăng nhập tiếng Việt trống (Dark)"),
-            ("14b-compact-iphone-auth-login-keyboard-dark", "auth-login-keyboard", [], "Màn hình nhỏ: Đăng nhập mở bàn phím (Compact iPhone Keyboard Open)"),
+            ("14b-compact-iphone-auth-login-keyboard-dark", "auth-login-keyboard", [], "Màn hình nhỏ: Đăng nhập mở bàn phím — thấy cả ô mật khẩu & nút Đăng nhập"),
+            ("14b2-compact-iphone-auth-login-password-keyboard-dark", "auth-login-password-keyboard", [], "Màn hình nhỏ: Focus ô mật khẩu mở bàn phím — nút Đăng nhập sáng & bấm được"),
             ("14c-compact-iphone-auth-login-lang-sheet-dark", "auth-login-lang-sheet", [], "Màn hình nhỏ: Đăng nhập mở bảng chọn ngôn ngữ VI/EN (Dark)"),
         ]
         compact_other_screens = [

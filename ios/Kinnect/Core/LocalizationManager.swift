@@ -41,7 +41,7 @@ final class LocalizationManager: ObservableObject {
 
     private init() {
         if UIReviewFixture.isEnabled {
-            self.currentLanguage = (UIReviewFixture.activeScreen == "auth-login-en") ? .en : .vi
+            self.currentLanguage = (UIReviewFixture.activeScreen?.hasSuffix("-en") == true) ? .en : .vi
         } else if let saved = UserDefaults.standard.string(forKey: userDefaultsKey),
            let lang = AppLanguage(rawValue: saved) {
             self.currentLanguage = lang
@@ -91,6 +91,26 @@ final class LocalizationManager: ObservableObject {
         "Dành cho người từ 18 tuổi · Minh họa tính năng": [
             .vi: "Dành cho người từ 18 tuổi · Minh họa tính năng",
             .en: "Ages 18+ · Feature Preview"
+        ],
+        "Dành cho bạn": [
+            .vi: "Dành cho bạn",
+            .en: "For you"
+        ],
+        "Đang theo dõi": [
+            .vi: "Đang theo dõi",
+            .en: "Following"
+        ],
+        "Hồ sơ minh họa": [
+            .vi: "Hồ sơ minh họa",
+            .en: "Sample profile"
+        ],
+        "Live": [
+            .vi: "Live",
+            .en: "Live"
+        ],
+        "Điện thoại minh họa luân phiên các tính năng Bảng tin, Khám phá, Video và Live. Chạm để chuyển tính năng.": [
+            .vi: "Điện thoại minh họa luân phiên các tính năng Bảng tin, Khám phá, Video và Live. Chạm để chuyển tính năng.",
+            .en: "Phone preview cycling through Feed, Explore, Video, and Live features. Tap to switch."
         ],
         "Tiếp tục nghĩa là bạn đồng ý quy tắc cộng đồng.": [
             .vi: "Tiếp tục nghĩa là bạn đồng ý quy tắc cộng đồng.",
