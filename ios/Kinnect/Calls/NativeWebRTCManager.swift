@@ -1,0 +1,727 @@
+import AVFoundation
+import Foundation
+import SwiftUI
+import UIKit
+import WebRTC
+
+struct ActiveCallSession: Identifiable, Equatable {
+    var id: String { callId }
+    let callId: String
+    let peerUser: KinnectUser
+    var mode: String // "video" | "audio"
+    var isIncoming: Bool
+    var state: CallLifecycleState
+
+    enum CallLifecycleState: String, Equatable {
+        case ringingIncoming
+        case dialingOutgoing
+        case connecting
+        case connected
+        case ended
+    }
+}
+
+struct WebRTCVideoRendererView: UIViewRepresentable {
+    let track: RTCVideoTrack?
+    var mirror: Bool = false
+
+    final class Coordinator {
+        weak var currentTrack: RTCVideoTrack?
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeUIView(context: Context) -> RTCMTLVideoView {
+        let view = RTCMTLVideoView(frame: .zero)
+        view.videoContentMode = .scaleAspectFill
+        view.clipsToBounds = true
+        return view
+    }
+
+    func updateUIView(_ uiView: RTCMTLVideoView, context: Context) {
+        if context.coordinator.currentTrack !== track {
+            context.coordinator.currentTrack?.remove(uiView)
+            context.coordinator.currentTrack = track
+            track?.add(uiView)
+        }
+        uiView.transform = mirror ? CGAffineTransform(scaleX: -1, y: 1) : .identity
+    }
+
+    static func dismantleUIView(_ uiView: RTCMTLVideoView, coordinator: Coordinator) {
+        coordinator.currentTrack?.remove(uiView)
+        coordinator.currentTrack = nil
+    }
+}
+
+final class NativeWebRTCManager: NSObject, ObservableObject {
+    static let shared = NativeWebRTCManager()
+
+    @Published var activeCall: ActiveCallSession?
+    @Published var localVideoTrack: RTCVideoTrack?
+    @Published var remoteVideoTrack: RTCVideoTrack?
+    @Published var isMicMuted: Bool = false
+    @Published var isCameraOff: Bool = false
+    @Published var isSpeakerOn: Bool = true
+    @Published var usingFrontCamera: Bool = true
+
+    // Live stream WebRTC state
+    @Published var liveLocalVideoTrack: RTCVideoTrack?
+    @Published var liveRemoteVideoTrack: RTCVideoTrack?
+
+    private let factory: RTCPeerConnectionFactory
+    private var callPeerConnection: RTCPeerConnection?
+    private var localAudioTrack: RTCAudioTrack?
+    private var videoCapturer: RTCCameraVideoCapturer?
+    private var videoSource: RTCVideoSource?
+    private var cachedIceServers: [RTCIceServer] = [
+        RTCIceServer(urlStrings: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"])
+    ]
+    private var pendingIceCandidates: [RTCIceCandidate] = []
+
+    // Live broadcast peer connections (host -> viewers, or viewer -> host)
+    private var liveViewerConnections: [String: PeerConnectionBox] = [:]
+    private var liveHostConnection: PeerConnectionBox?
+    private var liveAudioTrack: RTCAudioTrack?
+    private var liveCapturer: RTCCameraVideoCapturer?
+    private var liveVideoSource: RTCVideoSource?
+
+    private override init() {
+        RTCInitializeSSL()
+        let encoderFactory = RTCDefaultVideoEncoderFactory()
+        let decoderFactory = RTCDefaultVideoDecoderFactory()
+        self.factory = RTCPeerConnectionFactory(encoderFactory: encoderFactory, decoderFactory: decoderFactory)
+        super.init()
+    }
+
+    // MARK: - ICE Server Configuration
+
+    func refreshIceServers() async {
+        do {
+            let json = try await KinnectAPIClient.shared.requestJSON("/api/call-config")
+            guard let list = json["iceServers"] as? [[String: Any]], !list.isEmpty else { return }
+            var built: [RTCIceServer] = []
+            for entry in list {
+                var urls: [String] = []
+                if let single = entry["urls"] as? String {
+                    urls.append(single)
+                } else if let arr = entry["urls"] as? [String] {
+                    urls.append(contentsOf: arr)
+                }
+                guard !urls.isEmpty else { continue }
+                let username = entry["username"] as? String ?? ""
+                let credential = entry["credential"] as? String ?? ""
+                if !username.isEmpty || !credential.isEmpty {
+                    built.append(RTCIceServer(urlStrings: urls, username: username, credential: credential))
+                } else {
+                    built.append(RTCIceServer(urlStrings: urls))
+                }
+            }
+            if !built.isEmpty {
+                self.cachedIceServers = built
+            }
+        } catch {
+            // Keep default STUN servers
+        }
+    }
+
+    // MARK: - 1-1 Direct Call Flow
+
+    @MainActor
+    func startOutgoingCall(targetUser: KinnectUser, mode: String) async {
+        let isVideo = (mode != "audio")
+        let micOk = await MediaPermissionHandler.shared.requestMicrophoneAccess()
+        guard micOk else { return }
+        if isVideo {
+            _ = await MediaPermissionHandler.shared.requestCameraAccess()
+        }
+
+        await refreshIceServers()
+        let callId = "call_\(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(16))"
+        let session = ActiveCallSession(
+            callId: callId,
+            peerUser: targetUser,
+            mode: isVideo ? "video" : "audio",
+            isIncoming: false,
+            state: .dialingOutgoing
+        )
+        self.activeCall = session
+        MediaPermissionHandler.shared.configureAudioSessionForCall()
+        prepareLocalCallMedia(isVideo: isVideo)
+        CallKitManager.shared.startOutgoingCall(callId: callId, targetName: targetUser.name, isVideo: isVideo)
+
+        NativeSocketClient.shared.sendJSON([
+            "type": "call-start",
+            "callId": callId,
+            "targetUserId": targetUser.id,
+            "mode": isVideo ? "video" : "audio"
+        ])
+    }
+
+    @MainActor
+    func handleIncomingCallSocket(_ json: [String: Any]) {
+        let callId = json["callId"] as? String ?? ""
+        guard !callId.isEmpty else { return }
+        if activeCall != nil && activeCall?.callId != callId {
+            NativeSocketClient.shared.sendJSON([
+                "type": "call-reject",
+                "callId": callId,
+                "reason": "busy"
+            ])
+            return
+        }
+
+        let mode = json["mode"] as? String ?? "video"
+        let fromDict = json["from"] as? [String: Any] ?? [:]
+        let caller = KinnectUser.from(fromDict)
+        let isVideo = (mode != "audio")
+
+        self.activeCall = ActiveCallSession(
+            callId: callId,
+            peerUser: caller,
+            mode: isVideo ? "video" : "audio",
+            isIncoming: true,
+            state: .ringingIncoming
+        )
+        CallKitManager.shared.reportIncomingCall(callId: callId, callerName: caller.name, isVideo: isVideo)
+    }
+
+    @MainActor
+    func acceptIncomingCall(callId: String? = nil) async {
+        guard var current = activeCall else { return }
+        if let callId, current.callId != callId { return }
+
+        let isVideo = (current.mode != "audio")
+        _ = await MediaPermissionHandler.shared.requestMicrophoneAccess()
+        if isVideo {
+            _ = await MediaPermissionHandler.shared.requestCameraAccess()
+        }
+        await refreshIceServers()
+
+        current.state = .connecting
+        self.activeCall = current
+        MediaPermissionHandler.shared.configureAudioSessionForCall()
+        prepareLocalCallMedia(isVideo: isVideo)
+        setupCallPeerConnection()
+
+        NativeSocketClient.shared.sendJSON([
+            "type": "call-accept",
+            "callId": current.callId
+        ])
+    }
+
+    @MainActor
+    func endOrRejectCurrentCall(sendSocket: Bool = true) {
+        guard let current = activeCall else { return }
+        let callId = current.callId
+        if sendSocket {
+            let msgType = (current.isIncoming && current.state == .ringingIncoming) ? "call-reject" : "call-end"
+            NativeSocketClient.shared.sendJSON([
+                "type": msgType,
+                "callId": callId
+            ])
+        }
+        CallKitManager.shared.reportCallEnded(callId: callId, reason: .remoteEnded)
+        cleanupCallMedia()
+        self.activeCall = nil
+    }
+
+    @MainActor
+    func handleCallAcceptedSocket(_ json: [String: Any]) {
+        guard var current = activeCall else { return }
+        let callId = json["callId"] as? String ?? ""
+        guard callId == current.callId else { return }
+
+        current.state = .connecting
+        self.activeCall = current
+        CallKitManager.shared.reportCallConnected(callId: callId)
+
+        setupCallPeerConnection()
+        guard let pc = callPeerConnection else { return }
+        let constraints = RTCMediaConstraints(
+            mandatoryConstraints: [
+                "OfferToReceiveAudio": "true",
+                "OfferToReceiveVideo": current.mode == "video" ? "true" : "false"
+            ],
+            optionalConstraints: nil
+        )
+        pc.offer(for: constraints) { [weak self] sdp, error in
+            guard let self = self, let sdp = sdp, error == nil else { return }
+            pc.setLocalDescription(sdp) { err in
+                guard err == nil else { return }
+                NativeSocketClient.shared.sendJSON([
+                    "type": "call-signal",
+                    "callId": callId,
+                    "signal": [
+                        "description": [
+                            "type": Self.sdpTypeString(sdp.type),
+                            "sdp": sdp.sdp
+                        ]
+                    ]
+                ])
+            }
+        }
+    }
+
+    @MainActor
+    func handleCallSignalSocket(_ json: [String: Any]) {
+        guard let current = activeCall else { return }
+        let callId = json["callId"] as? String ?? ""
+        guard callId == current.callId,
+              let signal = json["signal"] as? [String: Any] else { return }
+
+        if callPeerConnection == nil {
+            setupCallPeerConnection()
+        }
+        guard let pc = callPeerConnection else { return }
+
+        if let desc = signal["description"] as? [String: Any],
+           let typeStr = desc["type"] as? String,
+           let sdpText = desc["sdp"] as? String {
+            let sdpType: RTCSdpType = (typeStr == "offer") ? .offer : .answer
+            let remoteSDP = RTCSessionDescription(type: sdpType, sdp: sdpText)
+            pc.setRemoteDescription(remoteSDP) { [weak self] error in
+                guard let self = self, error == nil else { return }
+                self.drainPendingCandidates(on: pc)
+                if sdpType == .offer {
+                    let constraints = RTCMediaConstraints(
+                        mandatoryConstraints: [
+                            "OfferToReceiveAudio": "true",
+                            "OfferToReceiveVideo": current.mode == "video" ? "true" : "false"
+                        ],
+                        optionalConstraints: nil
+                    )
+                    pc.answer(for: constraints) { answerSDP, err in
+                        guard let answerSDP = answerSDP, err == nil else { return }
+                        pc.setLocalDescription(answerSDP) { setErr in
+                            guard setErr == nil else { return }
+                            NativeSocketClient.shared.sendJSON([
+                                "type": "call-signal",
+                                "callId": callId,
+                                "signal": [
+                                    "description": [
+                                        "type": Self.sdpTypeString(answerSDP.type),
+                                        "sdp": answerSDP.sdp
+                                    ]
+                                ]
+                            ])
+                        }
+                    }
+                }
+            }
+        } else if let cand = signal["candidate"] as? [String: Any],
+                  let sdp = cand["candidate"] as? String {
+            let sdpMid = cand["sdpMid"] as? String
+            let sdpMLineIndex = Int32(cand["sdpMLineIndex"] as? Int ?? 0)
+            let ice = RTCIceCandidate(sdp: sdp, sdpMLineIndex: sdpMLineIndex, sdpMid: sdpMid)
+            if pc.remoteDescription != nil {
+                pc.add(ice) { _ in }
+            } else {
+                pendingIceCandidates.append(ice)
+            }
+        }
+    }
+
+    @MainActor
+    func handleCallEndedSocket(_ json: [String: Any]) {
+        let callId = json["callId"] as? String ?? ""
+        if !callId.isEmpty {
+            CallKitManager.shared.reportCallEnded(callId: callId, reason: .remoteEnded)
+        }
+        if activeCall == nil || activeCall?.callId == callId {
+            cleanupCallMedia()
+            activeCall = nil
+        }
+    }
+
+    // MARK: - Controls
+
+    @MainActor
+    func toggleMute() {
+        isMicMuted.toggle()
+        localAudioTrack?.isEnabled = !isMicMuted
+    }
+
+    @MainActor
+    func setMuted(_ muted: Bool) {
+        isMicMuted = muted
+        localAudioTrack?.isEnabled = !muted
+    }
+
+    @MainActor
+    func toggleCamera() {
+        isCameraOff.toggle()
+        localVideoTrack?.isEnabled = !isCameraOff
+    }
+
+    @MainActor
+    func toggleSpeaker() {
+        isSpeakerOn.toggle()
+        let session = AVAudioSession.sharedInstance()
+        try? session.overrideOutputAudioPort(isSpeakerOn ? .speaker : .none)
+    }
+
+    @MainActor
+    func switchCamera() {
+        usingFrontCamera.toggle()
+        if let capturer = videoCapturer {
+            startCapture(on: capturer, front: usingFrontCamera)
+        }
+        if let liveCap = liveCapturer {
+            startCapture(on: liveCap, front: usingFrontCamera)
+        }
+    }
+
+    // MARK: - Private Call Setup
+
+    private func prepareLocalCallMedia(isVideo: Bool) {
+        isMicMuted = false
+        isCameraOff = !isVideo
+        isSpeakerOn = true
+
+        let audioSource = factory.audioSource(with: RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil))
+        let audioTrack = factory.audioTrack(with: audioSource, trackId: "kinnect_audio0")
+        audioTrack.isEnabled = true
+        self.localAudioTrack = audioTrack
+
+        if isVideo {
+            let vSource = factory.videoSource()
+            let capturer = RTCCameraVideoCapturer(delegate: vSource)
+            let vTrack = factory.videoTrack(with: vSource, trackId: "kinnect_video0")
+            vTrack.isEnabled = true
+            self.videoSource = vSource
+            self.videoCapturer = capturer
+            self.localVideoTrack = vTrack
+            startCapture(on: capturer, front: usingFrontCamera)
+        } else {
+            self.localVideoTrack = nil
+        }
+    }
+
+    private func setupCallPeerConnection() {
+        guard callPeerConnection == nil else { return }
+        let config = RTCConfiguration()
+        config.iceServers = cachedIceServers
+        config.sdpSemantics = .unifiedPlan
+        config.continualGatheringPolicy = .gatherContinually
+
+        let constraints = RTCMediaConstraints(
+            mandatoryConstraints: nil,
+            optionalConstraints: ["DtlsSrtpKeyAgreement": "true"]
+        )
+        guard let pc = factory.peerConnection(with: config, constraints: constraints, delegate: self) else { return }
+        self.callPeerConnection = pc
+
+        let streamId = "kinnect_call_stream"
+        if let audio = localAudioTrack {
+            pc.add(audio, streamIds: [streamId])
+        }
+        if let video = localVideoTrack {
+            pc.add(video, streamIds: [streamId])
+        }
+    }
+
+    private func drainPendingCandidates(on pc: RTCPeerConnection) {
+        let queued = pendingIceCandidates
+        pendingIceCandidates.removeAll()
+        for candidate in queued {
+            pc.add(candidate) { _ in }
+        }
+    }
+
+    private func startCapture(on capturer: RTCCameraVideoCapturer, front: Bool) {
+        let position: AVCaptureDevice.Position = front ? .front : .back
+        let devices = RTCCameraVideoCapturer.captureDevices()
+        guard let device = devices.first(where: { $0.position == position }) ?? devices.first else { return }
+        let formats = RTCCameraVideoCapturer.supportedFormats(for: device)
+        let targetFormat = formats.first(where: {
+            let dim = CMVideoFormatDescriptionGetDimensions($0.formatDescription)
+            return dim.width == 1280 && dim.height == 720
+        }) ?? formats.last
+
+        guard let format = targetFormat else { return }
+        let fps = format.videoSupportedFrameRateRanges.first.map { Int(min($0.maxFrameRate, 30)) } ?? 30
+        capturer.startCapture(with: device, format: format, fps: fps)
+    }
+
+    private func cleanupCallMedia() {
+        videoCapturer?.stopCapture()
+        videoCapturer = nil
+        videoSource = nil
+        localAudioTrack = nil
+        localVideoTrack = nil
+        remoteVideoTrack = nil
+        pendingIceCandidates.removeAll()
+        callPeerConnection?.close()
+        callPeerConnection = nil
+        MediaPermissionHandler.shared.configureAudioSessionForMedia()
+    }
+
+    // MARK: - Live Stream WebRTC (Host & Viewer)
+
+    @MainActor
+    func startLiveHostBroadcast() async {
+        _ = await MediaPermissionHandler.shared.requestMicrophoneAccess()
+        _ = await MediaPermissionHandler.shared.requestCameraAccess()
+        await refreshIceServers()
+
+        MediaPermissionHandler.shared.configureAudioSessionForCall()
+        let aSource = factory.audioSource(with: nil)
+        let aTrack = factory.audioTrack(with: aSource, trackId: "live_audio0")
+        self.liveAudioTrack = aTrack
+
+        let vSource = factory.videoSource()
+        let capturer = RTCCameraVideoCapturer(delegate: vSource)
+        let vTrack = factory.videoTrack(with: vSource, trackId: "live_video0")
+        self.liveVideoSource = vSource
+        self.liveCapturer = capturer
+        self.liveLocalVideoTrack = vTrack
+        startCapture(on: capturer, front: usingFrontCamera)
+    }
+
+    @MainActor
+    func handleLiveViewerJoined(peerId: String) {
+        guard !peerId.isEmpty else { return }
+        let box = createLivePeerBox(peerId: peerId, isHost: true)
+        liveViewerConnections[peerId] = box
+
+        let constraints = RTCMediaConstraints(
+            mandatoryConstraints: ["OfferToReceiveAudio": "false", "OfferToReceiveVideo": "false"],
+            optionalConstraints: nil
+        )
+        box.pc.offer(for: constraints) { sdp, err in
+            guard let sdp = sdp, err == nil else { return }
+            box.pc.setLocalDescription(sdp) { setErr in
+                guard setErr == nil else { return }
+                let descPayload: [String: Any] = [
+                    "type": Self.sdpTypeString(sdp.type),
+                    "sdp": sdp.sdp
+                ]
+                NativeSocketClient.shared.sendJSON([
+                    "type": "signal",
+                    "to": peerId,
+                    "description": descPayload,
+                    "signal": ["description": descPayload]
+                ])
+            }
+        }
+    }
+
+    @MainActor
+    func handleLiveSignal(from peerId: String, signal: [String: Any], isHost: Bool) {
+        let box: PeerConnectionBox
+        if isHost {
+            if let existing = liveViewerConnections[peerId] {
+                box = existing
+            } else {
+                let created = createLivePeerBox(peerId: peerId, isHost: true)
+                liveViewerConnections[peerId] = created
+                box = created
+            }
+        } else {
+            if let existing = liveHostConnection {
+                box = existing
+            } else {
+                let created = createLivePeerBox(peerId: peerId, isHost: false)
+                liveHostConnection = created
+                box = created
+            }
+        }
+
+        if let desc = signal["description"] as? [String: Any],
+           let typeStr = desc["type"] as? String,
+           let sdpText = desc["sdp"] as? String {
+            let sdpType: RTCSdpType = (typeStr == "offer") ? .offer : .answer
+            let remoteSDP = RTCSessionDescription(type: sdpType, sdp: sdpText)
+            box.pc.setRemoteDescription(remoteSDP) { err in
+                guard err == nil else { return }
+                if sdpType == .offer {
+                    let constraints = RTCMediaConstraints(
+                        mandatoryConstraints: ["OfferToReceiveAudio": "true", "OfferToReceiveVideo": "true"],
+                        optionalConstraints: nil
+                    )
+                    box.pc.answer(for: constraints) { answer, ansErr in
+                        guard let answer = answer, ansErr == nil else { return }
+                        box.pc.setLocalDescription(answer) { setErr in
+                            guard setErr == nil else { return }
+                            let descPayload: [String: Any] = [
+                                "type": Self.sdpTypeString(answer.type),
+                                "sdp": answer.sdp
+                            ]
+                            NativeSocketClient.shared.sendJSON([
+                                "type": "signal",
+                                "to": peerId,
+                                "description": descPayload,
+                                "signal": ["description": descPayload]
+                            ])
+                        }
+                    }
+                }
+            }
+        } else if let cand = signal["candidate"] as? [String: Any],
+                  let sdp = cand["candidate"] as? String {
+            let sdpMid = cand["sdpMid"] as? String
+            let sdpMLineIndex = Int32(cand["sdpMLineIndex"] as? Int ?? 0)
+            let ice = RTCIceCandidate(sdp: sdp, sdpMLineIndex: sdpMLineIndex, sdpMid: sdpMid)
+            box.pc.add(ice) { _ in }
+        }
+    }
+
+    @MainActor
+    func stopLiveSession() {
+        liveCapturer?.stopCapture()
+        liveCapturer = nil
+        liveVideoSource = nil
+        liveAudioTrack = nil
+        liveLocalVideoTrack = nil
+        liveRemoteVideoTrack = nil
+        for (_, box) in liveViewerConnections {
+            box.pc.close()
+        }
+        liveViewerConnections.removeAll()
+        liveHostConnection?.pc.close()
+        liveHostConnection = nil
+        MediaPermissionHandler.shared.configureAudioSessionForMedia()
+    }
+
+    private func createLivePeerBox(peerId: String, isHost: Bool) -> PeerConnectionBox {
+        let config = RTCConfiguration()
+        config.iceServers = cachedIceServers
+        config.sdpSemantics = .unifiedPlan
+        let constraints = RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: ["DtlsSrtpKeyAgreement": "true"])
+        let box = PeerConnectionBox(peerId: peerId) { [weak self] videoTrack in
+            DispatchQueue.main.async {
+                self?.liveRemoteVideoTrack = videoTrack
+            }
+        }
+        let pc = factory.peerConnection(with: config, constraints: constraints, delegate: box)!
+        box.pc = pc
+        if isHost {
+            if let aTrack = liveAudioTrack {
+                pc.add(aTrack, streamIds: ["kinnect_live"])
+            }
+            if let vTrack = liveLocalVideoTrack {
+                pc.add(vTrack, streamIds: ["kinnect_live"])
+            }
+        }
+        return box
+    }
+
+    private static func sdpTypeString(_ type: RTCSdpType) -> String {
+        switch type {
+        case .offer: return "offer"
+        case .prAnswer: return "pranswer"
+        case .answer: return "answer"
+        case .rollback: return "rollback"
+        @unknown default: return "offer"
+        }
+    }
+}
+
+// MARK: - RTCPeerConnectionDelegate (1-1 Call)
+
+extension NativeWebRTCManager: RTCPeerConnectionDelegate {
+    func peerConnection(_ peerConnection: RTCPeerConnection, didChange stateChanged: RTCSignalingState) {}
+
+    func peerConnection(_ peerConnection: RTCPeerConnection, didAdd stream: RTCMediaStream) {
+        if let videoTrack = stream.videoTracks.first {
+            DispatchQueue.main.async {
+                self.remoteVideoTrack = videoTrack
+            }
+        }
+    }
+
+    func peerConnection(_ peerConnection: RTCPeerConnection, didRemove stream: RTCMediaStream) {}
+
+    func peerConnectionShouldNegotiate(_ peerConnection: RTCPeerConnection) {}
+
+    func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCIceConnectionState) {
+        DispatchQueue.main.async {
+            if newState == .connected || newState == .completed {
+                if var current = self.activeCall {
+                    current.state = .connected
+                    self.activeCall = current
+                }
+            } else if newState == .failed || newState == .closed {
+                self.endOrRejectCurrentCall(sendSocket: false)
+            }
+        }
+    }
+
+    func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCIceGatheringState) {}
+
+    func peerConnection(_ peerConnection: RTCPeerConnection, didGenerate candidate: RTCIceCandidate) {
+        DispatchQueue.main.async {
+            guard let callId = self.activeCall?.callId else { return }
+            NativeSocketClient.shared.sendJSON([
+                "type": "call-signal",
+                "callId": callId,
+                "signal": [
+                    "candidate": [
+                        "candidate": candidate.sdp,
+                        "sdpMid": candidate.sdpMid ?? "0",
+                        "sdpMLineIndex": candidate.sdpMLineIndex
+                    ]
+                ]
+            ])
+        }
+    }
+
+    func peerConnection(_ peerConnection: RTCPeerConnection, didRemove candidates: [RTCIceCandidate]) {}
+
+    func peerConnection(_ peerConnection: RTCPeerConnection, didOpen dataChannel: RTCDataChannel) {}
+
+    func peerConnection(_ peerConnection: RTCPeerConnection, didAdd rtpReceiver: RTCRtpReceiver, streams mediaStreams: [RTCMediaStream]) {
+        if let track = rtpReceiver.track as? RTCVideoTrack {
+            DispatchQueue.main.async {
+                self.remoteVideoTrack = track
+            }
+        }
+    }
+}
+
+// MARK: - Live PeerConnection Box
+
+private final class PeerConnectionBox: NSObject, RTCPeerConnectionDelegate {
+    let peerId: String
+    var pc: RTCPeerConnection!
+    let onRemoteVideo: (RTCVideoTrack) -> Void
+
+    init(peerId: String, onRemoteVideo: @escaping (RTCVideoTrack) -> Void) {
+        self.peerId = peerId
+        self.onRemoteVideo = onRemoteVideo
+    }
+
+    func peerConnection(_ peerConnection: RTCPeerConnection, didChange stateChanged: RTCSignalingState) {}
+    func peerConnection(_ peerConnection: RTCPeerConnection, didAdd stream: RTCMediaStream) {
+        if let v = stream.videoTracks.first {
+            onRemoteVideo(v)
+        }
+    }
+    func peerConnection(_ peerConnection: RTCPeerConnection, didRemove stream: RTCMediaStream) {}
+    func peerConnectionShouldNegotiate(_ peerConnection: RTCPeerConnection) {}
+    func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCIceConnectionState) {}
+    func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCIceGatheringState) {}
+    func peerConnection(_ peerConnection: RTCPeerConnection, didGenerate candidate: RTCIceCandidate) {
+        let candPayload: [String: Any] = [
+            "candidate": candidate.sdp,
+            "sdpMid": candidate.sdpMid ?? "0",
+            "sdpMLineIndex": candidate.sdpMLineIndex
+        ]
+        NativeSocketClient.shared.sendJSON([
+            "type": "signal",
+            "to": peerId,
+            "candidate": candPayload,
+            "signal": ["candidate": candPayload]
+        ])
+    }
+    func peerConnection(_ peerConnection: RTCPeerConnection, didRemove candidates: [RTCIceCandidate]) {}
+    func peerConnection(_ peerConnection: RTCPeerConnection, didOpen dataChannel: RTCDataChannel) {}
+    func peerConnection(_ peerConnection: RTCPeerConnection, didAdd rtpReceiver: RTCRtpReceiver, streams mediaStreams: [RTCMediaStream]) {
+        if let v = rtpReceiver.track as? RTCVideoTrack {
+            onRemoteVideo(v)
+        }
+    }
+}
+

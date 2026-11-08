@@ -1,9 +1,8 @@
+import SwiftUI
 import UIKit
 
 final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
-    private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
-    private weak var rootController: KinnectViewController?
 
     func scene(
         _ scene: UIScene,
@@ -12,30 +11,30 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     ) {
         guard let windowScene = (scene as? UIWindowScene) else { return }
         let window = UIWindow(windowScene: windowScene)
-        let vc = KinnectViewController()
-        self.rootController = vc
-        window.rootViewController = vc
+        let hostingController = UIHostingController(rootView: RootMainView())
+        hostingController.view.backgroundColor = UIColor { trait in
+            trait.userInterfaceStyle == .light
+                ? UIColor(red: 0.96, green: 0.95, blue: 0.98, alpha: 1.0)
+                : UIColor(red: 0.05, green: 0.04, blue: 0.11, alpha: 1.0)
+        }
+        window.rootViewController = hostingController
         self.window = window
         window.makeKeyAndVisible()
     }
 
     func sceneDidBecomeActive(_ scene: UIScene) {
-        endBackgroundTask()
         UIApplication.shared.applicationIconBadgeNumber = 0
-        rootController?.syncBackgroundSocket()
-    }
-
-    func sceneDidEnterBackground(_ scene: UIScene) {
-        rootController?.syncBackgroundSocket()
-        backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "KinnectSocketKeepAlive") { [weak self] in
-            self?.endBackgroundTask()
+        NativeSocketClient.shared.connectWithKeychainSession()
+        Task { @MainActor in
+            await AppState.shared.refreshGlobalBadges()
         }
     }
 
-    private func endBackgroundTask() {
-        if backgroundTask != .invalid {
-            UIApplication.shared.endBackgroundTask(backgroundTask)
-            backgroundTask = .invalid
+    func sceneDidEnterBackground(_ scene: UIScene) {
+        // Do NOT use UIBackgroundTask WebSocket keepalive as a substitute for PushKit.
+        // If there is no active CallKit/WebRTC call in progress, allow the foreground WebSocket to close cleanly.
+        if NativeWebRTCManager.shared.activeCall == nil {
+            NativeSocketClient.shared.disconnect()
         }
     }
 }

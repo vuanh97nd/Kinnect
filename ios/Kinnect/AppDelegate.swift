@@ -8,6 +8,10 @@ final class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationC
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
+        MediaPermissionHandler.shared.configureAudioSessionForMedia()
+        Task { @MainActor in
+            PushKitManager.shared.startRegistration()
+        }
         return true
     }
 
@@ -16,7 +20,25 @@ final class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationC
         configurationForConnecting connectingSceneSession: UISceneSession,
         options: UIScene.ConnectionOptions
     ) -> UISceneConfiguration {
-        return UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
+        UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
+    }
+
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        Task { @MainActor in
+            PushKitManager.shared.didRegisterForRemoteNotifications(deviceToken: deviceToken)
+        }
+    }
+
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        Task { @MainActor in
+            PushKitManager.shared.didFailToRegisterForRemoteNotifications(error: error)
+        }
     }
 
     // MARK: - UNUserNotificationCenterDelegate

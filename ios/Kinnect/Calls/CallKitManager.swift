@@ -14,6 +14,7 @@ final class CallKitManager: NSObject, CXProviderDelegate {
 
     var onAnswerCall: ((String) -> Void)?
     var onEndCall: ((String) -> Void)?
+    var onSetMuted: ((String, Bool) -> Void)?
 
     private override init() {
         let config = CXProviderConfiguration()
@@ -28,9 +29,18 @@ final class CallKitManager: NSObject, CXProviderDelegate {
         self.provider.setDelegate(self, queue: nil)
     }
 
-    func reportIncomingCall(callId: String, callerName: String, isVideo: Bool) {
-        guard !callId.isEmpty else { return }
+    func reportIncomingCall(
+        callId: String,
+        callerName: String,
+        isVideo: Bool,
+        completion: (() -> Void)? = nil
+    ) {
+        guard !callId.isEmpty else {
+            completion?()
+            return
+        }
         if callUUIDs[callId] != nil {
+            completion?()
             return
         }
 
@@ -52,6 +62,26 @@ final class CallKitManager: NSObject, CXProviderDelegate {
                 print("[KinnectCallKit] Failed to report incoming call: \(error)")
                 self?.postFallbackCallNotification(callId: callId, callerName: callerName, isVideo: isVideo)
             }
+            completion?()
+        }
+    }
+
+    func startOutgoingCall(callId: String, targetName: String, isVideo: Bool) {
+        guard !callId.isEmpty else { return }
+        let uuid = callUUIDs[callId] ?? UUID()
+        callUUIDs[callId] = uuid
+        callIDs[uuid] = callId
+
+        let handle = CXHandle(type: .generic, value: targetName)
+        let startAction = CXStartCallAction(call: uuid, handle: handle)
+        startAction.isVideo = isVideo
+        let transaction = CXTransaction(action: startAction)
+        callController.request(transaction) { error in
+            if let error = error {
+                print("[KinnectCallKit] Start outgoing call transaction failed: \(error.localizedDescription)")
+            } else {
+                self.provider.reportOutgoingCall(with: uuid, startedConnectingAt: Date())
+            }
         }
     }
 
@@ -65,6 +95,17 @@ final class CallKitManager: NSObject, CXProviderDelegate {
         callIDs.removeValue(forKey: uuid)
         provider.reportCall(with: uuid, endedAt: Date(), reason: reason)
         UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["call-\(callId)"])
+    }
+
+    func requestEndCall(callId: String) {
+        guard let uuid = callUUIDs[callId] else { return }
+        let endAction = CXEndCallAction(call: uuid)
+        let transaction = CXTransaction(action: endAction)
+        callController.request(transaction) { [weak self] error in
+            if error != nil {
+                self?.reportCallEnded(callId: callId, reason: .remoteEnded)
+            }
+        }
     }
 
     func endAllCalls() {
@@ -94,6 +135,11 @@ final class CallKitManager: NSObject, CXProviderDelegate {
         callIDs.removeAll()
     }
 
+    func provider(_ provider: CXProvider, perform action: CXStartCallAction) {
+        MediaPermissionHandler.shared.configureAudioSessionForCall()
+        action.fulfill()
+    }
+
     func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
         MediaPermissionHandler.shared.configureAudioSessionForCall()
         if let callId = callIDs[action.callUUID] {
@@ -109,6 +155,15 @@ final class CallKitManager: NSObject, CXProviderDelegate {
             callUUIDs.removeValue(forKey: callId)
             DispatchQueue.main.async { [weak self] in
                 self?.onEndCall?(callId)
+            }
+        }
+        action.fulfill()
+    }
+
+    func provider(_ provider: CXProvider, perform action: CXSetMutedCallAction) {
+        if let callId = callIDs[action.callUUID] {
+            DispatchQueue.main.async { [weak self] in
+                self?.onSetMuted?(callId, action.isMuted)
             }
         }
         action.fulfill()

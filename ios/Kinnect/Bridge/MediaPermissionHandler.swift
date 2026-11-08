@@ -1,80 +1,98 @@
 import AVFoundation
 import CoreLocation
+import Photos
 import UIKit
 import UserNotifications
 
-final class MediaPermissionHandler: NSObject, CLLocationManagerDelegate {
+final class MediaPermissionHandler: NSObject, ObservableObject, CLLocationManagerDelegate {
     static let shared = MediaPermissionHandler()
 
     private let locationManager = CLLocationManager()
+    private var locationContinuation: CheckedContinuation<CLLocationCoordinate2D?, Never>?
+
+    @Published var cameraAuthorized: Bool = false
+    @Published var microphoneAuthorized: Bool = false
+    @Published var locationAuthorized: Bool = false
 
     private override init() {
         super.init()
         locationManager.delegate = self
+        locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        refreshStatuses()
     }
 
-    func configureAudioSessionForCall() {
+    func refreshStatuses() {
+        cameraAuthorized = AVCaptureDevice.authorizationStatus(for: .video) == .authorized
+        microphoneAuthorized = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        let locStatus = locationManager.authorizationStatus
+        locationAuthorized = (locStatus == .authorizedWhenInUse || locStatus == .authorizedAlways)
+    }
+
+    func configureAudioSessionForCall(speaker: Bool = true) {
         let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(
-                .playAndRecord,
-                mode: .videoChat,
-                options: [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP, .mixWithOthers]
-            )
+            var options: AVAudioSession.CategoryOptions = [.allowBluetooth, .allowBluetoothA2DP]
+            if speaker {
+                options.insert(.defaultToSpeaker)
+            }
+            try session.setCategory(.playAndRecord, mode: .videoChat, options: options)
             try session.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
-            print("[KinnectAudio] AudioSession configuration error: \(error)")
+            print("[KinnectAudio] Call AudioSession error: \(error)")
         }
     }
 
     func configureAudioSessionForMedia() {
         let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(
-                .playback,
-                mode: .default,
-                options: [.mixWithOthers, .allowBluetooth, .allowBluetoothA2DP]
-            )
+            try session.setCategory(.playback, mode: .moviePlayback, options: [.mixWithOthers, .allowBluetooth, .allowBluetoothA2DP])
             try session.setActive(true)
         } catch {
-            print("[KinnectAudio] Playback session error: \(error)")
+            print("[KinnectAudio] Media AudioSession error: \(error)")
         }
     }
 
-    func requestCameraAndMicrophoneIfNeeded(completion: ((Bool) -> Void)? = nil) {
-        let videoStatus = AVCaptureDevice.authorizationStatus(for: .video)
-        let audioStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-
-        let checkAudio: (Bool) -> Void = { videoGranted in
-            switch audioStatus {
-            case .authorized:
-                DispatchQueue.main.async { completion?(videoGranted) }
-            case .notDetermined:
-                AVCaptureDevice.requestAccess(for: .audio) { audioGranted in
-                    DispatchQueue.main.async { completion?(videoGranted && audioGranted) }
-                }
-            default:
-                DispatchQueue.main.async { completion?(false) }
-            }
-        }
-
-        switch videoStatus {
+    func requestMicrophoneAccess() async -> Bool {
+        let status = AVCaptureDevice.authorizationStatus(for: .audio)
+        let granted: Bool
+        switch status {
         case .authorized:
-            checkAudio(true)
+            granted = true
         case .notDetermined:
-            AVCaptureDevice.requestAccess(for: .video) { granted in
-                checkAudio(granted)
-            }
+            granted = await AVCaptureDevice.requestAccess(for: .audio)
         default:
-            checkAudio(false)
+            granted = false
         }
+        await MainActor.run { self.microphoneAuthorized = granted }
+        return granted
+    }
+
+    func requestCameraAccess() async -> Bool {
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        let granted: Bool
+        switch status {
+        case .authorized:
+            granted = true
+        case .notDetermined:
+            granted = await AVCaptureDevice.requestAccess(for: .video)
+        default:
+            granted = false
+        }
+        await MainActor.run { self.cameraAuthorized = granted }
+        return granted
+    }
+
+    /// Requests Microphone and (optionally) Camera permissions and returns the true authorization result.
+    func ensureCallPermissions(requireVideo: Bool) async -> Bool {
+        let micOk = await requestMicrophoneAccess()
+        guard micOk else { return false }
+        guard requireVideo else { return true }
+        return await requestCameraAccess()
     }
 
     func requestNotificationPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
-            if let error = error {
-                print("[KinnectNotify] Notification auth error: \(error)")
-            } else if granted {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
+            if granted {
                 DispatchQueue.main.async {
                     UIApplication.shared.registerForRemoteNotifications()
                 }
@@ -82,10 +100,50 @@ final class MediaPermissionHandler: NSObject, CLLocationManagerDelegate {
         }
     }
 
-    func requestLocationIfNeeded() {
+    func requestCurrentLocation() async -> CLLocationCoordinate2D? {
+        return await requestCurrentCoordinates()
+    }
+
+    func requestCurrentCoordinates() async -> CLLocationCoordinate2D? {
         let status = locationManager.authorizationStatus
+        if status == .denied || status == .restricted {
+            return nil
+        }
         if status == .notDetermined {
             locationManager.requestWhenInUseAuthorization()
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
+        }
+        let updated = locationManager.authorizationStatus
+        guard updated == .authorizedWhenInUse || updated == .authorizedAlways else {
+            await MainActor.run { self.locationAuthorized = false }
+            return nil
+        }
+        await MainActor.run { self.locationAuthorized = true }
+        if let loc = locationManager.location {
+            return loc.coordinate
+        }
+        return await withCheckedContinuation { continuation in
+            self.locationContinuation = continuation
+            self.locationManager.requestLocation()
+        }
+    }
+
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        let status = manager.authorizationStatus
+        locationAuthorized = (status == .authorizedWhenInUse || status == .authorizedAlways)
+    }
+
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        if let cont = locationContinuation {
+            locationContinuation = nil
+            cont.resume(returning: locations.last?.coordinate)
+        }
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        if let cont = locationContinuation {
+            locationContinuation = nil
+            cont.resume(returning: nil)
         }
     }
 }
