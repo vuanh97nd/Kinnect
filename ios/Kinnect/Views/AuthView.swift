@@ -141,6 +141,11 @@ struct AuthView: View {
         .onAppear {
             if let screen = UIReviewFixture.activeScreen {
                 loc.setLanguage(screen.hasSuffix("-en") ? .en : .vi)
+                if let option = CommandLine.arguments.firstIndex(of: "--ui-review-welcome-tab"),
+                   option + 1 < CommandLine.arguments.count,
+                   let page = Int(CommandLine.arguments[option + 1]), (0..<4).contains(page) {
+                    welcomePreview = page
+                }
                 if screen.hasPrefix("auth-welcome") || screen == "auth" {
                     stage = .welcome
                 } else if screen.hasPrefix("auth-login") {
@@ -298,7 +303,7 @@ struct AuthView: View {
         .task {
             guard !reduceWelcomeMotion, !UIReviewFixture.isEnabled else { return }
             while !Task.isCancelled {
-                do { try await Task.sleep(nanoseconds: 3_000_000_000) }
+                do { try await Task.sleep(nanoseconds: 1_500_000_000) }
                 catch { return }
                 guard !Task.isCancelled else { return }
                 withAnimation(.easeInOut(duration: 0.3)) {
@@ -332,10 +337,9 @@ struct AuthView: View {
             .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
         }
         .clipped()
-        .accessibilityElement(children: .ignore)
+        .accessibilityElement(children: .contain)
         .accessibilityLabel(L10n.tr("Điện thoại minh họa luân phiên các tính năng Bảng tin, Khám phá, Video và Live. Chạm để chuyển tính năng."))
-        .accessibilityAddTraits(.isButton)
-        .onTapGesture { welcomePreview = (welcomePreview + 1) % 4 }
+
     }
 
     private var welcomePhoneContent: some View {
@@ -365,8 +369,16 @@ struct AuthView: View {
                 .font(.system(size: 8)).foregroundColor(LoginChrome.muted)
                 .frame(maxWidth: .infinity, alignment: .leading)
             welcomePreviewPage
+                .id(welcomePreview)
+                .transition(.opacity)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipped()
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        welcomePreview = (welcomePreview + 1) % 4
+                    }
+                }
             HStack(spacing: 0) {
                 welcomeMiniTab("house", title: "Bảng tin", index: 0)
                 welcomeMiniTab("safari", title: "Khám phá", index: 1)
@@ -385,12 +397,32 @@ struct AuthView: View {
     }
 
     private func welcomeMiniTab(_ icon: String, title: String, index: Int) -> some View {
-        VStack(spacing: 3) {
-            Image(systemName: icon).font(.system(size: 12))
-            Text(L10n.tr(title)).font(.system(size: 6)).lineLimit(1)
+        Button {
+            withAnimation(.easeInOut(duration: 0.25)) { welcomePreview = index }
+        } label: {
+            VStack(spacing: 3) {
+                Image(systemName: icon).font(.system(size: 12))
+                Text(L10n.tr(title)).font(.system(size: 6)).lineLimit(1)
+            }
+            .foregroundColor(welcomePreview == index ? LoginChrome.purple : LoginChrome.muted)
+            .frame(maxWidth: .infinity, minHeight: 32)
+            .contentShape(Rectangle())
         }
-        .foregroundColor(welcomePreview == index ? LoginChrome.purple : LoginChrome.muted)
+        .buttonStyle(.plain)
+        .accessibilityLabel(L10n.tr(title))
+        .accessibilityAddTraits(welcomePreview == index ? [.isSelected] : [])
         .frame(maxWidth: .infinity)
+    }
+
+    // Explicit bounds keep every showcase page from center-cropping portrait faces.
+    private func welcomePortrait(_ asset: String) -> some View {
+        GeometryReader { geometry in
+            Image(asset)
+                .resizable()
+                .scaledToFill()
+                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+                .clipped()
+        }
     }
 
     @ViewBuilder
@@ -415,9 +447,8 @@ struct AuthView: View {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
                     ForEach(0..<4, id: \.self) { index in
                         VStack(spacing: 3) {
-                            Image(["WelcomeProfile", "WelcomeProfile1", "WelcomeProfile2", "WelcomeProfile3"][index])
-                                .resizable().scaledToFill()
-                                .frame(width: 80, height: 72).clipped()
+                            welcomePortrait(["WelcomeProfile", "WelcomeProfile1", "WelcomeProfile2", "WelcomeProfile3"][index])
+                                .frame(width: 80, height: 72)
                             Text(["Minh Anh, 27", "Gia Huy, 28", "Hoàng Nam, 30", "Quang Minh, 26"][index])
                                 .font(.system(size: 7, weight: .semibold)).lineLimit(1)
                                 .padding(.bottom, 4)
@@ -429,11 +460,8 @@ struct AuthView: View {
                 Spacer(minLength: 0)
             }
         case 2:
-            Image("WelcomeProfile1")
-                .resizable()
-                .scaledToFill()
+            welcomePortrait("WelcomeProfile1")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .overlay(alignment: .bottomLeading) {
                     Text("@minhanh_demo")
@@ -442,11 +470,8 @@ struct AuthView: View {
                         .padding(8)
                 }
         case 3:
-            Image("WelcomeProfile2")
-                .resizable()
-                .scaledToFill()
+            welcomePortrait("WelcomeProfile2")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .overlay(alignment: .topLeading) {
                     Text("LIVE")
@@ -471,12 +496,8 @@ struct AuthView: View {
                 Text(L10n.tr("Hồ sơ minh họa"))
                     .font(.system(size: 10))
                     .foregroundColor(LoginChrome.muted)
-                Image("WelcomeProfile")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity)
+                welcomePortrait("WelcomeProfile")
                     .frame(height: 110)
-                    .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }

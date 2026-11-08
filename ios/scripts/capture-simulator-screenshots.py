@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -174,20 +175,19 @@ def build_contact_sheet(records):
     if Image is not None:
         try:
             cols = 4
-            rows = (len(records) + cols - 1) // cols
+            png_records = [r for r in records if Path(r["file"]).suffix.lower() == ".png" and Path(r["file"]).exists()]
+            rows = (len(png_records) + cols - 1) // cols
             cell_w, cell_h = 340, 680
             sheet = Image.new("RGB", (cols * cell_w + 40, rows * cell_h + 80), (14, 11, 24))
             draw = ImageDraw.Draw(sheet)
             draw.text((24, 20), "Kinnect iOS Native SwiftUI — Actual iOS Simulator UI Review Contact Sheet", fill=(255, 255, 255))
 
-            for idx, rec in enumerate(records):
+            for idx, rec in enumerate(png_records):
                 r = idx // cols
                 c = idx % cols
                 x0 = 20 + c * cell_w
                 y0 = 60 + r * cell_h
                 img_path = Path(rec["file"])
-                if not img_path.exists():
-                    continue
                 with Image.open(img_path) as im:
                     im_copy = im.convert("RGB")
                     im_copy.thumbnail((cell_w - 28, cell_h - 70))
@@ -288,8 +288,14 @@ def main():
     # 1. Standard iPhone screenshots
     boot_and_install(standard_iphone, app_path, bundle_id)
     login_iphone_screens = [
-        ("01-iphone-auth-welcome-dark", "auth-welcome", [], "Màn hình chào mừng đầu tiên tiếng Việt (Dark) — Standard iPhone"),
-        ("01a-iphone-auth-welcome-en-dark", "auth-welcome-en", [], "Màn hình chào mừng đầu tiên tiếng Anh (English Dark) — Standard iPhone"),
+        ("01-iphone-auth-welcome-dark", "auth-welcome", ["--ui-review-welcome-tab", "1"], "Chào mừng Tab 1: Khám phá (Discover VI) — Standard iPhone"),
+        ("01-iphone-auth-welcome-tab0-feed-dark", "auth-welcome", ["--ui-review-welcome-tab", "0"], "Chào mừng Tab 0: Bảng tin (Feed VI) — Standard iPhone"),
+        ("01-iphone-auth-welcome-tab2-video-dark", "auth-welcome", ["--ui-review-welcome-tab", "2"], "Chào mừng Tab 2: Video Shorts (VI) — Standard iPhone"),
+        ("01-iphone-auth-welcome-tab3-live-dark", "auth-welcome", ["--ui-review-welcome-tab", "3"], "Chào mừng Tab 3: Trực tiếp Live (VI) — Standard iPhone"),
+        ("01a-iphone-auth-welcome-en-dark", "auth-welcome-en", ["--ui-review-welcome-tab", "1"], "Chào mừng tiếng Anh Tab 1: Khám phá (Discover EN) — Standard iPhone"),
+        ("01a0-iphone-auth-welcome-tab0-feed-en-dark", "auth-welcome-en", ["--ui-review-welcome-tab", "0"], "Chào mừng tiếng Anh Tab 0: Bảng tin (Feed EN) — Standard iPhone"),
+        ("01a2-iphone-auth-welcome-tab2-video-en-dark", "auth-welcome-en", ["--ui-review-welcome-tab", "2"], "Chào mừng tiếng Anh Tab 2: Video Shorts (EN) — Standard iPhone"),
+        ("01a3-iphone-auth-welcome-tab3-live-en-dark", "auth-welcome-en", ["--ui-review-welcome-tab", "3"], "Chào mừng tiếng Anh Tab 3: Trực tiếp Live (EN) — Standard iPhone"),
         ("01b-iphone-auth-login-dark", "auth-login", [], "Đăng nhập chính tiếng Việt trống (Dark)"),
         ("01b2-iphone-auth-login-populated-dark", "auth-login-populated", [], "Đăng nhập đã điền tài khoản & mật khẩu (Dark)"),
         ("01b3-iphone-auth-login-error-dark", "auth-login-error", [], "Đăng nhập hiển thị lỗi xác thực (Dark)"),
@@ -356,6 +362,34 @@ def main():
             "file": str(f)
         })
 
+    # Record short auto-cycle video demo (1.5s per cycle)
+    try:
+        std_udid = standard_iphone["udid"]
+        subprocess.run(["xcrun", "simctl", "terminate", std_udid, bundle_id], check=False)
+        time.sleep(0.5)
+        clip_path = OUT_DIR / "welcome-autocycle-demo.mp4"
+        rec_p = subprocess.Popen(["xcrun", "simctl", "io", std_udid, "recordVideo", str(clip_path)])
+        time.sleep(0.5)
+        run(["xcrun", "simctl", "launch", std_udid, bundle_id])
+        time.sleep(5.0)
+        rec_p.send_signal(signal.SIGINT)
+        try:
+            rec_p.wait(timeout=6)
+        except Exception:
+            rec_p.kill()
+        if clip_path.exists() and clip_path.stat().st_size > 0:
+            print(f"Recorded simulator auto-cycle clip: {clip_path} ({clip_path.stat().st_size} bytes)", flush=True)
+            records.append({
+                "slug": "welcome-autocycle-demo",
+                "screen": "auth-welcome-autocycle",
+                "description": "Video thực tế luân phiên 4 màn hình chào mừng (1.5s/chu kỳ) trên iPhone 16 Pro",
+                "device": standard_iphone["name"],
+                "runtime": standard_iphone["runtime"],
+                "file": str(clip_path)
+            })
+    except Exception as e:
+        print(f"Auto-cycle video recording skipped/unavailable: {e}", flush=True)
+
     # 2. Compact / second iPhone screenshots
     if compact_iphone:
         if compact_iphone["udid"] != standard_iphone["udid"]:
@@ -363,8 +397,12 @@ def main():
             subprocess.run(["xcrun", "simctl", "shutdown", standard_iphone["udid"]], check=False)
             boot_and_install(compact_iphone, app_path, bundle_id)
         compact_login_screens = [
-            ("14-compact-iphone-auth-welcome-dark", "auth-welcome", [], "Màn hình nhỏ: Chào mừng tiếng Việt (Dark)"),
-            ("14en-compact-iphone-auth-welcome-en-dark", "auth-welcome-en", [], "Màn hình nhỏ: Chào mừng tiếng Anh (English Dark)"),
+            ("14-compact-iphone-auth-welcome-dark", "auth-welcome", ["--ui-review-welcome-tab", "1"], "Màn hình nhỏ: Chào mừng Tab 1 Khám phá (Dark)"),
+            ("14-compact-iphone-auth-welcome-tab0-feed-dark", "auth-welcome", ["--ui-review-welcome-tab", "0"], "Màn hình nhỏ: Chào mừng Tab 0 Bảng tin (Dark)"),
+            ("14-compact-iphone-auth-welcome-tab2-video-dark", "auth-welcome", ["--ui-review-welcome-tab", "2"], "Màn hình nhỏ: Chào mừng Tab 2 Video Shorts (Dark)"),
+            ("14-compact-iphone-auth-welcome-tab3-live-dark", "auth-welcome", ["--ui-review-welcome-tab", "3"], "Màn hình nhỏ: Chào mừng Tab 3 Trực tiếp Live (Dark)"),
+            ("14en-compact-iphone-auth-welcome-en-dark", "auth-welcome-en", ["--ui-review-welcome-tab", "1"], "Màn hình nhỏ: Chào mừng tiếng Anh Tab 1 Khám phá (English Dark)"),
+            ("14en0-compact-iphone-auth-welcome-tab0-feed-en-dark", "auth-welcome-en", ["--ui-review-welcome-tab", "0"], "Màn hình nhỏ: Chào mừng tiếng Anh Tab 0 Bảng tin (English Dark)"),
             ("14a-compact-iphone-auth-login-dark", "auth-login", [], "Màn hình nhỏ: Đăng nhập tiếng Việt trống (Dark)"),
             ("14b-compact-iphone-auth-login-keyboard-dark", "auth-login-keyboard", [], "Màn hình nhỏ: Đăng nhập mở bàn phím — thấy cả ô mật khẩu & nút Đăng nhập"),
             ("14b2-compact-iphone-auth-login-password-keyboard-dark", "auth-login-password-keyboard", [], "Màn hình nhỏ: Focus ô mật khẩu mở bàn phím — nút Đăng nhập sáng & bấm được"),
