@@ -1,6 +1,10 @@
 import SwiftUI
 import AuthenticationServices
 import CryptoKit
+import UIKit
+#if DEBUG && targetEnvironment(simulator)
+import Darwin
+#endif
 
 enum AuthStage {
     case welcome
@@ -43,16 +47,29 @@ struct AuthView: View {
     @State private var errorMessage: String?
     @State private var infoMessage: String?
     @State private var showPrivacySheet = false
+    @State private var showLoginLanguageSheet = false
+    @FocusState private var focusedLoginField: LoginField?
+
+    private enum LoginField: Hashable {
+        case username
+        case password
+    }
 
     var body: some View {
         ZStack {
-            KinnectTheme.background
-                .ignoresSafeArea()
+            Group {
+                if stage == .login {
+                    LoginChrome.background
+                } else {
+                    KinnectTheme.background
+                }
+            }
+            .ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 20) {
                     #if DEBUG
-                    if UIReviewFixture.isEnabled {
+                    if UIReviewFixture.isEnabled && stage != .login {
                         HStack {
                             Text("Mock CI Active")
                                 .font(.caption2.bold())
@@ -87,13 +104,55 @@ struct AuthView: View {
             }
         }
         .onAppear {
-            if UIReviewFixture.activeScreen == "auth-login" {
-                stage = .login
-            } else if UIReviewFixture.activeScreen == "auth-register" {
-                stage = .register
-            } else if UIReviewFixture.activeScreen == "auth-forgot" {
-                stage = .forgotPassword
+            if let screen = UIReviewFixture.activeScreen {
+                loc.setLanguage(screen == "auth-login-en" ? .en : .vi)
+                if screen.hasPrefix("auth-login") {
+                    stage = .login
+                    switch screen {
+                    case "auth-login-populated":
+                        loginUsername = "minhanh"
+                        loginPassword = "kinnect2026"
+                        rememberLogin = true
+                        errorMessage = nil
+                    case "auth-login-error":
+                        loginUsername = "minhanh"
+                        loginPassword = "123456"
+                        rememberLogin = true
+                        errorMessage = L10n.tr("Tên đăng nhập hoặc mật khẩu không đúng.")
+                    case "auth-login-keyboard":
+                        loginUsername = ""
+                        loginPassword = ""
+                        errorMessage = nil
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                            focusedLoginField = .username
+                            #if DEBUG && targetEnvironment(simulator)
+                            activateSimulatorSoftwareKeyboard()
+                            #endif
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
+                            focusedLoginField = .username
+                            #if DEBUG && targetEnvironment(simulator)
+                            activateSimulatorSoftwareKeyboard()
+                            #endif
+                        }
+                    case "auth-login-lang-sheet":
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                            showLoginLanguageSheet = true
+                        }
+                    default:
+                        loginUsername = ""
+                        loginPassword = ""
+                        errorMessage = nil
+                    }
+                } else if screen == "auth-register" {
+                    stage = .register
+                } else if screen == "auth-forgot" || screen == "auth-reset" {
+                    stage = .forgotPassword
+                }
             }
+        }
+        .sheet(isPresented: $showLoginLanguageSheet) {
+            loginLanguageSheet
         }
         .sheet(isPresented: $showPrivacySheet) {
             PrivacyConsentSheet(
@@ -240,97 +299,148 @@ struct AuthView: View {
         .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
     }
 
-    // MARK: - 2. Login View
+    // MARK: - 2. Login View (Android 1.2.12 build 118 hierarchy)
     private var loginView: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            // Header Bar
-            HStack {
-                Button {
-                    errorMessage = nil
-                    infoMessage = nil
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        stage = .welcome
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                        Text(L10n.tr("Trang chủ"))
-                    }
-                    .font(.subheadline.bold())
-                    .foregroundColor(KinnectTheme.accentBright)
-                }
-
-                Spacer()
-
-                // Language switch toggle
-                Button {
-                    loc.toggle()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "globe")
-                            .font(.caption)
-                        Text(loc.currentLanguage.shortLabel)
-                            .font(.caption.bold())
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Capsule().fill(KinnectTheme.surfaceElevated))
-                    .foregroundColor(KinnectTheme.textPrimary)
-                }
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 8) {
+                Image("KinnectLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 28, height: 28)
+                    .clipShape(RoundedRectangle(cornerRadius: 7))
+                Text("Kinnect")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(LoginChrome.purple)
+                Spacer(minLength: 8)
+                Text(L10n.tr("Sống đúng mình."))
+                    .font(.system(size: 13))
+                    .foregroundColor(LoginChrome.muted)
+                    .lineLimit(1)
             }
 
-            VStack(alignment: .leading, spacing: 4) {
+            Button {
+                errorMessage = nil
+                infoMessage = nil
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    stage = .welcome
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "chevron.left")
+                    Text(L10n.tr("Trang chủ"))
+                }
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(LoginChrome.ink)
+            }
+            .padding(.top, 4)
+
+            Button {
+                showLoginLanguageSheet = true
+            } label: {
+                Text(L10n.tr("Tiếng Việt / English"))
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(LoginChrome.ink)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 42)
+                    .background(RoundedRectangle(cornerRadius: 21).fill(LoginChrome.wash))
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
                 Text(L10n.tr("Chào bạn trở lại!"))
-                    .font(.title2.bold())
-                    .foregroundColor(KinnectTheme.textPrimary)
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundColor(LoginChrome.ink)
                 Text(L10n.tr("Đăng nhập để tiếp tục những kết nối của bạn."))
-                    .font(.subheadline)
-                    .foregroundColor(KinnectTheme.textSecondary)
+                    .font(.system(size: 14))
+                    .foregroundColor(LoginChrome.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.top, 4)
+
+            HStack(spacing: 10) {
+                loginProviderButton(title: "Google", asset: "BrandGoogle") {
+                    oauth.startOAuth(provider: "google") { res in
+                        switch res {
+                        case .success(let user):
+                            appState.applyAuthenticatedUser(user, rawDict: [:], rememberMe: true)
+                        case .failure(let err):
+                            errorMessage = err.localizedDescription
+                        }
+                    }
+                }
+                loginProviderButton(title: "Facebook", asset: "BrandFacebook") {
+                    oauth.startOAuth(provider: "facebook") { res in
+                        switch res {
+                        case .success(let user):
+                            appState.applyAuthenticatedUser(user, rawDict: [:], rememberMe: true)
+                        case .failure(let err):
+                            errorMessage = err.localizedDescription
+                        }
+                    }
+                }
             }
 
-            // Input Fields
-            VStack(spacing: 12) {
-                TextField(L10n.tr("Tài khoản hoặc email"), text: $loginUsername)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .padding(14)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                    .foregroundColor(KinnectTheme.textPrimary)
+            SignInWithAppleButton(
+                .signIn,
+                onRequest: { request in
+                    request.requestedScopes = [.fullName, .email]
+                    let rawNonce = UUID().uuidString + "-" + UUID().uuidString
+                    currentAppleNonce = rawNonce
+                    let hashedData = SHA256.hash(data: Data(rawNonce.utf8))
+                    request.nonce = hashedData.compactMap { String(format: "%02x", $0) }.joined()
+                },
+                onCompletion: handleAppleSignIn
+            )
+            .signInWithAppleButtonStyle(.white)
+            .frame(height: 44)
+            .clipShape(RoundedRectangle(cornerRadius: 22))
+            .accessibilityLabel(L10n.tr("Đăng nhập bằng Apple"))
 
-                HStack {
-                    if showLoginPassword {
-                        TextField(L10n.tr("Mật khẩu"), text: $loginPassword)
-                    } else {
-                        SecureField(L10n.tr("Mật khẩu"), text: $loginPassword)
-                    }
+            if let oauthErr = oauth.oauthError {
+                Text(oauthErr)
+                    .font(.caption)
+                    .foregroundColor(KinnectTheme.warning)
+            }
+
+            loginDivider(L10n.tr("hoặc tiếp tục với mật khẩu"))
+
+            loginCredentialField(
+                systemImage: "person",
+                placeholder: L10n.tr("Tên đăng nhập"),
+                text: $loginUsername,
+                secure: false,
+                field: .username,
+                trailing: { EmptyView() }
+            )
+
+            loginCredentialField(
+                systemImage: "lock",
+                placeholder: L10n.tr("Mật khẩu (từ 6 ký tự)"),
+                text: $loginPassword,
+                secure: !showLoginPassword,
+                field: .password,
+                trailing: {
                     Button {
                         showLoginPassword.toggle()
                     } label: {
                         Image(systemName: showLoginPassword ? "eye.slash" : "eye")
-                            .foregroundColor(KinnectTheme.textSecondary)
+                            .foregroundColor(LoginChrome.muted)
                     }
                 }
-                .padding(14)
-                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                .foregroundColor(KinnectTheme.textPrimary)
-            }
+            )
 
-            // Options Row: Remember Me & Forgot Password
             HStack {
                 Button {
                     rememberLogin.toggle()
                 } label: {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: rememberLogin ? "checkmark.square.fill" : "square")
-                            .foregroundColor(rememberLogin ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
-                        Text(L10n.tr("Ghi nhớ đăng nhập"))
-                            .font(.caption)
-                            .foregroundColor(KinnectTheme.textSecondary)
+                            .foregroundColor(rememberLogin ? LoginChrome.purple : LoginChrome.muted)
+                        Text(L10n.tr("Ghi nhớ"))
+                            .font(.system(size: 14))
+                            .foregroundColor(LoginChrome.ink)
                     }
                 }
-
                 Spacer()
-
                 Button {
                     errorMessage = nil
                     infoMessage = nil
@@ -339,60 +449,200 @@ struct AuthView: View {
                     }
                 } label: {
                     Text(L10n.tr("Quên mật khẩu?"))
-                        .font(.caption.bold())
-                        .foregroundColor(KinnectTheme.accentBright)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(LoginChrome.purple)
                 }
             }
 
             if let err = errorMessage {
                 Text(err)
                     .font(.caption)
-                    .foregroundColor(KinnectTheme.danger)
+                    .foregroundColor(LoginChrome.danger)
             }
 
-            // Primary Login Button
             Button {
                 Task { await performLogin() }
             } label: {
-                HStack {
+                HStack(spacing: 8) {
                     if isLoading {
-                        ProgressView().tint(.white).padding(.trailing, 6)
+                        ProgressView().tint(.white)
+                    } else {
+                        Image(systemName: "arrow.right")
                     }
                     Text(L10n.tr("Đăng nhập"))
-                        .font(.headline.bold())
+                        .font(.system(size: 16, weight: .bold))
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(KinnectTheme.primaryGradient)
+                .frame(height: 48)
+                .background(Capsule().fill(LoginChrome.purple))
                 .foregroundColor(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
             }
             .disabled(isLoading || loginUsername.isEmpty || loginPassword.isEmpty)
 
-            // Switch to Register
-            HStack {
-                Spacer()
-                Text(L10n.tr("Chưa có tài khoản?"))
-                    .font(.caption)
-                    .foregroundColor(KinnectTheme.textSecondary)
-                Button {
-                    errorMessage = nil
-                    infoMessage = nil
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        stage = .register
-                    }
-                } label: {
-                    Text(L10n.tr("Tạo tài khoản mới"))
-                        .font(.caption.bold())
-                        .foregroundColor(KinnectTheme.accentBright)
-                }
-                Spacer()
-            }
-            .padding(.top, 4)
+            loginDivider(L10n.tr("Mới đến Kinnect?"))
+                .padding(.top, 4)
 
-            // Social Logins (Sign in with Apple, Google, Facebook)
-            socialAuthSection
+            Button {
+                errorMessage = nil
+                infoMessage = nil
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    stage = .register
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "person.badge.plus")
+                    Text(L10n.tr("Tạo tài khoản mới"))
+                        .font(.system(size: 16, weight: .semibold))
+                }
+                .foregroundColor(LoginChrome.ink)
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .background(
+                    RoundedRectangle(cornerRadius: 24)
+                        .fill(LoginChrome.card)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 24)
+                                .stroke(LoginChrome.line, lineWidth: 1)
+                        )
+                )
+            }
+
+            Text(L10n.tr("Tiếp tục nghĩa là bạn đồng ý quy tắc cộng đồng."))
+                .font(.system(size: 12))
+                .foregroundColor(LoginChrome.muted)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 2)
         }
+    }
+
+    private var loginLanguageSheet: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Capsule()
+                .fill(LoginChrome.line)
+                .frame(width: 42, height: 4)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 8)
+
+            Text(L10n.tr("Ngôn ngữ ứng dụng"))
+                .font(.system(size: 22, weight: .bold))
+                .foregroundColor(LoginChrome.ink)
+
+            ForEach(AppLanguage.allCases) { language in
+                Button {
+                    loc.setLanguage(language)
+                    showLoginLanguageSheet = false
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "globe")
+                            .foregroundColor(LoginChrome.purple)
+                        Text(language.displayName)
+                            .font(.system(size: 17))
+                            .foregroundColor(LoginChrome.ink)
+                        Spacer()
+                        if loc.currentLanguage == language {
+                            Image(systemName: "checkmark")
+                                .foregroundColor(LoginChrome.purple)
+                        }
+                    }
+                    .padding(.vertical, 8)
+                }
+            }
+
+            Button {
+                showLoginLanguageSheet = false
+            } label: {
+                Text(L10n.tr("Đóng"))
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(LoginChrome.ink)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 46)
+                    .background(
+                        RoundedRectangle(cornerRadius: 23)
+                            .fill(LoginChrome.card)
+                            .overlay(RoundedRectangle(cornerRadius: 23).stroke(LoginChrome.line, lineWidth: 1))
+                    )
+            }
+            .padding(.top, 8)
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(LoginChrome.background.ignoresSafeArea())
+        .presentationDetents([.height(320)])
+    }
+
+    private func loginDivider(_ title: String) -> some View {
+        HStack(spacing: 10) {
+            Rectangle().fill(LoginChrome.line).frame(height: 1)
+            Text(title)
+                .font(.system(size: 13))
+                .foregroundColor(LoginChrome.muted)
+                .fixedSize()
+            Rectangle().fill(LoginChrome.line).frame(height: 1)
+        }
+    }
+
+    private func loginProviderButton(title: String, asset: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(asset)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 18, height: 18)
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(LoginChrome.ink)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 44)
+            .background(
+                RoundedRectangle(cornerRadius: 22)
+                    .fill(LoginChrome.card)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22)
+                            .stroke(LoginChrome.line, lineWidth: 1)
+                    )
+            )
+        }
+    }
+
+    private func loginCredentialField<Trailing: View>(
+        systemImage: String,
+        placeholder: String,
+        text: Binding<String>,
+        secure: Bool,
+        field: LoginField,
+        @ViewBuilder trailing: () -> Trailing
+    ) -> some View {
+        let focused = focusedLoginField == field
+        return HStack(spacing: 10) {
+            Image(systemName: systemImage)
+                .font(.system(size: 14))
+                .foregroundColor(focused ? LoginChrome.purple : LoginChrome.muted)
+            Group {
+                if secure {
+                    SecureField(placeholder, text: text)
+                } else {
+                    TextField(placeholder, text: text)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                }
+            }
+            .focused($focusedLoginField, equals: field)
+            .foregroundColor(LoginChrome.ink)
+            trailing()
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 48)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(LoginChrome.wash)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(focused ? LoginChrome.purple : LoginChrome.line, lineWidth: focused ? 1.5 : 1)
+                )
+        )
     }
 
     // MARK: - 3. Register View
@@ -882,5 +1132,87 @@ struct AuthView: View {
                 errorMessage = error.localizedDescription
             }
         }
+    }
+
+    #if DEBUG && targetEnvironment(simulator)
+    private func disableSimulatorHardwareKeyboardMode() {
+        if let handle = dlopen("/System/Library/PrivateFrameworks/GraphicsServices.framework/GraphicsServices", RTLD_NOW),
+           let sym = dlsym(handle, "GSEventSetHardwareKeyboardAttached") {
+            typealias Fn = @convention(c) (Bool, UInt8) -> Void
+            let setAttached = unsafeBitCast(sym, to: Fn.self)
+            setAttached(false, 0)
+        }
+        if let kbClass = NSClassFromString("UIKeyboardImpl") as? NSObject.Type,
+           kbClass.responds(to: NSSelectorFromString("sharedInstance")),
+           let kb = kbClass.perform(NSSelectorFromString("sharedInstance"))?.takeUnretainedValue() as? NSObject {
+            let sel = NSSelectorFromString("setInHardwareKeyboardMode:")
+            if kb.responds(to: sel), let imp = kb.method(for: sel) {
+                typealias SetModeFn = @convention(c) (AnyObject, Selector, Bool) -> Void
+                let fn = unsafeBitCast(imp, to: SetModeFn.self)
+                fn(kb, sel, false)
+            }
+            let showSel = NSSelectorFromString("showKeyboardIfNeeded")
+            if kb.responds(to: showSel) {
+                _ = kb.perform(showSel)
+            }
+        }
+    }
+
+    private func findFirstTextField(in view: UIView) -> UITextField? {
+        if let tf = view as? UITextField {
+            return tf
+        }
+        for sub in view.subviews {
+            if let found = findFirstTextField(in: sub) {
+                return found
+            }
+        }
+        return nil
+    }
+
+    private func activateSimulatorSoftwareKeyboard() {
+        disableSimulatorHardwareKeyboardMode()
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        for scene in scenes {
+            for window in scene.windows {
+                if let tf = findFirstTextField(in: window) {
+                    window.makeKeyAndVisible()
+                    disableSimulatorHardwareKeyboardMode()
+                    _ = tf.becomeFirstResponder()
+                    disableSimulatorHardwareKeyboardMode()
+                    tf.reloadInputViews()
+                    return
+                }
+            }
+        }
+    }
+    #endif
+}
+
+/// Login-only colors copied from `public/v2.css` `#kn` tokens.
+/// Light values are the first `light-dark()` argument; dark values are the second.
+private enum LoginChrome {
+    static var background: Color { adaptive(light: 0xF6F5FA, dark: 0x151419) }
+    static var card: Color { adaptive(light: 0xFFFFFF, dark: 0x222128) }
+    static var wash: Color { adaptive(light: 0xF4F1FA, dark: 0x2C2833) }
+    static var ink: Color { adaptive(light: 0x1F1D2B, dark: 0xF1EFF7) }
+    static var muted: Color { adaptive(light: 0x6A6478, dark: 0xB1AABD) }
+    static var line: Color { adaptive(light: 0xE4E0EC, dark: 0x38333F) }
+    static var purple: Color { adaptive(light: 0x6C47E0, dark: 0x7652E8) }
+    static var danger: Color { adaptive(light: 0xC2365A, dark: 0xD56579) }
+
+    private static func adaptive(light: UInt32, dark: UInt32) -> Color {
+        Color(UIColor { trait in
+            uiColor(trait.userInterfaceStyle == .light ? light : dark)
+        })
+    }
+
+    private static func uiColor(_ hex: UInt32) -> UIColor {
+        UIColor(
+            red: CGFloat((hex >> 16) & 0xFF) / 255,
+            green: CGFloat((hex >> 8) & 0xFF) / 255,
+            blue: CGFloat(hex & 0xFF) / 255,
+            alpha: 1
+        )
     }
 }

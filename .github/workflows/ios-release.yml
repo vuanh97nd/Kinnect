@@ -2,6 +2,11 @@ name: Build Kinnect Native iOS IPA
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Build sideload/AppStore IPA and publish GitHub Release'
+        required: false
+        default: 'false'
   push:
     branches:
       - '**'
@@ -23,6 +28,7 @@ env:
 jobs:
   build-sideload:
     name: Build Native iOS Sideload IPA (Free Apple ID / AltStore / Sideloadly)
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_release == 'true'
     runs-on: macos-15
     timeout-minutes: 30
     steps:
@@ -116,6 +122,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish downloadable Sideload IPA to GitHub Release (ios-v1.2.12)
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_release == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -140,6 +147,7 @@ jobs:
 
   build-appstore:
     name: Build Signed App Store IPA (When Apple Developer Cert Secrets Exist)
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_release == 'true'
     runs-on: macos-15
     timeout-minutes: 30
     env:
@@ -235,6 +243,8 @@ jobs:
           xcodegen generate
 
       - name: Build Simulator App & Capture Native Screenshots via simctl
+        env:
+          UI_REVIEW_ONLY_LOGIN: "1"
         run: |
           python3 -m pip install --break-system-packages pillow || true
           python3 ios/scripts/capture-simulator-screenshots.py

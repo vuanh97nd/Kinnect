@@ -94,8 +94,10 @@ def boot_and_install(device, app_path, bundle_id):
     udid = device["udid"]
     name = device["name"]
     print(f"Booting simulator {name} ({udid})...", flush=True)
+    subprocess.run(["defaults", "write", "com.apple.iphonesimulator", "ConnectHardwareKeyboard", "-bool", "false"], check=False)
     subprocess.run(["xcrun", "simctl", "boot", udid], check=False)
     run(["xcrun", "simctl", "bootstatus", udid, "-b"])
+    subprocess.run(["open", "-g", "-a", "Simulator", "--args", "-CurrentDeviceUDID", udid], check=False)
     # Set default dark appearance initially
     subprocess.run(["xcrun", "simctl", "ui", udid, "appearance", "dark"], check=False)
     # Set clean status bar
@@ -108,8 +110,8 @@ def boot_and_install(device, app_path, bundle_id):
     run(["xcrun", "simctl", "install", udid, str(app_path)])
     # Warm-up app launch to ensure Dyld, SpringBoard, and Metal render caches are ready
     print(f"Warming up app on {name}...", flush=True)
-    subprocess.run(["xcrun", "simctl", "launch", udid, bundle_id, "--ui-review-screen", "feed"], check=False)
-    time.sleep(4.0)
+    subprocess.run(["xcrun", "simctl", "launch", udid, bundle_id, "--ui-review-screen", "auth-login"], check=False)
+    time.sleep(3.5)
     subprocess.run(["xcrun", "simctl", "terminate", udid, bundle_id], check=False)
     time.sleep(1.0)
 
@@ -142,7 +144,10 @@ def capture_screen(device, slug, screen_arg, bundle_id, extra_args=None, wait_se
         cmd.extend(extra_args)
     run(cmd)
 
-    actual_wait = 5.5 if screen_arg == "auth" else wait_sec
+    if screen_arg in ("auth", "auth-login-keyboard", "auth-login-lang-sheet"):
+        actual_wait = 4.8
+    else:
+        actual_wait = wait_sec
     time.sleep(actual_wait)
 
     out_file = OUT_DIR / f"{slug}.png"
@@ -277,11 +282,20 @@ def main():
 
     records = []
 
+    only_login = os.environ.get("UI_REVIEW_ONLY_LOGIN") == "1"
+
     # 1. Standard iPhone screenshots
     boot_and_install(standard_iphone, app_path, bundle_id)
-    iphone_screens = [
+    login_iphone_screens = [
         ("01-iphone-auth-welcome-dark", "auth-welcome", [], "Màn hình chào mừng đầu tiên với logo và VI/EN (Dark)"),
-        ("01b-iphone-auth-login-dark", "auth-login", [], "Đăng nhập chính với Ghi nhớ & Quên mật khẩu"),
+        ("01b-iphone-auth-login-dark", "auth-login", [], "Đăng nhập chính tiếng Việt trống (Dark)"),
+        ("01b2-iphone-auth-login-populated-dark", "auth-login-populated", [], "Đăng nhập đã điền tài khoản & mật khẩu (Dark)"),
+        ("01b3-iphone-auth-login-error-dark", "auth-login-error", [], "Đăng nhập hiển thị lỗi xác thực (Dark)"),
+        ("01b4-iphone-auth-login-en-dark", "auth-login-en", [], "Đăng nhập giao diện tiếng Anh (English Dark)"),
+        ("01b5-iphone-auth-login-keyboard-dark", "auth-login-keyboard", [], "Đăng nhập mở bàn phím trên Standard iPhone (Dark)"),
+        ("01b6-iphone-auth-login-lang-sheet-dark", "auth-login-lang-sheet", [], "Đăng nhập mở bảng chọn ngôn ngữ VI/EN (Dark)"),
+    ]
+    other_iphone_screens = [
         ("01c-iphone-auth-register-dark", "auth-register", [], "Đăng ký tài khoản với checkbox 18+ và Quyền riêng tư"),
         ("01d-iphone-auth-forgot-dark", "auth-reset", [], "Quên mật khẩu: Khôi phục mật khẩu tài khoản (008)"),
         ("01e-iphone-auth-welcome-light", "auth-welcome", ["--ui-review-light"], "Màn hình chào mừng đầu tiên (Light)"),
@@ -327,6 +341,7 @@ def main():
         ("13j-iphone-support", "support", [], "Trung tâm Hỗ trợ & Trợ giúp người dùng (124)"),
         ("13k-iphone-change-password-light", "change-password", ["--ui-review-light"], "Cài đặt: Đổi mật khẩu tài khoản (Light)")
     ]
+    iphone_screens = login_iphone_screens if only_login else (login_iphone_screens + other_iphone_screens)
 
     for slug, screen_arg, extra, desc in iphone_screens:
         f = capture_screen(standard_iphone, slug, screen_arg, bundle_id, extra, wait_sec=3.0)
@@ -345,12 +360,19 @@ def main():
             print(f"Shutting down previous standard simulator {standard_iphone['name']} to free resources...", flush=True)
             subprocess.run(["xcrun", "simctl", "shutdown", standard_iphone["udid"]], check=False)
             boot_and_install(compact_iphone, app_path, bundle_id)
-        for slug, screen_arg, extra, desc in [
+        compact_login_screens = [
+            ("14a-compact-iphone-auth-login-dark", "auth-login", [], "Màn hình nhỏ: Đăng nhập tiếng Việt trống (Dark)"),
+            ("14b-compact-iphone-auth-login-keyboard-dark", "auth-login-keyboard", [], "Màn hình nhỏ: Đăng nhập mở bàn phím (Compact iPhone Keyboard Open)"),
+            ("14c-compact-iphone-auth-login-lang-sheet-dark", "auth-login-lang-sheet", [], "Màn hình nhỏ: Đăng nhập mở bảng chọn ngôn ngữ VI/EN (Dark)"),
+        ]
+        compact_other_screens = [
             ("14-compact-iphone-feed", "feed", [], "Màn hình nhỏ: Bảng tin & Tab bar 5 tab 26pt"),
             ("15-compact-iphone-chat-detail", "chat-detail", [], "Màn hình nhỏ: Chi tiết Chat & hàng trạng thái dưới"),
             ("16-compact-iphone-wallet", "wallet", [], "Màn hình nhỏ: Ví & Cửa hàng không cắt số dư / Nạp xu"),
             ("16b-compact-iphone-dynamictype-max", "feed", ["--ui-review-dynamictype-max"], "Màn hình nhỏ: Dynamic Type kích thước tối đa Accessibility 5")
-        ]:
+        ]
+        compact_screens = compact_login_screens if only_login else (compact_login_screens + compact_other_screens)
+        for slug, screen_arg, extra, desc in compact_screens:
             f = capture_screen(compact_iphone, slug, screen_arg, bundle_id, extra_args=extra, wait_sec=3.0)
             records.append({
                 "slug": slug,
@@ -362,7 +384,7 @@ def main():
             })
 
     # 3. iPad screenshots
-    if ipad:
+    if ipad and not only_login:
         active_to_shutdown = compact_iphone if (compact_iphone and compact_iphone["udid"] != standard_iphone["udid"]) else standard_iphone
         if active_to_shutdown and active_to_shutdown["udid"] != ipad["udid"]:
             print(f"Shutting down previous simulator {active_to_shutdown['name']} to free resources...", flush=True)

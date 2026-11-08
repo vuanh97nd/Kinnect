@@ -40,7 +40,9 @@ final class LocalizationManager: ObservableObject {
     }
 
     private init() {
-        if let saved = UserDefaults.standard.string(forKey: userDefaultsKey),
+        if UIReviewFixture.isEnabled {
+            self.currentLanguage = (UIReviewFixture.activeScreen == "auth-login-en") ? .en : .vi
+        } else if let saved = UserDefaults.standard.string(forKey: userDefaultsKey),
            let lang = AppLanguage(rawValue: saved) {
             self.currentLanguage = lang
         } else {
@@ -81,14 +83,6 @@ final class LocalizationManager: ObservableObject {
         "Về trang giới thiệu": [
             .vi: "Về trang giới thiệu",
             .en: "Back to intro"
-        ],
-        "Ngôn ngữ ứng dụng": [
-            .vi: "Ngôn ngữ ứng dụng",
-            .en: "App Language"
-        ],
-        "Tiếng Việt / English": [
-            .vi: "Tiếng Việt / English",
-            .en: "English / Tiếng Việt"
         ],
         "Bắt đầu kết nối": [
             .vi: "Bắt đầu kết nối",
@@ -143,6 +137,42 @@ final class LocalizationManager: ObservableObject {
         "Quên mật khẩu?": [
             .vi: "Quên mật khẩu?",
             .en: "Forgot password?"
+        ],
+        "Ghi nhớ": [
+            .vi: "Ghi nhớ",
+            .en: "Remember"
+        ],
+        "Tiếng Việt / English": [
+            .vi: "Tiếng Việt / English",
+            .en: "Tiếng Việt / English"
+        ],
+        "hoặc tiếp tục với mật khẩu": [
+            .vi: "hoặc tiếp tục với mật khẩu",
+            .en: "or continue with a password"
+        ],
+        "Tên đăng nhập": [
+            .vi: "Tên đăng nhập",
+            .en: "Username"
+        ],
+        "Mật khẩu (từ 6 ký tự)": [
+            .vi: "Mật khẩu (từ 6 ký tự)",
+            .en: "Password (6+ characters)"
+        ],
+        "Mới đến Kinnect?": [
+            .vi: "Mới đến Kinnect?",
+            .en: "New to Kinnect?"
+        ],
+        "Ngôn ngữ ứng dụng": [
+            .vi: "Ngôn ngữ ứng dụng",
+            .en: "App language"
+        ],
+        "Đóng": [
+            .vi: "Đóng",
+            .en: "Close"
+        ],
+        "Tên đăng nhập hoặc mật khẩu không đúng.": [
+            .vi: "Tên đăng nhập hoặc mật khẩu không đúng.",
+            .en: "Invalid username or password."
         ],
         "Chưa có tài khoản?": [
             .vi: "Chưa có tài khoản?",

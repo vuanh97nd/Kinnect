@@ -55,7 +55,7 @@ struct RootMainView: View {
 
             if UIReviewFixture.activeScreen == "auth" || UIReviewFixture.activeScreen == "auth-welcome" {
                 AuthView(initialStage: .welcome)
-            } else if UIReviewFixture.activeScreen == "auth-login" {
+            } else if UIReviewFixture.activeScreen?.hasPrefix("auth-login") == true {
                 AuthView(initialStage: .login)
             } else if UIReviewFixture.activeScreen == "auth-register" {
                 AuthView(initialStage: .register)
