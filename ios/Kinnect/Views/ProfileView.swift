@@ -598,91 +598,111 @@ struct ProfileView: View {
         }
     }
 
+    @ViewBuilder
+    private func peerFriendshipButton(user: KinnectUser) -> some View {
+        let isFriends = (peerFriendship == "friends")
+        let isOutgoing = (peerFriendship == "outgoing")
+        let isIncoming = (peerFriendship == "incoming")
+        let title: String = isFriends ? "Bạn bè" : (isOutgoing ? "Đã gửi" : (isIncoming ? "Chấp nhận" : "Kết bạn"))
+        let glyph: KinnectGlyph = isFriends ? .friends : (isOutgoing ? .refresh : .add)
+        let fgColor: Color = isFriends ? KinnectTheme.online : .white
+
+        Button {
+            Task { await handlePeerFriendAction(user: user) }
+        } label: {
+            HStack(spacing: 6) {
+                KinnectIcon(glyph: glyph, size: 18, tint: fgColor)
+                Text(title)
+                    .font(.subheadline.bold())
+                    .foregroundColor(fgColor)
+            }
+            .frame(maxWidth: .infinity, minHeight: 40)
+            .background(
+                Group {
+                    if isFriends || isOutgoing {
+                        RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated)
+                    } else {
+                        RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.primaryGradient)
+                    }
+                }
+            )
+        }
+        .disabled(isFriendActionLoading)
+    }
+
+    @ViewBuilder
+    private func peerMessageButton() -> some View {
+        Button {
+            showPeerChat = true
+        } label: {
+            HStack(spacing: 6) {
+                KinnectIcon(glyph: .messages, size: 18, tint: KinnectTheme.accentBright)
+                Text("Nhắn tin")
+                    .font(.subheadline.bold())
+                    .foregroundColor(KinnectTheme.accentBright)
+            }
+            .frame(maxWidth: .infinity, minHeight: 40)
+            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+        }
+    }
+
+    @ViewBuilder
+    private func peerCallButton(user: KinnectUser, mode: String) -> some View {
+        let isVideo = (mode == "video")
+        Button {
+            Task {
+                dismiss()
+                await NativeWebRTCManager.shared.startOutgoingCall(targetUser: user, mode: mode)
+            }
+        } label: {
+            KinnectIcon(
+                glyph: isVideo ? .videoCall : .phone,
+                size: 18,
+                tint: isVideo ? KinnectTheme.accentBright : KinnectTheme.online
+            )
+            .frame(width: 40, height: 40)
+            .background(Circle().fill(KinnectTheme.surfaceElevated))
+        }
+        .accessibilityLabel(isVideo ? "Gọi video" : "Gọi thoại")
+    }
+
+    @ViewBuilder
+    private func peerMoreMenu(user: KinnectUser) -> some View {
+        Menu {
+            Button(role: .destructive) {
+                Task {
+                    await appState.blockUser(userId: user.id, userName: user.name)
+                    dismiss()
+                }
+            } label: {
+                Label("Chặn người dùng", systemImage: "hand.raised.fill")
+            }
+            Button {
+                appState.activeReportContext = UGCReportContext(
+                    targetType: "user",
+                    targetId: user.id,
+                    targetUserId: user.id,
+                    targetTitle: user.name
+                )
+            } label: {
+                Label("Báo cáo người dùng", systemImage: "flag.fill")
+            }
+        } label: {
+            KinnectIcon(glyph: .more, size: 18, tint: KinnectTheme.textSecondary)
+                .frame(width: 40, height: 40)
+                .background(Circle().fill(KinnectTheme.surfaceElevated))
+        }
+        .accessibilityLabel("Tùy chọn khác")
+    }
+
+    @ViewBuilder
     private func peerActionsRow(user: KinnectUser) -> some View {
         HStack(spacing: 8) {
-            Button {
-                Task { await handlePeerFriendAction(user: user) }
-            } label: {
-                HStack(spacing: 6) {
-                    KinnectIcon(
-                        glyph: peerFriendship == "friends" ? .friends : (peerFriendship == "outgoing" ? .refresh : .add),
-                        size: 18,
-                        tint: peerFriendship == "friends" ? KinnectTheme.online : .white
-                    )
-                    Text(peerFriendship == "friends" ? "Bạn bè" : (peerFriendship == "outgoing" ? "Đã gửi" : (peerFriendship == "incoming" ? "Chấp nhận" : "Kết bạn")))
-                        .font(.subheadline.bold())
-                        .foregroundColor(peerFriendship == "friends" ? KinnectTheme.online : .white)
-                }
-                .frame(maxWidth: .infinity, minHeight: 40)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(peerFriendship == "friends" ? KinnectTheme.surfaceElevated : (peerFriendship == "outgoing" ? KinnectTheme.surfaceElevated : KinnectTheme.primaryGradient))
-                )
-            }
-            .disabled(isFriendActionLoading)
-
-            Button {
-                showPeerChat = true
-            } label: {
-                HStack(spacing: 6) {
-                    KinnectIcon(glyph: .messages, size: 18, tint: KinnectTheme.accentBright)
-                    Text("Nhắn tin")
-                        .font(.subheadline.bold())
-                        .foregroundColor(KinnectTheme.accentBright)
-                }
-                .frame(maxWidth: .infinity, minHeight: 40)
-                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-            }
-
-            Button {
-                Task {
-                    dismiss()
-                    await NativeWebRTCManager.shared.startOutgoingCall(targetUser: user, mode: "audio")
-                }
-            } label: {
-                KinnectIcon(glyph: .phone, size: 18, tint: KinnectTheme.online)
-                    .frame(width: 40, height: 40)
-                    .background(Circle().fill(KinnectTheme.surfaceElevated))
-            }
-            .accessibilityLabel("Gọi thoại")
-
-            Button {
-                Task {
-                    dismiss()
-                    await NativeWebRTCManager.shared.startOutgoingCall(targetUser: user, mode: "video")
-                }
-            } label: {
-                KinnectIcon(glyph: .videoCall, size: 18, tint: KinnectTheme.accentBright)
-                    .frame(width: 40, height: 40)
-                    .background(Circle().fill(KinnectTheme.surfaceElevated))
-            }
-            .accessibilityLabel("Gọi video")
-
-            Menu {
-                Button(role: .destructive) {
-                    Task {
-                        await appState.blockUser(userId: user.id, userName: user.name)
-                        dismiss()
-                    }
-                } label: {
-                    Label("Chặn người dùng", systemImage: "hand.raised.fill")
-                }
-                Button {
-                    appState.activeReportContext = UGCReportContext(
-                        targetType: "user",
-                        targetId: user.id,
-                        targetUserId: user.id,
-                        targetTitle: user.name
-                    )
-                } label: {
-                    Label("Báo cáo người dùng", systemImage: "flag.fill")
-                }
-            } label: {
-                KinnectIcon(glyph: .more, size: 18, tint: KinnectTheme.textSecondary)
-                    .frame(width: 40, height: 40)
-                    .background(Circle().fill(KinnectTheme.surfaceElevated))
-            }
-            .accessibilityLabel("Tùy chọn khác")
+            peerFriendshipButton(user: user)
+            peerMessageButton()
+            peerCallButton(user: user, mode: "audio")
+            peerCallButton(user: user, mode: "video")
+            peerMoreMenu(user: user)
         }
         .padding(.horizontal, 14)
     }
