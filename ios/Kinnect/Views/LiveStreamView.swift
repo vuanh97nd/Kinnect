@@ -736,7 +736,7 @@ struct LiveGiftDrawerSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedQuantity: Int = 1
 
-    private let quantities = [1, 5, 10, 100]
+    private let quantities = [1, 2, 5, 10, 50]
 
     var body: some View {
         NavigationStack {
@@ -751,14 +751,23 @@ struct LiveGiftDrawerSheet: View {
                         Button {
                             selectedQuantity = qty
                         } label: {
-                            Text("x\(qty)")
-                                .font(.caption.bold())
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(
-                                    Capsule().fill(selectedQuantity == qty ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
-                                )
-                                .foregroundColor(selectedQuantity == qty ? .white : KinnectTheme.textSecondary)
+                            HStack(spacing: 4) {
+                                if let img = UIImage(named: "kg20261109_combo_x\(qty)") {
+                                    Image(uiImage: img)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(height: 18)
+                                } else {
+                                    Text("x\(qty)")
+                                        .font(.caption.bold())
+                                }
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(
+                                Capsule().fill(selectedQuantity == qty ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
+                            )
+                            .foregroundColor(selectedQuantity == qty ? .white : KinnectTheme.textSecondary)
                         }
                     }
                     Spacer()
@@ -815,9 +824,19 @@ struct LiveGiftDrawerSheet: View {
         .presentationDragIndicator(.visible)
     }
 
+    private func giftAssetName(for id: String) -> String {
+        return (id == "car") ? "sports_car" : id
+    }
+
     @ViewBuilder
     private func giftIconView(_ gift: LiveGiftCatalogItem) -> some View {
-        if let img = UIImage(named: "gift_\(gift.id)") ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "gift_\(gift.id)", ofType: "png") ?? "") ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "gift_\(gift.id)_3d", ofType: "jpg") ?? "") {
+        let key = giftAssetName(for: gift.id)
+        if let img = UIImage(named: "kg20261109_gift_\(key)")
+            ?? UIImage(named: "kg20261109_gift_\(gift.id)")
+            ?? UIImage(named: "gift_\(key)")
+            ?? UIImage(named: "gift_\(gift.id)")
+            ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "gift_\(key)", ofType: "png") ?? "")
+            ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "gift_\(key)_3d", ofType: "jpg") ?? "") {
             Image(uiImage: img)
                 .resizable()
                 .scaledToFit()
@@ -860,21 +879,32 @@ struct LiveFloatingReactionView: View {
     @State private var scale: CGFloat = 0.5
 
     var body: some View {
-        Text(symbol)
-            .font(.system(size: 36))
-            .scaleEffect(scale)
-            .opacity(opacity)
-            .offset(y: offsetY)
-            .onAppear {
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
-                    scale = 1.15
-                }
-                withAnimation(.easeOut(duration: 1.1)) {
-                    offsetY = -180
-                    opacity = 0
-                    scale = 1.3
-                }
+        Group {
+            if let img = UIImage(named: "kg20261109_gift_\(symbol)")
+                ?? UIImage(named: "kg20261109_gift_\(symbol == "car" ? "sports_car" : symbol)")
+                ?? UIImage(named: "gift_\(symbol)") {
+                Image(uiImage: img)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 48, height: 48)
+            } else {
+                Text(symbol)
+                    .font(.system(size: 36))
             }
-            .allowsHitTesting(false)
+        }
+        .scaleEffect(scale)
+        .opacity(opacity)
+        .offset(y: offsetY)
+        .onAppear {
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                scale = 1.15
+            }
+            withAnimation(.easeOut(duration: 1.1)) {
+                offsetY = -180
+                opacity = 0
+                scale = 1.3
+            }
+        }
+        .allowsHitTesting(false)
     }
 }

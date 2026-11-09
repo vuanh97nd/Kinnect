@@ -85,7 +85,13 @@ struct CameraStudioView: View {
         ("rose", "Rose"),
         ("golden", "Golden"),
         ("ice", "Ice"),
-        ("teal", "Teal")
+        ("teal", "Teal"),
+        ("teal_orange", "Teal & Cam"),
+        ("cyberpunk", "Cyberpunk"),
+        ("vintage", "Vintage"),
+        ("drama", "Kịch tính"),
+        ("noir", "Noir"),
+        ("beauty_glow", "Glow sáng")
     ]
 
     static let beautyTools: [(key: String, title: String, icon: String)] = [
@@ -118,7 +124,15 @@ struct CameraStudioView: View {
         ("rainbow", "Cầu vồng", "🌈"),
         ("bubbles", "Bong bóng", "🫧"),
         ("snow", "Tuyết", "❄️"),
-        ("confetti", "Lễ hội", "🎉")
+        ("confetti", "Lễ hội", "🎉"),
+        ("devil", "Tiểu quỷ", "😈"),
+        ("mask", "Mặt nạ", "🎭"),
+        ("fire", "Hào quang", "🔥"),
+        ("music", "Nốt nhạc", "🎵"),
+        ("party", "Mũ tiệc", "🥳"),
+        ("pixel", "Pixel", "👾"),
+        ("retro", "Cổ điển", "🕶️"),
+        ("blush", "Má hồng", "☺️")
     ]
 
     // Media Data
@@ -258,7 +272,7 @@ struct CameraStudioView: View {
 
             // AR Face Sticker Overlay on Camera Viewfinder (Web & Android Parity)
             if activeSticker != "none", let s = Self.stickers.first(where: { $0.id == activeSticker }) {
-                if let img = UIImage(named: "sticker_\(s.id)") ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "sticker_\(s.id)", ofType: "png") ?? "") ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "sticker_\(s.id)", ofType: "jpg") ?? "") {
+                if let img = stickerImage(for: s.id) {
                     Image(uiImage: img)
                         .resizable()
                         .scaledToFit()
@@ -512,15 +526,7 @@ struct CameraStudioView: View {
                                 activeFilter = f.id
                             } label: {
                                 VStack(spacing: 4) {
-                                    Circle()
-                                        .strokeBorder(isChosen ? KinnectTheme.accentBright : Color.white.opacity(0.4), lineWidth: isChosen ? 3 : 1)
-                                        .frame(width: 48, height: 48)
-                                        .background(Circle().fill(Color.black.opacity(0.45)))
-                                        .overlay(
-                                            Text(f.name.prefix(1))
-                                                .font(.headline.bold())
-                                                .foregroundColor(isChosen ? KinnectTheme.accentBright : .white)
-                                        )
+                                    filterThumbnail(for: f.id, initial: String(f.name.prefix(1)), isChosen: isChosen)
                                     Text(f.name)
                                         .font(.caption2.bold())
                                         .foregroundColor(isChosen ? KinnectTheme.accentBright : .white.opacity(0.85))
@@ -590,7 +596,7 @@ struct CameraStudioView: View {
                                 activeSticker = s.id
                             } label: {
                                 VStack(spacing: 4) {
-                                    if let img = UIImage(named: "sticker_\(s.id)") ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "sticker_\(s.id)", ofType: "png") ?? "") ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "sticker_\(s.id)", ofType: "jpg") ?? "") {
+                                    if let img = stickerImage(for: s.id) {
                                         Image(uiImage: img)
                                             .resizable()
                                             .scaledToFit()
@@ -641,12 +647,82 @@ struct CameraStudioView: View {
         )
     }
 
+    private func filterAssetName(for id: String) -> String {
+        let key: String
+        switch id {
+        case "none": key = "original"
+        case "cool": key = "cold"
+        case "mono": key = "bw"
+        default: key = id
+        }
+        return "kg20261109_filter_\(key)"
+    }
+
+    @ViewBuilder
+    private func filterThumbnail(for id: String, initial: String, isChosen: Bool) -> some View {
+        let assetName = filterAssetName(for: id)
+        ZStack {
+            if let uiImg = UIImage(named: assetName) {
+                Image(uiImage: uiImg)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 48, height: 48)
+                    .clipShape(Circle())
+            } else {
+                Circle()
+                    .fill(Color.black.opacity(0.45))
+                    .frame(width: 48, height: 48)
+                Text(initial)
+                    .font(.headline.bold())
+                    .foregroundColor(isChosen ? KinnectTheme.accentBright : .white)
+            }
+            Circle()
+                .strokeBorder(isChosen ? KinnectTheme.accentBright : Color.white.opacity(0.4), lineWidth: isChosen ? 3 : 1)
+                .frame(width: 48, height: 48)
+        }
+    }
+
+    private func stickerImage(for id: String) -> UIImage? {
+        let mapping: [String: String] = [
+            "bunny": "bunny_ears",
+            "cat": "cat_whiskers",
+            "dog": "dog_ears",
+            "glasses": "neon_glasses",
+            "crown": "golden_tiara",
+            "flowers": "flower_crown",
+            "hearts": "cheek_hearts",
+            "sparkle": "sparkle_eyes",
+            "halo": "angel_halo",
+            "rainbow": "rainbow_paint",
+            "stars": "star_confetti",
+            "confetti": "star_confetti",
+            "butterfly": "butterfly_clip",
+            "devil": "cute_devil",
+            "mask": "cyber_mask",
+            "fire": "fire_aura",
+            "music": "music_notes",
+            "party": "party_hat",
+            "pixel": "pixel_glasses",
+            "retro": "retro_shades",
+            "blush": "blush_cheeks"
+        ]
+        let key = mapping[id] ?? id
+        return UIImage(named: "kg20261109_sticker_\(key)")
+            ?? UIImage(named: "kg20261109_sticker_\(id)")
+            ?? UIImage(named: "sticker_\(key)")
+            ?? UIImage(named: "sticker_\(id)")
+            ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "sticker_\(id)", ofType: "png") ?? "")
+            ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "sticker_\(id)", ofType: "jpg") ?? "")
+    }
+
     private func stickerOffset(for id: String) -> CGFloat {
         switch id {
-        case "crown", "bunny", "cat", "dog", "flowers", "halo":
+        case "crown", "golden_tiara", "bunny", "bunny_ears", "cat", "cat_whiskers", "dog", "dog_ears", "flowers", "flower_crown", "halo", "angel_halo", "party_hat":
             return -140
-        case "glasses", "round_glasses", "heart_glasses", "neon_glasses", "freckles":
+        case "glasses", "neon_glasses", "round_glasses", "heart_glasses", "pixel_glasses", "retro_shades", "freckles", "cyber_mask", "mask":
             return -40
+        case "hearts", "cheek_hearts", "blush_cheeks", "blush", "sparkle", "sparkle_eyes", "rainbow", "rainbow_paint":
+            return -20
         case "lips", "bow":
             return 60
         default:

@@ -452,16 +452,16 @@ struct LiveGiftCatalogItem: Identifiable, Equatable {
     }
 
     static let defaultCatalog: [LiveGiftCatalogItem] = [
-        LiveGiftCatalogItem(id: "rose", label: "Hoa hồng", emoji: "🌹", coins: 5, tier: "standard"),
-        LiveGiftCatalogItem(id: "star", label: "Sao pha lê", emoji: "⭐", coins: 20, tier: "standard"),
-        LiveGiftCatalogItem(id: "butterfly", label: "Bướm mộng", emoji: "🦋", coins: 15, tier: "standard"),
-        LiveGiftCatalogItem(id: "lotus", label: "Sen ánh sáng", emoji: "🪷", coins: 30, tier: "rare"),
-        LiveGiftCatalogItem(id: "aurora", label: "Cực quang", emoji: "🌌", coins: 50, tier: "rare"),
-        LiveGiftCatalogItem(id: "meteor", label: "Sao băng", emoji: "🌠", coins: 80, tier: "rare"),
-        LiveGiftCatalogItem(id: "crown", label: "Vương miện", emoji: "👑", coins: 100, tier: "epic"),
-        LiveGiftCatalogItem(id: "car", label: "Siêu xe", emoji: "🏎️", coins: 500, tier: "epic"),
-        LiveGiftCatalogItem(id: "yacht", label: "Du thuyền", emoji: "🛥️", coins: 1000, tier: "legendary"),
-        LiveGiftCatalogItem(id: "castle", label: "Lâu đài", emoji: "🏰", coins: 2000, tier: "legendary")
+        LiveGiftCatalogItem(id: "rose", label: "Hoa hồng", emoji: "🌹", coins: 10, tier: "standard"),
+        LiveGiftCatalogItem(id: "heart", label: "Trái tim", emoji: "💖", coins: 20, tier: "standard"),
+        LiveGiftCatalogItem(id: "coffee", label: "Cà phê", emoji: "☕", coins: 50, tier: "standard"),
+        LiveGiftCatalogItem(id: "love_gun", label: "Súng tình yêu", emoji: "🔫", coins: 100, tier: "rare"),
+        LiveGiftCatalogItem(id: "fireworks", label: "Pháo hoa", emoji: "🎆", coins: 200, tier: "rare"),
+        LiveGiftCatalogItem(id: "yacht", label: "Du thuyền", emoji: "🛥️", coins: 500, tier: "rare"),
+        LiveGiftCatalogItem(id: "crown", label: "Vương miện", emoji: "👑", coins: 1000, tier: "epic"),
+        LiveGiftCatalogItem(id: "diamond", label: "Kim cương", emoji: "💎", coins: 2000, tier: "epic"),
+        LiveGiftCatalogItem(id: "sports_car", label: "Siêu xe", emoji: "🏎️", coins: 5000, tier: "legendary"),
+        LiveGiftCatalogItem(id: "castle", label: "Lâu đài", emoji: "🏰", coins: 10000, tier: "legendary")
     ]
 }
 
