@@ -301,12 +301,13 @@ struct AuthView: View {
 
         }
         .task {
-            guard !reduceWelcomeMotion, !UIReviewFixture.isEnabled else { return }
+            // Production always cycles; UI captures opt in explicitly to remain reproducible.
+            guard !UIReviewFixture.isEnabled || CommandLine.arguments.contains("--ui-review-welcome-autocycle") else { return }
             while !Task.isCancelled {
                 do { try await Task.sleep(nanoseconds: 1_500_000_000) }
                 catch { return }
                 guard !Task.isCancelled else { return }
-                withAnimation(.easeInOut(duration: 0.3)) {
+                withAnimation(reduceWelcomeMotion ? nil : .easeInOut(duration: 0.3)) {
                     welcomePreview = (welcomePreview + 1) % 4
                 }
             }

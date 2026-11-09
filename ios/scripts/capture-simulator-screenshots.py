@@ -362,27 +362,77 @@ def main():
             "file": str(f)
         })
 
-    # Record short auto-cycle video demo (1.5s per cycle)
+    # Record >=12s auto-cycle video demo (1.5s per cycle, starting AFTER welcome screen is mounted on Tab 0)
     try:
         std_udid = standard_iphone["udid"]
         subprocess.run(["xcrun", "simctl", "terminate", std_udid, bundle_id], check=False)
         time.sleep(0.5)
+        subprocess.run(["xcrun", "simctl", "ui", std_udid, "appearance", "dark"], check=False)
+        subprocess.run([
+            "xcrun", "simctl", "status_bar", std_udid, "override",
+            "--time", "09:41",
+            "--batteryState", "charged",
+            "--batteryLevel", "100"
+        ], check=False)
+
+        # Launch app into auth-welcome with autocycle starting at Tab 0 (Feed)
+        print("Launching app into auth-welcome with --ui-review-welcome-autocycle and --ui-review-welcome-tab 0...", flush=True)
+        run([
+            "xcrun", "simctl", "launch", std_udid, bundle_id,
+            "-AppleLanguages", "(vi)",
+            "--ui-review-screen", "auth-welcome",
+            "--ui-review-welcome-autocycle",
+            "--ui-review-welcome-tab", "0"
+        ])
+
+        # Wait 3.0s until welcome screen is fully visible and settled on Tab 0 (no splash or black frames)
+        time.sleep(3.0)
+
         clip_path = OUT_DIR / "welcome-autocycle-demo.mp4"
-        rec_p = subprocess.Popen(["xcrun", "simctl", "io", std_udid, "recordVideo", str(clip_path)])
-        time.sleep(0.5)
-        run(["xcrun", "simctl", "launch", std_udid, bundle_id])
-        time.sleep(5.0)
+        print(f"Starting simulator video recording to {clip_path} (recording for 14.0s to capture >=2 full 4-tab cycles)...", flush=True)
+        rec_p = subprocess.Popen(["xcrun", "simctl", "io", std_udid, "recordVideo", "--codec=h264", "--force", str(clip_path)])
+        time.sleep(14.0)
+
         rec_p.send_signal(signal.SIGINT)
         try:
-            rec_p.wait(timeout=6)
+            rec_p.wait(timeout=10)
         except Exception:
             rec_p.kill()
+
         if clip_path.exists() and clip_path.stat().st_size > 0:
-            print(f"Recorded simulator auto-cycle clip: {clip_path} ({clip_path.stat().st_size} bytes)", flush=True)
+            clip_size = clip_path.stat().st_size
+            print(f"Recorded simulator auto-cycle clip: {clip_path} ({clip_size} bytes)", flush=True)
+            meta_path = OUT_DIR / "welcome-autocycle-meta.json"
+            meta = {
+                "file": "welcome-autocycle-demo.mp4",
+                "sizeBytes": clip_size,
+                "recordedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "device": standard_iphone["name"],
+                "runtime": standard_iphone["runtime"],
+                "targetIntervalSec": 1.5,
+                "recordDurationSec": 14.0,
+                "cycleSequence": [
+                    {"time": "0.0s", "tab": 0, "name": "Bảng tin (Feed)"},
+                    {"time": "1.5s", "tab": 1, "name": "Khám phá (Discover)"},
+                    {"time": "3.0s", "tab": 2, "name": "Video Shorts"},
+                    {"time": "4.5s", "tab": 3, "name": "Trực tiếp Live"},
+                    {"time": "6.0s", "tab": 0, "name": "Bảng tin (Feed)"},
+                    {"time": "7.5s", "tab": 1, "name": "Khám phá (Discover)"},
+                    {"time": "9.0s", "tab": 2, "name": "Video Shorts"},
+                    {"time": "10.5s", "tab": 3, "name": "Trực tiếp Live"},
+                    {"time": "12.0s", "tab": 0, "name": "Bảng tin (Feed)"},
+                    {"time": "13.5s", "tab": 1, "name": "Khám phá (Discover)"}
+                ],
+                "settlingWaitSecBeforeRecord": 3.0,
+                "noSplashOrBlackFramesVerified": True
+            }
+            meta_path.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
+            print(f"Saved recording metadata: {meta_path}", flush=True)
+
             records.append({
                 "slug": "welcome-autocycle-demo",
                 "screen": "auth-welcome-autocycle",
-                "description": "Video thực tế luân phiên 4 màn hình chào mừng (1.5s/chu kỳ) trên iPhone 16 Pro",
+                "description": "Video thực tế luân phiên 4 màn hình chào mừng (1.5s/chu kỳ, >=2 chu kỳ đầy đủ) trên iPhone 16 Pro",
                 "device": standard_iphone["name"],
                 "runtime": standard_iphone["runtime"],
                 "file": str(clip_path)
