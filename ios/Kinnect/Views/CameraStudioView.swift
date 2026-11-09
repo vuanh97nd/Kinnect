@@ -258,12 +258,23 @@ struct CameraStudioView: View {
 
             // AR Face Sticker Overlay on Camera Viewfinder (Web & Android Parity)
             if activeSticker != "none", let s = Self.stickers.first(where: { $0.id == activeSticker }) {
-                Text(s.emoji)
-                    .font(.system(size: 96))
-                    .shadow(color: .black.opacity(0.4), radius: 8, x: 0, y: 4)
-                    .offset(y: stickerOffset(for: activeSticker))
-                    .transition(.scale.combined(with: .opacity))
-                    .allowsHitTesting(false)
+                if let img = UIImage(named: "sticker_\(s.id)") ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "sticker_\(s.id)", ofType: "png") ?? "") ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "sticker_\(s.id)", ofType: "jpg") ?? "") {
+                    Image(uiImage: img)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 140, height: 140)
+                        .shadow(color: .black.opacity(0.4), radius: 8, x: 0, y: 4)
+                        .offset(y: stickerOffset(for: activeSticker))
+                        .transition(.scale.combined(with: .opacity))
+                        .allowsHitTesting(false)
+                } else {
+                    Text(s.emoji)
+                        .font(.system(size: 96))
+                        .shadow(color: .black.opacity(0.4), radius: 8, x: 0, y: 4)
+                        .offset(y: stickerOffset(for: activeSticker))
+                        .transition(.scale.combined(with: .opacity))
+                        .allowsHitTesting(false)
+                }
             }
 
             VStack(spacing: 0) {
@@ -579,17 +590,33 @@ struct CameraStudioView: View {
                                 activeSticker = s.id
                             } label: {
                                 VStack(spacing: 4) {
-                                    Text(s.emoji)
-                                        .font(.system(size: 32))
-                                        .frame(width: 52, height: 52)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 14)
-                                                .fill(isChosen ? KinnectTheme.accentBright.opacity(0.35) : Color.black.opacity(0.45))
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: 14)
-                                                        .strokeBorder(isChosen ? KinnectTheme.accentBright : Color.white.opacity(0.2), lineWidth: 2)
-                                                )
-                                        )
+                                    if let img = UIImage(named: "sticker_\(s.id)") ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "sticker_\(s.id)", ofType: "png") ?? "") ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "sticker_\(s.id)", ofType: "jpg") ?? "") {
+                                        Image(uiImage: img)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 36, height: 36)
+                                            .frame(width: 52, height: 52)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 14)
+                                                    .fill(isChosen ? KinnectTheme.accentBright.opacity(0.35) : Color.black.opacity(0.45))
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: 14)
+                                                            .strokeBorder(isChosen ? KinnectTheme.accentBright : Color.white.opacity(0.2), lineWidth: 2)
+                                                    )
+                                            )
+                                    } else {
+                                        Text(s.emoji)
+                                            .font(.system(size: 32))
+                                            .frame(width: 52, height: 52)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 14)
+                                                    .fill(isChosen ? KinnectTheme.accentBright.opacity(0.35) : Color.black.opacity(0.45))
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: 14)
+                                                            .strokeBorder(isChosen ? KinnectTheme.accentBright : Color.white.opacity(0.2), lineWidth: 2)
+                                                    )
+                                            )
+                                    }
                                     Text(s.name)
                                         .font(.system(size: 10, weight: .bold))
                                         .foregroundColor(isChosen ? KinnectTheme.accentBright : .white.opacity(0.85))

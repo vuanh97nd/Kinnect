@@ -774,8 +774,7 @@ struct LiveGiftDrawerSheet: View {
                                 sendGift(gift)
                             } label: {
                                 VStack(spacing: 6) {
-                                    Text(gift.emoji)
-                                        .font(.system(size: 38))
+                                    giftIconView(gift)
                                     Text(gift.label)
                                         .font(.caption.bold())
                                         .foregroundColor(.white)
@@ -814,6 +813,20 @@ struct LiveGiftDrawerSheet: View {
         }
         .presentationDetents([.medium, .fraction(0.85)])
         .presentationDragIndicator(.visible)
+    }
+
+    @ViewBuilder
+    private func giftIconView(_ gift: LiveGiftCatalogItem) -> some View {
+        if let img = UIImage(named: "gift_\(gift.id)") ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "gift_\(gift.id)", ofType: "png") ?? "") ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "gift_\(gift.id)_3d", ofType: "jpg") ?? "") {
+            Image(uiImage: img)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 44, height: 44)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+        } else {
+            Text(gift.emoji)
+                .font(.system(size: 38))
+        }
     }
 
     private func sendGift(_ gift: LiveGiftCatalogItem) {
