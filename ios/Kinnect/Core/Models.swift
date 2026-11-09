@@ -33,6 +33,7 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
     var isActive: Bool
     var age: Int
     var gender: String
+    var cloudChatSync: Bool
 
     var avatarURL: String? { avatarUrl.isEmpty ? nil : avatarUrl }
 
@@ -56,7 +57,8 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         distanceKm: Double? = nil,
         isActive: Bool = false,
         age: Int = 0,
-        gender: String = ""
+        gender: String = "",
+        cloudChatSync: Bool = true
     ) {
         self.id = id
         self.name = name
@@ -78,6 +80,7 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         self.isActive = isActive
         self.age = age
         self.gender = gender
+        self.cloudChatSync = cloudChatSync
     }
 
     init(json: [String: Any]) {
@@ -112,7 +115,8 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
             distanceKm: (dict["distanceKm"] as? NSNumber)?.doubleValue,
             isActive: (dict["isActive"] as? Bool) ?? false,
             age: (dict["age"] as? Int) ?? (dict["userAge"] as? Int) ?? 0,
-            gender: (dict["gender"] as? String) ?? ""
+            gender: (dict["gender"] as? String) ?? "",
+            cloudChatSync: (dict["cloudChatSync"] as? Bool) ?? true
         )
     }
 }
@@ -496,6 +500,8 @@ struct StorePackageItem: Identifiable, Equatable {
     var owned: Bool
     var equipped: Bool
     var expiresAt: Int64?
+
+    var kind: String { category }
 
     static func from(_ dict: [String: Any]) -> StorePackageItem {
         let colors = dict["colors"] as? [String]

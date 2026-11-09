@@ -605,7 +605,7 @@ struct ProfileView: View {
             } label: {
                 HStack(spacing: 6) {
                     KinnectIcon(
-                        glyph: peerFriendship == "friends" ? .userCheck : (peerFriendship == "outgoing" ? .clock : .userAdd),
+                        glyph: peerFriendship == "friends" ? .friends : (peerFriendship == "outgoing" ? .refresh : .add),
                         size: 18,
                         tint: peerFriendship == "friends" ? KinnectTheme.online : .white
                     )

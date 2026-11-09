@@ -176,7 +176,6 @@ final class AppState: ObservableObject {
         KeychainStore.shared.saveAccountId(user.id)
         NativeSocketClient.shared.connectWithKeychainSession()
         PushKitManager.shared.startRegistration()
-        PushKitManager.shared.uploadStoredTokens()
     }
 
     func logout() async {

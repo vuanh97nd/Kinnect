@@ -242,7 +242,7 @@ struct WalletStoreView: View {
                     ForEach(entries) { entry in
                         HStack(alignment: .center, spacing: 12) {
                             KinnectIcon(
-                                glyph: entry.direction == "credit" ? .plus : .coin,
+                                glyph: entry.direction == "credit" ? .add : .coin,
                                 size: 20,
                                 selected: true,
                                 tint: entry.direction == "credit" ? KinnectTheme.online : KinnectTheme.accentBright
@@ -342,7 +342,7 @@ struct WalletStoreView: View {
                     } label: {
                         HStack(spacing: 6) {
                             KinnectIcon(
-                                glyph: cat == .style ? .store : (cat == .studio ? .camera : .check),
+                                glyph: cat == .style ? .store : (cat == .studio ? .camera : .seen),
                                 size: 14,
                                 selected: isSelected,
                                 tint: isSelected ? .white : KinnectTheme.textSecondary

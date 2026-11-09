@@ -669,7 +669,7 @@ struct DirectChatDetailView: View {
 
                         if isMine {
                             Button(role: .destructive) {
-                                Task { await recallMessage(msg) }
+                                Task { await deleteMessage(msg) }
                             } label: {
                                 Label("Thu hồi / Xóa tin nhắn", systemImage: "trash")
                             }
@@ -802,6 +802,9 @@ struct DirectChatDetailView: View {
             self.text = text
             appState.showToast(error.localizedDescription)
         }
+    }
+
+    private func deleteMessage(_ msg: DirectMessageItem) async {
         let reqId = "del_dm_\(msg.id)"
         do {
             _ = try await KinnectAPIClient.shared.requestJSON(
@@ -1026,9 +1029,6 @@ struct GroupChatDetailView: View {
         }
         .sheet(isPresented: $showForwardSheet) {
             ForwardMessageSheet(text: forwardText, imageUrl: forwardImageUrl)
-        }
-        .sheet(isPresented: $showPeerProfile) {
-            ProfileView(targetUser: peer)
         }
         .sheet(isPresented: $showRenameSheet) {
             RenameGroupSheet(groupId: group.id, currentName: group.name) {
