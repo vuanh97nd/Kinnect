@@ -3,12 +3,27 @@ import SwiftUI
 import UIKit
 
 struct ProfileView: View {
-    let onOpenWallet: () -> Void
-    let onOpenFriends: () -> Void
+    var targetUser: KinnectUser? = nil
+    var onOpenWallet: (() -> Void)? = nil
+    var onOpenFriends: (() -> Void)? = nil
+    var onOpenStore: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var pushKit = PushKitManager.shared
+
+    private var isSelf: Bool {
+        guard let target = targetUser else { return true }
+        guard let me = appState.currentUser else { return false }
+        return target.id == me.id
+    }
+
+    private var activeUser: KinnectUser? {
+        if isSelf {
+            return appState.currentUser
+        }
+        return detailedPeerUser ?? targetUser
+    }
 
     enum ProfileTab: String, CaseIterable {
         case about = "Giới thiệu"
@@ -34,10 +49,38 @@ struct ProfileView: View {
     @State private var showSupportSheet = false
     @State private var showDeleteAccountSheet = false
 
+    @State private var detailedPeerUser: KinnectUser? = nil
+    @State private var peerFriendship: String = "none"
+    @State private var showPeerChat = false
+    @State private var isFriendActionLoading = false
+
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                if let user = appState.currentUser {
+                if !isSelf, let peer = activeUser {
+                    HStack {
+                        Button {
+                            dismiss()
+                        } label: {
+                            HStack(spacing: 6) {
+                                KinnectIcon(glyph: .back, size: 18, tint: KinnectTheme.textPrimary)
+                                Text("Quay lại")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(KinnectTheme.textPrimary)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                        }
+                        Spacer()
+                        Text("@\(peer.handle.isEmpty ? peer.name : peer.handle)")
+                            .font(.subheadline.bold())
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                    .padding(.horizontal, 4)
+                }
+
+                if let user = activeUser {
                     // 1. Cover & Avatar Card with Handle & Stats (Parity Android 1.2.12 build 118)
                     VStack(spacing: 12) {
                         ZStack(alignment: .bottomLeading) {
@@ -60,7 +103,7 @@ struct ProfileView: View {
                                     avatarURL: user.avatarUrl,
                                     colorHex: user.avatarColor,
                                     size: 76,
-                                    isOnline: true
+                                    isOnline: isSelf ? true : appState.onlineUserIds.contains(user.id)
                                 )
 
                                 VStack(alignment: .leading, spacing: 2) {
@@ -78,20 +121,24 @@ struct ProfileView: View {
                         }
                         .padding(.bottom, 22)
 
-                        // Prominent "Chỉnh sửa hồ sơ" Button (Matching Android 1.2.12 MainActivity bounds 413,771 -> 705,818)
-                        Button {
-                            showEditProfileSheet = true
-                        } label: {
-                            HStack(spacing: 8) {
-                                KinnectIcon(glyph: .edit, size: 18, tint: KinnectTheme.accentBright)
-                                Text("Chỉnh sửa hồ sơ")
-                                    .font(.subheadline.bold())
-                                    .foregroundColor(KinnectTheme.accentBright)
+                        if isSelf {
+                            // Prominent "Chỉnh sửa hồ sơ" Button
+                            Button {
+                                showEditProfileSheet = true
+                            } label: {
+                                HStack(spacing: 8) {
+                                    KinnectIcon(glyph: .edit, size: 18, tint: KinnectTheme.accentBright)
+                                    Text("Chỉnh sửa hồ sơ")
+                                        .font(.subheadline.bold())
+                                        .foregroundColor(KinnectTheme.accentBright)
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 40)
+                                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
                             }
-                            .frame(maxWidth: .infinity, minHeight: 40)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                            .padding(.horizontal, 14)
+                        } else {
+                            peerActionsRow(user: user)
                         }
-                        .padding(.horizontal, 14)
 
                         // Stats bar
                         HStack {
@@ -105,9 +152,9 @@ struct ProfileView: View {
                     }
                     .kinnectCard()
 
-                    // 2. 4 Profile Tabs: Giới thiệu | Bài viết | Album ảnh | Video (Exact Android 1.2.12 Parity)
+                    // 2. Profile Tabs (Android 1.2.12 Parity)
                     Picker("Mục hồ sơ", selection: $selectedTab) {
-                        ForEach(ProfileTab.allCases, id: \.self) { t in
+                        ForEach(isSelf ? ProfileTab.allCases : [.about, .posts, .videos], id: \.self) { t in
                             Text(t.rawValue).tag(t)
                         }
                     }
@@ -121,7 +168,11 @@ struct ProfileView: View {
                     case .posts:
                         postsTabContent(user: user)
                     case .albums:
-                        albumsTabContent(user: user)
+                        if isSelf {
+                            albumsTabContent(user: user)
+                        } else {
+                            aboutTabContent(user: user)
+                        }
                     case .videos:
                         videosTabContent(user: user)
                     }
@@ -133,20 +184,31 @@ struct ProfileView: View {
         .navigationTitle("")
         .toolbar(.hidden, for: .navigationBar)
         .task {
-            if let screen = UIReviewFixture.activeScreen {
-                switch screen {
-                case "profile-posts": selectedTab = .posts
-                case "profile-albums": selectedTab = .albums
-                case "profile-videos": selectedTab = .videos
-                case "profile-edit": showEditProfileSheet = true
-                case "profile-sessions": showSessionsSheet = true
-                case "profile-private-album":
-                    selectedTab = .albums
-                    showPrivateAlbumSheet = true
-                default: break
+            if isSelf {
+                if let screen = UIReviewFixture.activeScreen {
+                    switch screen {
+                    case "profile-posts": selectedTab = .posts
+                    case "profile-albums": selectedTab = .albums
+                    case "profile-videos": selectedTab = .videos
+                    case "profile-edit": showEditProfileSheet = true
+                    case "profile-sessions": showSessionsSheet = true
+                    case "profile-private-album":
+                        selectedTab = .albums
+                        showPrivateAlbumSheet = true
+                    default: break
+                    }
+                }
+                await refreshMe()
+            } else if let target = targetUser {
+                await refreshPeer(target: target)
+            }
+        }
+        .sheet(isPresented: $showPeerChat) {
+            if let u = activeUser {
+                NavigationStack {
+                    DirectChatDetailView(peer: u)
                 }
             }
-            await refreshMe()
         }
         .sheet(isPresented: $showEditProfileSheet) {
             EditProfileSheet(onSaved: {
@@ -216,7 +278,7 @@ struct ProfileView: View {
                         .foregroundColor(KinnectTheme.textPrimary)
                         .kinnectMultiline()
                 } else {
-                    Text("Chưa có thông tin công khai. Cập nhật hồ sơ để mọi người hiểu bạn hơn.")
+                    Text(isSelf ? "Chưa có thông tin công khai. Cập nhật hồ sơ để mọi người hiểu bạn hơn." : "Người dùng chưa cập nhật phần tự giới thiệu.")
                         .font(.subheadline)
                         .foregroundColor(KinnectTheme.textSecondary)
                         .kinnectMultiline()
@@ -242,73 +304,82 @@ struct ProfileView: View {
             }
             .kinnectCard()
 
-            // Quick Actions & Security
-            VStack(spacing: 10) {
-                actionRow(glyph: .wallet, title: "Ví thử nghiệm & Cửa hàng", color: KinnectTheme.warning, action: onOpenWallet)
-                actionRow(glyph: .friends, title: "Danh sách Bạn bè & Lời mời", color: KinnectTheme.accentBright, action: onOpenFriends)
-                actionRow(glyph: .shield, title: "Quản lý phiên đăng nhập", color: .cyan) {
-                    showSessionsSheet = true
-                }
-                actionRow(glyph: .lock, title: "Đổi mật khẩu", color: .green) {
-                    showPasswordSheet = true
-                }
-                actionRow(glyph: .block, title: "Danh sách người dùng đã chặn", color: .orange) {
-                    showBlocksSheet = true
-                }
-                actionRow(glyph: .shield, title: "Cài đặt Quyền riêng tư", color: .purple) {
-                    showPrivacySheet = true
-                }
-                actionRow(glyph: .notifications, title: "Trung tâm Hỗ trợ & Trợ giúp", color: .blue) {
-                    showSupportSheet = true
-                }
-            }
-            .kinnectCard()
-
-            // PushKit / Native Diagnostic Card
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    KinnectIcon(glyph: .phone, size: 20, selected: true, tint: KinnectTheme.online)
-                    Text("Trạng thái Cuộc gọi Native & PushKit")
-                        .font(.subheadline.bold())
-                        .foregroundColor(KinnectTheme.textPrimary)
-                }
-                Text(pushKit.voipRegistrationStatus)
-                    .font(.caption)
-                    .foregroundColor(KinnectTheme.textSecondary)
-                    .kinnectMultiline()
-                Text("Phiên bản: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.12") (Build \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "118"))")
-                    .font(.caption2)
-                    .foregroundColor(KinnectTheme.accentBright)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .kinnectCard()
-
-            // Logout & Delete Card
-            VStack(spacing: 10) {
-                Button {
-                    Task { await appState.logout() }
-                } label: {
-                    HStack(spacing: 8) {
-                        KinnectIcon(glyph: .logout, size: 20, tint: .white)
-                        Text("Đăng xuất (Xóa Keychain & Cache)")
-                            .font(.subheadline.bold())
+            if isSelf {
+                // Quick Actions & Security
+                VStack(spacing: 10) {
+                    actionRow(glyph: .wallet, title: "Ví Kinnect", color: KinnectTheme.warning) {
+                        if let onOpenWallet { onOpenWallet() } else { appState.navigate(to: "wallet") }
                     }
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                    .foregroundColor(KinnectTheme.textPrimary)
+                    actionRow(glyph: .store, title: "Cửa hàng Kinnect", color: KinnectTheme.accentBright) {
+                        if let onOpenStore { onOpenStore() } else if let onOpenWallet { onOpenWallet() } else { appState.navigate(to: "wallet") }
+                    }
+                    actionRow(glyph: .friends, title: "Bạn bè", color: KinnectTheme.accent) {
+                        if let onOpenFriends { onOpenFriends() } else { appState.navigate(to: "friends") }
+                    }
+                    actionRow(glyph: .shield, title: "Quản lý phiên đăng nhập", color: .cyan) {
+                        showSessionsSheet = true
+                    }
+                    actionRow(glyph: .lock, title: "Đổi mật khẩu", color: .green) {
+                        showPasswordSheet = true
+                    }
+                    actionRow(glyph: .block, title: "Danh sách người dùng đã chặn", color: .orange) {
+                        showBlocksSheet = true
+                    }
+                    actionRow(glyph: .shield, title: "Cài đặt và quyền riêng tư", color: .purple) {
+                        showPrivacySheet = true
+                    }
+                    actionRow(glyph: .notifications, title: "Trung tâm Hỗ trợ & Trợ giúp", color: .blue) {
+                        showSupportSheet = true
+                    }
                 }
+                .kinnectCard()
 
-                Button(role: .destructive) {
-                    showDeleteAccountSheet = true
-                } label: {
-                    Label("Xóa vĩnh viễn tài khoản Kinnect", systemImage: "trash.fill")
-                        .font(.subheadline.bold())
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.danger.opacity(0.18)))
-                        .foregroundColor(KinnectTheme.danger)
+                // PushKit / Native Diagnostic Card
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        KinnectIcon(glyph: .phone, size: 20, selected: true, tint: KinnectTheme.online)
+                        Text("Trạng thái Cuộc gọi Native & PushKit")
+                            .font(.subheadline.bold())
+                            .foregroundColor(KinnectTheme.textPrimary)
+                    }
+                    Text(pushKit.voipRegistrationStatus)
+                        .font(.caption)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                        .kinnectMultiline()
+                    Text("Phiên bản: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.12") (Build \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "118"))")
+                        .font(.caption2)
+                        .foregroundColor(KinnectTheme.accentBright)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .kinnectCard()
+
+                // Logout & Delete Card
+                VStack(spacing: 10) {
+                    Button {
+                        Task { await appState.logout() }
+                    } label: {
+                        HStack(spacing: 8) {
+                            KinnectIcon(glyph: .logout, size: 20, tint: .white)
+                            Text("Đăng xuất (Xóa Keychain & Cache)")
+                                .font(.subheadline.bold())
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                        .foregroundColor(KinnectTheme.textPrimary)
+                    }
+
+                    Button(role: .destructive) {
+                        showDeleteAccountSheet = true
+                    } label: {
+                        Label("Xóa vĩnh viễn tài khoản Kinnect", systemImage: "trash.fill")
+                            .font(.subheadline.bold())
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.danger.opacity(0.18)))
+                            .foregroundColor(KinnectTheme.danger)
+                    }
+                }
+                .kinnectCard()
             }
-            .kinnectCard()
         }
     }
 
@@ -526,6 +597,155 @@ struct ProfileView: View {
             self.pendingPrivateRequestsCount = self.privateAccessRequests.filter { $0.status == "pending" }.count
         }
     }
+
+    private func peerActionsRow(user: KinnectUser) -> some View {
+        HStack(spacing: 8) {
+            Button {
+                Task { await handlePeerFriendAction(user: user) }
+            } label: {
+                HStack(spacing: 6) {
+                    KinnectIcon(
+                        glyph: peerFriendship == "friends" ? .userCheck : (peerFriendship == "outgoing" ? .clock : .userAdd),
+                        size: 18,
+                        tint: peerFriendship == "friends" ? KinnectTheme.online : .white
+                    )
+                    Text(peerFriendship == "friends" ? "Bạn bè" : (peerFriendship == "outgoing" ? "Đã gửi" : (peerFriendship == "incoming" ? "Chấp nhận" : "Kết bạn")))
+                        .font(.subheadline.bold())
+                        .foregroundColor(peerFriendship == "friends" ? KinnectTheme.online : .white)
+                }
+                .frame(maxWidth: .infinity, minHeight: 40)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(peerFriendship == "friends" ? KinnectTheme.surfaceElevated : (peerFriendship == "outgoing" ? KinnectTheme.surfaceElevated : KinnectTheme.primaryGradient))
+                )
+            }
+            .disabled(isFriendActionLoading)
+
+            Button {
+                showPeerChat = true
+            } label: {
+                HStack(spacing: 6) {
+                    KinnectIcon(glyph: .messages, size: 18, tint: KinnectTheme.accentBright)
+                    Text("Nhắn tin")
+                        .font(.subheadline.bold())
+                        .foregroundColor(KinnectTheme.accentBright)
+                }
+                .frame(maxWidth: .infinity, minHeight: 40)
+                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+            }
+
+            Button {
+                Task {
+                    dismiss()
+                    await NativeWebRTCManager.shared.startOutgoingCall(targetUser: user, mode: "audio")
+                }
+            } label: {
+                KinnectIcon(glyph: .phone, size: 18, tint: KinnectTheme.online)
+                    .frame(width: 40, height: 40)
+                    .background(Circle().fill(KinnectTheme.surfaceElevated))
+            }
+            .accessibilityLabel("Gọi thoại")
+
+            Button {
+                Task {
+                    dismiss()
+                    await NativeWebRTCManager.shared.startOutgoingCall(targetUser: user, mode: "video")
+                }
+            } label: {
+                KinnectIcon(glyph: .videoCall, size: 18, tint: KinnectTheme.accentBright)
+                    .frame(width: 40, height: 40)
+                    .background(Circle().fill(KinnectTheme.surfaceElevated))
+            }
+            .accessibilityLabel("Gọi video")
+
+            Menu {
+                Button(role: .destructive) {
+                    Task {
+                        await appState.blockUser(userId: user.id, userName: user.name)
+                        dismiss()
+                    }
+                } label: {
+                    Label("Chặn người dùng", systemImage: "hand.raised.fill")
+                }
+                Button {
+                    appState.activeReportContext = UGCReportContext(
+                        targetType: "user",
+                        targetId: user.id,
+                        targetUserId: user.id,
+                        targetTitle: user.name
+                    )
+                } label: {
+                    Label("Báo cáo người dùng", systemImage: "flag.fill")
+                }
+            } label: {
+                KinnectIcon(glyph: .more, size: 18, tint: KinnectTheme.textSecondary)
+                    .frame(width: 40, height: 40)
+                    .background(Circle().fill(KinnectTheme.surfaceElevated))
+            }
+            .accessibilityLabel("Tùy chọn khác")
+        }
+        .padding(.horizontal, 14)
+    }
+
+    private func handlePeerFriendAction(user: KinnectUser) async {
+        isFriendActionLoading = true
+        defer { isFriendActionLoading = false }
+        let reqId = "pfriend_\(user.id)_\(Int(Date().timeIntervalSince1970))"
+        if peerFriendship == "friends" {
+            _ = try? await KinnectAPIClient.shared.requestJSON(
+                "/api/users/\(user.id)/friendship",
+                method: "DELETE",
+                body: [:],
+                requestId: reqId
+            )
+            peerFriendship = "none"
+            appState.showToast("Đã hủy kết bạn")
+        } else if peerFriendship == "outgoing" {
+            _ = try? await KinnectAPIClient.shared.requestJSON(
+                "/api/users/\(user.id)/friend-request",
+                method: "DELETE",
+                body: [:],
+                requestId: reqId
+            )
+            peerFriendship = "none"
+            appState.showToast("Đã thu hồi lời mời kết bạn")
+        } else if peerFriendship == "incoming" {
+            _ = try? await KinnectAPIClient.shared.requestJSON(
+                "/api/users/\(user.id)/friend-request/respond",
+                method: "POST",
+                body: ["action": "accept"],
+                requestId: reqId
+            )
+            peerFriendship = "friends"
+            appState.showToast("Đã chấp nhận kết bạn!")
+        } else {
+            _ = try? await KinnectAPIClient.shared.requestJSON(
+                "/api/users/\(user.id)/friend-request",
+                method: "POST",
+                body: [:],
+                requestId: reqId
+            )
+            peerFriendship = "outgoing"
+            appState.showToast("Đã gửi lời mời kết bạn")
+        }
+        await refreshPeer(target: user)
+    }
+
+    private func refreshPeer(target: KinnectUser) async {
+        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/users/\(target.id)"),
+           let userDict = (res["user"] as? [String: Any]) ?? (res as? [String: Any]) {
+            self.detailedPeerUser = KinnectUser.from(userDict)
+            self.peerFriendship = (userDict["friendship"] as? String) ?? "none"
+        }
+        if let feedRes = try? await KinnectAPIClient.shared.requestJSON("/api/posts?user=\(target.id)"),
+           let items = feedRes["posts"] as? [[String: Any]] {
+            self.userPosts = items.map(PostItem.from)
+        }
+        if let shortsRes = try? await KinnectAPIClient.shared.requestJSON("/api/shorts?user=\(target.id)"),
+           let items = shortsRes["shorts"] as? [[String: Any]] {
+            self.userShorts = items.map(ShortItem.from)
+        }
+    }
 }
 
 // MARK: - Private Album & Public Album Models & Sheets
@@ -629,11 +849,10 @@ struct PublicAlbumManageSheet: View {
             _ = try await KinnectAPIClient.shared.requestJSON(
                 "/api/posts",
                 method: "POST",
-                body: [
-                    "text": captionText.trimmingCharacters(in: .whitespacesAndNewlines),
-                    "category": "community",
-                    "imageUrl": dataURL
-                ],
+                body: KinnectWriteBody.post(
+                    text: captionText.trimmingCharacters(in: .whitespacesAndNewlines),
+                    mediaDataURL: dataURL
+                ),
                 requestId: "pub_photo_\(UUID().uuidString)"
             )
             captionText = ""

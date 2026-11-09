@@ -1,4 +1,6 @@
 import SwiftUI
+import AVFoundation
+import AVKit
 
 struct ShortsVideoView: View {
     @ObservedObject private var appState = AppState.shared
@@ -7,6 +9,7 @@ struct ShortsVideoView: View {
     @State private var currentIndex: Int = 0
     @State private var isLoading = false
     @State private var activeCommentShort: ShortItem?
+    @State private var floatingHearts: [FloatingHeart] = []
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -26,14 +29,20 @@ struct ShortsVideoView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if !items.isEmpty {
-                // Vertical pager / scroll of video cards
-                TabView(selection: $currentIndex) {
-                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                        shortVideoCard(item, at: index)
-                            .tag(index)
+                GeometryReader { geo in
+                    TabView(selection: $currentIndex) {
+                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                            shortVideoCard(item, at: index)
+                                .rotationEffect(.degrees(-90))
+                                .frame(width: geo.size.width, height: geo.size.height)
+                                .tag(index)
+                        }
                     }
+                    .frame(width: geo.size.height, height: geo.size.width)
+                    .rotationEffect(.degrees(90))
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .tabViewStyle(.page(indexDisplayMode: .never))
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
                 .ignoresSafeArea(edges: .top)
             }
 
@@ -93,26 +102,23 @@ struct ShortsVideoView: View {
 
     private func shortVideoCard(_ item: ShortItem, at index: Int) -> some View {
         ZStack(alignment: .bottomLeading) {
-            // Background Video Stage / Preview placeholder
-            Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.12, green: 0.08, blue: 0.22),
-                            Color(red: 0.05, green: 0.03, blue: 0.12)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .overlay(
-                    VStack(spacing: 12) {
-                        KinnectIcon(glyph: .video, size: 54, selected: true, tint: KinnectTheme.accentBright.opacity(0.4))
-                        Text(item.title.isEmpty ? "Video Kinnect Shorts" : item.title)
-                            .font(.headline)
-                            .foregroundColor(.white.opacity(0.6))
-                    }
-                )
+            Rectangle().fill(Color.black)
+            ShortClipPlayer(path: item.videoUrl, active: index == currentIndex)
+                .allowsHitTesting(false)
+
+            // Double tap detector for floating heart
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture(count: 2, coordinateSpace: .local) { location in
+                    triggerDoubleTapHeart(at: index, point: location)
+                }
+
+            // Floating hearts animation overlay
+            ForEach(floatingHearts) { heart in
+                HeartEffectView()
+                    .position(x: heart.x, y: heart.y)
+                    .allowsHitTesting(false)
+            }
 
             // Right Action Column (Like, Comment, Share)
             HStack(alignment: .bottom) {
@@ -218,6 +224,18 @@ struct ShortsVideoView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    private func triggerDoubleTapHeart(at index: Int, point: CGPoint) {
+        let heart = FloatingHeart(x: point.x, y: point.y)
+        floatingHearts.append(heart)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+            floatingHearts.removeAll(where: { $0.id == heart.id })
+        }
+        guard index < items.count else { return }
+        if !items[index].liked {
+            toggleLike(at: index)
+        }
+    }
+
     private func toggleLike(at index: Int) {
         guard index < items.count else { return }
         let current = items[index]
@@ -269,6 +287,111 @@ struct ShortsVideoView: View {
     }
 }
 
+private struct ShortClipPlayer: View {
+    let path: String
+    let active: Bool
+    @ObservedObject private var calls = NativeWebRTCManager.shared
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var player: AVPlayer?
+    @State private var failed = false
+    @State private var loading = false
+    @State private var loopObserver: NSObjectProtocol?
+
+    var body: some View {
+        ZStack {
+            if let player {
+                VideoPlayer(player: player)
+                    .disabled(true)
+            }
+            if loading {
+                ProgressView().tint(.white)
+            }
+            if failed {
+                VStack(spacing: 8) {
+                    Text("Không phát được video")
+                        .font(.caption.bold())
+                        .foregroundColor(.white)
+                    Button("Thử lại") { Task { await load() } }
+                        .font(.caption.bold())
+                        .foregroundColor(.white)
+                }
+            }
+        }
+        .task(id: path) { await load() }
+        .onChange(of: active) { _ in syncPlayback() }
+        .onChange(of: scenePhase) { _ in syncPlayback() }
+        .onChange(of: calls.activeCall != nil) { _ in syncPlayback() }
+        .onDisappear { stop() }
+    }
+
+    private func load() async {
+        stop()
+        failed = false
+        loading = true
+        defer { loading = false }
+
+        // Configure audio session for smooth video audio playback
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [.mixWithOthers])
+        try? AVAudioSession.sharedInstance().setActive(true)
+
+        if path.hasPrefix("file://"), let localURL = URL(string: path) {
+            setupPlayer(with: AVPlayerItem(url: localURL))
+            return
+        }
+
+        let origin = ServerConfig.currentOrigin
+        guard let remoteURL = ServerConfig.url(for: path, origin: origin) else {
+            failed = true
+            return
+        }
+
+        let cookie = KeychainStore.shared.cookieJarHeader(for: origin)
+        var options: [String: Any] = [:]
+        if !cookie.isEmpty {
+            options["AVURLAssetHTTPHeaderFieldsKey"] = ["Cookie": cookie]
+        }
+
+        let asset = AVURLAsset(url: remoteURL, options: options)
+        let item = AVPlayerItem(asset: asset)
+        setupPlayer(with: item)
+    }
+
+    private func setupPlayer(with item: AVPlayerItem) {
+        let next = AVPlayer(playerItem: item)
+        next.isMuted = false
+        next.automaticallyWaitsToMinimizeStalling = false
+        loopObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: item,
+            queue: .main
+        ) { _ in
+            next.seek(to: .zero)
+            if active { next.play() }
+        }
+        player = next
+        syncPlayback()
+    }
+
+    private func syncPlayback() {
+        guard let player else { return }
+        let blocked = !active || scenePhase != .active || calls.activeCall != nil
+        if blocked {
+            player.pause()
+        } else {
+            player.play()
+        }
+    }
+
+    private func stop() {
+        player?.pause()
+        player = nil
+        if let loopObserver {
+            NotificationCenter.default.removeObserver(loopObserver)
+            self.loopObserver = nil
+        }
+    }
+}
+
 struct ShortCommentsSheet: View {
     let short: ShortItem
     let onUpdated: () -> Void
@@ -277,43 +400,94 @@ struct ShortCommentsSheet: View {
 
     @State private var comments: [CommentItem] = []
     @State private var text = ""
+    @State private var isPosting = false
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                List(comments) { c in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(c.author.name)
-                            .font(.caption.bold())
-                            .foregroundColor(KinnectTheme.accentBright)
-                        Text(c.text)
-                            .font(.subheadline)
-                            .foregroundColor(.white)
-                            .kinnectMultiline()
+                if comments.isEmpty {
+                    VStack(spacing: 8) {
+                        Spacer()
+                        KinnectIcon(glyph: .comment, size: 36, tint: KinnectTheme.textSecondary)
+                        Text("Chưa có bình luận nào")
+                            .font(.subheadline.bold())
+                            .foregroundColor(KinnectTheme.textPrimary)
+                        Text("Hãy là người đầu tiên để lại bình luận!")
+                            .font(.caption)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                        Spacer()
                     }
-                    .listRowBackground(KinnectTheme.surface)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    List(comments) { c in
+                        HStack(alignment: .top, spacing: 10) {
+                            KinnectAvatarView(
+                                name: c.author.name,
+                                avatarURL: c.author.avatarUrl,
+                                colorHex: c.author.avatarColor,
+                                size: 34
+                            )
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 6) {
+                                    Text(c.author.name)
+                                        .font(.caption.bold())
+                                        .foregroundColor(KinnectTheme.accentBright)
+                                    Text(formatRelativeDate(c.createdAt))
+                                        .font(.caption2)
+                                        .foregroundColor(KinnectTheme.textSecondary)
+                                }
+                                Text(c.text)
+                                    .font(.subheadline)
+                                    .foregroundColor(.white)
+                                    .kinnectMultiline()
+                            }
+                        }
+                        .listRowBackground(KinnectTheme.surface)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 14))
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
 
-                HStack(spacing: 8) {
-                    TextField("Bình luận video ngắn...", text: $text)
-                        .padding(10)
-                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                        .foregroundColor(.white)
-                    KinnectIconButton(
-                        glyph: .send,
-                        label: "Gửi bình luận",
-                        tint: KinnectTheme.accentBright
-                    ) {
-                        Task { await postComment() }
+                // Quick emoji reaction bar
+                HStack(spacing: 12) {
+                    ForEach(["❤️", "🔥", "😂", "👏", "😍", "✨"], id: \.self) { emoji in
+                        Button {
+                            text.append(emoji)
+                        } label: {
+                            Text(emoji)
+                                .font(.title3)
+                                .frame(minWidth: 36, minHeight: 36)
+                        }
                     }
+                    Spacer()
                 }
-                .padding(12)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 4)
+                .background(KinnectTheme.surface)
+
+                // Composer input row
+                HStack(spacing: 10) {
+                    TextField("Bình luận về video này...", text: $text)
+                        .padding(10)
+                        .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated))
+                        .foregroundColor(.white)
+
+                    Button {
+                        Task { await postComment() }
+                    } label: {
+                        KinnectIcon(glyph: .send, size: 20, selected: true, tint: KinnectTheme.accentBright)
+                            .frame(width: 40, height: 40)
+                            .background(Circle().fill(KinnectTheme.surfaceElevated))
+                    }
+                    .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isPosting)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
                 .background(KinnectTheme.surface)
             }
             .background(KinnectTheme.background)
-            .navigationTitle("Bình luận Shorts")
+            .navigationTitle("Bình luận (\(comments.count))")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -326,6 +500,8 @@ struct ShortCommentsSheet: View {
                 await load()
             }
         }
+        .presentationDetents([.medium, .fraction(0.85)])
+        .presentationDragIndicator(.visible)
     }
 
     private func load() async {
@@ -337,19 +513,56 @@ struct ShortCommentsSheet: View {
     private func postComment() async {
         let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty else { return }
+        isPosting = true
+        let draft = text
         text = ""
         let reqId = "short_cmt_\(short.id)_\(UUID().uuidString)"
         do {
             _ = try await KinnectAPIClient.shared.requestJSON(
                 "/api/shorts/\(short.id)/comments",
                 method: "POST",
-                body: ["text": clean],
+                body: KinnectWriteBody.comment(clean),
                 requestId: reqId
             )
             await load()
             onUpdated()
         } catch {
+            text = draft
             appState.showToast(error.localizedDescription)
         }
+        isPosting = false
+    }
+}
+
+// MARK: - Floating Heart Animation (Web Parity `liveReaction` & Double Tap)
+struct FloatingHeart: Identifiable {
+    let id = UUID()
+    let x: CGFloat
+    let y: CGFloat
+}
+
+struct HeartEffectView: View {
+    @State private var scale: CGFloat = 0.4
+    @State private var opacity: Double = 1.0
+    @State private var offsetY: CGFloat = 0
+
+    var body: some View {
+        Image(systemName: "heart.fill")
+            .font(.system(size: 64))
+            .foregroundColor(KinnectTheme.danger)
+            .shadow(color: .black.opacity(0.4), radius: 6, x: 0, y: 3)
+            .scaleEffect(scale)
+            .opacity(opacity)
+            .offset(y: offsetY)
+            .onAppear {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.5)) {
+                    scale = 1.25
+                }
+                withAnimation(.easeOut(duration: 0.75).delay(0.2)) {
+                    offsetY = -120
+                    opacity = 0
+                    scale = 1.45
+                }
+            }
     }
 }

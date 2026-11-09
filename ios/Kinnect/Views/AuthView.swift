@@ -1261,6 +1261,10 @@ struct AuthView: View {
                 // User intentionally cancelled: ignore quietly
                 return
             }
+            if nsErr.code == 1000 || nsErr.localizedDescription.lowercased().contains("unknown") {
+                errorMessage = "Đăng nhập Apple trên bản cài Sideload cần tài khoản Apple Developer trả phí có kích hoạt Sign in with Apple Entitlement. Bạn vui lòng sử dụng Đăng nhập bằng Tên tài khoản & Mật khẩu bên dưới."
+                return
+            }
             errorMessage = error.localizedDescription
         }
     }

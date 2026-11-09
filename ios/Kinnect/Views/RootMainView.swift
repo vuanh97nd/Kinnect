@@ -371,7 +371,7 @@ struct RootMainView: View {
                             } label: {
                                 HStack(spacing: 12) {
                                     KinnectIcon(glyph: .wallet, size: 24, tint: KinnectTheme.warning)
-                                    Text("Ví & Cửa hàng")
+                                    Text("Ví Kinnect & Cửa hàng Kinnect")
                                         .foregroundColor(KinnectTheme.textPrimary)
                                 }
                                 .frame(minHeight: 44)
@@ -459,7 +459,7 @@ struct RootMainView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Ví & Cửa hàng")
+                .accessibilityLabel("Ví Kinnect và Cửa hàng Kinnect")
 
                 // 3. Bạn bè / Friends
                 Button {

@@ -85,15 +85,26 @@ enum StudioMediaFilters {
 
 final class StudioPhotoProject: ObservableObject {
     @Published var originalImage: UIImage
-    @Published var brightness: Double = 0        // -100 ... 100
-    @Published var contrast: Double = 0          // -80 ... 100
-    @Published var saturation: Double = 0        // -100 ... 100
-    @Published var warmth: Double = 0            // -100 ... 100
-    @Published var smooth: Double = 0            // 0 ... 100 (Real beauty smoothing)
-    @Published var rotation: Int = 0             // 0, 90, 180, 270
+    @Published var brightness: Double = 0
+    @Published var exposure: Double = 0
+    @Published var highlights: Double = 0
+    @Published var shadows: Double = 0
+    @Published var contrast: Double = 0
+    @Published var saturation: Double = 0
+    @Published var vibrance: Double = 0
+    @Published var warmth: Double = 0
+    @Published var tint: Double = 0
+    @Published var smooth: Double = 0
+    @Published var sharpness: Double = 0
+    @Published var clarity: Double = 0
+    @Published var curveAmount: Double = 0
+    @Published var grain: Double = 0
+    @Published var rotation: Int = 0
     @Published var flipHorizontal: Bool = false
     @Published var cropRatio: StudioCropRatio = .original
     @Published var proTemplate: StudioProTemplate = .none
+    @Published var proPack: StudioProPack = .original
+    @Published var overlayText: String = ""
 
     private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
 
@@ -103,11 +114,22 @@ final class StudioPhotoProject: ObservableObject {
 
     func resetColor() {
         brightness = 0
+        exposure = 0
+        highlights = 0
+        shadows = 0
         contrast = 0
         saturation = 0
+        vibrance = 0
         warmth = 0
+        tint = 0
         smooth = 0
+        sharpness = 0
+        clarity = 0
+        curveAmount = 0
+        grain = 0
+        overlayText = ""
         proTemplate = .none
+        proPack = .original
     }
 
     func resetAll() {
@@ -118,8 +140,27 @@ final class StudioPhotoProject: ObservableObject {
     }
 
     var hasEdits: Bool {
-        brightness != 0 || contrast != 0 || saturation != 0 || warmth != 0 ||
-        smooth != 0 || rotation != 0 || flipHorizontal || cropRatio != .original || proTemplate != .none
+        !makeGrade().isNeutral || rotation != 0 || flipHorizontal || cropRatio != .original
+    }
+
+    func makeGrade() -> StudioGradeState {
+        StudioGradeState(
+            exposure: exposure + brightness,
+            highlights: highlights,
+            shadows: shadows,
+            contrast: contrast,
+            saturation: saturation,
+            vibrance: vibrance,
+            warmth: warmth,
+            tint: tint,
+            smooth: smooth,
+            sharpness: sharpness,
+            clarity: clarity,
+            curveAmount: curveAmount,
+            grain: grain,
+            pack: proPack,
+            overlayText: overlayText
+        )
     }
 
     /// Renders the image with all geometric transforms and CoreImage filters applied.
@@ -147,107 +188,16 @@ final class StudioPhotoProject: ObservableObject {
             }
         }
 
-        // 4. CoreImage Filters (Color, Pro Template, Real Beauty Smoothing)
         guard let ciInput = CIImage(image: processed) else { return processed }
-        var ciOutput = ciInput
-
-        // A. Color Adjustments
-        ciOutput = applyColorControls(to: ciOutput)
-
-        // B. Pro Filter Preset
-        ciOutput = applyProTemplate(to: ciOutput)
-
-        // C. Real Edge-Preserving Skin Smoothing
-        if smooth > 0 {
-            ciOutput = applySkinSmoothing(to: ciOutput, intensity: smooth)
-        }
+        let graph = StudioEditGraph.make(grade: makeGrade())
+        let needsSkin = graph.grade.smooth + graph.grade.pack.definition.smooth > 0
+        let mask = needsSkin ? StudioSkinMask.mask(for: ciInput) : nil
+        let ciOutput = StudioColorPipeline.apply(to: ciInput, graph: graph, faceMask: mask)
 
         if let cgImg = ciContext.createCGImage(ciOutput, from: ciOutput.extent) {
             return UIImage(cgImage: cgImg, scale: processed.scale, orientation: .up)
         }
         return processed
-    }
-
-    // MARK: - CoreImage Pipelines
-    private func applyColorControls(to input: CIImage) -> CIImage {
-        let b = brightness / 200.0 // -0.5 ... 0.5
-        let c = 1.0 + (contrast / 100.0) * 0.5 // 0.6 ... 1.5
-        let s = max(0.0, 1.0 + (saturation / 100.0)) // 0 ... 2.0
-
-        var out = input.applyingFilter("CIColorControls", parameters: [
-            kCIInputBrightnessKey: b,
-            kCIInputContrastKey: c,
-            kCIInputSaturationKey: s
-        ])
-
-        if warmth != 0 {
-            let targetTemp = 6500.0 + warmth * 15.0
-            out = out.applyingFilter("CITemperatureAndTint", parameters: [
-                "inputNeutral": CIVector(x: 6500, y: 0),
-                "inputTargetNeutral": CIVector(x: targetTemp, y: 0)
-            ])
-        }
-        return out
-    }
-
-    private func applyProTemplate(to input: CIImage) -> CIImage {
-        switch proTemplate {
-        case .none:
-            return input
-        case .aurora:
-            // Lavender/cool tones with gentle highlight glow
-            let tinted = input.applyingFilter("CITemperatureAndTint", parameters: [
-                "inputNeutral": CIVector(x: 6500, y: 0),
-                "inputTargetNeutral": CIVector(x: 5800, y: 15)
-            ])
-            return tinted.applyingFilter("CIColorControls", parameters: [
-                kCIInputContrastKey: 1.08,
-                kCIInputSaturationKey: 1.15
-            ])
-        case .travel:
-            // Golden warmth + saturation boost
-            let warm = input.applyingFilter("CITemperatureAndTint", parameters: [
-                "inputNeutral": CIVector(x: 6500, y: 0),
-                "inputTargetNeutral": CIVector(x: 7400, y: 0)
-            ])
-            return warm.applyingFilter("CIColorControls", parameters: [
-                kCIInputContrastKey: 1.10,
-                kCIInputSaturationKey: 1.20
-            ])
-        case .cinema:
-            // Cinematic teal & orange curve
-            let cc = input.applyingFilter("CIColorControls", parameters: [
-                kCIInputContrastKey: 1.18,
-                kCIInputSaturationKey: 0.95
-            ])
-            return cc.applyingFilter("CITemperatureAndTint", parameters: [
-                "inputNeutral": CIVector(x: 6500, y: 0),
-                "inputTargetNeutral": CIVector(x: 5400, y: -10)
-            ])
-        case .vivid:
-            return input.applyingFilter("CIColorControls", parameters: [
-                kCIInputContrastKey: 1.15,
-                kCIInputSaturationKey: 1.35
-            ])
-        case .noir:
-            return input.applyingFilter("CIPhotoEffectNoir")
-        case .sunset:
-            let sun = input.applyingFilter("CITemperatureAndTint", parameters: [
-                "inputNeutral": CIVector(x: 6500, y: 0),
-                "inputTargetNeutral": CIVector(x: 7800, y: 10)
-            ])
-            return sun.applyingFilter("CIColorControls", parameters: [
-                kCIInputContrastKey: 1.05,
-                kCIInputSaturationKey: 1.25
-            ])
-        }
-    }
-
-    /// Real edge-preserving skin smoothing algorithm
-    /// Separates high frequency details from low-frequency color masses.
-    /// Blur softens skin blemishes while keeping eyes, lips, and hair sharp.
-    private func applySkinSmoothing(to input: CIImage, intensity: Double) -> CIImage {
-        return StudioMediaFilters.applySkinSmoothing(to: input, intensity: intensity)
     }
 
     // MARK: - Geometry Helpers
@@ -317,14 +267,27 @@ final class StudioVideoProject: ObservableObject {
     @Published var trimIn: Double = 0
     @Published var trimOut: Double = 0
     @Published var brightness: Double = 0
+    @Published var exposure: Double = 0
+    @Published var highlights: Double = 0
+    @Published var shadows: Double = 0
     @Published var contrast: Double = 0
     @Published var saturation: Double = 0
+    @Published var vibrance: Double = 0
     @Published var warmth: Double = 0
+    @Published var tint: Double = 0
     @Published var smooth: Double = 0
+    @Published var sharpness: Double = 0
+    @Published var clarity: Double = 0
+    @Published var curveAmount: Double = 0
+    @Published var grain: Double = 0
     @Published var rotation: Int = 0
     @Published var proTemplate: StudioProTemplate = .none
+    @Published var proPack: StudioProPack = .original
+    @Published var playbackRate: Double = 1
+    @Published var overlayText: String = ""
     @Published var isExporting = false
     @Published var exportProgress: Float = 0
+    private var activeExport: AVAssetExportSession?
 
     init(sourceURL: URL) {
         self.sourceURL = sourceURL
@@ -336,64 +299,62 @@ final class StudioVideoProject: ObservableObject {
 
     var hasEdits: Bool {
         trimIn > 0.05 || (duration > 0 && trimOut < duration - 0.05) ||
-        brightness != 0 || contrast != 0 || saturation != 0 || warmth != 0 ||
-        smooth != 0 || rotation != 0 || proTemplate != .none
+        abs(playbackRate - 1) > 0.01 || rotation != 0 || !makeGrade().isNeutral
     }
 
-    /// Builds a real AVVideoComposition that runs the CoreImage filter pipeline per frame
+    func makeGrade() -> StudioGradeState {
+        StudioGradeState(
+            exposure: exposure + brightness,
+            highlights: highlights,
+            shadows: shadows,
+            contrast: contrast,
+            saturation: saturation,
+            vibrance: vibrance,
+            warmth: warmth,
+            tint: tint,
+            smooth: smooth,
+            sharpness: sharpness,
+            clarity: clarity,
+            curveAmount: curveAmount,
+            grain: grain,
+            pack: proPack,
+            overlayText: overlayText
+        )
+    }
+
+    func cancelExport() {
+        activeExport?.cancelExport()
+    }
+
+    /// Builds a real AVVideoComposition that runs the shared edit graph per frame.
     func makeVideoComposition(for asset: AVAsset) -> AVVideoComposition {
-        let b = brightness / 200.0
-        let c = 1.0 + (contrast / 100.0) * 0.5
-        let s = max(0.0, 1.0 + (saturation / 100.0))
-        let w = warmth
-        let sm = smooth
-        let template = proTemplate
+        let graph = StudioEditGraph.make(grade: makeGrade())
+        let grade = graph.grade
         let rot = rotation % 360
+        let sampleMask: CIImage? = {
+            guard grade.smooth + grade.pack.definition.smooth > 0 else { return nil }
+            let generator = AVAssetImageGenerator(asset: asset)
+            generator.appliesPreferredTrackTransform = true
+            let time = CMTime(seconds: min(max(trimIn, 0), max(duration - 0.05, 0)), preferredTimescale: 600)
+            guard let cg = try? generator.copyCGImage(at: time, actualTime: nil) else { return nil }
+            return StudioSkinMask.mask(for: CIImage(cgImage: cg))
+        }()
 
         let baseComposition = AVVideoComposition(asset: asset, applyingCIFiltersWithHandler: { request in
-            let source = request.sourceImage.clampedToExtent()
-            var output = source
-
-            // 1. Color controls
-            output = output.applyingFilter("CIColorControls", parameters: [
-                kCIInputBrightnessKey: b,
-                kCIInputContrastKey: c,
-                kCIInputSaturationKey: s
-            ])
-
-            // 2. Warmth
-            if w != 0 {
-                output = output.applyingFilter("CITemperatureAndTint", parameters: [
-                    "inputNeutral": CIVector(x: 6500, y: 0),
-                    "inputTargetNeutral": CIVector(x: 6500.0 + w * 15.0, y: 0)
-                ])
+            let fittedMask = sampleMask.map { mask -> CIImage in
+                let extent = request.sourceImage.extent
+                let sx = extent.width / max(mask.extent.width, 1)
+                let sy = extent.height / max(mask.extent.height, 1)
+                return mask.transformed(by: CGAffineTransform(scaleX: sx, y: sy))
+                    .transformed(by: CGAffineTransform(translationX: extent.minX - mask.extent.minX * sx, y: extent.minY - mask.extent.minY * sy))
+                    .cropped(to: extent)
             }
-
-            // 3. Pro template
-            switch template {
-            case .none: break
-            case .aurora:
-                output = output.applyingFilter("CIColorControls", parameters: [kCIInputContrastKey: 1.10, kCIInputSaturationKey: 1.15])
-            case .travel:
-                output = output.applyingFilter("CITemperatureAndTint", parameters: ["inputNeutral": CIVector(x: 6500, y: 0), "inputTargetNeutral": CIVector(x: 7400, y: 0)])
-            case .cinema:
-                output = output.applyingFilter("CIColorControls", parameters: [kCIInputContrastKey: 1.20, kCIInputSaturationKey: 0.95])
-            case .vivid:
-                output = output.applyingFilter("CIColorControls", parameters: [kCIInputContrastKey: 1.15, kCIInputSaturationKey: 1.35])
-            case .noir:
-                output = output.applyingFilter("CIPhotoEffectNoir")
-            case .sunset:
-                output = output.applyingFilter("CITemperatureAndTint", parameters: ["inputNeutral": CIVector(x: 6500, y: 0), "inputTargetNeutral": CIVector(x: 7800, y: 10)])
-            }
-
-            // 4. Real edge-preserving skin smoothing per frame
-            if sm > 0 {
-                output = StudioMediaFilters.applySkinSmoothing(to: output, intensity: sm)
-            } else {
-                output = output.cropped(to: request.sourceImage.extent)
-            }
-
-            // 5. Video rotation geometry (90, 180, 270 degrees) with normalized origin
+            var output = StudioColorPipeline.apply(
+                to: request.sourceImage,
+                graph: graph,
+                faceMask: fittedMask,
+                compositionTime: request.compositionTime
+            )
             if rot != 0 {
                 switch rot {
                 case 90:
@@ -402,11 +363,11 @@ final class StudioVideoProject: ObservableObject {
                     output = output.oriented(.down)
                 case 270:
                     output = output.oriented(.left)
-                default: break
+                default:
+                    break
                 }
             }
-
-            request.finish(with: output, context: nil)
+            request.finish(with: output.cropped(to: output.extent), context: nil)
         })
 
         guard let mutableComposition = baseComposition.mutableCopy() as? AVMutableVideoComposition else {
@@ -421,18 +382,17 @@ final class StudioVideoProject: ObservableObject {
         return mutableComposition
     }
 
-    /// Real AVAssetExportSession export preserving source audio and trimmed time range
+    /// Exports one clip. Speed other than 1x changes pitch. HEVC is used when the preset exists.
     func exportVideo() async throws -> URL {
-        let asset = AVURLAsset(url: sourceURL)
-        let composition = makeVideoComposition(for: asset)
-
+        let source = AVURLAsset(url: sourceURL)
+        let exportAsset = try await assetForExport(from: source)
+        let composition = makeVideoComposition(for: exportAsset)
         let outputURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("Kinnect-Video-\(UUID().uuidString).mp4")
-
-        guard let exportSession = AVAssetExportSession(
-            asset: asset,
-            presetName: AVAssetExportPresetHighestQuality
-        ) else {
+        let preset = AVAssetExportSession.allExportPresets().contains(AVAssetExportPresetHEVCHighestQuality)
+            ? AVAssetExportPresetHEVCHighestQuality
+            : AVAssetExportPresetHighestQuality
+        guard let exportSession = AVAssetExportSession(asset: exportAsset, presetName: preset) else {
             throw NSError(domain: "KinnectStudio", code: -1, userInfo: [NSLocalizedDescriptionKey: "Không khởi tạo được bộ xuất video."])
         }
 
@@ -440,22 +400,57 @@ final class StudioVideoProject: ObservableObject {
         exportSession.outputURL = outputURL
         exportSession.outputFileType = .mp4
         exportSession.shouldOptimizeForNetworkUse = true
-
-        // Trimming range
-        let startTime = CMTime(seconds: max(0, trimIn), preferredTimescale: 600)
-        let endTime = CMTime(seconds: min(duration, trimOut > trimIn ? trimOut : duration), preferredTimescale: 600)
-        exportSession.timeRange = CMTimeRange(start: startTime, end: endTime)
+        if abs(playbackRate - 1) < 0.05 {
+            let startTime = CMTime(seconds: max(0, trimIn), preferredTimescale: 600)
+            let endTime = CMTime(seconds: min(duration, trimOut > trimIn ? trimOut : duration), preferredTimescale: 600)
+            exportSession.timeRange = CMTimeRange(start: startTime, end: endTime)
+        }
+        activeExport = exportSession
+        isExporting = true
+        exportProgress = 0
+        let progressTask = Task { @MainActor in
+            while !Task.isCancelled {
+                self.exportProgress = exportSession.progress
+                let status = exportSession.status
+                if status == .completed || status == .failed || status == .cancelled { break }
+                try? await Task.sleep(nanoseconds: 200_000_000)
+            }
+        }
 
         await withCheckedContinuation { continuation in
             exportSession.exportAsynchronously {
                 continuation.resume()
             }
         }
+        progressTask.cancel()
+        isExporting = false
+        exportProgress = exportSession.status == .completed ? 1 : exportSession.progress
+        activeExport = nil
 
         if exportSession.status == .completed {
             return outputURL
-        } else {
-            throw exportSession.error ?? NSError(domain: "KinnectStudio", code: -2, userInfo: [NSLocalizedDescriptionKey: "Xuất video không thành công."])
         }
+        throw exportSession.error ?? NSError(domain: "KinnectStudio", code: -2, userInfo: [NSLocalizedDescriptionKey: "Xuất video không thành công."])
+    }
+
+    private func assetForExport(from source: AVURLAsset) async throws -> AVAsset {
+        guard abs(playbackRate - 1) >= 0.05 else { return source }
+        let composition = AVMutableComposition()
+        let start = CMTime(seconds: max(0, trimIn), preferredTimescale: 600)
+        let length = CMTime(seconds: max(0.1, (trimOut > trimIn ? trimOut : duration) - trimIn), preferredTimescale: 600)
+        let range = CMTimeRange(start: start, duration: length)
+        let scaled = CMTimeMultiplyByFloat64(length, multiplier: 1.0 / playbackRate)
+        if let video = try await source.loadTracks(withMediaType: .video).first,
+           let track = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) {
+            try track.insertTimeRange(range, of: video, at: .zero)
+            track.scaleTimeRange(CMTimeRange(start: .zero, duration: length), toDuration: scaled)
+            track.preferredTransform = try await video.load(.preferredTransform)
+        }
+        if let audio = try await source.loadTracks(withMediaType: .audio).first,
+           let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
+            try track.insertTimeRange(range, of: audio, at: .zero)
+            track.scaleTimeRange(CMTimeRange(start: .zero, duration: length), toDuration: scaled)
+        }
+        return composition
     }
 }

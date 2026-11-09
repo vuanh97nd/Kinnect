@@ -23,6 +23,7 @@ struct FeedView: View {
     @State private var audiencePost: PostItem?
     @State private var showAudienceDialog = false
     @State private var hiddenPostIds: Set<String> = []
+    @State private var selectedAuthorProfile: KinnectUser? = nil
 
     var body: some View {
         ScrollView {
@@ -51,6 +52,9 @@ struct FeedView: View {
                             post: post,
                             currentUserId: appState.currentUser?.id ?? "",
                             isAuthorOnline: appState.onlineUserIds.contains(post.author.id),
+                            onOpenAuthorProfile: {
+                                selectedAuthorProfile = post.author
+                            },
                             onReact: { reaction in
                                 Task { await toggleReaction(post: post, reaction: reaction) }
                             },
@@ -185,6 +189,9 @@ struct FeedView: View {
                 }
                 Button("Hủy", role: .cancel) {}
             }
+        }
+        .sheet(item: $selectedAuthorProfile) { user in
+            ProfileView(targetUser: user)
         }
     }
 
@@ -438,6 +445,7 @@ private struct PostCardView: View {
     let post: PostItem
     let currentUserId: String
     let isAuthorOnline: Bool
+    var onOpenAuthorProfile: (() -> Void)? = nil
     let onReact: (String) -> Void
     let onOpenComments: () -> Void
     var onEdit: (() -> Void)? = nil
@@ -457,31 +465,43 @@ private struct PostCardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
-                KinnectAvatarView(
-                    name: post.author.name,
-                    avatarURL: post.author.avatarUrl,
-                    colorHex: post.author.avatarColor,
-                    size: 42,
-                    isOnline: isAuthorOnline
-                )
+                Button {
+                    onOpenAuthorProfile?()
+                } label: {
+                    KinnectAvatarView(
+                        name: post.author.name,
+                        avatarURL: post.author.avatarUrl,
+                        colorHex: post.author.avatarColor,
+                        size: 42,
+                        isOnline: isAuthorOnline
+                    )
+                }
+                .buttonStyle(.plain)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(post.author.name)
-                        .font(.subheadline.weight(.bold))
-                        .foregroundColor(KinnectTheme.textPrimary)
-                        .kinnectMultiline()
-                    HStack(spacing: 6) {
-                        Text(categoryLabel(post.category))
-                            .font(.caption2.weight(.semibold))
-                            .foregroundColor(KinnectTheme.accentBright)
-                        Text("•")
-                            .font(.caption2)
-                            .foregroundColor(KinnectTheme.textSecondary)
-                        Text(formatRelativeDate(post.createdAt))
-                            .font(.caption2)
-                            .foregroundColor(KinnectTheme.textSecondary)
+                Button {
+                    onOpenAuthorProfile?()
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(post.author.name)
+                            .font(.subheadline.weight(.bold))
+                            .foregroundColor(KinnectTheme.textPrimary)
+                            .kinnectMultiline()
+                        HStack(spacing: 6) {
+                            if !post.author.handle.isEmpty {
+                                Text("@\(post.author.handle)")
+                                    .font(.caption2)
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                                Text("•")
+                                    .font(.caption2)
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                            }
+                            Text(formatRelativeDate(post.createdAt))
+                                .font(.caption2)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        }
                     }
                 }
+                .buttonStyle(.plain)
 
                 Spacer()
 
@@ -663,15 +683,6 @@ private struct PostCardView: View {
         default: return "👍"
         }
     }
-
-    private func categoryLabel(_ key: String) -> String {
-        switch key {
-        case "confessions": return "Tâm sự"
-        case "questions": return "Hỏi đáp"
-        case "events": return "Sự kiện"
-        default: return "Cộng đồng"
-        }
-    }
 }
 
 struct PostComposerSheet: View {
@@ -681,7 +692,6 @@ struct PostComposerSheet: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var text = ""
-    @State private var category = "community"
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var imageDataURL: String = ""
     @State private var previewImage: UIImage?
@@ -691,14 +701,6 @@ struct PostComposerSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    Picker("Chuyên mục", selection: $category) {
-                        Text("Cộng đồng").tag("community")
-                        Text("Tâm sự").tag("confessions")
-                        Text("Hỏi đáp").tag("questions")
-                        Text("Sự kiện").tag("events")
-                    }
-                    .pickerStyle(.segmented)
-
                     TextField("Chia sẻ câu chuyện hoặc khoảnh khắc của bạn...", text: $text, axis: .vertical)
                         .lineLimit(4...10)
                         .padding(12)
@@ -774,11 +776,10 @@ struct PostComposerSheet: View {
             _ = try await KinnectAPIClient.shared.requestJSON(
                 "/api/posts",
                 method: "POST",
-                body: [
-                    "text": text.trimmingCharacters(in: .whitespacesAndNewlines),
-                    "category": category,
-                    "imageUrl": imageDataURL
-                ],
+                body: KinnectWriteBody.post(
+                    text: text.trimmingCharacters(in: .whitespacesAndNewlines),
+                    mediaDataURL: imageDataURL
+                ),
                 requestId: reqId
             )
             onPosted()
@@ -903,11 +904,11 @@ struct StoryComposerSheet: View {
             _ = try await KinnectAPIClient.shared.requestJSON(
                 "/api/stories",
                 method: "POST",
-                body: [
-                    "text": text.trimmingCharacters(in: .whitespacesAndNewlines),
-                    "imageUrl": imageDataURL,
-                    "backgroundColor": backgroundColor
-                ],
+                body: KinnectWriteBody.story(
+                    text: text.trimmingCharacters(in: .whitespacesAndNewlines),
+                    colorHex: backgroundColor,
+                    mediaDataURL: imageDataURL
+                ),
                 requestId: reqId
             )
             onCreated()
@@ -1129,13 +1130,31 @@ struct PostCommentsSheet: View {
     private func sendComment() async {
         let clean = newComment.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty else { return }
+        let draft = newComment
         newComment = ""
         let reqId = "comment_\(post.id)_\(UUID().uuidString)"
         do {
             _ = try await KinnectAPIClient.shared.requestJSON(
                 "/api/posts/\(post.id)/comments",
                 method: "POST",
-                body: ["text": clean],
+                body: KinnectWriteBody.comment(clean),
+                requestId: reqId
+            )
+            await loadComments()
+            onChanged()
+        } catch {
+            newComment = draft
+            appState.showToast(error.localizedDescription)
+        }
+    }
+
+    private func deleteComment(_ item: CommentItem) async {
+        let reqId = "del_comment_\(item.id)"
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/posts/\(post.id)/comments/\(item.id)",
+                method: "DELETE",
+                body: [:],
                 requestId: reqId
             )
             await loadComments()
@@ -1143,18 +1162,6 @@ struct PostCommentsSheet: View {
         } catch {
             appState.showToast(error.localizedDescription)
         }
-    }
-
-    private func deleteComment(_ item: CommentItem) async {
-        let reqId = "del_comment_\(item.id)"
-        _ = try? await KinnectAPIClient.shared.requestJSON(
-            "/api/posts/\(post.id)/comments/\(item.id)",
-            method: "DELETE",
-            body: [:],
-            requestId: reqId
-        )
-        await loadComments()
-        onChanged()
     }
 }
 

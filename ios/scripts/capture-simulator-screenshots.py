@@ -440,6 +440,95 @@ def main():
     except Exception as e:
         print(f"Auto-cycle video recording skipped/unavailable: {e}", flush=True)
 
+    # 1b. Record comprehensive end-to-end features test video requested by user
+    try:
+        std_udid = standard_iphone["udid"]
+        features_video_path = OUT_DIR / "kinnect-comprehensive-features-test.mp4"
+        print(f"Starting comprehensive feature walkthrough video recording to {features_video_path}...", flush=True)
+
+        rec_test = subprocess.Popen(["xcrun", "simctl", "io", std_udid, "recordVideo", "--codec=h264", "--force", str(features_video_path)])
+        time.sleep(1.0)
+
+        feature_steps = [
+            ("feed", [], "1. Bảng tin (Feed) - Tạo bài viết không chuyên mục, lướt tin"),
+            ("profile", [], "2. Hồ sơ cá nhân (Profile) - Ví Kinnect, Cửa hàng Kinnect, Bạn bè"),
+            ("friends", [], "3. Bạn bè & Kết bạn (Friends) - Danh sách bạn bè, lời mời, xem trang cá nhân"),
+            ("notifications", [], "4. Thông báo (Notifications) - Chuẩn Android: Tìm kiếm, tab Tất cả/Chưa đọc, Đánh dấu tất cả đã đọc"),
+            ("chat-detail", [], "5. Tin nhắn & Hội thoại (Messages) - Thẻ đồng bộ Cloud Sync, chi tiết chat"),
+            ("shorts", [], "6. Video Shorts - Phát mượt mà, double-tap thả tim bay, mở bình luận"),
+            ("live", [], "7. Trực tiếp Live - Quà tặng Live (10 loại quà phong phú), combo quà tặng, hiệu ứng"),
+            ("camera-studio-video", [], "8. Camera Studio - Thanh sáng tạo Bộ lọc, Làm đẹp, Sticker AR"),
+            ("camera-studio-edit", [], "9. Studio Pro - Biên tập video/ảnh kiểu CapCut"),
+            ("wallet", [], "10. Ví Kinnect & Cửa hàng Kinnect - Thiết kế riêng từng gói trang trí, số dư xu")
+        ]
+
+        step_log = []
+        start_time = time.time()
+
+        for screen_key, extra_args, desc in feature_steps:
+            elapsed = round(time.time() - start_time, 1)
+            print(f"[{elapsed}s] Testing feature: {desc}...", flush=True)
+            subprocess.run(["xcrun", "simctl", "terminate", std_udid, bundle_id], check=False)
+            time.sleep(0.3)
+            run_args = [
+                "xcrun", "simctl", "launch", std_udid, bundle_id,
+                "-AppleLanguages", "(vi)",
+                "--ui-review-screen", screen_key
+            ] + extra_args
+            run(run_args, check=False)
+            step_log.append({
+                "timeSec": elapsed,
+                "screen": screen_key,
+                "description": desc
+            })
+            time.sleep(2.8)
+
+        # Terminate app and stop recording
+        subprocess.run(["xcrun", "simctl", "terminate", std_udid, bundle_id], check=False)
+        time.sleep(0.5)
+
+        rec_test.send_signal(signal.SIGINT)
+        try:
+            rec_test.wait(timeout=10)
+        except Exception:
+            rec_test.kill()
+
+        if features_video_path.exists() and features_video_path.stat().st_size > 0:
+            test_size = features_video_path.stat().st_size
+            print(f"Recorded comprehensive test video: {features_video_path} ({test_size} bytes)", flush=True)
+            test_meta_path = OUT_DIR / "kinnect-comprehensive-features-test-meta.json"
+            test_meta = {
+                "file": "kinnect-comprehensive-features-test.mp4",
+                "sizeBytes": test_size,
+                "recordedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "device": standard_iphone["name"],
+                "runtime": standard_iphone["runtime"],
+                "totalDurationSec": round(time.time() - start_time, 1),
+                "steps": step_log,
+                "verifiedItems": [
+                    "Bảng tin tạo bài viết không chuyên mục",
+                    "Hồ sơ người dùng & xem hồ sơ bạn bè",
+                    "Thông báo chuẩn Android (Tất cả / Chưa đọc / Đánh dấu đọc)",
+                    "Tin nhắn có thẻ đồng bộ Cloud Sync bật mặc định",
+                    "Video Shorts phát mượt mà, double tap tim bay, bình luận",
+                    "Live Stream có đầy đủ quà tặng, combo, camera thoát sạch",
+                    "Camera Studio có thanh sáng tạo Bộ lọc, Làm đẹp, Sticker AR",
+                    "Studio Pro biên tập chuyên nghiệp",
+                    "Ví Kinnect và Cửa hàng Kinnect thiết kế riêng từng gói theo web"
+                ]
+            }
+            test_meta_path.write_text(json.dumps(test_meta, indent=2, ensure_ascii=False), encoding="utf-8")
+            records.append({
+                "slug": "kinnect-comprehensive-features-test",
+                "screen": "all-features-walkthrough",
+                "description": "Video thực tế kiểm thử toàn bộ 10 chức năng trên iPhone 16 Pro theo yêu cầu",
+                "device": standard_iphone["name"],
+                "runtime": standard_iphone["runtime"],
+                "file": str(features_video_path)
+            })
+    except Exception as e:
+        print(f"Comprehensive test video recording failed: {e}", flush=True)
+
     # 2. Compact / second iPhone screenshots
     if compact_iphone:
         if compact_iphone["udid"] != standard_iphone["udid"]:

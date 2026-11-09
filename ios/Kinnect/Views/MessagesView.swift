@@ -16,9 +16,68 @@ struct MessagesView: View {
     @State private var groups: [ChatGroupItem] = []
     @State private var showCreateGroupSheet = false
     @State private var isLoading = false
+    @State private var isCloudSyncEnabled: Bool = true
+    @State private var searchQuery: String = ""
 
     var body: some View {
         VStack(spacing: 10) {
+            // Cloud Chat Sync Setting Banner (Parity Android 1.2.12 MainActivity)
+            HStack(spacing: 10) {
+                KinnectIcon(
+                    glyph: .messages,
+                    size: 20,
+                    tint: isCloudSyncEnabled ? KinnectTheme.online : KinnectTheme.textSecondary
+                )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Đồng bộ tin nhắn lên Cloud")
+                        .font(.caption.bold())
+                        .foregroundColor(KinnectTheme.textPrimary)
+                    Text(isCloudSyncEnabled ? "Đồng bộ an toàn giữa web và điện thoại." : "Đang tắt lưu trữ Cloud cá nhân.")
+                        .font(.caption2)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                }
+
+                Spacer()
+
+                Toggle("", isOn: $isCloudSyncEnabled)
+                    .labelsHidden()
+                    .tint(KinnectTheme.online)
+                    .onChange(of: isCloudSyncEnabled) { enabled in
+                        Task { await toggleCloudSync(enabled) }
+                    }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(KinnectTheme.surfaceElevated)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(isCloudSyncEnabled ? KinnectTheme.online.opacity(0.35) : KinnectTheme.border, lineWidth: 1)
+                    )
+            )
+            .padding(.horizontal, 14)
+            .padding(.top, 4)
+
+            // Search Bar
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(KinnectTheme.textSecondary)
+                TextField("Tìm cuộc trò chuyện…", text: $searchQuery)
+                    .font(.subheadline)
+                    .foregroundColor(KinnectTheme.textPrimary)
+                if !searchQuery.isEmpty {
+                    Button { searchQuery = "" } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundColor(KinnectTheme.textSecondary)
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+            .padding(.horizontal, 14)
+
             HStack(spacing: 10) {
                 Picker("Loại tin nhắn", selection: $scope) {
                     ForEach(ChatScope.allCases, id: \.self) { s in
@@ -38,7 +97,6 @@ struct MessagesView: View {
                 }
             }
             .padding(.horizontal, 14)
-            .padding(.top, 8)
 
             ScrollView {
                 LazyVStack(spacing: 10) {
@@ -127,10 +185,12 @@ struct MessagesView: View {
     }
 
     private func directConversationRow(conv: [String: Any], peer: KinnectUser) -> some View {
-        let lastMsg = (conv["lastMessage"] as? [String: Any])?["text"] as? String
+        let lastObj = conv["last"] as? [String: Any]
+        let lastMsg = (lastObj?["body"] as? String)
+            ?? ((conv["lastMessage"] as? [String: Any])?["text"] as? String)
             ?? (conv["preview"] as? String)
             ?? "Nhấn để trò chuyện"
-        let unread = conv["unreadCount"] as? Int ?? 0
+        let unread = (conv["unread"] as? Int) ?? (conv["unreadCount"] as? Int) ?? 0
 
         return HStack(spacing: 12) {
             KinnectAvatarView(
@@ -203,10 +263,12 @@ struct MessagesView: View {
     }
 
     private func loadChats() async {
+        isCloudSyncEnabled = appState.currentUser?.cloudChatSync ?? true
+
         if conversations.isEmpty,
-           let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/conversations"),
-           let convs = cached["conversations"] as? [[String: Any]] {
-            self.conversations = convs
+           let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/conversations") {
+            let list = (cached["users"] as? [[String: Any]]) ?? (cached["conversations"] as? [[String: Any]]) ?? []
+            self.conversations = list
         }
         if groups.isEmpty,
            let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/groups"),
@@ -219,12 +281,26 @@ struct MessagesView: View {
         async let gTask = KinnectAPIClient.shared.requestJSON("/api/groups")
 
         if let cRes = try? await cTask {
-            self.conversations = cRes["conversations"] as? [[String: Any]] ?? []
+            let list = (cRes["users"] as? [[String: Any]]) ?? (cRes["conversations"] as? [[String: Any]]) ?? []
+            self.conversations = list
         }
         if let gRes = try? await gTask {
             self.groups = (gRes["groups"] as? [[String: Any]] ?? []).map(ChatGroupItem.from)
         }
         await appState.refreshGlobalBadges()
+    }
+
+    private func toggleCloudSync(_ enabled: Bool) async {
+        _ = try? await KinnectAPIClient.shared.requestJSON(
+            "/api/me",
+            method: "PATCH",
+            body: ["cloudChatSync": enabled]
+        )
+        if var user = appState.currentUser {
+            user.cloudChatSync = enabled
+            appState.currentUser = user
+        }
+        appState.showToast(enabled ? "Đã bật đồng bộ tin nhắn Cloud" : "Đã tắt đồng bộ tin nhắn Cloud")
     }
 }
 
@@ -247,6 +323,7 @@ struct DirectChatDetailView: View {
     @State private var isMuted = false
     @State private var showReviewChatMenu = (UIReviewFixture.activeScreen == "chat-menu")
     @State private var showReviewMessageMenu = (UIReviewFixture.activeScreen == "message-menu")
+    @State private var showPeerProfile = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -260,23 +337,30 @@ struct DirectChatDetailView: View {
                     dismiss()
                 }
 
-                KinnectAvatarView(
-                    name: peer.name,
-                    avatarURL: peer.avatarUrl,
-                    colorHex: peer.avatarColor,
-                    size: 36,
-                    isOnline: true
-                )
+                Button {
+                    showPeerProfile = true
+                } label: {
+                    HStack(spacing: 8) {
+                        KinnectAvatarView(
+                            name: peer.name,
+                            avatarURL: peer.avatarUrl,
+                            colorHex: peer.avatarColor,
+                            size: 36,
+                            isOnline: true
+                        )
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(peer.name)
-                        .font(.subheadline.bold())
-                        .foregroundColor(KinnectTheme.textPrimary)
-                        .lineLimit(1)
-                    Text("Đang hoạt động")
-                        .font(.caption2)
-                        .foregroundColor(KinnectTheme.online)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(peer.name)
+                                .font(.subheadline.bold())
+                                .foregroundColor(KinnectTheme.textPrimary)
+                                .lineLimit(1)
+                            Text("Đang hoạt động")
+                                .font(.caption2)
+                                .foregroundColor(KinnectTheme.online)
+                        }
+                    }
                 }
+                .buttonStyle(.plain)
 
                 Spacer(minLength: 4)
 
@@ -299,26 +383,36 @@ struct DirectChatDetailView: View {
                 Menu {
                     Button {
                         Task {
-                            isPinned.toggle()
-                            _ = try? await KinnectAPIClient.shared.requestJSON(
-                                "/api/chat-preferences/direct/\(peer.id)",
-                                method: "POST",
-                                body: ["pinned": isPinned]
-                            )
-                            appState.showToast(isPinned ? "Đã ghim hội thoại." : "Đã bỏ ghim.")
+                            let next = !isPinned
+                            do {
+                                _ = try await KinnectAPIClient.shared.requestJSON(
+                                    "/api/chat-preferences/direct/\(peer.id)",
+                                    method: "POST",
+                                    body: ["pinned": next]
+                                )
+                                isPinned = next
+                                appState.showToast(isPinned ? "Đã ghim hội thoại." : "Đã bỏ ghim.")
+                            } catch {
+                                appState.showToast(error.localizedDescription)
+                            }
                         }
                     } label: {
                         Label(isPinned ? "Bỏ ghim hội thoại" : "Ghim hội thoại", systemImage: isPinned ? "pin.slash" : "pin")
                     }
                     Button {
                         Task {
-                            isMuted.toggle()
-                            _ = try? await KinnectAPIClient.shared.requestJSON(
-                                "/api/chat-preferences/direct/\(peer.id)",
-                                method: "POST",
-                                body: ["muted": isMuted]
-                            )
-                            appState.showToast(isMuted ? "Đã tắt thông báo." : "Đã bật thông báo.")
+                            let next = !isMuted
+                            do {
+                                _ = try await KinnectAPIClient.shared.requestJSON(
+                                    "/api/chat-preferences/direct/\(peer.id)",
+                                    method: "POST",
+                                    body: ["muted": next]
+                                )
+                                isMuted = next
+                                appState.showToast(isMuted ? "Đã tắt thông báo." : "Đã bật thông báo.")
+                            } catch {
+                                appState.showToast(error.localizedDescription)
+                            }
                         }
                     } label: {
                         Label(isMuted ? "Bật thông báo" : "Tắt thông báo", systemImage: isMuted ? "bell" : "bell.slash")
@@ -461,6 +555,9 @@ struct DirectChatDetailView: View {
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showForwardSheet) {
             ForwardMessageSheet(text: forwardText, imageUrl: forwardImageUrl)
+        }
+        .sheet(isPresented: $showPeerProfile) {
+            ProfileView(targetUser: peer)
         }
         .confirmationDialog("Tùy chọn hội thoại", isPresented: $showReviewChatMenu, titleVisibility: .visible) {
             Button(isPinned ? "Bỏ ghim hội thoại" : "Ghim hội thoại") {}
@@ -702,34 +799,43 @@ struct DirectChatDetailView: View {
             )
             await loadMessages()
         } catch {
+            self.text = text
             appState.showToast(error.localizedDescription)
         }
-    }
-
-    private func recallMessage(_ msg: DirectMessageItem) async {
         let reqId = "del_dm_\(msg.id)"
-        _ = try? await KinnectAPIClient.shared.requestJSON(
-            "/api/users/\(peer.id)/messages/\(msg.id)",
-            method: "DELETE",
-            body: [:],
-            requestId: reqId
-        )
-        await loadMessages()
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/users/\(peer.id)/messages/\(msg.id)",
+                method: "DELETE",
+                body: [:],
+                requestId: reqId
+            )
+            await loadMessages()
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
     }
 
     private func saveEditedMessage(messageId: String) async {
         let clean = editingMessageText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty else { return }
+        let draft = editingMessageText
         editingMessageId = nil
         editingMessageText = ""
         let reqId = "edit_dm_\(messageId)_\(Int(Date().timeIntervalSince1970))"
-        _ = try? await KinnectAPIClient.shared.requestJSON(
-            "/api/users/\(peer.id)/messages/\(messageId)",
-            method: "PATCH",
-            body: ["body": clean, "text": clean],
-            requestId: reqId
-        )
-        await loadMessages()
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/users/\(peer.id)/messages/\(messageId)",
+                method: "PATCH",
+                body: ["body": clean],
+                requestId: reqId
+            )
+            await loadMessages()
+        } catch {
+            editingMessageId = messageId
+            editingMessageText = draft
+            appState.showToast(error.localizedDescription)
+        }
     }
 }
 
@@ -921,6 +1027,9 @@ struct GroupChatDetailView: View {
         .sheet(isPresented: $showForwardSheet) {
             ForwardMessageSheet(text: forwardText, imageUrl: forwardImageUrl)
         }
+        .sheet(isPresented: $showPeerProfile) {
+            ProfileView(targetUser: peer)
+        }
         .sheet(isPresented: $showRenameSheet) {
             RenameGroupSheet(groupId: group.id, currentName: group.name) {
                 Task { await loadGroupMessages() }
@@ -1004,31 +1113,37 @@ struct GroupChatDetailView: View {
     private func sendGroupMessage() async {
         let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty else { return }
+        let draft = text
         text = ""
         let reqId = "grp_msg_\(group.id)_\(UUID().uuidString)"
         do {
             _ = try await KinnectAPIClient.shared.requestJSON(
                 "/api/groups/\(group.id)/messages",
                 method: "POST",
-                body: ["body": clean, "text": clean],
+                body: ["body": clean],
                 requestId: reqId
             )
             await loadGroupMessages()
         } catch {
+            text = draft
             appState.showToast(error.localizedDescription)
         }
     }
 
     private func leaveGroup() async {
         let reqId = "leave_grp_\(group.id)"
-        _ = try? await KinnectAPIClient.shared.requestJSON(
-            "/api/groups/\(group.id)/leave",
-            method: "POST",
-            body: [:],
-            requestId: reqId
-        )
-        onLeftGroup()
-        dismiss()
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/groups/\(group.id)/leave",
+                method: "POST",
+                body: [:],
+                requestId: reqId
+            )
+            onLeftGroup()
+            dismiss()
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
     }
 }
 

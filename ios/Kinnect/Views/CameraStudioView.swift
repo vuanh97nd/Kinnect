@@ -31,6 +31,12 @@ struct CameraStudioView: View {
         case story = "Tin 24h"
     }
 
+    enum CreativeTool: String, CaseIterable {
+        case filters = "Bộ lọc"
+        case beauty = "Làm đẹp"
+        case stickers = "Sticker"
+    }
+
     // Camera / Capture State
     @StateObject private var cameraController = CameraCaptureController()
     @State private var captureMode: CaptureMode = .photo
@@ -43,6 +49,77 @@ struct CameraStudioView: View {
     @State private var showCreateLiveSheet = false
     @State private var studioProAppliedEffect = "Bộ lọc gốc"
     @State private var isUploading = false
+
+    // Creative Tool State (Web & Android Parity)
+    @State private var selectedCreativeTool: CreativeTool? = nil
+    @State private var activeFilter: String = "none"
+    @State private var filterIntensity: Double = 0.8
+    @State private var activeSticker: String = "none"
+    @State private var beautyValues: [String: Double] = [
+        "smooth": 0.5,
+        "whiten": 0.3,
+        "slim": 0.2,
+        "eyes": 0.2,
+        "lips": 0.3,
+        "blemish": 0.5,
+        "blush": 0.2
+    ]
+    @State private var activeBeautyKey: String = "smooth"
+
+    static let filterPresets: [(id: String, name: String)] = [
+        ("none", "Gốc"),
+        ("clear", "Trong trẻo"),
+        ("milk", "Sữa"),
+        ("peach", "Hồng đào"),
+        ("warm", "Ấm áp"),
+        ("cool", "Mát lạnh"),
+        ("film", "Phim cũ"),
+        ("mono", "Đen trắng"),
+        ("vivid", "Rực rỡ"),
+        ("sunset", "Hoàng hôn"),
+        ("candy", "Kẹo ngọt"),
+        ("mint", "Bạc hà"),
+        ("dream", "Mộng mơ"),
+        ("retro", "Retro"),
+        ("cinema", "Cinema"),
+        ("rose", "Rose"),
+        ("golden", "Golden"),
+        ("ice", "Ice"),
+        ("teal", "Teal")
+    ]
+
+    static let beautyTools: [(key: String, title: String, icon: String)] = [
+        ("smooth", "Mịn da", "sparkles"),
+        ("whiten", "Sáng da", "sun.max.fill"),
+        ("slim", "Gọn mặt", "face.dashed"),
+        ("eyes", "Mắt to", "eye.fill"),
+        ("lips", "Môi đầy", "mouth.fill"),
+        ("blemish", "Giảm đốm", "wand.and.stars"),
+        ("blush", "Má hồng", "heart.fill")
+    ]
+
+    static let stickers: [(id: String, name: String, emoji: String)] = [
+        ("none", "Không", "🚫"),
+        ("glasses", "Kính râm", "🕶️"),
+        ("bunny", "Tai thỏ", "🐰"),
+        ("cat", "Tai mèo", "🐱"),
+        ("dog", "Cún con", "🐶"),
+        ("crown", "Vương miện", "👑"),
+        ("flowers", "Vòng hoa", "🌸"),
+        ("bow", "Nơ xinh", "🎀"),
+        ("freckles", "Tàn nhang", "🤎"),
+        ("hearts", "Tim bay", "💕"),
+        ("sparkle", "Lấp lánh", "✨"),
+        ("stars", "Sao xoay", "⭐"),
+        ("round_glasses", "Kính tròn", "👓"),
+        ("heart_glasses", "Kính tim", "💗"),
+        ("butterfly", "Bướm", "🦋"),
+        ("halo", "Thiên thần", "😇"),
+        ("rainbow", "Cầu vồng", "🌈"),
+        ("bubbles", "Bong bóng", "🫧"),
+        ("snow", "Tuyết", "❄️"),
+        ("confetti", "Lễ hội", "🎉")
+    ]
 
     // Media Data
     @State private var originalImage: UIImage?
@@ -131,6 +208,9 @@ struct CameraStudioView: View {
                 caption = "[Fixture UI] Kiểm thử bảng chỉnh sửa Kinnect Studio với nút Lưu tách riêng."
             }
         }
+        .onDisappear {
+            cameraController.stop()
+        }
         .sheet(isPresented: $showMusicPickerSheet) {
             NavigationStack {
                 StudioMusicPickerSheet(selectedTrack: $selectedMusicTrack)
@@ -142,8 +222,8 @@ struct CameraStudioView: View {
                     appliedEffect: $studioProAppliedEffect,
                     onApply: { effect in
                         studioProAppliedEffect = effect
-                        if let template = StudioProTemplate.allCases.first(where: { $0.rawValue == effect }) {
-                            photoProject.proTemplate = template
+                        if let pack = StudioProPack.allCases.first(where: { $0.rawValue == effect }) {
+                            photoProject.proPack = pack
                             updatePhotoPreview()
                         } else if let base = originalImage {
                             let filtered = applyProFilter(named: effect, to: base)
@@ -158,7 +238,10 @@ struct CameraStudioView: View {
             }
         }
         .sheet(isPresented: $showCreateLiveSheet) {
-            CreateLiveRoomSheet()
+            CreateLiveRoomSheet(onStarted: {
+                cameraController.stop()
+                dismiss()
+            })
         }
     }
 
@@ -173,10 +256,21 @@ struct CameraStudioView: View {
             )
             .ignoresSafeArea()
 
+            // AR Face Sticker Overlay on Camera Viewfinder (Web & Android Parity)
+            if activeSticker != "none", let s = Self.stickers.first(where: { $0.id == activeSticker }) {
+                Text(s.emoji)
+                    .font(.system(size: 96))
+                    .shadow(color: .black.opacity(0.4), radius: 8, x: 0, y: 4)
+                    .offset(y: stickerOffset(for: activeSticker))
+                    .transition(.scale.combined(with: .opacity))
+                    .allowsHitTesting(false)
+            }
+
             VStack(spacing: 0) {
                 // Top Camera Chrome: Close, Aspect ratio 9:16, Music, Flash
                 HStack(spacing: 16) {
                     KinnectIconButton(glyph: .close, label: "Thoát Camera", tint: .white) {
+                        cameraController.stop()
                         dismiss()
                     }
 
@@ -225,6 +319,38 @@ struct CameraStudioView: View {
 
                 // Bottom Controls: Library Picker, Shutter, Mode Selector
                 VStack(spacing: 20) {
+                    if cameraController.availableLenses.count > 1 {
+                        HStack(spacing: 8) {
+                            ForEach(cameraController.availableLenses) { lens in
+                                Button {
+                                    cameraController.selectLens(lens, position: isUsingFrontCamera ? .front : .back)
+                                } label: {
+                                    Text(lens.title)
+                                        .font(.caption.bold())
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 6)
+                                        .background(Capsule().fill(cameraController.activeLens == lens ? Color.white : Color.black.opacity(0.45)))
+                                        .foregroundColor(cameraController.activeLens == lens ? .black : .white)
+                                }
+                            }
+                        }
+                    }
+
+                    // Creative Tool Adjustment Drawer (when a tool is selected)
+                    if let tool = selectedCreativeTool {
+                        creativeDrawer(for: tool)
+                            .padding(.horizontal, 16)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+
+                    // Creative Bar (Bộ lọc · Làm đẹp · Sticker) - Web & Android Parity
+                    HStack(spacing: 36) {
+                        creativeBarPill(tool: .filters, icon: "camera.filters")
+                        creativeBarPill(tool: .beauty, icon: "sparkles")
+                        creativeBarPill(tool: .stickers, icon: "face.smiling")
+                    }
+                    .padding(.vertical, 2)
+
                     HStack(spacing: 36) {
                         // Library Photos Picker
                         PhotosPicker(selection: $selectedLibraryItem, matching: .any(of: [.images, .videos])) {
@@ -320,6 +446,189 @@ struct CameraStudioView: View {
             }
         }
         .navigationBarHidden(true)
+    }
+
+    private func creativeBarPill(tool: CreativeTool, icon: String) -> some View {
+        let isSelected = selectedCreativeTool == tool
+        return Button {
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.7)) {
+                selectedCreativeTool = (selectedCreativeTool == tool ? nil : tool)
+            }
+        } label: {
+            VStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(isSelected ? KinnectTheme.accentBright : .white)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        Circle().fill(isSelected ? Color.white.opacity(0.3) : Color.black.opacity(0.45))
+                    )
+                Text(tool.rawValue)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(isSelected ? KinnectTheme.accentBright : .white.opacity(0.9))
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func creativeDrawer(for tool: CreativeTool) -> some View {
+        VStack(spacing: 12) {
+            switch tool {
+            case .filters:
+                // Filter intensity slider
+                if activeFilter != "none" {
+                    HStack(spacing: 12) {
+                        Text("Độ đậm:")
+                            .font(.caption.bold())
+                            .foregroundColor(.white)
+                        Slider(value: $filterIntensity, in: 0...1)
+                            .tint(KinnectTheme.accentBright)
+                        Text("\(Int(filterIntensity * 100))%")
+                            .font(.caption.bold())
+                            .foregroundColor(KinnectTheme.accentBright)
+                            .frame(width: 40)
+                    }
+                    .padding(.horizontal, 16)
+                }
+
+                // Horizontal scroll of filters
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(Self.filterPresets, id: \.id) { f in
+                            let isChosen = activeFilter == f.id
+                            Button {
+                                activeFilter = f.id
+                            } label: {
+                                VStack(spacing: 4) {
+                                    Circle()
+                                        .strokeBorder(isChosen ? KinnectTheme.accentBright : Color.white.opacity(0.4), lineWidth: isChosen ? 3 : 1)
+                                        .frame(width: 48, height: 48)
+                                        .background(Circle().fill(Color.black.opacity(0.45)))
+                                        .overlay(
+                                            Text(f.name.prefix(1))
+                                                .font(.headline.bold())
+                                                .foregroundColor(isChosen ? KinnectTheme.accentBright : .white)
+                                        )
+                                    Text(f.name)
+                                        .font(.caption2.bold())
+                                        .foregroundColor(isChosen ? KinnectTheme.accentBright : .white.opacity(0.85))
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                }
+
+            case .beauty:
+                // Active beauty slider
+                HStack(spacing: 12) {
+                    Text(beautyLabel(for: activeBeautyKey) + ":")
+                        .font(.caption.bold())
+                        .foregroundColor(.white)
+                    Slider(
+                        value: Binding(
+                            get: { beautyValues[activeBeautyKey] ?? 0.5 },
+                            set: { beautyValues[activeBeautyKey] = $0 }
+                        ),
+                        in: 0...1
+                    )
+                    .tint(KinnectTheme.accentBright)
+                    Text("\(Int((beautyValues[activeBeautyKey] ?? 0.5) * 100))%")
+                        .font(.caption.bold())
+                        .foregroundColor(KinnectTheme.accentBright)
+                        .frame(width: 40)
+                }
+                .padding(.horizontal, 16)
+
+                // 7 Beauty Tools from BeautyCatalog
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 14) {
+                        ForEach(Self.beautyTools, id: \.key) { b in
+                            let isChosen = activeBeautyKey == b.key
+                            Button {
+                                activeBeautyKey = b.key
+                            } label: {
+                                VStack(spacing: 4) {
+                                    Image(systemName: b.icon)
+                                        .font(.headline)
+                                        .foregroundColor(isChosen ? KinnectTheme.accentBright : .white)
+                                        .frame(width: 48, height: 48)
+                                        .background(
+                                            Circle().fill(isChosen ? Color.white.opacity(0.25) : Color.black.opacity(0.45))
+                                        )
+                                    Text(b.title)
+                                        .font(.caption2.bold())
+                                        .foregroundColor(isChosen ? KinnectTheme.accentBright : .white.opacity(0.85))
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                }
+
+            case .stickers:
+                // Stickers Grid / Row
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 14) {
+                        ForEach(Self.stickers, id: \.id) { s in
+                            let isChosen = activeSticker == s.id
+                            Button {
+                                activeSticker = s.id
+                            } label: {
+                                VStack(spacing: 4) {
+                                    Text(s.emoji)
+                                        .font(.system(size: 32))
+                                        .frame(width: 52, height: 52)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 14)
+                                                .fill(isChosen ? KinnectTheme.accentBright.opacity(0.35) : Color.black.opacity(0.45))
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 14)
+                                                        .strokeBorder(isChosen ? KinnectTheme.accentBright : Color.white.opacity(0.2), lineWidth: 2)
+                                                )
+                                        )
+                                    Text(s.name)
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(isChosen ? KinnectTheme.accentBright : .white.opacity(0.85))
+                                        .lineLimit(1)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                }
+            }
+        }
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.black.opacity(0.65))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+                )
+        )
+    }
+
+    private func stickerOffset(for id: String) -> CGFloat {
+        switch id {
+        case "crown", "bunny", "cat", "dog", "flowers", "halo":
+            return -140
+        case "glasses", "round_glasses", "heart_glasses", "neon_glasses", "freckles":
+            return -40
+        case "lips", "bow":
+            return 60
+        default:
+            return -70
+        }
+    }
+
+    private func beautyLabel(for key: String) -> String {
+        Self.beautyTools.first(where: { $0.key == key })?.title ?? "Cường độ"
     }
 
     // MARK: - Media Edit Mode (Real Mobile Editor with Parity to Android PhotoEditActivity)
@@ -494,6 +803,32 @@ struct CameraStudioView: View {
                                             Slider(value: Binding(get: { vp.trimOut }, set: { vp.trimOut = max($0, min(vp.duration, vp.trimIn + 0.5)) }), in: 0...max(1, vp.duration), step: 0.1)
                                                 .tint(KinnectTheme.accentBright)
                                         }
+                                        HStack(spacing: 8) {
+                                            Text("Tốc độ")
+                                                .font(.caption2)
+                                                .foregroundColor(KinnectTheme.textSecondary)
+                                            ForEach([0.5, 1.0, 2.0], id: \.self) { rate in
+                                                Button {
+                                                    vp.playbackRate = rate
+                                                    videoCompositionRevision = UUID().uuidString
+                                                } label: {
+                                                    Text(rate == 1 ? "1x" : String(format: "%.1fx", rate))
+                                                        .font(.caption.bold())
+                                                        .padding(.horizontal, 10)
+                                                        .padding(.vertical, 6)
+                                                        .background(Capsule().fill(abs(vp.playbackRate - rate) < 0.01 ? KinnectTheme.accentBright : KinnectTheme.surface))
+                                                        .foregroundColor(.white)
+                                                }
+                                            }
+                                        }
+                                        TextField("Chữ trên video", text: $photoProject.overlayText)
+                                            .padding(8)
+                                            .background(RoundedRectangle(cornerRadius: 8).fill(KinnectTheme.surface))
+                                            .foregroundColor(.white)
+                                            .onChange(of: photoProject.overlayText) { _ in
+                                                vp.overlayText = photoProject.overlayText
+                                                videoCompositionRevision = UUID().uuidString
+                                            }
                                     }
                                 }
 
@@ -581,10 +916,14 @@ struct CameraStudioView: View {
 
                     case .color:
                         VStack(spacing: 10) {
-                            studioSliderRow(name: "Độ sáng", value: $photoProject.brightness, range: -100...100)
+                            studioSliderRow(name: "Phơi sáng", value: $photoProject.exposure, range: -100...100)
+                            studioSliderRow(name: "Vùng sáng", value: $photoProject.highlights, range: -100...100)
+                            studioSliderRow(name: "Vùng tối", value: $photoProject.shadows, range: -100...100)
                             studioSliderRow(name: "Tương phản", value: $photoProject.contrast, range: -80...100)
-                            studioSliderRow(name: "Độ rực màu", value: $photoProject.saturation, range: -100...100)
-                            studioSliderRow(name: "Nhiệt độ màu", value: $photoProject.warmth, range: -100...100)
+                            studioSliderRow(name: "Độ rực", value: $photoProject.vibrance, range: -100...100)
+                            studioSliderRow(name: "Bão hòa", value: $photoProject.saturation, range: -100...100)
+                            studioSliderRow(name: "Nhiệt độ", value: $photoProject.warmth, range: -100...100)
+                            studioSliderRow(name: "Curve", value: $photoProject.curveAmount, range: 0...100)
 
                             HStack {
                                 Spacer()
@@ -605,7 +944,7 @@ struct CameraStudioView: View {
                                 .font(.caption.bold())
                                 .foregroundColor(KinnectTheme.textSecondary)
 
-                            Text("Thuật toán làm mịn CoreImage lọc tần số cao để làm dịu khuyết điểm trên da, đồng thời bảo toàn độ sắc nét tự nhiên của mắt, môi và tóc.")
+                            Text("Làm mịn theo tần số chỉ trên má, trán và cằm. Mắt, lông mày, môi và tóc được giữ nguyên khi nhận diện được khuôn mặt.")
                                 .font(.caption2)
                                 .foregroundColor(KinnectTheme.textSecondary)
 
@@ -622,18 +961,18 @@ struct CameraStudioView: View {
 
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 8) {
-                                    ForEach(StudioProTemplate.allCases) { template in
+                                    ForEach(StudioProPack.allCases) { pack in
                                         Button {
-                                            photoProject.proTemplate = template
+                                            photoProject.proPack = pack
                                             updatePhotoPreview()
                                         } label: {
-                                            Text(template.rawValue)
-                                                .font(.caption.weight(photoProject.proTemplate == template ? .bold : .medium))
+                                            Text(pack.rawValue)
+                                                .font(.caption.weight(photoProject.proPack == pack ? .bold : .medium))
                                                 .padding(.horizontal, 14)
                                                 .padding(.vertical, 8)
                                                 .background(
                                                     RoundedRectangle(cornerRadius: 10)
-                                                        .fill(photoProject.proTemplate == template ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
+                                                        .fill(photoProject.proPack == pack ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
                                                 )
                                                 .foregroundColor(.white)
                                         }
@@ -784,11 +1123,22 @@ struct CameraStudioView: View {
     // MARK: - Save Media to Device Camera Roll
     private func syncVideoProjectSliders(to vp: StudioVideoProject) {
         vp.brightness = photoProject.brightness
+        vp.exposure = photoProject.exposure
+        vp.highlights = photoProject.highlights
+        vp.shadows = photoProject.shadows
         vp.contrast = photoProject.contrast
         vp.saturation = photoProject.saturation
+        vp.vibrance = photoProject.vibrance
         vp.warmth = photoProject.warmth
+        vp.tint = photoProject.tint
         vp.smooth = photoProject.smooth
+        vp.sharpness = photoProject.sharpness
+        vp.clarity = photoProject.clarity
+        vp.curveAmount = photoProject.curveAmount
+        vp.grain = photoProject.grain
         vp.proTemplate = photoProject.proTemplate
+        vp.proPack = photoProject.proPack
+        vp.overlayText = photoProject.overlayText
     }
 
     private func saveMediaToPhotos() {
@@ -878,7 +1228,7 @@ struct CameraStudioView: View {
         defer { isUploading = false }
         let reqId = "studio_\(UUID().uuidString)"
         let cleanCap = caption.trimmingCharacters(in: .whitespacesAndNewlines)
-        let finalCaption = selectedMusicTrack.isEmpty ? cleanCap : (cleanCap.isEmpty ? "🎵 \(selectedMusicTrack)" : "\(cleanCap) • 🎵 \(selectedMusicTrack)")
+        let finalCaption = cleanCap
 
         do {
             switch target {
@@ -887,7 +1237,6 @@ struct CameraStudioView: View {
                     appState.showToast("Vui lòng quay hoặc chọn một video MP4 (< 8MB).")
                     return
                 }
-                var durationToPublish = 15
                 var finalVideoDataURL = videoDataURL
 
                 if let vp = videoProject ?? (capturedVideoTempURL.map { StudioVideoProject(sourceURL: $0) }) {
@@ -898,24 +1247,9 @@ struct CameraStudioView: View {
                             let exportedURL = try await vp.exportVideo()
                             let data = try Data(contentsOf: exportedURL)
                             finalVideoDataURL = "data:video/mp4;base64," + data.base64EncodedString()
-                            let asset = AVURLAsset(url: exportedURL)
-                            if let d = try? await asset.load(.duration) {
-                                let sec = CMTimeGetSeconds(d)
-                                if sec.isFinite && sec > 0 {
-                                    durationToPublish = max(1, Int(round(sec)))
-                                }
-                            }
                         } catch {
                             appState.showToast("Lỗi xuất video: \(error.localizedDescription)")
                             return
-                        }
-                    } else if let tempURL = capturedVideoTempURL {
-                        let asset = AVURLAsset(url: tempURL)
-                        if let d = try? await asset.load(.duration) {
-                            let sec = CMTimeGetSeconds(d)
-                            if sec.isFinite && sec > 0 {
-                                durationToPublish = max(1, Int(round(sec)))
-                            }
                         }
                     }
                 }
@@ -923,12 +1257,7 @@ struct CameraStudioView: View {
                 _ = try await KinnectAPIClient.shared.requestJSON(
                     "/api/shorts",
                     method: "POST",
-                    body: [
-                        "title": title.trimmingCharacters(in: .whitespacesAndNewlines),
-                        "caption": finalCaption,
-                        "videoDataUrl": finalVideoDataURL,
-                        "durationSec": durationToPublish
-                    ],
+                body: KinnectWriteBody.shortVideo(caption: finalCaption, dataURL: finalVideoDataURL),
                     requestId: reqId
                 )
                 appState.showToast("Đã đăng video ngắn thành công!")
@@ -938,11 +1267,7 @@ struct CameraStudioView: View {
                 _ = try await KinnectAPIClient.shared.requestJSON(
                     "/api/posts",
                     method: "POST",
-                    body: [
-                        "text": finalCaption,
-                        "category": "community",
-                        "imageUrl": imageDataURL
-                    ],
+                body: KinnectWriteBody.post(text: finalCaption, category: "community", mediaDataURL: imageDataURL),
                     requestId: reqId
                 )
                 appState.showToast("Đã đăng bài viết mới!")
@@ -952,11 +1277,7 @@ struct CameraStudioView: View {
                 _ = try await KinnectAPIClient.shared.requestJSON(
                     "/api/stories",
                     method: "POST",
-                    body: [
-                        "text": finalCaption,
-                        "imageUrl": imageDataURL,
-                        "backgroundColor": "#7C3AED"
-                    ],
+                body: KinnectWriteBody.story(text: finalCaption, colorHex: "#7C3AED", mediaDataURL: imageDataURL),
                     requestId: reqId
                 )
                 appState.showToast("Đã đăng tin 24h!")
@@ -982,7 +1303,10 @@ struct StudioMusicPickerSheet: View {
 
     var body: some View {
         List {
-            Section("Chọn nhạc nền cho bài đăng / Video Shorts") {
+            Section("Nhạc nền") {
+                Text("Chưa có file nhạc được cấp phép. Danh sách này không trộn âm thanh vào video.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
                 ForEach(tracks, id: \.0) { track, subtitle in
                     Button {
                         selectedTrack = track
@@ -1029,14 +1353,7 @@ struct StudioProSheet: View {
     let onApply: (String) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    private let proFilters = [
-        "Bộ lọc gốc",
-        "Kinnect Vivid",
-        "Cinematic Teal & Orange",
-        "Mịn da tự nhiên (Beauty)",
-        "Noir Cổ điển",
-        "Ấm áp hoàng hôn"
-    ]
+    private let proFilters = StudioProPack.allCases.map(\.rawValue)
 
     var body: some View {
         Form {
@@ -1088,15 +1405,43 @@ struct StudioProSheet: View {
 }
 
 // MARK: - Integrated AVFoundation Capture Controller & Preview
+enum StudioLens: String, CaseIterable, Identifiable {
+    case ultraWide
+    case wide
+    case tele
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .ultraWide: return "0.5"
+        case .wide: return "1x"
+        case .tele: return "2x"
+        }
+    }
+
+    var deviceType: AVCaptureDevice.DeviceType {
+        switch self {
+        case .ultraWide: return .builtInUltraWideCamera
+        case .wide: return .builtInWideAngleCamera
+        case .tele: return .builtInTelephotoCamera
+        }
+    }
+}
+
 final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutputRecordingDelegate {
     let session = AVCaptureSession()
     let photoOutput = AVCapturePhotoOutput()
     let movieOutput = AVCaptureMovieFileOutput()
     @Published var isRecordingVideo: Bool = false
+    @Published var availableLenses: [StudioLens] = []
+    @Published var activeLens: StudioLens = .wide
+    @Published var exposureBias: Float = 0
 
     var onCapturedImage: ((UIImage) -> Void)?
     var onCapturedVideoData: ((Data, URL) -> Void)?
     private var isConfigured = false
+    private var currentPosition: AVCaptureDevice.Position = .back
 
     func configureIfAuthorized() {
         #if !targetEnvironment(simulator)
@@ -1120,17 +1465,123 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
         if session.canAddOutput(movieOutput) {
             session.addOutput(movieOutput)
         }
+        applyStabilization()
         session.commitConfiguration()
+        refreshLenses(position: .back)
+        NotificationCenter.default.addObserver(self, selector: #selector(stopForInterruption), name: UIApplication.willResignActiveNotification, object: nil)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             self?.session.startRunning()
         }
         #endif
     }
 
+    func stop() {
+        #if !targetEnvironment(simulator)
+        if movieOutput.isRecording {
+            movieOutput.stopRecording()
+        }
+        if session.isRunning {
+            session.stopRunning()
+        }
+        NotificationCenter.default.removeObserver(self, name: UIApplication.willResignActiveNotification, object: nil)
+        #endif
+    }
+
+    deinit {
+        stop()
+    }
+
+    @objc private func stopForInterruption() {
+        #if !targetEnvironment(simulator)
+        if movieOutput.isRecording {
+            movieOutput.stopRecording()
+        }
+        #endif
+    }
+
+    func refreshLenses(position: AVCaptureDevice.Position) {
+        currentPosition = position
+        let found = StudioLens.allCases.filter {
+            AVCaptureDevice.default($0.deviceType, for: .video, position: position) != nil
+        }
+        availableLenses = found.isEmpty ? [.wide] : found
+        if !availableLenses.contains(activeLens) {
+            activeLens = availableLenses.contains(.wide) ? .wide : availableLenses[0]
+        }
+    }
+
+    func selectLens(_ lens: StudioLens, position: AVCaptureDevice.Position) {
+        #if !targetEnvironment(simulator)
+        guard let device = AVCaptureDevice.default(lens.deviceType, for: .video, position: position),
+              let input = try? AVCaptureDeviceInput(device: device) else { return }
+        session.beginConfiguration()
+        for existing in session.inputs {
+            if let devInput = existing as? AVCaptureDeviceInput, devInput.device.hasMediaType(.video) {
+                session.removeInput(devInput)
+            }
+        }
+        if session.canAddInput(input) {
+            session.addInput(input)
+            activeLens = lens
+        }
+        applyStabilization()
+        session.commitConfiguration()
+        #endif
+    }
+
+    func focus(at devicePoint: CGPoint) {
+        #if !targetEnvironment(simulator)
+        guard let device = currentVideoDevice() else { return }
+        do {
+            try device.lockForConfiguration()
+            if device.isFocusPointOfInterestSupported {
+                device.focusPointOfInterest = devicePoint
+                device.focusMode = .autoFocus
+            }
+            if device.isExposurePointOfInterestSupported {
+                device.exposurePointOfInterest = devicePoint
+                device.exposureMode = .autoExpose
+            }
+            device.unlockForConfiguration()
+        } catch {
+            return
+        }
+        #endif
+    }
+
+    func setExposureBias(_ bias: Float) {
+        #if !targetEnvironment(simulator)
+        guard let device = currentVideoDevice() else { return }
+        let clamped = min(device.maxExposureTargetBias, max(device.minExposureTargetBias, bias))
+        do {
+            try device.lockForConfiguration()
+            device.setExposureTargetBias(clamped, completionHandler: nil)
+            device.unlockForConfiguration()
+            exposureBias = clamped
+        } catch {
+            return
+        }
+        #endif
+    }
+
+    private func currentVideoDevice() -> AVCaptureDevice? {
+        session.inputs.compactMap { $0 as? AVCaptureDeviceInput }.first { $0.device.hasMediaType(.video) }?.device
+    }
+
+    func applyStabilization() {
+        guard let connection = movieOutput.connection(with: .video), connection.isVideoStabilizationSupported else { return }
+        connection.preferredVideoStabilizationMode = .cinematic
+    }
+
     func capturePhoto(flash: Bool) {
         #if !targetEnvironment(simulator)
         if session.isRunning && !photoOutput.connections.isEmpty {
-            let settings = AVCapturePhotoSettings()
+            let settings: AVCapturePhotoSettings
+            if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
+                settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
+            } else {
+                settings = AVCapturePhotoSettings()
+            }
             if photoOutput.supportedFlashModes.contains(flash ? .on : .off) {
                 settings.flashMode = flash ? .on : .off
             }
@@ -1278,7 +1729,23 @@ final class CameraPreviewViewController: UIViewController {
         layer.frame = view.bounds
         view.layer.addSublayer(layer)
         previewLayer = layer
+        let tap = UITapGestureRecognizer(target: self, action: #selector(handleFocusTap(_:)))
+        view.addGestureRecognizer(tap)
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(handleExposurePan(_:)))
+        view.addGestureRecognizer(pan)
         #endif
+    }
+
+    @objc private func handleFocusTap(_ gesture: UITapGestureRecognizer) {
+        guard let previewLayer else { return }
+        let point = previewLayer.captureDevicePointConverted(fromLayerPoint: gesture.location(in: view))
+        controller?.focus(at: point)
+    }
+
+    @objc private func handleExposurePan(_ gesture: UIPanGestureRecognizer) {
+        let delta = Float(-gesture.translation(in: view).y / 120)
+        controller?.setExposureBias((controller?.exposureBias ?? 0) + delta)
+        gesture.setTranslation(.zero, in: view)
     }
 
     func setCamera(front: Bool) {
@@ -1296,7 +1763,10 @@ final class CameraPreviewViewController: UIViewController {
            let input = try? AVCaptureDeviceInput(device: device), session.canAddInput(input) {
             session.addInput(input)
         }
+        controller?.applyStabilization()
         session.commitConfiguration()
+        controller?.refreshLenses(position: pos)
+        controller?.activeLens = .wide
         #endif
     }
 

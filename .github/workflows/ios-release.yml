@@ -243,7 +243,7 @@ jobs:
 
       - name: Build Simulator App & Capture Native Screenshots via simctl
         env:
-          UI_REVIEW_ONLY_LOGIN: "1"
+          UI_REVIEW_ONLY_LOGIN: "0"
         run: |
           python3 -m pip install --break-system-packages pillow || true
           python3 ios/scripts/capture-simulator-screenshots.py

@@ -36,7 +36,9 @@ final class AppState: ObservableObject {
     @Published var isCurrentLiveHost: Bool = false
     @Published var liveChatMessages: [LiveChatMessage] = []
     @Published var liveGiftRanking: [[String: Any]] = []
+    @Published var navigationTargetRef: String = ""
     @Published var liveLastReactionBanner: String?
+    @Published var liveGiftCombo: Int = 0
 
     func joinLiveRoom(_ room: LiveRoomItem) {
         if currentLiveRoom?.id == room.id {
@@ -52,6 +54,7 @@ final class AppState: ObservableObject {
         liveChatMessages = []
         liveGiftRanking = []
         liveLastReactionBanner = nil
+        liveGiftCombo = 0
 
         if !UIReviewFixture.isEnabled && !isHost {
             Task {
@@ -77,6 +80,7 @@ final class AppState: ObservableObject {
         liveChatMessages = []
         liveGiftRanking = []
         liveLastReactionBanner = nil
+        liveGiftCombo = 0
     }
 
     private init() {
@@ -172,6 +176,7 @@ final class AppState: ObservableObject {
         KeychainStore.shared.saveAccountId(user.id)
         NativeSocketClient.shared.connectWithKeychainSession()
         PushKitManager.shared.startRegistration()
+        PushKitManager.shared.uploadStoredTokens()
     }
 
     func logout() async {
@@ -318,7 +323,9 @@ final class AppState: ObservableObject {
             let qty = json["quantity"] as? Int ?? 1
             let isGift = (json["experience"] as? Bool) ?? (json["isGift"] as? Bool) ?? (json["giftId"] != nil)
             if isGift {
-                self.liveLastReactionBanner = "🎁 \(senderName) đã gửi \(qty)x \(label)"
+                let same = self.liveLastReactionBanner?.contains(label) == true
+                self.liveGiftCombo = same ? self.liveGiftCombo + qty : qty
+                self.liveLastReactionBanner = "🎁 \(senderName) đã gửi \(self.liveGiftCombo)x \(label)"
             } else {
                 self.liveLastReactionBanner = "💜 \(senderName) thả cảm xúc \(label)"
             }

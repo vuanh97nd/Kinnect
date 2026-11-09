@@ -248,3 +248,31 @@ final class KinnectAPIClient {
         AccountCache.shared.wipeAllCaches()
     }
 }
+
+enum KinnectAuthenticatedFile {
+    static func fetch(path: String, fileExtension: String) async throws -> URL {
+        if path.hasPrefix("file://"), let url = URL(string: path) {
+            return url
+        }
+        let origin = ServerConfig.currentOrigin
+        guard let remote = ServerConfig.url(for: path, origin: origin) else {
+            throw KinnectAPIError.invalidURL
+        }
+        var request = URLRequest(url: remote)
+        let cookie = KeychainStore.shared.cookieJarHeader(for: origin)
+        if !cookie.isEmpty {
+            request.setValue(cookie, forHTTPHeaderField: "Cookie")
+        }
+        let (temporary, response) = try await URLSession.shared.download(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw KinnectAPIError.networkError("Không tải được media.")
+        }
+        let destination = FileManager.default.temporaryDirectory
+            .appendingPathComponent("kinnect-media-\(UUID().uuidString).\(fileExtension)")
+        if FileManager.default.fileExists(atPath: destination.path) {
+            try FileManager.default.removeItem(at: destination)
+        }
+        try FileManager.default.moveItem(at: temporary, to: destination)
+        return destination
+    }
+}
