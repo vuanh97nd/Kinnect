@@ -33,9 +33,9 @@ struct FeedView: View {
                 quickComposeRow
 
                 if isLoading && posts.isEmpty {
-                    ProgressView()
-                        .tint(KinnectTheme.accentBright)
-                        .padding(.vertical, 32)
+                    ForEach(0..<3, id: \.self) { _ in
+                        PostSkeletonCard()
+                    }
                 } else if visiblePosts.isEmpty {
                     VStack(spacing: 10) {
                         Image(systemName: "newspaper.fill")
@@ -462,6 +462,8 @@ private struct PostCardView: View {
         ("sad", "😢")
     ]
 
+    @State private var isBouncing = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
@@ -613,9 +615,17 @@ private struct PostCardView: View {
                                 .foregroundColor(KinnectTheme.textSecondary)
                         }
                     }
+                    .scaleEffect(isBouncing ? 1.3 : 1.0)
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .contentShape(Rectangle())
                 } primaryAction: {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.45, blendDuration: 0)) {
+                        isBouncing = true
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        isBouncing = false
+                    }
                     onReact(post.liked ? post.userReaction : "like")
                 }
                 .accessibilityLabel("Cảm xúc")

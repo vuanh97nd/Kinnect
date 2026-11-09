@@ -273,4 +273,115 @@ extension View {
                     )
             )
     }
+
+    /// Shimmer wave animation for skeleton loading
+    func kinnectShimmer() -> some View {
+        modifier(KinnectShimmerModifier())
+    }
+}
+
+// MARK: - Skeleton Shimmer Loading (Micro-interactions & UX Parity)
+public struct KinnectShimmerModifier: ViewModifier {
+    @State private var phase: CGFloat = -1.0
+
+    public func body(content: Content) -> some View {
+        content
+            .overlay(
+                GeometryReader { geo in
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.0),
+                            Color.white.opacity(0.12),
+                            Color.white.opacity(0.0)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .frame(width: geo.size.width * 1.5)
+                    .offset(x: phase * geo.size.width)
+                }
+            )
+            .clipped()
+            .onAppear {
+                withAnimation(
+                    .linear(duration: 1.4)
+                    .repeatForever(autoreverses: false)
+                ) {
+                    phase = 1.8
+                }
+            }
+    }
+}
+
+public struct PostSkeletonCard: View {
+    public init() {}
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(KinnectTheme.surfaceElevated)
+                    .frame(width: 42, height: 42)
+                VStack(alignment: .leading, spacing: 6) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(KinnectTheme.surfaceElevated)
+                        .frame(width: 130, height: 14)
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(KinnectTheme.surfaceElevated)
+                        .frame(width: 80, height: 10)
+                }
+                Spacer()
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(KinnectTheme.surfaceElevated)
+                    .frame(maxWidth: .infinity, minHeight: 12)
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(KinnectTheme.surfaceElevated)
+                    .frame(width: 220, height: 12)
+            }
+            RoundedRectangle(cornerRadius: 14)
+                .fill(KinnectTheme.surfaceElevated)
+                .frame(maxWidth: .infinity)
+                .frame(height: 200)
+            HStack {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(KinnectTheme.surfaceElevated)
+                    .frame(width: 70, height: 18)
+                Spacer()
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(KinnectTheme.surfaceElevated)
+                    .frame(width: 80, height: 18)
+                Spacer()
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(KinnectTheme.surfaceElevated)
+                    .frame(width: 60, height: 18)
+            }
+            .padding(.top, 4)
+        }
+        .kinnectCard()
+        .kinnectShimmer()
+    }
+}
+
+public struct StorySkeletonStrip: View {
+    public init() {}
+    public var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(0..<5, id: \.self) { _ in
+                    VStack(spacing: 6) {
+                        Circle()
+                            .fill(KinnectTheme.surfaceElevated)
+                            .frame(width: 58, height: 58)
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(KinnectTheme.surfaceElevated)
+                            .frame(width: 44, height: 10)
+                    }
+                    .frame(width: 68)
+                }
+            }
+            .padding(.vertical, 6)
+        }
+        .kinnectShimmer()
+    }
 }
