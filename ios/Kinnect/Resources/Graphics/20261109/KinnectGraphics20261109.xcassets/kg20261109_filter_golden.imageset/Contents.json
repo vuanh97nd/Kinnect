@@ -1,0 +1,18 @@
+{
+  "info": {
+    "author": "xcode",
+    "version": 1
+  },
+  "images": [
+    {
+      "filename": "filter_golden-256.png",
+      "idiom": "universal",
+      "scale": "1x"
+    },
+    {
+      "filename": "filter_golden-512.png",
+      "idiom": "universal",
+      "scale": "2x"
+    }
+  ]
+}

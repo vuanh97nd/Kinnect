@@ -154,9 +154,20 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         NativeSocketClient.shared.sendJSON([
             "type": "call-start",
             "callId": callId,
+            "to": targetUser.id,
             "targetUserId": targetUser.id,
+            "requestId": callId,
             "mode": isVideo ? "video" : "audio"
         ])
+    }
+
+    @MainActor
+    func handleCallRingingSocket(_ json: [String: Any]) {
+        guard var current = activeCall else { return }
+        if let serverCallId = json["callId"] as? String, !serverCallId.isEmpty {
+            current.callId = serverCallId
+            self.activeCall = current
+        }
     }
 
     @MainActor
@@ -253,6 +264,10 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
                 NativeSocketClient.shared.sendJSON([
                     "type": "call-signal",
                     "callId": callId,
+                    "description": [
+                        "type": Self.sdpTypeString(sdp.type),
+                        "sdp": sdp.sdp
+                    ],
                     "signal": [
                         "description": [
                             "type": Self.sdpTypeString(sdp.type),
@@ -268,15 +283,18 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
     func handleCallSignalSocket(_ json: [String: Any]) {
         guard let current = activeCall else { return }
         let callId = json["callId"] as? String ?? ""
-        guard callId == current.callId,
-              let signal = json["signal"] as? [String: Any] else { return }
+        guard callId.isEmpty || callId == current.callId else { return }
 
         if callPeerConnection == nil {
             setupCallPeerConnection()
         }
         guard let pc = callPeerConnection else { return }
 
-        if let desc = signal["description"] as? [String: Any],
+        let signal = json["signal"] as? [String: Any]
+        let desc = (json["description"] as? [String: Any]) ?? (signal?["description"] as? [String: Any])
+        let cand = (json["candidate"] as? [String: Any]) ?? (signal?["candidate"] as? [String: Any])
+
+        if let desc = desc,
            let typeStr = desc["type"] as? String,
            let sdpText = desc["sdp"] as? String {
             let sdpType: RTCSdpType = (typeStr == "offer") ? .offer : .answer
@@ -298,7 +316,11 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
                             guard setErr == nil else { return }
                             NativeSocketClient.shared.sendJSON([
                                 "type": "call-signal",
-                                "callId": callId,
+                                "callId": callId.isEmpty ? current.callId : callId,
+                                "description": [
+                                    "type": Self.sdpTypeString(answerSDP.type),
+                                    "sdp": answerSDP.sdp
+                                ],
                                 "signal": [
                                     "description": [
                                         "type": Self.sdpTypeString(answerSDP.type),
@@ -310,7 +332,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
                     }
                 }
             }
-        } else if let cand = signal["candidate"] as? [String: Any],
+        } else if let cand = cand,
                   let sdp = cand["candidate"] as? String {
             let sdpMid = cand["sdpMid"] as? String
             let sdpMLineIndex = Int32(cand["sdpMLineIndex"] as? Int ?? 0)
@@ -657,6 +679,11 @@ extension NativeWebRTCManager: RTCPeerConnectionDelegate {
             NativeSocketClient.shared.sendJSON([
                 "type": "call-signal",
                 "callId": callId,
+                "candidate": [
+                    "candidate": candidate.sdp,
+                    "sdpMid": candidate.sdpMid ?? "0",
+                    "sdpMLineIndex": candidate.sdpMLineIndex
+                ],
                 "signal": [
                     "candidate": [
                         "candidate": candidate.sdp,

@@ -31,6 +31,12 @@ struct CameraStudioView: View {
         case story = "Tin 24h"
     }
 
+    enum CreativeTool: String, CaseIterable {
+        case filters = "Bộ lọc"
+        case beauty = "Làm đẹp"
+        case stickers = "Sticker"
+    }
+
     // Camera / Capture State
     @StateObject private var cameraController = CameraCaptureController()
     @State private var captureMode: CaptureMode = .photo
@@ -43,6 +49,91 @@ struct CameraStudioView: View {
     @State private var showCreateLiveSheet = false
     @State private var studioProAppliedEffect = "Bộ lọc gốc"
     @State private var isUploading = false
+
+    // Creative Tool State (Web & Android Parity)
+    @State private var selectedCreativeTool: CreativeTool? = nil
+    @State private var activeFilter: String = "none"
+    @State private var filterIntensity: Double = 0.8
+    @State private var activeSticker: String = "none"
+    @State private var beautyValues: [String: Double] = [
+        "smooth": 0.5,
+        "whiten": 0.3,
+        "slim": 0.2,
+        "eyes": 0.2,
+        "lips": 0.3,
+        "blemish": 0.5,
+        "blush": 0.2
+    ]
+    @State private var activeBeautyKey: String = "smooth"
+
+    static let filterPresets: [(id: String, name: String)] = [
+        ("none", "Gốc"),
+        ("clear", "Trong trẻo"),
+        ("milk", "Sữa"),
+        ("peach", "Hồng đào"),
+        ("warm", "Ấm áp"),
+        ("cool", "Mát lạnh"),
+        ("film", "Phim cũ"),
+        ("mono", "Đen trắng"),
+        ("vivid", "Rực rỡ"),
+        ("sunset", "Hoàng hôn"),
+        ("candy", "Kẹo ngọt"),
+        ("mint", "Bạc hà"),
+        ("dream", "Mộng mơ"),
+        ("retro", "Retro"),
+        ("cinema", "Cinema"),
+        ("rose", "Rose"),
+        ("golden", "Golden"),
+        ("ice", "Ice"),
+        ("teal", "Teal"),
+        ("teal_orange", "Teal & Cam"),
+        ("cyberpunk", "Cyberpunk"),
+        ("vintage", "Vintage"),
+        ("drama", "Kịch tính"),
+        ("noir", "Noir"),
+        ("beauty_glow", "Glow sáng")
+    ]
+
+    static let beautyTools: [(key: String, title: String, icon: String)] = [
+        ("smooth", "Mịn da", "sparkles"),
+        ("whiten", "Sáng da", "sun.max.fill"),
+        ("slim", "Gọn mặt", "face.dashed"),
+        ("eyes", "Mắt to", "eye.fill"),
+        ("lips", "Môi đầy", "mouth.fill"),
+        ("blemish", "Giảm đốm", "wand.and.stars"),
+        ("blush", "Má hồng", "heart.fill")
+    ]
+
+    static let stickers: [(id: String, name: String, emoji: String)] = [
+        ("none", "Không", "🚫"),
+        ("glasses", "Kính râm", "🕶️"),
+        ("bunny", "Tai thỏ", "🐰"),
+        ("cat", "Tai mèo", "🐱"),
+        ("dog", "Cún con", "🐶"),
+        ("crown", "Vương miện", "👑"),
+        ("flowers", "Vòng hoa", "🌸"),
+        ("bow", "Nơ xinh", "🎀"),
+        ("freckles", "Tàn nhang", "🤎"),
+        ("hearts", "Tim bay", "💕"),
+        ("sparkle", "Lấp lánh", "✨"),
+        ("stars", "Sao xoay", "⭐"),
+        ("round_glasses", "Kính tròn", "👓"),
+        ("heart_glasses", "Kính tim", "💗"),
+        ("butterfly", "Bướm", "🦋"),
+        ("halo", "Thiên thần", "😇"),
+        ("rainbow", "Cầu vồng", "🌈"),
+        ("bubbles", "Bong bóng", "🫧"),
+        ("snow", "Tuyết", "❄️"),
+        ("confetti", "Lễ hội", "🎉"),
+        ("devil", "Tiểu quỷ", "😈"),
+        ("mask", "Mặt nạ", "🎭"),
+        ("fire", "Hào quang", "🔥"),
+        ("music", "Nốt nhạc", "🎵"),
+        ("party", "Mũ tiệc", "🥳"),
+        ("pixel", "Pixel", "👾"),
+        ("retro", "Cổ điển", "🕶️"),
+        ("blush", "Má hồng", "☺️")
+    ]
 
     // Media Data
     @State private var originalImage: UIImage?
@@ -131,6 +222,9 @@ struct CameraStudioView: View {
                 caption = "[Fixture UI] Kiểm thử bảng chỉnh sửa Kinnect Studio với nút Lưu tách riêng."
             }
         }
+        .onDisappear {
+            cameraController.stop()
+        }
         .sheet(isPresented: $showMusicPickerSheet) {
             NavigationStack {
                 StudioMusicPickerSheet(selectedTrack: $selectedMusicTrack)
@@ -158,7 +252,10 @@ struct CameraStudioView: View {
             }
         }
         .sheet(isPresented: $showCreateLiveSheet) {
-            CreateLiveRoomSheet()
+            CreateLiveRoomSheet(onStarted: {
+                cameraController.stop()
+                dismiss()
+            })
         }
     }
 
@@ -173,10 +270,32 @@ struct CameraStudioView: View {
             )
             .ignoresSafeArea()
 
+            // AR Face Sticker Overlay on Camera Viewfinder (Web & Android Parity)
+            if activeSticker != "none", let s = Self.stickers.first(where: { $0.id == activeSticker }) {
+                if let img = stickerImage(for: s.id) {
+                    Image(uiImage: img)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 140, height: 140)
+                        .shadow(color: .black.opacity(0.4), radius: 8, x: 0, y: 4)
+                        .offset(y: stickerOffset(for: activeSticker))
+                        .transition(.scale.combined(with: .opacity))
+                        .allowsHitTesting(false)
+                } else {
+                    Text(s.emoji)
+                        .font(.system(size: 96))
+                        .shadow(color: .black.opacity(0.4), radius: 8, x: 0, y: 4)
+                        .offset(y: stickerOffset(for: activeSticker))
+                        .transition(.scale.combined(with: .opacity))
+                        .allowsHitTesting(false)
+                }
+            }
+
             VStack(spacing: 0) {
                 // Top Camera Chrome: Close, Aspect ratio 9:16, Music, Flash
                 HStack(spacing: 16) {
                     KinnectIconButton(glyph: .close, label: "Thoát Camera", tint: .white) {
+                        cameraController.stop()
                         dismiss()
                     }
 
@@ -241,6 +360,22 @@ struct CameraStudioView: View {
                             }
                         }
                     }
+
+                    // Creative Tool Adjustment Drawer (when a tool is selected)
+                    if let tool = selectedCreativeTool {
+                        creativeDrawer(for: tool)
+                            .padding(.horizontal, 16)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+
+                    // Creative Bar (Bộ lọc · Làm đẹp · Sticker) - Web & Android Parity
+                    HStack(spacing: 36) {
+                        creativeBarPill(tool: .filters, icon: "camera.filters")
+                        creativeBarPill(tool: .beauty, icon: "sparkles")
+                        creativeBarPill(tool: .stickers, icon: "face.smiling")
+                    }
+                    .padding(.vertical, 2)
+
                     HStack(spacing: 36) {
                         // Library Photos Picker
                         PhotosPicker(selection: $selectedLibraryItem, matching: .any(of: [.images, .videos])) {
@@ -336,6 +471,267 @@ struct CameraStudioView: View {
             }
         }
         .navigationBarHidden(true)
+    }
+
+    private func creativeBarPill(tool: CreativeTool, icon: String) -> some View {
+        let isSelected = selectedCreativeTool == tool
+        return Button {
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.7)) {
+                selectedCreativeTool = (selectedCreativeTool == tool ? nil : tool)
+            }
+        } label: {
+            VStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(isSelected ? KinnectTheme.accentBright : .white)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        Circle().fill(isSelected ? Color.white.opacity(0.3) : Color.black.opacity(0.45))
+                    )
+                Text(tool.rawValue)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(isSelected ? KinnectTheme.accentBright : .white.opacity(0.9))
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func creativeDrawer(for tool: CreativeTool) -> some View {
+        VStack(spacing: 12) {
+            switch tool {
+            case .filters:
+                // Filter intensity slider
+                if activeFilter != "none" {
+                    HStack(spacing: 12) {
+                        Text("Độ đậm:")
+                            .font(.caption.bold())
+                            .foregroundColor(.white)
+                        Slider(value: $filterIntensity, in: 0...1)
+                            .tint(KinnectTheme.accentBright)
+                        Text("\(Int(filterIntensity * 100))%")
+                            .font(.caption.bold())
+                            .foregroundColor(KinnectTheme.accentBright)
+                            .frame(width: 40)
+                    }
+                    .padding(.horizontal, 16)
+                }
+
+                // Horizontal scroll of filters
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(Self.filterPresets, id: \.id) { f in
+                            let isChosen = activeFilter == f.id
+                            Button {
+                                activeFilter = f.id
+                            } label: {
+                                VStack(spacing: 4) {
+                                    filterThumbnail(for: f.id, initial: String(f.name.prefix(1)), isChosen: isChosen)
+                                    Text(f.name)
+                                        .font(.caption2.bold())
+                                        .foregroundColor(isChosen ? KinnectTheme.accentBright : .white.opacity(0.85))
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                }
+
+            case .beauty:
+                // Active beauty slider
+                HStack(spacing: 12) {
+                    Text(beautyLabel(for: activeBeautyKey) + ":")
+                        .font(.caption.bold())
+                        .foregroundColor(.white)
+                    Slider(
+                        value: Binding(
+                            get: { beautyValues[activeBeautyKey] ?? 0.5 },
+                            set: { beautyValues[activeBeautyKey] = $0 }
+                        ),
+                        in: 0...1
+                    )
+                    .tint(KinnectTheme.accentBright)
+                    Text("\(Int((beautyValues[activeBeautyKey] ?? 0.5) * 100))%")
+                        .font(.caption.bold())
+                        .foregroundColor(KinnectTheme.accentBright)
+                        .frame(width: 40)
+                }
+                .padding(.horizontal, 16)
+
+                // 7 Beauty Tools from BeautyCatalog
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 14) {
+                        ForEach(Self.beautyTools, id: \.key) { b in
+                            let isChosen = activeBeautyKey == b.key
+                            Button {
+                                activeBeautyKey = b.key
+                            } label: {
+                                VStack(spacing: 4) {
+                                    Image(systemName: b.icon)
+                                        .font(.headline)
+                                        .foregroundColor(isChosen ? KinnectTheme.accentBright : .white)
+                                        .frame(width: 48, height: 48)
+                                        .background(
+                                            Circle().fill(isChosen ? Color.white.opacity(0.25) : Color.black.opacity(0.45))
+                                        )
+                                    Text(b.title)
+                                        .font(.caption2.bold())
+                                        .foregroundColor(isChosen ? KinnectTheme.accentBright : .white.opacity(0.85))
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                }
+
+            case .stickers:
+                // Stickers Grid / Row
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 14) {
+                        ForEach(Self.stickers, id: \.id) { s in
+                            let isChosen = activeSticker == s.id
+                            Button {
+                                activeSticker = s.id
+                            } label: {
+                                VStack(spacing: 4) {
+                                    if let img = stickerImage(for: s.id) {
+                                        Image(uiImage: img)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 36, height: 36)
+                                            .frame(width: 52, height: 52)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 14)
+                                                    .fill(isChosen ? KinnectTheme.accentBright.opacity(0.35) : Color.black.opacity(0.45))
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: 14)
+                                                            .strokeBorder(isChosen ? KinnectTheme.accentBright : Color.white.opacity(0.2), lineWidth: 2)
+                                                    )
+                                            )
+                                    } else {
+                                        Text(s.emoji)
+                                            .font(.system(size: 32))
+                                            .frame(width: 52, height: 52)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 14)
+                                                    .fill(isChosen ? KinnectTheme.accentBright.opacity(0.35) : Color.black.opacity(0.45))
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: 14)
+                                                            .strokeBorder(isChosen ? KinnectTheme.accentBright : Color.white.opacity(0.2), lineWidth: 2)
+                                                    )
+                                            )
+                                    }
+                                    Text(s.name)
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(isChosen ? KinnectTheme.accentBright : .white.opacity(0.85))
+                                        .lineLimit(1)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                }
+            }
+        }
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.black.opacity(0.65))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+                )
+        )
+    }
+
+    private func filterAssetName(for id: String) -> String {
+        let key: String
+        switch id {
+        case "none": key = "original"
+        case "cool": key = "cold"
+        case "mono": key = "bw"
+        default: key = id
+        }
+        return "kg20261109_filter_\(key)"
+    }
+
+    @ViewBuilder
+    private func filterThumbnail(for id: String, initial: String, isChosen: Bool) -> some View {
+        let assetName = filterAssetName(for: id)
+        ZStack {
+            if let uiImg = UIImage(named: assetName) {
+                Image(uiImage: uiImg)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 48, height: 48)
+                    .clipShape(Circle())
+            } else {
+                Circle()
+                    .fill(Color.black.opacity(0.45))
+                    .frame(width: 48, height: 48)
+                Text(initial)
+                    .font(.headline.bold())
+                    .foregroundColor(isChosen ? KinnectTheme.accentBright : .white)
+            }
+            Circle()
+                .strokeBorder(isChosen ? KinnectTheme.accentBright : Color.white.opacity(0.4), lineWidth: isChosen ? 3 : 1)
+                .frame(width: 48, height: 48)
+        }
+    }
+
+    private func stickerImage(for id: String) -> UIImage? {
+        let mapping: [String: String] = [
+            "bunny": "bunny_ears",
+            "cat": "cat_whiskers",
+            "dog": "dog_ears",
+            "glasses": "neon_glasses",
+            "crown": "golden_tiara",
+            "flowers": "flower_crown",
+            "hearts": "cheek_hearts",
+            "sparkle": "sparkle_eyes",
+            "halo": "angel_halo",
+            "rainbow": "rainbow_paint",
+            "stars": "star_confetti",
+            "confetti": "star_confetti",
+            "butterfly": "butterfly_clip",
+            "devil": "cute_devil",
+            "mask": "cyber_mask",
+            "fire": "fire_aura",
+            "music": "music_notes",
+            "party": "party_hat",
+            "pixel": "pixel_glasses",
+            "retro": "retro_shades",
+            "blush": "blush_cheeks"
+        ]
+        let key = mapping[id] ?? id
+        return UIImage(named: "kg20261109_sticker_\(key)")
+            ?? UIImage(named: "kg20261109_sticker_\(id)")
+            ?? UIImage(named: "sticker_\(key)")
+            ?? UIImage(named: "sticker_\(id)")
+            ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "sticker_\(id)", ofType: "png") ?? "")
+            ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "sticker_\(id)", ofType: "jpg") ?? "")
+    }
+
+    private func stickerOffset(for id: String) -> CGFloat {
+        switch id {
+        case "crown", "golden_tiara", "bunny", "bunny_ears", "cat", "cat_whiskers", "dog", "dog_ears", "flowers", "flower_crown", "halo", "angel_halo", "party_hat":
+            return -140
+        case "glasses", "neon_glasses", "round_glasses", "heart_glasses", "pixel_glasses", "retro_shades", "freckles", "cyber_mask", "mask":
+            return -40
+        case "hearts", "cheek_hearts", "blush_cheeks", "blush", "sparkle", "sparkle_eyes", "rainbow", "rainbow_paint":
+            return -20
+        case "lips", "bow":
+            return 60
+        default:
+            return -70
+        }
+    }
+
+    private func beautyLabel(for key: String) -> String {
+        Self.beautyTools.first(where: { $0.key == key })?.title ?? "Cường độ"
     }
 
     // MARK: - Media Edit Mode (Real Mobile Editor with Parity to Android PhotoEditActivity)
@@ -1180,6 +1576,22 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
             self?.session.startRunning()
         }
         #endif
+    }
+
+    func stop() {
+        #if !targetEnvironment(simulator)
+        if movieOutput.isRecording {
+            movieOutput.stopRecording()
+        }
+        if session.isRunning {
+            session.stopRunning()
+        }
+        NotificationCenter.default.removeObserver(self, name: UIApplication.willResignActiveNotification, object: nil)
+        #endif
+    }
+
+    deinit {
+        stop()
     }
 
     @objc private func stopForInterruption() {

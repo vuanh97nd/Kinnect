@@ -23,6 +23,7 @@ struct FeedView: View {
     @State private var audiencePost: PostItem?
     @State private var showAudienceDialog = false
     @State private var hiddenPostIds: Set<String> = []
+    @State private var selectedAuthorProfile: KinnectUser? = nil
 
     var body: some View {
         ScrollView {
@@ -32,9 +33,9 @@ struct FeedView: View {
                 quickComposeRow
 
                 if isLoading && posts.isEmpty {
-                    ProgressView()
-                        .tint(KinnectTheme.accentBright)
-                        .padding(.vertical, 32)
+                    ForEach(0..<3, id: \.self) { _ in
+                        PostSkeletonCard()
+                    }
                 } else if visiblePosts.isEmpty {
                     VStack(spacing: 10) {
                         Image(systemName: "newspaper.fill")
@@ -51,6 +52,9 @@ struct FeedView: View {
                             post: post,
                             currentUserId: appState.currentUser?.id ?? "",
                             isAuthorOnline: appState.onlineUserIds.contains(post.author.id),
+                            onOpenAuthorProfile: {
+                                selectedAuthorProfile = post.author
+                            },
                             onReact: { reaction in
                                 Task { await toggleReaction(post: post, reaction: reaction) }
                             },
@@ -185,6 +189,9 @@ struct FeedView: View {
                 }
                 Button("Hủy", role: .cancel) {}
             }
+        }
+        .sheet(item: $selectedAuthorProfile) { user in
+            ProfileView(targetUser: user)
         }
     }
 
@@ -438,6 +445,7 @@ private struct PostCardView: View {
     let post: PostItem
     let currentUserId: String
     let isAuthorOnline: Bool
+    var onOpenAuthorProfile: (() -> Void)? = nil
     let onReact: (String) -> Void
     let onOpenComments: () -> Void
     var onEdit: (() -> Void)? = nil
@@ -454,34 +462,48 @@ private struct PostCardView: View {
         ("sad", "😢")
     ]
 
+    @State private var isBouncing = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
-                KinnectAvatarView(
-                    name: post.author.name,
-                    avatarURL: post.author.avatarUrl,
-                    colorHex: post.author.avatarColor,
-                    size: 42,
-                    isOnline: isAuthorOnline
-                )
+                Button {
+                    onOpenAuthorProfile?()
+                } label: {
+                    KinnectAvatarView(
+                        name: post.author.name,
+                        avatarURL: post.author.avatarUrl,
+                        colorHex: post.author.avatarColor,
+                        size: 42,
+                        isOnline: isAuthorOnline
+                    )
+                }
+                .buttonStyle(.plain)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(post.author.name)
-                        .font(.subheadline.weight(.bold))
-                        .foregroundColor(KinnectTheme.textPrimary)
-                        .kinnectMultiline()
-                    HStack(spacing: 6) {
-                        Text(categoryLabel(post.category))
-                            .font(.caption2.weight(.semibold))
-                            .foregroundColor(KinnectTheme.accentBright)
-                        Text("•")
-                            .font(.caption2)
-                            .foregroundColor(KinnectTheme.textSecondary)
-                        Text(formatRelativeDate(post.createdAt))
-                            .font(.caption2)
-                            .foregroundColor(KinnectTheme.textSecondary)
+                Button {
+                    onOpenAuthorProfile?()
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(post.author.name)
+                            .font(.subheadline.weight(.bold))
+                            .foregroundColor(KinnectTheme.textPrimary)
+                            .kinnectMultiline()
+                        HStack(spacing: 6) {
+                            if !post.author.handle.isEmpty {
+                                Text("@\(post.author.handle)")
+                                    .font(.caption2)
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                                Text("•")
+                                    .font(.caption2)
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                            }
+                            Text(formatRelativeDate(post.createdAt))
+                                .font(.caption2)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        }
                     }
                 }
+                .buttonStyle(.plain)
 
                 Spacer()
 
@@ -593,9 +615,17 @@ private struct PostCardView: View {
                                 .foregroundColor(KinnectTheme.textSecondary)
                         }
                     }
+                    .scaleEffect(isBouncing ? 1.3 : 1.0)
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .contentShape(Rectangle())
                 } primaryAction: {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.45, blendDuration: 0)) {
+                        isBouncing = true
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        isBouncing = false
+                    }
                     onReact(post.liked ? post.userReaction : "like")
                 }
                 .accessibilityLabel("Cảm xúc")
@@ -663,15 +693,6 @@ private struct PostCardView: View {
         default: return "👍"
         }
     }
-
-    private func categoryLabel(_ key: String) -> String {
-        switch key {
-        case "confessions": return "Tâm sự"
-        case "questions": return "Hỏi đáp"
-        case "events": return "Sự kiện"
-        default: return "Cộng đồng"
-        }
-    }
 }
 
 struct PostComposerSheet: View {
@@ -681,7 +702,6 @@ struct PostComposerSheet: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var text = ""
-    @State private var category = "community"
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var imageDataURL: String = ""
     @State private var previewImage: UIImage?
@@ -691,14 +711,6 @@ struct PostComposerSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    Picker("Chuyên mục", selection: $category) {
-                        Text("Cộng đồng").tag("community")
-                        Text("Tâm sự").tag("confessions")
-                        Text("Hỏi đáp").tag("questions")
-                        Text("Sự kiện").tag("events")
-                    }
-                    .pickerStyle(.segmented)
-
                     TextField("Chia sẻ câu chuyện hoặc khoảnh khắc của bạn...", text: $text, axis: .vertical)
                         .lineLimit(4...10)
                         .padding(12)
@@ -776,7 +788,6 @@ struct PostComposerSheet: View {
                 method: "POST",
                 body: KinnectWriteBody.post(
                     text: text.trimmingCharacters(in: .whitespacesAndNewlines),
-                    category: category,
                     mediaDataURL: imageDataURL
                 ),
                 requestId: reqId

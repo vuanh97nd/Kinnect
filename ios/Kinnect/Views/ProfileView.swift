@@ -3,12 +3,27 @@ import SwiftUI
 import UIKit
 
 struct ProfileView: View {
-    let onOpenWallet: () -> Void
-    let onOpenFriends: () -> Void
+    var targetUser: KinnectUser? = nil
+    var onOpenWallet: (() -> Void)? = nil
+    var onOpenFriends: (() -> Void)? = nil
+    var onOpenStore: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var pushKit = PushKitManager.shared
+
+    private var isSelf: Bool {
+        guard let target = targetUser else { return true }
+        guard let me = appState.currentUser else { return false }
+        return target.id == me.id
+    }
+
+    private var activeUser: KinnectUser? {
+        if isSelf {
+            return appState.currentUser
+        }
+        return detailedPeerUser ?? targetUser
+    }
 
     enum ProfileTab: String, CaseIterable {
         case about = "Giới thiệu"
@@ -34,10 +49,38 @@ struct ProfileView: View {
     @State private var showSupportSheet = false
     @State private var showDeleteAccountSheet = false
 
+    @State private var detailedPeerUser: KinnectUser? = nil
+    @State private var peerFriendship: String = "none"
+    @State private var showPeerChat = false
+    @State private var isFriendActionLoading = false
+
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                if let user = appState.currentUser {
+                if !isSelf, let peer = activeUser {
+                    HStack {
+                        Button {
+                            dismiss()
+                        } label: {
+                            HStack(spacing: 6) {
+                                KinnectIcon(glyph: .back, size: 18, tint: KinnectTheme.textPrimary)
+                                Text("Quay lại")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(KinnectTheme.textPrimary)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                        }
+                        Spacer()
+                        Text("@\(peer.handle.isEmpty ? peer.name : peer.handle)")
+                            .font(.subheadline.bold())
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                    .padding(.horizontal, 4)
+                }
+
+                if let user = activeUser {
                     // 1. Cover & Avatar Card with Handle & Stats (Parity Android 1.2.12 build 118)
                     VStack(spacing: 12) {
                         ZStack(alignment: .bottomLeading) {
@@ -60,7 +103,7 @@ struct ProfileView: View {
                                     avatarURL: user.avatarUrl,
                                     colorHex: user.avatarColor,
                                     size: 76,
-                                    isOnline: true
+                                    isOnline: isSelf ? true : appState.onlineUserIds.contains(user.id)
                                 )
 
                                 VStack(alignment: .leading, spacing: 2) {
@@ -78,20 +121,24 @@ struct ProfileView: View {
                         }
                         .padding(.bottom, 22)
 
-                        // Prominent "Chỉnh sửa hồ sơ" Button (Matching Android 1.2.12 MainActivity bounds 413,771 -> 705,818)
-                        Button {
-                            showEditProfileSheet = true
-                        } label: {
-                            HStack(spacing: 8) {
-                                KinnectIcon(glyph: .edit, size: 18, tint: KinnectTheme.accentBright)
-                                Text("Chỉnh sửa hồ sơ")
-                                    .font(.subheadline.bold())
-                                    .foregroundColor(KinnectTheme.accentBright)
+                        if isSelf {
+                            // Prominent "Chỉnh sửa hồ sơ" Button
+                            Button {
+                                showEditProfileSheet = true
+                            } label: {
+                                HStack(spacing: 8) {
+                                    KinnectIcon(glyph: .edit, size: 18, tint: KinnectTheme.accentBright)
+                                    Text("Chỉnh sửa hồ sơ")
+                                        .font(.subheadline.bold())
+                                        .foregroundColor(KinnectTheme.accentBright)
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 40)
+                                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
                             }
-                            .frame(maxWidth: .infinity, minHeight: 40)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                            .padding(.horizontal, 14)
+                        } else {
+                            peerActionsRow(user: user)
                         }
-                        .padding(.horizontal, 14)
 
                         // Stats bar
                         HStack {
@@ -105,9 +152,9 @@ struct ProfileView: View {
                     }
                     .kinnectCard()
 
-                    // 2. 4 Profile Tabs: Giới thiệu | Bài viết | Album ảnh | Video (Exact Android 1.2.12 Parity)
+                    // 2. Profile Tabs (Android 1.2.12 Parity)
                     Picker("Mục hồ sơ", selection: $selectedTab) {
-                        ForEach(ProfileTab.allCases, id: \.self) { t in
+                        ForEach(isSelf ? ProfileTab.allCases : [.about, .posts, .videos], id: \.self) { t in
                             Text(t.rawValue).tag(t)
                         }
                     }
@@ -121,7 +168,11 @@ struct ProfileView: View {
                     case .posts:
                         postsTabContent(user: user)
                     case .albums:
-                        albumsTabContent(user: user)
+                        if isSelf {
+                            albumsTabContent(user: user)
+                        } else {
+                            aboutTabContent(user: user)
+                        }
                     case .videos:
                         videosTabContent(user: user)
                     }
@@ -133,20 +184,31 @@ struct ProfileView: View {
         .navigationTitle("")
         .toolbar(.hidden, for: .navigationBar)
         .task {
-            if let screen = UIReviewFixture.activeScreen {
-                switch screen {
-                case "profile-posts": selectedTab = .posts
-                case "profile-albums": selectedTab = .albums
-                case "profile-videos": selectedTab = .videos
-                case "profile-edit": showEditProfileSheet = true
-                case "profile-sessions": showSessionsSheet = true
-                case "profile-private-album":
-                    selectedTab = .albums
-                    showPrivateAlbumSheet = true
-                default: break
+            if isSelf {
+                if let screen = UIReviewFixture.activeScreen {
+                    switch screen {
+                    case "profile-posts": selectedTab = .posts
+                    case "profile-albums": selectedTab = .albums
+                    case "profile-videos": selectedTab = .videos
+                    case "profile-edit": showEditProfileSheet = true
+                    case "profile-sessions": showSessionsSheet = true
+                    case "profile-private-album":
+                        selectedTab = .albums
+                        showPrivateAlbumSheet = true
+                    default: break
+                    }
+                }
+                await refreshMe()
+            } else if let target = targetUser {
+                await refreshPeer(target: target)
+            }
+        }
+        .sheet(isPresented: $showPeerChat) {
+            if let u = activeUser {
+                NavigationStack {
+                    DirectChatDetailView(peer: u)
                 }
             }
-            await refreshMe()
         }
         .sheet(isPresented: $showEditProfileSheet) {
             EditProfileSheet(onSaved: {
@@ -216,7 +278,7 @@ struct ProfileView: View {
                         .foregroundColor(KinnectTheme.textPrimary)
                         .kinnectMultiline()
                 } else {
-                    Text("Chưa có thông tin công khai. Cập nhật hồ sơ để mọi người hiểu bạn hơn.")
+                    Text(isSelf ? "Chưa có thông tin công khai. Cập nhật hồ sơ để mọi người hiểu bạn hơn." : "Người dùng chưa cập nhật phần tự giới thiệu.")
                         .font(.subheadline)
                         .foregroundColor(KinnectTheme.textSecondary)
                         .kinnectMultiline()
@@ -242,73 +304,82 @@ struct ProfileView: View {
             }
             .kinnectCard()
 
-            // Quick Actions & Security
-            VStack(spacing: 10) {
-                actionRow(glyph: .wallet, title: "Ví thử nghiệm & Cửa hàng", color: KinnectTheme.warning, action: onOpenWallet)
-                actionRow(glyph: .friends, title: "Danh sách Bạn bè & Lời mời", color: KinnectTheme.accentBright, action: onOpenFriends)
-                actionRow(glyph: .shield, title: "Quản lý phiên đăng nhập", color: .cyan) {
-                    showSessionsSheet = true
-                }
-                actionRow(glyph: .lock, title: "Đổi mật khẩu", color: .green) {
-                    showPasswordSheet = true
-                }
-                actionRow(glyph: .block, title: "Danh sách người dùng đã chặn", color: .orange) {
-                    showBlocksSheet = true
-                }
-                actionRow(glyph: .shield, title: "Cài đặt Quyền riêng tư", color: .purple) {
-                    showPrivacySheet = true
-                }
-                actionRow(glyph: .notifications, title: "Trung tâm Hỗ trợ & Trợ giúp", color: .blue) {
-                    showSupportSheet = true
-                }
-            }
-            .kinnectCard()
-
-            // PushKit / Native Diagnostic Card
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    KinnectIcon(glyph: .phone, size: 20, selected: true, tint: KinnectTheme.online)
-                    Text("Trạng thái Cuộc gọi Native & PushKit")
-                        .font(.subheadline.bold())
-                        .foregroundColor(KinnectTheme.textPrimary)
-                }
-                Text(pushKit.voipRegistrationStatus)
-                    .font(.caption)
-                    .foregroundColor(KinnectTheme.textSecondary)
-                    .kinnectMultiline()
-                Text("Phiên bản: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.12") (Build \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "118"))")
-                    .font(.caption2)
-                    .foregroundColor(KinnectTheme.accentBright)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .kinnectCard()
-
-            // Logout & Delete Card
-            VStack(spacing: 10) {
-                Button {
-                    Task { await appState.logout() }
-                } label: {
-                    HStack(spacing: 8) {
-                        KinnectIcon(glyph: .logout, size: 20, tint: .white)
-                        Text("Đăng xuất (Xóa Keychain & Cache)")
-                            .font(.subheadline.bold())
+            if isSelf {
+                // Quick Actions & Security
+                VStack(spacing: 10) {
+                    actionRow(glyph: .wallet, title: "Ví Kinnect", color: KinnectTheme.warning) {
+                        if let onOpenWallet { onOpenWallet() } else { appState.navigate(to: "wallet") }
                     }
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                    .foregroundColor(KinnectTheme.textPrimary)
+                    actionRow(glyph: .store, title: "Cửa hàng Kinnect", color: KinnectTheme.accentBright) {
+                        if let onOpenStore { onOpenStore() } else if let onOpenWallet { onOpenWallet() } else { appState.navigate(to: "wallet") }
+                    }
+                    actionRow(glyph: .friends, title: "Bạn bè", color: KinnectTheme.accent) {
+                        if let onOpenFriends { onOpenFriends() } else { appState.navigate(to: "friends") }
+                    }
+                    actionRow(glyph: .shield, title: "Quản lý phiên đăng nhập", color: .cyan) {
+                        showSessionsSheet = true
+                    }
+                    actionRow(glyph: .lock, title: "Đổi mật khẩu", color: .green) {
+                        showPasswordSheet = true
+                    }
+                    actionRow(glyph: .block, title: "Danh sách người dùng đã chặn", color: .orange) {
+                        showBlocksSheet = true
+                    }
+                    actionRow(glyph: .shield, title: "Cài đặt và quyền riêng tư", color: .purple) {
+                        showPrivacySheet = true
+                    }
+                    actionRow(glyph: .notifications, title: "Trung tâm Hỗ trợ & Trợ giúp", color: .blue) {
+                        showSupportSheet = true
+                    }
                 }
+                .kinnectCard()
 
-                Button(role: .destructive) {
-                    showDeleteAccountSheet = true
-                } label: {
-                    Label("Xóa vĩnh viễn tài khoản Kinnect", systemImage: "trash.fill")
-                        .font(.subheadline.bold())
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.danger.opacity(0.18)))
-                        .foregroundColor(KinnectTheme.danger)
+                // PushKit / Native Diagnostic Card
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        KinnectIcon(glyph: .phone, size: 20, selected: true, tint: KinnectTheme.online)
+                        Text("Trạng thái Cuộc gọi Native & PushKit")
+                            .font(.subheadline.bold())
+                            .foregroundColor(KinnectTheme.textPrimary)
+                    }
+                    Text(pushKit.voipRegistrationStatus)
+                        .font(.caption)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                        .kinnectMultiline()
+                    Text("Phiên bản: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.12") (Build \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "118"))")
+                        .font(.caption2)
+                        .foregroundColor(KinnectTheme.accentBright)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .kinnectCard()
+
+                // Logout & Delete Card
+                VStack(spacing: 10) {
+                    Button {
+                        Task { await appState.logout() }
+                    } label: {
+                        HStack(spacing: 8) {
+                            KinnectIcon(glyph: .logout, size: 20, tint: .white)
+                            Text("Đăng xuất (Xóa Keychain & Cache)")
+                                .font(.subheadline.bold())
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                        .foregroundColor(KinnectTheme.textPrimary)
+                    }
+
+                    Button(role: .destructive) {
+                        showDeleteAccountSheet = true
+                    } label: {
+                        Label("Xóa vĩnh viễn tài khoản Kinnect", systemImage: "trash.fill")
+                            .font(.subheadline.bold())
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.danger.opacity(0.18)))
+                            .foregroundColor(KinnectTheme.danger)
+                    }
+                }
+                .kinnectCard()
             }
-            .kinnectCard()
         }
     }
 
@@ -526,6 +597,175 @@ struct ProfileView: View {
             self.pendingPrivateRequestsCount = self.privateAccessRequests.filter { $0.status == "pending" }.count
         }
     }
+
+    @ViewBuilder
+    private func peerFriendshipButton(user: KinnectUser) -> some View {
+        let isFriends = (peerFriendship == "friends")
+        let isOutgoing = (peerFriendship == "outgoing")
+        let isIncoming = (peerFriendship == "incoming")
+        let title: String = isFriends ? "Bạn bè" : (isOutgoing ? "Đã gửi" : (isIncoming ? "Chấp nhận" : "Kết bạn"))
+        let glyph: KinnectGlyph = isFriends ? .friends : (isOutgoing ? .refresh : .add)
+        let fgColor: Color = isFriends ? KinnectTheme.online : .white
+
+        Button {
+            Task { await handlePeerFriendAction(user: user) }
+        } label: {
+            HStack(spacing: 6) {
+                KinnectIcon(glyph: glyph, size: 18, tint: fgColor)
+                Text(title)
+                    .font(.subheadline.bold())
+                    .foregroundColor(fgColor)
+            }
+            .frame(maxWidth: .infinity, minHeight: 40)
+            .background(
+                Group {
+                    if isFriends || isOutgoing {
+                        RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated)
+                    } else {
+                        RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.primaryGradient)
+                    }
+                }
+            )
+        }
+        .disabled(isFriendActionLoading)
+    }
+
+    @ViewBuilder
+    private func peerMessageButton() -> some View {
+        Button {
+            showPeerChat = true
+        } label: {
+            HStack(spacing: 6) {
+                KinnectIcon(glyph: .messages, size: 18, tint: KinnectTheme.accentBright)
+                Text("Nhắn tin")
+                    .font(.subheadline.bold())
+                    .foregroundColor(KinnectTheme.accentBright)
+            }
+            .frame(maxWidth: .infinity, minHeight: 40)
+            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+        }
+    }
+
+    @ViewBuilder
+    private func peerCallButton(user: KinnectUser, mode: String) -> some View {
+        let isVideo = (mode == "video")
+        Button {
+            Task {
+                dismiss()
+                await NativeWebRTCManager.shared.startOutgoingCall(targetUser: user, mode: mode)
+            }
+        } label: {
+            KinnectIcon(
+                glyph: isVideo ? .videoCall : .phone,
+                size: 18,
+                tint: isVideo ? KinnectTheme.accentBright : KinnectTheme.online
+            )
+            .frame(width: 40, height: 40)
+            .background(Circle().fill(KinnectTheme.surfaceElevated))
+        }
+        .accessibilityLabel(isVideo ? "Gọi video" : "Gọi thoại")
+    }
+
+    @ViewBuilder
+    private func peerMoreMenu(user: KinnectUser) -> some View {
+        Menu {
+            Button(role: .destructive) {
+                Task {
+                    await appState.blockUser(userId: user.id, userName: user.name)
+                    dismiss()
+                }
+            } label: {
+                Label("Chặn người dùng", systemImage: "hand.raised.fill")
+            }
+            Button {
+                appState.activeReportContext = UGCReportContext(
+                    targetType: "user",
+                    targetId: user.id,
+                    targetUserId: user.id,
+                    targetTitle: user.name
+                )
+            } label: {
+                Label("Báo cáo người dùng", systemImage: "flag.fill")
+            }
+        } label: {
+            KinnectIcon(glyph: .more, size: 18, tint: KinnectTheme.textSecondary)
+                .frame(width: 40, height: 40)
+                .background(Circle().fill(KinnectTheme.surfaceElevated))
+        }
+        .accessibilityLabel("Tùy chọn khác")
+    }
+
+    @ViewBuilder
+    private func peerActionsRow(user: KinnectUser) -> some View {
+        HStack(spacing: 8) {
+            peerFriendshipButton(user: user)
+            peerMessageButton()
+            peerCallButton(user: user, mode: "audio")
+            peerCallButton(user: user, mode: "video")
+            peerMoreMenu(user: user)
+        }
+        .padding(.horizontal, 14)
+    }
+
+    private func handlePeerFriendAction(user: KinnectUser) async {
+        isFriendActionLoading = true
+        defer { isFriendActionLoading = false }
+        let reqId = "pfriend_\(user.id)_\(Int(Date().timeIntervalSince1970))"
+        if peerFriendship == "friends" {
+            _ = try? await KinnectAPIClient.shared.requestJSON(
+                "/api/users/\(user.id)/friendship",
+                method: "DELETE",
+                body: [:],
+                requestId: reqId
+            )
+            peerFriendship = "none"
+            appState.showToast("Đã hủy kết bạn")
+        } else if peerFriendship == "outgoing" {
+            _ = try? await KinnectAPIClient.shared.requestJSON(
+                "/api/users/\(user.id)/friend-request",
+                method: "DELETE",
+                body: [:],
+                requestId: reqId
+            )
+            peerFriendship = "none"
+            appState.showToast("Đã thu hồi lời mời kết bạn")
+        } else if peerFriendship == "incoming" {
+            _ = try? await KinnectAPIClient.shared.requestJSON(
+                "/api/users/\(user.id)/friend-request/respond",
+                method: "POST",
+                body: ["action": "accept"],
+                requestId: reqId
+            )
+            peerFriendship = "friends"
+            appState.showToast("Đã chấp nhận kết bạn!")
+        } else {
+            _ = try? await KinnectAPIClient.shared.requestJSON(
+                "/api/users/\(user.id)/friend-request",
+                method: "POST",
+                body: [:],
+                requestId: reqId
+            )
+            peerFriendship = "outgoing"
+            appState.showToast("Đã gửi lời mời kết bạn")
+        }
+        await refreshPeer(target: user)
+    }
+
+    private func refreshPeer(target: KinnectUser) async {
+        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/users/\(target.id)"),
+           let userDict = (res["user"] as? [String: Any]) ?? (res as? [String: Any]) {
+            self.detailedPeerUser = KinnectUser.from(userDict)
+            self.peerFriendship = (userDict["friendship"] as? String) ?? "none"
+        }
+        if let feedRes = try? await KinnectAPIClient.shared.requestJSON("/api/posts?user=\(target.id)"),
+           let items = feedRes["posts"] as? [[String: Any]] {
+            self.userPosts = items.map(PostItem.from)
+        }
+        if let shortsRes = try? await KinnectAPIClient.shared.requestJSON("/api/shorts?user=\(target.id)"),
+           let items = shortsRes["shorts"] as? [[String: Any]] {
+            self.userShorts = items.map(ShortItem.from)
+        }
+    }
 }
 
 // MARK: - Private Album & Public Album Models & Sheets
@@ -631,7 +871,6 @@ struct PublicAlbumManageSheet: View {
                 method: "POST",
                 body: KinnectWriteBody.post(
                     text: captionText.trimmingCharacters(in: .whitespacesAndNewlines),
-                    category: "community",
                     mediaDataURL: dataURL
                 ),
                 requestId: "pub_photo_\(UUID().uuidString)"
@@ -925,64 +1164,279 @@ struct ProfileShortDetailSheet: View {
     }
 }
 
-// MARK: - Dedicated Edit Profile Sheet
+// MARK: - Dedicated Edit Profile Sheet (100% Android & Web Parity)
 struct EditProfileSheet: View {
     let onSaved: () -> Void
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
 
+    // Basic Info
     @State private var name = ""
+    @State private var birthDate = ""
+    @State private var birthDateValue = Calendar.current.date(byAdding: .year, value: -20, to: Date()) ?? Date()
+    @State private var showDatePicker = false
+
+    // About & Interests
     @State private var bio = ""
-    @State private var locationName = ""
+    @State private var selectedInterests: [String] = []
+
+    // Identity
+    @State private var gender = ""
+    @State private var height = ""
+    @State private var weight = ""
+    @State private var orientation = ""
+    @State private var communityRole = ""
+    @State private var pronouns = ""
+
+    // Connection & Life
+    @State private var relationshipRole = ""
+    @State private var selectedLookingFor: [String] = []
+    @State private var city = ""
+    @State private var occupation = ""
+    @State private var school = ""
     @State private var isPrivate = false
+
+    // Field-level Public/Private Visibility (Globe 🌐 vs Lock 🔒)
+    @State private var visibility: [String: Bool] = [:]
+
+    // Media & State
     @State private var isSaving = false
+    @State private var isLoading = false
     @State private var selectedAvatarItem: PhotosPickerItem?
     @State private var selectedCoverItem: PhotosPickerItem?
+
+    private let interestChoices = [
+        "Nhiếp ảnh", "Du lịch", "Âm nhạc", "Đọc sách",
+        "Thể thao", "Ẩm thực", "Phim ảnh", "Công nghệ",
+        "Nghệ thuật", "Thiên nhiên", "Game", "Thú cưng"
+    ]
+
+    private let genderChoices = [
+        "Nam", "Nữ", "Nam chuyển giới", "Nữ chuyển giới",
+        "Phi nhị nguyên", "Linh hoạt giới", "Vô giới", "Đang tìm hiểu", "Khác"
+    ]
+
+    private let orientationChoices = [
+        "Dị tính", "Gay / Đồng tính nam", "Lesbian / Đồng tính nữ",
+        "Song tính / Bisexual", "Toàn tính / Pansexual", "Vô tính / Asexual",
+        "Queer", "Á tính / Demisexual", "Đang tìm hiểu", "Khác"
+    ]
+
+    private let communityRoleChoices = [
+        "Top", "Bottom", "Vers", "Vers Top", "Vers Bottom",
+        "Side", "Femme", "Masc / Butch", "Androgynous", "Stem", "Đang tìm hiểu", "Khác"
+    ]
+
+    private let pronounChoices = ["Anh", "Chị", "Em", "Bạn", "Họ / They"]
+
+    private let relationshipChoices = [
+        "Độc thân", "Đang tìm hiểu", "Đang trong mối quan hệ", "Đã kết hôn", "Mối quan hệ mở"
+    ]
+
+    private let lookingForChoices = [
+        "Kết bạn", "Trò chuyện", "Hẹn hò", "Mối quan hệ nghiêm túc",
+        "Tìm bạn chung sở thích", "Giao lưu học hỏi", "Tâm sự"
+    ]
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Hình ảnh đại diện") {
-                    HStack(spacing: 16) {
-                        PhotosPicker(selection: $selectedAvatarItem, matching: .images) {
-                            HStack(spacing: 6) {
-                                KinnectIcon(glyph: .profile, size: 18, tint: KinnectTheme.accentBright)
-                                Text("Đổi Avatar")
-                                    .font(.caption.bold())
+                // 1. Photos Section
+                Section {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 14) {
+                            PhotosPicker(selection: $selectedAvatarItem, matching: .images) {
+                                HStack(spacing: 6) {
+                                    KinnectIcon(glyph: .profile, size: 18, tint: KinnectTheme.accentBright)
+                                    Text("Đổi Avatar")
+                                        .font(.caption.bold())
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 40)
+                                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                                .foregroundColor(KinnectTheme.accentBright)
                             }
-                            .frame(maxWidth: .infinity, minHeight: 38)
-                            .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
-                            .foregroundColor(KinnectTheme.accentBright)
-                        }
-                        .onChange(of: selectedAvatarItem) { item in
-                            guard let item else { return }
-                            Task { await uploadImage(item: item, endpoint: "/api/me/avatar", field: "avatarDataUrl") }
+                            .onChange(of: selectedAvatarItem) { item in
+                                guard let item else { return }
+                                Task { await uploadImage(item: item, endpoint: "/api/me/avatar", field: "avatarDataUrl") }
+                            }
+
+                            PhotosPicker(selection: $selectedCoverItem, matching: .images) {
+                                HStack(spacing: 6) {
+                                    KinnectIcon(glyph: .photo, size: 18, tint: KinnectTheme.accentBright)
+                                    Text("Đổi Ảnh bìa")
+                                        .font(.caption.bold())
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 40)
+                                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                                .foregroundColor(KinnectTheme.accentBright)
+                            }
+                            .onChange(of: selectedCoverItem) { item in
+                                guard let item else { return }
+                                Task { await uploadImage(item: item, endpoint: "/api/me/cover", field: "coverDataUrl") }
+                            }
                         }
 
-                        PhotosPicker(selection: $selectedCoverItem, matching: .images) {
-                            HStack(spacing: 6) {
-                                KinnectIcon(glyph: .photo, size: 18, tint: KinnectTheme.accentBright)
-                                Text("Đổi Ảnh bìa")
-                                    .font(.caption.bold())
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 38)
-                            .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
-                            .foregroundColor(KinnectTheme.accentBright)
-                        }
-                        .onChange(of: selectedCoverItem) { item in
-                            guard let item else { return }
-                            Task { await uploadImage(item: item, endpoint: "/api/me/cover", field: "coverDataUrl") }
+                        HStack(spacing: 6) {
+                            Image(systemName: "globe")
+                                .font(.caption2)
+                                .foregroundColor(KinnectTheme.accentBright)
+                            Text("Chạm 🌐 / 🔒 để chọn thông tin công khai hoặc riêng tư.")
+                                .font(.caption2)
+                                .foregroundColor(KinnectTheme.textSecondary)
                         }
                     }
+                } header: {
+                    Text("Hình ảnh đại diện")
                 }
 
-                Section("Thông tin cá nhân") {
-                    TextField("Tên hiển thị", text: $name)
-                    TextField("Tiểu sử (Bio)", text: $bio, axis: .vertical)
-                        .lineLimit(2...4)
-                    TextField("Thành phố / Khu vực", text: $locationName)
-                    Toggle("Tài khoản riêng tư", isOn: $isPrivate)
-                        .tint(KinnectTheme.accentBright)
+                // 2. Thông tin cơ bản
+                Section {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Tên hiển thị")
+                            .font(.caption.bold())
+                            .foregroundColor(KinnectTheme.textSecondary)
+                        TextField("Nhập tên hiển thị...", text: $name)
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Ngày sinh")
+                                .font(.caption.bold())
+                                .foregroundColor(KinnectTheme.textSecondary)
+                            Spacer()
+                            visibilityToggle(key: "age", title: "Hiện tuổi")
+                        }
+                        Button {
+                            showDatePicker.toggle()
+                        } label: {
+                            HStack {
+                                Text(birthDate.isEmpty ? "Chọn ngày sinh (YYYY-MM-DD)" : birthDate)
+                                    .foregroundColor(birthDate.isEmpty ? KinnectTheme.textSecondary : KinnectTheme.textPrimary)
+                                Spacer()
+                                Image(systemName: "calendar")
+                                    .foregroundColor(KinnectTheme.accentBright)
+                            }
+                        }
+                        .buttonStyle(.plain)
+
+                        if showDatePicker {
+                            DatePicker(
+                                "Ngày sinh",
+                                selection: $birthDateValue,
+                                in: ...eighteenYearsAgo,
+                                displayedComponents: .date
+                            )
+                            .datePickerStyle(.graphical)
+                            .onChange(of: birthDateValue) { newDate in
+                                let formatter = DateFormatter()
+                                formatter.dateFormat = "yyyy-MM-dd"
+                                self.birthDate = formatter.string(from: newDate)
+                            }
+                        }
+                        Text("Ngày sinh chỉ bạn xem; biểu tượng 🌐 cho phép hiện tuổi trên hồ sơ.")
+                            .font(.caption2)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                } header: {
+                    Text("Thông tin cơ bản")
+                }
+
+                // 3. Giới thiệu và sở thích
+                Section {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Giới thiệu bản thân (Bio)")
+                                .font(.caption.bold())
+                                .foregroundColor(KinnectTheme.textSecondary)
+                            Spacer()
+                            visibilityToggle(key: "bio", title: "Tiểu sử")
+                        }
+                        TextField("Chia sẻ vài dòng về bạn...", text: $bio, axis: .vertical)
+                            .lineLimit(3...6)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Sở thích")
+                                .font(.caption.bold())
+                                .foregroundColor(KinnectTheme.textSecondary)
+                            Spacer()
+                            visibilityToggle(key: "interests", title: "Sở thích")
+                        }
+                        chipFlow(choices: interestChoices, selected: $selectedInterests, max: 10)
+                    }
+                } header: {
+                    Text("Giới thiệu và sở thích")
+                }
+
+                // 4. Bản thân và cách xưng hô (Identity)
+                Section {
+                    pickerWithVisibility(title: "Bản dạng giới", key: "gender", selection: $gender, choices: genderChoices)
+
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("Chiều cao (cm)")
+                                    .font(.caption.bold())
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                                Spacer()
+                                visibilityToggle(key: "height", title: "Chiều cao")
+                            }
+                            TextField("175", text: $height)
+                                .keyboardType(.numberPad)
+                        }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("Cân nặng (kg)")
+                                    .font(.caption.bold())
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                                Spacer()
+                                visibilityToggle(key: "weight", title: "Cân nặng")
+                            }
+                            TextField("68", text: $weight)
+                                .keyboardType(.numberPad)
+                        }
+                    }
+
+                    pickerWithVisibility(title: "Xu hướng tính dục", key: "orientation", selection: $orientation, choices: orientationChoices)
+                    pickerWithVisibility(title: "Vai trò tự mô tả", key: "communityRole", selection: $communityRole, choices: communityRoleChoices)
+                    pickerWithVisibility(title: "Cách xưng hô", key: "pronouns", selection: $pronouns, choices: pronounChoices)
+                } header: {
+                    Text("Bản thân và cách xưng hô")
+                }
+
+                // 5. Kết nối và cuộc sống
+                Section {
+                    pickerWithVisibility(title: "Tình trạng quan hệ", key: "relationshipRole", selection: $relationshipRole, choices: relationshipChoices)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Mong muốn kết nối")
+                                .font(.caption.bold())
+                                .foregroundColor(KinnectTheme.textSecondary)
+                            Spacer()
+                            visibilityToggle(key: "lookingFor", title: "Mong muốn")
+                        }
+                        chipFlow(choices: lookingForChoices, selected: $selectedLookingFor, max: 7)
+                    }
+
+                    textWithVisibility(title: "Tỉnh / Thành phố", key: "city", text: $city, placeholder: "Hà Nội, TP. Hồ Chí Minh...")
+                    textWithVisibility(title: "Nghề nghiệp", key: "occupation", text: $occupation, placeholder: "Lập trình viên, Nhiếp ảnh gia...")
+                    textWithVisibility(title: "Trường học", key: "school", text: $school, placeholder: "Đại học Bách Khoa...")
+
+                    Toggle(isOn: $isPrivate) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Chế độ tài khoản riêng tư")
+                                .font(.subheadline.bold())
+                            Text("Chỉ bạn bè mới xem được đầy đủ bài viết và album của bạn.")
+                                .font(.caption2)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        }
+                    }
+                    .tint(KinnectTheme.accentBright)
+                } header: {
+                    Text("Kết nối và cuộc sống")
                 }
             }
             .scrollContentBackground(.hidden)
@@ -994,44 +1448,204 @@ struct EditProfileSheet: View {
                     Button("Hủy") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Lưu") {
+                    Button("Lưu thay đổi") {
                         Task { await saveProfile() }
                     }
                     .bold()
                     .disabled(isSaving)
                 }
             }
-            .onAppear {
-                if let u = appState.currentUser {
-                    name = u.name
-                    bio = u.bio
-                    locationName = u.locationName
-                    isPrivate = u.isPrivate
-                }
+            .task {
+                await loadMyProfile()
             }
         }
+    }
+
+    private var eighteenYearsAgo: Date {
+        Calendar.current.date(byAdding: .year, value: -18, to: Date()) ?? Date()
+    }
+
+    @ViewBuilder
+    private func visibilityToggle(key: String, title: String) -> some View {
+        let isPublic = visibility[key] ?? true
+        Button {
+            visibility[key] = !isPublic
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: isPublic ? "globe" : "lock.fill")
+                    .font(.caption2)
+                Text(isPublic ? "Công khai" : "Chỉ tôi")
+                    .font(.system(size: 11, weight: .bold))
+            }
+            .foregroundColor(isPublic ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(KinnectTheme.surfaceElevated))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(isPublic ? "Công khai" : "Ẩn") \(title)")
+    }
+
+    @ViewBuilder
+    private func chipFlow(choices: [String], selected: Binding<[String]>, max: Int) -> some View {
+        WrappingHStack(horizontalSpacing: 8, verticalSpacing: 8) {
+            ForEach(choices, id: \.self) { choice in
+                let isSel = selected.wrappedValue.contains(choice)
+                Button {
+                    if isSel {
+                        selected.wrappedValue.removeAll { $0 == choice }
+                    } else {
+                        if selected.wrappedValue.count < max {
+                            selected.wrappedValue.append(choice)
+                        } else {
+                            appState.showToast("Tối đa \(max) lựa chọn.")
+                        }
+                    }
+                } label: {
+                    Text(choice)
+                        .font(.caption.bold())
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule().fill(isSel ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
+                        )
+                        .foregroundColor(isSel ? .white : KinnectTheme.textPrimary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func pickerWithVisibility(title: String, key: String, selection: Binding<String>, choices: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(title)
+                    .font(.caption.bold())
+                    .foregroundColor(KinnectTheme.textSecondary)
+                Spacer()
+                visibilityToggle(key: key, title: title)
+            }
+            Picker(title, selection: selection) {
+                Text("Không muốn tiết lộ").tag("")
+                ForEach(choices, id: \.self) { c in
+                    Text(c).tag(c)
+                }
+            }
+            .pickerStyle(.menu)
+            .tint(KinnectTheme.accentBright)
+        }
+    }
+
+    @ViewBuilder
+    private func textWithVisibility(title: String, key: String, text: Binding<String>, placeholder: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(title)
+                    .font(.caption.bold())
+                    .foregroundColor(KinnectTheme.textSecondary)
+                Spacer()
+                visibilityToggle(key: key, title: title)
+            }
+            TextField(placeholder, text: text)
+        }
+    }
+
+    private func loadMyProfile() async {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let res = try await KinnectAPIClient.shared.requestJSON("/api/me")
+            if let me = res["user"] as? [String: Any] {
+                self.name = me["name"] as? String ?? ""
+                self.bio = me["bio"] as? String ?? ""
+                self.birthDate = me["birthDate"] as? String ?? ""
+                if !self.birthDate.isEmpty {
+                    let formatter = DateFormatter()
+                    formatter.dateFormat = "yyyy-MM-dd"
+                    if let d = formatter.date(from: self.birthDate) {
+                        self.birthDateValue = d
+                    }
+                }
+                if let ints = me["interests"] as? [String] {
+                    self.selectedInterests = ints
+                } else if let intStr = me["interests"] as? String {
+                    self.selectedInterests = intStr.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                }
+                self.gender = me["gender"] as? String ?? ""
+                if let h = me["height"] as? Int, h > 0 { self.height = "\(h)" }
+                if let w = me["weight"] as? Int, w > 0 { self.weight = "\(w)" }
+                self.orientation = me["orientation"] as? String ?? ""
+                self.communityRole = me["communityRole"] as? String ?? ""
+                self.pronouns = me["pronouns"] as? String ?? ""
+                self.relationshipRole = me["relationshipRole"] as? String ?? ""
+                if let lfs = me["lookingFor"] as? [String] {
+                    self.selectedLookingFor = lfs
+                } else if let lfStr = me["lookingFor"] as? String {
+                    self.selectedLookingFor = lfStr.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                }
+                self.city = (me["city"] as? String) ?? (me["locationName"] as? String) ?? ""
+                self.occupation = me["occupation"] as? String ?? ""
+                self.school = me["school"] as? String ?? ""
+                self.isPrivate = me["isPrivate"] as? Bool ?? false
+
+                if let vis = me["profileVisibility"] as? [String: Bool] {
+                    self.visibility = vis
+                } else {
+                    for k in ["bio", "age", "gender", "orientation", "communityRole", "pronouns", "relationshipRole", "lookingFor", "city", "interests", "height", "weight", "occupation", "school"] {
+                        self.visibility[k] = true
+                    }
+                }
+            }
+        } catch {}
     }
 
     private func saveProfile() async {
         isSaving = true
         defer { isSaving = false }
         let reqId = "patch_me_\(Int(Date().timeIntervalSince1970))"
+
+        var payload: [String: Any] = [
+            "name": name.trimmingCharacters(in: .whitespacesAndNewlines),
+            "birthDate": birthDate.trimmingCharacters(in: .whitespacesAndNewlines),
+            "bio": bio.trimmingCharacters(in: .whitespacesAndNewlines),
+            "interests": selectedInterests,
+            "gender": gender,
+            "orientation": orientation,
+            "communityRole": communityRole,
+            "pronouns": pronouns,
+            "relationshipRole": relationshipRole,
+            "lookingFor": selectedLookingFor.joined(separator: ", "),
+            "city": city.trimmingCharacters(in: .whitespacesAndNewlines),
+            "locationName": city.trimmingCharacters(in: .whitespacesAndNewlines),
+            "occupation": occupation.trimmingCharacters(in: .whitespacesAndNewlines),
+            "school": school.trimmingCharacters(in: .whitespacesAndNewlines),
+            "isPrivate": isPrivate,
+            "profileVisibility": visibility
+        ]
+
+        if let h = Int(height.trimmingCharacters(in: .whitespacesAndNewlines)), h > 0 {
+            payload["height"] = h
+        } else {
+            payload["height"] = NSNull()
+        }
+        if let w = Int(weight.trimmingCharacters(in: .whitespacesAndNewlines)), w > 0 {
+            payload["weight"] = w
+        } else {
+            payload["weight"] = NSNull()
+        }
+
         do {
             let res = try await KinnectAPIClient.shared.requestJSON(
                 "/api/me",
                 method: "PATCH",
-                body: [
-                    "name": name.trimmingCharacters(in: .whitespacesAndNewlines),
-                    "bio": bio.trimmingCharacters(in: .whitespacesAndNewlines),
-                    "locationName": locationName.trimmingCharacters(in: .whitespacesAndNewlines),
-                    "isPrivate": isPrivate
-                ],
+                body: payload,
                 requestId: reqId
             )
             if let userDict = res["user"] as? [String: Any] {
                 appState.applyAuthenticatedUser(KinnectUser.from(userDict), rawDict: userDict)
             }
-            appState.showToast("Đã cập nhật hồ sơ cá nhân.")
+            appState.showToast("Đã cập nhật hồ sơ cá nhân hoàn chỉnh.")
             onSaved()
             dismiss()
         } catch {
@@ -1059,6 +1673,49 @@ struct EditProfileSheet: View {
             onSaved()
         } catch {
             appState.showToast(error.localizedDescription)
+        }
+    }
+}
+
+// Simple wrapping flow layout for chips on iOS
+private struct WrappingHStack: Layout {
+    var horizontalSpacing: CGFloat = 8
+    var verticalSpacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? .infinity
+        var currentX: CGFloat = 0
+        var currentY: CGFloat = 0
+        var lineHeight: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if currentX + size.width > width && currentX > 0 {
+                currentX = 0
+                currentY += lineHeight + verticalSpacing
+                lineHeight = 0
+            }
+            currentX += size.width + horizontalSpacing
+            lineHeight = max(lineHeight, size.height)
+        }
+        return CGSize(width: width, height: currentY + lineHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var currentX: CGFloat = bounds.minX
+        var currentY: CGFloat = bounds.minY
+        var lineHeight: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if currentX + size.width > bounds.maxX && currentX > bounds.minX {
+                currentX = bounds.minX
+                currentY += lineHeight + verticalSpacing
+                lineHeight = 0
+            }
+            subview.place(at: CGPoint(x: currentX, y: currentY), proposal: .unspecified)
+            currentX += size.width + horizontalSpacing
+            lineHeight = max(lineHeight, size.height)
         }
     }
 }

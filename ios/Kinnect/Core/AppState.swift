@@ -176,7 +176,6 @@ final class AppState: ObservableObject {
         KeychainStore.shared.saveAccountId(user.id)
         NativeSocketClient.shared.connectWithKeychainSession()
         PushKitManager.shared.startRegistration()
-        PushKitManager.shared.uploadStoredTokens()
     }
 
     func logout() async {
@@ -357,6 +356,8 @@ final class AppState: ObservableObject {
             }
         case "call-incoming":
             NativeWebRTCManager.shared.handleIncomingCallSocket(json)
+        case "call-ringing":
+            NativeWebRTCManager.shared.handleCallRingingSocket(json)
         case "call-accepted":
             NativeWebRTCManager.shared.handleCallAcceptedSocket(json)
         case "call-signal":

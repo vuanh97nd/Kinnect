@@ -108,6 +108,32 @@ extension Color {
     }
 }
 
+// MARK: - High-Performance In-Memory Image Cache (Zero Disk I/O & Butter-smooth 120 FPS)
+final class ImageMemoryCache {
+    static let shared = ImageMemoryCache()
+    private let cache = NSCache<NSString, UIImage>()
+
+    private init() {
+        cache.countLimit = 400
+        cache.totalCostLimit = 120 * 1024 * 1024 // 120 MB
+    }
+
+    func image(forKey key: String) -> UIImage? {
+        guard !key.isEmpty else { return nil }
+        return cache.object(forKey: key as NSString)
+    }
+
+    func store(_ image: UIImage, forKey key: String) {
+        guard !key.isEmpty else { return }
+        let cost = Int(image.size.width * image.size.height * 4)
+        cache.setObject(image, forKey: key as NSString, cost: cost)
+    }
+
+    func clear() {
+        cache.removeAllObjects()
+    }
+}
+
 struct KinnectAvatarView: View {
     let name: String
     let avatarURL: String
@@ -129,6 +155,7 @@ struct KinnectAvatarView: View {
         self.colorHex = colorHex
         self.size = size
         self.isOnline = isOnline
+        _loadedImage = State(initialValue: ImageMemoryCache.shared.image(forKey: avatarURL))
     }
 
     init(user: KinnectUser, size: CGFloat = 44) {
@@ -137,6 +164,7 @@ struct KinnectAvatarView: View {
         self.colorHex = user.avatarColor
         self.size = size
         self.isOnline = user.isActive
+        _loadedImage = State(initialValue: ImageMemoryCache.shared.image(forKey: user.avatarUrl))
     }
 
     var body: some View {
@@ -174,12 +202,17 @@ struct KinnectAvatarView: View {
             }
         }
         .task(id: avatarURL) {
+            if let mem = ImageMemoryCache.shared.image(forKey: avatarURL) {
+                loadedImage = mem
+                return
+            }
             guard !avatarURL.isEmpty else {
                 loadedImage = nil
                 return
             }
             if let data = await KinnectAPIClient.shared.fetchBinaryData(path: avatarURL),
                let uiImg = UIImage(data: data) {
+                ImageMemoryCache.shared.store(uiImg, forKey: avatarURL)
                 loadedImage = uiImg
             }
         }
@@ -215,11 +248,13 @@ struct KinnectRemoteImageView: View {
         self.contentMode = contentMode
         self.cornerRadius = cornerRadius
         self.maxHeight = maxHeight
+        _image = State(initialValue: ImageMemoryCache.shared.image(forKey: rawURL))
     }
 
     init(path: String, maxHeight: CGFloat = 320) {
         self.rawURL = path
         self.maxHeight = maxHeight
+        _image = State(initialValue: ImageMemoryCache.shared.image(forKey: path))
     }
 
     var body: some View {
@@ -241,12 +276,17 @@ struct KinnectRemoteImageView: View {
             }
         }
         .task(id: rawURL) {
+            if let mem = ImageMemoryCache.shared.image(forKey: rawURL) {
+                image = mem
+                return
+            }
             guard !rawURL.isEmpty else {
                 failed = true
                 return
             }
             if let data = await KinnectAPIClient.shared.fetchBinaryData(path: rawURL),
                let uiImg = UIImage(data: data) {
+                ImageMemoryCache.shared.store(uiImg, forKey: rawURL)
                 image = uiImg
             } else {
                 failed = true
@@ -272,5 +312,116 @@ extension View {
                             .stroke(KinnectTheme.border, lineWidth: 1)
                     )
             )
+    }
+
+    /// Shimmer wave animation for skeleton loading
+    func kinnectShimmer() -> some View {
+        modifier(KinnectShimmerModifier())
+    }
+}
+
+// MARK: - Skeleton Shimmer Loading (Micro-interactions & UX Parity)
+public struct KinnectShimmerModifier: ViewModifier {
+    @State private var phase: CGFloat = -1.0
+
+    public func body(content: Content) -> some View {
+        content
+            .overlay(
+                GeometryReader { geo in
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.0),
+                            Color.white.opacity(0.12),
+                            Color.white.opacity(0.0)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .frame(width: geo.size.width * 1.5)
+                    .offset(x: phase * geo.size.width)
+                }
+            )
+            .clipped()
+            .onAppear {
+                withAnimation(
+                    .linear(duration: 1.4)
+                    .repeatForever(autoreverses: false)
+                ) {
+                    phase = 1.8
+                }
+            }
+    }
+}
+
+public struct PostSkeletonCard: View {
+    public init() {}
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(KinnectTheme.surfaceElevated)
+                    .frame(width: 42, height: 42)
+                VStack(alignment: .leading, spacing: 6) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(KinnectTheme.surfaceElevated)
+                        .frame(width: 130, height: 14)
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(KinnectTheme.surfaceElevated)
+                        .frame(width: 80, height: 10)
+                }
+                Spacer()
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(KinnectTheme.surfaceElevated)
+                    .frame(maxWidth: .infinity, minHeight: 12)
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(KinnectTheme.surfaceElevated)
+                    .frame(width: 220, height: 12)
+            }
+            RoundedRectangle(cornerRadius: 14)
+                .fill(KinnectTheme.surfaceElevated)
+                .frame(maxWidth: .infinity)
+                .frame(height: 200)
+            HStack {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(KinnectTheme.surfaceElevated)
+                    .frame(width: 70, height: 18)
+                Spacer()
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(KinnectTheme.surfaceElevated)
+                    .frame(width: 80, height: 18)
+                Spacer()
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(KinnectTheme.surfaceElevated)
+                    .frame(width: 60, height: 18)
+            }
+            .padding(.top, 4)
+        }
+        .kinnectCard()
+        .kinnectShimmer()
+    }
+}
+
+public struct StorySkeletonStrip: View {
+    public init() {}
+    public var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(0..<5, id: \.self) { _ in
+                    VStack(spacing: 6) {
+                        Circle()
+                            .fill(KinnectTheme.surfaceElevated)
+                            .frame(width: 58, height: 58)
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(KinnectTheme.surfaceElevated)
+                            .frame(width: 44, height: 10)
+                    }
+                    .frame(width: 68)
+                }
+            }
+            .padding(.vertical, 6)
+        }
+        .kinnectShimmer()
     }
 }

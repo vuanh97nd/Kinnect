@@ -33,6 +33,7 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
     var isActive: Bool
     var age: Int
     var gender: String
+    var cloudChatSync: Bool
 
     var avatarURL: String? { avatarUrl.isEmpty ? nil : avatarUrl }
 
@@ -56,7 +57,8 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         distanceKm: Double? = nil,
         isActive: Bool = false,
         age: Int = 0,
-        gender: String = ""
+        gender: String = "",
+        cloudChatSync: Bool = true
     ) {
         self.id = id
         self.name = name
@@ -78,6 +80,7 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         self.isActive = isActive
         self.age = age
         self.gender = gender
+        self.cloudChatSync = cloudChatSync
     }
 
     init(json: [String: Any]) {
@@ -112,7 +115,8 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
             distanceKm: (dict["distanceKm"] as? NSNumber)?.doubleValue,
             isActive: (dict["isActive"] as? Bool) ?? false,
             age: (dict["age"] as? Int) ?? (dict["userAge"] as? Int) ?? 0,
-            gender: (dict["gender"] as? String) ?? ""
+            gender: (dict["gender"] as? String) ?? "",
+            cloudChatSync: (dict["cloudChatSync"] as? Bool) ?? true
         )
     }
 }
@@ -446,6 +450,19 @@ struct LiveGiftCatalogItem: Identifiable, Equatable {
             tier: (dict["tier"] as? String) ?? "standard"
         )
     }
+
+    static let defaultCatalog: [LiveGiftCatalogItem] = [
+        LiveGiftCatalogItem(id: "rose", label: "Hoa hồng", emoji: "🌹", coins: 10, tier: "standard"),
+        LiveGiftCatalogItem(id: "heart", label: "Trái tim", emoji: "💖", coins: 20, tier: "standard"),
+        LiveGiftCatalogItem(id: "coffee", label: "Cà phê", emoji: "☕", coins: 50, tier: "standard"),
+        LiveGiftCatalogItem(id: "love_gun", label: "Súng tình yêu", emoji: "🔫", coins: 100, tier: "rare"),
+        LiveGiftCatalogItem(id: "fireworks", label: "Pháo hoa", emoji: "🎆", coins: 200, tier: "rare"),
+        LiveGiftCatalogItem(id: "yacht", label: "Du thuyền", emoji: "🛥️", coins: 500, tier: "rare"),
+        LiveGiftCatalogItem(id: "crown", label: "Vương miện", emoji: "👑", coins: 1000, tier: "epic"),
+        LiveGiftCatalogItem(id: "diamond", label: "Kim cương", emoji: "💎", coins: 2000, tier: "epic"),
+        LiveGiftCatalogItem(id: "sports_car", label: "Siêu xe", emoji: "🏎️", coins: 5000, tier: "legendary"),
+        LiveGiftCatalogItem(id: "castle", label: "Lâu đài", emoji: "🏰", coins: 10000, tier: "legendary")
+    ]
 }
 
 struct WalletEntryItem: Identifiable, Equatable {
@@ -483,6 +500,8 @@ struct StorePackageItem: Identifiable, Equatable {
     var owned: Bool
     var equipped: Bool
     var expiresAt: Int64?
+
+    var kind: String { category }
 
     static func from(_ dict: [String: Any]) -> StorePackageItem {
         let colors = dict["colors"] as? [String]

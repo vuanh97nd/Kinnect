@@ -14,13 +14,14 @@ struct LiveStreamView: View {
     @State private var showGiftDrawer = false
     @State private var giftCatalog: [LiveGiftCatalogItem] = []
     @State private var giftPriceVersion = 1
+    @State private var showCreateLiveSheet = false
 
     var body: some View {
         ZStack(alignment: .top) {
             Color.black
 
             if appState.liveRooms.isEmpty && !isLoading {
-                VStack(spacing: 14) {
+                VStack(spacing: 16) {
                     KinnectIcon(glyph: .live, size: 54, tint: KinnectTheme.textSecondary)
                     Text("Hiện chưa có phòng Live nào đang phát")
                         .font(.headline)
@@ -30,6 +31,23 @@ struct LiveStreamView: View {
                         .foregroundColor(KinnectTheme.textSecondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 32)
+
+                    Button {
+                        showCreateLiveSheet = true
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "video.badge.plus")
+                                .font(.system(size: 16, weight: .bold))
+                            Text("Bắt đầu phát Live ngay")
+                                .font(.subheadline.bold())
+                        }
+                        .padding(.horizontal, 22)
+                        .padding(.vertical, 12)
+                        .background(Capsule().fill(KinnectTheme.primaryGradient))
+                        .foregroundColor(.white)
+                        .shadow(color: KinnectTheme.accent.opacity(0.4), radius: 10, y: 4)
+                    }
+                    .padding(.top, 8)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if !appState.liveRooms.isEmpty {
@@ -87,6 +105,42 @@ struct LiveStreamView: View {
                     }
                 }
             }
+
+            // Top overlay bar with Go Live button
+            HStack {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 8, height: 8)
+                    Text("LIVE")
+                        .font(.caption.bold())
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(Color.black.opacity(0.5)))
+
+                Spacer()
+
+                Button {
+                    showCreateLiveSheet = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "video.fill")
+                            .font(.system(size: 13, weight: .bold))
+                        Text("Phát Live")
+                            .font(.caption.bold())
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(Capsule().fill(KinnectTheme.primaryGradient))
+                    .foregroundColor(.white)
+                    .shadow(color: Color.black.opacity(0.4), radius: 6, y: 2)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
         }
         .task {
             await fetchLiveRooms()
@@ -106,6 +160,13 @@ struct LiveStreamView: View {
         }
         .onDisappear {
             appState.leaveCurrentLiveRoom()
+        }
+        .sheet(isPresented: $showCreateLiveSheet) {
+            CreateLiveRoomSheet(onStarted: {
+                Task {
+                    await fetchLiveRooms()
+                }
+            })
         }
         .sheet(isPresented: $showGiftDrawer) {
             if !appState.liveRooms.isEmpty && selectedIndex < appState.liveRooms.count {
@@ -402,6 +463,7 @@ struct LiveStreamView: View {
 struct CreateLiveRoomSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
+    var onStarted: (() -> Void)? = nil
 
     @State private var title = ""
     @State private var topic = "Giao lưu kết bạn"
@@ -459,6 +521,8 @@ struct CreateLiveRoomSheet: View {
     private func startHostLive() async {
         isStarting = true
         defer { isStarting = false }
+        _ = await MediaPermissionHandler.shared.requestMicrophoneAccess()
+        _ = await MediaPermissionHandler.shared.requestCameraAccess()
         await NativeWebRTCManager.shared.startLiveHostBroadcast()
 
         let roomTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -473,6 +537,7 @@ struct CreateLiveRoomSheet: View {
             "gameTitle": liveMode == "game" ? gameTitle : ""
         ])
         dismiss()
+        onStarted?()
     }
 }
 
@@ -481,9 +546,10 @@ struct LiveRoomFullScreenView: View {
     @ObservedObject private var webrtc = NativeWebRTCManager.shared
 
     @State private var chatInput = ""
-    @State private var giftCatalog: [LiveGiftCatalogItem] = []
+    @State private var giftCatalog: [LiveGiftCatalogItem] = LiveGiftCatalogItem.defaultCatalog
     @State private var giftPriceVersion: Int = 1
     @State private var showGiftSheet = false
+    @State private var floatingReactions: [LiveFloatingReaction] = []
 
     var body: some View {
         if let room = appState.currentLiveRoom {
@@ -639,11 +705,7 @@ struct LiveRoomFullScreenView: View {
                         }
 
                         Button {
-                            NativeSocketClient.shared.sendJSON([
-                                "type": "live-reaction",
-                                "room": room.id,
-                                "kind": "heart"
-                            ])
+                            triggerLiveReaction(symbol: "💜", kind: "heart", room: room.id)
                         } label: {
                             Text("💜")
                                 .font(.title3)
@@ -663,6 +725,12 @@ struct LiveRoomFullScreenView: View {
                     .padding(.horizontal, 14)
                     .padding(.bottom, 20)
                 }
+
+                // Floating Reactions Layer matching Web `live-reactions`
+                ForEach(floatingReactions) { reaction in
+                    LiveFloatingReactionView(symbol: reaction.symbol)
+                        .position(x: reaction.x, y: reaction.y)
+                }
             }
             .task {
                 await loadGiftCatalog()
@@ -671,10 +739,29 @@ struct LiveRoomFullScreenView: View {
                 LiveGiftDrawerSheet(
                     roomId: room.id,
                     gifts: giftCatalog,
-                    priceVersion: giftPriceVersion
+                    priceVersion: giftPriceVersion,
+                    onGiftSent: { gift, qty in
+                        triggerLiveReaction(symbol: gift.emoji, kind: gift.id, room: room.id)
+                    }
                 )
             }
         }
+    }
+
+    private func triggerLiveReaction(symbol: String, kind: String, room: String) {
+        let screenWidth = UIScreen.main.bounds.width
+        let startX = screenWidth * CGFloat.random(in: 0.68...0.88)
+        let startY = UIScreen.main.bounds.height * 0.78
+        let r = LiveFloatingReaction(symbol: symbol, x: startX, y: startY)
+        floatingReactions.append(r)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            floatingReactions.removeAll(where: { $0.id == r.id })
+        }
+        NativeSocketClient.shared.sendJSON([
+            "type": "live-reaction",
+            "room": room,
+            "kind": kind
+        ])
     }
 
     private func sendLiveChat() {
@@ -694,10 +781,12 @@ struct LiveRoomFullScreenView: View {
     }
 
     private func loadGiftCatalog() async {
-        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/live/gifts") {
-            let items = res["gifts"] as? [[String: Any]] ?? []
+        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/live/gifts"),
+           let items = res["gifts"] as? [[String: Any]], !items.isEmpty {
             self.giftCatalog = items.map(LiveGiftCatalogItem.from)
             self.giftPriceVersion = res["priceVersion"] as? Int ?? 1
+        } else if self.giftCatalog.isEmpty {
+            self.giftCatalog = LiveGiftCatalogItem.defaultCatalog
         }
     }
 }
@@ -706,42 +795,119 @@ struct LiveGiftDrawerSheet: View {
     let roomId: String
     let gifts: [LiveGiftCatalogItem]
     let priceVersion: Int
+    var onGiftSent: ((LiveGiftCatalogItem, Int) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
+    @State private var selectedQuantity: Int = 1
+
+    private let quantities = [1, 2, 5, 10, 50]
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 12)], spacing: 12) {
-                    ForEach(gifts) { gift in
+            VStack(spacing: 0) {
+                // Quantity / Combo Multiplier Pills matching Android & Web
+                HStack(spacing: 10) {
+                    Text("Số lượng:")
+                        .font(.caption.bold())
+                        .foregroundColor(KinnectTheme.textSecondary)
+
+                    ForEach(quantities, id: \.self) { qty in
                         Button {
-                            sendGift(gift)
+                            selectedQuantity = qty
                         } label: {
-                            VStack(spacing: 6) {
-                                Text(gift.emoji)
-                                    .font(.largeTitle)
-                                Text(gift.label)
-                                    .font(.caption.bold())
-                                    .foregroundColor(.white)
-                                Text("\(gift.coins) xu")
-                                    .font(.caption2)
-                                    .foregroundColor(KinnectTheme.warning)
+                            HStack(spacing: 4) {
+                                if let img = UIImage(named: "kg20261109_combo_x\(qty)") {
+                                    Image(uiImage: img)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(height: 18)
+                                } else {
+                                    Text("x\(qty)")
+                                        .font(.caption.bold())
+                                }
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding(12)
-                            .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(
+                                Capsule().fill(selectedQuantity == qty ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
+                            )
+                            .foregroundColor(selectedQuantity == qty ? .white : KinnectTheme.textSecondary)
                         }
                     }
+                    Spacer()
                 }
-                .padding(16)
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
+
+                ScrollView {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 12)], spacing: 12) {
+                        ForEach(gifts) { gift in
+                            Button {
+                                sendGift(gift)
+                            } label: {
+                                VStack(spacing: 6) {
+                                    giftIconView(gift)
+                                    Text(gift.label)
+                                        .font(.caption.bold())
+                                        .foregroundColor(.white)
+                                        .lineLimit(1)
+                                    HStack(spacing: 3) {
+                                        KinnectIcon(glyph: .coin, size: 12, selected: true, tint: KinnectTheme.warning)
+                                        Text("\(gift.coins * selectedQuantity) xu")
+                                            .font(.caption2.bold())
+                                            .foregroundColor(KinnectTheme.warning)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(KinnectTheme.surfaceElevated)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+                                        )
+                                )
+                            }
+                        }
+                    }
+                    .padding(16)
+                }
             }
             .background(KinnectTheme.background)
-            .navigationTitle("Gửi quà tặng thử nghiệm")
+            .navigationTitle("Tặng quà phòng Live")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Đóng") { dismiss() }
                 }
             }
+        }
+        .presentationDetents([.medium, .fraction(0.85)])
+        .presentationDragIndicator(.visible)
+    }
+
+    private func giftAssetName(for id: String) -> String {
+        return (id == "car") ? "sports_car" : id
+    }
+
+    @ViewBuilder
+    private func giftIconView(_ gift: LiveGiftCatalogItem) -> some View {
+        let key = giftAssetName(for: gift.id)
+        if let img = UIImage(named: "kg20261109_gift_\(key)")
+            ?? UIImage(named: "kg20261109_gift_\(gift.id)")
+            ?? UIImage(named: "gift_\(key)")
+            ?? UIImage(named: "gift_\(gift.id)")
+            ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "gift_\(key)", ofType: "png") ?? "")
+            ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "gift_\(key)_3d", ofType: "jpg") ?? "") {
+            Image(uiImage: img)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 44, height: 44)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+        } else {
+            Text(gift.emoji)
+                .font(.system(size: 38))
         }
     }
 
@@ -751,11 +917,57 @@ struct LiveGiftDrawerSheet: View {
             "type": "live-reaction",
             "room": roomId,
             "kind": gift.id,
-            "quantity": 1,
+            "quantity": selectedQuantity,
             "fundingSource": "gifted",
             "requestId": reqId,
             "priceVersion": priceVersion
         ])
+        onGiftSent?(gift, selectedQuantity)
         dismiss()
+    }
+}
+
+// MARK: - Floating Reaction Model & View (Web Parity `live-floating-reaction`)
+struct LiveFloatingReaction: Identifiable {
+    let id = UUID()
+    let symbol: String
+    let x: CGFloat
+    let y: CGFloat
+}
+
+struct LiveFloatingReactionView: View {
+    let symbol: String
+    @State private var offsetY: CGFloat = 0
+    @State private var opacity: Double = 1.0
+    @State private var scale: CGFloat = 0.5
+
+    var body: some View {
+        Group {
+            if let img = UIImage(named: "kg20261109_gift_\(symbol)")
+                ?? UIImage(named: "kg20261109_gift_\(symbol == "car" ? "sports_car" : symbol)")
+                ?? UIImage(named: "gift_\(symbol)") {
+                Image(uiImage: img)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 48, height: 48)
+            } else {
+                Text(symbol)
+                    .font(.system(size: 36))
+            }
+        }
+        .scaleEffect(scale)
+        .opacity(opacity)
+        .offset(y: offsetY)
+        .onAppear {
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                scale = 1.15
+            }
+            withAnimation(.easeOut(duration: 1.1)) {
+                offsetY = -180
+                opacity = 0
+                scale = 1.3
+            }
+        }
+        .allowsHitTesting(false)
     }
 }

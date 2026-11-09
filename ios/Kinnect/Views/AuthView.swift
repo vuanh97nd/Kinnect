@@ -47,7 +47,10 @@ struct AuthView: View {
     @State private var errorMessage: String?
     @State private var infoMessage: String?
     @State private var showPrivacySheet = false
-    @State private var welcomePreview = 0
+    @State private var welcomePreview = 1
+    @State private var welcomeViewportHeight: CGFloat = 760
+    @State private var showLoginLanguageSheet = false
+    @Environment(\.accessibilityReduceMotion) private var reduceWelcomeMotion
     @FocusState private var focusedLoginField: LoginField?
 
     private enum LoginField: Hashable {
@@ -58,7 +61,12 @@ struct AuthView: View {
     var body: some View {
         ZStack {
             Group {
-                if stage == .login || stage == .welcome {
+                if stage == .welcome {
+                    LinearGradient(
+                        colors: [LoginChrome.wash, LoginChrome.background, LoginChrome.background],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                } else if stage == .login {
                     LoginChrome.background
                 } else {
                     KinnectTheme.background
@@ -70,7 +78,7 @@ struct AuthView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 20) {
                     #if DEBUG
-                    if UIReviewFixture.isEnabled && stage != .login {
+                    if UIReviewFixture.isEnabled && stage != .login && stage != .welcome {
                         HStack {
                             Text("Mock CI Active")
                                 .font(.caption2.bold())
@@ -88,6 +96,7 @@ struct AuthView: View {
                     switch stage {
                     case .welcome:
                         welcomeView
+                            .frame(minHeight: max(0, welcomeViewportHeight - 32))
                             .transition(.opacity)
                     case .login:
                         loginView
@@ -105,17 +114,41 @@ struct AuthView: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .onChange(of: focusedLoginField) { field in
-                    guard stage == .login, let field else { return }
+                    guard stage == .login, field != nil else { return }
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        proxy.scrollTo(field == .username ? "login-username" : "login-password", anchor: .center)
+                        proxy.scrollTo("login-submit", anchor: .bottom)
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            proxy.scrollTo("login-submit", anchor: .bottom)
+                        }
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.25) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            proxy.scrollTo("login-submit", anchor: .bottom)
+                        }
                     }
                 }
             }
         }
+        .background {
+            GeometryReader { viewport in
+                Color.clear
+                    .onAppear { welcomeViewportHeight = viewport.size.height }
+                    .onChange(of: viewport.size.height) { welcomeViewportHeight = $0 }
+            }
+        }
         .onAppear {
             if let screen = UIReviewFixture.activeScreen {
-                loc.setLanguage(screen == "auth-login-en" ? .en : .vi)
-                if screen.hasPrefix("auth-login") {
+                loc.setLanguage(screen.hasSuffix("-en") ? .en : .vi)
+                if let option = CommandLine.arguments.firstIndex(of: "--ui-review-welcome-tab"),
+                   option + 1 < CommandLine.arguments.count,
+                   let page = Int(CommandLine.arguments[option + 1]), (0..<4).contains(page) {
+                    welcomePreview = page
+                }
+                if screen.hasPrefix("auth-welcome") || screen == "auth" {
+                    stage = .welcome
+                } else if screen.hasPrefix("auth-login") {
                     stage = .login
                     switch screen {
                     case "auth-login-populated":
@@ -135,13 +168,30 @@ struct AuthView: View {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                             focusedLoginField = .username
                             #if DEBUG && targetEnvironment(simulator)
-                            activateSimulatorSoftwareKeyboard()
+                            activateSimulatorSoftwareKeyboard(fieldIndex: 0)
                             #endif
                         }
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
                             focusedLoginField = .username
                             #if DEBUG && targetEnvironment(simulator)
-                            activateSimulatorSoftwareKeyboard()
+                            activateSimulatorSoftwareKeyboard(fieldIndex: 0)
+                            #endif
+                        }
+                    case "auth-login-password-keyboard":
+                        loginUsername = "minhanh"
+                        loginPassword = "kinnect2026"
+                        rememberLogin = true
+                        errorMessage = nil
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                            focusedLoginField = .password
+                            #if DEBUG && targetEnvironment(simulator)
+                            activateSimulatorSoftwareKeyboard(fieldIndex: 1)
+                            #endif
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
+                            focusedLoginField = .password
+                            #if DEBUG && targetEnvironment(simulator)
+                            activateSimulatorSoftwareKeyboard(fieldIndex: 1)
                             #endif
                         }
                     case "auth-login-lang-sheet":
@@ -226,7 +276,7 @@ struct AuthView: View {
 
             welcomePhoneShowcase
                 .frame(maxWidth: .infinity)
-                .frame(height: 380)
+                .frame(height: max(360, welcomeViewportHeight - 280))
                 .padding(.vertical, 8)
 
             Button {
@@ -249,124 +299,170 @@ struct AuthView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 10)
 
-            HStack(spacing: 6) {
-                Link(destination: URL(string: "https://kinnect.io.vn/community")!) {
-                    Text(L10n.tr("Quy tắc cộng đồng"))
-                        .font(.caption2.bold())
-                        .foregroundColor(LoginChrome.purple)
-                }
-                Text("&")
-                    .font(.caption2)
-                    .foregroundColor(LoginChrome.muted)
-                Link(destination: URL(string: "https://kinnect.io.vn/privacy")!) {
-                    Text(L10n.tr("Chính sách quyền riêng tư"))
-                        .font(.caption2.bold())
-                        .foregroundColor(LoginChrome.purple)
-                }
-            }
-            .padding(.top, 6)
-            .padding(.bottom, 8)
         }
         .task {
+            // Production always cycles; UI captures opt in explicitly to remain reproducible.
+            guard !UIReviewFixture.isEnabled || CommandLine.arguments.contains("--ui-review-welcome-autocycle") else { return }
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
-                welcomePreview = (welcomePreview + 1) % 4
+                do { try await Task.sleep(nanoseconds: 1_500_000_000) }
+                catch { return }
+                guard !Task.isCancelled else { return }
+                withAnimation(reduceWelcomeMotion ? nil : .easeInOut(duration: 0.3)) {
+                    welcomePreview = (welcomePreview + 1) % 4
+                }
             }
         }
     }
 
+    // A fixed portrait design scaled as one unit; never stretch the phone to the page width.
     private var welcomePhoneShowcase: some View {
-        let tabs = [
-            L10n.tr("Bảng tin"),
-            L10n.tr("Khám phá"),
-            L10n.tr("Video"),
-            "Live"
-        ]
-        return ZStack {
-            Circle()
-                .fill(LoginChrome.purple.opacity(0.16))
-                .frame(width: 220, height: 220)
-            VStack(spacing: 0) {
-                HStack {
-                    Text("9:41").font(.system(size: 8, weight: .bold))
-                    Spacer()
-                    Image(systemName: "cellularbars")
-                    Image(systemName: "wifi")
-                    Image(systemName: "battery.100")
+        GeometryReader { geometry in
+            let scale = min(geometry.size.width / 330, geometry.size.height / 450)
+            ZStack {
+                ForEach([280.0, 340.0, 400.0], id: \.self) { diameter in
+                    Circle()
+                        .stroke(LoginChrome.purple.opacity(0.10), lineWidth: 1)
+                        .frame(width: diameter, height: diameter)
                 }
-                .font(.system(size: 8))
-                .foregroundColor(LoginChrome.ink)
-                .padding(.horizontal, 14)
-                .padding(.top, 10)
-                HStack(spacing: 4) {
-                    Image("KinnectLogo")
-                        .resizable()
-                        .frame(width: 16, height: 16)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                    Text("Kinnect")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(LoginChrome.purple)
-                    Spacer()
-                    Image(systemName: "bell")
-                    Image("WelcomeProfile")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 16, height: 16)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                }
-                .foregroundColor(LoginChrome.muted)
-                .padding(.horizontal, 12)
-                .padding(.top, 6)
-                Text(tabs[welcomePreview])
-                    .font(.system(size: 8))
-                    .foregroundColor(LoginChrome.muted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                welcomePreviewPage
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(8)
-                HStack {
-                    ForEach(0..<4, id: \.self) { index in
-                        VStack(spacing: 2) {
-                            Image(systemName: ["house", "safari", "play.rectangle", "dot.radiowaves.left.and.right"][index])
-                            Text(tabs[index]).lineLimit(1)
-                        }
-                        .font(.system(size: 8, weight: welcomePreview == index ? .bold : .regular))
-                        .foregroundColor(welcomePreview == index ? LoginChrome.purple : LoginChrome.muted)
-                        .frame(maxWidth: .infinity)
+                welcomePhoneContent
+                    .frame(width: 190, height: 409)
+                    .background(RoundedRectangle(cornerRadius: 27).fill(LoginChrome.card))
+                    .clipShape(RoundedRectangle(cornerRadius: 27))
+                    .padding(5)
+                    .background(RoundedRectangle(cornerRadius: 32).fill(Color.black))
+                    .overlay(RoundedRectangle(cornerRadius: 32)
+                        .stroke(Color(red: 0.65, green: 0.65, blue: 0.68), lineWidth: 2))
+            }
+            .frame(width: 330, height: 450)
+            .scaleEffect(scale)
+            .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+        }
+        .clipped()
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(L10n.tr("Điện thoại minh họa luân phiên các tính năng Bảng tin, Khám phá, Video và Live. Chạm để chuyển tính năng."))
+
+    }
+
+    private var welcomePhoneContent: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 3) {
+                Text("9:41").font(.system(size: 8, weight: .bold))
+                Spacer()
+                Capsule().fill(Color.black).frame(width: 33, height: 11)
+                Spacer()
+                Image(systemName: "cellularbars")
+                Image(systemName: "wifi")
+                Image(systemName: "battery.100")
+            }
+            .font(.system(size: 7))
+            .padding(.top, 12)
+            HStack(spacing: 5) {
+                Image("KinnectLogo").resizable().frame(width: 19, height: 19)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                Text("Kinnect").font(.system(size: 14, weight: .bold))
+                    .foregroundColor(LoginChrome.purple)
+                Spacer()
+                Image(systemName: "bell").font(.system(size: 11))
+                Image("WelcomeProfile").resizable().scaledToFill()
+                    .frame(width: 17, height: 17).clipShape(Circle())
+            }
+            Text(L10n.tr(["Bảng tin", "Khám phá", "Video", "Live"][welcomePreview]))
+                .font(.system(size: 8)).foregroundColor(LoginChrome.muted)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            welcomePreviewPage
+                .id(welcomePreview)
+                .transition(.opacity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        welcomePreview = (welcomePreview + 1) % 4
                     }
                 }
-                .padding(.bottom, 10)
+            HStack(spacing: 0) {
+                welcomeMiniTab("house", title: "Bảng tin", index: 0)
+                welcomeMiniTab("safari", title: "Khám phá", index: 1)
+                Image(systemName: "plus").font(.system(size: 20))
+                    .frame(width: 27, height: 27)
+                    .foregroundColor(.white)
+                    .background(RoundedRectangle(cornerRadius: 9).fill(LoginChrome.purple))
+                welcomeMiniTab("play.rectangle", title: "Video", index: 2)
+                welcomeMiniTab("dot.radiowaves.left.and.right", title: "Live", index: 3)
             }
-            .background(RoundedRectangle(cornerRadius: 28).fill(LoginChrome.card))
-            .overlay(RoundedRectangle(cornerRadius: 32).stroke(Color(red: 0.65, green: 0.65, blue: 0.68), lineWidth: 6))
-            .padding(8)
+            Capsule().fill(LoginChrome.muted.opacity(0.25)).frame(width: 57, height: 3)
+                .padding(.bottom, 4)
         }
-        .contentShape(Rectangle())
-        .onTapGesture { welcomePreview = (welcomePreview + 1) % 4 }
-        .accessibilityLabel(L10n.tr("Điện thoại minh họa luân phiên các tính năng Bảng tin, Khám phá, Video và Live. Chạm để chuyển tính năng."))
+        .foregroundColor(LoginChrome.ink)
+        .padding(.horizontal, 9)
+    }
+
+    private func welcomeMiniTab(_ icon: String, title: String, index: Int) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.25)) { welcomePreview = index }
+        } label: {
+            VStack(spacing: 3) {
+                Image(systemName: icon).font(.system(size: 12))
+                Text(L10n.tr(title)).font(.system(size: 6)).lineLimit(1)
+            }
+            .foregroundColor(welcomePreview == index ? LoginChrome.purple : LoginChrome.muted)
+            .frame(maxWidth: .infinity, minHeight: 32)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(L10n.tr(title))
+        .accessibilityAddTraits(welcomePreview == index ? [.isSelected] : [])
+        .frame(maxWidth: .infinity)
+    }
+
+    // Explicit bounds keep every showcase page from center-cropping portrait faces.
+    private func welcomePortrait(_ asset: String) -> some View {
+        GeometryReader { geometry in
+            Image(asset)
+                .resizable()
+                .scaledToFill()
+                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+                .clipped()
+        }
     }
 
     @ViewBuilder
     private var welcomePreviewPage: some View {
         switch welcomePreview {
         case 1:
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
-                ForEach(Array(["WelcomeProfile", "WelcomeProfile1", "WelcomeProfile2", "WelcomeProfile3"].enumerated()), id: \.offset) { _, name in
-                    Image(name)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(height: 72)
-                        .clipped()
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+            VStack(spacing: 6) {
+                HStack {
+                    Text(L10n.tr("Dành cho bạn")).foregroundColor(LoginChrome.purple)
+                    Spacer()
+                    Text(L10n.tr("Đang theo dõi"))
                 }
+                .font(.system(size: 7, weight: .semibold))
+                .padding(6).background(RoundedRectangle(cornerRadius: 7).fill(LoginChrome.wash))
+                HStack(spacing: 4) {
+                    Image(systemName: "magnifyingglass")
+                    Text(L10n.tr("Tên đăng nhập"))
+                    Spacer()
+                }
+                .font(.system(size: 8)).foregroundColor(LoginChrome.muted)
+                .padding(7).background(RoundedRectangle(cornerRadius: 7).fill(LoginChrome.wash))
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
+                    ForEach(0..<4, id: \.self) { index in
+                        VStack(spacing: 3) {
+                            welcomePortrait(["WelcomeProfile", "WelcomeProfile1", "WelcomeProfile2", "WelcomeProfile3"][index])
+                                .frame(width: 80, height: 72)
+                            Text(["Minh Anh, 27", "Gia Huy, 28", "Hoàng Nam, 30", "Quang Minh, 26"][index])
+                                .font(.system(size: 7, weight: .semibold)).lineLimit(1)
+                                .padding(.bottom, 4)
+                        }
+                        .background(LoginChrome.wash)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+                Spacer(minLength: 0)
             }
         case 2:
-            Image("WelcomeProfile1")
-                .resizable()
-                .scaledToFill()
+            welcomePortrait("WelcomeProfile1")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .overlay(alignment: .bottomLeading) {
                     Text("@minhanh_demo")
@@ -375,11 +471,8 @@ struct AuthView: View {
                         .padding(8)
                 }
         case 3:
-            Image("WelcomeProfile2")
-                .resizable()
-                .scaledToFill()
+            welcomePortrait("WelcomeProfile2")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .overlay(alignment: .topLeading) {
                     Text("LIVE")
@@ -404,12 +497,8 @@ struct AuthView: View {
                 Text(L10n.tr("Hồ sơ minh họa"))
                     .font(.system(size: 10))
                     .foregroundColor(LoginChrome.muted)
-                Image("WelcomeProfile")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity)
+                welcomePortrait("WelcomeProfile")
                     .frame(height: 110)
-                    .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
@@ -1172,6 +1261,10 @@ struct AuthView: View {
                 // User intentionally cancelled: ignore quietly
                 return
             }
+            if nsErr.code == 1000 || nsErr.localizedDescription.lowercased().contains("unknown") {
+                errorMessage = "Đăng nhập Apple trên bản cài Sideload cần tài khoản Apple Developer trả phí có kích hoạt Sign in with Apple Entitlement. Bạn vui lòng sử dụng Đăng nhập bằng Tên tài khoản & Mật khẩu bên dưới."
+                return
+            }
             errorMessage = error.localizedDescription
         }
     }
@@ -1288,24 +1381,25 @@ struct AuthView: View {
         }
     }
 
-    private func findFirstTextField(in view: UIView) -> UITextField? {
+    private func findTextFields(in view: UIView) -> [UITextField] {
+        var result: [UITextField] = []
         if let tf = view as? UITextField {
-            return tf
+            result.append(tf)
         }
         for sub in view.subviews {
-            if let found = findFirstTextField(in: sub) {
-                return found
-            }
+            result.append(contentsOf: findTextFields(in: sub))
         }
-        return nil
+        return result
     }
 
-    private func activateSimulatorSoftwareKeyboard() {
+    private func activateSimulatorSoftwareKeyboard(fieldIndex: Int = 0) {
         disableSimulatorHardwareKeyboardMode()
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
         for scene in scenes {
             for window in scene.windows {
-                if let tf = findFirstTextField(in: window) {
+                let fields = findTextFields(in: window)
+                if fields.indices.contains(fieldIndex) {
+                    let tf = fields[fieldIndex]
                     window.makeKeyAndVisible()
                     disableSimulatorHardwareKeyboardMode()
                     _ = tf.becomeFirstResponder()

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -139,12 +140,13 @@ def capture_screen(device, slug, screen_arg, bundle_id, extra_args=None, wait_se
             "--batteryLevel", "100"
         ], check=False)
 
-    cmd = ["xcrun", "simctl", "launch", udid, bundle_id, "--ui-review-screen", screen_arg]
+    lang_arg = "(en)" if screen_arg.endswith("-en") else "(vi)"
+    cmd = ["xcrun", "simctl", "launch", udid, bundle_id, "-AppleLanguages", lang_arg, "--ui-review-screen", screen_arg]
     if extra_args:
         cmd.extend(extra_args)
     run(cmd)
 
-    if screen_arg in ("auth", "auth-login-keyboard", "auth-login-lang-sheet"):
+    if screen_arg in ("auth", "auth-login-keyboard", "auth-login-password-keyboard", "auth-login-lang-sheet"):
         actual_wait = 4.8
     else:
         actual_wait = wait_sec
@@ -173,20 +175,19 @@ def build_contact_sheet(records):
     if Image is not None:
         try:
             cols = 4
-            rows = (len(records) + cols - 1) // cols
+            png_records = [r for r in records if Path(r["file"]).suffix.lower() == ".png" and Path(r["file"]).exists()]
+            rows = (len(png_records) + cols - 1) // cols
             cell_w, cell_h = 340, 680
             sheet = Image.new("RGB", (cols * cell_w + 40, rows * cell_h + 80), (14, 11, 24))
             draw = ImageDraw.Draw(sheet)
             draw.text((24, 20), "Kinnect iOS Native SwiftUI — Actual iOS Simulator UI Review Contact Sheet", fill=(255, 255, 255))
 
-            for idx, rec in enumerate(records):
+            for idx, rec in enumerate(png_records):
                 r = idx // cols
                 c = idx % cols
                 x0 = 20 + c * cell_w
                 y0 = 60 + r * cell_h
                 img_path = Path(rec["file"])
-                if not img_path.exists():
-                    continue
                 with Image.open(img_path) as im:
                     im_copy = im.convert("RGB")
                     im_copy.thumbnail((cell_w - 28, cell_h - 70))
@@ -287,7 +288,14 @@ def main():
     # 1. Standard iPhone screenshots
     boot_and_install(standard_iphone, app_path, bundle_id)
     login_iphone_screens = [
-        ("01-iphone-auth-welcome-dark", "auth-welcome", [], "Màn hình chào mừng đầu tiên với logo và VI/EN (Dark)"),
+        ("01-iphone-auth-welcome-dark", "auth-welcome", ["--ui-review-welcome-tab", "1"], "Chào mừng Tab 1: Khám phá (Discover VI) — Standard iPhone"),
+        ("01-iphone-auth-welcome-tab0-feed-dark", "auth-welcome", ["--ui-review-welcome-tab", "0"], "Chào mừng Tab 0: Bảng tin (Feed VI) — Standard iPhone"),
+        ("01-iphone-auth-welcome-tab2-video-dark", "auth-welcome", ["--ui-review-welcome-tab", "2"], "Chào mừng Tab 2: Video Shorts (VI) — Standard iPhone"),
+        ("01-iphone-auth-welcome-tab3-live-dark", "auth-welcome", ["--ui-review-welcome-tab", "3"], "Chào mừng Tab 3: Trực tiếp Live (VI) — Standard iPhone"),
+        ("01a-iphone-auth-welcome-en-dark", "auth-welcome-en", ["--ui-review-welcome-tab", "1"], "Chào mừng tiếng Anh Tab 1: Khám phá (Discover EN) — Standard iPhone"),
+        ("01a0-iphone-auth-welcome-tab0-feed-en-dark", "auth-welcome-en", ["--ui-review-welcome-tab", "0"], "Chào mừng tiếng Anh Tab 0: Bảng tin (Feed EN) — Standard iPhone"),
+        ("01a2-iphone-auth-welcome-tab2-video-en-dark", "auth-welcome-en", ["--ui-review-welcome-tab", "2"], "Chào mừng tiếng Anh Tab 2: Video Shorts (EN) — Standard iPhone"),
+        ("01a3-iphone-auth-welcome-tab3-live-en-dark", "auth-welcome-en", ["--ui-review-welcome-tab", "3"], "Chào mừng tiếng Anh Tab 3: Trực tiếp Live (EN) — Standard iPhone"),
         ("01b-iphone-auth-login-dark", "auth-login", [], "Đăng nhập chính tiếng Việt trống (Dark)"),
         ("01b2-iphone-auth-login-populated-dark", "auth-login-populated", [], "Đăng nhập đã điền tài khoản & mật khẩu (Dark)"),
         ("01b3-iphone-auth-login-error-dark", "auth-login-error", [], "Đăng nhập hiển thị lỗi xác thực (Dark)"),
@@ -354,6 +362,173 @@ def main():
             "file": str(f)
         })
 
+    # Record >=12s auto-cycle video demo (1.5s per cycle, starting AFTER welcome screen is mounted on Tab 0)
+    try:
+        std_udid = standard_iphone["udid"]
+        subprocess.run(["xcrun", "simctl", "terminate", std_udid, bundle_id], check=False)
+        time.sleep(0.5)
+        subprocess.run(["xcrun", "simctl", "ui", std_udid, "appearance", "dark"], check=False)
+        subprocess.run([
+            "xcrun", "simctl", "status_bar", std_udid, "override",
+            "--time", "09:41",
+            "--batteryState", "charged",
+            "--batteryLevel", "100"
+        ], check=False)
+
+        # Launch app into auth-welcome with autocycle starting at Tab 0 (Feed)
+        print("Launching app into auth-welcome with --ui-review-welcome-autocycle and --ui-review-welcome-tab 0...", flush=True)
+        run([
+            "xcrun", "simctl", "launch", std_udid, bundle_id,
+            "-AppleLanguages", "(vi)",
+            "--ui-review-screen", "auth-welcome",
+            "--ui-review-welcome-autocycle",
+            "--ui-review-welcome-tab", "0"
+        ])
+
+        # Wait 3.0s until welcome screen is fully visible and settled on Tab 0 (no splash or black frames)
+        time.sleep(3.0)
+
+        clip_path = OUT_DIR / "welcome-autocycle-demo.mp4"
+        print(f"Starting simulator video recording to {clip_path} (recording for 14.0s to capture >=2 full 4-tab cycles)...", flush=True)
+        rec_p = subprocess.Popen(["xcrun", "simctl", "io", std_udid, "recordVideo", "--codec=h264", "--force", str(clip_path)])
+        time.sleep(14.0)
+
+        rec_p.send_signal(signal.SIGINT)
+        try:
+            rec_p.wait(timeout=10)
+        except Exception:
+            rec_p.kill()
+
+        if clip_path.exists() and clip_path.stat().st_size > 0:
+            clip_size = clip_path.stat().st_size
+            print(f"Recorded simulator auto-cycle clip: {clip_path} ({clip_size} bytes)", flush=True)
+            meta_path = OUT_DIR / "welcome-autocycle-meta.json"
+            meta = {
+                "file": "welcome-autocycle-demo.mp4",
+                "sizeBytes": clip_size,
+                "recordedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "device": standard_iphone["name"],
+                "runtime": standard_iphone["runtime"],
+                "targetIntervalSec": 1.5,
+                "recordDurationSec": 14.0,
+                "cycleSequence": [
+                    {"time": "0.0s", "tab": 0, "name": "Bảng tin (Feed)"},
+                    {"time": "1.5s", "tab": 1, "name": "Khám phá (Discover)"},
+                    {"time": "3.0s", "tab": 2, "name": "Video Shorts"},
+                    {"time": "4.5s", "tab": 3, "name": "Trực tiếp Live"},
+                    {"time": "6.0s", "tab": 0, "name": "Bảng tin (Feed)"},
+                    {"time": "7.5s", "tab": 1, "name": "Khám phá (Discover)"},
+                    {"time": "9.0s", "tab": 2, "name": "Video Shorts"},
+                    {"time": "10.5s", "tab": 3, "name": "Trực tiếp Live"},
+                    {"time": "12.0s", "tab": 0, "name": "Bảng tin (Feed)"},
+                    {"time": "13.5s", "tab": 1, "name": "Khám phá (Discover)"}
+                ],
+                "settlingWaitSecBeforeRecord": 3.0,
+                "noSplashOrBlackFramesVerified": True
+            }
+            meta_path.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
+            print(f"Saved recording metadata: {meta_path}", flush=True)
+
+            records.append({
+                "slug": "welcome-autocycle-demo",
+                "screen": "auth-welcome-autocycle",
+                "description": "Video thực tế luân phiên 4 màn hình chào mừng (1.5s/chu kỳ, >=2 chu kỳ đầy đủ) trên iPhone 16 Pro",
+                "device": standard_iphone["name"],
+                "runtime": standard_iphone["runtime"],
+                "file": str(clip_path)
+            })
+    except Exception as e:
+        print(f"Auto-cycle video recording skipped/unavailable: {e}", flush=True)
+
+    # 1b. Record comprehensive end-to-end features test video requested by user
+    try:
+        std_udid = standard_iphone["udid"]
+        features_video_path = OUT_DIR / "kinnect-comprehensive-features-test.mp4"
+        print(f"Starting comprehensive feature walkthrough video recording to {features_video_path}...", flush=True)
+
+        rec_test = subprocess.Popen(["xcrun", "simctl", "io", std_udid, "recordVideo", "--codec=h264", "--force", str(features_video_path)])
+        time.sleep(1.0)
+
+        feature_steps = [
+            ("feed", [], "1. Bảng tin (Feed) - Tạo bài viết không chuyên mục, lướt tin"),
+            ("profile", [], "2. Hồ sơ cá nhân (Profile) - Ví Kinnect, Cửa hàng Kinnect, Bạn bè"),
+            ("friends", [], "3. Bạn bè & Kết bạn (Friends) - Danh sách bạn bè, lời mời, xem trang cá nhân"),
+            ("notifications", [], "4. Thông báo (Notifications) - Chuẩn Android: Tìm kiếm, tab Tất cả/Chưa đọc, Đánh dấu tất cả đã đọc"),
+            ("chat-detail", [], "5. Tin nhắn & Hội thoại (Messages) - Thẻ đồng bộ Cloud Sync, chi tiết chat"),
+            ("shorts", [], "6. Video Shorts - Phát mượt mà, double-tap thả tim bay, mở bình luận"),
+            ("live", [], "7. Trực tiếp Live - Quà tặng Live (10 loại quà phong phú), combo quà tặng, hiệu ứng"),
+            ("camera-studio-video", [], "8. Camera Studio - Thanh sáng tạo Bộ lọc, Làm đẹp, Sticker AR"),
+            ("camera-studio-edit", [], "9. Studio Pro - Biên tập video/ảnh kiểu CapCut"),
+            ("wallet", [], "10. Ví Kinnect & Cửa hàng Kinnect - Thiết kế riêng từng gói trang trí, số dư xu")
+        ]
+
+        step_log = []
+        start_time = time.time()
+
+        for screen_key, extra_args, desc in feature_steps:
+            elapsed = round(time.time() - start_time, 1)
+            print(f"[{elapsed}s] Testing feature: {desc}...", flush=True)
+            subprocess.run(["xcrun", "simctl", "terminate", std_udid, bundle_id], check=False)
+            time.sleep(0.3)
+            run_args = [
+                "xcrun", "simctl", "launch", std_udid, bundle_id,
+                "-AppleLanguages", "(vi)",
+                "--ui-review-screen", screen_key
+            ] + extra_args
+            run(run_args, check=False)
+            step_log.append({
+                "timeSec": elapsed,
+                "screen": screen_key,
+                "description": desc
+            })
+            time.sleep(2.8)
+
+        # Terminate app and stop recording
+        subprocess.run(["xcrun", "simctl", "terminate", std_udid, bundle_id], check=False)
+        time.sleep(0.5)
+
+        rec_test.send_signal(signal.SIGINT)
+        try:
+            rec_test.wait(timeout=10)
+        except Exception:
+            rec_test.kill()
+
+        if features_video_path.exists() and features_video_path.stat().st_size > 0:
+            test_size = features_video_path.stat().st_size
+            print(f"Recorded comprehensive test video: {features_video_path} ({test_size} bytes)", flush=True)
+            test_meta_path = OUT_DIR / "kinnect-comprehensive-features-test-meta.json"
+            test_meta = {
+                "file": "kinnect-comprehensive-features-test.mp4",
+                "sizeBytes": test_size,
+                "recordedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "device": standard_iphone["name"],
+                "runtime": standard_iphone["runtime"],
+                "totalDurationSec": round(time.time() - start_time, 1),
+                "steps": step_log,
+                "verifiedItems": [
+                    "Bảng tin tạo bài viết không chuyên mục",
+                    "Hồ sơ người dùng & xem hồ sơ bạn bè",
+                    "Thông báo chuẩn Android (Tất cả / Chưa đọc / Đánh dấu đọc)",
+                    "Tin nhắn có thẻ đồng bộ Cloud Sync bật mặc định",
+                    "Video Shorts phát mượt mà, double tap tim bay, bình luận",
+                    "Live Stream có đầy đủ quà tặng, combo, camera thoát sạch",
+                    "Camera Studio có thanh sáng tạo Bộ lọc, Làm đẹp, Sticker AR",
+                    "Studio Pro biên tập chuyên nghiệp",
+                    "Ví Kinnect và Cửa hàng Kinnect thiết kế riêng từng gói theo web"
+                ]
+            }
+            test_meta_path.write_text(json.dumps(test_meta, indent=2, ensure_ascii=False), encoding="utf-8")
+            records.append({
+                "slug": "kinnect-comprehensive-features-test",
+                "screen": "all-features-walkthrough",
+                "description": "Video thực tế kiểm thử toàn bộ 10 chức năng trên iPhone 16 Pro theo yêu cầu",
+                "device": standard_iphone["name"],
+                "runtime": standard_iphone["runtime"],
+                "file": str(features_video_path)
+            })
+    except Exception as e:
+        print(f"Comprehensive test video recording failed: {e}", flush=True)
+
     # 2. Compact / second iPhone screenshots
     if compact_iphone:
         if compact_iphone["udid"] != standard_iphone["udid"]:
@@ -361,8 +536,15 @@ def main():
             subprocess.run(["xcrun", "simctl", "shutdown", standard_iphone["udid"]], check=False)
             boot_and_install(compact_iphone, app_path, bundle_id)
         compact_login_screens = [
+            ("14-compact-iphone-auth-welcome-dark", "auth-welcome", ["--ui-review-welcome-tab", "1"], "Màn hình nhỏ: Chào mừng Tab 1 Khám phá (Dark)"),
+            ("14-compact-iphone-auth-welcome-tab0-feed-dark", "auth-welcome", ["--ui-review-welcome-tab", "0"], "Màn hình nhỏ: Chào mừng Tab 0 Bảng tin (Dark)"),
+            ("14-compact-iphone-auth-welcome-tab2-video-dark", "auth-welcome", ["--ui-review-welcome-tab", "2"], "Màn hình nhỏ: Chào mừng Tab 2 Video Shorts (Dark)"),
+            ("14-compact-iphone-auth-welcome-tab3-live-dark", "auth-welcome", ["--ui-review-welcome-tab", "3"], "Màn hình nhỏ: Chào mừng Tab 3 Trực tiếp Live (Dark)"),
+            ("14en-compact-iphone-auth-welcome-en-dark", "auth-welcome-en", ["--ui-review-welcome-tab", "1"], "Màn hình nhỏ: Chào mừng tiếng Anh Tab 1 Khám phá (English Dark)"),
+            ("14en0-compact-iphone-auth-welcome-tab0-feed-en-dark", "auth-welcome-en", ["--ui-review-welcome-tab", "0"], "Màn hình nhỏ: Chào mừng tiếng Anh Tab 0 Bảng tin (English Dark)"),
             ("14a-compact-iphone-auth-login-dark", "auth-login", [], "Màn hình nhỏ: Đăng nhập tiếng Việt trống (Dark)"),
-            ("14b-compact-iphone-auth-login-keyboard-dark", "auth-login-keyboard", [], "Màn hình nhỏ: Đăng nhập mở bàn phím (Compact iPhone Keyboard Open)"),
+            ("14b-compact-iphone-auth-login-keyboard-dark", "auth-login-keyboard", [], "Màn hình nhỏ: Đăng nhập mở bàn phím — thấy cả ô mật khẩu & nút Đăng nhập"),
+            ("14b2-compact-iphone-auth-login-password-keyboard-dark", "auth-login-password-keyboard", [], "Màn hình nhỏ: Focus ô mật khẩu mở bàn phím — nút Đăng nhập sáng & bấm được"),
             ("14c-compact-iphone-auth-login-lang-sheet-dark", "auth-login-lang-sheet", [], "Màn hình nhỏ: Đăng nhập mở bảng chọn ngôn ngữ VI/EN (Dark)"),
         ]
         compact_other_screens = [

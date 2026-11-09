@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#7548de">
+  <title>Kinnect · Không gian Quản trị</title>
+  <link rel="icon" href="/admin/mark.svg">
+  <link rel="stylesheet" href="/admin/admin.css?v=20261109c">
+  <link rel="stylesheet" href="/admin/wallet-tools.css?v=20261109c">
+  <script src="/admin/wallet-tools.js?v=20261109c" defer></script>
+  <script src="/admin/admin.js?v=20261109c" defer></script>
+</head>
+<body>
+  <div id="notice" role="status" aria-live="polite"></div>
+
+  <!-- Cổng Đăng nhập Phân hệ -->
+  <section id="login" class="login">
+    <div class="login-art">
+      <div class="mark-wrapper">
+        <img class="mark" src="/admin/mark.svg" alt="Kinnect" width="56" height="56">
+      </div>
+      <p class="eyebrow" id="portal-art-eyebrow">KINNECT WORKSPACE</p>
+      <h1 id="portal-art-title">Kết nối tử tế.<br>Quản trị tận tâm.</h1>
+      <div class="orbit">✳<span>♡</span></div>
+      <small id="portal-art-desc">Không gian làm việc bảo mật dành riêng cho đội ngũ Kinnect.</small>
+    </div>
+    <div class="login-form">
+      <a class="brand" href="https://kinnect.io.vn">
+        <img src="/admin/mark.svg" alt="" width="32" height="32">Kinnect
+      </a>
+      <div class="portal-header-tag">
+        <p class="eyebrow" id="portal-label">CỔNG QUẢN TRỊ</p>
+      </div>
+      <h2>Chào mừng trở lại.</h2>
+      <p class="muted" id="portal-note">Đăng nhập bằng tài khoản quản trị Kinnect.</p>
+      <form id="login-form">
+        <label>Tên đăng nhập
+          <input id="username" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="30" placeholder="Nhập tên đăng nhập (hỗ trợ cả chữ HOA / thường)...">
+        </label>
+        <label>Mật khẩu
+          <div class="password-field-wrap">
+            <input id="password" type="password" autocomplete="current-password" required maxlength="128" placeholder="Nhập mật khẩu (có phân biệt HOA / thường)...">
+            <button type="button" id="toggle-password" class="password-toggle-btn" aria-label="Hiện hoặc ẩn mật khẩu" title="Hiện hoặc ẩn mật khẩu">👁️ Hiện</button>
+          </div>
+        </label>
+        <p id="caps-warning" class="caps-warning" hidden>⚠️ Đang bật phím Caps Lock (chữ HOA)</p>
+        <small class="muted login-case-hint">💡 Hỗ trợ nhập chữ HOA / chữ thường và biểu tượng 👁️ Hiện / Ẩn mật khẩu.</small>
+        <button class="primary" type="submit">Đăng nhập →</button>
+        <p id="login-error" class="error" role="alert"></p>
+      </form>
+      <small class="muted session-notice">Phiên làm việc tự hết hạn sau 30 phút không thao tác.</small>
+    </div>
+  </section>
+
+  <!-- Không gian Làm việc Bộ phận -->
+  <div id="workspace" hidden>
+    <div id="mobile-backdrop" class="mobile-backdrop" hidden></div>
+    <aside id="sidebar-drawer">
+      <div class="sidebar-topline">
+        <span class="topline-label">KINNECT WORKSPACE</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="portal-badge" id="portal-badge">ADMIN</span>
+          <button type="button" id="mobile-menu-close" class="mobile-menu-close" aria-label="Đóng menu">✕</button>
+        </div>
+      </div>
+      <a class="brand" href="/">
+        <img src="/admin/mark.svg" alt="" width="30" height="30">Kinnect
+      </a>
+      <p class="eyebrow" id="role-label">ADMIN WORKSPACE</p>
+      <nav aria-label="Quản trị" id="navigation">
+        <button data-page="overview">◫ Tổng quan</button>
+        <button data-page="tickets">📋 Phiếu phối hợp</button>
+        <button data-page="reputation">⭐ Điểm uy tín & Vi phạm</button>
+        <button data-page="users">👥 Thành viên</button>
+        <button data-page="reports">⚑ Báo cáo</button>
+        <button data-page="resets">↺ Khôi phục tài khoản</button>
+        <button data-page="wallet">🪙 Tặng xu & Bù giao dịch</button>
+        <button data-page="finance">📊 Tài chính & đối soát</button>
+        <button data-page="operations">💻 Kỹ thuật & hệ thống</button>
+        <button data-page="content">📝 Nội dung</button>
+        <button data-page="team" id="team-nav">🛡️ Nhân sự & phân quyền</button>
+        <button data-page="activity">≡ Nhật ký</button>
+        <button data-page="password" id="password-nav">⚙ Đổi mật khẩu</button>
+      </nav>
+      <div class="identity">
+        <div class="identity-profile">
+          <div class="status-dot" title="Kết nối an toàn"></div>
+          <div class="identity-meta">
+            <b id="identity"></b>
+            <small id="role-name"></small>
+          </div>
+        </div>
+        <button id="logout">Đăng xuất ↗</button>
+      </div>
+    </aside>
+
+    <main>
+      <header>
+        <div class="header-title-group">
+          <button type="button" id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Mở menu điều hướng">☰ Menu</button>
+          <div>
+            <p class="eyebrow" id="header-eyebrow">KINNECT / WORKSPACE</p>
+            <h1 id="page-title">Tổng quan</h1>
+          </div>
+        </div>
+        <div class="header-tools">
+          <span class="private-badge" id="header-badge">● Khu vực nội bộ</span>
+          <button id="refresh">Làm mới ↻</button>
+        </div>
+      </header>
+      <p class="muted" id="page-description"></p>
+      <section id="content" aria-live="polite"></section>
+      <nav id="mobile-bottom-nav" class="mobile-bottom-nav" aria-label="Điều hướng nhanh"></nav>
+    </main>
+  </div>
+
+  <!-- Hộp thoại Xác nhận 2 lớp -->
+  <dialog id="confirm-dialog">
+    <form method="dialog">
+      <p class="eyebrow">XÁC NHẬN THAO TÁC</p>
+      <h2 id="confirm-title"></h2>
+      <p id="confirm-message"></p>
+      <div class="dialog-actions">
+        <button value="cancel">Hủy</button>
+        <button class="primary" value="confirm">Xác nhận</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Hộp thoại Cấp Mật khẩu tạm -->
+  <dialog id="secret-dialog">
+    <p class="eyebrow">MẬT KHẨU TẠM (DÙNG 1 LẦN)</p>
+    <h2 id="secret-user"></h2>
+    <p class="muted">Sao chép và gửi trực tiếp cho chủ tài khoản. Hệ thống không lưu lại mật khẩu này dưới dạng văn bản.</p>
+    <input id="secret-value" readonly>
+    <div class="dialog-actions">
+      <button id="copy-secret" class="primary" type="button">Sao chép</button>
+      <button id="secret-close" type="button">Đã lưu</button>
+    </div>
+  </dialog>
+</body>
+</html>

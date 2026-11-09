@@ -16,6 +16,8 @@ struct FriendsView: View {
     @State private var outgoing: [KinnectUser] = []
     @State private var suggestions: [KinnectUser] = []
     @State private var isLoading = false
+    @State private var selectedProfileUser: KinnectUser? = nil
+    @State private var activeChatPeer: KinnectUser? = nil
 
     var body: some View {
         VStack(spacing: 12) {
@@ -84,6 +86,14 @@ struct FriendsView: View {
                 tab = .suggestions
             }
         }
+        .sheet(item: $selectedProfileUser) { user in
+            ProfileView(targetUser: user)
+        }
+        .sheet(item: $activeChatPeer) { peer in
+            NavigationStack {
+                DirectChatDetailView(peer: peer)
+            }
+        }
     }
 
     private func sectionHeader(_ text: String) -> some View {
@@ -104,32 +114,48 @@ struct FriendsView: View {
 
     private func friendRow(user: KinnectUser) -> some View {
         HStack(spacing: 10) {
-            KinnectAvatarView(
-                name: user.name,
-                avatarURL: user.avatarUrl,
-                colorHex: user.avatarColor,
-                size: 46,
-                isOnline: appState.onlineUserIds.contains(user.id)
-            )
-            VStack(alignment: .leading, spacing: 2) {
-                Text(user.name)
-                    .font(.subheadline.bold())
-                    .foregroundColor(KinnectTheme.textPrimary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                if !user.handle.isEmpty {
-                    Text("@\(user.handle)")
-                        .font(.caption)
-                        .foregroundColor(KinnectTheme.textSecondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+            Button {
+                selectedProfileUser = user
+            } label: {
+                HStack(spacing: 10) {
+                    KinnectAvatarView(
+                        name: user.name,
+                        avatarURL: user.avatarUrl,
+                        colorHex: user.avatarColor,
+                        size: 46,
+                        isOnline: appState.onlineUserIds.contains(user.id)
+                    )
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(user.name)
+                            .font(.subheadline.bold())
+                            .foregroundColor(KinnectTheme.textPrimary)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if !user.handle.isEmpty {
+                            Text("@\(user.handle)")
+                                .font(.caption)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                        }
+                    }
                 }
             }
+            .buttonStyle(.plain)
             .layoutPriority(1)
 
             Spacer(minLength: 6)
 
             HStack(spacing: 4) {
+                Button {
+                    activeChatPeer = user
+                } label: {
+                    KinnectIcon(glyph: .messages, size: 18, tint: KinnectTheme.accentBright)
+                        .frame(width: 36, height: 36)
+                        .background(Circle().fill(KinnectTheme.surfaceElevated))
+                }
+                .accessibilityLabel("Nhắn tin")
+
                 Button {
                     Task {
                         dismiss()
@@ -181,16 +207,24 @@ struct FriendsView: View {
 
     private func incomingRequestRow(user: KinnectUser) -> some View {
         HStack(spacing: 12) {
-            KinnectAvatarView(name: user.name, avatarURL: user.avatarUrl, colorHex: user.avatarColor, size: 46)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(user.name)
-                    .font(.subheadline.bold())
-                    .foregroundColor(KinnectTheme.textPrimary)
-                    .kinnectMultiline()
-                Text("Muốn kết bạn với bạn")
-                    .font(.caption)
-                    .foregroundColor(KinnectTheme.textSecondary)
+            Button {
+                selectedProfileUser = user
+            } label: {
+                HStack(spacing: 10) {
+                    KinnectAvatarView(name: user.name, avatarURL: user.avatarUrl, colorHex: user.avatarColor, size: 46)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(user.name)
+                            .font(.subheadline.bold())
+                            .foregroundColor(KinnectTheme.textPrimary)
+                            .kinnectMultiline()
+                        Text("Muốn kết bạn với bạn")
+                            .font(.caption)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                }
             }
+            .buttonStyle(.plain)
+
             Spacer()
             Button("Đồng ý") {
                 Task { await respondRequest(user: user, action: "accept") }
@@ -215,11 +249,19 @@ struct FriendsView: View {
 
     private func outgoingRequestRow(user: KinnectUser) -> some View {
         HStack(spacing: 12) {
-            KinnectAvatarView(name: user.name, avatarURL: user.avatarUrl, colorHex: user.avatarColor, size: 44)
-            Text(user.name)
-                .font(.subheadline.bold())
-                .foregroundColor(KinnectTheme.textPrimary)
-                .kinnectMultiline()
+            Button {
+                selectedProfileUser = user
+            } label: {
+                HStack(spacing: 10) {
+                    KinnectAvatarView(name: user.name, avatarURL: user.avatarUrl, colorHex: user.avatarColor, size: 44)
+                    Text(user.name)
+                        .font(.subheadline.bold())
+                        .foregroundColor(KinnectTheme.textPrimary)
+                        .kinnectMultiline()
+                }
+            }
+            .buttonStyle(.plain)
+
             Spacer()
             Button("Thu hồi") {
                 Task { await cancelRequest(user) }
@@ -235,19 +277,27 @@ struct FriendsView: View {
 
     private func suggestionRow(user: KinnectUser) -> some View {
         HStack(spacing: 12) {
-            KinnectAvatarView(name: user.name, avatarURL: user.avatarUrl, colorHex: user.avatarColor, size: 46)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(user.name)
-                    .font(.subheadline.bold())
-                    .foregroundColor(KinnectTheme.textPrimary)
-                    .kinnectMultiline()
-                if !user.bio.isEmpty {
-                    Text(user.bio)
-                        .font(.caption)
-                        .foregroundColor(KinnectTheme.textSecondary)
-                        .kinnectMultiline()
+            Button {
+                selectedProfileUser = user
+            } label: {
+                HStack(spacing: 10) {
+                    KinnectAvatarView(name: user.name, avatarURL: user.avatarUrl, colorHex: user.avatarColor, size: 46)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(user.name)
+                            .font(.subheadline.bold())
+                            .foregroundColor(KinnectTheme.textPrimary)
+                            .kinnectMultiline()
+                        if !user.bio.isEmpty {
+                            Text(user.bio)
+                                .font(.caption)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                                .kinnectMultiline()
+                        }
+                    }
                 }
             }
+            .buttonStyle(.plain)
+
             Spacer()
             Button("Kết bạn") {
                 Task { await sendRequest(user) }

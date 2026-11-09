@@ -1,19 +1,21 @@
 import Foundation
 
 enum KinnectWriteBody {
-    static func post(text: String, category: String, visibility: String = "public", mediaDataURL: String) -> [String: Any] {
+    static func post(text: String, category: String = "", visibility: String = "public", mediaDataURL: String = "") -> [String: Any] {
         var payload: [String: Any] = [
             "body": text,
-            "visibility": visibility,
-            "category": category
+            "visibility": visibility
         ]
+        if !category.isEmpty {
+            payload["category"] = category
+        }
         if !mediaDataURL.isEmpty {
             payload["media"] = mediaDataURL
         }
         return payload
     }
 
-    static func story(text: String, colorHex: String, mediaDataURL: String) -> [String: Any] {
+    static func story(text: String, colorHex: String, mediaDataURL: String = "") -> [String: Any] {
         var payload: [String: Any] = [
             "body": text,
             "background": storyBackground(hex: colorHex)
