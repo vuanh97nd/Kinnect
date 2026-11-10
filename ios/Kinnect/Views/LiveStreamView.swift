@@ -69,7 +69,6 @@ struct LiveStreamView: View {
                         }
                         .scrollTargetBehavior(.paging)
                         .scrollPosition(id: $scrolledRoomId)
-                        .ignoresSafeArea()
                         .onChange(of: scrolledRoomId) { newId in
                             guard let newId,
                                   let idx = appState.liveRooms.firstIndex(where: { $0.id == newId }) else { return }
@@ -108,6 +107,7 @@ struct LiveStreamView: View {
                         }
                     }
                 }
+                .ignoresSafeArea()
             }
         }
         .task {
@@ -395,7 +395,7 @@ struct LiveStreamView: View {
                     .padding(.bottom, 6)
                 }
                 .padding(.horizontal, 14)
-                .padding(.bottom, 24)
+                .padding(.bottom, 38)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
