@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import SwiftUI
 import UIKit
 
 /// Isolated UI review fixture mode activated ONLY when launched with `--ui-review-screen <name>`.
