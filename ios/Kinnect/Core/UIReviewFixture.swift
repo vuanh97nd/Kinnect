@@ -820,5 +820,273 @@ enum UIReviewFixture {
 
         return movieURL
     }
+
+    /// Creates the appropriate SwiftUI view for the given screen name.
+    /// Used by SceneDelegate when `--ui-review-screen` argument is provided.
+    @MainActor
+    static func makeView(for screenName: String) -> some View {
+        switch screenName {
+        // MARK: - Auth Screens
+        case "auth-welcome":
+            return AnyView(AuthView())
+        case "auth-login":
+            return AnyView(AuthView(initialMode: .login))
+        case "auth-register":
+            return AnyView(AuthView(initialMode: .register))
+        case "auth-forgot-password":
+            return AnyView(AuthView(initialMode: .forgotPassword))
+
+        // MARK: - Main Tabs (5 tabs)
+        case "feed":
+            return AnyView(
+                NavigationStack {
+                    FeedView(onOpenCamera: {}, onOpenFriends: {})
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Bảng tin")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "discover":
+            return AnyView(
+                NavigationStack {
+                    DiscoverView(onOpenCamera: {})
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Khám phá")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "create":
+            return AnyView(
+                NavigationStack {
+                    CameraStudioView()
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Tạo")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "video":
+            return AnyView(
+                NavigationStack {
+                    ShortsVideoView()
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Video")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "live":
+            return AnyView(
+                NavigationStack {
+                    LiveStreamView(onOpenWallet: {})
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Live")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+
+        // MARK: - Profile & Settings
+        case "profile":
+            return AnyView(
+                NavigationStack {
+                    ProfileView()
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Hồ sơ")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "profile-edit":
+            return AnyView(
+                NavigationStack {
+                    ProfileView(initialTab: .edit)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Chỉnh sửa hồ sơ")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "profile-posts":
+            return AnyView(
+                NavigationStack {
+                    ProfileView(initialTab: .posts)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Bài viết")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "profile-albums":
+            return AnyView(
+                NavigationStack {
+                    ProfileView(initialTab: .albums)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Album")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "profile-videos":
+            return AnyView(
+                NavigationStack {
+                    ProfileView(initialTab: .videos)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Video")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+
+        // MARK: - Messages
+        case "messages":
+            return AnyView(
+                NavigationStack {
+                    MessagesView()
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Tin nhắn")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "messages-group":
+            return AnyView(
+                NavigationStack {
+                    MessagesView(initialMode: .groups)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Nhóm")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+
+        // MARK: - Notifications
+        case "notifications":
+            return AnyView(
+                NavigationStack {
+                    NotificationsView()
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Thông báo")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+
+        // MARK: - Wallet & Store
+        case "wallet":
+            return AnyView(
+                NavigationStack {
+                    WalletStoreView(initialTab: .wallet)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Ví")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "store":
+            return AnyView(
+                NavigationStack {
+                    WalletStoreView(initialTab: .store)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Cửa hàng")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "store-packages":
+            return AnyView(
+                NavigationStack {
+                    WalletStoreView(initialTab: .store, initialStoreTab: .packages)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Gói trang trí")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "store-coins":
+            return AnyView(
+                NavigationStack {
+                    WalletStoreView(initialTab: .store, initialStoreTab: .coins)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Nạp xu")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+
+        // MARK: - Friends
+        case "friends":
+            return AnyView(
+                NavigationStack {
+                    FriendsView()
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Bạn bè")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "friends-requests":
+            return AnyView(
+                NavigationStack {
+                    FriendsView(initialTab: .requests)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Lời mời")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+
+        // MARK: - Camera Studio
+        case "camera-studio":
+            return AnyView(
+                NavigationStack {
+                    CameraStudioView()
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Studio")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+
+        // MARK: - Live Stream
+        case "live-room":
+            return AnyView(
+                NavigationStack {
+                    LiveStreamView(onOpenWallet: {})
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Phòng Live")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+
+        // MARK: - Shorts Video
+        case "shorts":
+            return AnyView(
+                NavigationStack {
+                    ShortsVideoView()
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Shorts")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+
+        // MARK: - Call Overlay
+        case "call-incoming":
+            return AnyView(
+                CallOverlayView(
+                    callId: "fixture_call_1",
+                    callerName: "Lê Hoàng Nam",
+                    callerAvatarColor: "#2563EB",
+                    isVideo: true,
+                    onAccept: {},
+                    onDecline: {}
+                )
+            )
+        case "call-outgoing":
+            return AnyView(
+                CallOverlayView(
+                    callId: "fixture_call_2",
+                    callerName: "Trần Thanh Trúc",
+                    callerAvatarColor: "#EC4899",
+                    isVideo: false,
+                    onAccept: {},
+                    onDecline: {}
+                )
+            )
+
+        // MARK: - Default fallback
+        default:
+            return AnyView(
+                NavigationStack {
+                    Text("Màn hình không tồn tại: \(screenName)")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                        .padding()
+                }
+            )
+        }
+    }
 }
 

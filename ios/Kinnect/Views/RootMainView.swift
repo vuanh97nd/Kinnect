@@ -58,11 +58,69 @@ struct RootMainView: View {
     @State private var selectedTab: KinnectNavTab = .feed
     @State private var activeTopSection: KinnectTopSection? = nil
     @State private var showCameraStudioSheet = false
+
+    // Shared trailing toolbar for all tabs (P1) - static version for UI Review Fixture
+    @ToolbarContentBuilder
+    static func headerTrailingButtonsStatic() -> some ToolbarContent {
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            // Notifications
+            Button { } label: {
+                KinnectIcon(glyph: .notifications, size: 22, tint: KinnectTheme.textPrimary)
+                    .frame(width: 38, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Thông báo")
+
+            // Store
+            Button { } label: {
+                KinnectIcon(glyph: .store, size: 22, tint: KinnectTheme.textPrimary)
+                    .frame(width: 38, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Ví Kinnect và Cửa hàng Kinnect")
+
+            // Friends
+            Button { } label: {
+                KinnectIcon(glyph: .friends, size: 22, tint: KinnectTheme.textPrimary)
+                    .frame(width: 38, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Bạn bè")
+
+            // Messages
+            Button { } label: {
+                KinnectIcon(glyph: .messages, size: 22, tint: KinnectTheme.textPrimary)
+                    .frame(width: 38, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Tin nhắn")
+
+            // Profile
+            Button { } label: {
+                Circle()
+                    .fill(KinnectTheme.accent)
+                    .frame(width: 28, height: 28)
+                    .overlay(
+                        Text("MA")
+                            .font(.caption2.bold())
+                            .foregroundStyle(.white)
+                    )
+                    .frame(width: 38, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Hồ sơ")
+        }
+    }
     @State private var fixturePrivatePhotos: [PrivatePhotoItem] = UIReviewFixture.mockPrivatePhotos()
     @State private var fixturePrivateRequests: [PrivateAccessRequestItem] = UIReviewFixture.mockPrivateRequests()
     @State private var splitColumnVisibility: NavigationSplitViewVisibility = .all
 
-    // Shared trailing toolbar for all tabs (P1)
+        // Shared trailing toolbar for all tabs (P1) - instance version
     @ToolbarContentBuilder
         private func headerTrailingButtons() -> some ToolbarContent {
         ToolbarItemGroup(placement: .topBarTrailing) {
