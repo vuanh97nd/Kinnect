@@ -58,6 +58,7 @@ struct RootMainView: View {
     @State private var selectedTab: KinnectNavTab = .feed
     @State private var activeTopSection: KinnectTopSection? = nil
     @State private var showCameraStudioSheet = false
+    @State private var isShowingSplash = true
     @AppStorage("app_appearance_mode") private var appearanceMode: String = "system"
 
     private var activeColorScheme: ColorScheme? {
@@ -282,16 +283,8 @@ struct RootMainView: View {
                 AuthView(initialStage: .register)
             } else if UIReviewFixture.activeScreen == "auth-reset" || UIReviewFixture.activeScreen == "auth-forgot" || UIReviewFixture.activeScreen == "forgot-password" {
                 AuthView(initialStage: .forgotPassword)
-            } else if appState.isRestoringSession && appState.currentUser == nil {
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .tint(KinnectTheme.accentBright)
-                        .scaleEffect(1.3)
-                    Text("Đang kết nối Kinnect...")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundColor(KinnectTheme.textSecondary)
-                        .kinnectMultiline()
-                }
+            } else if isShowingSplash || (appState.isRestoringSession && appState.currentUser == nil) {
+                KinnectSplashScreen()
             } else if appState.currentUser == nil {
                 AuthView(initialStage: .welcome)
             } else if UIReviewFixture.activeScreen == "chat-detail" || UIReviewFixture.activeScreen == "chat-menu" || UIReviewFixture.activeScreen == "message-menu" {
@@ -501,6 +494,14 @@ struct RootMainView: View {
                             .modifier(UIReviewDynamicTypeModifier())
                             .task {
                                 await appState.bootstrapSession()
+                                if UIReviewFixture.isEnabled {
+                                    isShowingSplash = false
+                                } else {
+                                    try? await Task.sleep(nanoseconds: 700_000_000)
+                                    withAnimation(.easeOut(duration: 0.25)) {
+                                        isShowingSplash = false
+                                    }
+                                }
                                 if let screen = UIReviewFixture.activeScreen {
                                     switch screen {
                                     case "feed":
@@ -694,65 +695,52 @@ struct RootMainView: View {
                                     }
                                 }
                             } else {
-                                // iPhone compact layout with native TabView (5 tabs) + shared trailing toolbar
-                                TabView(selection: $selectedTab) {
-                                    NavigationStack {
+                                // iPhone compact layout with fixed KinnectTopBar + native TabView (5 tabs)
+                                VStack(spacing: 0) {
+                                    if selectedTab == .feed || selectedTab == .discover || selectedTab == .create {
+                                        KinnectTopBar(
+                                            appState: appState,
+                                            activeTopSection: $activeTopSection,
+                                            onLogoTap: {
+                                                selectedTab = .feed
+                                            }
+                                        )
+                                    }
+
+                                    TabView(selection: $selectedTab) {
                                         FeedView(
                                             onOpenCamera: { showCameraStudioSheet = true },
                                             onOpenFriends: { activeTopSection = .friends }
                                         )
-                                        .toolbar {
-                                            headerLeadingLogo()
-                                            headerTrailingButtons()
+                                        .tag(KinnectNavTab.feed)
+                                        .tabItem {
+                                            Label("Bảng tin", systemImage: "house.fill")
                                         }
-                                        .navigationTitle("")
-                                        .navigationBarTitleDisplayMode(.inline)
-                                    }
-                                    .tag(KinnectNavTab.feed)
-                                    .tabItem {
-                                        Label("Bảng tin", systemImage: "house.fill")
-                                    }
 
-                                    NavigationStack {
                                         DiscoverView(onOpenCamera: { showCameraStudioSheet = true })
-                                            .toolbar {
-                                                headerLeadingLogo()
-                                                headerTrailingButtons()
+                                            .tag(KinnectNavTab.discover)
+                                            .tabItem {
+                                                Label("Khám phá", systemImage: "magnifyingglass")
                                             }
-                                            .navigationTitle("")
-                                            .navigationBarTitleDisplayMode(.inline)
-                                    }
-                                    .tag(KinnectNavTab.discover)
-                                    .tabItem {
-                                        Label("Khám phá", systemImage: "magnifyingglass")
-                                    }
 
-                                    NavigationStack {
                                         CameraStudioView()
-                                            .toolbar {
-                                                headerLeadingLogo()
-                                                headerTrailingButtons()
+                                            .tag(KinnectNavTab.create)
+                                            .tabItem {
+                                                Label("Tạo", systemImage: "plus.circle.fill")
                                             }
-                                            .navigationTitle("")
-                                            .navigationBarTitleDisplayMode(.inline)
-                                    }
-                                    .tag(KinnectNavTab.create)
-                                    .tabItem {
-                                        Label("Tạo", systemImage: "plus.circle.fill")
-                                    }
 
-                                    ShortsVideoView()
-                                        .tag(KinnectNavTab.video)
-                                        .tabItem {
-                                            Image(systemName: "play.rectangle.fill")
-                                                .accessibilityLabel("Video")
-                                        }
+                                        ShortsVideoView()
+                                            .tag(KinnectNavTab.video)
+                                            .tabItem {
+                                                Label("Video", systemImage: "play.rectangle.fill")
+                                            }
 
-                                    LiveStreamView(onOpenWallet: { activeTopSection = .wallet })
-                                        .tag(KinnectNavTab.live)
-                                        .tabItem {
-                                            Label("Live", systemImage: "dot.radiowaves.left.and.right")
-                                        }
+                                        LiveStreamView(onOpenWallet: { activeTopSection = .wallet })
+                                            .tag(KinnectNavTab.live)
+                                            .tabItem {
+                                                Label("Live", systemImage: "dot.radiowaves.left.and.right")
+                                            }
+                                    }
                                 }
                                                                 .onChange(of: selectedTab) { newTab in
                                     // Haptic feedback on tab selection (P1)

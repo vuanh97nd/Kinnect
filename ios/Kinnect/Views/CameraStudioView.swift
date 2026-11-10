@@ -175,6 +175,8 @@ struct CameraStudioView: View {
         .background(KinnectTheme.background)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
+            cameraController.configureIfAuthorized()
+            cameraController.start()
             cameraController.onCapturedImage = { uiImg in
                 self.originalImage = uiImg
                 self.photoProject.originalImage = uiImg
@@ -1549,9 +1551,12 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
 
     func configureIfAuthorized() {
         #if !targetEnvironment(simulator)
-        guard !isConfigured else { return }
         let status = AVCaptureDevice.authorizationStatus(for: .video)
         guard status == .authorized else { return }
+        if isConfigured {
+            start()
+            return
+        }
         isConfigured = true
         session.beginConfiguration()
         session.sessionPreset = .high
@@ -1573,6 +1578,13 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
         session.commitConfiguration()
         refreshLenses(position: .back)
         NotificationCenter.default.addObserver(self, selector: #selector(stopForInterruption), name: UIApplication.willResignActiveNotification, object: nil)
+        start()
+        #endif
+    }
+
+    func start() {
+        #if !targetEnvironment(simulator)
+        guard !session.isRunning else { return }
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             self?.session.startRunning()
         }
@@ -1770,6 +1782,13 @@ final class CameraPreviewViewController: UIViewController {
         setupSessionIfAuthorized()
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        setupSessionIfAuthorized()
+        controller?.configureIfAuthorized()
+        controller?.start()
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         backdropLayer.frame = view.bounds
@@ -1812,7 +1831,9 @@ final class CameraPreviewViewController: UIViewController {
         #if !targetEnvironment(simulator)
         let status = AVCaptureDevice.authorizationStatus(for: .video)
         if status == .authorized {
-            attachHardwarePreview()
+            if previewLayer == nil {
+                attachHardwarePreview()
+            }
         } else if status == .notDetermined && !UIReviewFixture.isEnabled {
             AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
                 guard granted else { return }

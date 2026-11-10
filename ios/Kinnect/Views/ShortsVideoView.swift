@@ -497,6 +497,16 @@ struct ShortCommentsSheet: View {
 
     private let quickEmojis = ["😍", "😂", "🔥", "👏", "🥰", "😮", "😢", "💜"]
 
+    private var rootComments: [CommentItem] {
+        let roots = comments.filter { $0.parentId == nil || $0.parentId?.isEmpty == true }
+        if roots.isEmpty && !comments.isEmpty { return comments }
+        return roots
+    }
+
+    private func childReplies(for rootId: String) -> [CommentItem] {
+        comments.filter { $0.parentId == rootId }
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -514,63 +524,14 @@ struct ShortCommentsSheet: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    List(comments) { c in
-                        HStack(alignment: .top, spacing: 10) {
-                            KinnectAvatarView(
-                                name: c.author.name,
-                                avatarURL: c.author.avatarUrl,
-                                colorHex: c.author.avatarColor,
-                                size: 34
-                            )
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack(spacing: 6) {
-                                    Text(c.author.name)
-                                        .font(.caption.bold())
-                                        .foregroundColor(KinnectTheme.accentBright)
-                                    Text(formatRelativeDate(c.createdAt))
-                                        .font(.caption2)
-                                        .foregroundColor(KinnectTheme.textSecondary)
-                                }
-                                Text(c.text)
-                                    .font(.subheadline)
-                                    .foregroundColor(.white)
-                                    .kinnectMultiline()
+                    List {
+                        ForEach(rootComments) { root in
+                            commentRowView(root, depth: 0)
 
-                                // Action bar: Trả lời, Thả cảm xúc
-                                HStack(spacing: 14) {
-                                    Button {
-                                        replyingTo = c
-                                        if !text.contains("@\(c.author.name)") {
-                                            text = "@\(c.author.name) " + text
-                                        }
-                                    } label: {
-                                        Text("Trả lời")
-                                            .font(.caption2.bold())
-                                            .foregroundColor(KinnectTheme.accentBright)
-                                    }
-                                    .buttonStyle(.plain)
-
-                                    Button {
-                                        toggleCommentLike(c)
-                                    } label: {
-                                        HStack(spacing: 3) {
-                                            Image(systemName: c.liked ? "heart.fill" : "heart")
-                                                .font(.caption2)
-                                                .foregroundColor(c.liked ? KinnectTheme.danger : KinnectTheme.textSecondary)
-                                            if c.likesCount > 0 {
-                                                Text("\(c.likesCount)")
-                                                    .font(.caption2)
-                                                    .foregroundColor(c.liked ? KinnectTheme.danger : KinnectTheme.textSecondary)
-                                            }
-                                        }
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                                .padding(.top, 2)
+                            ForEach(childReplies(for: root.id)) { reply in
+                                commentRowView(reply, depth: 1, parentAuthorName: root.author.name)
                             }
                         }
-                        .listRowBackground(KinnectTheme.surface)
-                        .listRowInsets(EdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 14))
                     }
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
@@ -663,6 +624,82 @@ struct ShortCommentsSheet: View {
         }
         .presentationDetents([.medium, .fraction(0.85)])
         .presentationDragIndicator(.visible)
+    }
+
+    private func commentRowView(_ c: CommentItem, depth: Int, parentAuthorName: String? = nil) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            if depth > 0 {
+                Image(systemName: "arrow.turn.down.right")
+                    .font(.caption2.bold())
+                    .foregroundColor(KinnectTheme.textSecondary)
+                    .padding(.top, 6)
+            }
+
+            KinnectAvatarView(
+                name: c.author.name,
+                avatarURL: c.author.avatarUrl,
+                colorHex: c.author.avatarColor,
+                size: depth > 0 ? 28 : 34
+            )
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(c.author.name)
+                        .font(.caption.bold())
+                        .foregroundColor(KinnectTheme.accentBright)
+
+                    if let parent = parentAuthorName, depth > 0 {
+                        Text("▸ @\(parent)")
+                            .font(.caption2)
+                            .foregroundColor(KinnectTheme.accentBright)
+                    }
+
+                    Text(formatRelativeDate(c.createdAt))
+                        .font(.caption2)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                }
+
+                Text(c.text)
+                    .font(.subheadline)
+                    .foregroundColor(.white)
+                    .kinnectMultiline()
+
+                // Action bar: Trả lời, Thả cảm xúc
+                HStack(spacing: 14) {
+                    Button {
+                        replyingTo = c
+                        if !text.contains("@\(c.author.name)") {
+                            text = "@\(c.author.name) " + text
+                        }
+                    } label: {
+                        Text("Trả lời")
+                            .font(.caption2.bold())
+                            .foregroundColor(KinnectTheme.accentBright)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        toggleCommentLike(c)
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: c.liked ? "heart.fill" : "heart")
+                                .font(.caption2)
+                                .foregroundColor(c.liked ? KinnectTheme.danger : KinnectTheme.textSecondary)
+                            if c.likesCount > 0 {
+                                Text("\(c.likesCount)")
+                                    .font(.caption2)
+                                    .foregroundColor(c.liked ? KinnectTheme.danger : KinnectTheme.textSecondary)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.top, 2)
+            }
+        }
+        .padding(.leading, CGFloat(depth * 24))
+        .listRowBackground(KinnectTheme.surface)
+        .listRowInsets(EdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 14))
     }
 
     private func toggleCommentLike(_ item: CommentItem) {

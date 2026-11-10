@@ -537,7 +537,18 @@ private struct DiscoverFilterSheet: View {
 
     private let genders = [
         "", "Nam", "Nữ", "Nam chuyển giới", "Nữ chuyển giới",
-        "Phi nhị nguyên", "Linh hoạt giới", "Vô giới", "Đang tìm hiểu", "Khác"
+        "Phi nhị nguyên", "Linh hoạt giới", "Vô giới", "Khác"
+    ]
+
+    private let orientations = [
+        "", "Gay / Đồng tính nam", "Lesbian / Đồng tính nữ", "Song tính / Bisexual",
+        "Toàn tính / Pansexual", "Vô tính / Asexual", "Dị tính", "Queer",
+        "Á tính / Demisexual", "Đang tìm hiểu", "Khác"
+    ]
+
+    private let communityRoles = [
+        "", "Top", "Bottom", "Vers", "Vers Top", "Vers Bottom",
+        "Side", "Femme", "Masc / Butch", "Androgynous", "Stem", "Đang tìm hiểu", "Khác"
     ]
 
     var body: some View {
@@ -566,10 +577,24 @@ private struct DiscoverFilterSheet: View {
 
                 if type == .gender || type == .full {
                     Section("Bản dạng giới & Xu hướng (LGBT+)") {
-                        Picker("Giới tính", selection: $selectedGender) {
+                        Picker("Bản dạng giới", selection: $selectedGender) {
                             Text("Tất cả").tag("")
                             ForEach(genders.filter { !$0.isEmpty }, id: \.self) { g in
                                 Text(g).tag(g)
+                            }
+                        }
+
+                        Picker("Xu hướng tính dục", selection: $selectedGender) {
+                            Text("Tất cả").tag("")
+                            ForEach(orientations.filter { !$0.isEmpty }, id: \.self) { o in
+                                Text(o).tag(o)
+                            }
+                        }
+
+                        Picker("Vai trò tự mô tả", selection: $selectedGender) {
+                            Text("Tất cả").tag("")
+                            ForEach(communityRoles.filter { !$0.isEmpty }, id: \.self) { r in
+                                Text(r).tag(r)
                             }
                         }
                     }

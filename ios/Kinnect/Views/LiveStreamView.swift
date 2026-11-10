@@ -516,6 +516,11 @@ struct LiveRoomFullScreenView: View {
     @State private var giftCatalog: [LiveGiftCatalogItem] = LiveGiftCatalogItem.defaultCatalog
     @State private var giftPriceVersion: Int = 1
     @State private var showGiftSheet = false
+    @State private var showEffectsSheet = false
+    @State private var activeLiveSticker: String = "none"
+    @State private var beautySmooth: Double = 0.5
+    @State private var beautyWhiten: Double = 0.3
+    @State private var activeGiftEffect: ActiveGiftEffect? = nil
     @State private var floatingReactions: [LiveFloatingReaction] = []
 
     var body: some View {
@@ -656,8 +661,8 @@ struct LiveRoomFullScreenView: View {
                     .frame(maxHeight: 190)
 
                     // Bottom controls
-                    HStack(spacing: 10) {
-                        TextField("Trò chuyện trong phòng Live...", text: $chatInput)
+                    HStack(spacing: 8) {
+                        TextField("Trò chuyện...", text: $chatInput)
                             .padding(10)
                             .background(Capsule().fill(Color.black.opacity(0.55)))
                             .foregroundColor(.white)
@@ -670,6 +675,17 @@ struct LiveRoomFullScreenView: View {
                                 .padding(10)
                                 .background(Circle().fill(KinnectTheme.accent))
                         }
+
+                        // Làm đẹp & Sticker AR button
+                        Button {
+                            showEffectsSheet = true
+                        } label: {
+                            Image(systemName: "sparkles")
+                                .foregroundColor(.white)
+                                .padding(10)
+                                .background(Circle().fill(Color.black.opacity(0.55)))
+                        }
+                        .accessibilityLabel("Chế độ làm đẹp và Sticker")
 
                         Button {
                             triggerLiveReaction(symbol: "💜", kind: "heart", room: room.id)
@@ -693,6 +709,19 @@ struct LiveRoomFullScreenView: View {
                     .padding(.bottom, 20)
                 }
 
+                // AR Face Sticker in Live
+                if activeLiveSticker != "none" {
+                    LiveStickerOverlayView(stickerId: activeLiveSticker)
+                        .allowsHitTesting(false)
+                }
+
+                // 3D Gift Animation Showcase Effect
+                if let giftEffect = activeGiftEffect {
+                    LiveGiftBurstShowcaseView(effect: giftEffect)
+                        .transition(.scale.combined(with: .opacity))
+                        .zIndex(60)
+                }
+
                 // Floating Reactions Layer matching Web `live-reactions`
                 ForEach(floatingReactions) { reaction in
                     LiveFloatingReactionView(symbol: reaction.symbol)
@@ -709,7 +738,15 @@ struct LiveRoomFullScreenView: View {
                     priceVersion: giftPriceVersion,
                     onGiftSent: { gift, qty in
                         triggerLiveReaction(symbol: gift.emoji, kind: gift.id, room: room.id)
+                        triggerGiftEffect(gift: gift, qty: qty, senderName: appState.currentUser?.name ?? "Bạn")
                     }
+                )
+            }
+            .sheet(isPresented: $showEffectsSheet) {
+                LiveEffectsSheet(
+                    activeSticker: $activeLiveSticker,
+                    smooth: $beautySmooth,
+                    whiten: $beautyWhiten
                 )
             }
         }
@@ -729,6 +766,27 @@ struct LiveRoomFullScreenView: View {
             "room": room,
             "kind": kind
         ])
+    }
+
+    private func triggerGiftEffect(gift: LiveGiftCatalogItem, qty: Int, senderName: String) {
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        let effect = ActiveGiftEffect(
+            giftId: gift.id,
+            giftName: gift.label,
+            giftEmoji: gift.emoji,
+            senderName: senderName,
+            quantity: qty
+        )
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.65)) {
+            activeGiftEffect = effect
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            if activeGiftEffect?.id == effect.id {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    activeGiftEffect = nil
+                }
+            }
+        }
     }
 
     private func sendLiveChat() {
@@ -936,5 +994,297 @@ struct LiveFloatingReactionView: View {
             }
         }
         .allowsHitTesting(false)
+    }
+}
+
+// MARK: - Active Gift Effect Model
+struct ActiveGiftEffect: Identifiable {
+    let id = UUID()
+    let giftId: String
+    let giftName: String
+    let giftEmoji: String
+    let senderName: String
+    let quantity: Int
+}
+
+// MARK: - Live Gift Burst Showcase View (Big 3D Animation Overlay)
+struct LiveGiftBurstShowcaseView: View {
+    let effect: ActiveGiftEffect
+    @State private var rotation: Double = 0
+    @State private var scale: CGFloat = 0.2
+    @State private var bannerOffset: CGFloat = -60
+
+    var body: some View {
+        ZStack {
+            // Dark vignette backdrop
+            Color.black.opacity(0.35)
+                .ignoresSafeArea()
+
+            VStack(spacing: 16) {
+                // Top Gift Banner
+                HStack(spacing: 10) {
+                    KinnectAvatarView(name: effect.senderName, avatarURL: "", colorHex: "#7C3AED", size: 36)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(effect.senderName)
+                            .font(.caption.bold())
+                            .foregroundColor(.white)
+                        Text("đã gửi tặng \(effect.giftName)")
+                            .font(.caption2)
+                            .foregroundColor(KinnectTheme.warning)
+                    }
+                    Spacer()
+                    Text("x\(effect.quantity)")
+                        .font(.title2.bold())
+                        .foregroundStyle(KinnectTheme.primaryGradient)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .frame(maxWidth: 320)
+                .background(
+                    Capsule()
+                        .fill(KinnectTheme.surface.opacity(0.95))
+                        .overlay(Capsule().stroke(KinnectTheme.warning.opacity(0.8), lineWidth: 1.5))
+                )
+                .offset(y: bannerOffset)
+
+                Spacer()
+
+                // Center 3D Gift Artwork & Glowing Burst Rays
+                ZStack {
+                    // Rotating Light Rays
+                    Image(systemName: "sun.max.fill")
+                        .font(.system(size: 220))
+                        .foregroundColor(KinnectTheme.warning.opacity(0.25))
+                        .rotationEffect(.degrees(rotation))
+
+                    // 3D Gift Image
+                    giftArtworkView
+                        .scaleEffect(scale)
+                }
+                .frame(width: 240, height: 240)
+
+                // Combo Badge
+                HStack(spacing: 6) {
+                    Text(effect.giftName)
+                        .font(.title3.bold())
+                        .foregroundColor(.white)
+                    Text("x\(effect.quantity)")
+                        .font(.system(size: 32, weight: .heavy))
+                        .foregroundColor(KinnectTheme.warning)
+                }
+                .shadow(color: .black.opacity(0.8), radius: 4, y: 2)
+
+                Spacer()
+            }
+            .padding(.top, 40)
+        }
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.35)) {
+                bannerOffset = 0
+            }
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.6)) {
+                scale = 1.05
+            }
+            withAnimation(.linear(duration: 4.0).repeatForever(autoreverses: false)) {
+                rotation = 360
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    @ViewBuilder
+    private var giftArtworkView: some View {
+        let key = giftAssetName(for: effect.giftId)
+        if let img = UIImage(named: "gift_\(key)")
+            ?? UIImage(named: "gift_\(effect.giftId)")
+            ?? UIImage(named: "kg20261109_gift_\(key)") {
+            Image(uiImage: img)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 160, height: 160)
+                .shadow(color: KinnectTheme.warning.opacity(0.6), radius: 18)
+        } else {
+            Text(effect.giftEmoji)
+                .font(.system(size: 110))
+                .shadow(color: .black.opacity(0.5), radius: 10)
+        }
+    }
+
+    private func giftAssetName(for id: String) -> String {
+        switch id {
+        case "rose": return "rose"
+        case "heart": return "heart"
+        case "crown": return "crown"
+        case "diamond": return "diamond"
+        case "car", "sports_car": return "sports_car"
+        case "yacht": return "yacht"
+        case "castle": return "castle"
+        default: return id
+        }
+    }
+}
+
+// MARK: - AR Face Sticker Overlay in Live
+struct LiveStickerOverlayView: View {
+    let stickerId: String
+
+    var body: some View {
+        VStack {
+            Spacer().frame(height: 120)
+            stickerContentView
+                .transition(.scale.combined(with: .opacity))
+            Spacer()
+        }
+    }
+
+    @ViewBuilder
+    private var stickerContentView: some View {
+        if let img = UIImage(named: "sticker_\(stickerId)") {
+            Image(uiImage: img)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 140, height: 140)
+                .shadow(color: .black.opacity(0.4), radius: 6)
+        } else {
+            Text(emojiForSticker(stickerId))
+                .font(.system(size: 90))
+                .shadow(color: .black.opacity(0.4), radius: 6)
+        }
+    }
+
+    private func emojiForSticker(_ id: String) -> String {
+        switch id {
+        case "bunny": return "🐰"
+        case "crown": return "👑"
+        case "glasses": return "🕶️"
+        case "hearts": return "💕"
+        case "flowers": return "🌸"
+        case "fire": return "🔥"
+        case "devil": return "😈"
+        case "cat": return "🐱"
+        case "stars": return "⭐"
+        default: return "✨"
+        }
+    }
+}
+
+// MARK: - Live Effects Sheet (Làm đẹp & Sticker AR)
+struct LiveEffectsSheet: View {
+    @Binding var activeSticker: String
+    @Binding var smooth: Double
+    @Binding var whiten: Double
+    @State private var selectedTab: Int = 0
+    @Environment(\.dismiss) private var dismiss
+
+    private let stickerList: [(id: String, name: String, emoji: String)] = [
+        ("none", "Tắt", "🚫"),
+        ("crown", "Vương miện", "👑"),
+        ("bunny", "Tai thỏ", "🐰"),
+        ("glasses", "Kính râm", "🕶️"),
+        ("hearts", "Tim bay", "💕"),
+        ("flowers", "Vòng hoa", "🌸"),
+        ("fire", "Hào quang", "🔥"),
+        ("devil", "Tiểu quỷ", "😈"),
+        ("cat", "Tai mèo", "🐱"),
+        ("stars", "Sao xoay", "⭐")
+    ]
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                Picker("Chế độ", selection: $selectedTab) {
+                    Text("Làm đẹp").tag(0)
+                    Text("Sticker AR").tag(1)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+
+                if selectedTab == 0 {
+                    VStack(spacing: 20) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("Làm mịn da")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(.white)
+                                Spacer()
+                                Text("\(Int(smooth * 100))%")
+                                    .font(.caption)
+                                    .foregroundColor(KinnectTheme.accentBright)
+                            }
+                            Slider(value: $smooth, in: 0...1)
+                                .tint(KinnectTheme.accentBright)
+                        }
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("Sáng da")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(.white)
+                                Spacer()
+                                Text("\(Int(whiten * 100))%")
+                                    .font(.caption)
+                                    .foregroundColor(KinnectTheme.accentBright)
+                            }
+                            Slider(value: $whiten, in: 0...1)
+                                .tint(KinnectTheme.accentBright)
+                        }
+
+                        Button {
+                            smooth = 0.5
+                            whiten = 0.3
+                        } label: {
+                            Text("Đặt lại mặc định")
+                                .font(.caption.bold())
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 16)
+                } else {
+                    ScrollView {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 70))], spacing: 14) {
+                            ForEach(stickerList, id: \.id) { s in
+                                Button {
+                                    activeSticker = s.id
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                } label: {
+                                    VStack(spacing: 4) {
+                                        ZStack {
+                                            Circle()
+                                                .fill(activeSticker == s.id ? KinnectTheme.accent.opacity(0.3) : KinnectTheme.surfaceElevated)
+                                                .frame(width: 54, height: 54)
+                                                .overlay(
+                                                    Circle().stroke(activeSticker == s.id ? KinnectTheme.accentBright : Color.clear, lineWidth: 2)
+                                                )
+                                            Text(s.emoji)
+                                                .font(.system(size: 28))
+                                        }
+                                        Text(s.name)
+                                            .font(.caption2)
+                                            .foregroundColor(activeSticker == s.id ? KinnectTheme.accentBright : .white)
+                                            .lineLimit(1)
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 8)
+                    }
+                }
+
+                Spacer()
+            }
+            .background(KinnectTheme.background)
+            .navigationTitle("Hiệu ứng & Làm đẹp")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Xong") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.height(300)])
     }
 }

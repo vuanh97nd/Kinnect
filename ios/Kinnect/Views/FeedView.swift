@@ -98,8 +98,6 @@ struct FeedView: View {
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: 72)
         }
-        .navigationTitle("")
-        .toolbar(.hidden, for: .navigationBar)
         .refreshable {
             await loadFeedAndStories()
         }
@@ -1286,6 +1284,18 @@ struct PostCommentsSheet: View {
 
     private let quickEmojis = ["😍", "😂", "🔥", "👏", "🥰", "😮", "😢", "💜"]
 
+    private var rootComments: [CommentItem] {
+        let roots = comments.filter { $0.parentId == nil || $0.parentId?.isEmpty == true }
+        if roots.isEmpty && !comments.isEmpty {
+            return comments
+        }
+        return roots
+    }
+
+    private func childReplies(for rootId: String) -> [CommentItem] {
+        comments.filter { $0.parentId == rootId }
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -1304,72 +1314,12 @@ struct PostCommentsSheet: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List {
-                        ForEach(comments) { c in
-                            HStack(alignment: .top, spacing: 10) {
-                                KinnectAvatarView(
-                                    name: c.author.name,
-                                    avatarURL: c.author.avatarUrl,
-                                    colorHex: c.author.avatarColor,
-                                    size: 34
-                                )
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack {
-                                        Text(c.author.name)
-                                            .font(.caption.bold())
-                                            .foregroundColor(KinnectTheme.textPrimary)
-                                        Spacer()
-                                        if c.author.id == appState.currentUser?.id {
-                                            Button(role: .destructive) {
-                                                Task { await deleteComment(c) }
-                                            } label: {
-                                                Image(systemName: "trash")
-                                                    .font(.caption)
-                                            }
-                                        }
-                                    }
-                                    Text(c.text)
-                                        .font(.subheadline)
-                                        .foregroundColor(KinnectTheme.textPrimary)
-                                        .kinnectMultiline()
+                        ForEach(rootComments) { root in
+                            commentRowView(root, depth: 0)
 
-                                    // Action bar: Trả lời, Thả cảm xúc, Thời gian
-                                    HStack(spacing: 14) {
-                                        Button {
-                                            replyingTo = c
-                                            if !newComment.contains("@\(c.author.name)") {
-                                                newComment = "@\(c.author.name) " + newComment
-                                            }
-                                        } label: {
-                                            Text("Trả lời")
-                                                .font(.caption2.bold())
-                                                .foregroundColor(KinnectTheme.accentBright)
-                                        }
-                                        .buttonStyle(.plain)
-
-                                        Button {
-                                            toggleCommentLike(c)
-                                        } label: {
-                                            HStack(spacing: 3) {
-                                                Image(systemName: c.liked ? "heart.fill" : "heart")
-                                                    .font(.caption2)
-                                                    .foregroundColor(c.liked ? KinnectTheme.danger : KinnectTheme.textSecondary)
-                                                if c.likesCount > 0 {
-                                                    Text("\(c.likesCount)")
-                                                        .font(.caption2)
-                                                        .foregroundColor(c.liked ? KinnectTheme.danger : KinnectTheme.textSecondary)
-                                                }
-                                            }
-                                        }
-                                        .buttonStyle(.plain)
-
-                                        Text(formatRelativeDate(c.createdAt))
-                                            .font(.caption2)
-                                            .foregroundColor(KinnectTheme.textSecondary)
-                                    }
-                                    .padding(.top, 2)
-                                }
+                            ForEach(childReplies(for: root.id)) { reply in
+                                commentRowView(reply, depth: 1, parentAuthorName: root.author.name)
                             }
-                            .listRowBackground(KinnectTheme.surface)
                         }
                     }
                     .listStyle(.plain)
@@ -1459,6 +1409,94 @@ struct PostCommentsSheet: View {
                 await loadComments()
             }
         }
+    }
+
+    private func commentRowView(_ c: CommentItem, depth: Int, parentAuthorName: String? = nil) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            if depth > 0 {
+                Image(systemName: "arrow.turn.down.right")
+                    .font(.caption2.bold())
+                    .foregroundColor(KinnectTheme.textSecondary)
+                    .padding(.top, 6)
+            }
+
+            KinnectAvatarView(
+                name: c.author.name,
+                avatarURL: c.author.avatarUrl,
+                colorHex: c.author.avatarColor,
+                size: depth > 0 ? 28 : 34
+            )
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(c.author.name)
+                        .font(.caption.bold())
+                        .foregroundColor(KinnectTheme.textPrimary)
+
+                    if let parent = parentAuthorName, depth > 0 {
+                        Text("▸ @\(parent)")
+                            .font(.caption2)
+                            .foregroundColor(KinnectTheme.accentBright)
+                    }
+
+                    Spacer()
+
+                    if c.author.id == appState.currentUser?.id {
+                        Button(role: .destructive) {
+                            Task { await deleteComment(c) }
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.caption)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                Text(c.text)
+                    .font(.subheadline)
+                    .foregroundColor(KinnectTheme.textPrimary)
+                    .kinnectMultiline()
+
+                // Action bar: Trả lời, Thả cảm xúc, Thời gian
+                HStack(spacing: 14) {
+                    Button {
+                        replyingTo = c
+                        if !newComment.contains("@\(c.author.name)") {
+                            newComment = "@\(c.author.name) " + newComment
+                        }
+                    } label: {
+                        Text("Trả lời")
+                            .font(.caption2.bold())
+                            .foregroundColor(KinnectTheme.accentBright)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        toggleCommentLike(c)
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: c.liked ? "heart.fill" : "heart")
+                                .font(.caption2)
+                                .foregroundColor(c.liked ? KinnectTheme.danger : KinnectTheme.textSecondary)
+                            if c.likesCount > 0 {
+                                Text("\(c.likesCount)")
+                                    .font(.caption2)
+                                    .foregroundColor(c.liked ? KinnectTheme.danger : KinnectTheme.textSecondary)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+
+                    Text(formatRelativeDate(c.createdAt))
+                        .font(.caption2)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                }
+                .padding(.top, 2)
+            }
+        }
+        .padding(.leading, CGFloat(depth * 24))
+        .listRowBackground(KinnectTheme.surface)
     }
 
     private func toggleCommentLike(_ item: CommentItem) {
