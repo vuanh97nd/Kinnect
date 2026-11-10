@@ -913,7 +913,7 @@ enum UIReviewFixture {
                         .navigationBarTitleDisplayMode(.large)
                 }
             )
-        case "camera-studio-edit":
+        case "camera-studio-edit", "camera-studio-video-edit":
             return AnyView(
                 CameraStudioView()
             )
