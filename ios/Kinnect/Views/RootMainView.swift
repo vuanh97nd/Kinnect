@@ -64,7 +64,7 @@ struct RootMainView: View {
 
     // Shared trailing toolbar for all tabs (P1)
     @ToolbarContentBuilder
-    private var headerTrailingButtons: some ToolbarContent {
+        private func headerTrailingButtons() -> some ToolbarContent {
         ToolbarItemGroup(placement: .topBarTrailing) {
             // Notifications
             Button {
@@ -520,7 +520,7 @@ struct RootMainView: View {
                                                                                 onOpenCamera: { showCameraStudioSheet = true },
                                                                                 onOpenFriends: { activeTopSection = .friends }
                                                                             )
-                                                                                                                .toolbar { headerTrailingButtons }
+                                                                                                                                                    .toolbar { headerTrailingButtons() }
                                                                             .navigationTitle("Bảng tin")
                                         .navigationBarTitleDisplayMode(.large)
                                     }
@@ -531,7 +531,7 @@ struct RootMainView: View {
 
                                     NavigationStack {
                                                                             DiscoverView(onOpenCamera: { showCameraStudioSheet = true })
-                                                                                                                .toolbar { headerTrailingButtons }
+                                                                                                                                                    .toolbar { headerTrailingButtons() }
                                                                             .navigationTitle("Khám phá")
                                         .navigationBarTitleDisplayMode(.large)
                                     }
@@ -542,7 +542,7 @@ struct RootMainView: View {
 
                                     NavigationStack {
                                                                             CameraStudioView()
-                                                                                                                .toolbar { headerTrailingButtons }
+                                                                                                                                                    .toolbar { headerTrailingButtons() }
                                                                             .navigationTitle("Tạo")
                                         .navigationBarTitleDisplayMode(.large)
                                     }
@@ -553,7 +553,7 @@ struct RootMainView: View {
 
                                     NavigationStack {
                                                                             ShortsVideoView()
-                                                                                                                .toolbar { headerTrailingButtons }
+                                                                                                                                                    .toolbar { headerTrailingButtons() }
                                                                             .navigationTitle("Video")
                                         .navigationBarTitleDisplayMode(.large)
                                     }
@@ -564,7 +564,7 @@ struct RootMainView: View {
 
                                     NavigationStack {
                                                                             LiveStreamView(onOpenWallet: { activeTopSection = .wallet })
-                                                                                                                .toolbar { headerTrailingButtons }
+                                                                                                                                                    .toolbar { headerTrailingButtons() }
                                                                             .navigationTitle("Live")
                                         .navigationBarTitleDisplayMode(.large)
                                     }
