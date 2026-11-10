@@ -744,7 +744,8 @@ struct RootMainView: View {
                                     ShortsVideoView()
                                         .tag(KinnectNavTab.video)
                                         .tabItem {
-                                            Label("Video", systemImage: "play.rectangle.fill")
+                                            Image(systemName: "play.rectangle.fill")
+                                                .accessibilityLabel("Video")
                                         }
 
                                     LiveStreamView(onOpenWallet: { activeTopSection = .wallet })

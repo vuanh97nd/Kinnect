@@ -33,6 +33,8 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
     var isActive: Bool
     var age: Int
     var gender: String
+    var orientation: String
+    var communityRole: String
     var cloudChatSync: Bool
 
     var avatarURL: String? { avatarUrl.isEmpty ? nil : avatarUrl }
@@ -58,6 +60,8 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         isActive: Bool = false,
         age: Int = 0,
         gender: String = "",
+        orientation: String = "",
+        communityRole: String = "",
         cloudChatSync: Bool = true
     ) {
         self.id = id
@@ -80,6 +84,8 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         self.isActive = isActive
         self.age = age
         self.gender = gender
+        self.orientation = orientation
+        self.communityRole = communityRole
         self.cloudChatSync = cloudChatSync
     }
 
@@ -116,6 +122,8 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
             isActive: (dict["isActive"] as? Bool) ?? false,
             age: (dict["age"] as? Int) ?? (dict["userAge"] as? Int) ?? 0,
             gender: (dict["gender"] as? String) ?? "",
+            orientation: (dict["orientation"] as? String) ?? (dict["sexualOrientation"] as? String) ?? "",
+            communityRole: (dict["communityRole"] as? String) ?? (dict["role"] as? String) ?? "",
             cloudChatSync: (dict["cloudChatSync"] as? Bool) ?? true
         )
     }
