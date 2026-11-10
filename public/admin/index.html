@@ -4,13 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,viewport-fit=cover">
   <meta name="robots" content="noindex,nofollow">
-  <meta name="theme-color" content="#7548de">
-  <title>Kinnect · Không gian Quản trị</title>
+  <meta name="theme-color" content="#5a2fc0">
+  <meta name="color-scheme" content="light dark">
+  <title>Kinnect · Không gian Quản trị Thông minh</title>
   <link rel="icon" href="/admin/mark.svg">
-  <link rel="stylesheet" href="/admin/admin.css?v=20261109c">
-  <link rel="stylesheet" href="/admin/wallet-tools.css?v=20261109c">
-  <script src="/admin/wallet-tools.js?v=20261109c" defer></script>
-  <script src="/admin/admin.js?v=20261109c" defer></script>
+  <script src="/admin/theme-boot.js?v=20261110_p0_v7"></script>
+  <link rel="stylesheet" href="/admin/admin.css?v=20261110_p0_v7">
+  <link rel="stylesheet" href="/admin/wallet-tools.css?v=20261110_p0_v7">
+  <link rel="stylesheet" href="/admin/admin-v2.css?v=20261110_p0_v7">
+  <link rel="stylesheet" href="/admin/ops-monitor.css?v=20261110_p0_v7">
+  <script src="/admin/wallet-tools.js?v=20261110_p0_v7" defer></script>
+  <script src="/admin/admin.js?v=20261110_p0_v7" defer></script>
+  <script src="/admin/admin-v2.js?v=20261110_p0_v7" defer></script>
+  <script src="/admin/ops-monitor.js?v=20261110_p0_v7" defer></script>
 </head>
 <body>
   <div id="notice" role="status" aria-live="polite"></div>
@@ -22,9 +28,9 @@
         <img class="mark" src="/admin/mark.svg" alt="Kinnect" width="56" height="56">
       </div>
       <p class="eyebrow" id="portal-art-eyebrow">KINNECT WORKSPACE</p>
-      <h1 id="portal-art-title">Kết nối tử tế.<br>Quản trị tận tâm.</h1>
-      <div class="orbit">✳<span>♡</span></div>
-      <small id="portal-art-desc">Không gian làm việc bảo mật dành riêng cho đội ngũ Kinnect.</small>
+      <h1 id="portal-art-title">Quản trị Thông minh.<br>Hỗ trợ tận tâm.</h1>
+      <div class="orbit" aria-hidden="true">✳<span>♡</span></div>
+      <small id="portal-art-desc">Không gian làm việc bảo mật & tối ưu thông minh cho đội ngũ Kinnect.</small>
     </div>
     <div class="login-form">
       <a class="brand" href="https://kinnect.io.vn">
@@ -34,7 +40,7 @@
         <p class="eyebrow" id="portal-label">CỔNG QUẢN TRỊ</p>
       </div>
       <h2>Chào mừng trở lại.</h2>
-      <p class="muted" id="portal-note">Đăng nhập bằng tài khoản quản trị Kinnect.</p>
+      <p class="muted" id="portal-note">Đăng nhập tài khoản quản trị Kinnect.</p>
       <form id="login-form">
         <label>Tên đăng nhập
           <input id="username" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="30" placeholder="Nhập tên đăng nhập (hỗ trợ cả chữ HOA / thường)...">
@@ -42,15 +48,14 @@
         <label>Mật khẩu
           <div class="password-field-wrap">
             <input id="password" type="password" autocomplete="current-password" required maxlength="128" placeholder="Nhập mật khẩu (có phân biệt HOA / thường)...">
-            <button type="button" id="toggle-password" class="password-toggle-btn" aria-label="Hiện hoặc ẩn mật khẩu" title="Hiện hoặc ẩn mật khẩu">👁️ Hiện</button>
+            <button type="button" id="toggle-password" class="password-toggle-btn" aria-label="Hiện hoặc ẩn mật khẩu">👁️ Hiện</button>
           </div>
         </label>
         <p id="caps-warning" class="caps-warning" hidden>⚠️ Đang bật phím Caps Lock (chữ HOA)</p>
-        <small class="muted login-case-hint">💡 Hỗ trợ nhập chữ HOA / chữ thường và biểu tượng 👁️ Hiện / Ẩn mật khẩu.</small>
         <button class="primary" type="submit">Đăng nhập →</button>
         <p id="login-error" class="error" role="alert"></p>
       </form>
-      <small class="muted session-notice">Phiên làm việc tự hết hạn sau 30 phút không thao tác.</small>
+      <small class="muted session-notice">Tự đăng xuất sau 30 phút không hoạt động.</small>
     </div>
   </section>
 
@@ -106,15 +111,60 @@
           </div>
         </div>
         <div class="header-tools">
-          <span class="private-badge" id="header-badge">● Khu vực nội bộ</span>
+          <button type="button" id="btn-toggle-chat" class="chat-toggle-btn" title="Trao đổi nội bộ giữa các bộ phận">💬 Trao đổi nội bộ <span id="chat-unread-badge" class="badge-count" hidden>0</span></button>
+          <span class="ai-smart-indicator" id="ai-smart-indicator">🤖 AI Trợ lý Bật</span>
+          <button type="button" id="btn-notify" hidden title="Bật thông báo khi có phiếu mới">🔔 Bật thông báo</button>
           <button id="refresh">Làm mới ↻</button>
         </div>
       </header>
       <p class="muted" id="page-description"></p>
+      <p class="muted" id="cloud-data-state" hidden></p>
       <section id="content" aria-live="polite"></section>
       <nav id="mobile-bottom-nav" class="mobile-bottom-nav" aria-label="Điều hướng nhanh"></nav>
     </main>
   </div>
+
+  <!-- Khung Trao đổi Nội bộ Liên Bộ Phận (Chat Drawer) -->
+  <aside id="chat-drawer" class="chat-drawer" aria-label="Trao đổi nội bộ liên bộ phận" hidden>
+    <div class="chat-drawer-header">
+      <div class="chat-drawer-title">
+        <span class="chat-icon">💬</span>
+        <div>
+          <h3>Trao đổi Liên Bộ phận</h3>
+          <small id="chat-active-channel-name">Kênh: Toàn bộ phận</small>
+        </div>
+      </div>
+      <button type="button" id="chat-drawer-close" class="chat-close-btn" aria-label="Đóng trao đổi">✕</button>
+    </div>
+
+    <!-- Thanh chọn kênh bộ phận -->
+    <div class="chat-channels-bar" id="chat-channels-bar" role="tablist">
+      <button type="button" class="channel-chip active" data-channel="all">🌐 Toàn bộ phận</button>
+      <button type="button" class="channel-chip" data-channel="support-finance">🤝 Hỗ trợ & Tài chính</button>
+      <button type="button" class="channel-chip" data-channel="support-operations">⚡ Hỗ trợ & Kỹ thuật</button>
+      <button type="button" class="channel-chip" data-channel="internal">🔒 Nội bộ nhóm</button>
+    </div>
+
+    <!-- Danh sách tin nhắn -->
+    <div class="chat-messages-container" id="chat-messages-container">
+      <div class="chat-empty">Chưa có tin nhắn nào trong kênh này. Hãy bắt đầu trao đổi!</div>
+    </div>
+
+    <!-- Gắn thẻ / Đính kèm phiếu nếu có -->
+    <div class="chat-ticket-ref-bar" id="chat-ticket-ref-bar" hidden>
+      <span>📎 Phiếu đính kèm: <b id="chat-ticket-ref-id"></b></span>
+      <button type="button" id="chat-remove-ticket-ref" title="Gỡ gắn thẻ phiếu">✕</button>
+    </div>
+
+    <!-- Khung nhập và gửi tin nhắn -->
+    <form id="chat-send-form" class="chat-send-form">
+      <div class="chat-input-wrap">
+        <textarea id="chat-input" placeholder="Nhập tin nhắn trao đổi... (Enter gửi, Shift+Enter xuống dòng)" rows="2" maxlength="2000"></textarea>
+        <button type="submit" id="chat-send-btn" class="chat-send-btn" title="Gửi tin nhắn">➤ Gửi</button>
+      </div>
+    </form>
+  </aside>
+  <div id="chat-backdrop" class="chat-backdrop" hidden></div>
 
   <!-- Hộp thoại Xác nhận 2 lớp -->
   <dialog id="confirm-dialog">
@@ -133,7 +183,7 @@
   <dialog id="secret-dialog">
     <p class="eyebrow">MẬT KHẨU TẠM (DÙNG 1 LẦN)</p>
     <h2 id="secret-user"></h2>
-    <p class="muted">Sao chép và gửi trực tiếp cho chủ tài khoản. Hệ thống không lưu lại mật khẩu này dưới dạng văn bản.</p>
+    <p class="muted">Sao chép và gửi trực tiếp cho chủ tài khoản.</p>
     <input id="secret-value" readonly>
     <div class="dialog-actions">
       <button id="copy-secret" class="primary" type="button">Sao chép</button>
