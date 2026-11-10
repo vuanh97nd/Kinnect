@@ -50,10 +50,10 @@ struct MessagesView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: KinnectTheme.radiusMD)
                     .fill(KinnectTheme.surfaceElevated)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12)
+                        RoundedRectangle(cornerRadius: KinnectTheme.radiusMD)
                             .stroke(isCloudSyncEnabled ? KinnectTheme.online.opacity(0.35) : KinnectTheme.border, lineWidth: 1)
                     )
             )
@@ -75,7 +75,7 @@ struct MessagesView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+            .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
             .padding(.horizontal, 14)
 
             HStack(spacing: 10) {
@@ -174,6 +174,8 @@ struct MessagesView: View {
             CreateGroupSheet {
                 Task { await loadChats() }
             }
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showCreateGroupSheet)
         }
     }
 
@@ -525,7 +527,7 @@ struct DirectChatDetailView: View {
                         prompt: Text("Nội dung tin nhắn mới...").foregroundColor(KinnectTheme.textSecondary)
                     )
                     .padding(10)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                    .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
                     .foregroundColor(KinnectTheme.textPrimary)
                 } else {
                     TextField(
@@ -534,7 +536,7 @@ struct DirectChatDetailView: View {
                         prompt: Text("Nhắn tin...").foregroundColor(KinnectTheme.textSecondary)
                     )
                     .padding(10)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                    .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
                     .foregroundColor(KinnectTheme.textPrimary)
 
                     KinnectIconButton(
@@ -555,9 +557,13 @@ struct DirectChatDetailView: View {
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showForwardSheet) {
             ForwardMessageSheet(text: forwardText, imageUrl: forwardImageUrl)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showForwardSheet)
         }
         .sheet(isPresented: $showPeerProfile) {
             ProfileView(targetUser: peer)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showPeerProfile)
         }
         .confirmationDialog("Tùy chọn hội thoại", isPresented: $showReviewChatMenu, titleVisibility: .visible) {
             Button(isPinned ? "Bỏ ghim hội thoại" : "Ghim hội thoại") {}
@@ -586,7 +592,7 @@ struct DirectChatDetailView: View {
             VStack(alignment: isMine ? .trailing : .leading, spacing: 6) {
                 // Message content on top
                 if !msg.imageUrl.isEmpty {
-                    KinnectRemoteImageView(rawURL: msg.imageUrl, cornerRadius: 12, maxHeight: 220)
+                    KinnectRemoteImageView(rawURL: msg.imageUrl, cornerRadius: KinnectTheme.radiusMD, maxHeight: 220)
                 }
                 if !msg.text.isEmpty {
                     Text(msg.text)
@@ -596,7 +602,7 @@ struct DirectChatDetailView: View {
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
                         .background(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            RoundedRectangle(cornerRadius: KinnectTheme.radiusXL, style: .continuous)
                                 .fill(isMine ? AnyShapeStyle(KinnectTheme.primaryGradient) : AnyShapeStyle(KinnectTheme.surfaceElevated))
                         )
                 }
@@ -906,7 +912,7 @@ struct GroupChatDetailView: View {
                                     .padding(.horizontal, 14)
                                     .padding(.vertical, 10)
                                     .background(
-                                        RoundedRectangle(cornerRadius: 16)
+                                        RoundedRectangle(cornerRadius: KinnectTheme.radiusXL)
                                             .fill(isMine ? AnyShapeStyle(KinnectTheme.primaryGradient) : AnyShapeStyle(KinnectTheme.surfaceElevated))
                                     )
                                 // Bottom row: time, seen, reaction, more
@@ -997,7 +1003,7 @@ struct GroupChatDetailView: View {
             HStack(spacing: 10) {
                 TextField("Nhắn vào nhóm \(group.name)...", text: $text)
                     .padding(10)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                    .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
                     .foregroundColor(KinnectTheme.textPrimary)
 
                 KinnectIconButton(
@@ -1047,16 +1053,22 @@ struct GroupChatDetailView: View {
         }
         .sheet(isPresented: $showForwardSheet) {
             ForwardMessageSheet(text: forwardText, imageUrl: forwardImageUrl)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showForwardSheet)
         }
         .sheet(isPresented: $showRenameSheet) {
             RenameGroupSheet(groupId: group.id, currentName: group.name) {
                 Task { await loadGroupMessages() }
             }
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showRenameSheet)
         }
         .sheet(isPresented: $showAddMemberSheet) {
             AddGroupMembersSheet(groupId: group.id) {
                 Task { await loadGroupMessages() }
             }
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showAddMemberSheet)
         }
         .task {
             await loadGroupMessages()
@@ -1349,7 +1361,7 @@ struct ForwardMessageSheet: View {
                     "peer": [
                         "id": "fixture_user_fwd_1",
                         "name": "Hoàng Nam",
-                        "username": "hoang_nam",
+                        "handle": "hoang_nam",
                         "avatarColor": "#7C3AED"
                     ]
                 ],
@@ -1357,7 +1369,7 @@ struct ForwardMessageSheet: View {
                     "peer": [
                         "id": "fixture_user_fwd_2",
                         "name": "Thanh Trúc",
-                        "username": "thanh_truc",
+                        "handle": "thanh_truc",
                         "avatarColor": "#EC4899"
                     ]
                 ]
@@ -1377,7 +1389,7 @@ struct ForwardMessageSheet: View {
                 KinnectUser.from([
                     "id": "fixture_user_fwd_3",
                     "name": "Võ Minh Khang",
-                    "username": "minh_khang",
+                    "handle": "minh_khang",
                     "avatarColor": "#3B82F6"
                 ])
             ]

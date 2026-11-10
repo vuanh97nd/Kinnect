@@ -88,11 +88,11 @@ struct ProfileView: View {
                                 KinnectRemoteImageView(
                                     rawURL: user.coverUrl,
                                     contentMode: .fill,
-                                    cornerRadius: 16,
+                                    cornerRadius: KinnectTheme.radiusXL,
                                     maxHeight: 140
                                 )
                             } else {
-                                RoundedRectangle(cornerRadius: 16)
+                                RoundedRectangle(cornerRadius: KinnectTheme.radiusXL)
                                     .fill(KinnectTheme.primaryGradient)
                                     .frame(height: 130)
                             }
@@ -133,7 +133,7 @@ struct ProfileView: View {
                                         .foregroundColor(KinnectTheme.accentBright)
                                 }
                                 .frame(maxWidth: .infinity, minHeight: 40)
-                                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                                .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
                             }
                             .padding(.horizontal, 14)
                         } else {
@@ -209,17 +209,23 @@ struct ProfileView: View {
                     DirectChatDetailView(peer: u)
                 }
             }
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showPeerChat)
         }
         .sheet(isPresented: $showEditProfileSheet) {
             EditProfileSheet(onSaved: {
                 Task { await refreshMe() }
             })
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showEditProfileSheet)
         }
         .sheet(isPresented: $showPublicAlbumSheet) {
             PublicAlbumManageSheet(
                 posts: userPosts,
                 onRefresh: { Task { await refreshMe() } }
             )
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showPublicAlbumSheet)
         }
         .sheet(isPresented: $showPrivateAlbumSheet) {
             PrivateAlbumManageSheet(
@@ -227,30 +233,46 @@ struct ProfileView: View {
                 requests: $privateAccessRequests,
                 onRefresh: { Task { await refreshMe() } }
             )
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showPrivateAlbumSheet)
         }
         .sheet(item: $activeShortItem) { short in
             ProfileShortDetailSheet(
                 short: short,
                 onRefresh: { Task { await refreshMe() } }
             )
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: activeShortItem)
         }
         .sheet(isPresented: $showSessionsSheet) {
             ActiveSessionsSheet()
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showSessionsSheet)
         }
         .sheet(isPresented: $showPasswordSheet) {
             ChangePasswordSheet()
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showPasswordSheet)
         }
         .sheet(isPresented: $showBlocksSheet) {
             BlockedUsersSheet()
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showBlocksSheet)
         }
         .sheet(isPresented: $showPrivacySheet) {
             PrivacySettingsSheet()
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showPrivacySheet)
         }
         .sheet(isPresented: $showSupportSheet) {
             SupportContactSheet()
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showSupportSheet)
         }
         .sheet(isPresented: $showDeleteAccountSheet) {
             DeleteAccountConfirmationSheet()
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showDeleteAccountSheet)
         }
     }
 
@@ -364,7 +386,7 @@ struct ProfileView: View {
                                 .font(.subheadline.bold())
                         }
                         .frame(maxWidth: .infinity, minHeight: 44)
-                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                        .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
                         .foregroundColor(KinnectTheme.textPrimary)
                     }
 
@@ -374,11 +396,18 @@ struct ProfileView: View {
                         Label("Xóa vĩnh viễn tài khoản Kinnect", systemImage: "trash.fill")
                             .font(.subheadline.bold())
                             .frame(maxWidth: .infinity, minHeight: 44)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.danger.opacity(0.18)))
+                            .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.danger.opacity(0.18)))
                             .foregroundColor(KinnectTheme.danger)
                     }
                 }
                 .kinnectCard()
+            }
+        }
+        .refreshable {
+            if isSelf {
+                await refreshMe()
+            } else if let target = targetUser {
+                await refreshPeer(target: target)
             }
         }
     }
@@ -408,7 +437,7 @@ struct ProfileView: View {
                             .foregroundColor(KinnectTheme.textPrimary)
                             .kinnectMultiline()
                         if !post.imageUrl.isEmpty {
-                            KinnectRemoteImageView(rawURL: post.imageUrl, contentMode: .fill, cornerRadius: 10, maxHeight: 180)
+                            KinnectRemoteImageView(rawURL: post.imageUrl, contentMode: .fill, cornerRadius: KinnectTheme.radiusSM, maxHeight: 180)
                         }
                         Text(post.createdAt.isEmpty ? "Vừa xong" : post.createdAt)
                             .font(.caption2)
@@ -428,7 +457,7 @@ struct ProfileView: View {
                 showPublicAlbumSheet = true
             } label: {
                 VStack(alignment: .leading, spacing: 6) {
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: KinnectTheme.radiusMD)
                         .fill(KinnectTheme.surfaceElevated)
                         .frame(height: 120)
                         .overlay(
@@ -460,7 +489,7 @@ struct ProfileView: View {
                 showPrivateAlbumSheet = true
             } label: {
                 VStack(alignment: .leading, spacing: 6) {
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: KinnectTheme.radiusMD)
                         .fill(KinnectTheme.surfaceElevated)
                         .frame(height: 120)
                         .overlay(
@@ -513,7 +542,7 @@ struct ProfileView: View {
                             activeShortItem = short
                         } label: {
                             VStack(alignment: .leading, spacing: 6) {
-                                RoundedRectangle(cornerRadius: 12)
+                                RoundedRectangle(cornerRadius: KinnectTheme.radiusMD)
                                     .fill(KinnectTheme.surfaceElevated)
                                     .frame(height: 156)
                                     .overlay(
@@ -620,9 +649,9 @@ struct ProfileView: View {
             .background(
                 Group {
                     if isFriends || isOutgoing {
-                        RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated)
+                        RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated)
                     } else {
-                        RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.primaryGradient)
+                        RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.primaryGradient)
                     }
                 }
             )
@@ -642,7 +671,7 @@ struct ProfileView: View {
                     .foregroundColor(KinnectTheme.accentBright)
             }
             .frame(maxWidth: .infinity, minHeight: 40)
-            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+            .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
         }
     }
 
@@ -838,7 +867,7 @@ struct PublicAlbumManageSheet: View {
                                     .font(.subheadline)
                                     .foregroundColor(KinnectTheme.textPrimary)
                                 if !post.imageUrl.isEmpty {
-                                    KinnectRemoteImageView(rawURL: post.imageUrl, contentMode: .fill, cornerRadius: 10, maxHeight: 160)
+                                    KinnectRemoteImageView(rawURL: post.imageUrl, contentMode: .fill, cornerRadius: KinnectTheme.radiusSM, maxHeight: 160)
                                 }
                             }
                             .padding(.vertical, 4)
@@ -969,9 +998,9 @@ struct PrivateAlbumManageSheet: View {
                         ForEach(photos) { photo in
                             HStack(alignment: .center, spacing: 12) {
                                 // Fixed-size, clipped thumbnail so the image can never extend under the text column.
-                                KinnectRemoteImageView(rawURL: photo.url, contentMode: .fill, cornerRadius: 8, maxHeight: 64)
+                                KinnectRemoteImageView(rawURL: photo.url, contentMode: .fill, cornerRadius: KinnectTheme.radiusXS, maxHeight: 64)
                                     .frame(width: 64, height: 64)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                    .clipShape(RoundedRectangle(cornerRadius: KinnectTheme.radiusXS, style: .continuous))
                                     .contentShape(Rectangle())
                                     .layoutPriority(0)
                                 VStack(alignment: .leading, spacing: 2) {
@@ -1099,7 +1128,7 @@ struct ProfileShortDetailSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: KinnectTheme.radiusXL)
                     .fill(KinnectTheme.surfaceElevated)
                     .frame(maxWidth: .infinity, maxHeight: 360)
                     .overlay(
@@ -1129,7 +1158,7 @@ struct ProfileShortDetailSheet: View {
                         Label("Xóa video ngắn này", systemImage: "trash.fill")
                             .font(.subheadline.bold())
                             .frame(maxWidth: .infinity, minHeight: 44)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.danger.opacity(0.18)))
+                            .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.danger.opacity(0.18)))
                             .foregroundColor(KinnectTheme.danger)
                     }
                 }
@@ -1252,7 +1281,7 @@ struct EditProfileSheet: View {
                                         .font(.caption.bold())
                                 }
                                 .frame(maxWidth: .infinity, minHeight: 40)
-                                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                                .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
                                 .foregroundColor(KinnectTheme.accentBright)
                             }
                             .onChange(of: selectedAvatarItem) { item in
@@ -1267,7 +1296,7 @@ struct EditProfileSheet: View {
                                         .font(.caption.bold())
                                 }
                                 .frame(maxWidth: .infinity, minHeight: 40)
-                                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                                .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
                                 .foregroundColor(KinnectTheme.accentBright)
                             }
                             .onChange(of: selectedCoverItem) { item in
@@ -1838,7 +1867,7 @@ struct ChangePasswordSheet: View {
                             }
                         }
                         .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                        .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
                         .foregroundColor(KinnectTheme.textPrimary)
                     }
 
@@ -1861,7 +1890,7 @@ struct ChangePasswordSheet: View {
                             }
                         }
                         .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                        .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
                         .foregroundColor(KinnectTheme.textPrimary)
                     }
 
@@ -1871,7 +1900,7 @@ struct ChangePasswordSheet: View {
                             .foregroundColor(KinnectTheme.textSecondary)
                         SecureField("Nhập lại mật khẩu mới", text: $confirmPassword)
                             .padding(12)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                            .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
                             .foregroundColor(KinnectTheme.textPrimary)
                     }
 
@@ -1899,7 +1928,7 @@ struct ChangePasswordSheet: View {
                                 : LinearGradient(colors: [Color.gray.opacity(0.3)], startPoint: .leading, endPoint: .trailing)
                         )
                         .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .clipShape(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD))
                     }
                     .disabled(!canSubmit || isSubmitting)
                     .padding(.top, 8)
@@ -2004,18 +2033,18 @@ struct BlockedUsersSheet: View {
     }
 
     private func loadBlocks() async {
-        if UIReviewFixture.activeScreen != nil {
+        if UIReviewFixture.isEnabled {
             self.blockedUsers = [
                 KinnectUser.from([
                     "id": "fixture_blocked_01",
                     "name": "Trần Văn Bình",
-                    "username": "binh_tran",
+                    "handle": "binh_tran",
                     "avatarColor": "#EF4444"
                 ]),
                 KinnectUser.from([
                     "id": "fixture_blocked_02",
                     "name": "Lê Hoàng Phúc",
-                    "username": "phuc_le",
+                    "handle": "phuc_le",
                     "avatarColor": "#F59E0B"
                 ])
             ]
@@ -2070,7 +2099,7 @@ struct DeleteAccountConfirmationSheet: View {
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .padding(12)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                            .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
                             .foregroundColor(KinnectTheme.textPrimary)
                     }
 
@@ -2080,7 +2109,7 @@ struct DeleteAccountConfirmationSheet: View {
                             .foregroundColor(KinnectTheme.textPrimary)
                         SecureField("Mật khẩu của bạn", text: $password)
                             .padding(12)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                            .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
                             .foregroundColor(KinnectTheme.textPrimary)
                     }
 
@@ -2100,7 +2129,7 @@ struct DeleteAccountConfirmationSheet: View {
                         .padding(.vertical, 14)
                         .background(KinnectTheme.danger)
                         .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .clipShape(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD))
                     }
                     .disabled(isDeleting || confirmUsername.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() != targetUsername.lowercased())
                 }
@@ -2246,7 +2275,7 @@ struct PrivacySettingsSheet: View {
                         .tint(KinnectTheme.accentBright)
                     }
                     .padding(16)
-                    .background(RoundedRectangle(cornerRadius: 16).fill(KinnectTheme.surface))
+                    .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusXL).fill(KinnectTheme.surface))
 
                     Button {
                         Task { await saveSettings() }
@@ -2261,7 +2290,7 @@ struct PrivacySettingsSheet: View {
                         .frame(maxWidth: .infinity, minHeight: 48)
                         .background(KinnectTheme.primaryGradient)
                         .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .clipShape(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD))
                     }
                     .disabled(isSaving)
                     .padding(.top, 4)
@@ -2361,7 +2390,7 @@ struct SupportContactSheet: View {
                             .foregroundColor(KinnectTheme.textSecondary)
                         TextField("nhap@email.com hoặc 09xxxxxxxx", text: $contactText)
                             .padding(12)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                            .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
                             .foregroundColor(KinnectTheme.textPrimary)
                     }
 
@@ -2372,7 +2401,7 @@ struct SupportContactSheet: View {
                         TextEditor(text: $noteText)
                             .frame(minHeight: 120)
                             .padding(8)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                            .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
                             .foregroundColor(KinnectTheme.textPrimary)
                             .scrollContentBackground(.hidden)
                     }
@@ -2390,7 +2419,7 @@ struct SupportContactSheet: View {
                         .frame(maxWidth: .infinity, minHeight: 48)
                         .background(canSubmit ? KinnectTheme.primaryGradient : LinearGradient(colors: [Color.gray.opacity(0.3)], startPoint: .leading, endPoint: .trailing))
                         .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .clipShape(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD))
                     }
                     .disabled(!canSubmit || isSubmitting)
 
@@ -2422,7 +2451,7 @@ struct SupportContactSheet: View {
                         }
                     }
                     .padding(16)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surface))
+                    .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surface))
                     .padding(.top, 10)
                 }
                 .padding(20)
