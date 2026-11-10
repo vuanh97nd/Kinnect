@@ -2198,6 +2198,7 @@ struct DeleteAccountConfirmationSheet: View {
 struct PrivacySettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
+    @AppStorage("app_appearance_mode") private var appearanceMode: String = "system"
 
     @State private var discoverable: Bool = true
     @State private var showDistance: Bool = true
@@ -2210,6 +2211,27 @@ struct PrivacySettingsSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Giao diện & Chế độ sáng/tối")
+                            .font(.headline)
+                            .foregroundColor(KinnectTheme.textPrimary)
+                        Text("Tùy chỉnh giao diện theo sở thích của bạn: Sáng, Tối hoặc tự động theo cài đặt iOS.")
+                            .font(.footnote)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                            .kinnectMultiline()
+
+                        Picker("Chế độ hiển thị", selection: $appearanceMode) {
+                            Text("Hệ thống").tag("system")
+                            Text("Chế độ tối").tag("dark")
+                            Text("Chế độ sáng").tag("light")
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.top, 4)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surface))
+
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Quyền riêng tư & Định vị")
                             .font(.headline)

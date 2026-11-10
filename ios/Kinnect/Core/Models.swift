@@ -184,14 +184,21 @@ struct CommentItem: Identifiable, Equatable {
     var author: KinnectUser
     var text: String
     var createdAt: String
+    var likesCount: Int = 0
+    var liked: Bool = false
+    var parentId: String? = nil
 
     static func from(_ dict: [String: Any]) -> CommentItem {
         let authorDict = (dict["author"] as? [String: Any]) ?? (dict["user"] as? [String: Any]) ?? dict
+        let pId = (dict["parentId"] as? String) ?? (dict["parent_id"] as? String)
         return CommentItem(
             id: (dict["id"] as? String) ?? UUID().uuidString,
             author: KinnectUser.from(authorDict),
             text: (dict["text"] as? String) ?? (dict["body"] as? String) ?? (dict["content"] as? String) ?? "",
-            createdAt: isoString(from: dict["createdAt"] ?? dict["created"])
+            createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
+            likesCount: (dict["likesCount"] as? Int) ?? (dict["likes"] as? Int) ?? 0,
+            liked: (dict["liked"] as? Bool) ?? false,
+            parentId: (pId != nil && !pId!.isEmpty) ? pId : nil
         )
     }
 }

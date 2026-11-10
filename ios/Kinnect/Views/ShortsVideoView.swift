@@ -9,6 +9,9 @@ struct ShortsVideoView: View {
     @State private var currentIndex: Int = 0
     @State private var isLoading = false
     @State private var activeCommentShort: ShortItem?
+    @State private var activeOptionsShort: ShortItem?
+    @State private var selectedAuthorProfile: KinnectUser? = nil
+    @State private var isMuted: Bool = false
     @State private var floatingHearts: [FloatingHeart] = []
 
     var body: some View {
@@ -81,6 +84,43 @@ struct ShortsVideoView: View {
         .sheet(item: $activeCommentShort) { short in
             ShortCommentsSheet(short: short) {
                 Task { await loadShorts() }
+            }
+        }
+        .sheet(item: $activeOptionsShort) { short in
+            ShortOptionsSheet(
+                item: short,
+                isMine: short.author.id == appState.currentUser?.id,
+                onMuteToggle: { isMuted.toggle() },
+                isMuted: isMuted,
+                onDelete: {
+                    Task { await deleteShort(short) }
+                },
+                onReport: {
+                    appState.activeReportContext = UGCReportContext(
+                        targetType: "short",
+                        targetId: short.id,
+                        targetUserId: short.author.id,
+                        targetTitle: "Video ngắn của \(short.author.name)"
+                    )
+                },
+                onOpenAuthor: {
+                    selectedAuthorProfile = short.author
+                },
+                onShare: {
+                    let permalink = "https://kinnect.io.vn/shorts/\(short.id)"
+                    UIPasteboard.general.string = permalink
+                    appState.showToast("Đã sao chép liên kết video!")
+                }
+            )
+        }
+        .sheet(item: $selectedAuthorProfile) { author in
+            NavigationStack {
+                ProfileView(targetUser: author)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Đóng") { selectedAuthorProfile = nil }
+                        }
+                    }
             }
         }
     }
@@ -227,6 +267,20 @@ struct ShortsVideoView: View {
                         .frame(minWidth: 44, minHeight: 44)
                     }
                     .accessibilityLabel("Chia sẻ video")
+
+                    // Options / More button (Tùy chọn) - Parity with Android shortOptions
+                    Button {
+                        activeOptionsShort = item
+                    } label: {
+                        VStack(spacing: 4) {
+                            KinnectIcon(glyph: .more, size: 28, tint: .white)
+                            Text("Tùy chọn")
+                                .font(.caption.bold())
+                                .foregroundColor(.white)
+                        }
+                        .frame(minWidth: 44, minHeight: 44)
+                    }
+                    .accessibilityLabel("Tùy chọn video")
                 }
                 .padding(.trailing, 12)
                 .padding(.bottom, 28)
@@ -267,6 +321,19 @@ struct ShortsVideoView: View {
                     items[index].likesCount = current.likesCount
                 }
             }
+        }
+    }
+
+    private func deleteShort(_ item: ShortItem) async {
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/shorts/\(item.id)",
+                method: "DELETE"
+            )
+            items.removeAll(where: { $0.id == item.id })
+            appState.showToast("Đã xoá video ngắn.")
+        } catch {
+            appState.showToast(error.localizedDescription)
         }
     }
 
@@ -425,7 +492,10 @@ struct ShortCommentsSheet: View {
 
     @State private var comments: [CommentItem] = []
     @State private var text = ""
+    @State private var replyingTo: CommentItem? = nil
     @State private var isPosting = false
+
+    private let quickEmojis = ["😍", "😂", "🔥", "👏", "🥰", "😮", "😢", "💜"]
 
     var body: some View {
         NavigationStack {
@@ -465,6 +535,38 @@ struct ShortCommentsSheet: View {
                                     .font(.subheadline)
                                     .foregroundColor(.white)
                                     .kinnectMultiline()
+
+                                // Action bar: Trả lời, Thả cảm xúc
+                                HStack(spacing: 14) {
+                                    Button {
+                                        replyingTo = c
+                                        if !text.contains("@\(c.author.name)") {
+                                            text = "@\(c.author.name) " + text
+                                        }
+                                    } label: {
+                                        Text("Trả lời")
+                                            .font(.caption2.bold())
+                                            .foregroundColor(KinnectTheme.accentBright)
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    Button {
+                                        toggleCommentLike(c)
+                                    } label: {
+                                        HStack(spacing: 3) {
+                                            Image(systemName: c.liked ? "heart.fill" : "heart")
+                                                .font(.caption2)
+                                                .foregroundColor(c.liked ? KinnectTheme.danger : KinnectTheme.textSecondary)
+                                            if c.likesCount > 0 {
+                                                Text("\(c.likesCount)")
+                                                    .font(.caption2)
+                                                    .foregroundColor(c.liked ? KinnectTheme.danger : KinnectTheme.textSecondary)
+                                            }
+                                        }
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .padding(.top, 2)
                             }
                         }
                         .listRowBackground(KinnectTheme.surface)
@@ -475,14 +577,14 @@ struct ShortCommentsSheet: View {
                 }
 
                 // Quick emoji reaction bar
-                HStack(spacing: 12) {
-                    ForEach(["❤️", "🔥", "😂", "👏", "😍", "✨"], id: \.self) { emoji in
+                HStack(spacing: 10) {
+                    ForEach(quickEmojis, id: \.self) { emoji in
                         Button {
                             text.append(emoji)
                         } label: {
                             Text(emoji)
                                 .font(.title3)
-                                .frame(minWidth: 36, minHeight: 36)
+                                .frame(minWidth: 32, minHeight: 32)
                         }
                     }
                     Spacer()
@@ -491,8 +593,42 @@ struct ShortCommentsSheet: View {
                 .padding(.vertical, 4)
                 .background(KinnectTheme.surface)
 
+                // Replying banner
+                if let replying = replyingTo {
+                    HStack {
+                        Text("Đang trả lời @\(replying.author.name) • Chạm để huỷ")
+                            .font(.caption)
+                            .foregroundColor(KinnectTheme.accentBright)
+                        Spacer()
+                        Button {
+                            replyingTo = nil
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 6)
+                    .background(KinnectTheme.surfaceElevated)
+                }
+
                 // Composer input row
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
+                    // Mention button
+                    Button {
+                        if !text.hasSuffix("@") {
+                            text.append("@")
+                        }
+                    } label: {
+                        Text("@")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(KinnectTheme.accentBright)
+                            .frame(width: 34, height: 34)
+                            .background(Circle().fill(KinnectTheme.surfaceElevated))
+                    }
+                    .accessibilityLabel("Nhắc tên thành viên")
+
                     TextField("Bình luận về video này...", text: $text)
                         .padding(10)
                         .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated))
@@ -529,6 +665,22 @@ struct ShortCommentsSheet: View {
         .presentationDragIndicator(.visible)
     }
 
+    private func toggleCommentLike(_ item: CommentItem) {
+        if let idx = comments.firstIndex(where: { $0.id == item.id }) {
+            comments[idx].liked.toggle()
+            comments[idx].likesCount += comments[idx].liked ? 1 : -1
+            if comments[idx].likesCount < 0 { comments[idx].likesCount = 0 }
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            Task {
+                _ = try? await KinnectAPIClient.shared.requestJSON(
+                    "/api/shorts/\(short.id)/comments/\(item.id)/like",
+                    method: "POST",
+                    body: [:]
+                )
+            }
+        }
+    }
+
     private func load() async {
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/shorts/\(short.id)/comments") {
             self.comments = (res["comments"] as? [[String: Any]] ?? []).map(CommentItem.from)
@@ -541,12 +693,18 @@ struct ShortCommentsSheet: View {
         isPosting = true
         let draft = text
         text = ""
+        let parent = replyingTo?.id
+        replyingTo = nil
         let reqId = "short_cmt_\(short.id)_\(UUID().uuidString)"
         do {
+            var bodyDict: [String: Any] = ["body": clean]
+            if let parent = parent {
+                bodyDict["parentId"] = parent
+            }
             _ = try await KinnectAPIClient.shared.requestJSON(
                 "/api/shorts/\(short.id)/comments",
                 method: "POST",
-                body: KinnectWriteBody.comment(clean),
+                body: bodyDict,
                 requestId: reqId
             )
             await load()
@@ -556,6 +714,96 @@ struct ShortCommentsSheet: View {
             appState.showToast(error.localizedDescription)
         }
         isPosting = false
+    }
+}
+
+// MARK: - Video Options Sheet (Parity with Android shortOptions)
+struct ShortOptionsSheet: View {
+    let item: ShortItem
+    let isMine: Bool
+    let onMuteToggle: () -> Void
+    let isMuted: Bool
+    let onDelete: () -> Void
+    let onReport: () -> Void
+    let onOpenAuthor: () -> Void
+    let onShare: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                // Horizontal scrolling options buttons row (Android parity: tiktokOptionBtn)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        optionTile(icon: "arrow.down.circle.fill", label: "Lưu video") {
+                            dismiss()
+                            UIPasteboard.general.string = item.videoUrl
+                            AppState.shared.showToast("Đã lưu liên kết video vào bộ nhớ tạm!")
+                        }
+
+                        optionTile(icon: "music.note", label: "Âm thanh") {
+                            dismiss()
+                            AppState.shared.showToast("Âm thanh gốc — \(item.author.name)")
+                        }
+
+                        optionTile(icon: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill", label: isMuted ? "Bật âm" : "Tắt âm") {
+                            dismiss()
+                            onMuteToggle()
+                        }
+
+                        optionTile(icon: isMine ? "trash.fill" : "flag.fill", label: isMine ? "Xoá video" : "Báo cáo", isDestructive: isMine) {
+                            dismiss()
+                            if isMine { onDelete() } else { onReport() }
+                        }
+
+                        optionTile(icon: "person.crop.circle.fill", label: "Hồ sơ tác giả") {
+                            dismiss()
+                            onOpenAuthor()
+                        }
+
+                        optionTile(icon: "link", label: "Sao chép link") {
+                            dismiss()
+                            onShare()
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 8)
+                }
+
+                Spacer()
+            }
+            .padding(.top, 16)
+            .background(KinnectTheme.background)
+            .navigationTitle("Tùy chọn")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Đóng") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.height(180)])
+    }
+
+    private func optionTile(icon: String, label: String, isDestructive: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                ZStack {
+                    Circle()
+                        .fill(isDestructive ? KinnectTheme.danger.opacity(0.18) : KinnectTheme.surfaceElevated)
+                        .frame(width: 56, height: 56)
+                    Image(systemName: icon)
+                        .font(.system(size: 24))
+                        .foregroundColor(isDestructive ? KinnectTheme.danger : KinnectTheme.accentBright)
+                }
+                Text(label)
+                    .font(.caption.weight(.medium))
+                    .foregroundColor(KinnectTheme.textPrimary)
+                    .lineLimit(1)
+            }
+            .frame(width: 72)
+        }
+        .buttonStyle(.plain)
     }
 }
 

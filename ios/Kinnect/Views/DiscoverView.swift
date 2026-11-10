@@ -156,14 +156,14 @@ struct DiscoverView: View {
             )
         }
         .sheet(item: $selectedUserForDetail) { person in
-            DiscoverUserDetailSheet(
-                person: person,
-                isOnline: appState.onlineUserIds.contains(person.id),
-                onFollowToggle: { Task { await toggleFollow(person) } },
-                onCallVideo: {
-                    Task { await NativeWebRTCManager.shared.startOutgoingCall(targetUser: person, mode: "video") }
-                }
-            )
+            NavigationStack {
+                ProfileView(targetUser: person)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Đóng") { selectedUserForDetail = nil }
+                        }
+                    }
+            }
         }
     }
 
@@ -176,7 +176,15 @@ struct DiscoverView: View {
             guard !appState.blockedUserIds.contains(p.id) && p.id != appState.currentUser?.id else { return false }
             if minAge > 0 && p.age < minAge { return false }
             if maxAge > 0 && p.age > maxAge { return false }
-            if !selectedGender.isEmpty && p.gender.lowercased() != selectedGender.lowercased() { return false }
+            if !selectedGender.isEmpty {
+                let target = selectedGender.lowercased()
+                let pG = p.gender.lowercased()
+                let pO = p.orientation.lowercased()
+                let pR = p.communityRole.lowercased()
+                if !pG.contains(target) && !pO.contains(target) && !pR.contains(target) {
+                    return false
+                }
+            }
             return true
         }
     }
@@ -527,7 +535,10 @@ private struct DiscoverFilterSheet: View {
     let onReset: () -> Void
     @Environment(\.dismiss) private var dismiss
 
-    private let genders = ["", "Nam", "Nữ", "Khác"]
+    private let genders = [
+        "", "Nam", "Nữ", "Nam chuyển giới", "Nữ chuyển giới",
+        "Phi nhị nguyên", "Linh hoạt giới", "Vô giới", "Đang tìm hiểu", "Khác"
+    ]
 
     var body: some View {
         NavigationStack {
@@ -554,14 +565,13 @@ private struct DiscoverFilterSheet: View {
                 }
 
                 if type == .gender || type == .full {
-                    Section("Giới tính") {
+                    Section("Bản dạng giới & Xu hướng (LGBT+)") {
                         Picker("Giới tính", selection: $selectedGender) {
                             Text("Tất cả").tag("")
-                            Text("Nam").tag("Nam")
-                            Text("Nữ").tag("Nữ")
-                            Text("Khác").tag("Khác")
+                            ForEach(genders.filter { !$0.isEmpty }, id: \.self) { g in
+                                Text(g).tag(g)
+                            }
                         }
-                        .pickerStyle(.segmented)
                     }
                 }
             }

@@ -58,6 +58,41 @@ struct RootMainView: View {
     @State private var selectedTab: KinnectNavTab = .feed
     @State private var activeTopSection: KinnectTopSection? = nil
     @State private var showCameraStudioSheet = false
+    @AppStorage("app_appearance_mode") private var appearanceMode: String = "system"
+
+    private var activeColorScheme: ColorScheme? {
+        if UIReviewFixture.forceLightMode { return .light }
+        switch appearanceMode {
+        case "light": return .light
+        case "dark": return .dark
+        default: return nil // Follows system appearance (Light or Dark)
+        }
+    }
+
+    // Shared leading brand logo for main tabs (Android parity)
+    @ToolbarContentBuilder
+    static func headerLeadingLogoStatic() -> some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            HStack(spacing: 8) {
+                KinnectBrandLogo(size: 30)
+                Text("Kinnect")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(KinnectTheme.textPrimary)
+            }
+        }
+    }
+
+    @ToolbarContentBuilder
+    private func headerLeadingLogo() -> some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            HStack(spacing: 8) {
+                KinnectBrandLogo(size: 30)
+                Text("Kinnect")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(KinnectTheme.textPrimary)
+            }
+        }
+    }
 
     // Shared trailing toolbar for all tabs (P1) - static version for UI Review Fixture
     @ToolbarContentBuilder
@@ -462,7 +497,7 @@ struct RootMainView: View {
                                         .zIndex(100)
                                 }
                             }
-                            .preferredColorScheme(UIReviewFixture.forceLightMode ? .light : .dark)
+                            .preferredColorScheme(activeColorScheme)
                             .modifier(UIReviewDynamicTypeModifier())
                             .task {
                                 await appState.bootstrapSession()
@@ -650,21 +685,28 @@ struct RootMainView: View {
                                 } detail: {
                                     NavigationStack {
                                         mainSectionContent
+                                            .toolbar {
+                                                headerLeadingLogo()
+                                                headerTrailingButtons()
+                                            }
                                             .navigationTitle("")
-                                            .toolbar(.hidden, for: .navigationBar)
+                                            .navigationBarTitleDisplayMode(.inline)
                                     }
                                 }
                             } else {
                                 // iPhone compact layout with native TabView (5 tabs) + shared trailing toolbar
                                 TabView(selection: $selectedTab) {
                                     NavigationStack {
-                                                                            FeedView(
-                                                                                onOpenCamera: { showCameraStudioSheet = true },
-                                                                                onOpenFriends: { activeTopSection = .friends }
-                                                                            )
-                                                                                                                                                    .toolbar { headerTrailingButtons() }
-                                                                            .navigationTitle("Bảng tin")
-                                        .navigationBarTitleDisplayMode(.large)
+                                        FeedView(
+                                            onOpenCamera: { showCameraStudioSheet = true },
+                                            onOpenFriends: { activeTopSection = .friends }
+                                        )
+                                        .toolbar {
+                                            headerLeadingLogo()
+                                            headerTrailingButtons()
+                                        }
+                                        .navigationTitle("")
+                                        .navigationBarTitleDisplayMode(.inline)
                                     }
                                     .tag(KinnectNavTab.feed)
                                     .tabItem {
@@ -672,10 +714,13 @@ struct RootMainView: View {
                                     }
 
                                     NavigationStack {
-                                                                            DiscoverView(onOpenCamera: { showCameraStudioSheet = true })
-                                                                                                                                                    .toolbar { headerTrailingButtons() }
-                                                                            .navigationTitle("Khám phá")
-                                        .navigationBarTitleDisplayMode(.large)
+                                        DiscoverView(onOpenCamera: { showCameraStudioSheet = true })
+                                            .toolbar {
+                                                headerLeadingLogo()
+                                                headerTrailingButtons()
+                                            }
+                                            .navigationTitle("")
+                                            .navigationBarTitleDisplayMode(.inline)
                                     }
                                     .tag(KinnectNavTab.discover)
                                     .tabItem {
@@ -683,10 +728,13 @@ struct RootMainView: View {
                                     }
 
                                     NavigationStack {
-                                                                            CameraStudioView()
-                                                                                                                                                    .toolbar { headerTrailingButtons() }
-                                                                            .navigationTitle("Tạo")
-                                        .navigationBarTitleDisplayMode(.large)
+                                        CameraStudioView()
+                                            .toolbar {
+                                                headerLeadingLogo()
+                                                headerTrailingButtons()
+                                            }
+                                            .navigationTitle("")
+                                            .navigationBarTitleDisplayMode(.inline)
                                     }
                                     .tag(KinnectNavTab.create)
                                     .tabItem {
@@ -712,7 +760,7 @@ struct RootMainView: View {
                                 }
                                 .toolbarBackground(KinnectTheme.surface, for: .tabBar)
                                 .toolbarBackground(.visible, for: .tabBar)
-                                .toolbarColorScheme(.dark, for: .tabBar)
+                                .toolbarColorScheme(activeColorScheme == .light ? .light : .dark, for: .tabBar)
                                 .sheet(item: $activeTopSection) { section in
                                     NavigationStack {
                                         switch section {

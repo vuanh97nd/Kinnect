@@ -34,6 +34,9 @@ enum UIReviewFixture {
         "bio": "Thiết kế giao diện & nhiếp ảnh đường phố • Sài Gòn",
         "locationName": "Quận 1, TP. Hồ Chí Minh",
         "avatarColor": "#7C3AED",
+        "gender": "Nam",
+        "orientation": "Gay / Đồng tính nam",
+        "communityRole": "Vers",
         "friendsCount": 128,
         "followersCount": 1420,
         "followingCount": 95,
@@ -47,6 +50,9 @@ enum UIReviewFixture {
         "bio": "Thiết kế sản phẩm & nhiếp ảnh • Đà Nẵng",
         "locationName": "Đà Nẵng",
         "avatarColor": "#2563EB",
+        "gender": "Nam",
+        "orientation": "Gay / Đồng tính nam",
+        "communityRole": "Top",
         "distanceKm": 2.4,
         "isFollowing": true,
         "isFriend": true
@@ -162,7 +168,9 @@ enum UIReviewFixture {
                     "age": 24,
                     "height": 175,
                     "weight": 68,
-                    "gender": "nam",
+                    "gender": "Nam",
+                    "orientation": "Gay / Đồng tính nam",
+                    "communityRole": "Vers",
                     "distanceKm": 1.8,
                     "isFollowing": true,
                     "isFriend": true
@@ -177,7 +185,9 @@ enum UIReviewFixture {
                     "age": 22,
                     "height": 162,
                     "weight": 48,
-                    "gender": "nu",
+                    "gender": "Nữ",
+                    "orientation": "Lesbian / Đồng tính nữ",
+                    "communityRole": "Femme",
                     "distanceKm": 3.2,
                     "isFollowing": false,
                     "isFriend": false
@@ -192,7 +202,9 @@ enum UIReviewFixture {
                     "age": 26,
                     "height": 178,
                     "weight": 72,
-                    "gender": "nam",
+                    "gender": "Phi nhị nguyên",
+                    "orientation": "Queer",
+                    "communityRole": "Androgynous",
                     "distanceKm": 4.5,
                     "isFollowing": true,
                     "isFriend": false
@@ -207,7 +219,9 @@ enum UIReviewFixture {
                     "age": 23,
                     "height": 165,
                     "weight": 50,
-                    "gender": "nu",
+                    "gender": "Nam chuyển giới",
+                    "orientation": "Song tính / Bisexual",
+                    "communityRole": "Top",
                     "distanceKm": 5.1,
                     "isFollowing": false,
                     "isFriend": false
@@ -1036,27 +1050,36 @@ enum UIReviewFixture {
             return AnyView(
                 NavigationStack {
                     FeedView(onOpenCamera: {}, onOpenFriends: {})
-                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                        .navigationTitle("Bảng tin")
-                        .navigationBarTitleDisplayMode(.large)
+                        .toolbar {
+                            RootMainView.headerLeadingLogoStatic()
+                            RootMainView.headerTrailingButtonsStatic()
+                        }
+                        .navigationTitle("")
+                        .navigationBarTitleDisplayMode(.inline)
                 }
             )
         case "discover":
             return AnyView(
                 NavigationStack {
                     DiscoverView(onOpenCamera: {})
-                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                        .navigationTitle("Khám phá")
-                        .navigationBarTitleDisplayMode(.large)
+                        .toolbar {
+                            RootMainView.headerLeadingLogoStatic()
+                            RootMainView.headerTrailingButtonsStatic()
+                        }
+                        .navigationTitle("")
+                        .navigationBarTitleDisplayMode(.inline)
                 }
             )
         case "create", "camera-studio":
             return AnyView(
                 NavigationStack {
                     CameraStudioView()
-                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                        .navigationTitle("Tạo")
-                        .navigationBarTitleDisplayMode(.large)
+                        .toolbar {
+                            RootMainView.headerLeadingLogoStatic()
+                            RootMainView.headerTrailingButtonsStatic()
+                        }
+                        .navigationTitle("")
+                        .navigationBarTitleDisplayMode(.inline)
                 }
             )
         case "camera-studio-edit", "camera-studio-video-edit":

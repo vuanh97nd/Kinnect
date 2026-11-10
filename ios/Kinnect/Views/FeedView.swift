@@ -458,15 +458,18 @@ private struct PostCardView: View {
     let onDelete: () -> Void
     let onReport: () -> Void
 
-    private let reactionOptions: [(key: String, emoji: String)] = [
-        ("like", "👍"),
-        ("love", "❤️"),
-        ("haha", "😆"),
-        ("wow", "😮"),
-        ("sad", "😢")
+    private let reactionOptions: [(key: String, emoji: String, title: String)] = [
+        ("like", "👍", "Thích"),
+        ("love", "❤️", "Yêu thích"),
+        ("care", "🥰", "Thương thương"),
+        ("haha", "😆", "Haha"),
+        ("wow", "😮", "Ngạc nhiên"),
+        ("sad", "😢", "Buồn"),
+        ("angry", "😡", "Phẫn nộ")
     ]
 
     @State private var isBouncing = false
+    @State private var showReactionDock = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -595,14 +598,52 @@ private struct PostCardView: View {
 
             Divider().background(KinnectTheme.border)
 
+            if showReactionDock {
+                HStack(spacing: 8) {
+                    ForEach(reactionOptions, id: \.key) { item in
+                        Button {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            onReact(item.key)
+                            withAnimation(.spring(response: 0.25, dampingFraction: 0.6)) {
+                                showReactionDock = false
+                            }
+                        } label: {
+                            VStack(spacing: 2) {
+                                Text(item.emoji)
+                                    .font(.system(size: 26))
+                                Text(item.title)
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(.white)
+                            }
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 4)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(KinnectTheme.surfaceElevated)
+                        .shadow(color: Color.black.opacity(0.4), radius: 12, y: 4)
+                        .overlay(Capsule().stroke(KinnectTheme.accentBright.opacity(0.4), lineWidth: 1))
+                )
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.8, anchor: .bottomLeading).combined(with: .opacity),
+                    removal: .scale(scale: 0.8, anchor: .bottomLeading).combined(with: .opacity)
+                ))
+                .padding(.leading, 8)
+                .zIndex(20)
+            }
+
             // Equal 3-Column Action Bar (Android parity: 33% Cảm xúc, 33% Bình luận, 33% Chia sẻ)
             HStack(spacing: 0) {
                 // Column 1: Cảm xúc (Reaction)
-                Menu {
-                    ForEach(reactionOptions, id: \.key) { item in
-                        Button("\(item.emoji) \(item.key.capitalized)") {
-                            onReact(item.key)
-                        }
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+                        showReactionDock.toggle()
                     }
                 } label: {
                     HStack(spacing: 6) {
@@ -622,16 +663,15 @@ private struct PostCardView: View {
                     .scaleEffect(isBouncing ? 1.3 : 1.0)
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .contentShape(Rectangle())
-                } primaryAction: {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.45, blendDuration: 0)) {
-                        isBouncing = true
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                        isBouncing = false
-                    }
-                    onReact(post.liked ? post.userReaction : "like")
                 }
+                .simultaneousGesture(
+                    LongPressGesture(minimumDuration: 0.25).onEnded { _ in
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+                            showReactionDock = true
+                        }
+                    }
+                )
                 .accessibilityLabel("Cảm xúc")
 
                 // Column 2: Bình luận (Comment)
@@ -679,21 +719,25 @@ private struct PostCardView: View {
     }
 
     private func reactionTitle(for key: String) -> String {
-        switch key {
+        switch key.lowercased() {
         case "love": return "Yêu thích"
+        case "care": return "Thương thương"
         case "haha": return "Haha"
-        case "wow": return "Wow"
+        case "wow": return "Ngạc nhiên"
         case "sad": return "Buồn"
+        case "angry": return "Phẫn nộ"
         default: return "Thích"
         }
     }
 
     private func reactionEmoji(for key: String) -> String {
-        switch key {
+        switch key.lowercased() {
         case "love": return "❤️"
+        case "care": return "🥰"
         case "haha": return "😆"
         case "wow": return "😮"
         case "sad": return "😢"
+        case "angry": return "😡"
         default: return "👍"
         }
     }
@@ -804,6 +848,12 @@ struct PostComposerSheet: View {
     }
 }
 
+struct StoryMusicTrack: Identifiable {
+    let id: String
+    let title: String
+    let artist: String
+}
+
 struct StoryComposerSheet: View {
     let onCreated: () -> Void
     @Environment(\.dismiss) private var dismiss
@@ -812,28 +862,144 @@ struct StoryComposerSheet: View {
 
     @State private var text = ""
     @State private var backgroundColor = "#7C3AED"
-    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var selectedMediaItem: PhotosPickerItem?
     @State private var imageDataURL = ""
     @State private var previewImage: UIImage?
+    @State private var selectedVideoName: String?
+    @State private var selectedMusic: StoryMusicTrack?
+    @State private var showMusicSheet = false
     @State private var isSubmitting = false
 
     private let colors = ["#7C3AED", "#EC4899", "#2563EB", "#059669", "#D97706"]
+    private let musicCatalog = [
+        StoryMusicTrack(id: "chill_1", title: "Kinnect Chill Beats", artist: "Lo-Fi Collective"),
+        StoryMusicTrack(id: "sunset_2", title: "Acoustic Sunset", artist: "Hoàng hôn Đà Nẵng"),
+        StoryMusicTrack(id: "cyber_3", title: "Cyber Wave 2026", artist: "Kinnect Studio"),
+        StoryMusicTrack(id: "summer_4", title: "Thanh âm mùa hạ", artist: "Nhạc cụ mộc"),
+        StoryMusicTrack(id: "dragon_5", title: "Nắng qua cầu Rồng", artist: "Vibes Sông Hàn")
+    ]
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
+                    // Two prominent creation tiles (Android parity: "Quay tin" & "Ảnh kèm nhạc")
+                    HStack(spacing: 12) {
+                        PhotosPicker(selection: $selectedMediaItem, matching: .videos) {
+                            VStack(spacing: 8) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.white.opacity(0.2))
+                                        .frame(width: 44, height: 44)
+                                    Image(systemName: "video.fill")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(.white)
+                                }
+                                Text("Quay tin / Video")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(.white)
+                                Text("Video 24h • Nhạc")
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.85))
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 110)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color(red: 0.51, green: 0.33, blue: 0.94), Color(red: 0.85, green: 0.30, blue: 0.68)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 18))
+                        }
+
+                        Button {
+                            showMusicSheet = true
+                        } label: {
+                            VStack(spacing: 8) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.white.opacity(0.2))
+                                        .frame(width: 44, height: 44)
+                                    Image(systemName: "music.note")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(.white)
+                                }
+                                Text("Chọn nhạc nền")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(.white)
+                                Text(selectedMusic?.title ?? "Thêm bài hát")
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.85))
+                                    .lineLimit(1)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 110)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color(red: 0.22, green: 0.48, blue: 0.91), Color(red: 0.45, green: 0.31, blue: 0.90)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 18))
+                        }
+                    }
+
+                    // Main Story Canvas Preview
                     ZStack {
                         RoundedRectangle(cornerRadius: 20)
                             .fill(Color(hex: backgroundColor))
-                            .frame(height: 260)
+                            .frame(height: 280)
 
                         if let previewImage {
                             Image(uiImage: previewImage)
                                 .resizable()
                                 .scaledToFill()
-                                .frame(height: 260)
+                                .frame(height: 280)
                                 .clipShape(RoundedRectangle(cornerRadius: 20))
+                        }
+
+                        if let videoName = selectedVideoName {
+                            VStack(spacing: 8) {
+                                Image(systemName: "video.circle.fill")
+                                    .font(.system(size: 48))
+                                    .foregroundColor(.white)
+                                Text(videoName)
+                                    .font(.caption.bold())
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 4)
+                                    .background(Capsule().fill(Color.black.opacity(0.5)))
+                            }
+                        }
+
+                        // Music overlay badge
+                        if let music = selectedMusic {
+                            VStack {
+                                HStack {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "music.note")
+                                            .font(.caption.bold())
+                                        Text("\(music.title) — \(music.artist)")
+                                            .font(.caption.bold())
+                                            .lineLimit(1)
+                                        Button {
+                                            selectedMusic = nil
+                                        } label: {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .font(.caption)
+                                        }
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(Capsule().fill(Color.black.opacity(0.65)))
+                                    .foregroundColor(.white)
+
+                                    Spacer()
+                                }
+                                .padding(12)
+                                Spacer()
+                            }
                         }
 
                         TextField("Nhập nội dung tin 24h...", text: $text, axis: .vertical)
@@ -841,8 +1007,11 @@ struct StoryComposerSheet: View {
                             .multilineTextAlignment(.center)
                             .foregroundColor(.white)
                             .padding(20)
+                            .background(previewImage != nil || selectedVideoName != nil ? Color.black.opacity(0.4) : Color.clear)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
 
+                    // Color Palette Selector
                     HStack(spacing: 12) {
                         ForEach(colors, id: \.self) { hex in
                             Circle()
@@ -857,22 +1026,33 @@ struct StoryComposerSheet: View {
                         }
                     }
 
-                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                        Label("Chọn ảnh cho Tin", systemImage: "photo")
-                            .font(.subheadline.weight(.semibold))
-                            .padding(12)
-                            .frame(maxWidth: .infinity)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                            .foregroundColor(KinnectTheme.accentBright)
+                    // Photo/Video Picker Button
+                    PhotosPicker(selection: $selectedMediaItem, matching: .any(of: [.images, .videos])) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "photo.on.rectangle.angled")
+                            Text("Chọn ảnh hoặc video từ máy")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .padding(12)
+                        .frame(maxWidth: .infinity)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                        .foregroundColor(KinnectTheme.accentBright)
                     }
-                    .onChange(of: selectedPhotoItem) { item in
+                    .onChange(of: selectedMediaItem) { item in
                         guard let item else { return }
                         Task {
-                            if let data = try? await item.loadTransferable(type: Data.self),
-                               let uiImg = UIImage(data: data),
-                               let jpeg = uiImg.jpegData(compressionQuality: 0.72) {
-                                previewImage = uiImg
-                                imageDataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
+                            if let data = try? await item.loadTransferable(type: Data.self) {
+                                if let uiImg = UIImage(data: data),
+                                   let jpeg = uiImg.jpegData(compressionQuality: 0.72) {
+                                    previewImage = uiImg
+                                    selectedVideoName = nil
+                                    imageDataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
+                                } else {
+                                    // Video selected
+                                    previewImage = nil
+                                    selectedVideoName = "Đã chọn video 24h (\(data.count / 1024 / 1024) MB)"
+                                    imageDataURL = "data:video/mp4;base64,\(data.base64EncodedString())"
+                                }
                             }
                         }
                     }
@@ -900,12 +1080,56 @@ struct StoryComposerSheet: View {
                 .padding(16)
             }
             .background(KinnectTheme.background)
-            .navigationTitle("Tạo Tin")
+            .navigationTitle("Tạo Tin 24h")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Đóng") { dismiss() }
                 }
+            }
+            .sheet(isPresented: $showMusicSheet) {
+                NavigationStack {
+                    List(musicCatalog) { track in
+                        Button {
+                            selectedMusic = track
+                            showMusicSheet = false
+                        } label: {
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    Circle()
+                                        .fill(KinnectTheme.accent.opacity(0.2))
+                                        .frame(width: 40, height: 40)
+                                    Image(systemName: "music.note")
+                                        .foregroundColor(KinnectTheme.accentBright)
+                                }
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(track.title)
+                                        .font(.subheadline.bold())
+                                        .foregroundColor(KinnectTheme.textPrimary)
+                                    Text(track.artist)
+                                        .font(.caption)
+                                        .foregroundColor(KinnectTheme.textSecondary)
+                                }
+                                Spacer()
+                                if selectedMusic?.id == track.id {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(KinnectTheme.accentBright)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                    .listStyle(.plain)
+                    .background(KinnectTheme.background)
+                    .navigationTitle("Chọn bài hát")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Đóng") { showMusicSheet = false }
+                        }
+                    }
+                }
+                .presentationDetents([.medium])
             }
         }
     }
@@ -1057,48 +1281,153 @@ struct PostCommentsSheet: View {
 
     @State private var comments: [CommentItem] = []
     @State private var newComment = ""
+    @State private var replyingTo: CommentItem? = nil
     @State private var isLoading = false
+
+    private let quickEmojis = ["😍", "😂", "🔥", "👏", "🥰", "😮", "😢", "💜"]
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                List {
-                    ForEach(comments) { c in
-                        HStack(alignment: .top, spacing: 10) {
-                            KinnectAvatarView(
-                                name: c.author.name,
-                                avatarURL: c.author.avatarUrl,
-                                colorHex: c.author.avatarColor,
-                                size: 34
-                            )
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text(c.author.name)
-                                        .font(.caption.bold())
-                                        .foregroundColor(KinnectTheme.textPrimary)
-                                    Spacer()
-                                    if c.author.id == appState.currentUser?.id {
-                                        Button(role: .destructive) {
-                                            Task { await deleteComment(c) }
-                                        } label: {
-                                            Image(systemName: "trash")
-                                                .font(.caption)
+                if comments.isEmpty && !isLoading {
+                    VStack(spacing: 8) {
+                        Spacer()
+                        KinnectIcon(glyph: .comment, size: 36, tint: KinnectTheme.textSecondary)
+                        Text("Chưa có bình luận nào")
+                            .font(.subheadline.bold())
+                            .foregroundColor(KinnectTheme.textPrimary)
+                        Text("Hãy là người đầu tiên để lại bình luận!")
+                            .font(.caption)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    List {
+                        ForEach(comments) { c in
+                            HStack(alignment: .top, spacing: 10) {
+                                KinnectAvatarView(
+                                    name: c.author.name,
+                                    avatarURL: c.author.avatarUrl,
+                                    colorHex: c.author.avatarColor,
+                                    size: 34
+                                )
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack {
+                                        Text(c.author.name)
+                                            .font(.caption.bold())
+                                            .foregroundColor(KinnectTheme.textPrimary)
+                                        Spacer()
+                                        if c.author.id == appState.currentUser?.id {
+                                            Button(role: .destructive) {
+                                                Task { await deleteComment(c) }
+                                            } label: {
+                                                Image(systemName: "trash")
+                                                    .font(.caption)
+                                            }
                                         }
                                     }
-                                }
-                                Text(c.text)
-                                    .font(.subheadline)
-                                    .foregroundColor(KinnectTheme.textPrimary)
-                                    .kinnectMultiline()
-                            }
-                        }
-                        .listRowBackground(KinnectTheme.surface)
-                    }
-                }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
+                                    Text(c.text)
+                                        .font(.subheadline)
+                                        .foregroundColor(KinnectTheme.textPrimary)
+                                        .kinnectMultiline()
 
+                                    // Action bar: Trả lời, Thả cảm xúc, Thời gian
+                                    HStack(spacing: 14) {
+                                        Button {
+                                            replyingTo = c
+                                            if !newComment.contains("@\(c.author.name)") {
+                                                newComment = "@\(c.author.name) " + newComment
+                                            }
+                                        } label: {
+                                            Text("Trả lời")
+                                                .font(.caption2.bold())
+                                                .foregroundColor(KinnectTheme.accentBright)
+                                        }
+                                        .buttonStyle(.plain)
+
+                                        Button {
+                                            toggleCommentLike(c)
+                                        } label: {
+                                            HStack(spacing: 3) {
+                                                Image(systemName: c.liked ? "heart.fill" : "heart")
+                                                    .font(.caption2)
+                                                    .foregroundColor(c.liked ? KinnectTheme.danger : KinnectTheme.textSecondary)
+                                                if c.likesCount > 0 {
+                                                    Text("\(c.likesCount)")
+                                                        .font(.caption2)
+                                                        .foregroundColor(c.liked ? KinnectTheme.danger : KinnectTheme.textSecondary)
+                                                }
+                                            }
+                                        }
+                                        .buttonStyle(.plain)
+
+                                        Text(formatRelativeDate(c.createdAt))
+                                            .font(.caption2)
+                                            .foregroundColor(KinnectTheme.textSecondary)
+                                    }
+                                    .padding(.top, 2)
+                                }
+                            }
+                            .listRowBackground(KinnectTheme.surface)
+                        }
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                }
+
+                // Quick emoji reaction bar
                 HStack(spacing: 10) {
+                    ForEach(quickEmojis, id: \.self) { emoji in
+                        Button {
+                            newComment.append(emoji)
+                        } label: {
+                            Text(emoji)
+                                .font(.title3)
+                                .frame(minWidth: 32, minHeight: 32)
+                        }
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 4)
+                .background(KinnectTheme.surface)
+
+                // Replying banner
+                if let replying = replyingTo {
+                    HStack {
+                        Text("Đang trả lời @\(replying.author.name) • Chạm để huỷ")
+                            .font(.caption)
+                            .foregroundColor(KinnectTheme.accentBright)
+                        Spacer()
+                        Button {
+                            replyingTo = nil
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 6)
+                    .background(KinnectTheme.surfaceElevated)
+                }
+
+                HStack(spacing: 8) {
+                    // Mention button
+                    Button {
+                        if !newComment.hasSuffix("@") {
+                            newComment.append("@")
+                        }
+                    } label: {
+                        Text("@")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(KinnectTheme.accentBright)
+                            .frame(width: 34, height: 34)
+                            .background(Circle().fill(KinnectTheme.surfaceElevated))
+                    }
+                    .accessibilityLabel("Nhắc tên thành viên")
+
                     TextField("Viết bình luận...", text: $newComment)
                         .padding(10)
                         .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
@@ -1132,6 +1461,22 @@ struct PostCommentsSheet: View {
         }
     }
 
+    private func toggleCommentLike(_ item: CommentItem) {
+        if let idx = comments.firstIndex(where: { $0.id == item.id }) {
+            comments[idx].liked.toggle()
+            comments[idx].likesCount += comments[idx].liked ? 1 : -1
+            if comments[idx].likesCount < 0 { comments[idx].likesCount = 0 }
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            Task {
+                _ = try? await KinnectAPIClient.shared.requestJSON(
+                    "/api/posts/\(post.id)/comments/\(item.id)/like",
+                    method: "POST",
+                    body: [:]
+                )
+            }
+        }
+    }
+
     private func loadComments() async {
         isLoading = true
         defer { isLoading = false }
@@ -1146,12 +1491,18 @@ struct PostCommentsSheet: View {
         guard !clean.isEmpty else { return }
         let draft = newComment
         newComment = ""
+        let parent = replyingTo?.id
+        replyingTo = nil
         let reqId = "comment_\(post.id)_\(UUID().uuidString)"
         do {
+            var bodyDict: [String: Any] = ["body": clean]
+            if let parent = parent {
+                bodyDict["parentId"] = parent
+            }
             _ = try await KinnectAPIClient.shared.requestJSON(
                 "/api/posts/\(post.id)/comments",
                 method: "POST",
-                body: KinnectWriteBody.comment(clean),
+                body: bodyDict,
                 requestId: reqId
             )
             await loadComments()
