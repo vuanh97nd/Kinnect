@@ -29,10 +29,18 @@ enum KinnectTheme {
     static var border: Color {
         Color(UIColor { trait in
             trait.userInterfaceStyle == .light
-                ? UIColor.black.withAlphaComponent(0.08)
-                : UIColor.white.withAlphaComponent(0.10)
+                    ? UIColor.black.withAlphaComponent(0.15)
+                    : UIColor.white.withAlphaComponent(0.20)
         })
     }
+
+        // MARK: - Corner Radius Scale
+        static let radiusXS: CGFloat = 8
+        static let radiusSM: CGFloat = 12
+        static let radiusMD: CGFloat = 16
+        static let radiusLG: CGFloat = 24
+        static let radiusXL: CGFloat = 32
+        static let radiusPill: CGFloat = 999
 
     static let accent = Color(red: 0.49, green: 0.23, blue: 0.93)           // #7C3AED
     static let accentBright = Color(red: 0.65, green: 0.33, blue: 0.97)     // #A855F7
@@ -305,10 +313,10 @@ extension View {
     func kinnectCard() -> some View {
         self.padding(14)
             .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: KinnectTheme.radiusMD, style: .continuous)
                     .fill(KinnectTheme.surface)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            RoundedRectangle(cornerRadius: KinnectTheme.radiusMD, style: .continuous)
                             .stroke(KinnectTheme.border, lineWidth: 1)
                     )
             )
@@ -379,7 +387,7 @@ public struct PostSkeletonCard: View {
                     .fill(KinnectTheme.surfaceElevated)
                     .frame(width: 220, height: 12)
             }
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: KinnectTheme.radiusLG)
                 .fill(KinnectTheme.surfaceElevated)
                 .frame(maxWidth: .infinity)
                 .frame(height: 200)
