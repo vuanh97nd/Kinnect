@@ -31,7 +31,6 @@ struct ProfileView: View {
         case posts = "Bài viết"
         case albums = "Album ảnh"
         case videos = "Video"
-        case edit = "Chỉnh sửa"
     }
 
     @State private var selectedTab: ProfileTab = .about
