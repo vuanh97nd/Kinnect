@@ -693,27 +693,17 @@ struct RootMainView: View {
                                         Label("Tạo", systemImage: "plus.circle.fill")
                                     }
 
-                                    NavigationStack {
-                                                                            ShortsVideoView()
-                                                                                                                                                    .toolbar { headerTrailingButtons() }
-                                                                            .navigationTitle("Video")
-                                        .navigationBarTitleDisplayMode(.large)
-                                    }
-                                    .tag(KinnectNavTab.video)
-                                    .tabItem {
-                                        Label("Video", systemImage: "play.rectangle.fill")
-                                    }
+                                    ShortsVideoView()
+                                        .tag(KinnectNavTab.video)
+                                        .tabItem {
+                                            Label("Video", systemImage: "play.rectangle.fill")
+                                        }
 
-                                    NavigationStack {
-                                                                            LiveStreamView(onOpenWallet: { activeTopSection = .wallet })
-                                                                                                                                                    .toolbar { headerTrailingButtons() }
-                                                                            .navigationTitle("Live")
-                                        .navigationBarTitleDisplayMode(.large)
-                                    }
-                                    .tag(KinnectNavTab.live)
-                                    .tabItem {
-                                        Label("Live", systemImage: "dot.radiowaves.left.and.right")
-                                    }
+                                    LiveStreamView(onOpenWallet: { activeTopSection = .wallet })
+                                        .tag(KinnectNavTab.live)
+                                        .tabItem {
+                                            Label("Live", systemImage: "dot.radiowaves.left.and.right")
+                                        }
                                 }
                                                                 .onChange(of: selectedTab) { newTab in
                                     // Haptic feedback on tab selection (P1)

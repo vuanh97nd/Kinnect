@@ -298,7 +298,7 @@ struct ShortsVideoView: View {
     }
 }
 
-private struct ShortClipPlayer: View {
+struct ShortClipPlayer: View {
     let path: String
     let active: Bool
     @ObservedObject private var calls = NativeWebRTCManager.shared

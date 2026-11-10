@@ -354,12 +354,7 @@ struct WalletStoreView: View {
                             storeFilter = cat
                         } label: {
                             HStack(spacing: 6) {
-                                KinnectIcon(
-                                    glyph: cat == .style ? .store : (cat == .studio ? .camera : .seen),
-                                    size: 14,
-                                    selected: isSelected,
-                                    tint: isSelected ? .white : KinnectTheme.textSecondary
-                                )
+                                categoryIcon(for: cat, isSelected: isSelected)
                                 Text(cat.rawValue)
                                     .font(.caption.bold())
                                     .lineLimit(1)
@@ -503,6 +498,52 @@ struct WalletStoreView: View {
         }
     }
 
+    @ViewBuilder
+    private func categoryIcon(for cat: StoreCategoryFilter, isSelected: Bool) -> some View {
+        let tint: Color = isSelected ? .white : KinnectTheme.textSecondary
+        switch cat {
+        case .style:
+            Image(systemName: "paintpalette.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(tint)
+        case .live:
+            KinnectIcon(glyph: .live, size: 14, selected: isSelected, tint: tint)
+        case .gifts:
+            KinnectIcon(glyph: .gift, size: 14, selected: isSelected, tint: tint)
+        case .member:
+            Image(systemName: "crown.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(tint)
+        case .studio:
+            KinnectIcon(glyph: .studio, size: 14, selected: isSelected, tint: tint)
+        case .owned:
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(tint)
+        }
+    }
+
+    @ViewBuilder
+    private func packageKindIcon(_ kind: String, accentHex: String) -> some View {
+        let accent = Color(hex: accentHex)
+        switch kind {
+        case "live":
+            KinnectIcon(glyph: .live, size: 20, selected: true, tint: accent)
+        case "gifts":
+            KinnectIcon(glyph: .gift, size: 20, selected: true, tint: accent)
+        case "member":
+            Image(systemName: "crown.fill")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(accent)
+        case "studio":
+            KinnectIcon(glyph: .studio, size: 20, selected: true, tint: accent)
+        default:
+            Image(systemName: "paintpalette.fill")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(accent)
+        }
+    }
+
     // MARK: - Individual Package Card with Visual Artwork Parity (`storeArtwork(p)`)
     private func storeProductCard(_ pkg: StorePackageItem) -> some View {
         VStack(spacing: 0) {
@@ -536,12 +577,7 @@ struct WalletStoreView: View {
 
                     Spacer()
 
-                    KinnectIcon(
-                        glyph: pkg.kind == "studio" ? .camera : .store,
-                        size: 20,
-                        selected: true,
-                        tint: Color(hex: pkg.accentColor)
-                    )
+                    packageKindIcon(pkg.kind, accentHex: pkg.accentColor)
                 }
 
                 // Price Row
@@ -826,6 +862,8 @@ private struct StorePackageArtworkView: View {
         let candidatePaths = [
             Bundle.main.path(forResource: assetImageName, ofType: "png"),
             Bundle.main.path(forResource: assetImageName, ofType: "webp"),
+            Bundle.main.path(forResource: assetImageName, ofType: "png", inDirectory: "StoreArt"),
+            Bundle.main.path(forResource: "StoreArt/\(assetImageName)", ofType: "png"),
             Bundle.main.path(forResource: "Graphics/\(assetImageName)", ofType: "png")
         ]
         for p in candidatePaths.compactMap({ $0 }) {

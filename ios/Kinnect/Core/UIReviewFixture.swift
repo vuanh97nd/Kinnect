@@ -446,70 +446,216 @@ enum UIReviewFixture {
 
         case "/api/store":
             return [
+                "ownedPackages": ["style_aurora"],
+                "liveTheme": "",
+                "membership": "",
                 "packages": [
                     [
-                        "id": "fixture_pkg_1",
-                        "title": "Khung Avatar Tím Tinh Vân",
-                        "subtitle": "Hiệu ứng viền tím Kinnect nổi bật trên hồ sơ & phòng Live",
-                        "category": "frame",
+                        "id": "style_aurora",
+                        "title": "Cực quang",
+                        "subtitle": "Sắc màu kết nối · Dải cực quang mềm, biểu trưng cho sự cởi mở",
+                        "category": "style",
                         "priceCoins": 500,
                         "badgeText": "HOT",
-                        "accentColor": "#7C3AED",
+                        "accentColor": "#8B5CF6",
                         "owned": true,
                         "equipped": true
                     ],
                     [
-                        "id": "fixture_pkg_2",
-                        "title": "Huy Hiệu Tiên Phong",
-                        "subtitle": "Huy hiệu hiển thị cạnh tên trên bảng tin và phòng Live",
-                        "category": "badge",
+                        "id": "style_galaxy",
+                        "title": "Galaxy",
+                        "subtitle": "Vũ trụ của bạn · Chiều sâu bầu trời đêm, dành cho cá tính riêng",
+                        "category": "style",
                         "priceCoins": 800,
+                        "badgeText": "VIP",
+                        "accentColor": "#312E81",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "style_neon",
+                        "title": "Neon",
+                        "subtitle": "Dấu ấn thành thị · Năng lượng trẻ, đường sáng tím và cyan",
+                        "category": "style",
+                        "priceCoins": 300,
                         "badgeText": "MỚI",
-                        "accentColor": "#2563EB",
+                        "accentColor": "#7C3AED",
                         "owned": false,
                         "equipped": false
                     ],
                     [
-                        "id": "fixture_pkg_studio",
-                        "title": "Gói Mở Khóa Studio Pro",
-                        "subtitle": "Mở khóa bộ lọc màu điện ảnh CIFilter, hiệu ứng Pro & xuất video HD",
-                        "category": "studio",
-                        "priceCoins": 1200,
-                        "badgeText": "PRO",
-                        "accentColor": "#EC4899",
-                        "owned": false,
-                        "equipped": false
-                    ],
-                    [
-                        "id": "fixture_pkg_live",
-                        "title": "Chủ Đề Live Ánh Sao",
-                        "subtitle": "Giao diện phòng Live ánh sao lấp lánh",
-                        "category": "live",
+                        "id": "style_ice",
+                        "title": "Băng hà",
+                        "subtitle": "Tinh thể băng xanh, cảm giác lạnh và sạch",
+                        "category": "style",
                         "priceCoins": 600,
-                        "badgeText": "HOT",
+                        "badgeText": "EPIC",
+                        "accentColor": "#38BDF8",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "style_ruby",
+                        "title": "Hồng ngọc",
+                        "subtitle": "Sắc ruby sâu, điểm nhấn quyến rũ",
+                        "category": "style",
+                        "priceCoins": 650,
+                        "badgeText": "EPIC",
+                        "accentColor": "#BE123C",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "style_forest",
+                        "title": "Rừng thẳm",
+                        "subtitle": "Xanh lá trầm, gần gũi thiên nhiên",
+                        "category": "style",
+                        "priceCoins": 350,
+                        "badgeText": "RARE",
+                        "accentColor": "#047857",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "style_paper",
+                        "title": "Giấy mỹ thuật",
+                        "subtitle": "Kem và mực, tối giản như trang giấy",
+                        "category": "style",
+                        "priceCoins": 300,
+                        "badgeText": "RARE",
+                        "accentColor": "#D6D3D1",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "style_ember",
+                        "title": "Lửa trại",
+                        "subtitle": "Hổ phách và đỏ than, ấm áp",
+                        "category": "style",
+                        "priceCoins": 900,
+                        "badgeText": "LEGENDARY",
                         "accentColor": "#F59E0B",
                         "owned": false,
                         "equipped": false
                     ],
                     [
-                        "id": "fixture_pkg_gifts",
-                        "title": "Bộ Quà Tặng Hoàng Gia",
-                        "subtitle": "Bộ 6 quà tặng 3D độc quyền phòng Live",
-                        "category": "gifts",
-                        "priceCoins": 999,
-                        "badgeText": "VIP",
-                        "accentColor": "#EC4899",
+                        "id": "live_chill",
+                        "title": "Live Chill",
+                        "subtitle": "Không gian thư giãn · Sắc biển dịu khi trò chuyện",
+                        "category": "live",
+                        "priceCoins": 500,
+                        "badgeText": "HOT",
+                        "accentColor": "#0D9488",
                         "owned": false,
                         "equipped": false
                     ],
                     [
-                        "id": "fixture_pkg_member",
-                        "title": "Hội Viên Kinnect Creator",
-                        "subtitle": "Đặc quyền sáng tạo nội dung & huy hiệu sáng tạo",
+                        "id": "live_gaming",
+                        "title": "Live Gaming",
+                        "subtitle": "Sân khấu trận đấu · Đường nét góc cạnh chuyên nghiệp",
+                        "category": "live",
+                        "priceCoins": 800,
+                        "badgeText": "EPIC",
+                        "accentColor": "#4F46E5",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "live_spotlight",
+                        "title": "Live Spotlight",
+                        "subtitle": "Bạn là tâm điểm · Ánh đèn sân khấu và sắc vàng ấm",
+                        "category": "live",
+                        "priceCoins": 1200,
+                        "badgeText": "VIP",
+                        "accentColor": "#A16207",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "live_game_30",
+                        "title": "Live Game 30 ngày",
+                        "subtitle": "Phát màn hình game, bình luận nổi và trả lời",
+                        "category": "live",
+                        "priceCoins": 490,
+                        "badgeText": "PRO",
+                        "accentColor": "#6D28D9",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "gift_love",
+                        "title": "Bộ Quà Yêu Thương",
+                        "subtitle": "Bộ 6 hoa hồng 3D độc quyền gửi tặng phòng Live",
+                        "category": "gifts",
+                        "priceCoins": 300,
+                        "badgeText": "HOT",
+                        "accentColor": "#DB2777",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "gift_speed",
+                        "title": "Bộ Quà Tốc Độ",
+                        "subtitle": "Bộ siêu xe & sao băng 3D hiệu ứng sân khấu",
+                        "category": "gifts",
+                        "priceCoins": 1000,
+                        "badgeText": "EPIC",
+                        "accentColor": "#2563EB",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "gift_royal",
+                        "title": "Bộ Quà Hoàng Gia",
+                        "subtitle": "Bộ lâu đài & vương miện 3D đỉnh cao phòng Live",
+                        "category": "gifts",
+                        "priceCoins": 2000,
+                        "badgeText": "VIP",
+                        "accentColor": "#7E22CE",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "member_plus",
+                        "title": "Hội Viên Plus",
+                        "subtitle": "Huy hiệu thành viên Plus trên hồ sơ và phòng Live",
                         "category": "member",
-                        "priceCoins": 1500,
+                        "priceCoins": 490,
+                        "badgeText": "PLUS",
+                        "accentColor": "#4338CA",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "member_creator",
+                        "title": "Hội Viên Creator",
+                        "subtitle": "Đặc quyền sáng tạo nội dung & huy hiệu Creator nổi bật",
+                        "category": "member",
+                        "priceCoins": 990,
                         "badgeText": "CREATOR",
-                        "accentColor": "#10B981",
+                        "accentColor": "#C026D3",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "studio_video_30",
+                        "title": "Studio Video Pro 30 ngày",
+                        "subtitle": "Mở khóa toàn bộ hiệu ứng dựng phim Pro & xuất HD không watermark",
+                        "category": "studio",
+                        "priceCoins": 490,
+                        "badgeText": "PRO",
+                        "accentColor": "#7C3AED",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "studio_photo_30",
+                        "title": "Studio Ảnh Pro 30 ngày",
+                        "subtitle": "Bộ lọc màu điện ảnh & công cụ chỉnh ảnh cao cấp",
+                        "category": "studio",
+                        "priceCoins": 490,
+                        "badgeText": "PRO",
+                        "accentColor": "#DB2777",
                         "owned": false,
                         "equipped": false
                     ]
@@ -934,21 +1080,11 @@ enum UIReviewFixture {
             )
         case "video", "shorts":
             return AnyView(
-                NavigationStack {
-                    ShortsVideoView()
-                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                        .navigationTitle("Video")
-                        .navigationBarTitleDisplayMode(.large)
-                }
+                ShortsVideoView()
             )
         case "live", "live-room":
             return AnyView(
-                NavigationStack {
-                    LiveStreamView(onOpenWallet: {})
-                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                        .navigationTitle("Live")
-                        .navigationBarTitleDisplayMode(.large)
-                }
+                LiveStreamView(onOpenWallet: {})
             )
 
         // MARK: - Messages & Chats

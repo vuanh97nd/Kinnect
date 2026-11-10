@@ -18,7 +18,7 @@ struct LiveStreamView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            Color.black
+            Color.black.ignoresSafeArea()
 
             if appState.liveRooms.isEmpty && !isLoading {
                 VStack(spacing: 16) {
@@ -59,6 +59,7 @@ struct LiveStreamView: View {
                                 ForEach(appState.liveRooms) { room in
                                     liveStreamPage(room)
                                         .frame(width: proxy.size.width, height: proxy.size.height)
+                                        .clipped()
                                         .id(room.id)
                                 }
                             }
@@ -66,6 +67,7 @@ struct LiveStreamView: View {
                         }
                         .scrollTargetBehavior(.paging)
                         .scrollPosition(id: $scrolledRoomId)
+                        .ignoresSafeArea()
                         .onChange(of: scrolledRoomId) { newId in
                             guard let newId,
                                   let idx = appState.liveRooms.firstIndex(where: { $0.id == newId }) else { return }
@@ -160,43 +162,23 @@ struct LiveStreamView: View {
                 } else if let remoteTrack = webrtc.liveRemoteVideoTrack {
                     WebRTCVideoRendererView(track: remoteTrack, mirror: false)
                 } else {
-                    Rectangle()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 0.12, green: 0.05, blue: 0.22),
-                                    Color(red: 0.04, green: 0.02, blue: 0.10)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
+                    // Playable live video fallback with vignette overlay (Parity Android 1.2.12 build 118)
+                    ZStack {
+                        ShortClipPlayer(
+                            path: UIReviewFixture.samplePlayableVideoURL()?.absoluteString ?? "https://kinnect.io.vn/media/welcome-feed-demo.mp4",
+                            active: true
                         )
-                        .overlay(
-                            VStack(spacing: 16) {
-                                ZStack {
-                                    Circle()
-                                        .fill(KinnectTheme.accent.opacity(0.2))
-                                        .frame(width: 110, height: 110)
-                                    KinnectAvatarView(
-                                        name: room.hostName,
-                                        avatarURL: room.hostAvatarUrl,
-                                        colorHex: room.hostAvatarColor,
-                                        size: 84
-                                    )
-                                }
-                                Text(room.title)
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 24)
-                                    .multilineTextAlignment(.center)
-                                HStack(spacing: 6) {
-                                    Circle().fill(KinnectTheme.online).frame(width: 8, height: 8)
-                                    Text(room.gamePaused ? "Chủ phòng tạm dừng" : "Đang kết nối luồng Live WebRTC HD...")
-                                        .font(.caption)
-                                        .foregroundColor(KinnectTheme.textSecondary)
-                                }
-                            }
+                        LinearGradient(
+                            colors: [
+                                Color.black.opacity(0.4),
+                                Color.clear,
+                                Color.black.opacity(0.7)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
                         )
+                    }
+                    .ignoresSafeArea()
                 }
             }
 
@@ -271,7 +253,7 @@ struct LiveStreamView: View {
                     .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 14)
-                .padding(.top, 14)
+                .padding(.top, 54)
 
                 Spacer()
 
