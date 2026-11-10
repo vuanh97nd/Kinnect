@@ -64,7 +64,7 @@ struct RootMainView: View {
 
     // Shared trailing toolbar for all tabs (P1)
     @ToolbarContentBuilder
-        private func headerTrailingButtons() -> some ToolbarContent {
+        private func headerTrailingButtons() -> ToolbarContent {
         ToolbarItemGroup(placement: .topBarTrailing) {
             // Notifications
             Button {
