@@ -217,6 +217,7 @@ struct LiveStreamView: View {
                                 .font(.caption.bold())
                                 .foregroundColor(.white)
                                 .lineLimit(1)
+                                .minimumScaleFactor(0.85)
                             HStack(spacing: 4) {
                                 Text("LIVE")
                                     .font(.system(size: 9, weight: .black))
