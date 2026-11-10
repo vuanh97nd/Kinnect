@@ -64,7 +64,7 @@ struct RootMainView: View {
 
     // Shared trailing toolbar for all tabs (P1)
     @ToolbarContentBuilder
-        private func headerTrailingButtons() -> ToolbarContent {
+        private func headerTrailingButtons() -> any ToolbarContent {
         ToolbarItemGroup(placement: .topBarTrailing) {
             // Notifications
             Button {
@@ -573,7 +573,7 @@ struct RootMainView: View {
                                         Label("Live", systemImage: "dot.radiowaves.left.and.right")
                                     }
                                 }
-                                .onChange(of: selectedTab) { _, newTab in
+                                                                .onChange(of: selectedTab) { newTab in
                                     // Haptic feedback on tab selection (P1)
                                     let generator = UIImpactFeedbackGenerator(style: .light)
                                     generator.impactOccurred()
