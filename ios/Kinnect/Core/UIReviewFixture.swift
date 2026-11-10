@@ -64,6 +64,18 @@ enum UIReviewFixture {
         "isFriend": false
     ]
 
+    static let thirdPeerDict: [String: Any] = [
+        "id": "fixture_user_3",
+        "name": "Phạm Minh Hoàng",
+        "handle": "hoangpham",
+        "bio": "Lập trình viên iOS & đam mê thiết kế UI • Đà Nẵng",
+        "locationName": "Đà Nẵng",
+        "avatarColor": "#3B82F6",
+        "distanceKm": 12.4,
+        "isFollowing": false,
+        "isFriend": false
+    ]
+
     static let fixtureGroupDict: [String: Any] = [
         "id": "fixture_group_1",
         "name": "Nhóm Thiết Kế Kinnect [Fixture]",
@@ -336,7 +348,7 @@ enum UIReviewFixture {
         case "/api/friend-requests":
             return [
                 "incoming": [["fromUser": secondPeerDict]],
-                "outgoing": [["toUser": secondPeerDict]]
+                "outgoing": [["toUser": thirdPeerDict]]
             ]
 
         case "/api/me/privacy-consent":
@@ -891,7 +903,7 @@ enum UIReviewFixture {
                         .navigationBarTitleDisplayMode(.large)
                 }
             )
-        case "create", "camera-studio", "camera-studio-edit":
+        case "create", "camera-studio":
             return AnyView(
                 NavigationStack {
                     CameraStudioView()
@@ -899,6 +911,10 @@ enum UIReviewFixture {
                         .navigationTitle("Tạo")
                         .navigationBarTitleDisplayMode(.large)
                 }
+            )
+        case "camera-studio-edit":
+            return AnyView(
+                CameraStudioView()
             )
         case "camera-studio-video":
             return AnyView(
@@ -1091,7 +1107,7 @@ enum UIReviewFixture {
         case "wallet-topup":
             return AnyView(
                 NavigationStack {
-                    WalletStoreView(initialTab: .packages, initialStoreFilter: .style)
+                    WalletStoreView(initialTab: .topup)
                         .toolbar { RootMainView.headerTrailingButtonsStatic() }
                         .navigationTitle("Nạp xu Kinnect")
                         .navigationBarTitleDisplayMode(.large)

@@ -7,7 +7,8 @@ struct WalletStoreView: View {
 
     enum SectionTab: String, CaseIterable {
         case wallet = "Ví Kinnect"
-        case packages = "Cửa hàng Kinnect"
+        case packages = "Cửa hàng"
+        case topup = "Nạp xu"
     }
 
     enum StoreCategoryFilter: String, CaseIterable {
@@ -63,6 +64,9 @@ struct WalletStoreView: View {
 
                     case .packages:
                         storeSectionView
+
+                    case .topup:
+                        storeKitSectionView
                     }
                 }
                 .padding(.horizontal, 16)
@@ -74,15 +78,17 @@ struct WalletStoreView: View {
         }
         .background(KinnectTheme.background.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
-        .navigationTitle(tab == .wallet ? "Ví Kinnect" : "Cửa hàng Kinnect")
+        .navigationTitle(tab == .wallet ? "Ví Kinnect" : (tab == .topup ? "Nạp xu Kinnect" : "Cửa hàng Kinnect"))
         .task {
             await loadWalletAndStore()
         }
         .onAppear {
             if UIReviewFixture.activeScreen == "wallet-topup" {
+                tab = .topup
+            } else if UIReviewFixture.activeScreen == "wallet-packages" || UIReviewFixture.activeScreen == "store-packages" {
                 tab = .packages
-            } else if UIReviewFixture.activeScreen == "wallet-packages" {
-                tab = .packages
+            } else if UIReviewFixture.activeScreen == "wallet" {
+                tab = .wallet
             }
         }
     }
@@ -154,7 +160,7 @@ struct WalletStoreView: View {
                 }
 
                 Button {
-                    tab = .packages
+                    tab = .topup
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "plus.circle.fill")
@@ -340,31 +346,36 @@ struct WalletStoreView: View {
             )
 
             // Category Filter Pills matching Web `store-category`
-            HStack(spacing: 8) {
-                ForEach(StoreCategoryFilter.allCases, id: \.self) { cat in
-                    let isSelected = storeFilter == cat
-                    Button {
-                        storeFilter = cat
-                    } label: {
-                        HStack(spacing: 6) {
-                            KinnectIcon(
-                                glyph: cat == .style ? .store : (cat == .studio ? .camera : .seen),
-                                size: 14,
-                                selected: isSelected,
-                                tint: isSelected ? .white : KinnectTheme.textSecondary
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(StoreCategoryFilter.allCases, id: \.self) { cat in
+                        let isSelected = storeFilter == cat
+                        Button {
+                            storeFilter = cat
+                        } label: {
+                            HStack(spacing: 6) {
+                                KinnectIcon(
+                                    glyph: cat == .style ? .store : (cat == .studio ? .camera : .seen),
+                                    size: 14,
+                                    selected: isSelected,
+                                    tint: isSelected ? .white : KinnectTheme.textSecondary
+                                )
+                                Text(cat.rawValue)
+                                    .font(.caption.bold())
+                                    .lineLimit(1)
+                                    .fixedSize(horizontal: true, vertical: false)
+                            }
+                            .foregroundColor(isSelected ? .white : KinnectTheme.textSecondary)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule().fill(isSelected ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
                             )
-                            Text(cat.rawValue)
-                                .font(.caption.bold())
                         }
-                        .foregroundColor(isSelected ? .white : KinnectTheme.textSecondary)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(
-                            Capsule().fill(isSelected ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
-                        )
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
+                .padding(.horizontal, 2)
             }
 
             // Interactive Live Preview Banner when user taps "Xem thử" (Web `storePreview()`)

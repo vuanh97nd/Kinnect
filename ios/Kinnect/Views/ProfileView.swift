@@ -93,44 +93,42 @@ struct ProfileView: View {
 
                 if let user = activeUser {
                     // 1. Cover & Avatar Card with Handle & Stats (Parity Android 1.2.12 build 118)
-                    VStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 14) {
                         ZStack(alignment: .bottomLeading) {
                             if !user.coverUrl.isEmpty {
                                 KinnectRemoteImageView(
                                     rawURL: user.coverUrl,
                                     contentMode: .fill,
                                     cornerRadius: KinnectTheme.radiusXL,
-                                    maxHeight: 140
+                                    maxHeight: 130
                                 )
                             } else {
                                 RoundedRectangle(cornerRadius: KinnectTheme.radiusXL)
                                     .fill(KinnectTheme.primaryGradient)
-                                    .frame(height: 130)
+                                    .frame(height: 120)
                             }
 
-                            HStack(alignment: .bottom, spacing: 12) {
-                                KinnectAvatarView(
-                                    name: user.name,
-                                    avatarURL: user.avatarUrl,
-                                    colorHex: user.avatarColor,
-                                    size: 76,
-                                    isOnline: isSelf ? true : appState.onlineUserIds.contains(user.id)
-                                )
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(user.name)
-                                        .font(.title3.bold())
-                                        .foregroundColor(KinnectTheme.textPrimary)
-                                    Text("@\(user.handle.isEmpty ? user.name : user.handle)")
-                                        .font(.subheadline)
-                                        .foregroundColor(KinnectTheme.accentBright)
-                                }
-                                .padding(.bottom, 6)
-                            }
-                            .padding(.horizontal, 14)
-                            .padding(.bottom, -20)
+                            KinnectAvatarView(
+                                name: user.name,
+                                avatarURL: user.avatarUrl,
+                                colorHex: user.avatarColor,
+                                size: 76,
+                                isOnline: isSelf ? true : appState.onlineUserIds.contains(user.id)
+                            )
+                            .padding(.leading, 14)
+                            .offset(y: 38)
                         }
-                        .padding(.bottom, 22)
+                        .padding(.bottom, 38)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(user.name)
+                                .font(.title3.bold())
+                                .foregroundColor(KinnectTheme.textPrimary)
+                            Text("@\(user.handle.isEmpty ? user.name : user.handle)")
+                                .font(.subheadline)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        }
+                        .padding(.horizontal, 14)
 
                         if isSelf {
                             // Prominent "Chỉnh sửa hồ sơ" Button
@@ -159,6 +157,7 @@ struct ProfileView: View {
                             Divider().frame(height: 28).background(KinnectTheme.border)
                             statColumn(count: user.followingCount, label: "Đang theo dõi")
                         }
+                        .frame(maxWidth: .infinity)
                         .padding(.top, 4)
                     }
                     .kinnectCard()

@@ -105,42 +105,6 @@ struct LiveStreamView: View {
                     }
                 }
             }
-
-            // Top overlay bar with Go Live button
-            HStack {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(Color.red)
-                        .frame(width: 8, height: 8)
-                    Text("LIVE")
-                        .font(.caption.bold())
-                        .foregroundColor(.white)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(Capsule().fill(Color.black.opacity(0.5)))
-
-                Spacer()
-
-                Button {
-                    showCreateLiveSheet = true
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "video.fill")
-                            .font(.system(size: 13, weight: .bold))
-                        Text("Phát Live")
-                            .font(.caption.bold())
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 7)
-                    .background(Capsule().fill(KinnectTheme.primaryGradient))
-                    .foregroundColor(.white)
-                    .shadow(color: Color.black.opacity(0.4), radius: 6, y: 2)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 10)
         }
         .task {
             await fetchLiveRooms()
@@ -286,6 +250,24 @@ struct LiveStreamView: View {
                     .background(Capsule().fill(Color.white.opacity(0.18)))
 
                     Spacer()
+
+                    // Go Live Button
+                    Button {
+                        showCreateLiveSheet = true
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "video.fill")
+                                .font(.system(size: 11, weight: .bold))
+                            Text("Phát Live")
+                                .font(.caption2.bold())
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Capsule().fill(KinnectTheme.primaryGradient))
+                        .foregroundColor(.white)
+                        .shadow(color: Color.black.opacity(0.4), radius: 6, y: 2)
+                    }
+                    .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 14)
                 .padding(.top, 14)
