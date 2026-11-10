@@ -7,6 +7,7 @@ struct ProfileView: View {
     var onOpenWallet: (() -> Void)? = nil
     var onOpenFriends: (() -> Void)? = nil
     var onOpenStore: (() -> Void)? = nil
+    var initialTab: ProfileTab? = nil
 
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
@@ -30,9 +31,20 @@ struct ProfileView: View {
         case posts = "Bài viết"
         case albums = "Album ảnh"
         case videos = "Video"
+        case edit = "Chỉnh sửa"
     }
 
     @State private var selectedTab: ProfileTab = .about
+
+    init(targetUser: KinnectUser? = nil, onOpenWallet: (() -> Void)? = nil, onOpenFriends: (() -> Void)? = nil, onOpenStore: (() -> Void)? = nil, initialTab: ProfileTab? = nil) {
+        self.targetUser = targetUser
+        self.onOpenWallet = onOpenWallet
+        self.onOpenFriends = onOpenFriends
+        self.onOpenStore = onOpenStore
+        if let initialTab = initialTab {
+            _selectedTab = State(initialValue: initialTab)
+        }
+    }
     @State private var userPosts: [PostItem] = []
     @State private var userShorts: [ShortItem] = []
     @State private var privatePhotos: [PrivatePhotoItem] = []
