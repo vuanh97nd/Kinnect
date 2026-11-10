@@ -862,8 +862,6 @@ private struct StorePackageArtworkView: View {
         let candidatePaths = [
             Bundle.main.path(forResource: assetImageName, ofType: "png"),
             Bundle.main.path(forResource: assetImageName, ofType: "webp"),
-            Bundle.main.path(forResource: assetImageName, ofType: "png", inDirectory: "StoreArt"),
-            Bundle.main.path(forResource: "StoreArt/\(assetImageName)", ofType: "png"),
             Bundle.main.path(forResource: "Graphics/\(assetImageName)", ofType: "png")
         ]
         for p in candidatePaths.compactMap({ $0 }) {
