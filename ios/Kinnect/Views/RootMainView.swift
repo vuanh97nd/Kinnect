@@ -516,14 +516,12 @@ struct RootMainView: View {
                                 // iPhone compact layout with native TabView (5 tabs) + shared trailing toolbar
                                 TabView(selection: $selectedTab) {
                                     NavigationStack {
-                                        FeedView(
-                                            onOpenCamera: { showCameraStudioSheet = true },
-                                            onOpenFriends: { activeTopSection = .friends }
-                                        )
-                                        .toolbar {
-                                            headerTrailingButtons
-                                        }
-                                        .navigationTitle("Bảng tin")
+                                                                            FeedView(
+                                                                                onOpenCamera: { showCameraStudioSheet = true },
+                                                                                onOpenFriends: { activeTopSection = .friends }
+                                                                            )
+                                                                            .toolbar(headerTrailingButtons)
+                                                                            .navigationTitle("Bảng tin")
                                         .navigationBarTitleDisplayMode(.large)
                                     }
                                     .tag(KinnectNavTab.feed)
@@ -532,11 +530,9 @@ struct RootMainView: View {
                                     }
 
                                     NavigationStack {
-                                        DiscoverView(onOpenCamera: { showCameraStudioSheet = true })
-                                        .toolbar {
-                                            headerTrailingButtons
-                                        }
-                                        .navigationTitle("Khám phá")
+                                                                            DiscoverView(onOpenCamera: { showCameraStudioSheet = true })
+                                                                            .toolbar(headerTrailingButtons)
+                                                                            .navigationTitle("Khám phá")
                                         .navigationBarTitleDisplayMode(.large)
                                     }
                                     .tag(KinnectNavTab.discover)
@@ -545,11 +541,9 @@ struct RootMainView: View {
                                     }
 
                                     NavigationStack {
-                                        CameraStudioView()
-                                        .toolbar {
-                                            headerTrailingButtons
-                                        }
-                                        .navigationTitle("Tạo")
+                                                                            CameraStudioView()
+                                                                            .toolbar(headerTrailingButtons)
+                                                                            .navigationTitle("Tạo")
                                         .navigationBarTitleDisplayMode(.large)
                                     }
                                     .tag(KinnectNavTab.create)
@@ -558,11 +552,9 @@ struct RootMainView: View {
                                     }
 
                                     NavigationStack {
-                                        ShortsVideoView()
-                                        .toolbar {
-                                            headerTrailingButtons
-                                        }
-                                        .navigationTitle("Video")
+                                                                            ShortsVideoView()
+                                                                            .toolbar(headerTrailingButtons)
+                                                                            .navigationTitle("Video")
                                         .navigationBarTitleDisplayMode(.large)
                                     }
                                     .tag(KinnectNavTab.video)
@@ -571,11 +563,9 @@ struct RootMainView: View {
                                     }
 
                                     NavigationStack {
-                                        LiveStreamView(onOpenWallet: { activeTopSection = .wallet })
-                                        .toolbar {
-                                            headerTrailingButtons
-                                        }
-                                        .navigationTitle("Live")
+                                                                            LiveStreamView(onOpenWallet: { activeTopSection = .wallet })
+                                                                            .toolbar(headerTrailingButtons)
+                                                                            .navigationTitle("Live")
                                         .navigationBarTitleDisplayMode(.large)
                                     }
                                     .tag(KinnectNavTab.live)
@@ -788,9 +778,8 @@ struct RootMainView: View {
                             }
                         }
                     }
-}
 
-private struct UIReviewDynamicTypeModifier: ViewModifier {
+                    private struct UIReviewDynamicTypeModifier: ViewModifier {
     func body(content: Content) -> some View {
         if UIReviewFixture.forceMaxDynamicType {
             content.dynamicTypeSize(.accessibility5)

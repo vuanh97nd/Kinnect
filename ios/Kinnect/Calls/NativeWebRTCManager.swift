@@ -165,10 +165,16 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
     func handleCallRingingSocket(_ json: [String: Any]) {
         guard var current = activeCall else { return }
         if let serverCallId = json["callId"] as? String, !serverCallId.isEmpty {
-            current.callId = serverCallId
-            self.activeCall = current
+                let updated = ActiveCallSession(
+                    callId: serverCallId,
+                    peerUser: current.peerUser,
+                    mode: current.mode,
+                    isIncoming: current.isIncoming,
+                    state: current.state
+                )
+                self.activeCall = updated
+            }
         }
-    }
 
     @MainActor
     func handleIncomingCallSocket(_ json: [String: Any]) {

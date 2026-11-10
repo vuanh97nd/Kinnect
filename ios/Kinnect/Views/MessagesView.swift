@@ -2,6 +2,18 @@ import PhotosUI
 import SwiftUI
 import UIKit
 
+private func isoString(from anyVal: Any?) -> String {
+    if let s = anyVal as? String, !s.isEmpty {
+        return s
+    }
+    if let n = anyVal as? NSNumber {
+        let ms = n.doubleValue
+        let sec = ms > 10_000_000_000 ? (ms / 1000.0) : ms
+        return ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: sec))
+    }
+    return ""
+}
+
 struct MessagesView: View {
     let onOpenFriends: () -> Void
     @ObservedObject private var appState = AppState.shared
@@ -788,13 +800,14 @@ struct DirectChatDetailView: View {
         self.text = ""
         let reqId = "dm_\(peer.id)_\(UUID().uuidString)"
         let tempId = "opt_\(UUID().uuidString)"
+        let createdAt = ISO8601DateFormatter().string(from: Date())
         let optimistic = DirectMessageItem(
             id: tempId,
             fromUserId: appState.currentUser?.id ?? "",
             toUserId: peer.id,
             text: clean,
             imageUrl: imageDataURL,
-            createdAt: isoString(from: Date().timeIntervalSince1970 * 1000),
+            createdAt: createdAt,
             deliveredAt: "",
             seenAt: "",
             reaction: "",

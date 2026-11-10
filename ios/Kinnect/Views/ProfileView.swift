@@ -208,25 +208,25 @@ struct ProfileView: View {
                 NavigationStack {
                     DirectChatDetailView(peer: u)
                 }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-            .transition(.move(edge: .bottom).combined(with: .opacity))
-            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showPeerChat)
         }
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showPeerChat)
         .sheet(isPresented: $showEditProfileSheet) {
             EditProfileSheet(onSaved: {
                 Task { await refreshMe() }
             })
             .transition(.move(edge: .bottom).combined(with: .opacity))
-            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showEditProfileSheet)
         }
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showEditProfileSheet)
         .sheet(isPresented: $showPublicAlbumSheet) {
             PublicAlbumManageSheet(
                 posts: userPosts,
                 onRefresh: { Task { await refreshMe() } }
             )
             .transition(.move(edge: .bottom).combined(with: .opacity))
-            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showPublicAlbumSheet)
         }
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showPublicAlbumSheet)
         .sheet(isPresented: $showPrivateAlbumSheet) {
             PrivateAlbumManageSheet(
                 photos: $privatePhotos,
@@ -234,46 +234,46 @@ struct ProfileView: View {
                 onRefresh: { Task { await refreshMe() } }
             )
             .transition(.move(edge: .bottom).combined(with: .opacity))
-            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showPrivateAlbumSheet)
         }
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showPrivateAlbumSheet)
         .sheet(item: $activeShortItem) { short in
             ProfileShortDetailSheet(
                 short: short,
                 onRefresh: { Task { await refreshMe() } }
             )
             .transition(.move(edge: .bottom).combined(with: .opacity))
-            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: activeShortItem)
         }
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: activeShortItem)
         .sheet(isPresented: $showSessionsSheet) {
             ActiveSessionsSheet()
             .transition(.move(edge: .bottom).combined(with: .opacity))
-            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showSessionsSheet)
         }
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showSessionsSheet)
         .sheet(isPresented: $showPasswordSheet) {
             ChangePasswordSheet()
             .transition(.move(edge: .bottom).combined(with: .opacity))
-            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showPasswordSheet)
         }
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showPasswordSheet)
         .sheet(isPresented: $showBlocksSheet) {
             BlockedUsersSheet()
             .transition(.move(edge: .bottom).combined(with: .opacity))
-            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showBlocksSheet)
         }
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showBlocksSheet)
         .sheet(isPresented: $showPrivacySheet) {
             PrivacySettingsSheet()
             .transition(.move(edge: .bottom).combined(with: .opacity))
-            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showPrivacySheet)
         }
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showPrivacySheet)
         .sheet(isPresented: $showSupportSheet) {
             SupportContactSheet()
             .transition(.move(edge: .bottom).combined(with: .opacity))
-            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showSupportSheet)
         }
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showSupportSheet)
         .sheet(isPresented: $showDeleteAccountSheet) {
             DeleteAccountConfirmationSheet()
             .transition(.move(edge: .bottom).combined(with: .opacity))
-            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showDeleteAccountSheet)
         }
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showDeleteAccountSheet)
     }
 
     // MARK: - Tab Contents
