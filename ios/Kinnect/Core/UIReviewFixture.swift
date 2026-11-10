@@ -294,6 +294,7 @@ enum UIReviewFixture {
             ]
 
         case "/api/shorts":
+            let videoURL = samplePlayableVideoURL()?.absoluteString ?? ""
             return [
                 "shorts": [
                     [
@@ -301,7 +302,7 @@ enum UIReviewFixture {
                         "author": peerUserDict,
                         "title": "Dạo phố sáng cuối tuần [Fixture UI]",
                         "caption": "Video ngắn thử nghiệm bố cục Shorts trên iOS Simulator.",
-                        "videoUrl": "",
+                        "videoUrl": videoURL,
                         "durationSec": 15,
                         "likesCount": 128,
                         "commentsCount": 14,

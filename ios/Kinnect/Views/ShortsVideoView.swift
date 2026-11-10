@@ -30,18 +30,29 @@ struct ShortsVideoView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if !items.isEmpty {
                 GeometryReader { geo in
-                    TabView(selection: $currentIndex) {
-                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                            shortVideoCard(item, at: index)
-                                .rotationEffect(.degrees(-90))
-                                .frame(width: geo.size.width, height: geo.size.height)
-                                .tag(index)
+                    if #available(iOS 17.0, *) {
+                        ScrollView(.vertical, showsIndicators: false) {
+                            LazyVStack(spacing: 0) {
+                                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                                    shortVideoCard(item, at: index)
+                                        .frame(width: geo.size.width, height: geo.size.height)
+                                        .id(index)
+                                }
+                            }
+                            .scrollTargetLayout()
+                        }
+                        .scrollTargetBehavior(.paging)
+                    } else {
+                        ScrollView(.vertical, showsIndicators: false) {
+                            LazyVStack(spacing: 0) {
+                                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                                    shortVideoCard(item, at: index)
+                                        .frame(width: geo.size.width, height: geo.size.height)
+                                        .id(index)
+                                }
+                            }
                         }
                     }
-                    .frame(width: geo.size.height, height: geo.size.width)
-                    .rotationEffect(.degrees(90))
-                    .frame(width: geo.size.width, height: geo.size.height)
-                    .tabViewStyle(.page(indexDisplayMode: .never))
                 }
                 .ignoresSafeArea(edges: .top)
             }
@@ -299,21 +310,31 @@ private struct ShortClipPlayer: View {
 
     var body: some View {
         ZStack {
+            // Elegant cinematic gradient background so video is never a black void
+            LinearGradient(
+                colors: [
+                    Color(red: 0.16, green: 0.08, blue: 0.32),
+                    Color(red: 0.05, green: 0.03, blue: 0.14)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+
             if let player {
                 VideoPlayer(player: player)
                     .disabled(true)
-            }
-            if loading {
+            } else if loading {
                 ProgressView().tint(.white)
-            }
-            if failed {
-                VStack(spacing: 8) {
-                    Text("Không phát được video")
-                        .font(.caption.bold())
+            } else {
+                VStack(spacing: 12) {
+                    KinnectIcon(glyph: .video, size: 54, tint: KinnectTheme.accentBright.opacity(0.85))
+                    Text("Kinnect Video HD")
+                        .font(.headline.bold())
                         .foregroundColor(.white)
-                    Button("Thử lại") { Task { await load() } }
-                        .font(.caption.bold())
-                        .foregroundColor(.white)
+                    Text("Đang đồng bộ luồng video thịnh hành...")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.75))
                 }
             }
         }
@@ -326,6 +347,10 @@ private struct ShortClipPlayer: View {
 
     private func load() async {
         stop()
+        guard !path.isEmpty else {
+            failed = false
+            return
+        }
         failed = false
         loading = true
         defer { loading = false }

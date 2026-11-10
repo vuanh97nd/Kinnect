@@ -28,7 +28,6 @@ struct MessagesView: View {
     @State private var groups: [ChatGroupItem] = []
     @State private var showCreateGroupSheet = false
     @State private var isLoading = false
-    @State private var isCloudSyncEnabled: Bool = true
     @State private var searchQuery: String = ""
 
     init(initialScope: ChatScope = .direct, onOpenFriends: @escaping () -> Void = {}) {
@@ -38,45 +37,6 @@ struct MessagesView: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            // Cloud Chat Sync Setting Banner (Parity Android 1.2.12 MainActivity)
-            HStack(spacing: 10) {
-                KinnectIcon(
-                    glyph: .messages,
-                    size: 20,
-                    tint: isCloudSyncEnabled ? KinnectTheme.online : KinnectTheme.textSecondary
-                )
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Đồng bộ tin nhắn lên Cloud")
-                        .font(.caption.bold())
-                        .foregroundColor(KinnectTheme.textPrimary)
-                    Text(isCloudSyncEnabled ? "Đồng bộ an toàn giữa web và điện thoại." : "Đang tắt lưu trữ Cloud cá nhân.")
-                        .font(.caption2)
-                        .foregroundColor(KinnectTheme.textSecondary)
-                }
-
-                Spacer()
-
-                Toggle("", isOn: $isCloudSyncEnabled)
-                    .labelsHidden()
-                    .tint(KinnectTheme.online)
-                    .onChange(of: isCloudSyncEnabled) { enabled in
-                        Task { await toggleCloudSync(enabled) }
-                    }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: KinnectTheme.radiusMD)
-                    .fill(KinnectTheme.surfaceElevated)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: KinnectTheme.radiusMD)
-                            .stroke(isCloudSyncEnabled ? KinnectTheme.online.opacity(0.35) : KinnectTheme.border, lineWidth: 1)
-                    )
-            )
-            .padding(.horizontal, 14)
-            .padding(.top, 4)
-
             // Search Bar
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
@@ -302,8 +262,6 @@ struct MessagesView: View {
     }
 
     private func loadChats() async {
-        isCloudSyncEnabled = appState.currentUser?.cloudChatSync ?? true
-
         if conversations.isEmpty,
            let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/conversations") {
             let list = (cached["users"] as? [[String: Any]]) ?? (cached["conversations"] as? [[String: Any]]) ?? []
@@ -327,19 +285,6 @@ struct MessagesView: View {
             self.groups = (gRes["groups"] as? [[String: Any]] ?? []).map(ChatGroupItem.from)
         }
         await appState.refreshGlobalBadges()
-    }
-
-    private func toggleCloudSync(_ enabled: Bool) async {
-        _ = try? await KinnectAPIClient.shared.requestJSON(
-            "/api/me",
-            method: "PATCH",
-            body: ["cloudChatSync": enabled]
-        )
-        if var user = appState.currentUser {
-            user.cloudChatSync = enabled
-            appState.currentUser = user
-        }
-        appState.showToast(enabled ? "Đã bật đồng bộ tin nhắn Cloud" : "Đã tắt đồng bộ tin nhắn Cloud")
     }
 }
 
