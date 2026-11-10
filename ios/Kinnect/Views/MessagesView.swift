@@ -31,6 +31,11 @@ struct MessagesView: View {
     @State private var isCloudSyncEnabled: Bool = true
     @State private var searchQuery: String = ""
 
+    init(initialScope: ChatScope = .direct, onOpenFriends: @escaping () -> Void = {}) {
+        self.onOpenFriends = onOpenFriends
+        _scope = State(initialValue: initialScope)
+    }
+
     var body: some View {
         VStack(spacing: 10) {
             // Cloud Chat Sync Setting Banner (Parity Android 1.2.12 MainActivity)
@@ -205,6 +210,10 @@ struct MessagesView: View {
             ?? (conv["preview"] as? String)
             ?? "Nhấn để trò chuyện"
         let unread = (conv["unread"] as? Int) ?? (conv["unreadCount"] as? Int) ?? 0
+        let rawTime = (lastObj?["createdAt"] as? String)
+            ?? (conv["updatedAt"] as? String)
+            ?? (conv["lastTime"] as? String)
+            ?? ""
 
         return HStack(spacing: 12) {
             KinnectAvatarView(
@@ -216,25 +225,33 @@ struct MessagesView: View {
             )
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(peer.name)
-                    .font(.subheadline.bold())
-                    .foregroundColor(KinnectTheme.textPrimary)
-                    .kinnectMultiline()
-                Text(lastMsg)
-                    .font(.caption)
-                    .foregroundColor(unread > 0 ? KinnectTheme.textPrimary : KinnectTheme.textSecondary)
-                    .lineLimit(2)
-            }
-
-            Spacer()
-
-            if unread > 0 {
-                Text("\(unread)")
-                    .font(.caption2.bold())
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(Capsule().fill(KinnectTheme.accentBright))
+                HStack {
+                    Text(peer.name)
+                        .font(.subheadline.bold())
+                        .foregroundColor(KinnectTheme.textPrimary)
+                        .lineLimit(1)
+                    Spacer()
+                    if !rawTime.isEmpty {
+                        Text(formatRelativeDate(rawTime))
+                            .font(.caption2)
+                            .foregroundColor(unread > 0 ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
+                    }
+                }
+                HStack {
+                    Text(lastMsg)
+                        .font(.caption)
+                        .foregroundColor(unread > 0 ? KinnectTheme.textPrimary : KinnectTheme.textSecondary)
+                        .lineLimit(2)
+                    Spacer()
+                    if unread > 0 {
+                        Text("\(unread)")
+                            .font(.caption2.bold())
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(KinnectTheme.accentBright))
+                    }
+                }
             }
         }
         .kinnectCard()
@@ -253,24 +270,32 @@ struct MessagesView: View {
                     Text(group.name)
                         .font(.subheadline.bold())
                         .foregroundColor(KinnectTheme.textPrimary)
-                        .kinnectMultiline()
+                        .lineLimit(1)
                     Text("(\(group.membersCount) TV)")
                         .font(.caption2)
                         .foregroundColor(KinnectTheme.textSecondary)
+                    Spacer()
+                    if !group.updatedAt.isEmpty {
+                        Text(formatRelativeDate(group.updatedAt))
+                            .font(.caption2)
+                            .foregroundColor(group.unreadCount > 0 ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
+                    }
                 }
-                Text(group.lastMessageText.isEmpty ? group.description : group.lastMessageText)
-                    .font(.caption)
-                    .foregroundColor(KinnectTheme.textSecondary)
-                    .lineLimit(2)
-            }
-            Spacer()
-            if group.unreadCount > 0 {
-                Text("\(group.unreadCount)")
-                    .font(.caption2.bold())
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(Capsule().fill(KinnectTheme.accentBright))
+                HStack {
+                    Text(group.lastMessageText.isEmpty ? group.description : group.lastMessageText)
+                        .font(.caption)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                        .lineLimit(2)
+                    Spacer()
+                    if group.unreadCount > 0 {
+                        Text("\(group.unreadCount)")
+                            .font(.caption2.bold())
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(KinnectTheme.accentBright))
+                    }
+                }
             }
         }
         .kinnectCard()
@@ -623,7 +648,7 @@ struct DirectChatDetailView: View {
                 HStack(spacing: 8) {
                     Text(formatRelativeDate(msg.createdAt))
                         .font(.caption2)
-                        .foregroundColor(KinnectTheme.textSecondary)
+                        .foregroundColor(Color(hex: "#9CA3AF"))
 
                     if isMine {
                         HStack(spacing: 4) {
@@ -631,11 +656,11 @@ struct DirectChatDetailView: View {
                                 glyph: .seen,
                                 size: 16,
                                 selected: msg.isSeen,
-                                tint: msg.isSeen ? KinnectTheme.accentBright : KinnectTheme.textSecondary
+                                tint: msg.isSeen ? KinnectTheme.accentBright : Color(hex: "#9CA3AF")
                             )
                             Text(msg.isSeen ? "Đã xem" : (msg.deliveredAt.isEmpty ? "Đã gửi" : "Đã nhận"))
                                 .font(.caption2.weight(.semibold))
-                                .foregroundColor(msg.isSeen ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
+                                .foregroundColor(msg.isSeen ? KinnectTheme.accentBright : Color(hex: "#9CA3AF"))
                         }
                     }
 
@@ -932,7 +957,7 @@ struct GroupChatDetailView: View {
                                 HStack(spacing: 8) {
                                     Text(formatRelativeDate(msg.createdAt))
                                         .font(.caption2)
-                                        .foregroundColor(KinnectTheme.textSecondary)
+                                        .foregroundColor(Color(hex: "#9CA3AF"))
 
                                     HStack(spacing: 4) {
                                         KinnectIcon(glyph: .seen, size: 16, selected: true, tint: KinnectTheme.accentBright)
@@ -1014,7 +1039,7 @@ struct GroupChatDetailView: View {
             }
 
             HStack(spacing: 10) {
-                TextField("Nhắn vào nhóm \(group.name)...", text: $text)
+                TextField("Nhập tin nhắn trong nhóm...", text: $text)
                     .padding(10)
                     .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
                     .foregroundColor(KinnectTheme.textPrimary)
@@ -1035,6 +1060,17 @@ struct GroupChatDetailView: View {
         .navigationTitle(group.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.body.weight(.semibold))
+                        .foregroundColor(KinnectTheme.textPrimary)
+                }
+                .accessibilityLabel("Quay lại")
+            }
+
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
                     Button {

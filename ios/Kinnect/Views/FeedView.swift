@@ -90,10 +90,14 @@ struct FeedView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
+            .padding(.bottom, 72)
             .frame(maxWidth: 680)
             .frame(maxWidth: .infinity)
         }
         .background(KinnectTheme.background)
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 72)
+        }
         .navigationTitle("")
         .toolbar(.hidden, for: .navigationBar)
         .refreshable {

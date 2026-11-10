@@ -19,6 +19,10 @@ struct FriendsView: View {
     @State private var selectedProfileUser: KinnectUser? = nil
     @State private var activeChatPeer: KinnectUser? = nil
 
+    init(initialTab: FriendTab = .friends) {
+        _tab = State(initialValue: initialTab)
+    }
+
     var body: some View {
         VStack(spacing: 12) {
             Picker("Bạn bè", selection: $tab) {

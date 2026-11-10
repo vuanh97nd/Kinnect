@@ -301,11 +301,13 @@ struct ChatGroupItem: Identifiable, Hashable, Equatable {
     var membersCount: Int
     var lastMessageText: String
     var unreadCount: Int
+    var updatedAt: String
 
     static func from(_ dict: [String: Any]) -> ChatGroupItem {
         let members = dict["members"] as? [Any]
         let lastObj = (dict["lastMessage"] as? [String: Any]) ?? (dict["last"] as? [String: Any])
         let lastText = (lastObj?["text"] as? String) ?? (lastObj?["body"] as? String) ?? (dict["lastMessageText"] as? String) ?? ""
+        let updated = (lastObj?["createdAt"] as? String) ?? (dict["updatedAt"] as? String) ?? ""
         return ChatGroupItem(
             id: (dict["id"] as? String) ?? UUID().uuidString,
             name: (dict["name"] as? String) ?? "Nhóm Kinnect",
@@ -313,7 +315,8 @@ struct ChatGroupItem: Identifiable, Hashable, Equatable {
             avatarColor: (dict["avatarColor"] as? String) ?? "#7C3AED",
             membersCount: (dict["membersCount"] as? Int) ?? members?.count ?? 1,
             lastMessageText: lastText,
-            unreadCount: (dict["unreadCount"] as? Int) ?? (dict["unread"] as? Int) ?? 0
+            unreadCount: (dict["unreadCount"] as? Int) ?? (dict["unread"] as? Int) ?? 0,
+            updatedAt: updated
         )
     }
 }

@@ -383,6 +383,7 @@ enum UIReviewFixture {
                 "notifications": [
                     [
                         "id": "fixture_notif_1",
+                        "type": "like",
                         "actor": peerUserDict,
                         "preview": "[Fixture UI] Hoàng Nam đã bày tỏ cảm xúc với bài viết của bạn.",
                         "read": false,
@@ -390,6 +391,7 @@ enum UIReviewFixture {
                     ],
                     [
                         "id": "fixture_notif_2",
+                        "type": "friend_request",
                         "actor": secondPeerDict,
                         "preview": "[Fixture UI] Thanh Trúc đã gửi lời mời kết bạn.",
                         "read": true,
@@ -462,6 +464,39 @@ enum UIReviewFixture {
                         "priceCoins": 1200,
                         "badgeText": "PRO",
                         "accentColor": "#EC4899",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "fixture_pkg_live",
+                        "title": "Chủ Đề Live Ánh Sao",
+                        "subtitle": "Giao diện phòng Live ánh sao lấp lánh",
+                        "category": "live",
+                        "priceCoins": 600,
+                        "badgeText": "HOT",
+                        "accentColor": "#F59E0B",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "fixture_pkg_gifts",
+                        "title": "Bộ Quà Tặng Hoàng Gia",
+                        "subtitle": "Bộ 6 quà tặng 3D độc quyền phòng Live",
+                        "category": "gifts",
+                        "priceCoins": 999,
+                        "badgeText": "VIP",
+                        "accentColor": "#EC4899",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "fixture_pkg_member",
+                        "title": "Hội Viên Kinnect Creator",
+                        "subtitle": "Đặc quyền sáng tạo nội dung & huy hiệu sáng tạo",
+                        "category": "member",
+                        "priceCoins": 1500,
+                        "badgeText": "CREATOR",
+                        "accentColor": "#10B981",
                         "owned": false,
                         "equipped": false
                     ]
@@ -824,10 +859,281 @@ enum UIReviewFixture {
 
     /// Creates the appropriate SwiftUI view for the given screen name.
     /// Used by SceneDelegate when --ui-review-screen argument is provided.
-    /// All screen routing, mock session bootstrap, dynamic type scaling, and themes
-    /// are handled by RootMainView.
     @MainActor
-    static func makeView(for screenName: String) -> some View {
-        RootMainView()
+    static func makeView(for screenName: String) -> AnyView {
+        switch screenName {
+        // MARK: - Auth Screens
+        case "auth-welcome", "auth":
+            return AnyView(AuthView(initialStage: .welcome))
+        case "auth-login", "auth-login-populated", "auth-login-error", "auth-login-keyboard", "auth-login-password-keyboard", "auth-login-en":
+            return AnyView(AuthView(initialStage: .login))
+        case "auth-register":
+            return AnyView(AuthView(initialStage: .register))
+        case "auth-reset", "auth-forgot", "forgot-password":
+            return AnyView(AuthView(initialStage: .forgotPassword))
+
+        // MARK: - Main Tabs (5 tabs)
+        case "feed":
+            return AnyView(
+                NavigationStack {
+                    FeedView(onOpenCamera: {}, onOpenFriends: {})
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Bảng tin")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "discover":
+            return AnyView(
+                NavigationStack {
+                    DiscoverView(onOpenCamera: {})
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Khám phá")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "create", "camera-studio", "camera-studio-edit":
+            return AnyView(
+                NavigationStack {
+                    CameraStudioView()
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Tạo")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "camera-studio-video":
+            return AnyView(
+                NavigationStack {
+                    CameraStudioView(initialMode: .video)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Video")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "studio-pro-sheet":
+            return AnyView(
+                NavigationStack {
+                    StudioProSheet(appliedEffect: .constant("Cinematic Teal & Orange"), onApply: { _ in })
+                }
+            )
+        case "video", "shorts":
+            return AnyView(
+                NavigationStack {
+                    ShortsVideoView()
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Video")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "live", "live-room":
+            return AnyView(
+                NavigationStack {
+                    LiveStreamView(onOpenWallet: {})
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Live")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+
+        // MARK: - Messages & Chats
+        case "messages":
+            return AnyView(
+                NavigationStack {
+                    MessagesView(initialScope: .direct, onOpenFriends: {})
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Tin nhắn")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "chat-detail", "chat-menu", "message-menu":
+            return AnyView(
+                NavigationStack {
+                    DirectChatDetailView(peer: KinnectUser.from(UIReviewFixture.peerUserDict))
+                }
+            )
+        case "group-chat-detail":
+            return AnyView(
+                NavigationStack {
+                    GroupChatDetailView(group: ChatGroupItem.from(UIReviewFixture.fixtureGroupDict), onLeftGroup: {})
+                }
+            )
+        case "forward-message":
+            return AnyView(
+                NavigationStack {
+                    ForwardMessageSheet(text: "Tin nhắn chia sẻ từ Bảng tin Kinnect", imageUrl: "")
+                }
+            )
+
+        // MARK: - Profile & Settings
+        case "profile":
+            return AnyView(
+                NavigationStack {
+                    ProfileView(onOpenWallet: {}, onOpenFriends: {})
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Hồ sơ")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "profile-posts":
+            return AnyView(
+                NavigationStack {
+                    ProfileView(onOpenWallet: {}, onOpenFriends: {}, initialTab: .posts)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Bài viết")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "profile-albums":
+            return AnyView(
+                NavigationStack {
+                    ProfileView(onOpenWallet: {}, onOpenFriends: {}, initialTab: .albums)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Album ảnh")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "profile-videos":
+            return AnyView(
+                NavigationStack {
+                    ProfileView(onOpenWallet: {}, onOpenFriends: {}, initialTab: .videos)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Video")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "profile-edit":
+            return AnyView(
+                NavigationStack {
+                    EditProfileSheet(onSaved: {})
+                }
+            )
+        case "profile-public-album":
+            return AnyView(
+                NavigationStack {
+                    PublicAlbumManageSheet(posts: UIReviewFixture.mockPosts(), onRefresh: {})
+                }
+            )
+        case "profile-private-album":
+            return AnyView(
+                NavigationStack {
+                    PrivateAlbumManageSheet(
+                        photos: .constant(UIReviewFixture.mockPrivatePhotos()),
+                        requests: .constant(UIReviewFixture.mockPrivateRequests()),
+                        onRefresh: {}
+                    )
+                }
+            )
+        case "profile-sessions":
+            return AnyView(
+                NavigationStack {
+                    ActiveSessionsSheet()
+                }
+            )
+
+        // MARK: - Friends
+        case "friends":
+            return AnyView(
+                NavigationStack {
+                    FriendsView(initialTab: .friends)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Bạn bè")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "friends-requests":
+            return AnyView(
+                NavigationStack {
+                    FriendsView(initialTab: .requests)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Lời mời kết bạn")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "friends-suggestions":
+            return AnyView(
+                NavigationStack {
+                    FriendsView(initialTab: .suggestions)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Gợi ý kết bạn")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+
+        // MARK: - Notifications
+        case "notifications":
+            return AnyView(
+                NavigationStack {
+                    NotificationsView()
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Thông báo")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+
+        // MARK: - Wallet & Store
+        case "wallet":
+            return AnyView(
+                NavigationStack {
+                    WalletStoreView(initialTab: .wallet)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Ví Kinnect")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "store", "wallet-packages", "store-packages":
+            return AnyView(
+                NavigationStack {
+                    WalletStoreView(initialTab: .packages, initialStoreFilter: .style)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Cửa hàng Kinnect")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "wallet-topup":
+            return AnyView(
+                NavigationStack {
+                    WalletStoreView(initialTab: .packages, initialStoreFilter: .style)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Nạp xu Kinnect")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+
+        // MARK: - Modals / Sheets
+        case "privacy-consent":
+            return AnyView(
+                PrivacyConsentSheet(
+                    request: PrivacyConsentRequest(
+                        version: "2026.11",
+                        notice: "Chính sách quyền riêng tư và điều khoản dịch vụ Kinnect. Cam kết bảo mật theo tiêu chuẩn Apple và pháp luật Việt Nam."
+                    ),
+                    recordOnServer: false,
+                    onAccepted: {}
+                )
+            )
+        case "delete-account":
+            return AnyView(DeleteAccountConfirmationSheet())
+        case "ugc-report":
+            return AnyView(
+                UGCReportSheet(
+                    context: UGCReportContext(
+                        targetType: "user",
+                        targetId: "fixture_user_peer",
+                        targetUserId: "fixture_user_peer",
+                        targetTitle: "Lê Hoàng Nam"
+                    )
+                )
+            )
+        case "change-password":
+            return AnyView(ChangePasswordSheet())
+        case "blocked-users":
+            return AnyView(BlockedUsersSheet())
+        case "privacy-settings":
+            return AnyView(PrivacySettingsSheet())
+        case "support":
+            return AnyView(SupportContactSheet())
+
+        default:
+            return AnyView(RootMainView())
+        }
     }
 }

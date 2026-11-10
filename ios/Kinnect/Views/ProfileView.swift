@@ -2,6 +2,26 @@ import PhotosUI
 import SwiftUI
 import UIKit
 
+private func formatRelativeDate(_ iso: String) -> String {
+    guard !iso.isEmpty else { return "Vừa xong" }
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    var date = formatter.date(from: iso)
+    if date == nil {
+        formatter.formatOptions = [.withInternetDateTime]
+        date = formatter.date(from: iso)
+    }
+    guard let d = date else { return iso }
+    let diff = Int(Date().timeIntervalSince(d))
+    if diff < 60 { return "Vừa xong" }
+    if diff < 3600 { return "\(diff / 60) phút trước" }
+    if diff < 86400 { return "\(diff / 3600) giờ trước" }
+    if diff < 86400 * 7 { return "\(diff / 86400) ngày trước" }
+    let df = DateFormatter()
+    df.dateFormat = "dd/MM/yyyy"
+    return df.string(from: d)
+}
+
 struct ProfileView: View {
     var targetUser: KinnectUser? = nil
     var onOpenWallet: (() -> Void)? = nil
@@ -450,7 +470,7 @@ struct ProfileView: View {
                         if !post.imageUrl.isEmpty {
                             KinnectRemoteImageView(rawURL: post.imageUrl, contentMode: .fill, cornerRadius: KinnectTheme.radiusSM, maxHeight: 180)
                         }
-                        Text(post.createdAt.isEmpty ? "Vừa xong" : post.createdAt)
+                        Text(post.createdAt.isEmpty ? "Vừa xong" : formatRelativeDate(post.createdAt))
                             .font(.caption2)
                             .foregroundColor(KinnectTheme.textSecondary)
                     }
@@ -970,9 +990,12 @@ struct PrivateAlbumManageSheet: View {
                                     Text(req.user.name)
                                         .font(.subheadline.bold())
                                         .foregroundColor(KinnectTheme.textPrimary)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.85)
                                     Text(req.status == "granted" ? "Đã cấp quyền xem" : "Đang chờ bạn duyệt")
                                         .font(.caption2)
                                         .foregroundColor(req.status == "granted" ? KinnectTheme.online : KinnectTheme.warning)
+                                        .lineLimit(1)
                                 }
                                 Spacer()
                                 if req.status == "pending" {
@@ -1481,6 +1504,9 @@ struct EditProfileSheet: View {
             }
             .scrollContentBackground(.hidden)
             .background(KinnectTheme.background)
+            .safeAreaInset(edge: .bottom) {
+                Color.clear.frame(height: 36)
+            }
             .navigationTitle("Chỉnh sửa hồ sơ")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

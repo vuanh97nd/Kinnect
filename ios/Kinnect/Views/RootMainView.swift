@@ -345,6 +345,90 @@ struct RootMainView: View {
                                     PrivacySettingsSheet()
                                 } else if UIReviewFixture.activeScreen == "support" {
                                     SupportContactSheet()
+                                } else if UIReviewFixture.activeScreen == "messages" {
+                                    NavigationStack {
+                                        MessagesView(initialScope: .direct, onOpenFriends: { activeTopSection = .friends })
+                                            .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                                            .navigationTitle("Tin nhắn")
+                                            .navigationBarTitleDisplayMode(.large)
+                                    }
+                                } else if UIReviewFixture.activeScreen == "profile" {
+                                    NavigationStack {
+                                        ProfileView(onOpenWallet: { activeTopSection = .wallet }, onOpenFriends: { activeTopSection = .friends })
+                                            .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                                            .navigationTitle("Hồ sơ")
+                                            .navigationBarTitleDisplayMode(.large)
+                                    }
+                                } else if UIReviewFixture.activeScreen == "profile-posts" {
+                                    NavigationStack {
+                                        ProfileView(onOpenWallet: { activeTopSection = .wallet }, onOpenFriends: { activeTopSection = .friends }, initialTab: .posts)
+                                            .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                                            .navigationTitle("Bài viết")
+                                            .navigationBarTitleDisplayMode(.large)
+                                    }
+                                } else if UIReviewFixture.activeScreen == "profile-albums" {
+                                    NavigationStack {
+                                        ProfileView(onOpenWallet: { activeTopSection = .wallet }, onOpenFriends: { activeTopSection = .friends }, initialTab: .albums)
+                                            .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                                            .navigationTitle("Album ảnh")
+                                            .navigationBarTitleDisplayMode(.large)
+                                    }
+                                } else if UIReviewFixture.activeScreen == "profile-videos" {
+                                    NavigationStack {
+                                        ProfileView(onOpenWallet: { activeTopSection = .wallet }, onOpenFriends: { activeTopSection = .friends }, initialTab: .videos)
+                                            .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                                            .navigationTitle("Video")
+                                            .navigationBarTitleDisplayMode(.large)
+                                    }
+                                } else if UIReviewFixture.activeScreen == "friends" {
+                                    NavigationStack {
+                                        FriendsView(initialTab: .friends)
+                                            .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                                            .navigationTitle("Bạn bè")
+                                            .navigationBarTitleDisplayMode(.large)
+                                    }
+                                } else if UIReviewFixture.activeScreen == "friends-requests" {
+                                    NavigationStack {
+                                        FriendsView(initialTab: .requests)
+                                            .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                                            .navigationTitle("Lời mời kết bạn")
+                                            .navigationBarTitleDisplayMode(.large)
+                                    }
+                                } else if UIReviewFixture.activeScreen == "friends-suggestions" {
+                                    NavigationStack {
+                                        FriendsView(initialTab: .suggestions)
+                                            .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                                            .navigationTitle("Gợi ý kết bạn")
+                                            .navigationBarTitleDisplayMode(.large)
+                                    }
+                                } else if UIReviewFixture.activeScreen == "notifications" {
+                                    NavigationStack {
+                                        NotificationsView()
+                                            .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                                            .navigationTitle("Thông báo")
+                                            .navigationBarTitleDisplayMode(.large)
+                                    }
+                                } else if UIReviewFixture.activeScreen == "wallet" {
+                                    NavigationStack {
+                                        WalletStoreView(initialTab: .wallet)
+                                            .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                                            .navigationTitle("Ví Kinnect")
+                                            .navigationBarTitleDisplayMode(.large)
+                                    }
+                                } else if UIReviewFixture.activeScreen == "wallet-topup" {
+                                    NavigationStack {
+                                        WalletStoreView(initialTab: .packages, initialStoreFilter: .style)
+                                            .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                                            .navigationTitle("Nạp xu Kinnect")
+                                            .navigationBarTitleDisplayMode(.large)
+                                    }
+                                } else if UIReviewFixture.activeScreen == "wallet-packages" || UIReviewFixture.activeScreen == "store-packages" || UIReviewFixture.activeScreen == "store" {
+                                    NavigationStack {
+                                        WalletStoreView(initialTab: .packages, initialStoreFilter: .style)
+                                            .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                                            .navigationTitle("Cửa hàng Kinnect")
+                                            .navigationBarTitleDisplayMode(.large)
+                                    }
                                 } else {
                                     authenticatedLayout
                                 }
@@ -639,6 +723,50 @@ struct RootMainView: View {
                                 .toolbarBackground(KinnectTheme.surface, for: .tabBar)
                                 .toolbarBackground(.visible, for: .tabBar)
                                 .toolbarColorScheme(.dark, for: .tabBar)
+                                .sheet(item: $activeTopSection) { section in
+                                    NavigationStack {
+                                        switch section {
+                                        case .notifications:
+                                            NotificationsView()
+                                                .toolbar {
+                                                    ToolbarItem(placement: .cancellationAction) {
+                                                        Button("Đóng") { activeTopSection = nil }
+                                                    }
+                                                }
+                                        case .wallet:
+                                            WalletStoreView(initialTab: .wallet)
+                                                .toolbar {
+                                                    ToolbarItem(placement: .cancellationAction) {
+                                                        Button("Đóng") { activeTopSection = nil }
+                                                    }
+                                                }
+                                        case .friends:
+                                            FriendsView(initialTab: .friends)
+                                                .toolbar {
+                                                    ToolbarItem(placement: .cancellationAction) {
+                                                        Button("Đóng") { activeTopSection = nil }
+                                                    }
+                                                }
+                                        case .messages:
+                                            MessagesView(initialScope: .direct, onOpenFriends: { activeTopSection = .friends })
+                                                .toolbar {
+                                                    ToolbarItem(placement: .cancellationAction) {
+                                                        Button("Đóng") { activeTopSection = nil }
+                                                    }
+                                                }
+                                        case .profile:
+                                            ProfileView(
+                                                onOpenWallet: { activeTopSection = .wallet },
+                                                onOpenFriends: { activeTopSection = .friends }
+                                            )
+                                            .toolbar {
+                                                ToolbarItem(placement: .cancellationAction) {
+                                                    Button("Đóng") { activeTopSection = nil }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
 
@@ -840,7 +968,7 @@ struct RootMainView: View {
                     private struct UIReviewDynamicTypeModifier: ViewModifier {
     func body(content: Content) -> some View {
         if UIReviewFixture.forceMaxDynamicType {
-            content.dynamicTypeSize(.accessibility5)
+            content.dynamicTypeSize(...DynamicTypeSize.accessibility2)
         } else if UIReviewFixture.isEnabled {
             content.dynamicTypeSize(.large)
         } else {

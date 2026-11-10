@@ -414,9 +414,10 @@ private struct DiscoverSquareUserTile: View {
                                 .lineLimit(1)
                         }
                         Text(person.name)
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.system(size: 12, weight: .bold))
                             .foregroundColor(.white)
-                            .lineLimit(1)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.85)
                     }
                     .padding(.horizontal, 8)
                     .padding(.bottom, 6)

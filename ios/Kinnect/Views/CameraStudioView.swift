@@ -781,10 +781,10 @@ struct CameraStudioView: View {
                         saveMediaToPhotos()
                     } label: {
                         HStack(spacing: 4) {
-                            KinnectIcon(glyph: .save, size: 14, tint: KinnectTheme.accentBright)
+                            KinnectIcon(glyph: .save, size: 14, tint: .white)
                             Text("Lưu về máy")
                                 .font(.caption2.weight(.semibold))
-                                .foregroundColor(KinnectTheme.accentBright)
+                                .foregroundColor(.white)
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
@@ -1139,6 +1139,7 @@ struct CameraStudioView: View {
                 .disabled(isUploading)
             }
             .padding(16)
+            .padding(.bottom, 36)
         }
         .navigationTitle("Chỉnh sửa Studio Pro")
     }

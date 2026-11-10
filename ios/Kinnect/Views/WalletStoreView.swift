@@ -23,6 +23,11 @@ struct WalletStoreView: View {
     @State private var storeFilter: StoreCategoryFilter = .style
     @State private var previewPackage: StorePackageItem? = nil
 
+    init(initialTab: SectionTab = .wallet, initialStoreFilter: StoreCategoryFilter = .style) {
+        _tab = State(initialValue: initialTab)
+        _storeFilter = State(initialValue: initialStoreFilter)
+    }
+
     @State private var availableBalance: Int = 0
     @State private var earnedBalance: Int = 0
     @State private var spentBalance: Int = 0
@@ -61,7 +66,7 @@ struct WalletStoreView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.bottom, 32)
+                .padding(.bottom, 84)
             }
             .refreshable {
                 await loadWalletAndStore()
@@ -251,23 +256,25 @@ struct WalletStoreView: View {
                                 Text(entry.title)
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundColor(KinnectTheme.textPrimary)
-                                    .lineLimit(1)
+                                    .lineLimit(2)
                                 if !entry.note.isEmpty {
                                     Text(entry.note)
                                         .font(.caption2)
                                         .foregroundColor(KinnectTheme.textSecondary)
-                                        .lineLimit(1)
+                                        .lineLimit(2)
                                 }
                                 Text(formatRelativeDate(entry.createdAt))
                                     .font(.caption2)
                                     .foregroundColor(KinnectTheme.textSecondary)
                             }
 
-                            Spacer()
+                            Spacer(minLength: 8)
 
                             Text(entry.direction == "credit" ? "+\(entry.amount.formattedWithSeparator()) xu" : "-\(entry.amount.formattedWithSeparator()) xu")
                                 .font(.subheadline.bold())
                                 .foregroundColor(entry.direction == "credit" ? KinnectTheme.online : KinnectTheme.textPrimary)
+                                .layoutPriority(1)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
                         .padding(.vertical, 8)
                         .padding(.horizontal, 14)
@@ -470,7 +477,7 @@ struct WalletStoreView: View {
         packages.filter { p in
             switch storeFilter {
             case .style:
-                return p.kind == "style" || p.kind.isEmpty
+                return p.kind == "style" || p.kind == "frame" || p.kind == "badge" || p.kind.isEmpty
             case .live:
                 return p.kind == "live"
             case .gifts:
