@@ -16,6 +16,10 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
     var id: String
     var name: String
     var handle: String
+    var username: String {
+        get { handle.isEmpty ? name : handle }
+        set { handle = newValue }
+    }
     var email: String
     var phone: String
     var bio: String

@@ -957,179 +957,209 @@ struct GroupChatDetailView: View {
 
     private func formattedBubbleText(_ rawText: String, isMine: Bool) -> Text {
         let words = rawText.components(separatedBy: " ")
-        return words.enumerated().reduce(Text("")) { acc, elem in
-            let (idx, word) = elem
-            let space = idx == 0 ? Text("") : Text(" ")
+        var result = Text("")
+        for (idx, word) in words.enumerated() {
+            let space = (idx == 0) ? Text("") : Text(" ")
             if word.hasPrefix("@") {
                 let styled = Text(word)
-                    .font(.subheadline.bold())
+                    .font(.subheadline)
+                    .bold()
                     .foregroundColor(isMine ? Color.white : KinnectTheme.accentBright)
                     .underline()
-                return acc + space + styled
+                result = result + space + styled
             } else {
                 let normal = Text(word)
                     .font(.subheadline)
                     .foregroundColor(isMine ? Color.white : KinnectTheme.textPrimary)
-                return acc + space + normal
+                result = result + space + normal
             }
+        }
+        return result
+    }
+
+    @ViewBuilder
+    private func groupMessageRow(msg: GroupMessageItem) -> some View {
+        let isMine = (msg.sender.id == appState.currentUser?.id)
+        HStack(alignment: .bottom, spacing: 8) {
+            if isMine { Spacer(minLength: 40) }
+            if !isMine {
+                KinnectAvatarView(
+                    name: msg.sender.name,
+                    avatarURL: msg.sender.avatarUrl,
+                    colorHex: msg.sender.avatarColor,
+                    size: 30
+                )
+            }
+            VStack(alignment: isMine ? .trailing : .leading, spacing: 5) {
+                if !isMine {
+                    Text(msg.sender.name)
+                        .font(.caption2.bold())
+                        .foregroundColor(KinnectTheme.accentBright)
+                }
+                // Content on top with Zalo-style member mention highlight
+                formattedBubbleText(msg.text, isMine: isMine)
+                    .kinnectMultiline()
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: KinnectTheme.radiusXL)
+                            .fill(isMine ? AnyShapeStyle(KinnectTheme.primaryGradient) : AnyShapeStyle(KinnectTheme.surfaceElevated))
+                    )
+                // Bottom row: time, seen, reaction, more
+                groupMessageFooter(msg: msg, isMine: isMine)
+            }
+            if !isMine { Spacer(minLength: 40) }
         }
     }
 
-    var body: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                LazyVStack(spacing: 10) {
-                    ForEach(messages) { msg in
-                        let isMine = (msg.sender.id == appState.currentUser?.id)
-                        HStack(alignment: .bottom, spacing: 8) {
-                            if isMine { Spacer(minLength: 40) }
-                            if !isMine {
-                                KinnectAvatarView(
-                                    name: msg.sender.name,
-                                    avatarURL: msg.sender.avatarUrl,
-                                    colorHex: msg.sender.avatarColor,
-                                    size: 30
-                                )
-                            }
-                            VStack(alignment: isMine ? .trailing : .leading, spacing: 5) {
-                                if !isMine {
-                                    Text(msg.sender.name)
-                                        .font(.caption2.bold())
-                                        .foregroundColor(KinnectTheme.accentBright)
-                                }
-                                // Content on top with Zalo-style member mention highlight
-                                formattedBubbleText(msg.text, isMine: isMine)
-                                    .kinnectMultiline()
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 10)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: KinnectTheme.radiusXL)
-                                            .fill(isMine ? AnyShapeStyle(KinnectTheme.primaryGradient) : AnyShapeStyle(KinnectTheme.surfaceElevated))
-                                    )
-                                // Bottom row: time, seen, reaction, more
-                                HStack(spacing: 8) {
-                                    Text(formatRelativeDate(msg.createdAt))
-                                        .font(.caption2)
-                                        .foregroundColor(Color(hex: "#9CA3AF"))
+    @ViewBuilder
+    private func groupMessageFooter(msg: GroupMessageItem, isMine: Bool) -> some View {
+        HStack(spacing: 8) {
+            Text(formatRelativeDate(msg.createdAt))
+                .font(.caption2)
+                .foregroundColor(Color(hex: "#9CA3AF"))
 
-                                    HStack(spacing: 4) {
-                                        KinnectIcon(glyph: .seen, size: 16, selected: true, tint: KinnectTheme.accentBright)
-                                        Text("\(max(msg.seenCount, 1))")
-                                            .font(.caption2.weight(.semibold))
-                                            .foregroundColor(KinnectTheme.accentBright)
-                                    }
+            HStack(spacing: 4) {
+                KinnectIcon(glyph: .seen, size: 16, selected: true, tint: KinnectTheme.accentBright)
+                Text("\(max(msg.seenCount, 1))")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundColor(KinnectTheme.accentBright)
+            }
 
-                                    Menu {
-                                        ForEach(["👍", "❤️", "😂", "😮", "😢", "😡"], id: \.self) { emoji in
-                                            Button(emoji) {
-                                                Task { await reactToGroupMessage(msgId: msg.id, emoji: emoji) }
-                                            }
-                                        }
-                                    } label: {
-                                        HStack(spacing: 3) {
-                                            KinnectIcon(
-                                                glyph: .reaction,
-                                                size: 16,
-                                                selected: groupReactions[msg.id] != nil,
-                                                tint: groupReactions[msg.id] != nil ? KinnectTheme.accentBright : KinnectTheme.textSecondary
-                                            )
-                                            if let reacted = groupReactions[msg.id] {
-                                                Text(DirectMessageItem.emoji(for: reacted)).font(.caption2)
-                                            }
-                                        }
-                                    }
-                                    .accessibilityLabel("Thả cảm xúc tin nhắn nhóm")
+            Menu {
+                ForEach(["👍", "❤️", "😂", "😮", "😢", "😡"], id: \.self) { emoji in
+                    Button(emoji) {
+                        Task { await reactToGroupMessage(msgId: msg.id, emoji: emoji) }
+                    }
+                }
+            } label: {
+                HStack(spacing: 3) {
+                    KinnectIcon(
+                        glyph: .reaction,
+                        size: 16,
+                        selected: groupReactions[msg.id] != nil,
+                        tint: groupReactions[msg.id] != nil ? KinnectTheme.accentBright : KinnectTheme.textSecondary
+                    )
+                    if let reacted = groupReactions[msg.id] {
+                        Text(DirectMessageItem.emoji(for: reacted)).font(.caption2)
+                    }
+                }
+            }
+            .accessibilityLabel("Thả cảm xúc tin nhắn nhóm")
 
-                                    Menu {
-                                        Button {
-                                            forwardText = msg.text
-                                            forwardImageUrl = msg.imageUrl
-                                            showForwardSheet = true
-                                        } label: {
-                                            HStack {
-                                                Text("Chuyển tiếp tin nhắn")
-                                                KinnectIcon(glyph: .share, size: 18)
-                                            }
-                                        }
+            Menu {
+                Button {
+                    forwardText = msg.text
+                    forwardImageUrl = msg.imageUrl
+                    showForwardSheet = true
+                } label: {
+                    HStack {
+                        Text("Chuyển tiếp tin nhắn")
+                        KinnectIcon(glyph: .share, size: 18)
+                    }
+                }
 
-                                        if !isMine {
-                                            Button(role: .destructive) {
-                                                appState.activeReportContext = UGCReportContext(
-                                                    targetType: "group_message",
-                                                    targetId: msg.id,
-                                                    targetUserId: msg.sender.id,
-                                                    targetTitle: "Tin nhắn nhóm của \(msg.sender.name)"
-                                                )
-                                            } label: {
-                                                HStack {
-                                                    Text("Báo cáo tin nhắn")
-                                                    KinnectIcon(glyph: .report, size: 18, tint: KinnectTheme.danger)
-                                                }
-                                            }
-                                            Button(role: .destructive) {
-                                                Task { await appState.blockUser(userId: msg.sender.id, userName: msg.sender.name) }
-                                            } label: {
-                                                HStack {
-                                                    Text("Chặn người gửi")
-                                                    KinnectIcon(glyph: .block, size: 18, tint: KinnectTheme.danger)
-                                                }
-                                            }
-                                        }
-                                    } label: {
-                                        KinnectIcon(glyph: .more, size: 18, tint: KinnectTheme.textSecondary)
-                                            .padding(.vertical, 4)
-                                            .padding(.horizontal, 4)
-                                            .contentShape(Rectangle())
-                                    }
-                                    .accessibilityLabel("Tùy chọn tin nhắn nhóm")
-                                }
-                            }
-                            if !isMine { Spacer(minLength: 40) }
+                if !isMine {
+                    Button(role: .destructive) {
+                        appState.activeReportContext = UGCReportContext(
+                            targetType: "group_message",
+                            targetId: msg.id,
+                            targetUserId: msg.sender.id,
+                            targetTitle: "Tin nhắn nhóm của \(msg.sender.name)"
+                        )
+                    } label: {
+                        HStack {
+                            Text("Báo cáo tin nhắn")
+                            KinnectIcon(glyph: .report, size: 18, tint: KinnectTheme.danger)
+                        }
+                    }
+                    Button(role: .destructive) {
+                        Task { await appState.blockUser(userId: msg.sender.id, userName: msg.sender.name) }
+                    } label: {
+                        HStack {
+                            Text("Chặn người gửi")
+                            KinnectIcon(glyph: .block, size: 18, tint: KinnectTheme.danger)
                         }
                     }
                 }
-                .padding(14)
+            } label: {
+                KinnectIcon(glyph: .more, size: 18, tint: KinnectTheme.textSecondary)
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 4)
+                    .contentShape(Rectangle())
             }
+            .accessibilityLabel("Tùy chọn tin nhắn nhóm")
+        }
+    }
 
-            // Zalo-Style Member Mention Suggestion Bar
-            if currentMentionQuery != nil {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text("Nhắc thành viên (@)")
-                            .font(.caption2.bold())
+    @ViewBuilder
+    private var mentionSuggestionBar: some View {
+        if currentMentionQuery != nil {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Nhắc thành viên (@)")
+                        .font(.caption2.bold())
+                        .foregroundColor(KinnectTheme.textSecondary)
+                    Spacer()
+                    Button {
+                        text.append(" ")
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.caption2)
                             .foregroundColor(KinnectTheme.textSecondary)
-                        Spacer()
-                        Button {
-                            text.append(" ")
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.caption2)
-                                .foregroundColor(KinnectTheme.textSecondary)
-                        }
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.top, 6)
+                }
+                .padding(.horizontal, 14)
+                .padding(.top, 6)
 
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            // @Tất cả (Zalo Tag All)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        // @Tất cả (Zalo Tag All)
+                        Button {
+                            insertMention(tag: "Tất cả")
+                        } label: {
+                            HStack(spacing: 6) {
+                                ZStack {
+                                    Circle()
+                                        .fill(KinnectTheme.accentBright.opacity(0.2))
+                                        .frame(width: 28, height: 28)
+                                    Image(systemName: "person.3.fill")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(KinnectTheme.accentBright)
+                                }
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text("@Tất cả")
+                                        .font(.caption.bold())
+                                        .foregroundColor(KinnectTheme.accentBright)
+                                    Text("Cả nhóm")
+                                        .font(.system(size: 9))
+                                        .foregroundColor(KinnectTheme.textSecondary)
+                                }
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated))
+                        }
+                        .buttonStyle(.plain)
+
+                        // Group members
+                        ForEach(filteredMentionMembers) { u in
                             Button {
-                                insertMention(tag: "Tất cả")
+                                let tag = u.username.isEmpty ? u.name : u.username
+                                insertMention(tag: tag)
                             } label: {
                                 HStack(spacing: 6) {
-                                    ZStack {
-                                        Circle()
-                                            .fill(KinnectTheme.accentBright.opacity(0.2))
-                                            .frame(width: 28, height: 28)
-                                        Image(systemName: "person.3.fill")
-                                            .font(.system(size: 12))
-                                            .foregroundColor(KinnectTheme.accentBright)
-                                    }
+                                    KinnectAvatarView(
+                                        name: u.name,
+                                        avatarURL: u.avatarUrl,
+                                        colorHex: u.avatarColor,
+                                        size: 28
+                                    )
                                     VStack(alignment: .leading, spacing: 1) {
-                                        Text("@Tất cả")
-                                            .font(.caption.bold())
-                                            .foregroundColor(KinnectTheme.accentBright)
-                                        Text("Cả nhóm")
+                                        Text(u.name)
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundColor(KinnectTheme.textPrimary)
+                                        Text("@\(u.username.isEmpty ? u.name : u.username)")
                                             .font(.system(size: 9))
                                             .foregroundColor(KinnectTheme.textSecondary)
                                     }
@@ -1139,79 +1169,70 @@ struct GroupChatDetailView: View {
                                 .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated))
                             }
                             .buttonStyle(.plain)
-
-                            // Group members
-                            ForEach(filteredMentionMembers) { u in
-                                Button {
-                                    let tag = u.username.isEmpty ? u.name : u.username
-                                    insertMention(tag: tag)
-                                } label: {
-                                    HStack(spacing: 6) {
-                                        KinnectAvatarView(
-                                            name: u.name,
-                                            avatarURL: u.avatarUrl,
-                                            colorHex: u.avatarColor,
-                                            size: 28
-                                        )
-                                        VStack(alignment: .leading, spacing: 1) {
-                                            Text(u.name)
-                                                .font(.caption.weight(.semibold))
-                                                .foregroundColor(KinnectTheme.textPrimary)
-                                            Text("@\(u.username.isEmpty ? u.name : u.username)")
-                                                .font(.system(size: 9))
-                                                .foregroundColor(KinnectTheme.textSecondary)
-                                        }
-                                    }
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                                    .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated))
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.bottom, 6)
-                    }
-                }
-                .background(KinnectTheme.surface)
-                .overlay(Rectangle().frame(height: 1).foregroundColor(KinnectTheme.border), alignment: .bottom)
-            }
-
-            HStack(spacing: 8) {
-                // Mention shortcut button (@)
-                Button {
-                    if !text.hasSuffix("@") {
-                        if text.isEmpty || text.hasSuffix(" ") {
-                            text.append("@")
-                        } else {
-                            text.append(" @")
                         }
                     }
-                } label: {
-                    Text("@")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(KinnectTheme.accentBright)
-                        .frame(width: 36, height: 36)
-                        .background(Circle().fill(KinnectTheme.surfaceElevated))
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 6)
                 }
-                .accessibilityLabel("Nhắc tên thành viên")
-
-                TextField("Nhập tin nhắn trong nhóm...", text: $text)
-                    .padding(10)
-                    .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
-                    .foregroundColor(KinnectTheme.textPrimary)
-
-                KinnectIconButton(
-                    glyph: .send,
-                    label: "Gửi tin nhắn nhóm",
-                    tint: KinnectTheme.accentBright
-                ) {
-                    Task { await sendGroupMessage() }
-                }
-                .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
-            .padding(12)
             .background(KinnectTheme.surface)
+            .overlay(Rectangle().frame(height: 1).foregroundColor(KinnectTheme.border), alignment: .bottom)
+        }
+    }
+
+    @ViewBuilder
+    private var groupChatInputBar: some View {
+        HStack(spacing: 8) {
+            // Mention shortcut button (@)
+            Button {
+                if !text.hasSuffix("@") {
+                    if text.isEmpty || text.hasSuffix(" ") {
+                        text.append("@")
+                    } else {
+                        text.append(" @")
+                    }
+                }
+            } label: {
+                Text("@")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(KinnectTheme.accentBright)
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(KinnectTheme.surfaceElevated))
+            }
+            .accessibilityLabel("Nhắc tên thành viên")
+
+            TextField("Nhập tin nhắn trong nhóm...", text: $text)
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
+                .foregroundColor(KinnectTheme.textPrimary)
+
+            KinnectIconButton(
+                glyph: .send,
+                label: "Gửi tin nhắn nhóm",
+                tint: KinnectTheme.accentBright
+            ) {
+                Task { await sendGroupMessage() }
+            }
+            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+        .padding(12)
+        .background(KinnectTheme.surface)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                LazyVStack(spacing: 10) {
+                    ForEach(messages) { msg in
+                        groupMessageRow(msg: msg)
+                    }
+                }
+                .padding(14)
+            }
+
+            mentionSuggestionBar
+
+            groupChatInputBar
         }
         .background(KinnectTheme.background)
         .navigationTitle(group.name)
