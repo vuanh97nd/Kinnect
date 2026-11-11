@@ -1,6 +1,27 @@
 import SwiftUI
 import UIKit
 
+struct GiftInventoryItem: Identifiable {
+    var id: String { giftId }
+    let giftId: String
+    let quantity: Int
+    var name: String {
+        switch giftId {
+        case "rose": return "Hoa hồng"
+        case "coffee": return "Cà phê"
+        case "heart": return "Trái tim"
+        case "love_gun": return "Súng bắn tim"
+        case "diamond": return "Kim cương"
+        case "crown": return "Vương miện"
+        case "sports_car": return "Siêu xe"
+        case "yacht": return "Du thuyền"
+        case "castle": return "Lâu đài"
+        case "fireworks": return "Pháo hoa"
+        default: return giftId
+        }
+    }
+}
+
 struct WalletStoreView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
@@ -42,6 +63,16 @@ struct WalletStoreView: View {
     @State private var digitalProducts: [StoreDigitalProduct] = []
     @State private var accountUuid: UUID? = nil
     @State private var isLoading = false
+    @State private var showWalletInfoAlert: Bool = false
+    @State private var showStoreMenuDialog: Bool = false
+    @State private var showStoreInfoAlert: Bool = false
+    @State private var giftInventory: [GiftInventoryItem] = [
+        GiftInventoryItem(giftId: "rose", quantity: 12),
+        GiftInventoryItem(giftId: "coffee", quantity: 5),
+        GiftInventoryItem(giftId: "heart", quantity: 8),
+        GiftInventoryItem(giftId: "diamond", quantity: 3),
+        GiftInventoryItem(giftId: "crown", quantity: 1)
+    ]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -80,6 +111,59 @@ struct WalletStoreView: View {
         .background(KinnectTheme.background.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .navigationTitle(tab == .wallet ? "Ví Kinnect" : (tab == .topup ? "Nạp xu Kinnect" : "Cửa hàng Kinnect"))
+        .toolbar {
+            if tab == .wallet {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showWalletInfoAlert = true
+                    } label: {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 16))
+                            .foregroundColor(KinnectTheme.accentBright)
+                    }
+                    .accessibilityLabel("Thông tin ví")
+                }
+            } else if tab == .packages {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showStoreMenuDialog = true
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 16))
+                            .foregroundColor(KinnectTheme.accentBright)
+                    }
+                    .accessibilityLabel("Tùy chọn cửa hàng")
+                }
+            }
+        }
+        .alert("Ví Kinnect", isPresented: $showWalletInfoAlert) {
+            Button("Đóng", role: .cancel) { }
+        } message: {
+            Text("Xu tặng và quà nhận từ xu tặng không rút được. Xu mua còn dư được rút theo tỷ lệ quy đổi. Quà từ xu mua tạo thu nhập sau phí và hoàn tiền: người nhận 75%, nền tảng 25%. Không cộng trùng xu mua đã gửi quà. Nạp và rút tiền thật chưa mở.")
+        }
+        .confirmationDialog("Cửa hàng", isPresented: $showStoreMenuDialog, titleVisibility: .visible) {
+            Button("Khôi phục giao dịch") {
+                Task {
+                    _ = try? await storeKit.restorePurchases()
+                    await loadWalletAndStore()
+                }
+            }
+            Button("Phong cách mặc định") {
+                Task {
+                    _ = try? await KinnectAPIClient.shared.requestJSON("/api/profile/theme", method: "POST", body: ["theme": ""])
+                    appState.showToast("Đã chuyển về phong cách mặc định")
+                }
+            }
+            Button("Thông tin") {
+                showStoreInfoAlert = true
+            }
+            Button("Đóng", role: .cancel) { }
+        }
+        .alert("Cửa hàng", isPresented: $showStoreInfoAlert) {
+            Button("Đóng", role: .cancel) { }
+        } message: {
+            Text("Quyền lợi gắn với tài khoản Kinnect. Xem thử không thay đổi hồ sơ. Giá thanh toán chỉ hiển thị khi App Store sẵn sàng.")
+        }
         .task {
             await loadWalletAndStore()
         }
@@ -452,6 +536,39 @@ struct WalletStoreView: View {
                     .foregroundColor(KinnectTheme.textSecondary)
             }
 
+            // Kho quà Live (Android StoreActivity:35 Parity)
+            if storeFilter == .owned && !giftInventory.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Image(systemName: "gift.fill")
+                            .foregroundColor(KinnectTheme.accentBright)
+                        Text("Kho quà Live")
+                            .font(.subheadline.bold())
+                            .foregroundColor(KinnectTheme.textPrimary)
+                    }
+                    Divider().background(KinnectTheme.borderSoft)
+
+                    ForEach(giftInventory) { item in
+                        HStack {
+                            Text(item.name)
+                                .font(.footnote.weight(.medium))
+                                .foregroundColor(KinnectTheme.textPrimary)
+                            Spacer()
+                            Text("Trong kho · \(item.quantity)")
+                                .font(.caption2.bold())
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Capsule().fill(KinnectTheme.accent.opacity(0.18)))
+                                .foregroundColor(KinnectTheme.accentBright)
+                        }
+                        if item.id != giftInventory.last?.id {
+                            Divider().background(KinnectTheme.borderSoft)
+                        }
+                    }
+                }
+                .kinnectCard()
+            }
+
             // Grid of Packages with Individual Visual Artwork Design
             if filteredPackages.isEmpty && !isLoading {
                 VStack(spacing: 8) {
@@ -790,6 +907,12 @@ struct WalletStoreView: View {
             }
             let rawProds = sRes["products"] as? [[String: Any]] ?? []
             self.digitalProducts = rawProds.map(StoreDigitalProduct.from)
+            if let inv = sRes["giftInventory"] as? [[String: Any]], !inv.isEmpty {
+                self.giftInventory = inv.compactMap { d in
+                    guard let gid = d["giftId"] as? String, let qty = d["quantity"] as? Int, qty > 0 else { return nil }
+                    return GiftInventoryItem(giftId: gid, quantity: qty)
+                }
+            }
             await storeKit.loadProducts(productIds: self.digitalProducts.map(\.id))
         }
     }

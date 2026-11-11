@@ -24,6 +24,7 @@ struct MessagesView: View {
     }
 
     @State private var scope: ChatScope = .direct
+    @State private var unreadOnly: Bool = false
     @State private var conversations: [[String: Any]] = []
     @State private var groups: [ChatGroupItem] = []
     @State private var showCreateGroupSheet = false
@@ -75,32 +76,64 @@ struct MessagesView: View {
             }
             .padding(.horizontal, 14)
 
+            // Android 1.2.12 MainActivity:2053 Parity Filter: [Tất cả | Chưa đọc]
+            if scope == .direct {
+                HStack(spacing: 8) {
+                    Button {
+                        unreadOnly = false
+                    } label: {
+                        Text("Tất cả")
+                            .font(.caption.weight(!unreadOnly ? .bold : .medium))
+                            .foregroundColor(!unreadOnly ? .white : KinnectTheme.textSecondary)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(!unreadOnly ? KinnectTheme.accent : KinnectTheme.surfaceElevated))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        unreadOnly = true
+                    } label: {
+                        Text("Chưa đọc")
+                            .font(.caption.weight(unreadOnly ? .bold : .medium))
+                            .foregroundColor(unreadOnly ? .white : KinnectTheme.textSecondary)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(unreadOnly ? KinnectTheme.accent : KinnectTheme.surfaceElevated))
+                    }
+                    .buttonStyle(.plain)
+
+                    Spacer()
+                }
+                .padding(.horizontal, 14)
+            }
+
             ScrollView {
                 LazyVStack(spacing: 10) {
                     if scope == .direct {
-                        if conversations.isEmpty && !isLoading {
+                        let rows = filteredConversations
+                        if rows.isEmpty && !isLoading {
                             VStack(spacing: 12) {
-                                Text("Chưa có cuộc trò chuyện riêng nào")
+                                Text(unreadOnly ? "Không có tin nhắn chưa đọc." : "Chưa có cuộc trò chuyện riêng nào")
                                     .font(.subheadline)
                                     .foregroundColor(KinnectTheme.textSecondary)
-                                Button("Mở danh sách bạn bè", action: onOpenFriends)
-                                    .font(.caption.bold())
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 8)
-                                    .background(Capsule().fill(KinnectTheme.primaryGradient))
-                                    .foregroundColor(.white)
+                                if !unreadOnly {
+                                    Button("Mở danh sách bạn bè", action: onOpenFriends)
+                                        .font(.caption.bold())
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 8)
+                                        .background(Capsule().fill(KinnectTheme.primaryGradient))
+                                        .foregroundColor(.white)
+                                }
                             }
                             .padding(.vertical, 36)
                         }
 
-                        ForEach(Array(conversations.enumerated()), id: \.offset) { _, conv in
-                            let peer = extractPeer(from: conv)
-                            if !peer.id.isEmpty && !appState.blockedUserIds.contains(peer.id) {
-                                NavigationLink {
-                                    DirectChatDetailView(peer: peer)
-                                } label: {
-                                    directConversationRow(conv: conv, peer: peer)
-                                }
+                        ForEach(rows, id: \.0) { _, conv, peer in
+                            NavigationLink {
+                                DirectChatDetailView(peer: peer)
+                            } label: {
+                                directConversationRow(conv: conv, peer: peer)
                             }
                         }
                     } else {
@@ -153,6 +186,24 @@ struct MessagesView: View {
             }
             .transition(.move(edge: .bottom).combined(with: .opacity))
             .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showCreateGroupSheet)
+        }
+    }
+
+    private var filteredConversations: [(Int, [String: Any], KinnectUser)] {
+        conversations.enumerated().compactMap { index, conv in
+            let peer = extractPeer(from: conv)
+            guard !peer.id.isEmpty && !appState.blockedUserIds.contains(peer.id) else { return nil }
+            if !searchQuery.isEmpty {
+                let q = searchQuery.lowercased()
+                if !peer.name.lowercased().contains(q) && !peer.handle.lowercased().contains(q) {
+                    return nil
+                }
+            }
+            if unreadOnly {
+                let unread = (conv["unread"] as? Int) ?? (conv["unreadCount"] as? Int) ?? 0
+                if unread == 0 { return nil }
+            }
+            return (index, conv, peer)
         }
     }
 
