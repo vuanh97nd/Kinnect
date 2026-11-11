@@ -46,6 +46,7 @@ struct WalletView: View {
     @State private var currencyLabel: String = "Xu Kinnect"
     @State private var entries: [WalletEntryItem] = []
     @State private var digitalProducts: [StoreDigitalProduct] = []
+    @State private var coinPacks: [StoreDigitalProduct] = []
     @State private var selectedFilter: HistoryFilter = .all
     @State private var isLoading = false
     @State private var showWalletInfoAlert = false
@@ -409,6 +410,10 @@ struct WalletView: View {
                     .foregroundColor(KinnectTheme.accentBright)
             }
 
+            if giftInventory.isEmpty {
+                Text("Kho quà của bạn đang trống.")
+                    .font(.caption).foregroundColor(KinnectTheme.textSecondary)
+            }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     ForEach(giftInventory) { gift in
@@ -613,12 +618,9 @@ struct WalletView: View {
 
                     // 6 Packages
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                        topUpOptionCard(coins: 100, price: "10.000đ")
-                        topUpOptionCard(coins: 200, price: "20.000đ")
-                        topUpOptionCard(coins: 500, price: "50.000đ")
-                        topUpOptionCard(coins: 1000, price: "100.000đ")
-                        topUpOptionCard(coins: 2000, price: "200.000đ")
-                        topUpOptionCard(coins: 5000, price: "500.000đ")
+                        ForEach(coinPacks) { pack in
+                            topUpOptionCard(coins: pack.coinsGranted, price: pack.priceLabel)
+                        }
                     }
 
                     // StoreKit digital products
@@ -832,6 +834,7 @@ struct WalletView: View {
             earnedBalance = wallet["earningsVnd"] as? Int ?? 0
             spentBalance = wallet["spentCoins"] as? Int ?? 0
             currencyLabel = "Xu Kinnect"
+            coinPacks = (wallet["coinPacks"] as? [[String: Any]] ?? []).map(StoreDigitalProduct.from)
             entries = (wallet["entries"] as? [[String: Any]] ?? []).map(WalletEntryItem.from)
             loadError = nil
             let store = try await KinnectAPIClient.shared.requestJSON("/api/store")

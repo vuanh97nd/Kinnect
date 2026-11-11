@@ -134,6 +134,7 @@ struct ShortsVideoView: View {
         let isSelected = shortsTab == id
         return Button {
             shortsTab = id
+            currentIndex = 0
             Task { await loadShorts() }
         } label: {
             VStack(spacing: 4) {
@@ -412,6 +413,7 @@ struct ShortClipPlayer: View {
     @State private var failed = false
     @State private var loading = false
     @State private var loopObserver: NSObjectProtocol?
+    @State private var shouldPlay = false
 
     var body: some View {
         ZStack {
@@ -497,15 +499,16 @@ struct ShortClipPlayer: View {
             queue: .main
         ) { _ in
             next.seek(to: .zero)
-            if active { next.play() }
+            if shouldPlay { next.play() }
         }
         player = next
         syncPlayback()
     }
 
     private func syncPlayback() {
-        guard let player else { return }
         let blocked = !active || scenePhase != .active || calls.activeCall != nil
+        shouldPlay = !blocked
+        guard let player else { return }
         if blocked {
             player.pause()
         } else {
@@ -514,6 +517,7 @@ struct ShortClipPlayer: View {
     }
 
     private func stop() {
+        shouldPlay = false
         player?.pause()
         player = nil
         if let loopObserver {
@@ -632,7 +636,7 @@ struct ShortCommentsSheet: View {
                     TextField(replyingTo != nil ? "Trả lời @\(replyingTo!.author.name)..." : "Viết bình luận...", text: $text)
                         .padding(10)
                         .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated))
-                        .foregroundColor(.white)
+                        .foregroundColor(KinnectTheme.textPrimary)
 
                     Button {
                         Task { await postComment() }
@@ -700,7 +704,7 @@ struct ShortCommentsSheet: View {
 
                 Text(c.text)
                     .font(.subheadline)
-                    .foregroundColor(.white)
+                    .foregroundColor(KinnectTheme.textPrimary)
                     .kinnectMultiline()
 
                 // Action bar: Trả lời, Thả cảm xúc

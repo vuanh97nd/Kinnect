@@ -73,12 +73,13 @@ jobs:
           cd build
           zip -qry "../dist/Kinnect-1.2.12-ios.ipa" Payload
           cd ../dist
-          cp "Kinnect-1.2.12-ios.ipa" "Kinnect-1.2.12-b119-ios.ipa"
+          cp "Kinnect-1.2.12-ios.ipa" "Kinnect-1.2.12-b120-ios.ipa"
           cp "Kinnect-1.2.12-ios.ipa" "Kinnect-1.2.12-sideload.ipa"
           shasum -a 256 "Kinnect-1.2.12-ios.ipa" > "Kinnect-1.2.12-ios.ipa.sha256"
-          shasum -a 256 "Kinnect-1.2.12-b119-ios.ipa" > "Kinnect-1.2.12-b119-ios.ipa.sha256"
+          shasum -a 256 "Kinnect-1.2.12-b120-ios.ipa" > "Kinnect-1.2.12-b120-ios.ipa.sha256"
           shasum -a 256 "Kinnect-1.2.12-sideload.ipa" > "Kinnect-1.2.12-sideload.ipa.sha256"
           ls -lh Kinnect-1.2.12*.ipa
+          python3 -c 'import json,os,plistlib; p=plistlib.load(open("../build/Payload/Kinnect.app/Info.plist","rb")); json.dump({"commit":os.environ["GITHUB_SHA"],"runId":os.environ["GITHUB_RUN_ID"],"version":p["CFBundleShortVersionString"],"build":p["CFBundleVersion"]},open("build-info.json","w"),indent=2)'
 
       - name: Upload IPA to GitHub Actions Artifacts
         uses: actions/upload-artifact@v4
@@ -86,39 +87,42 @@ jobs:
           name: Kinnect-1.2.12-ios-ipa
           path: |
             dist/Kinnect-1.2.12-ios.ipa
-            dist/Kinnect-1.2.12-b119-ios.ipa
+            dist/Kinnect-1.2.12-b120-ios.ipa
             dist/Kinnect-1.2.12-sideload.ipa
             dist/*.sha256
+            dist/build-info.json
           if-no-files-found: error
 
       - name: Publish downloadable IPA to GitHub Release (ios-v1.2.12)
+        if: startsWith(github.ref, 'refs/tags/ios-v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="ios-v1.2.12"
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release edit "$TAG" \
-              --title "Kinnect iOS 1.2.12 (Build 119)" \
-              --notes "Gói cài đặt Kinnect iOS 1.2.12 Build 119 (.ipa) — Đồng bộ toàn diện Android 1.2.12 (Build 118). Thiết kế tách riêng độc lập Ví Kinnect và Cửa hàng Kinnect theo chuẩn Android. Mở toàn màn hình tất cả các mục chính (Tin nhắn, Thông báo, Cửa hàng, Ví Kinnect, Bạn bè, Hồ sơ), camera viewfinder phần cứng AVFoundation, hiển thị chân dung đầy đủ không bị cắt đầu, sửa lỗi thoát app khi đăng nhập."
+              --title "Kinnect iOS 1.2.12 (Build 120)" \
+              --notes "Gói cài đặt Kinnect iOS 1.2.12 Build 120 (.ipa) — Đồng bộ toàn diện Android 1.2.12 (Build 118). Thiết kế tách riêng độc lập Ví Kinnect và Cửa hàng Kinnect theo chuẩn Android. Mở toàn màn hình tất cả các mục chính (Tin nhắn, Thông báo, Cửa hàng, Ví Kinnect, Bạn bè, Hồ sơ), camera viewfinder phần cứng AVFoundation, hiển thị chân dung đầy đủ không bị cắt đầu, sửa lỗi thoát app khi đăng nhập."
             gh release upload "$TAG" \
               dist/Kinnect-1.2.12-ios.ipa \
-              dist/Kinnect-1.2.12-b119-ios.ipa \
+              dist/Kinnect-1.2.12-b120-ios.ipa \
               dist/Kinnect-1.2.12-sideload.ipa \
               dist/*.sha256 \
               --clobber
           else
             gh release create "$TAG" \
               dist/Kinnect-1.2.12-ios.ipa \
-              dist/Kinnect-1.2.12-b119-ios.ipa \
+              dist/Kinnect-1.2.12-b120-ios.ipa \
               dist/Kinnect-1.2.12-sideload.ipa \
               dist/*.sha256 \
-              --title "Kinnect iOS 1.2.12 (Build 119)" \
+              --title "Kinnect iOS 1.2.12 (Build 120)" \
               --notes "Gói cài đặt Kinnect iOS (.ipa) — Cài đặt lên iPhone/iPad từ Windows qua Sideloadly hoặc AltStore bằng Apple ID cá nhân miễn phí." \
               --prerelease
           fi
 
   ui-review-screenshots:
     name: Capture iOS Simulator UI Review Screenshots
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/ios-v')
     runs-on: macos-15
     timeout-minutes: 45
     needs: build-ios
@@ -149,6 +153,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish UI Review Screenshots to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/ios-v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

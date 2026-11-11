@@ -527,6 +527,8 @@ struct RootMainView: View {
                             .onReceive(NotificationCenter.default.publisher(for: .kinnectNavigateRoute)) { notif in
                                 guard let route = notif.object as? String else { return }
                                 switch route {
+                                case "notifications":
+                                    activeTopSection = .notifications
                                 case "messages":
                                     activeTopSection = .messages
                                 case "profile":

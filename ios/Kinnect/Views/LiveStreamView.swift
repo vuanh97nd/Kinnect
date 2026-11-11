@@ -565,9 +565,20 @@ struct CreateLiveRoomSheet: View {
     private func startHostLive() async {
         isStarting = true
         defer { isStarting = false }
-        _ = await MediaPermissionHandler.shared.requestMicrophoneAccess()
-        _ = await MediaPermissionHandler.shared.requestCameraAccess()
-        await NativeWebRTCManager.shared.startLiveHostBroadcast()
+        guard liveMode == "chat" else {
+            appState.showToast("Phát màn hình game chưa khả dụng trên iOS.")
+            return
+        }
+        let manager = NativeWebRTCManager.shared
+        manager.updateLiveEffects(LiveVideoSettings(
+            filter: previewFilter, sticker: previewSticker, beauty: previewBeautyOn,
+            smooth: previewSmooth, whiten: previewWhiten, slim: previewSlim, eyes: previewEyes,
+            lips: previewLips, blemish: previewBlemish, blush: previewBlush))
+        guard await manager.startLiveHostBroadcast() else {
+            appState.showToast("Cần quyền camera và micro để bắt đầu Live.")
+            return
+        }
+        manager.setMicrophoneMuted(!previewMicEnabled)
 
         let roomTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? "Phòng Live của \(appState.currentUser?.name ?? "Kinnect")"
@@ -635,12 +646,7 @@ struct LiveRoomFullScreenView: View {
                     }
                 }
 
-                // Live Color Filter Grading Overlay
-                if activeLiveFilter != "none" {
-                    LiveFilterColorOverlay(filterId: activeLiveFilter)
-                        .ignoresSafeArea()
-                        .allowsHitTesting(false)
-                }
+                // Filters are baked into RTCVideoSource, not painted over the viewer UI.
 
                 VStack {
                     // Top bar
@@ -801,6 +807,7 @@ struct LiveRoomFullScreenView: View {
                                 .background(Circle().fill(Color.black.opacity(0.55)))
                         }
                         .accessibilityLabel("Hiệu ứng Live")
+                        .disabled(!appState.isCurrentLiveHost)
 
                         Button {
                             triggerLiveReaction(symbol: "💜", kind: "heart", room: room.id)
@@ -824,11 +831,7 @@ struct LiveRoomFullScreenView: View {
                     .padding(.bottom, 20)
                 }
 
-                // AR Face Sticker in Live
-                if activeLiveSticker != "none" {
-                    LiveStickerOverlayView(stickerId: activeLiveSticker)
-                        .allowsHitTesting(false)
-                }
+                // Face stickers travel in the encoded video stream.
 
                 // 3D Gift Animation Showcase Effect
                 if let giftEffect = activeGiftEffect {
@@ -856,6 +859,22 @@ struct LiveRoomFullScreenView: View {
                     }
                 )
             }
+            .onAppear {
+                let value = webrtc.liveEffects
+                activeLiveFilter = value.filter
+                activeLiveSticker = value.sticker
+                beautyEnabled = value.beauty
+                beautySmooth = value.smooth
+                beautyWhiten = value.whiten
+                beautySlim = value.slim
+                beautyEyes = value.eyes
+                beautyLips = value.lips
+                beautyBlemish = value.blemish
+                beautyBlush = value.blush
+            }
+            .onChange(of: liveVideoSettings) { value in
+                if appState.isCurrentLiveHost { webrtc.updateLiveEffects(value) }
+            }
             .sheet(isPresented: $showEffectsSheet) {
                 LiveEffectsSheet(
                     activeSticker: $activeLiveSticker,
@@ -871,6 +890,12 @@ struct LiveRoomFullScreenView: View {
                 )
             }
         }
+    }
+
+    private var liveVideoSettings: LiveVideoSettings {
+        LiveVideoSettings(filter: activeLiveFilter, sticker: activeLiveSticker, beauty: beautyEnabled,
+                          smooth: beautySmooth, whiten: beautyWhiten, slim: beautySlim, eyes: beautyEyes,
+                          lips: beautyLips, blemish: beautyBlemish, blush: beautyBlush)
     }
 
     private func triggerLiveReaction(symbol: String, kind: String, room: String) {
@@ -1047,7 +1072,10 @@ struct LiveGiftDrawerSheet: View {
                 guard let pendingRequestId, let data = event.userInfo else { return }
                 if data["type"] as? String == "live-gift-receipt",
                    data["requestId"] as? String == pendingRequestId {
-                    if let gift = pendingGift { onGiftSent?(gift, pendingQuantity) }
+                    if let gift = pendingGift {
+                        UserDefaults.standard.removeObject(forKey: giftRequestKey(gift.id, quantity: pendingQuantity))
+                        onGiftSent?(gift, pendingQuantity)
+                    }
                     self.pendingRequestId = nil
                     dismiss()
                 } else if data["type"] as? String == "live-gift-error" || data["type"] as? String == "live-mode-error" {
@@ -1090,13 +1118,21 @@ struct LiveGiftDrawerSheet: View {
         }
     }
 
+    private func giftRequestKey(_ giftId: String, quantity: Int) -> String {
+        "kinnect-gift-request:" + ServerConfig.currentOrigin + ":"
+            + (AppState.shared.currentUser?.id ?? "") + ":" + roomId + ":" + giftId + ":" + String(quantity)
+    }
+
     private func sendGift(_ gift: LiveGiftCatalogItem) {
         guard pendingRequestId == nil else { return }
         guard NativeSocketClient.shared.isConnected else {
             giftError = "Mất kết nối phòng Live. Hãy kết nối lại trước khi tặng quà."
             return
         }
-        let reqId = "gift_" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        let key = giftRequestKey(gift.id, quantity: selectedQuantity)
+        let reqId = UserDefaults.standard.string(forKey: key)
+            ?? "gift_" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        UserDefaults.standard.set(reqId, forKey: key)
         pendingGift = gift
         pendingRequestId = reqId
         pendingQuantity = selectedQuantity

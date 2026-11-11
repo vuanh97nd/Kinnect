@@ -56,6 +56,27 @@ final class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationC
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
+        let data = response.notification.request.content.userInfo
+        if data["notificationId"] != nil {
+            NotificationCenter.default.post(name: .kinnectNavigateRoute, object: "notifications")
+        }
         completionHandler()
     }
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        if userInfo["type"] as? String == "call-ended", let callId = userInfo["callId"] as? String {
+            Task { @MainActor in
+                if NativeWebRTCManager.shared.activeCall?.callId == callId {
+                    NativeWebRTCManager.shared.endOrRejectCurrentCall(sendSocket: false)
+                } else {
+                    CallKitManager.shared.reportCallEnded(callId: callId)
+                }
+            }
+        }
+        completionHandler(.newData)
+    }
+
 }

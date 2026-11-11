@@ -28,7 +28,6 @@ struct StoreView: View {
     @State private var accountUuid: UUID? = nil
     @State private var isLoading = false
     @State private var transactionInProgress = false
-    @State private var purchaseRequestIds: [String: String] = [:]
     @State private var coinSource = "gifted"
     @State private var trialPackagePurchases = true
     @State private var storeBalance = 0
@@ -80,15 +79,26 @@ struct StoreView: View {
         .confirmationDialog("Cửa hàng Kinnect", isPresented: $showStoreMenuDialog, titleVisibility: .visible) {
             Button("Khôi phục giao dịch") {
                 Task {
-                    _ = try? await storeKit.restorePurchases()
-                    await loadStoreData()
+                    do {
+                        let outcome = try await storeKit.restorePurchases()
+                        appState.showToast(outcome.failed.isEmpty
+                            ? "Đã kiểm tra và khôi phục các giao dịch hợp lệ."
+                            : "Một số giao dịch chưa xác minh được. Hãy thử lại.")
+                        await loadStoreData()
+                    } catch {
+                        appState.showToast("Chưa khôi phục được: \(error.localizedDescription)")
+                    }
                 }
             }
             Button("Phong cách mặc định") {
                 Task {
-                    _ = try? await KinnectAPIClient.shared.requestJSON("/api/store/style", method: "POST", body: ["productId": ""])
-                    appState.showToast("Đã chuyển về phong cách mặc định")
-                    await loadStoreData()
+                    do {
+                        _ = try await KinnectAPIClient.shared.requestJSON("/api/store/style", method: "POST", body: ["productId": ""])
+                        appState.showToast("Đã chuyển về phong cách mặc định")
+                        await loadStoreData()
+                    } catch {
+                        appState.showToast("Chưa đổi được phong cách: \(error.localizedDescription)")
+                    }
                 }
             }
             Button("Thông tin cửa hàng") {
@@ -571,9 +581,10 @@ struct StoreView: View {
         transactionInProgress = true
         defer { transactionInProgress = false }
         // Retain this ID after a transport failure so retry cannot debit twice.
-        let key = pkg.id + ":" + coinSource
-        let requestId = purchaseRequestIds[key] ?? KinnectWriteBody.packageRequestId()
-        purchaseRequestIds[key] = requestId
+        let key = "kinnect-package-request:" + ServerConfig.currentOrigin + ":"
+            + (appState.currentUser?.id ?? "") + ":" + pkg.id + ":" + coinSource
+        let requestId = UserDefaults.standard.string(forKey: key) ?? KinnectWriteBody.packageRequestId()
+        UserDefaults.standard.set(requestId, forKey: key)
         do {
             let res = try await KinnectAPIClient.shared.requestJSON(
                 "/api/store/packages/buy", method: "POST",
@@ -583,7 +594,7 @@ struct StoreView: View {
             guard (res["ownedPackages"] as? [String] ?? []).contains(pkg.id) else {
                 throw KinnectAPIError.serverMessage("Máy chủ chưa xác nhận quyền sử dụng gói.")
             }
-            purchaseRequestIds.removeValue(forKey: key)
+            UserDefaults.standard.removeObject(forKey: key)
             applyStoreState(res)
             appState.showToast("Đã sở hữu \(pkg.title)!")
             await loadStoreData()

@@ -101,8 +101,28 @@ final class PushKitManager: NSObject, ObservableObject, PKPushRegistryDelegate {
             callId: callId,
             callerName: callerName,
             isVideo: isVideo,
-            completion: completion
+            completion: {
+                DispatchQueue.main.async {
+                    NativeSocketClient.shared.connectWithKeychainSession()
+                }
+                completion()
+            }
         )
+        DispatchQueue.main.asyncAfter(deadline: .now() + 45) {
+            let current = NativeWebRTCManager.shared.activeCall
+            if current == nil || (current?.callId == callId && current?.state == .ringingIncoming) {
+                CallKitManager.shared.reportCallEnded(callId: callId, reason: .unanswered)
+            }
+        }
+    }
+
+    func unregisterStoredTokens() async {
+        for (kind, token) in [("voip", voipTokenHex), ("apns", apnsTokenHex)] {
+            if let token {
+                _ = try? await KinnectAPIClient.shared.requestJSON(
+                    "/api/devices/push", method: "DELETE", body: ["kind": kind, "token": token])
+            }
+        }
     }
 
     func uploadStoredTokens() {

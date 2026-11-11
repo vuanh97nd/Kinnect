@@ -86,6 +86,15 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
     private var liveAudioTrack: RTCAudioTrack?
     private var liveCapturer: RTCCameraVideoCapturer?
     private var liveVideoSource: RTCVideoSource?
+    private var liveProcessor: LiveVideoProcessor?
+    @Published private(set) var liveEffects = LiveVideoSettings()
+    private var pendingAnswerCallId: String?
+
+    @MainActor
+    func updateLiveEffects(_ value: LiveVideoSettings) {
+        liveEffects = value
+        liveProcessor?.update(value)
+    }
 
     private override init() {
         RTCInitializeSSL()
@@ -202,11 +211,19 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
             state: .ringingIncoming
         )
         CallKitManager.shared.reportIncomingCall(callId: callId, callerName: caller.name, isVideo: isVideo)
+        if pendingAnswerCallId == callId {
+            pendingAnswerCallId = nil
+            Task { await acceptIncomingCall(callId: callId) }
+        }
     }
 
     @MainActor
     func acceptIncomingCall(callId: String? = nil) async {
-        guard var current = activeCall else { return }
+        guard var current = activeCall else {
+            pendingAnswerCallId = callId
+            NativeSocketClient.shared.connectWithKeychainSession()
+            return
+        }
         if let callId, current.callId != callId { return }
 
         let isVideo = (current.mode != "audio")
@@ -229,8 +246,19 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
     }
 
     @MainActor
-    func endOrRejectCurrentCall(sendSocket: Bool = true) {
-        guard let current = activeCall else { return }
+    func endOrRejectCurrentCall(sendSocket: Bool = true, fallbackCallId: String? = nil) {
+        pendingAnswerCallId = nil
+        guard let current = activeCall else {
+            // CallKit can be answered or declined before the websocket finishes reconnecting.
+            if sendSocket, let callId = fallbackCallId {
+                Task {
+                    _ = try? await KinnectAPIClient.shared.requestJSON(
+                        "/api/push/decline", method: "POST", body: ["callId": callId])
+                }
+                CallKitManager.shared.reportCallEnded(callId: callId)
+            }
+            return
+        }
         let callId = current.callId
         if sendSocket {
             let msgType: String
@@ -507,9 +535,10 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
     // MARK: - Live Stream WebRTC (Host & Viewer)
 
     @MainActor
-    func startLiveHostBroadcast() async {
-        _ = await MediaPermissionHandler.shared.requestMicrophoneAccess()
-        _ = await MediaPermissionHandler.shared.requestCameraAccess()
+    func startLiveHostBroadcast() async -> Bool {
+        let mic = await MediaPermissionHandler.shared.requestMicrophoneAccess()
+        let camera = await MediaPermissionHandler.shared.requestCameraAccess()
+        guard mic && camera else { return false }
         await refreshIceServers()
 
         MediaPermissionHandler.shared.configureAudioSessionForCall()
@@ -518,12 +547,16 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         self.liveAudioTrack = aTrack
 
         let vSource = factory.videoSource()
-        let capturer = RTCCameraVideoCapturer(delegate: vSource)
+        let processor = LiveVideoProcessor(source: vSource)
+        processor.update(liveEffects)
+        liveProcessor = processor
+        let capturer = RTCCameraVideoCapturer(delegate: processor)
         let vTrack = factory.videoTrack(with: vSource, trackId: "live_video0")
         self.liveVideoSource = vSource
         self.liveCapturer = capturer
         self.liveLocalVideoTrack = vTrack
         startCapture(on: capturer, front: usingFrontCamera)
+        return true
     }
 
     @MainActor
@@ -619,6 +652,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         liveCapturer?.stopCapture()
         liveCapturer = nil
         liveVideoSource = nil
+        liveProcessor = nil
         liveAudioTrack = nil
         liveLocalVideoTrack = nil
         liveRemoteVideoTrack = nil
