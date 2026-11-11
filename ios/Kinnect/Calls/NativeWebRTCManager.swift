@@ -155,7 +155,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
             return
         }
         await refreshIceServers()
-        guard activeCall == nil else { return }
+        guard await NativeSocketClient.shared.ensureConnected(), activeCall == nil else { return }
         let callId = "call_\(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(16))"
         let session = ActiveCallSession(
             callId: callId,
@@ -182,7 +182,10 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
 
     @MainActor
     func handleCallRingingSocket(_ json: [String: Any]) {
-        guard var current = activeCall else { return }
+        guard let current = activeCall, !current.isIncoming, current.state == .dialingOutgoing else { return }
+        let requestId = json["requestId"] as? String ?? ""
+        let canonicalId = json["callId"] as? String ?? ""
+        guard requestId == current.callId || canonicalId == current.callId else { return }
         if let serverCallId = json["callId"] as? String, !serverCallId.isEmpty {
                 CallKitManager.shared.remapCallId(from: current.callId, to: serverCallId)
                 let updated = ActiveCallSession(
@@ -241,11 +244,20 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         guard current.state == .ringingIncoming else { return }
 
         let isVideo = (current.mode != "audio")
-        _ = await MediaPermissionHandler.shared.requestMicrophoneAccess()
+        guard await MediaPermissionHandler.shared.requestMicrophoneAccess() else {
+            endOrRejectCurrentCall()
+            AppState.shared.showToast("Hãy cho phép dùng micro trong Cài đặt để nhận cuộc gọi.")
+            return
+        }
         if isVideo {
             _ = await MediaPermissionHandler.shared.requestCameraAccess()
         }
         await refreshIceServers()
+        guard await NativeSocketClient.shared.ensureConnected() else {
+            endOrRejectCurrentCall()
+            AppState.shared.showToast("Chưa kết nối được cuộc gọi. Vui lòng thử lại.")
+            return
+        }
         guard activeCall?.callId == current.callId,
               activeCall?.state == .ringingIncoming else { return }
 
@@ -734,6 +746,7 @@ extension NativeWebRTCManager: RTCPeerConnectionDelegate {
     func peerConnection(_ peerConnection: RTCPeerConnection, didAdd stream: RTCMediaStream) {
         if let videoTrack = stream.videoTracks.first {
             DispatchQueue.main.async {
+                guard self.callPeerConnection === peerConnection else { return }
                 self.remoteVideoTrack = videoTrack
             }
         }
@@ -765,7 +778,8 @@ extension NativeWebRTCManager: RTCPeerConnectionDelegate {
 
     func peerConnection(_ peerConnection: RTCPeerConnection, didGenerate candidate: RTCIceCandidate) {
         DispatchQueue.main.async {
-            guard let callId = self.activeCall?.callId else { return }
+            guard self.callPeerConnection === peerConnection,
+                  let callId = self.activeCall?.callId else { return }
             NativeSocketClient.shared.sendJSON([
                 "type": "call-signal",
                 "callId": callId,
@@ -792,6 +806,7 @@ extension NativeWebRTCManager: RTCPeerConnectionDelegate {
     func peerConnection(_ peerConnection: RTCPeerConnection, didAdd rtpReceiver: RTCRtpReceiver, streams mediaStreams: [RTCMediaStream]) {
         if let track = rtpReceiver.track as? RTCVideoTrack {
             DispatchQueue.main.async {
+                guard self.callPeerConnection === peerConnection else { return }
                 self.remoteVideoTrack = track
             }
         }

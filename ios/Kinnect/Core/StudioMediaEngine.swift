@@ -402,9 +402,7 @@ final class StudioVideoProject: ObservableObject {
         let composition = makeVideoComposition(for: exportAsset)
         let outputURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("Kinnect-Video-\(UUID().uuidString).mp4")
-        let preset = AVAssetExportSession.allExportPresets().contains(AVAssetExportPresetHEVCHighestQuality)
-            ? AVAssetExportPresetHEVCHighestQuality
-            : AVAssetExportPresetHighestQuality
+        let preset = AVAssetExportPresetHighestQuality
         guard let exportSession = AVAssetExportSession(asset: exportAsset, presetName: preset) else {
             throw NSError(domain: "KinnectStudio", code: -1, userInfo: [NSLocalizedDescriptionKey: "Không khởi tạo được bộ xuất video."])
         }
@@ -484,22 +482,26 @@ final class StudioVideoProject: ObservableObject {
 
         if let mURL = musicURL {
             let musicAsset = AVURLAsset(url: mURL)
-            if let mAudio = try? await musicAsset.loadTracks(withMediaType: .audio).first,
-               let mTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
-                let mDuration = (try? await musicAsset.load(.duration)) ?? CMTime(seconds: 30, preferredTimescale: 600)
-                var currentTime = CMTime.zero
-                let totalTarget = scaled
-                while currentTime < totalTarget {
-                    let remaining = CMTimeSubtract(totalTarget, currentTime)
-                    let insertDur = CMTimeMinimum(mDuration, remaining)
-                    let insertRange = CMTimeRange(start: .zero, duration: insertDur)
-                    try? mTrack.insertTimeRange(insertRange, of: mAudio, at: currentTime)
-                    currentTime = CMTimeAdd(currentTime, insertDur)
-                }
-                let params = AVMutableAudioMixInputParameters(track: mTrack)
-                params.setVolume(musicVolume, at: .zero)
-                inputParams.append(params)
+            let tracks = try await musicAsset.loadTracks(withMediaType: .audio)
+            guard let mAudio = tracks.first,
+                  let mTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+                throw KinnectAPIError.serverMessage("Tệp nhạc không có âm thanh khả dụng.")
             }
+            let mDuration = try await musicAsset.load(.duration)
+            let seconds = CMTimeGetSeconds(mDuration)
+            guard seconds.isFinite, seconds > 0 else {
+                throw KinnectAPIError.serverMessage("Thời lượng tệp nhạc không hợp lệ.")
+            }
+            var currentTime = CMTime.zero
+            while currentTime < scaled {
+                try Task.checkCancellation()
+                let insertDur = CMTimeMinimum(mDuration, CMTimeSubtract(scaled, currentTime))
+                try mTrack.insertTimeRange(CMTimeRange(start: .zero, duration: insertDur), of: mAudio, at: currentTime)
+                currentTime = CMTimeAdd(currentTime, insertDur)
+            }
+            let params = AVMutableAudioMixInputParameters(track: mTrack)
+            params.setVolume(musicVolume, at: .zero)
+            inputParams.append(params)
         }
 
         let audioMix = AVMutableAudioMix()

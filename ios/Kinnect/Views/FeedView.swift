@@ -925,6 +925,7 @@ struct StoryComposerSheet: View {
     @State private var storyMusicTitle = ""
     @State private var storyMusicURL: URL?
     @State private var storyVideoURL: URL?
+    @State private var storyMediaLoading = false
 
     var body: some View {
         NavigationStack {
@@ -1010,7 +1011,9 @@ struct StoryComposerSheet: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 20))
                         }
 
-                        if let videoName = selectedVideoName {
+                        if let storyVideoURL {
+                            ShortClipPlayer(path: storyVideoURL.absoluteString, active: true).frame(height: 280)
+                        } else if let videoName = selectedVideoName {
                             VStack(spacing: 8) {
                                 Image(systemName: "video.circle.fill")
                                     .font(.system(size: 48))
@@ -1031,7 +1034,7 @@ struct StoryComposerSheet: View {
                                     HStack(spacing: 6) {
                                         Image(systemName: "music.note")
                                             .font(.caption.bold())
-                                        Text("\(music.title) — \(music.artist)")
+                                        Text(music.artist.isEmpty ? music.title : "\(music.title) — \(music.artist)")
                                             .font(.caption.bold())
                                             .lineLimit(1)
                                         Button {
@@ -1079,6 +1082,13 @@ struct StoryComposerSheet: View {
                         }
                     }
 
+                    Button { showMusicSheet = true } label: {
+                        Label(storyMusicTitle.isEmpty ? "Thêm nhạc" : storyMusicTitle, systemImage: "music.note")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .disabled(isSubmitting || storyMediaLoading)
+                    if storyMediaLoading { ProgressView("Đang chuẩn bị media…") }
+
                     // Photo/Video Picker Button
                     PhotosPicker(selection: $selectedMediaItem, matching: .any(of: [.images, .videos])) {
                         HStack(spacing: 8) {
@@ -1094,9 +1104,14 @@ struct StoryComposerSheet: View {
                     .onChange(of: selectedMediaItem) { item in
                         guard let item else { return }
                         Task {
+                            storyMediaLoading = true
+                            defer { storyMediaLoading = false }
                             if let data = try? await item.loadTransferable(type: Data.self) {
                                 if let uiImg = UIImage(data: data),
                                    let jpeg = uiImg.jpegData(compressionQuality: 0.72) {
+                                    guard jpeg.count <= 20 * 1024 * 1024 else {
+                                        appState.showToast("Ảnh vượt quá giới hạn 20 MB."); return
+                                    }
                                     previewImage = uiImg
                                     selectedVideoName = nil
                                     storyVideoURL = nil
@@ -1133,7 +1148,7 @@ struct StoryComposerSheet: View {
                         .foregroundColor(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
-                    .disabled(isSubmitting || (text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && imageDataURL.isEmpty))
+                    .disabled(isSubmitting || storyMediaLoading || (text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && imageDataURL.isEmpty))
                 }
                 .padding(16)
             }

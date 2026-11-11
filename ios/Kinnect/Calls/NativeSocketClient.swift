@@ -105,6 +105,10 @@ final class NativeSocketClient: NSObject, URLSessionWebSocketDelegate {
         }
 
         DispatchQueue.main.async { [weak self] in
+            if type == "welcome", let call = NativeWebRTCManager.shared.activeCall,
+               call.state == .connecting || call.state == .connected {
+                self?.sendJSON(["type": "call-resume", "callId": call.callId])
+            }
             self?.onEvent?(json)
         }
     }
