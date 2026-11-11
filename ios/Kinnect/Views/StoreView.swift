@@ -468,7 +468,7 @@ struct StoreView: View {
         let tint = isSelected ? Color.white : KinnectTheme.textSecondary
         switch cat {
         case .style:
-            return AnyView(KinnectIcon(glyph: .theme, size: 14, tint: tint))
+            return AnyView(Image(systemName: "sparkles").font(.system(size: 13)).foregroundColor(tint))
         case .live:
             return AnyView(KinnectIcon(glyph: .live, size: 14, tint: tint))
         case .studio:
@@ -540,3 +540,4 @@ struct StoreView: View {
         }
     }
 }
+

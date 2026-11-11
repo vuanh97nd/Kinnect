@@ -114,7 +114,7 @@ struct ShortsVideoView: View {
                 }
             )
         }
-        .sheet(item: $selectedAuthorProfile) { author in
+        .fullScreenCover(item: $selectedAuthorProfile) { author in
             NavigationStack {
                 ProfileView(targetUser: author)
                     .toolbar {

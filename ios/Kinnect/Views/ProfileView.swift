@@ -264,7 +264,7 @@ struct ProfileView: View {
                 await refreshPeer(target: target)
             }
         }
-        .sheet(isPresented: $showPeerChat) {
+        .fullScreenCover(isPresented: $showPeerChat) {
             if let u = activeUser {
                 NavigationStack {
                     DirectChatDetailView(peer: u)
@@ -273,14 +273,14 @@ struct ProfileView: View {
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showPeerChat)
-        .sheet(isPresented: $showEditProfileSheet) {
+        .fullScreenCover(isPresented: $showEditProfileSheet) {
             EditProfileSheet(onSaved: {
                 Task { await refreshMe() }
             })
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showEditProfileSheet)
-        .sheet(isPresented: $showPublicAlbumSheet) {
+        .fullScreenCover(isPresented: $showPublicAlbumSheet) {
             PublicAlbumManageSheet(
                 posts: userPosts,
                 onRefresh: { Task { await refreshMe() } }
@@ -288,7 +288,7 @@ struct ProfileView: View {
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showPublicAlbumSheet)
-        .sheet(isPresented: $showPrivateAlbumSheet) {
+        .fullScreenCover(isPresented: $showPrivateAlbumSheet) {
             PrivateAlbumManageSheet(
                 photos: $privatePhotos,
                 requests: $privateAccessRequests,
@@ -297,7 +297,7 @@ struct ProfileView: View {
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showPrivateAlbumSheet)
-        .sheet(item: $activeShortItem) { short in
+        .fullScreenCover(item: $activeShortItem) { short in
             ProfileShortDetailSheet(
                 short: short,
                 onRefresh: { Task { await refreshMe() } }
@@ -305,32 +305,32 @@ struct ProfileView: View {
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: activeShortItem)
-        .sheet(isPresented: $showSessionsSheet) {
+        .fullScreenCover(isPresented: $showSessionsSheet) {
             ActiveSessionsSheet()
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showSessionsSheet)
-        .sheet(isPresented: $showPasswordSheet) {
+        .fullScreenCover(isPresented: $showPasswordSheet) {
             ChangePasswordSheet()
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showPasswordSheet)
-        .sheet(isPresented: $showBlocksSheet) {
+        .fullScreenCover(isPresented: $showBlocksSheet) {
             BlockedUsersSheet()
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showBlocksSheet)
-        .sheet(isPresented: $showPrivacySheet) {
+        .fullScreenCover(isPresented: $showPrivacySheet) {
             PrivacySettingsSheet()
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showPrivacySheet)
-        .sheet(isPresented: $showSupportSheet) {
+        .fullScreenCover(isPresented: $showSupportSheet) {
             SupportContactSheet()
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showSupportSheet)
-        .sheet(isPresented: $showDeleteAccountSheet) {
+        .fullScreenCover(isPresented: $showDeleteAccountSheet) {
             DeleteAccountConfirmationSheet()
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }

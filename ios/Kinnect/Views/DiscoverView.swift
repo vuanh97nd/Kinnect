@@ -168,7 +168,7 @@ struct DiscoverView: View {
                 }
             )
         }
-        .sheet(item: $selectedUserForDetail) { person in
+        .fullScreenCover(item: $selectedUserForDetail) { person in
             NavigationStack {
                 ProfileView(targetUser: person)
                     .toolbar {

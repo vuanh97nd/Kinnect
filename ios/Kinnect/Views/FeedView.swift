@@ -192,7 +192,7 @@ struct FeedView: View {
                 Button("Hủy", role: .cancel) {}
             }
         }
-        .sheet(item: $selectedAuthorProfile) { user in
+        .fullScreenCover(item: $selectedAuthorProfile) { user in
             ProfileView(targetUser: user)
         }
     }

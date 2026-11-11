@@ -1,9 +1,10 @@
 import SwiftUI
 import UIKit
 
-/// Dedicated Full-Screen Wallet Screen matching Android 1.2.12 WalletActivity.java
+/// Dedicated Full-Screen Wallet Screen matching Android 1.2.12 WalletActivity.java and modern social media apps (TikTok, Zalo, Instagram)
+/// 100% Full-Screen navigation (NO popup sheets).
 /// Features Hero Coin Balance Card with hide/show toggle, 3 shortcut actions (Nạp xu, Rút tiền, Cửa hàng),
-/// Live earnings card, Kho quà Live (10 gift types), Transaction filters & history, and Top-up Sheet.
+/// Live earnings card, Kho quà Live (10 gift types), Transaction filters & history, and Full-screen Top-up & Details.
 struct WalletView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
@@ -12,24 +13,30 @@ struct WalletView: View {
     var onBack: (() -> Void)? = nil
     var onOpenStore: (() -> Void)? = nil
 
+    enum WalletSubScreen: Equatable {
+        case main
+        case topUp
+        case transactionDetail(WalletEntryItem)
+
+        static func == (lhs: WalletSubScreen, rhs: WalletSubScreen) -> Bool {
+            switch (lhs, rhs) {
+            case (.main, .main): return true
+            case (.topUp, .topUp): return true
+            case (.transactionDetail(let a), .transactionDetail(let b)): return a.id == b.id
+            default: return false
+            }
+        }
+    }
+
     enum HistoryFilter: String, CaseIterable {
         case all = "Tất cả"
         case topup = "Nạp xu"
         case spend = "Chi tiêu"
         case grant = "Được tặng"
         case income = "Thu nhập"
-
-        var apiKey: String {
-            switch self {
-            case .all: return "all"
-            case .topup: return "topup"
-            case .spend: return "spend"
-            case .grant: return "grant"
-            case .income: return "income"
-            }
-        }
     }
 
+    @State private var subScreen: WalletSubScreen = .main
     @State private var availableBalance: Int = 0
     @State private var earnedBalance: Int = 0
     @State private var spentBalance: Int = 0
@@ -42,8 +49,6 @@ struct WalletView: View {
     @State private var selectedFilter: HistoryFilter = .all
     @State private var isLoading = false
     @State private var showWalletInfoAlert = false
-    @State private var showTopUpSheet = false
-    @State private var selectedEntryDetail: WalletEntryItem? = nil
 
     @State private var giftInventory: [GiftInventoryItem] = [
         GiftInventoryItem(giftId: "rose", quantity: 12),
@@ -59,31 +64,56 @@ struct WalletView: View {
     ]
 
     var body: some View {
+        ZStack {
+            switch subScreen {
+            case .main:
+                mainWalletContent
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .leading),
+                        removal: .move(edge: .leading)
+                    ))
+
+            case .topUp:
+                fullScreenTopUpContent
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing),
+                        removal: .move(edge: .trailing)
+                    ))
+
+            case .transactionDetail(let item):
+                fullScreenDetailContent(item)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing),
+                        removal: .move(edge: .trailing)
+                    ))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(KinnectTheme.background.ignoresSafeArea())
+        .navigationBarHidden(true)
+        .alert("Ví Kinnect", isPresented: $showWalletInfoAlert) {
+            Button("Đóng", role: .cancel) { }
+        } message: {
+            Text("Xu tặng và quà nhận từ xu tặng không rút được. Xu mua còn dư được rút theo tỷ lệ quy đổi. Quà từ xu mua tạo thu nhập sau phí và hoàn tiền: người nhận 75%, nền tảng 25%. Không cộng trùng xu mua đã gửi quà. Nạp và rút tiền thật chưa mở.")
+        }
+        .task {
+            await loadWalletData()
+        }
+    }
+
+    // MARK: - 1. MAIN WALLET CONTENT
+    private var mainWalletContent: some View {
         VStack(spacing: 0) {
-            // Pinned Dedicated Header Bar matching Android WalletActivity
-            walletHeaderBar
+            walletMainHeaderBar
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    // 1. Hero Balance Card
                     heroBalanceCard
-
-                    // 2. Action Shortcuts (Nạp xu, Rút tiền, Cửa hàng) matching Android
                     actionShortcutsRow
-
-                    // 3. Live Earnings Card
                     liveEarningsCard
-
-                    // 4. Kho quà Live (Gift inventory)
                     giftInventorySection
-
-                    // 5. Transaction History Filter Strip
                     transactionFilterStrip
-
-                    // 6. Transaction History List
                     transactionHistoryList
-
-                    // Policy text
                     bottomPolicyText
                 }
                 .padding(.horizontal, 16)
@@ -94,26 +124,10 @@ struct WalletView: View {
                 await loadWalletData()
             }
         }
-        .background(KinnectTheme.background.ignoresSafeArea())
-        .navigationBarHidden(true)
-        .alert("Ví Kinnect", isPresented: $showWalletInfoAlert) {
-            Button("Đóng", role: .cancel) { }
-        } message: {
-            Text("Xu tặng và quà nhận từ xu tặng không rút được. Xu mua còn dư được rút theo tỷ lệ quy đổi. Quà từ xu mua tạo thu nhập sau phí và hoàn tiền: người nhận 75%, nền tảng 25%. Không cộng trùng xu mua đã gửi quà. Nạp và rút tiền thật chưa mở.")
-        }
-        .sheet(item: $selectedEntryDetail) { entry in
-            transactionDetailSheet(entry)
-        }
-        .sheet(isPresented: $showTopUpSheet) {
-            topUpSheetContent
-        }
-        .task {
-            await loadWalletData()
-        }
     }
 
     // MARK: - Header Bar
-    private var walletHeaderBar: some View {
+    private var walletMainHeaderBar: some View {
         HStack(spacing: 12) {
             Button {
                 if let onBack = onBack {
@@ -140,7 +154,6 @@ struct WalletView: View {
 
             Spacer()
 
-            // Info Button
             Button {
                 showWalletInfoAlert = true
             } label: {
@@ -153,7 +166,6 @@ struct WalletView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Thông tin ví")
 
-            // Refresh Button
             Button {
                 Task { await loadWalletData() }
             } label: {
@@ -196,7 +208,6 @@ struct WalletView: View {
                 .accessibilityLabel("Ẩn / hiện số dư")
             }
 
-            // Total Balance
             VStack(alignment: .leading, spacing: 4) {
                 Text("Tổng số dư xu")
                     .font(.caption.weight(.medium))
@@ -208,7 +219,6 @@ struct WalletView: View {
                     .minimumScaleFactor(0.7)
             }
 
-            // Two Sub-columns: Xu mua and Xu tặng
             HStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 5) {
@@ -242,9 +252,10 @@ struct WalletView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            // Quick Top-up Button
             Button {
-                showTopUpSheet = true
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    subScreen = .topUp
+                }
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "plus.circle.fill")
@@ -274,9 +285,10 @@ struct WalletView: View {
     // MARK: - Action Shortcuts Row
     private var actionShortcutsRow: some View {
         HStack(spacing: 12) {
-            // Nạp xu
             Button {
-                showTopUpSheet = true
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    subScreen = .topUp
+                }
             } label: {
                 VStack(spacing: 8) {
                     Circle()
@@ -301,7 +313,6 @@ struct WalletView: View {
             }
             .buttonStyle(.plain)
 
-            // Rút tiền
             Button {
                 appState.showToast("Đang kết nối chi trả tự động. Chưa mở rút tiền mặt.")
             } label: {
@@ -328,7 +339,6 @@ struct WalletView: View {
             }
             .buttonStyle(.plain)
 
-            // Cửa hàng -> Transitions to StoreView!
             Button {
                 if let onOpenStore = onOpenStore {
                     onOpenStore()
@@ -504,7 +514,9 @@ struct WalletView: View {
             } else {
                 ForEach(list) { entry in
                     Button {
-                        selectedEntryDetail = entry
+                        withAnimation(.easeInOut(duration: 0.22)) {
+                            subScreen = .transactionDetail(entry)
+                        }
                     } label: {
                         HStack(alignment: .center, spacing: 12) {
                             KinnectIcon(
@@ -525,7 +537,7 @@ struct WalletView: View {
                                         .foregroundColor(KinnectTheme.textSecondary)
                                         .lineLimit(2)
                                 }
-                                Text(formatRelativeDate(entry.createdAt))
+                                Text(entry.createdAt.isEmpty ? "Gần đây" : entry.createdAt)
                                     .font(.caption2)
                                     .foregroundColor(KinnectTheme.textSecondary)
                             }
@@ -551,120 +563,74 @@ struct WalletView: View {
         }
     }
 
-    // MARK: - Transaction Detail Sheet
-    private func transactionDetailSheet(_ entry: WalletEntryItem) -> some View {
-        VStack(spacing: 20) {
-            Capsule()
-                .fill(Color.secondary.opacity(0.3))
-                .frame(width: 40, height: 4)
-                .padding(.top, 12)
-
-            Text("Chi tiết giao dịch")
-                .font(.headline.bold())
-                .foregroundColor(KinnectTheme.textPrimary)
-
-            VStack(spacing: 12) {
-                Text(entry.direction == "credit" ? "+\(entry.amount.formattedWithSeparator()) xu" : "-\(entry.amount.formattedWithSeparator()) xu")
-                    .font(.system(size: 32, weight: .bold, design: .rounded))
-                    .foregroundColor(entry.direction == "credit" ? KinnectTheme.online : KinnectTheme.textPrimary)
-
-                Text(entry.title)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundColor(KinnectTheme.textPrimary)
-                    .multilineTextAlignment(.center)
-
-                if !entry.note.isEmpty {
-                    Text(entry.note)
-                        .font(.caption)
-                        .foregroundColor(KinnectTheme.textSecondary)
-                        .multilineTextAlignment(.center)
-                }
-
-                Text(formatRelativeDate(entry.createdAt))
-                    .font(.caption2)
-                    .foregroundColor(KinnectTheme.textSecondary)
-            }
-            .padding(20)
-            .frame(maxWidth: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 18)
-                    .fill(KinnectTheme.surface)
-            )
-            .padding(.horizontal, 16)
-
-            Button("Đóng") {
-                selectedEntryDetail = nil
-            }
-            .font(.subheadline.bold())
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(Capsule().fill(KinnectTheme.accentBright))
-            .padding(.horizontal, 16)
-            .padding(.bottom, 24)
-        }
-        .presentationDetents([.height(340)])
-    }
-
-    // MARK: - Top-Up Sheet Content
-    private var topUpSheetContent: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Conversion Rate Badge
-                    HStack {
-                        Spacer()
-                        Text("1 xu = 100đ")
-                            .font(.subheadline.bold())
-                            .foregroundColor(KinnectTheme.accentBright)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 6)
-                            .background(Capsule().fill(KinnectTheme.accentSoft))
-                        Spacer()
+    // MARK: - 2. FULL-SCREEN TOP-UP VIEW (100% Full Screen, NO Popups)
+    private var fullScreenTopUpContent: some View {
+        VStack(spacing: 0) {
+            // Pinned Dedicated Header
+            HStack(spacing: 12) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        subScreen = .main
                     }
+                } label: {
+                    Image(systemName: "arrow.left")
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundColor(KinnectTheme.textPrimary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Quay lại Ví")
 
-                    Text("Chọn gói nạp xu Kinnect")
+                Text("Nạp xu Kinnect")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(KinnectTheme.textPrimary)
+
+                Spacer()
+
+                Text("1 xu = 100đ")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(KinnectTheme.accentBright)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Capsule().fill(KinnectTheme.accentSoft))
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 52)
+            .background(KinnectTheme.surface.ignoresSafeArea(edges: .top))
+            .overlay(Divider().background(KinnectTheme.borderSoft), alignment: .bottom)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    // Balance Chip
+                    HStack {
+                        Text("Số dư hiện tại:")
+                            .font(.subheadline)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                        Spacer()
+                        Text("\(availableBalance.formattedWithSeparator()) xu")
+                            .font(.headline.bold())
+                            .foregroundColor(KinnectTheme.warning)
+                    }
+                    .kinnectCard()
+
+                    Text("Chọn gói nạp xu")
                         .font(.headline.bold())
                         .foregroundColor(KinnectTheme.textPrimary)
 
-                    // Coin Packages Grid
-                    let packages: [(coins: Int, price: String)] = [
-                        (100, "10.000đ"),
-                        (200, "20.000đ"),
-                        (500, "50.000đ"),
-                        (1000, "100.000đ"),
-                        (2000, "200.000đ"),
-                        (5000, "500.000đ")
-                    ]
-
+                    // 6 Packages
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                        ForEach(packages, id: \.coins) { pack in
-                            Button {
-                                appState.showToast("Cổng thanh toán đang kết nối. Gói \(pack.coins) xu.")
-                            } label: {
-                                VStack(spacing: 6) {
-                                    Text("\(pack.coins) xu")
-                                        .font(.headline.bold())
-                                        .foregroundColor(KinnectTheme.accentBright)
-                                    Text(pack.price)
-                                        .font(.subheadline)
-                                        .foregroundColor(KinnectTheme.textSecondary)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .fill(KinnectTheme.surface)
-                                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(KinnectTheme.borderSoft, lineWidth: 1))
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
+                        topUpOptionCard(coins: 100, price: "10.000đ")
+                        topUpOptionCard(coins: 200, price: "20.000đ")
+                        topUpOptionCard(coins: 500, price: "50.000đ")
+                        topUpOptionCard(coins: 1000, price: "100.000đ")
+                        topUpOptionCard(coins: 2000, price: "200.000đ")
+                        topUpOptionCard(coins: 5000, price: "500.000đ")
                     }
 
-                    // StoreKit Products (if configured)
+                    // StoreKit digital products
                     if !digitalProducts.isEmpty {
-                        Text("Gói mua qua App Store")
+                        Text("Gói mua In-App Purchase")
                             .font(.headline.bold())
                             .foregroundColor(KinnectTheme.textPrimary)
                             .padding(.top, 8)
@@ -705,19 +671,123 @@ struct WalletView: View {
                         .padding(.top, 12)
                 }
                 .padding(16)
+                .padding(.bottom, 60)
             }
-            .background(KinnectTheme.background.ignoresSafeArea())
-            .navigationTitle("Nạp xu Kinnect")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Đóng") {
-                        showTopUpSheet = false
-                    }
-                    .font(.subheadline.bold())
+        }
+    }
+
+    private func topUpOptionCard(coins: Int, price: String) -> some View {
+        Button {
+            appState.showToast("Cổng thanh toán đang kết nối. Gói \(coins) xu.")
+        } label: {
+            VStack(spacing: 6) {
+                Text("\(coins) xu")
+                    .font(.headline.bold())
                     .foregroundColor(KinnectTheme.accentBright)
-                }
+                Text(price)
+                    .font(.subheadline)
+                    .foregroundColor(KinnectTheme.textSecondary)
             }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(KinnectTheme.surface)
+                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(KinnectTheme.borderSoft, lineWidth: 1))
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - 3. FULL-SCREEN TRANSACTION DETAIL VIEW (100% Full Screen, NO Popups)
+    private func fullScreenDetailContent(_ entry: WalletEntryItem) -> some View {
+        VStack(spacing: 0) {
+            // Pinned Dedicated Header
+            HStack(spacing: 12) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        subScreen = .main
+                    }
+                } label: {
+                    Image(systemName: "arrow.left")
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundColor(KinnectTheme.textPrimary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Quay lại Ví")
+
+                Text("Chi tiết giao dịch")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(KinnectTheme.textPrimary)
+
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 52)
+            .background(KinnectTheme.surface.ignoresSafeArea(edges: .top))
+            .overlay(Divider().background(KinnectTheme.borderSoft), alignment: .bottom)
+
+            ScrollView {
+                VStack(spacing: 20) {
+                    VStack(spacing: 12) {
+                        Circle()
+                            .fill((entry.direction == "credit" ? KinnectTheme.online : KinnectTheme.warning).opacity(0.18))
+                            .frame(width: 64, height: 64)
+                            .overlay(
+                                KinnectIcon(
+                                    glyph: entry.direction == "credit" ? .add : .coin,
+                                    size: 30,
+                                    selected: true,
+                                    tint: entry.direction == "credit" ? KinnectTheme.online : KinnectTheme.warning
+                                )
+                            )
+
+                        Text(entry.direction == "credit" ? "+\(entry.amount.formattedWithSeparator()) xu" : "-\(entry.amount.formattedWithSeparator()) xu")
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                            .foregroundColor(entry.direction == "credit" ? KinnectTheme.online : KinnectTheme.textPrimary)
+
+                        Text("Giao dịch thành công")
+                            .font(.subheadline.bold())
+                            .foregroundColor(KinnectTheme.online)
+                    }
+                    .padding(.top, 24)
+
+                    VStack(spacing: 14) {
+                        detailRow(title: "Nội dung", value: entry.title)
+                        if !entry.note.isEmpty {
+                            detailRow(title: "Ghi chú", value: entry.note)
+                        }
+                        detailRow(title: "Thời gian", value: entry.createdAt.isEmpty ? "Gần đây" : entry.createdAt)
+                        detailRow(title: "Loại tiền", value: currencyLabel)
+                        detailRow(title: "Mã giao dịch", value: String(entry.id.prefix(12)))
+                    }
+                    .kinnectCard()
+
+                    Text("Xu tặng và quà từ xu tặng không rút được. Xu mua còn dư được rút theo tỷ lệ quy đổi. Quà từ xu mua tạo thu nhập: người nhận 75%, nền tảng 25%.")
+                        .font(.caption2)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                        .lineSpacing(3)
+                        .padding(.horizontal, 12)
+                        .padding(.top, 8)
+                }
+                .padding(16)
+            }
+        }
+    }
+
+    private func detailRow(title: String, value: String) -> some View {
+        HStack(alignment: .top) {
+            Text(title)
+                .font(.subheadline)
+                .foregroundColor(KinnectTheme.textSecondary)
+                .frame(width: 110, alignment: .leading)
+            Spacer()
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(KinnectTheme.textPrimary)
+                .multilineTextAlignment(.trailing)
         }
     }
 
@@ -744,14 +814,6 @@ struct WalletView: View {
         case "fireworks": return "🎆"
         default: return "🎁"
         }
-    }
-
-    private func formatRelativeDate(_ ts: Int64) -> String {
-        guard ts > 0 else { return "Gần đây" }
-        let date = Date(timeIntervalSince1970: TimeInterval(ts > 10_000_000_000 ? ts / 1000 : ts))
-        let df = DateFormatter()
-        df.dateFormat = "dd/MM · HH:mm"
-        return df.string(from: date)
     }
 
     // MARK: - API Calls

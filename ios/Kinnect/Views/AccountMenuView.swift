@@ -55,65 +55,23 @@ struct AccountMenuView: View {
             } message: {
                 Text("Bạn có thể đăng nhập lại bất kỳ lúc nào.")
             }
-            .sheet(isPresented: $showPrivacySheet) {
-                NavigationStack {
-                    PrivacySettingsView()
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarTrailing) {
-                                Button("Đóng") { showPrivacySheet = false }
-                            }
-                        }
-                }
+            .navigationDestination(isPresented: $showPrivacySheet) {
+                PrivacySettingsView()
             }
-            .sheet(isPresented: $showSecuritySheet) {
-                NavigationStack {
-                    SecuritySettingsView()
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarTrailing) {
-                                Button("Đóng") { showSecuritySheet = false }
-                            }
-                        }
-                }
+            .navigationDestination(isPresented: $showSecuritySheet) {
+                SecuritySettingsView()
             }
-            .sheet(isPresented: $showPasswordSheet) {
-                NavigationStack {
-                    ChangePasswordSheetView()
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarTrailing) {
-                                Button("Đóng") { showPasswordSheet = false }
-                            }
-                        }
-                }
+            .navigationDestination(isPresented: $showPasswordSheet) {
+                ChangePasswordSheetView()
             }
-            .sheet(isPresented: $showAppearanceSheet) {
-                NavigationStack {
-                    AppearanceSettingsSheetView()
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarTrailing) {
-                                Button("Đóng") { showAppearanceSheet = false }
-                            }
-                        }
-                }
+            .navigationDestination(isPresented: $showAppearanceSheet) {
+                AppearanceSettingsSheetView()
             }
-            .sheet(isPresented: $showSupportSheet) {
-                NavigationStack {
-                    HelpSupportSheetView()
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarTrailing) {
-                                Button("Đóng") { showSupportSheet = false }
-                            }
-                        }
-                }
+            .navigationDestination(isPresented: $showSupportSheet) {
+                HelpSupportSheetView()
             }
-            .sheet(isPresented: $showAboutSheet) {
-                NavigationStack {
-                    AboutKinnectSheetView()
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarTrailing) {
-                                Button("Đóng") { showAboutSheet = false }
-                            }
-                        }
-                }
+            .navigationDestination(isPresented: $showAboutSheet) {
+                AboutKinnectSheetView()
             }
         }
     }
