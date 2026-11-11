@@ -320,6 +320,7 @@ struct ProfileView: View {
             Task { await uploadProfileImage(item: item, endpoint: "/api/me/avatar", field: "avatarDataUrl") }
         }
     }
+}
 
     // MARK: - Header & Visual Helpers (Parity Android shell & profileCard)
     private var profilePinnedHeader: some View {
