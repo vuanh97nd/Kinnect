@@ -405,9 +405,9 @@ struct DirectChatDetailView: View {
                 } label: {
                     Image(systemName: "phone.fill")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(Color(uiColor: .systemGreen))
+                        .foregroundColor(KinnectTheme.callGreen)
                         .frame(width: 36, height: 36)
-                        .background(Circle().fill(Color(uiColor: .systemGreen).opacity(0.15)))
+                        .background(Circle().fill(KinnectTheme.callGreen.opacity(0.15)))
                 }
                 .accessibilityLabel("Gọi thoại")
 
@@ -955,17 +955,24 @@ struct GroupChatDetailView: View {
         text = "\(prefix)@\(tag) "
     }
 
-    private func attributedMessageText(_ rawText: String, isMine: Bool) -> AttributedString {
-        var attr = AttributedString(rawText)
-        let words = rawText.split(separator: " ")
-        for word in words where word.hasPrefix("@") {
-            if let range = attr.range(of: String(word)) {
-                attr[range].font = .subheadline.bold()
-                attr[range].foregroundColor = isMine ? .white : KinnectTheme.accentBright
-                attr[range].underlineStyle = .single
+    private func formattedBubbleText(_ rawText: String, isMine: Bool) -> Text {
+        let words = rawText.components(separatedBy: " ")
+        return words.enumerated().reduce(Text("")) { acc, elem in
+            let (idx, word) = elem
+            let space = idx == 0 ? Text("") : Text(" ")
+            if word.hasPrefix("@") {
+                let styled = Text(word)
+                    .font(.subheadline.bold())
+                    .foregroundColor(isMine ? Color.white : KinnectTheme.accentBright)
+                    .underline()
+                return acc + space + styled
+            } else {
+                let normal = Text(word)
+                    .font(.subheadline)
+                    .foregroundColor(isMine ? Color.white : KinnectTheme.textPrimary)
+                return acc + space + normal
             }
         }
-        return attr
     }
 
     var body: some View {
@@ -991,9 +998,7 @@ struct GroupChatDetailView: View {
                                         .foregroundColor(KinnectTheme.accentBright)
                                 }
                                 // Content on top with Zalo-style member mention highlight
-                                Text(attributedMessageText(msg.text, isMine: isMine))
-                                    .font(.subheadline)
-                                    .foregroundColor(isMine ? .white : KinnectTheme.textPrimary)
+                                formattedBubbleText(msg.text, isMine: isMine)
                                     .kinnectMultiline()
                                     .padding(.horizontal, 14)
                                     .padding(.vertical, 10)

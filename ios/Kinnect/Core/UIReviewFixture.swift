@@ -129,9 +129,10 @@ enum UIReviewFixture {
         "name": "Nhóm Thiết Kế Kinnect [Fixture]",
         "description": "Trao đổi giao diện iOS & Android",
         "avatarColor": "#6D4AFF",
-        "membersCount": 6,
-        "lastMessageText": "Bộ 40 icon vector đã lên chuẩn 24pt!",
-        "unreadCount": 1
+        "membersCount": 4,
+        "lastMessageText": "@Tất cả Tính năng nhắc tên Zalo đã sẵn sàng!",
+        "unreadCount": 1,
+        "members": [peerUserDict, secondPeerDict, thirdPeerDict]
     ]
 
     static func mockResponse(for path: String) -> [String: Any] {
@@ -429,7 +430,7 @@ enum UIReviewFixture {
                         "id": "fixture_gmsg_1",
                         "groupId": "fixture_group_1",
                         "sender": peerUserDict,
-                        "text": "[Fixture UI] Chào cả nhóm! Giao diện chat nhóm trên iOS hiển thị thanh công cụ, icon vector và avatar thành viên rất chuẩn.",
+                        "text": "@Tất cả Chào cả nhóm! Đã kích hoạt tính năng nhắc thành viên phong cách Zalo và gọi thoại iOS HIG.",
                         "createdAt": "2026-11-07T01:30:00.000Z",
                         "seenCount": 4
                     ],
@@ -437,9 +438,32 @@ enum UIReviewFixture {
                         "id": "fixture_gmsg_2",
                         "groupId": "fixture_group_1",
                         "sender": currentUserDict,
-                        "text": "[Fixture UI] Menu 3 chấm ở góc phải gồm Đổi tên nhóm, Thêm thành viên, Rời nhóm.",
+                        "text": "@minhanh_demo Cảm ơn bạn! Đã đồng bộ chuẩn 100% Android 1.2.12.",
                         "createdAt": "2026-11-07T01:31:00.000Z",
                         "seenCount": 3
+                    ]
+                ]
+            ]
+
+        case _ where cleanPath.hasSuffix("/comments"):
+            return [
+                "comments": [
+                    [
+                        "id": "fixture_c_1",
+                        "author": peerUserDict,
+                        "text": "Bức ảnh đẹp quá bạn ơi! Chụp bằng ống kính nào thế? 📸",
+                        "createdAt": "2026-11-07T01:35:00.000Z",
+                        "liked": true,
+                        "likesCount": 5
+                    ],
+                    [
+                        "id": "fixture_c_2",
+                        "parentId": "fixture_c_1",
+                        "author": currentUserDict,
+                        "text": "@minhanh_demo Cảm ơn bạn nhé! Chụp bằng camera góc rộng 1x của Kinnect Studio.",
+                        "createdAt": "2026-11-07T01:36:00.000Z",
+                        "liked": true,
+                        "likesCount": 2
                     ]
                 ]
             ]
@@ -1173,6 +1197,33 @@ enum UIReviewFixture {
                 NavigationStack {
                     GroupChatDetailView(group: ChatGroupItem.from(UIReviewFixture.fixtureGroupDict), onLeftGroup: {})
                 }
+            )
+        case "call-overlay", "call-incoming":
+            NativeWebRTCManager.shared.activeCall = ActiveCallSession(
+                callId: "fixture_call_1",
+                peerUser: KinnectUser.from(UIReviewFixture.peerUserDict),
+                mode: "video",
+                isIncoming: true,
+                state: .ringingIncoming
+            )
+            return AnyView(
+                CallOverlayView()
+            )
+        case "feed-comments":
+            return AnyView(
+                PostCommentsSheet(post: UIReviewFixture.mockPosts()[0], onChanged: {})
+            )
+        case "shorts-comments":
+            return AnyView(
+                ShortCommentsSheet(short: ShortItem.from([
+                    "id": "fixture_short_1",
+                    "title": "Khoảnh khắc hoàng hôn Hà Nội",
+                    "videoUrl": samplePlayableVideoURL()?.absoluteString ?? "",
+                    "author": UIReviewFixture.peerUserDict,
+                    "likesCount": 142,
+                    "commentsCount": 18,
+                    "liked": true
+                ]), onUpdated: {})
             )
         case "forward-message":
             return AnyView(

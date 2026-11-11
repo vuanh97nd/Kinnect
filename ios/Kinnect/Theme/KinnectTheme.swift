@@ -77,6 +77,8 @@ enum KinnectTheme {
     static let emerald = Color(red: 0.09, green: 0.64, blue: 0.45)
     static let online = Color(red: 0.13, green: 0.77, blue: 0.37)
     static let success = Color(red: 0.13, green: 0.77, blue: 0.37)
+    static let callGreen = Color(red: 0.19, green: 0.82, blue: 0.35)
+    static let callRed = Color(red: 1.0, green: 0.27, blue: 0.23)
     static let amber = Color(red: 0.96, green: 0.62, blue: 0.04)
     static let warning = Color(red: 0.96, green: 0.62, blue: 0.04)
     static let danger = Color(red: 0.94, green: 0.27, blue: 0.27)

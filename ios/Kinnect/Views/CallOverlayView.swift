@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct CallOverlayView: View {
     @ObservedObject private var webrtc = NativeWebRTCManager.shared
@@ -67,7 +68,7 @@ struct CallOverlayView: View {
                             callActionButton(
                                 systemIcon: "phone.down.fill",
                                 label: "Từ chối",
-                                color: Color(uiColor: .systemRed)
+                                color: KinnectTheme.callRed
                             ) {
                                 webrtc.endOrRejectCurrentCall(sendSocket: true)
                             }
@@ -75,7 +76,7 @@ struct CallOverlayView: View {
                             callActionButton(
                                 systemIcon: call.mode == "video" ? "video.fill" : "phone.fill",
                                 label: "Trả lời",
-                                color: Color(uiColor: .systemGreen)
+                                color: KinnectTheme.callGreen
                             ) {
                                 Task { await webrtc.acceptIncomingCall(callId: call.callId) }
                             }
@@ -124,7 +125,7 @@ struct CallOverlayView: View {
                             callActionButton(
                                 systemIcon: "phone.down.fill",
                                 label: "Kết thúc",
-                                color: Color(uiColor: .systemRed)
+                                color: KinnectTheme.callRed
                             ) {
                                 webrtc.endOrRejectCurrentCall(sendSocket: true)
                             }
