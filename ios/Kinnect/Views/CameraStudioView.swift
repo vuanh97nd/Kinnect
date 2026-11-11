@@ -964,7 +964,7 @@ struct CameraStudioView: View {
                     } else {
                         HStack(spacing: 12) {
                             Button {
-                                photoProject.rotateLeft()
+                                photoProject.rotation = (photoProject.rotation + 270) % 360
                                 updatePhotoPreview()
                             } label: {
                                 Label("Xoay trái", systemImage: "rotate.left")
@@ -975,7 +975,7 @@ struct CameraStudioView: View {
                             }
 
                             Button {
-                                photoProject.rotateRight()
+                                photoProject.rotation = (photoProject.rotation + 90) % 360
                                 updatePhotoPreview()
                             } label: {
                                 Label("Xoay phải", systemImage: "rotate.right")

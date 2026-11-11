@@ -139,6 +139,14 @@ final class StudioPhotoProject: ObservableObject {
         cropRatio = .original
     }
 
+    func rotateLeft() {
+        rotation = (rotation + 270) % 360
+    }
+
+    func rotateRight() {
+        rotation = (rotation + 90) % 360
+    }
+
     var hasEdits: Bool {
         !makeGrade().isNeutral || rotation != 0 || flipHorizontal || cropRatio != .original
     }
