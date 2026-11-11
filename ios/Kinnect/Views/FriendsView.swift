@@ -7,7 +7,7 @@ struct FriendsView: View {
     enum FriendTab: String, CaseIterable {
         case friends = "Bạn bè"
         case requests = "Lời mời"
-        case suggestions = "Gợi ý"
+        case outgoing = "Đã gửi"
     }
 
     @State private var tab: FriendTab = .friends
@@ -45,29 +45,27 @@ struct FriendsView: View {
                             friendRow(user: user)
                         }
 
-                    case .requests:
-                        if !incoming.isEmpty {
-                            sectionHeader("Lời mời kết bạn đến (\(incoming.count))")
-                            ForEach(incoming) { user in
-                                incomingRequestRow(user: user)
+                        if !suggestions.isEmpty {
+                            sectionHeader("Gợi ý kết bạn")
+                            ForEach(suggestions) { user in
+                                suggestionRow(user: user)
                             }
-                        }
-                        if !outgoing.isEmpty {
-                            sectionHeader("Lời mời đã gửi (\(outgoing.count))")
-                            ForEach(outgoing) { user in
-                                outgoingRequestRow(user: user)
-                            }
-                        }
-                        if incoming.isEmpty && outgoing.isEmpty && !isLoading {
-                            emptyPlaceholder("Không có lời mời kết bạn nào")
                         }
 
-                    case .suggestions:
-                        if suggestions.isEmpty && !isLoading {
-                            emptyPlaceholder("Hiện chưa có gợi ý kết bạn mới")
+                    case .requests:
+                        if incoming.isEmpty && !isLoading {
+                            emptyPlaceholder("Không có lời mời kết bạn nào")
                         }
-                        ForEach(suggestions) { user in
-                            suggestionRow(user: user)
+                        ForEach(incoming) { user in
+                            incomingRequestRow(user: user)
+                        }
+
+                    case .outgoing:
+                        if outgoing.isEmpty && !isLoading {
+                            emptyPlaceholder("Không có lời mời nào đã gửi")
+                        }
+                        ForEach(outgoing) { user in
+                            outgoingRequestRow(user: user)
                         }
                     }
                 }
@@ -87,7 +85,7 @@ struct FriendsView: View {
             if UIReviewFixture.activeScreen == "friends-requests" {
                 tab = .requests
             } else if UIReviewFixture.activeScreen == "friends-suggestions" {
-                tab = .suggestions
+                tab = .friends
             }
         }
         .sheet(item: $selectedProfileUser) { user in

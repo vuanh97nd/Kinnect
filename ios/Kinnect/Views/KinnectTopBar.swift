@@ -1,24 +1,20 @@
 import SwiftUI
 
 /// Pinned top header bar matching Android 1.2.12 MainActivity (lines 398-438)
-/// Features Logo K, Kinnect title, and trailing icons (Notifications, Store, Friends, Messages, Account).
+/// Features 40dp squircle Logo K (no text next to it) and trailing icons:
+/// 1. Thông báo, 2. Cửa hàng, 3. Bạn bè, 4. Tin nhắn, 5. Tài khoản.
 struct KinnectTopBar: View {
     @ObservedObject var appState: AppState
     @Binding var activeTopSection: RootMainView.TopSection?
     var onLogoTap: (() -> Void)? = nil
 
     var body: some View {
-        HStack(spacing: 6) {
-            // Left: Brand Logo K + App Title
+        HStack(spacing: 4) {
+            // Left: Brand Logo K (40dp squircle matching Android line 407, no text)
             Button {
                 onLogoTap?()
             } label: {
-                HStack(spacing: 8) {
-                    KinnectBrandLogo(size: 36)
-                    Text("Kinnect")
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundColor(KinnectTheme.textPrimary)
-                }
+                KinnectBrandLogo(size: 40)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Về đầu Bảng tin Kinnect")
@@ -35,16 +31,16 @@ struct KinnectTopBar: View {
                 toggleSection(.notifications)
             }
 
-            // Trailing icon 2: Store / Wallet
+            // Trailing icon 2: Store / Cửa hàng
             topBarButton(
                 glyph: .store,
-                label: "Ví Kinnect và Cửa hàng Kinnect",
+                label: "Cửa hàng",
                 isSelected: activeTopSection == .wallet
             ) {
                 toggleSection(.wallet)
             }
 
-            // Trailing icon 3: Friends
+            // Trailing icon 3: Friends / Bạn bè
             topBarButton(
                 glyph: .friends,
                 label: "Bạn bè",
@@ -53,7 +49,7 @@ struct KinnectTopBar: View {
                 toggleSection(.friends)
             }
 
-            // Trailing icon 4: Messages / Inbox
+            // Trailing icon 4: Messages / Tin nhắn
             topBarButton(
                 glyph: .messages,
                 label: "Tin nhắn",
@@ -63,38 +59,44 @@ struct KinnectTopBar: View {
                 toggleSection(.messages)
             }
 
-            // Trailing icon 5: User Account / Avatar
+            // Trailing icon 5: User Account / Tài khoản (Avatar 24dp in 44dp holder matching Android meHolder)
             Button {
                 toggleSection(.profile)
             } label: {
-                if let u = appState.currentUser {
-                    KinnectAvatarView(
-                        name: u.name,
-                        avatarURL: u.avatarUrl,
-                        colorHex: u.avatarColor,
-                        size: 32,
-                        isOnline: false
-                    )
-                    .overlay(
-                        Circle()
-                            .stroke(activeTopSection == .profile ? KinnectTheme.accentBright : Color.clear, lineWidth: 2)
-                    )
-                } else {
-                    KinnectIcon(
-                        glyph: .profile,
-                        size: 24,
-                        selected: activeTopSection == .profile,
-                        tint: activeTopSection == .profile ? KinnectTheme.accentBright : KinnectTheme.textPrimary
-                    )
-                    .frame(width: 38, height: 44)
+                ZStack {
+                    Circle()
+                        .fill(activeTopSection == .profile ? KinnectTheme.accentSoft : Color.clear)
+                        .frame(width: 44, height: 44)
+
+                    if let u = appState.currentUser {
+                        KinnectAvatarView(
+                            name: u.name,
+                            avatarURL: u.avatarUrl,
+                            colorHex: u.avatarColor,
+                            size: 28,
+                            isOnline: false
+                        )
+                        .overlay(
+                            Circle()
+                                .stroke(activeTopSection == .profile ? KinnectTheme.accentBright : Color.clear, lineWidth: 2)
+                        )
+                    } else {
+                        KinnectIcon(
+                            glyph: .profile,
+                            size: 24,
+                            selected: activeTopSection == .profile,
+                            tint: activeTopSection == .profile ? KinnectTheme.accentBright : KinnectTheme.textPrimary
+                        )
+                    }
                 }
+                .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Hồ sơ cá nhân")
+            .accessibilityLabel("Tài khoản")
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .frame(height: 54)
+        .padding(.vertical, 6)
+        .frame(height: 56)
         .background(KinnectTheme.surface.ignoresSafeArea(edges: .top))
         .overlay(
             Divider().background(KinnectTheme.borderSoft),
@@ -140,3 +142,4 @@ struct KinnectTopBar: View {
         .accessibilityLabel(label)
     }
 }
+

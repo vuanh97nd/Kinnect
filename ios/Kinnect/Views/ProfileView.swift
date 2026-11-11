@@ -60,6 +60,9 @@ struct ProfileView: View {
     @State private var showSupportSheet = false
     @State private var showDeleteAccountSheet = false
 
+    @State private var selectedCoverItem: PhotosPickerItem? = nil
+    @State private var selectedAvatarItem: PhotosPickerItem? = nil
+
     @State private var detailedPeerUser: KinnectUser? = nil
     @State private var peerFriendship: String = "none"
     @State private var showPeerChat = false
@@ -92,31 +95,69 @@ struct ProfileView: View {
                 }
 
                 if let user = activeUser {
-                    // 1. Cover & Avatar Card with Handle & Stats (Parity Android 1.2.12 build 118)
+                    // 1. Cover & Avatar Card with Handle, Bio & Stats (Parity Android 1.2.12 build 118)
                     VStack(alignment: .leading, spacing: 14) {
                         ZStack(alignment: .bottomLeading) {
-                            if !user.coverUrl.isEmpty {
-                                KinnectRemoteImageView(
-                                    rawURL: user.coverUrl,
-                                    contentMode: .fill,
-                                    cornerRadius: KinnectTheme.radiusXL,
-                                    maxHeight: 130
-                                )
-                            } else {
-                                RoundedRectangle(cornerRadius: KinnectTheme.radiusXL)
-                                    .fill(KinnectTheme.primaryGradient)
-                                    .frame(height: 120)
+                            ZStack(alignment: .topTrailing) {
+                                if !user.coverUrl.isEmpty {
+                                    KinnectRemoteImageView(
+                                        rawURL: user.coverUrl,
+                                        contentMode: .fill,
+                                        cornerRadius: KinnectTheme.radiusXL,
+                                        maxHeight: 130
+                                    )
+                                    .frame(maxWidth: .infinity, maxHeight: 130)
+                                } else {
+                                    RoundedRectangle(cornerRadius: KinnectTheme.radiusXL)
+                                        .fill(KinnectTheme.primaryGradient)
+                                        .frame(height: 120)
+                                }
+
+                                if isSelf {
+                                    PhotosPicker(selection: $selectedCoverItem, matching: .images) {
+                                        Image(systemName: "camera.fill")
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundColor(.white)
+                                            .frame(width: 36, height: 36)
+                                            .background(Circle().fill(Color.black.opacity(0.45)))
+                                    }
+                                    .padding(8)
+                                    .accessibilityLabel("Đổi ảnh bìa")
+                                }
                             }
 
-                            KinnectAvatarView(
-                                name: user.name,
-                                avatarURL: user.avatarUrl,
-                                colorHex: user.avatarColor,
-                                size: 76,
-                                isOnline: isSelf ? true : appState.onlineUserIds.contains(user.id)
-                            )
-                            .padding(.leading, 14)
-                            .offset(y: 38)
+                            if isSelf {
+                                PhotosPicker(selection: $selectedAvatarItem, matching: .images) {
+                                    KinnectAvatarView(
+                                        name: user.name,
+                                        avatarURL: user.avatarUrl,
+                                        colorHex: user.avatarColor,
+                                        size: 84,
+                                        isOnline: true
+                                    )
+                                    .overlay(
+                                        Circle()
+                                            .stroke(KinnectTheme.surface, lineWidth: 4)
+                                    )
+                                }
+                                .padding(.leading, 14)
+                                .offset(y: 38)
+                                .accessibilityLabel("Đổi ảnh đại diện")
+                            } else {
+                                KinnectAvatarView(
+                                    name: user.name,
+                                    avatarURL: user.avatarUrl,
+                                    colorHex: user.avatarColor,
+                                    size: 84,
+                                    isOnline: appState.onlineUserIds.contains(user.id)
+                                )
+                                .overlay(
+                                    Circle()
+                                        .stroke(KinnectTheme.surface, lineWidth: 4)
+                                )
+                                .padding(.leading, 14)
+                                .offset(y: 38)
+                            }
                         }
                         .padding(.bottom, 38)
 
@@ -131,33 +172,43 @@ struct ProfileView: View {
                         .padding(.horizontal, 14)
 
                         if isSelf {
-                            // Prominent "Chỉnh sửa hồ sơ" Button
+                            // Prominent "Chỉnh sửa hồ sơ" Button (Android parity: authButton pencil 44dp)
                             Button {
                                 showEditProfileSheet = true
                             } label: {
                                 HStack(spacing: 8) {
-                                    KinnectIcon(glyph: .edit, size: 18, tint: KinnectTheme.accentBright)
+                                    Image(systemName: "pencil")
+                                        .font(.subheadline.bold())
                                     Text("Chỉnh sửa hồ sơ")
                                         .font(.subheadline.bold())
-                                        .foregroundColor(KinnectTheme.accentBright)
                                 }
-                                .frame(maxWidth: .infinity, minHeight: 40)
-                                .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .background(KinnectTheme.primaryGradient)
+                                .foregroundColor(.white)
+                                .clipShape(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD))
                             }
                             .padding(.horizontal, 14)
                         } else {
                             peerActionsRow(user: user)
                         }
 
-                        // Stats bar
-                        HStack {
-                            statColumn(count: user.friendsCount, label: "Bạn bè")
-                            Divider().frame(height: 28).background(KinnectTheme.border)
-                            statColumn(count: user.followersCount, label: "Người theo dõi")
-                            Divider().frame(height: 28).background(KinnectTheme.border)
-                            statColumn(count: user.followingCount, label: "Đang theo dõi")
+                        // Bio in Profile Card (Android parity lines 2272-2276: 13sp MUTED, lineSpacing 1.6f)
+                        if !user.bio.isEmpty {
+                            Text(user.bio)
+                                .font(.system(size: 13))
+                                .foregroundColor(KinnectTheme.textSecondary)
+                                .lineSpacing(4)
+                                .padding(.horizontal, 14)
+                                .padding(.top, 2)
                         }
-                        .frame(maxWidth: .infinity)
+
+                        // Stats Bar: 3 soft cards (Android parity lines 4508-4529: bài viết, người theo dõi, đang theo dõi)
+                        HStack(spacing: 8) {
+                            statCard(count: user.postsCount, label: "bài viết")
+                            statCard(count: user.followersCount, label: "người theo dõi")
+                            statCard(count: user.followingCount, label: "đang theo dõi")
+                        }
+                        .padding(.horizontal, 14)
                         .padding(.top, 4)
                     }
                     .kinnectCard()
@@ -284,134 +335,221 @@ struct ProfileView: View {
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showDeleteAccountSheet)
+        .onChange(of: selectedCoverItem) { item in
+            guard let item else { return }
+            Task { await uploadProfileImage(item: item, endpoint: "/api/me/cover", field: "coverDataUrl") }
+        }
+        .onChange(of: selectedAvatarItem) { item in
+            guard let item else { return }
+            Task { await uploadProfileImage(item: item, endpoint: "/api/me/avatar", field: "avatarDataUrl") }
+        }
     }
 
-    // MARK: - Tab Contents
+    // MARK: - Tab Contents (100% Parity with Android MainActivity.profileAbout lines 2329-2346)
+    private func isFieldVisible(key: String, user: KinnectUser) -> Bool {
+        if isSelf { return true }
+        if !user.identityPublic {
+            let identityKeys = ["gender", "orientation", "communityRole", "pronouns", "relationshipRole"]
+            if identityKeys.contains(key) { return false }
+        }
+        if let vis = user.profileVisibility[key], !vis {
+            return false
+        }
+        return true
+    }
+
+    private func isProfileEmpty(user: KinnectUser) -> Bool {
+        let hasBio = isFieldVisible(key: "bio", user: user) && !user.bio.isEmpty
+        let hasAge = isFieldVisible(key: "age", user: user) && user.age > 0
+        let displayCity = user.city.isEmpty ? user.locationName : user.city
+        let hasCity = isFieldVisible(key: "city", user: user) && !displayCity.isEmpty
+        let hasHeight = isFieldVisible(key: "height", user: user) && user.height > 0
+        let hasWeight = isFieldVisible(key: "weight", user: user) && user.weight > 0
+        let hasOcc = isFieldVisible(key: "occupation", user: user) && !user.occupation.isEmpty
+        let hasSchool = isFieldVisible(key: "school", user: user) && !user.school.isEmpty
+        let hasGender = isFieldVisible(key: "gender", user: user) && !user.gender.isEmpty
+        let hasOrient = isFieldVisible(key: "orientation", user: user) && !user.orientation.isEmpty
+        let hasRole = isFieldVisible(key: "communityRole", user: user) && !user.communityRole.isEmpty
+        let hasPronouns = isFieldVisible(key: "pronouns", user: user) && !user.pronouns.isEmpty
+        let hasRel = isFieldVisible(key: "relationshipRole", user: user) && !user.relationshipRole.isEmpty
+        let hasLooking = isFieldVisible(key: "lookingFor", user: user) && !user.lookingFor.isEmpty
+        let hasInterests = isFieldVisible(key: "interests", user: user) && !user.interests.isEmpty
+        return !(hasBio || hasAge || hasCity || hasHeight || hasWeight || hasOcc || hasSchool || hasGender || hasOrient || hasRole || hasPronouns || hasRel || hasLooking || hasInterests)
+    }
+
+    private var emptyAboutBlock: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "person.crop.circle")
+                .font(.system(size: 40))
+                .foregroundColor(KinnectTheme.textSecondary)
+            Text("Chưa có thông tin công khai")
+                .font(.headline)
+                .foregroundColor(KinnectTheme.textPrimary)
+            Text(isSelf ? "Cập nhật hồ sơ để mọi người hiểu bạn hơn." : "Thành viên này chưa chia sẻ thông tin giới thiệu.")
+                .font(.subheadline)
+                .foregroundColor(KinnectTheme.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+    }
+
+    private func formattedJoinedDate(_ timestamp: Int64) -> String {
+        guard timestamp > 0 else { return "" }
+        let date = Date(timeIntervalSince1970: Double(timestamp) / 1000.0)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MM/yyyy"
+        return "Tham gia Kinnect từ " + formatter.string(from: date)
+    }
+
+    @ViewBuilder
     private func aboutTabContent(user: KinnectUser) -> some View {
         VStack(spacing: 14) {
-            // Bio & Details Card
-            VStack(alignment: .leading, spacing: 10) {
+            // Bio & Details Card (Parity Android MainActivity.java:2329-2346 profileAbout)
+            VStack(alignment: .leading, spacing: 0) {
+                // Header: "Giới thiệu", globe icon, "Công khai"
                 HStack {
                     Text("Giới thiệu")
-                        .font(.headline)
+                        .font(.headline.weight(.bold))
                         .foregroundColor(KinnectTheme.textPrimary)
                     Spacer()
+                    Image(systemName: "globe")
+                        .font(.caption)
+                        .foregroundColor(KinnectTheme.textSecondary)
                     Text(user.isPrivate ? "Riêng tư" : "Công khai")
                         .font(.caption2.bold())
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(user.isPrivate ? KinnectTheme.warning.opacity(0.2) : KinnectTheme.online.opacity(0.2)))
-                        .foregroundColor(user.isPrivate ? KinnectTheme.warning : KinnectTheme.online)
-                }
-
-                if !user.bio.isEmpty {
-                    Text(user.bio)
-                        .font(.subheadline)
-                        .foregroundColor(KinnectTheme.textPrimary)
-                        .kinnectMultiline()
-                } else {
-                    Text(isSelf ? "Chưa có thông tin công khai. Cập nhật hồ sơ để mọi người hiểu bạn hơn." : "Người dùng chưa cập nhật phần tự giới thiệu.")
-                        .font(.subheadline)
                         .foregroundColor(KinnectTheme.textSecondary)
-                        .kinnectMultiline()
                 }
+                .padding(.bottom, 12)
 
-                if !user.locationName.isEmpty {
-                    HStack(spacing: 6) {
-                        Image(systemName: "mappin.circle.fill")
-                            .foregroundColor(KinnectTheme.accentBright)
-                        Text(user.locationName)
-                            .font(.caption)
+                // 0. Tiểu sử (Bio)
+                if isFieldVisible(key: "bio", user: user) && !user.bio.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Tiểu sử")
+                            .font(.system(size: 12))
                             .foregroundColor(KinnectTheme.textSecondary)
+                        Text(user.bio)
+                            .font(.system(size: 14))
+                            .foregroundColor(KinnectTheme.textPrimary)
+                            .kinnectMultiline()
                     }
+                    .padding(.vertical, 8)
+                    Divider().background(KinnectTheme.borderSoft)
                 }
 
-                HStack(spacing: 6) {
-                    Image(systemName: "calendar")
+                // Canonical Identity & Details List (matching Android lines 2338-2339)
+                // 1. Tuổi
+                if isFieldVisible(key: "age", user: user) && user.age > 0 {
+                    profileDetailRow(label: "Tuổi", value: "\(user.age) tuổi")
+                    Divider().background(KinnectTheme.borderSoft)
+                }
+
+                // 2. Nơi sống
+                let displayCity = user.city.isEmpty ? user.locationName : user.city
+                if isFieldVisible(key: "city", user: user) && !displayCity.isEmpty {
+                    profileDetailRow(label: "Nơi sống", value: displayCity)
+                    Divider().background(KinnectTheme.borderSoft)
+                }
+
+                // 3. Chiều cao
+                if isFieldVisible(key: "height", user: user) && user.height > 0 {
+                    profileDetailRow(label: "Chiều cao", value: "\(user.height) cm")
+                    Divider().background(KinnectTheme.borderSoft)
+                }
+
+                // 4. Cân nặng
+                if isFieldVisible(key: "weight", user: user) && user.weight > 0 {
+                    profileDetailRow(label: "Cân nặng", value: "\(user.weight) kg")
+                    Divider().background(KinnectTheme.borderSoft)
+                }
+
+                // 5. Nghề nghiệp
+                if isFieldVisible(key: "occupation", user: user) && !user.occupation.isEmpty {
+                    profileDetailRow(label: "Nghề nghiệp", value: user.occupation)
+                    Divider().background(KinnectTheme.borderSoft)
+                }
+
+                // 6. Trường học
+                if isFieldVisible(key: "school", user: user) && !user.school.isEmpty {
+                    profileDetailRow(label: "Trường học", value: user.school)
+                    Divider().background(KinnectTheme.borderSoft)
+                }
+
+                // Giới tính & Bản sắc LGBT (Android parity: Bản dạng giới, Xu hướng, Vai trò cộng đồng, Cách xưng hô)
+                // 7. Bản dạng giới
+                if isFieldVisible(key: "gender", user: user) && !user.gender.isEmpty {
+                    profileDetailRow(label: "Bản dạng giới", value: localizedIdentityValue("gender", user.gender))
+                    Divider().background(KinnectTheme.borderSoft)
+                }
+
+                // 8. Xu hướng
+                if isFieldVisible(key: "orientation", user: user) && !user.orientation.isEmpty {
+                    profileDetailRow(label: "Xu hướng", value: localizedIdentityValue("orientation", user.orientation))
+                    Divider().background(KinnectTheme.borderSoft)
+                }
+
+                // 9. Vai trò cộng đồng
+                if isFieldVisible(key: "communityRole", user: user) && !user.communityRole.isEmpty {
+                    profileDetailRow(label: "Vai trò cộng đồng", value: localizedIdentityValue("communityRole", user.communityRole))
+                    Divider().background(KinnectTheme.borderSoft)
+                }
+
+                // 10. Cách xưng hô
+                if isFieldVisible(key: "pronouns", user: user) && !user.pronouns.isEmpty {
+                    profileDetailRow(label: "Cách xưng hô", value: localizedIdentityValue("pronouns", user.pronouns))
+                    Divider().background(KinnectTheme.borderSoft)
+                }
+
+                // 11. Tình trạng quan hệ
+                if isFieldVisible(key: "relationshipRole", user: user) && !user.relationshipRole.isEmpty {
+                    profileDetailRow(label: "Tình trạng quan hệ", value: localizedIdentityValue("relationshipRole", user.relationshipRole))
+                    Divider().background(KinnectTheme.borderSoft)
+                }
+
+                // 12. Mong muốn
+                if isFieldVisible(key: "lookingFor", user: user) && !user.lookingFor.isEmpty {
+                    profileDetailRow(label: "Mong muốn", value: user.lookingFor)
+                    Divider().background(KinnectTheme.borderSoft)
+                }
+
+                // Sở thích (Interests Tags)
+                if isFieldVisible(key: "interests", user: user) && !user.interests.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Sở thích")
+                            .font(.system(size: 12))
+                            .foregroundColor(KinnectTheme.textSecondary)
+                        WrappingHStack(horizontalSpacing: 6, verticalSpacing: 6) {
+                            ForEach(user.interests, id: \.self) { item in
+                                Text(item)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(KinnectTheme.accentBright)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .fill(KinnectTheme.accentSoft)
+                                    )
+                            }
+                        }
+                    }
+                    .padding(.top, 10)
+                }
+
+                // Empty state if nothing filled or visible
+                if isProfileEmpty(user: user) {
+                    emptyAboutBlock
+                }
+
+                // Tham gia Kinnect từ MM/yyyy (Android parity line 2344)
+                if user.joinedAt > 0 {
+                    Text(formattedJoinedDate(user.joinedAt))
+                        .font(.system(size: 12))
                         .foregroundColor(KinnectTheme.textSecondary)
-                    Text("Tham gia Kinnect từ 11/2026")
-                        .font(.caption2)
-                        .foregroundColor(KinnectTheme.textSecondary)
+                        .padding(.top, 16)
+                        .padding(.bottom, 6)
                 }
             }
             .kinnectCard()
-
-            if isSelf {
-                // Quick Actions & Security
-                VStack(spacing: 10) {
-                    actionRow(glyph: .wallet, title: "Ví Kinnect", color: KinnectTheme.warning) {
-                        if let onOpenWallet { onOpenWallet() } else { appState.navigate(to: "wallet") }
-                    }
-                    actionRow(glyph: .store, title: "Cửa hàng Kinnect", color: KinnectTheme.accentBright) {
-                        if let onOpenStore { onOpenStore() } else if let onOpenWallet { onOpenWallet() } else { appState.navigate(to: "wallet") }
-                    }
-                    actionRow(glyph: .friends, title: "Bạn bè", color: KinnectTheme.accent) {
-                        if let onOpenFriends { onOpenFriends() } else { appState.navigate(to: "friends") }
-                    }
-                    actionRow(glyph: .shield, title: "Quản lý phiên đăng nhập", color: .cyan) {
-                        showSessionsSheet = true
-                    }
-                    actionRow(glyph: .lock, title: "Đổi mật khẩu", color: .green) {
-                        showPasswordSheet = true
-                    }
-                    actionRow(glyph: .block, title: "Danh sách người dùng đã chặn", color: .orange) {
-                        showBlocksSheet = true
-                    }
-                    actionRow(glyph: .shield, title: "Cài đặt và quyền riêng tư", color: .purple) {
-                        showPrivacySheet = true
-                    }
-                    actionRow(glyph: .notifications, title: "Trung tâm Hỗ trợ & Trợ giúp", color: .blue) {
-                        showSupportSheet = true
-                    }
-                }
-                .kinnectCard()
-
-                // PushKit / Native Diagnostic Card
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        KinnectIcon(glyph: .phone, size: 20, selected: true, tint: KinnectTheme.online)
-                        Text("Trạng thái Cuộc gọi Native & PushKit")
-                            .font(.subheadline.bold())
-                            .foregroundColor(KinnectTheme.textPrimary)
-                    }
-                    Text(pushKit.voipRegistrationStatus)
-                        .font(.caption)
-                        .foregroundColor(KinnectTheme.textSecondary)
-                        .kinnectMultiline()
-                    Text("Phiên bản: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.12") (Build \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "118"))")
-                        .font(.caption2)
-                        .foregroundColor(KinnectTheme.accentBright)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .kinnectCard()
-
-                // Logout & Delete Card
-                VStack(spacing: 10) {
-                    Button {
-                        Task { await appState.logout() }
-                    } label: {
-                        HStack(spacing: 8) {
-                            KinnectIcon(glyph: .logout, size: 20, tint: .white)
-                            Text("Đăng xuất (Xóa Keychain & Cache)")
-                                .font(.subheadline.bold())
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
-                        .foregroundColor(KinnectTheme.textPrimary)
-                    }
-
-                    Button(role: .destructive) {
-                        showDeleteAccountSheet = true
-                    } label: {
-                        Label("Xóa vĩnh viễn tài khoản Kinnect", systemImage: "trash.fill")
-                            .font(.subheadline.bold())
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.danger.opacity(0.18)))
-                            .foregroundColor(KinnectTheme.danger)
-                    }
-                }
-                .kinnectCard()
-            }
         }
         .refreshable {
             if isSelf {
@@ -581,16 +719,96 @@ struct ProfileView: View {
         }
     }
 
-    private func statColumn(count: Int, label: String) -> some View {
-        VStack(spacing: 2) {
-            Text("\(count)")
-                .font(.headline.bold())
-                .foregroundColor(KinnectTheme.textPrimary)
-            Text(label)
-                .font(.caption2)
-                .foregroundColor(KinnectTheme.textSecondary)
+    private func statCard(count: Int, label: String, onClick: (() -> Void)? = nil) -> some View {
+        Button {
+            onClick?()
+        } label: {
+            VStack(spacing: 2) {
+                Text("\(count)")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(KinnectTheme.textPrimary)
+                Text(label)
+                    .font(.system(size: 11))
+                    .foregroundColor(KinnectTheme.textSecondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(RoundedRectangle(cornerRadius: 16).fill(KinnectTheme.surfaceElevated))
         }
-        .frame(maxWidth: .infinity)
+        .buttonStyle(.plain)
+        .disabled(onClick == nil)
+    }
+
+    private func statColumn(count: Int, label: String) -> some View {
+        statCard(count: count, label: label)
+    }
+
+    private func localizedIdentityValue(_ key: String, _ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+        switch key {
+        case "gender":
+            switch trimmed.lowercased() {
+            case "male", "nam": return "Nam"
+            case "female", "nu", "nữ": return "Nữ"
+            case "transgender_male", "trans_male", "nam chuyển giới": return "Nam chuyển giới"
+            case "transgender_female", "trans_female", "nữ chuyển giới": return "Nữ chuyển giới"
+            case "non_binary", "nonbinary", "phi nhị nguyên": return "Phi nhị nguyên"
+            case "genderfluid", "linh hoạt giới": return "Linh hoạt giới"
+            case "agender", "vô giới": return "Vô giới"
+            case "questioning", "đang tìm hiểu": return "Đang tìm hiểu"
+            case "other", "khác": return "Khác"
+            default: return trimmed
+            }
+        case "orientation":
+            switch trimmed.lowercased() {
+            case "heterosexual", "straight", "dị tính": return "Dị tính"
+            case "gay", "gay / đồng tính nam", "đồng tính nam": return "Gay / Đồng tính nam"
+            case "lesbian", "lesbian / đồng tính nữ", "đồng tính nữ": return "Lesbian / Đồng tính nữ"
+            case "bisexual", "song tính / bisexual", "song tính": return "Song tính / Bisexual"
+            case "pansexual", "toàn tính / pansexual", "toàn tính": return "Toàn tính / Pansexual"
+            case "asexual", "vô tính / asexual", "vô tính": return "Vô tính / Asexual"
+            case "queer": return "Queer"
+            case "demisexual", "á tính / demisexual", "á tính": return "Á tính / Demisexual"
+            case "questioning", "đang tìm hiểu": return "Đang tìm hiểu"
+            case "other", "khác": return "Khác"
+            default: return trimmed
+            }
+        case "pronouns":
+            switch trimmed.lowercased() {
+            case "he", "him", "he/him", "anh": return "Anh"
+            case "she", "her", "she/her", "chị": return "Chị"
+            case "em": return "Em"
+            case "you", "bạn": return "Bạn"
+            case "they", "them", "they/them", "họ / they": return "Họ / They"
+            default: return trimmed
+            }
+        case "relationshipRole":
+            switch trimmed.lowercased() {
+            case "single", "độc thân": return "Độc thân"
+            case "dating", "đang tìm hiểu": return "Đang tìm hiểu"
+            case "in_relationship", "đang trong mối quan hệ": return "Đang trong mối quan hệ"
+            case "married", "đã kết hôn": return "Đã kết hôn"
+            case "open_relationship", "mối quan hệ mở": return "Mối quan hệ mở"
+            default: return trimmed
+            }
+        default:
+            return trimmed
+        }
+    }
+
+    private func profileDetailRow(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(label)
+                .font(.system(size: 12))
+                .foregroundColor(KinnectTheme.textSecondary)
+            Text(value)
+                .font(.system(size: 14))
+                .foregroundColor(KinnectTheme.textPrimary)
+        }
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func actionRow(glyph: KinnectGlyph, title: String, color: Color, action: @escaping () -> Void) -> some View {
@@ -610,11 +828,45 @@ struct ProfileView: View {
         }
     }
 
+    private func uploadProfileImage(item: PhotosPickerItem, endpoint: String, field: String) async {
+        guard let data = try? await item.loadTransferable(type: Data.self),
+              let uiImg = UIImage(data: data),
+              let jpeg = uiImg.jpegData(compressionQuality: 0.72) else {
+            appState.showToast("Không thể xử lý ảnh đã chọn.")
+            return
+        }
+        let dataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
+        do {
+            let res = try await KinnectAPIClient.shared.requestJSON(
+                endpoint,
+                method: "POST",
+                body: [field: dataURL],
+                requestId: "upload_\(UUID().uuidString)"
+            )
+            if let userDict = res["user"] as? [String: Any] {
+                appState.applyAuthenticatedUser(KinnectUser.from(userDict), rawDict: userDict)
+            }
+            appState.showToast("Đã cập nhật ảnh thành công!")
+            await refreshMe()
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+
     private func refreshMe() async {
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/me"),
            let userDict = res["user"] as? [String: Any] {
             let user = KinnectUser.from(userDict)
             appState.applyAuthenticatedUser(user, rawDict: userDict)
+        }
+        let myId = appState.currentUser?.id ?? "fixture_user_me"
+        if let statsRes = try? await KinnectAPIClient.shared.requestJSON("/api/users/\(myId)/stats") {
+            if var current = appState.currentUser {
+                if let p = statsRes["posts"] as? Int { current.postsCount = p }
+                if let fo = statsRes["followers"] as? Int { current.followersCount = fo }
+                if let fi = statsRes["following"] as? Int { current.followingCount = fi }
+                appState.currentUser = current
+            }
         }
         if let feedRes = try? await KinnectAPIClient.shared.requestJSON("/api/posts"),
            let items = feedRes["posts"] as? [[String: Any]] {
@@ -624,7 +876,6 @@ struct ProfileView: View {
            let items = shortsRes["shorts"] as? [[String: Any]] {
             self.userShorts = items.map(ShortItem.from)
         }
-        let myId = appState.currentUser?.id ?? "fixture_user_me"
         if let privRes = try? await KinnectAPIClient.shared.requestJSON("/api/users/\(myId)/private") {
             let list = privRes["photos"] as? [[String: Any]] ?? []
             self.privatePhotos = list.map(PrivatePhotoItem.from)
@@ -655,7 +906,7 @@ struct ProfileView: View {
                     .font(.subheadline.bold())
                     .foregroundColor(fgColor)
             }
-            .frame(maxWidth: .infinity, minHeight: 40)
+            .frame(maxWidth: .infinity, minHeight: 44)
             .background(
                 Group {
                     if isFriends || isOutgoing {
@@ -680,42 +931,69 @@ struct ProfileView: View {
                     .font(.subheadline.bold())
                     .foregroundColor(KinnectTheme.accentBright)
             }
-            .frame(maxWidth: .infinity, minHeight: 40)
+            .frame(maxWidth: .infinity, minHeight: 44)
             .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
         }
     }
 
     @ViewBuilder
-    private func peerCallButton(user: KinnectUser, mode: String) -> some View {
-        let isVideo = (mode == "video")
-        Button {
-            Task {
-                dismiss()
-                await NativeWebRTCManager.shared.startOutgoingCall(targetUser: user, mode: mode)
-            }
-        } label: {
-            KinnectIcon(
-                glyph: isVideo ? .videoCall : .phone,
-                size: 18,
-                tint: isVideo ? KinnectTheme.accentBright : KinnectTheme.online
-            )
-            .frame(width: 40, height: 40)
-            .background(Circle().fill(KinnectTheme.surfaceElevated))
-        }
-        .accessibilityLabel(isVideo ? "Gọi video" : "Gọi thoại")
-    }
-
-    @ViewBuilder
     private func peerMoreMenu(user: KinnectUser) -> some View {
         Menu {
-            Button(role: .destructive) {
+            Button {
                 Task {
-                    await appState.blockUser(userId: user.id, userName: user.name)
-                    dismiss()
+                    let endpoint = "/api/users/\(user.id)/follow"
+                    _ = try? await KinnectAPIClient.shared.requestJSON(
+                        endpoint,
+                        method: user.isFollowing ? "DELETE" : "POST"
+                    )
+                    await refreshPeer(target: user)
                 }
             } label: {
-                Label("Chặn người dùng", systemImage: "hand.raised.fill")
+                Label(user.isFollowing ? "Bỏ theo dõi" : "Theo dõi", systemImage: "heart")
             }
+
+            if peerFriendship == "incoming" {
+                Button {
+                    Task {
+                        _ = try? await KinnectAPIClient.shared.requestJSON(
+                            "/api/users/\(user.id)/friend-request/respond",
+                            method: "POST",
+                            body: ["action": "decline"]
+                        )
+                        peerFriendship = "none"
+                        appState.showToast("Đã từ chối lời mời")
+                    }
+                } label: {
+                    Label("Từ chối lời mời", systemImage: "xmark")
+                }
+            } else if peerFriendship == "friends" {
+                Button(role: .destructive) {
+                    Task {
+                        _ = try? await KinnectAPIClient.shared.requestJSON(
+                            "/api/users/\(user.id)/friendship",
+                            method: "DELETE"
+                        )
+                        peerFriendship = "none"
+                        appState.showToast("Đã hủy kết bạn")
+                    }
+                } label: {
+                    Label("Huỷ kết bạn", systemImage: "person.badge.minus")
+                }
+            } else if peerFriendship == "outgoing" {
+                Button {
+                    Task {
+                        _ = try? await KinnectAPIClient.shared.requestJSON(
+                            "/api/users/\(user.id)/friend-request",
+                            method: "DELETE"
+                        )
+                        peerFriendship = "none"
+                        appState.showToast("Đã huỷ lời mời")
+                    }
+                } label: {
+                    Label("Huỷ lời mời", systemImage: "xmark.circle")
+                }
+            }
+
             Button {
                 appState.activeReportContext = UGCReportContext(
                     targetType: "user",
@@ -724,14 +1002,23 @@ struct ProfileView: View {
                     targetTitle: user.name
                 )
             } label: {
-                Label("Báo cáo người dùng", systemImage: "flag.fill")
+                Label("Báo cáo hồ sơ", systemImage: "flag")
+            }
+
+            Button(role: .destructive) {
+                Task {
+                    await appState.blockUser(userId: user.id, userName: user.name)
+                    dismiss()
+                }
+            } label: {
+                Label("Chặn tài khoản", systemImage: "nosign")
             }
         } label: {
             KinnectIcon(glyph: .more, size: 18, tint: KinnectTheme.textSecondary)
-                .frame(width: 40, height: 40)
+                .frame(width: 44, height: 44)
                 .background(Circle().fill(KinnectTheme.surfaceElevated))
         }
-        .accessibilityLabel("Tùy chọn khác")
+        .accessibilityLabel("Tùy chọn hồ sơ")
     }
 
     @ViewBuilder
@@ -739,8 +1026,6 @@ struct ProfileView: View {
         HStack(spacing: 8) {
             peerFriendshipButton(user: user)
             peerMessageButton()
-            peerCallButton(user: user, mode: "audio")
-            peerCallButton(user: user, mode: "video")
             peerMoreMenu(user: user)
         }
         .padding(.horizontal, 14)
@@ -1276,8 +1561,7 @@ struct EditProfileSheet: View {
     ]
 
     private let lookingForChoices = [
-        "Kết bạn", "Trò chuyện", "Hẹn hò", "Mối quan hệ nghiêm túc",
-        "Tìm bạn chung sở thích", "Giao lưu học hỏi", "Tâm sự"
+        "Kết bạn", "Trò chuyện", "Hẹn hò", "Mối quan hệ nghiêm túc", "Cùng sở thích"
     ]
 
     var body: some View {
@@ -1442,7 +1726,7 @@ struct EditProfileSheet: View {
                     }
 
                     pickerWithVisibility(title: "Xu hướng tính dục", key: "orientation", selection: $orientation, choices: orientationChoices)
-                    pickerWithVisibility(title: "Vai trò tự mô tả", key: "communityRole", selection: $communityRole, choices: communityRoleChoices)
+                    pickerWithVisibility(title: "Vai trò tự mô tả (tùy chọn)", key: "communityRole", selection: $communityRole, choices: communityRoleChoices)
                     pickerWithVisibility(title: "Cách xưng hô", key: "pronouns", selection: $pronouns, choices: pronounChoices)
                 } header: {
                     Text("Bản thân và cách xưng hô")
@@ -1463,7 +1747,7 @@ struct EditProfileSheet: View {
                         chipFlow(choices: lookingForChoices, selected: $selectedLookingFor, max: 7)
                     }
 
-                    textWithVisibility(title: "Tỉnh / Thành phố", key: "city", text: $city, placeholder: "Hà Nội, TP. Hồ Chí Minh...")
+                    textWithVisibility(title: "Nơi sống", key: "city", text: $city, placeholder: "Hà Nội, TP. Hồ Chí Minh...")
                     textWithVisibility(title: "Nghề nghiệp", key: "occupation", text: $occupation, placeholder: "Lập trình viên, Nhiếp ảnh gia...")
                     textWithVisibility(title: "Trường học", key: "school", text: $school, placeholder: "Đại học Bách Khoa...")
 
@@ -1665,6 +1949,7 @@ struct EditProfileSheet: View {
             "locationName": city.trimmingCharacters(in: .whitespacesAndNewlines),
             "occupation": occupation.trimmingCharacters(in: .whitespacesAndNewlines),
             "school": school.trimmingCharacters(in: .whitespacesAndNewlines),
+            "identityPublic": true,
             "isPrivate": isPrivate,
             "profileVisibility": visibility
         ]

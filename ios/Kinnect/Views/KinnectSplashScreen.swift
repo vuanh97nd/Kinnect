@@ -45,3 +45,4 @@ struct KinnectSplashScreen: View {
         }
     }
 }
+

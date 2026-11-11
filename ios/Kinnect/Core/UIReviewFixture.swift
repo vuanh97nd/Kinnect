@@ -33,13 +33,26 @@ enum UIReviewFixture {
         "email": "minhanh@kinnect.local",
         "bio": "Thiết kế giao diện & nhiếp ảnh đường phố • Sài Gòn",
         "locationName": "Quận 1, TP. Hồ Chí Minh",
+        "city": "TP. Hồ Chí Minh",
         "avatarColor": "#7C3AED",
+        "age": 25,
+        "height": 175,
+        "weight": 68,
         "gender": "Nam",
         "orientation": "Gay / Đồng tính nam",
         "communityRole": "Vers",
+        "pronouns": "Anh",
+        "relationshipRole": "Đang tìm hiểu",
+        "lookingFor": "Kết bạn, Trò chuyện",
+        "occupation": "Thiết kế sản phẩm",
+        "school": "Đại học Bách Khoa",
+        "interests": ["Nhiếp ảnh", "Du lịch", "Công nghệ", "Âm nhạc"],
         "friendsCount": 128,
         "followersCount": 1420,
         "followingCount": 95,
+        "postsCount": 24,
+        "joinedAt": 1704067200000,
+        "identityPublic": true,
         "isPrivate": false
     ]
 
@@ -49,13 +62,26 @@ enum UIReviewFixture {
         "handle": "hoangnam",
         "bio": "Thiết kế sản phẩm & nhiếp ảnh • Đà Nẵng",
         "locationName": "Đà Nẵng",
+        "city": "Đà Nẵng",
         "avatarColor": "#2563EB",
+        "age": 26,
+        "height": 178,
+        "weight": 72,
         "gender": "Nam",
         "orientation": "Gay / Đồng tính nam",
         "communityRole": "Top",
+        "pronouns": "Anh",
+        "relationshipRole": "Đang tìm hiểu",
+        "lookingFor": "Kết bạn, Hẹn hò",
+        "occupation": "Thiết kế sản phẩm",
+        "school": "Đại học Bách Khoa",
+        "interests": ["Nhiếp ảnh", "Du lịch", "Công nghệ"],
         "distanceKm": 2.4,
         "isFollowing": true,
-        "isFriend": true
+        "isFriend": true,
+        "postsCount": 18,
+        "joinedAt": 1698796800000,
+        "identityPublic": true
     ]
 
     static let secondPeerDict: [String: Any] = [
@@ -64,10 +90,26 @@ enum UIReviewFixture {
         "handle": "thanhtruc",
         "bio": "Âm nhạc, du lịch & công nghệ • Hà Nội",
         "locationName": "Hà Nội",
+        "city": "Hà Nội",
         "avatarColor": "#EC4899",
+        "age": 24,
+        "height": 165,
+        "weight": 52,
+        "gender": "Nữ",
+        "orientation": "Song tính / Bisexual",
+        "communityRole": "Femme",
+        "pronouns": "Chị",
+        "relationshipRole": "Độc thân",
+        "lookingFor": "Kết bạn, Trò chuyện",
+        "occupation": "Lập trình viên",
+        "school": "Đại học Quốc Gia Hà Nội",
+        "interests": ["Âm nhạc", "Du lịch", "Cà phê"],
         "distanceKm": 5.8,
         "isFollowing": false,
-        "isFriend": false
+        "isFriend": false,
+        "postsCount": 9,
+        "joinedAt": 1701388800000,
+        "identityPublic": true
     ]
 
     static let thirdPeerDict: [String: Any] = [
@@ -1204,6 +1246,12 @@ enum UIReviewFixture {
                     ActiveSessionsSheet()
                 }
             )
+        case "account-menu", "me-menu":
+            return AnyView(
+                NavigationStack {
+                    AccountMenuView(onOpenProfile: {}, onOpenWallet: {}, onOpenFriends: {})
+                }
+            )
 
         // MARK: - Friends
         case "friends":
@@ -1227,7 +1275,7 @@ enum UIReviewFixture {
         case "friends-suggestions":
             return AnyView(
                 NavigationStack {
-                    FriendsView(initialTab: .suggestions)
+                    FriendsView(initialTab: .friends)
                         .toolbar { RootMainView.headerTrailingButtonsStatic() }
                         .navigationTitle("Gợi ý kết bạn")
                         .navigationBarTitleDisplayMode(.large)

@@ -35,7 +35,20 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
     var gender: String
     var orientation: String
     var communityRole: String
+    var height: Int
+    var weight: Int
+    var pronouns: String
+    var relationshipRole: String
+    var lookingFor: String
+    var occupation: String
+    var school: String
+    var city: String
+    var interests: [String]
     var cloudChatSync: Bool
+    var postsCount: Int
+    var joinedAt: Int64
+    var identityPublic: Bool
+    var profileVisibility: [String: Bool]
 
     var avatarURL: String? { avatarUrl.isEmpty ? nil : avatarUrl }
 
@@ -62,7 +75,20 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         gender: String = "",
         orientation: String = "",
         communityRole: String = "",
-        cloudChatSync: Bool = true
+        height: Int = 0,
+        weight: Int = 0,
+        pronouns: String = "",
+        relationshipRole: String = "",
+        lookingFor: String = "",
+        occupation: String = "",
+        school: String = "",
+        city: String = "",
+        interests: [String] = [],
+        cloudChatSync: Bool = true,
+        postsCount: Int = 0,
+        joinedAt: Int64 = 0,
+        identityPublic: Bool = true,
+        profileVisibility: [String: Bool] = [:]
     ) {
         self.id = id
         self.name = name
@@ -86,7 +112,20 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         self.gender = gender
         self.orientation = orientation
         self.communityRole = communityRole
+        self.height = height
+        self.weight = weight
+        self.pronouns = pronouns
+        self.relationshipRole = relationshipRole
+        self.lookingFor = lookingFor
+        self.occupation = occupation
+        self.school = school
+        self.city = city
+        self.interests = interests
         self.cloudChatSync = cloudChatSync
+        self.postsCount = postsCount
+        self.joinedAt = joinedAt
+        self.identityPublic = identityPublic
+        self.profileVisibility = profileVisibility
     }
 
     init(json: [String: Any]) {
@@ -101,6 +140,23 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
             av = "/api/users/\(uid)/avatar"
         }
         let cov = (dict["coverUrl"] as? String) ?? (dict["cover"] as? String) ?? ""
+        var parsedInterests: [String] = []
+        if let arr = dict["interests"] as? [String] {
+            parsedInterests = arr
+        } else if let str = dict["interests"] as? String {
+            parsedInterests = str.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        }
+        let userCity = (dict["city"] as? String) ?? (dict["locationName"] as? String) ?? ""
+        var visDict: [String: Bool] = [:]
+        if let pv = dict["profileVisibility"] as? [String: Any] {
+            for (k, v) in pv {
+                if let b = v as? Bool {
+                    visDict[k] = b
+                }
+            }
+        }
+        let joined: Int64 = (dict["joinedAt"] as? Int64) ?? (dict["joinedAt"] as? NSNumber)?.int64Value ?? Int64((dict["joinedAt"] as? Int) ?? 0)
+
         return KinnectUser(
             id: uid,
             name: rawName.isEmpty ? "Người dùng Kinnect" : rawName,
@@ -111,7 +167,7 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
             avatarUrl: av,
             avatarColor: (dict["avatarColor"] as? String) ?? (dict["color"] as? String) ?? "#7C3AED",
             coverUrl: cov,
-            locationName: (dict["locationName"] as? String) ?? (dict["city"] as? String) ?? "",
+            locationName: userCity,
             isPrivate: (dict["isPrivate"] as? Bool) ?? false,
             followersCount: (dict["followersCount"] as? Int) ?? (dict["followers"] as? Int) ?? 0,
             followingCount: (dict["followingCount"] as? Int) ?? (dict["followingTotal"] as? Int) ?? 0,
@@ -124,7 +180,20 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
             gender: (dict["gender"] as? String) ?? "",
             orientation: (dict["orientation"] as? String) ?? (dict["sexualOrientation"] as? String) ?? "",
             communityRole: (dict["communityRole"] as? String) ?? (dict["role"] as? String) ?? "",
-            cloudChatSync: (dict["cloudChatSync"] as? Bool) ?? true
+            height: (dict["height"] as? Int) ?? Int((dict["height"] as? String) ?? "") ?? 0,
+            weight: (dict["weight"] as? Int) ?? Int((dict["weight"] as? String) ?? "") ?? 0,
+            pronouns: (dict["pronouns"] as? String) ?? "",
+            relationshipRole: (dict["relationshipRole"] as? String) ?? "",
+            lookingFor: (dict["lookingFor"] as? String) ?? "",
+            occupation: (dict["occupation"] as? String) ?? "",
+            school: (dict["school"] as? String) ?? "",
+            city: userCity,
+            interests: parsedInterests,
+            cloudChatSync: (dict["cloudChatSync"] as? Bool) ?? true,
+            postsCount: (dict["postsCount"] as? Int) ?? (dict["posts"] as? Int) ?? (dict["postCount"] as? Int) ?? 0,
+            joinedAt: joined,
+            identityPublic: (dict["identityPublic"] as? Bool) ?? true,
+            profileVisibility: visDict
         )
     }
 }

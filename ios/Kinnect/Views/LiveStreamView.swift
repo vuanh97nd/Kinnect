@@ -437,6 +437,18 @@ struct CreateLiveRoomSheet: View {
     @State private var liveMode = "chat" // "chat" | "game" (NO karaoke)
     @State private var gameTitle = "Liên Quân Mobile"
     @State private var isStarting = false
+    @State private var showPreviewEffects = false
+    @State private var previewSticker = "none"
+    @State private var previewFilter = "none"
+    @State private var previewBeautyOn = true
+    @State private var previewSmooth = 0.5
+    @State private var previewWhiten = 0.3
+    @State private var previewSlim = 0.2
+    @State private var previewEyes = 0.2
+    @State private var previewLips = 0.0
+    @State private var previewBlemish = 0.4
+    @State private var previewBlush = 0.0
+    @State private var previewMicEnabled = true
 
     var body: some View {
         NavigationStack {
@@ -450,7 +462,7 @@ struct CreateLiveRoomSheet: View {
                 }
 
                 Section("Thông tin phòng Live") {
-                    TextField("Tiêu đề phòng Live", text: $title)
+                    TextField("Tiêu đề buổi Live", text: $title)
                     TextField("Chủ đề", text: $topic)
                     if liveMode == "game" {
                         Picker("Tựa game", selection: $gameTitle) {
@@ -466,6 +478,60 @@ struct CreateLiveRoomSheet: View {
                             .foregroundColor(KinnectTheme.textSecondary)
                     }
                 }
+
+                Section("Thiết bị & Hiệu ứng") {
+                    HStack(spacing: 12) {
+                        Button {
+                            NativeWebRTCManager.shared.flipCamera()
+                        } label: {
+                            VStack(spacing: 4) {
+                                Image(systemName: "camera.rotate.fill")
+                                    .font(.title3)
+                                Text("Lật camera")
+                                    .font(.caption2)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(KinnectTheme.surfaceElevated)
+                            .cornerRadius(10)
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            showPreviewEffects = true
+                        } label: {
+                            VStack(spacing: 4) {
+                                Image(systemName: "wand.and.stars")
+                                    .font(.title3)
+                                    .foregroundColor(KinnectTheme.accentBright)
+                                Text("Làm đẹp")
+                                    .font(.caption2)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(KinnectTheme.surfaceElevated)
+                            .cornerRadius(10)
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            previewMicEnabled.toggle()
+                        } label: {
+                            VStack(spacing: 4) {
+                                Image(systemName: previewMicEnabled ? "mic.fill" : "mic.slash.fill")
+                                    .font(.title3)
+                                    .foregroundColor(previewMicEnabled ? KinnectTheme.success : KinnectTheme.danger)
+                                Text("Micro")
+                                    .font(.caption2)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(KinnectTheme.surfaceElevated)
+                            .cornerRadius(10)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
             .scrollContentBackground(.hidden)
             .background(KinnectTheme.background)
@@ -476,11 +542,25 @@ struct CreateLiveRoomSheet: View {
                     Button("Hủy") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Phát ngay") {
+                    Button("Bắt đầu Live") {
                         Task { await startHostLive() }
                     }
                     .disabled(isStarting)
                 }
+            }
+            .sheet(isPresented: $showPreviewEffects) {
+                LiveEffectsSheet(
+                    activeSticker: $previewSticker,
+                    activeFilter: $previewFilter,
+                    beautyEnabled: $previewBeautyOn,
+                    smooth: $previewSmooth,
+                    whiten: $previewWhiten,
+                    slim: $previewSlim,
+                    eyes: $previewEyes,
+                    lips: $previewLips,
+                    blemish: $previewBlemish,
+                    blush: $previewBlush
+                )
             }
         }
     }
@@ -518,8 +598,16 @@ struct LiveRoomFullScreenView: View {
     @State private var showGiftSheet = false
     @State private var showEffectsSheet = false
     @State private var activeLiveSticker: String = "none"
+    @State private var activeLiveFilter: String = "none"
+    @State private var beautyEnabled: Bool = true
     @State private var beautySmooth: Double = 0.5
     @State private var beautyWhiten: Double = 0.3
+    @State private var beautySlim: Double = 0.2
+    @State private var beautyEyes: Double = 0.2
+    @State private var beautyLips: Double = 0.0
+    @State private var beautyBlemish: Double = 0.4
+    @State private var beautyBlush: Double = 0.0
+    @State private var hostMicMuted: Bool = false
     @State private var activeGiftEffect: ActiveGiftEffect? = nil
     @State private var floatingReactions: [LiveFloatingReaction] = []
 
@@ -548,6 +636,13 @@ struct LiveRoomFullScreenView: View {
                             .foregroundColor(KinnectTheme.textSecondary)
                             .kinnectMultiline()
                     }
+                }
+
+                // Live Color Filter Grading Overlay
+                if activeLiveFilter != "none" {
+                    LiveFilterColorOverlay(filterId: activeLiveFilter)
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
                 }
 
                 VStack {
@@ -676,7 +771,30 @@ struct LiveRoomFullScreenView: View {
                                 .background(Circle().fill(KinnectTheme.accent))
                         }
 
-                        // Làm đẹp & Sticker AR button
+                        if appState.isCurrentLiveHost {
+                            Button {
+                                NativeWebRTCManager.shared.flipCamera()
+                            } label: {
+                                Image(systemName: "camera.rotate.fill")
+                                    .foregroundColor(.white)
+                                    .padding(10)
+                                    .background(Circle().fill(Color.black.opacity(0.55)))
+                            }
+                            .accessibilityLabel("Lật camera")
+
+                            Button {
+                                hostMicMuted.toggle()
+                                NativeWebRTCManager.shared.setMicrophoneMuted(hostMicMuted)
+                            } label: {
+                                Image(systemName: hostMicMuted ? "mic.slash.fill" : "mic.fill")
+                                    .foregroundColor(hostMicMuted ? KinnectTheme.danger : .white)
+                                    .padding(10)
+                                    .background(Circle().fill(Color.black.opacity(0.55)))
+                            }
+                            .accessibilityLabel(hostMicMuted ? "Bật micro" : "Tắt micro")
+                        }
+
+                        // Hiệu ứng Live (Làm đẹp, Sticker AR, Bộ lọc màu)
                         Button {
                             showEffectsSheet = true
                         } label: {
@@ -685,7 +803,7 @@ struct LiveRoomFullScreenView: View {
                                 .padding(10)
                                 .background(Circle().fill(Color.black.opacity(0.55)))
                         }
-                        .accessibilityLabel("Chế độ làm đẹp và Sticker")
+                        .accessibilityLabel("Hiệu ứng Live")
 
                         Button {
                             triggerLiveReaction(symbol: "💜", kind: "heart", room: room.id)
@@ -745,8 +863,15 @@ struct LiveRoomFullScreenView: View {
             .sheet(isPresented: $showEffectsSheet) {
                 LiveEffectsSheet(
                     activeSticker: $activeLiveSticker,
+                    activeFilter: $activeLiveFilter,
+                    beautyEnabled: $beautyEnabled,
                     smooth: $beautySmooth,
-                    whiten: $beautyWhiten
+                    whiten: $beautyWhiten,
+                    slim: $beautySlim,
+                    eyes: $beautyEyes,
+                    lips: $beautyLips,
+                    blemish: $beautyBlemish,
+                    blush: $beautyBlush
                 )
             }
         }
@@ -1154,96 +1279,253 @@ struct LiveStickerOverlayView: View {
 
     private func emojiForSticker(_ id: String) -> String {
         switch id {
-        case "bunny": return "🐰"
-        case "crown": return "👑"
         case "glasses": return "🕶️"
-        case "hearts": return "💕"
-        case "flowers": return "🌸"
-        case "fire": return "🔥"
-        case "devil": return "😈"
+        case "bunny": return "🐰"
         case "cat": return "🐱"
+        case "dog": return "🐶"
+        case "crown": return "👑"
+        case "flowers": return "🌸"
+        case "bow": return "🎀"
+        case "freckles": return "🤎"
+        case "hearts": return "💕"
+        case "sparkle": return "✨"
         case "stars": return "⭐"
+        case "round_glasses": return "👓"
+        case "heart_glasses": return "💗"
+        case "neon_glasses": return "⚡"
+        case "butterfly": return "🦋"
+        case "halo": return "😇"
+        case "devil": return "😈"
+        case "rainbow": return "🌈"
+        case "bubbles": return "🫧"
+        case "snow": return "❄️"
+        case "confetti": return "🎉"
         default: return "✨"
         }
     }
 }
 
-// MARK: - Live Effects Sheet (Làm đẹp & Sticker AR)
+// MARK: - Live Color Grading Filter Overlay
+struct LiveFilterColorOverlay: View {
+    let filterId: String
+
+    var body: some View {
+        Group {
+            switch filterId {
+            case "clear":
+                Color.cyan.opacity(0.08)
+            case "milk":
+                Color.white.opacity(0.12)
+            case "peach":
+                Color.pink.opacity(0.12)
+            case "warm":
+                Color.orange.opacity(0.12)
+            case "cool":
+                Color.blue.opacity(0.12)
+            case "film":
+                Color(red: 0.82, green: 0.72, blue: 0.52).opacity(0.16)
+            case "mono":
+                Color.gray.opacity(0.25)
+            case "noir":
+                Color.black.opacity(0.22)
+            case "vivid":
+                Color.purple.opacity(0.08)
+            case "sunset":
+                Color(red: 1.0, green: 0.42, blue: 0.22).opacity(0.16)
+            case "candy":
+                Color(red: 1.0, green: 0.5, blue: 0.8).opacity(0.16)
+            case "mint":
+                Color(red: 0.3, green: 0.9, blue: 0.7).opacity(0.12)
+            case "dream":
+                Color(red: 0.8, green: 0.6, blue: 0.9).opacity(0.14)
+            case "retro":
+                Color(red: 0.75, green: 0.65, blue: 0.35).opacity(0.16)
+            case "city":
+                Color(red: 0.2, green: 0.4, blue: 0.65).opacity(0.14)
+            case "cinema":
+                Color(red: 0.1, green: 0.3, blue: 0.45).opacity(0.15)
+            case "rose":
+                Color(red: 0.92, green: 0.4, blue: 0.55).opacity(0.15)
+            case "golden":
+                Color(red: 1.0, green: 0.84, blue: 0.0).opacity(0.15)
+            case "ice":
+                Color(red: 0.6, green: 0.9, blue: 1.0).opacity(0.15)
+            case "lavender":
+                Color(red: 0.75, green: 0.55, blue: 0.92).opacity(0.14)
+            case "choco":
+                Color(red: 0.55, green: 0.32, blue: 0.12).opacity(0.16)
+            case "polaroid":
+                Color(red: 0.92, green: 0.88, blue: 0.76).opacity(0.14)
+            case "teal":
+                Color(red: 0.0, green: 0.5, blue: 0.5).opacity(0.15)
+            default:
+                EmptyView()
+            }
+        }
+    }
+}
+
+// MARK: - Live Effects Sheet (Hiệu ứng Live: Làm đẹp · Hiệu ứng · Màu)
 struct LiveEffectsSheet: View {
     @Binding var activeSticker: String
+    @Binding var activeFilter: String
+    @Binding var beautyEnabled: Bool
     @Binding var smooth: Double
     @Binding var whiten: Double
+    @Binding var slim: Double
+    @Binding var eyes: Double
+    @Binding var lips: Double
+    @Binding var blemish: Double
+    @Binding var blush: Double
     @State private var selectedTab: Int = 0
     @Environment(\.dismiss) private var dismiss
 
+    // 22 Stickers matching FxEngine.STICKERS
     private let stickerList: [(id: String, name: String, emoji: String)] = [
-        ("none", "Tắt", "🚫"),
-        ("crown", "Vương miện", "👑"),
+        ("none", "Không", "🚫"),
+        ("glasses", "Kính râm", "🕶"),
         ("bunny", "Tai thỏ", "🐰"),
-        ("glasses", "Kính râm", "🕶️"),
-        ("hearts", "Tim bay", "💕"),
-        ("flowers", "Vòng hoa", "🌸"),
-        ("fire", "Hào quang", "🔥"),
-        ("devil", "Tiểu quỷ", "😈"),
         ("cat", "Tai mèo", "🐱"),
-        ("stars", "Sao xoay", "⭐")
+        ("dog", "Cún con", "🐶"),
+        ("crown", "Vương miện", "👑"),
+        ("flowers", "Vòng hoa", "🌸"),
+        ("bow", "Nơ xinh", "🎀"),
+        ("freckles", "Tàn nhang", "🤎"),
+        ("hearts", "Tim bay", "💕"),
+        ("sparkle", "Lấp lánh", "✨"),
+        ("stars", "Sao xoay", "⭐"),
+        ("round_glasses", "Kính tròn", "👓"),
+        ("heart_glasses", "Kính tim", "💗"),
+        ("neon_glasses", "Kính neon", "⚡"),
+        ("butterfly", "Bướm", "🦋"),
+        ("halo", "Thiên thần", "😇"),
+        ("devil", "Sừng xinh", "😈"),
+        ("rainbow", "Cầu vồng", "🌈"),
+        ("bubbles", "Bong bóng", "🫧"),
+        ("snow", "Tuyết", "❄️"),
+        ("confetti", "Lễ hội", "🎉")
+    ]
+
+    // 24 Filters matching FxEngine.FILTERS
+    private let filterList: [(id: String, name: String, color: Color)] = [
+        ("none", "Gốc", .gray),
+        ("clear", "Trong trẻo", .cyan),
+        ("milk", "Sữa", .white),
+        ("peach", "Hồng đào", .pink),
+        ("warm", "Ấm áp", .orange),
+        ("cool", "Mát lạnh", .blue),
+        ("film", "Phim cũ", Color(red: 0.82, green: 0.72, blue: 0.52)),
+        ("mono", "Đen trắng", .gray),
+        ("noir", "Tương phản", .black),
+        ("vivid", "Rực rỡ", .purple),
+        ("sunset", "Hoàng hôn", .orange),
+        ("candy", "Kẹo ngọt", .pink),
+        ("mint", "Bạc hà", .mint),
+        ("dream", "Mộng mơ", .purple),
+        ("retro", "Retro", Color(red: 0.75, green: 0.65, blue: 0.35)),
+        ("city", "Thành phố", .blue),
+        ("cinema", "Cinema", .indigo),
+        ("rose", "Rose", .red),
+        ("golden", "Golden", .yellow),
+        ("ice", "Ice", .teal),
+        ("lavender", "Lavender", Color(red: 0.75, green: 0.55, blue: 0.92)),
+        ("choco", "Choco", Color(red: 0.55, green: 0.32, blue: 0.12)),
+        ("polaroid", "Polaroid", Color(red: 0.92, green: 0.88, blue: 0.76)),
+        ("teal", "Teal", .teal)
     ]
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 16) {
+            VStack(spacing: 12) {
+                // 3 Tabs: Làm đẹp · Hiệu ứng · Màu
                 Picker("Chế độ", selection: $selectedTab) {
                     Text("Làm đẹp").tag(0)
-                    Text("Sticker AR").tag(1)
+                    Text("Hiệu ứng").tag(1)
+                    Text("Màu").tag(2)
                 }
                 .pickerStyle(.segmented)
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
 
                 if selectedTab == 0 {
-                    VStack(spacing: 20) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text("Làm mịn da")
-                                    .font(.subheadline.bold())
-                                    .foregroundColor(.white)
-                                Spacer()
-                                Text("\(Int(smooth * 100))%")
-                                    .font(.caption)
-                                    .foregroundColor(KinnectTheme.accentBright)
-                            }
-                            Slider(value: $smooth, in: 0...1)
-                                .tint(KinnectTheme.accentBright)
-                        }
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text("Sáng da")
-                                    .font(.subheadline.bold())
-                                    .foregroundColor(.white)
-                                Spacer()
-                                Text("\(Int(whiten * 100))%")
-                                    .font(.caption)
-                                    .foregroundColor(KinnectTheme.accentBright)
-                            }
-                            Slider(value: $whiten, in: 0...1)
-                                .tint(KinnectTheme.accentBright)
-                        }
-
-                        Button {
-                            smooth = 0.5
-                            whiten = 0.3
-                        } label: {
-                            Text("Đặt lại mặc định")
-                                .font(.caption.bold())
-                                .foregroundColor(KinnectTheme.textSecondary)
-                        }
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 16)
-                } else {
+                    // Tab Làm đẹp
                     ScrollView {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 70))], spacing: 14) {
+                        VStack(spacing: 16) {
+                            // Quick look preset tiles
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 10) {
+                                    lookPresetButton(id: "off", name: "Gốc", icon: "slash.circle") {
+                                        beautyEnabled = false
+                                        smooth = 0
+                                        whiten = 0
+                                        slim = 0
+                                        eyes = 0
+                                        lips = 0
+                                        blemish = 0
+                                        blush = 0
+                                    }
+                                    lookPresetButton(id: "natural", name: "Tự nhiên", icon: "sparkles") {
+                                        beautyEnabled = true
+                                        smooth = 0.55; blemish = 0.5; eyes = 0.08; lips = 0.05; slim = 0.2; whiten = 0.3; blush = 0.1
+                                    }
+                                    lookPresetButton(id: "glass", name: "Da căng", icon: "drop.fill") {
+                                        beautyEnabled = true
+                                        smooth = 0.78; blemish = 0.85; eyes = 0.15; lips = 0.2; slim = 0.25; whiten = 0.45; blush = 0.15
+                                    }
+                                    lookPresetButton(id: "peach", name: "Đào", icon: "heart.fill") {
+                                        beautyEnabled = true
+                                        smooth = 0.62; blemish = 0.65; eyes = 0.14; lips = 0.13; blush = 0.4; whiten = 0.35; slim = 0.2
+                                    }
+                                    lookPresetButton(id: "doll", name: "Búp bê", icon: "face.smiling.inverse") {
+                                        beautyEnabled = true
+                                        smooth = 0.7; eyes = 0.72; lips = 0.27; slim = 0.4; whiten = 0.4; blemish = 0.6; blush = 0.35
+                                    }
+                                    lookPresetButton(id: "eyes", name: "Mắt to", icon: "eye.fill") {
+                                        beautyEnabled = true
+                                        eyes = 0.9; smooth = 0.55; whiten = 0.3
+                                    }
+                                    lookPresetButton(id: "lips", name: "Môi đầy", icon: "mouth.fill") {
+                                        beautyEnabled = true
+                                        lips = 0.78; blush = 0.25; smooth = 0.55; whiten = 0.3
+                                    }
+                                }
+                                .padding(.horizontal, 16)
+                            }
+
+                            // 7 Canonical Beauty Sliders matching BeautyCatalog.ITEMS
+                            VStack(spacing: 12) {
+                                beautySliderRow(label: "Mịn da", value: $smooth)
+                                beautySliderRow(label: "Sáng da", value: $whiten)
+                                beautySliderRow(label: "Gọn mặt", value: $slim)
+                                beautySliderRow(label: "Giảm đốm", value: $blemish)
+                                beautySliderRow(label: "Mắt to", value: $eyes)
+                                beautySliderRow(label: "Môi đầy", value: $lips)
+                                beautySliderRow(label: "Má hồng", value: $blush)
+                            }
+                            .padding(.horizontal, 16)
+
+                            Button {
+                                beautyEnabled = true
+                                smooth = 0.5
+                                whiten = 0.3
+                                slim = 0.2
+                                eyes = 0.2
+                                lips = 0.0
+                                blemish = 0.4
+                                blush = 0.0
+                            } label: {
+                                Text("Đặt lại mặc định")
+                                    .font(.caption.bold())
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                                    .padding(.vertical, 8)
+                            }
+                        }
+                        .padding(.vertical, 8)
+                    }
+                } else if selectedTab == 1 {
+                    // Tab Hiệu ứng (22 Stickers from FxEngine.STICKERS)
+                    ScrollView {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 72))], spacing: 14) {
                             ForEach(stickerList, id: \.id) { s in
                                 Button {
                                     activeSticker = s.id
@@ -1253,12 +1535,12 @@ struct LiveEffectsSheet: View {
                                         ZStack {
                                             Circle()
                                                 .fill(activeSticker == s.id ? KinnectTheme.accent.opacity(0.3) : KinnectTheme.surfaceElevated)
-                                                .frame(width: 54, height: 54)
+                                                .frame(width: 52, height: 52)
                                                 .overlay(
                                                     Circle().stroke(activeSticker == s.id ? KinnectTheme.accentBright : Color.clear, lineWidth: 2)
                                                 )
                                             Text(s.emoji)
-                                                .font(.system(size: 28))
+                                                .font(.system(size: 26))
                                         }
                                         Text(s.name)
                                             .font(.caption2)
@@ -1269,7 +1551,46 @@ struct LiveEffectsSheet: View {
                                 .buttonStyle(.plain)
                             }
                         }
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                    }
+                } else {
+                    // Tab Màu (24 Filters from FxEngine.FILTERS)
+                    ScrollView {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 72))], spacing: 14) {
+                            ForEach(filterList, id: \.id) { f in
+                                Button {
+                                    activeFilter = f.id
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                } label: {
+                                    VStack(spacing: 4) {
+                                        ZStack {
+                                            Circle()
+                                                .fill(f.color.opacity(0.35))
+                                                .frame(width: 52, height: 52)
+                                                .overlay(
+                                                    Circle().stroke(activeFilter == f.id ? KinnectTheme.accentBright : KinnectTheme.line, lineWidth: activeFilter == f.id ? 2.5 : 1)
+                                                )
+                                            if f.id == "none" {
+                                                Image(systemName: "circle.slash")
+                                                    .font(.title3)
+                                                    .foregroundColor(.white)
+                                            } else {
+                                                Circle()
+                                                    .fill(f.color)
+                                                    .frame(width: 22, height: 22)
+                                            }
+                                        }
+                                        Text(f.name)
+                                            .font(.caption2)
+                                            .foregroundColor(activeFilter == f.id ? KinnectTheme.accentBright : .white)
+                                            .lineLimit(1)
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 16)
                         .padding(.vertical, 8)
                     }
                 }
@@ -1277,14 +1598,49 @@ struct LiveEffectsSheet: View {
                 Spacer()
             }
             .background(KinnectTheme.background)
-            .navigationTitle("Hiệu ứng & Làm đẹp")
+            .navigationTitle("Hiệu ứng Live")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Xong") { dismiss() }
+                        .font(.subheadline.bold())
+                        .foregroundColor(KinnectTheme.accentBright)
                 }
             }
         }
-        .presentationDetents([.height(300)])
+        .presentationDetents([.height(420), .medium, .large])
+    }
+
+    private func lookPresetButton(id: String, name: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 20))
+                    .foregroundColor(KinnectTheme.accentBright)
+                    .frame(width: 44, height: 44)
+                    .background(KinnectTheme.surfaceElevated)
+                    .clipShape(Circle())
+                Text(name)
+                    .font(.caption2)
+                    .foregroundColor(.white)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func beautySliderRow(label: String, value: Binding<Double>) -> some View {
+        VStack(spacing: 3) {
+            HStack {
+                Text(label)
+                    .font(.caption.bold())
+                    .foregroundColor(.white)
+                Spacer()
+                Text("\(Int(value.wrappedValue * 100))%")
+                    .font(.caption2)
+                    .foregroundColor(KinnectTheme.accentBright)
+            }
+            Slider(value: value, in: 0...1)
+                .tint(KinnectTheme.accentBright)
+        }
     }
 }

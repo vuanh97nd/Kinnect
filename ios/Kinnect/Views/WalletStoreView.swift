@@ -13,11 +13,11 @@ struct WalletStoreView: View {
 
     enum StoreCategoryFilter: String, CaseIterable {
         case style = "Phong cách"
-        case live = "Phòng Live"
-        case gifts = "Bộ quà"
-        case member = "Hội viên"
-        case studio = "Studio Pro"
-        case owned = "Đã sở hữu"
+        case studio = "Studio"
+        case live = "Live"
+        case gifts = "Quà"
+        case member = "Thành viên"
+        case owned = "Của tôi"
     }
 
     @State private var tab: SectionTab = .wallet

@@ -25,7 +25,7 @@ struct DiscoverView: View {
     @State private var selectedUserForDetail: KinnectUser?
     @State private var activeFilterType: FilterSheetType?
 
-    // Quick filter states
+    // Quick filter states (matching Android MainActivity lines 1650-1668)
     @State private var minAge: Int = 0
     @State private var maxAge: Int = 0
     @State private var minWeight: Int = 0
@@ -33,6 +33,11 @@ struct DiscoverView: View {
     @State private var minHeight: Int = 0
     @State private var maxHeight: Int = 0
     @State private var selectedGender: String = ""
+    @State private var selectedOrientation: String = ""
+    @State private var selectedRole: String = ""
+    @State private var selectedIntent: String = ""
+    @State private var isOnlineOnly: Bool = false
+    @State private var isRecentOnly: Bool = false
     @State private var hasLocationPermission: Bool = true
 
     private let gridColumns = [
@@ -67,22 +72,20 @@ struct DiscoverView: View {
                 FilterChipButton(title: "Chiều cao", isSelected: minHeight > 0 || maxHeight > 0) {
                     activeFilterType = .height
                 }
-                FilterChipButton(title: "Giới tính", isSelected: !selectedGender.isEmpty) {
+                FilterChipButton(title: "Giới tính", isSelected: !selectedGender.isEmpty || !selectedOrientation.isEmpty || !selectedRole.isEmpty) {
                     activeFilterType = .gender
                 }
                 Button {
                     activeFilterType = .full
                 } label: {
-                    KinnectIcon(
-                        glyph: .more,
-                        size: 20,
-                        tint: isFilterActive ? KinnectTheme.accentBright : KinnectTheme.textSecondary
-                    )
-                    .frame(width: 44, height: 44)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(isFilterActive ? KinnectTheme.accent.opacity(0.18) : KinnectTheme.surfaceElevated)
-                    )
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(isFilterActive ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
+                        .frame(width: 44, height: 44)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(isFilterActive ? KinnectTheme.accent.opacity(0.18) : KinnectTheme.surfaceElevated)
+                        )
                 }
                 .accessibilityLabel("Bộ lọc tổng hợp")
             }
@@ -143,6 +146,11 @@ struct DiscoverView: View {
                 minHeight: $minHeight,
                 maxHeight: $maxHeight,
                 selectedGender: $selectedGender,
+                selectedOrientation: $selectedOrientation,
+                selectedRole: $selectedRole,
+                selectedIntent: $selectedIntent,
+                isOnlineOnly: $isOnlineOnly,
+                isRecentOnly: $isRecentOnly,
                 onApply: {
                     Task { await loadCurrentSegment() }
                 },
@@ -151,6 +159,11 @@ struct DiscoverView: View {
                     minWeight = 0; maxWeight = 0
                     minHeight = 0; maxHeight = 0
                     selectedGender = ""
+                    selectedOrientation = ""
+                    selectedRole = ""
+                    selectedIntent = ""
+                    isOnlineOnly = false
+                    isRecentOnly = false
                     Task { await loadCurrentSegment() }
                 }
             )
@@ -168,7 +181,9 @@ struct DiscoverView: View {
     }
 
     private var isFilterActive: Bool {
-        minAge > 0 || maxAge > 0 || minWeight > 0 || maxWeight > 0 || minHeight > 0 || maxHeight > 0 || !selectedGender.isEmpty
+        minAge > 0 || maxAge > 0 || minWeight > 0 || maxWeight > 0 || minHeight > 0 || maxHeight > 0 ||
+        !selectedGender.isEmpty || !selectedOrientation.isEmpty || !selectedRole.isEmpty || !selectedIntent.isEmpty ||
+        isOnlineOnly || isRecentOnly
     }
 
     private var visiblePeople: [KinnectUser] {
@@ -176,14 +191,22 @@ struct DiscoverView: View {
             guard !appState.blockedUserIds.contains(p.id) && p.id != appState.currentUser?.id else { return false }
             if minAge > 0 && p.age < minAge { return false }
             if maxAge > 0 && p.age > maxAge { return false }
+            if minWeight > 0 && p.weight < minWeight { return false }
+            if maxWeight > 0 && p.weight > maxWeight { return false }
+            if minHeight > 0 && p.height < minHeight { return false }
+            if maxHeight > 0 && p.height > maxHeight { return false }
+            if isOnlineOnly && !p.isActive { return false }
             if !selectedGender.isEmpty {
-                let target = selectedGender.lowercased()
-                let pG = p.gender.lowercased()
-                let pO = p.orientation.lowercased()
-                let pR = p.communityRole.lowercased()
-                if !pG.contains(target) && !pO.contains(target) && !pR.contains(target) {
-                    return false
-                }
+                if !p.gender.localizedCaseInsensitiveContains(selectedGender) { return false }
+            }
+            if !selectedOrientation.isEmpty {
+                if !p.orientation.localizedCaseInsensitiveContains(selectedOrientation) { return false }
+            }
+            if !selectedRole.isEmpty {
+                if !p.communityRole.localizedCaseInsensitiveContains(selectedRole) { return false }
+            }
+            if !selectedIntent.isEmpty {
+                if !p.lookingFor.localizedCaseInsensitiveContains(selectedIntent) { return false }
             }
             return true
         }
@@ -383,8 +406,24 @@ private struct DiscoverSquareUserTile: View {
                             )
                     }
 
-                    // Top-Right Badge: "Mới" or Online
-                    if isOnline {
+                    // Top-Left Online Dot (Android parity lines 1639: 10dp ONLINE dot with 2dp CARD stroke)
+                    if isOnline || person.isActive {
+                        VStack {
+                            HStack {
+                                Circle()
+                                    .fill(KinnectTheme.online)
+                                    .frame(width: 10, height: 10)
+                                    .overlay(Circle().stroke(KinnectTheme.surface, lineWidth: 2))
+                                    .padding(7)
+                                Spacer()
+                            }
+                            Spacer()
+                        }
+                    }
+
+                    // Top-Right Badge: "Mới" (Android parity lines 1638: RegistrationBadge.today)
+                    let isNew = person.joinedAt > 0 && (Date().timeIntervalSince1970 * 1000 - Double(person.joinedAt)) < 86_400_000
+                    if isNew {
                         VStack {
                             HStack {
                                 Spacer()
@@ -521,7 +560,7 @@ private struct DiscoverUserDetailSheet: View {
     }
 }
 
-// 7. Interactive Discover Filter Sheet
+// 7. Interactive Discover Filter Sheet (100% Parity with Android MainActivity lines 1650-1668)
 private struct DiscoverFilterSheet: View {
     let type: DiscoverView.FilterSheetType
     @Binding var minAge: Int
@@ -531,6 +570,11 @@ private struct DiscoverFilterSheet: View {
     @Binding var minHeight: Int
     @Binding var maxHeight: Int
     @Binding var selectedGender: String
+    @Binding var selectedOrientation: String
+    @Binding var selectedRole: String
+    @Binding var selectedIntent: String
+    @Binding var isOnlineOnly: Bool
+    @Binding var isRecentOnly: Bool
     let onApply: () -> Void
     let onReset: () -> Void
     @Environment(\.dismiss) private var dismiss
@@ -551,6 +595,10 @@ private struct DiscoverFilterSheet: View {
         "Side", "Femme", "Masc / Butch", "Androgynous", "Stem", "Đang tìm hiểu", "Khác"
     ]
 
+    private let intents = [
+        "", "Trò chuyện", "Kết bạn", "Hẹn hò"
+    ]
+
     var body: some View {
         NavigationStack {
             Form {
@@ -563,15 +611,15 @@ private struct DiscoverFilterSheet: View {
 
                 if type == .weight || type == .full {
                     Section("Cân nặng (kg)") {
-                        Stepper("Tối thiểu: \(minWeight > 0 ? "\(minWeight) kg" : "Bất kỳ")", value: $minWeight, in: 0...200, step: 5)
-                        Stepper("Tối đa: \(maxWeight > 0 ? "\(maxWeight) kg" : "Bất kỳ")", value: $maxWeight, in: 0...200, step: 5)
+                        Stepper("Tối thiểu: \(minWeight > 0 ? "\(minWeight) kg" : "Bất kỳ")", value: $minWeight, in: 0...400, step: 5)
+                        Stepper("Tối đa: \(maxWeight > 0 ? "\(maxWeight) kg" : "Bất kỳ")", value: $maxWeight, in: 0...400, step: 5)
                     }
                 }
 
                 if type == .height || type == .full {
                     Section("Chiều cao (cm)") {
-                        Stepper("Tối thiểu: \(minHeight > 0 ? "\(minHeight) cm" : "Bất kỳ")", value: $minHeight, in: 0...220, step: 5)
-                        Stepper("Tối đa: \(maxHeight > 0 ? "\(maxHeight) cm" : "Bất kỳ")", value: $maxHeight, in: 0...220, step: 5)
+                        Stepper("Tối thiểu: \(minHeight > 0 ? "\(minHeight) cm" : "Bất kỳ")", value: $minHeight, in: 0...250, step: 5)
+                        Stepper("Tối đa: \(maxHeight > 0 ? "\(maxHeight) cm" : "Bất kỳ")", value: $maxHeight, in: 0...250, step: 5)
                     }
                 }
 
@@ -584,19 +632,33 @@ private struct DiscoverFilterSheet: View {
                             }
                         }
 
-                        Picker("Xu hướng tính dục", selection: $selectedGender) {
+                        Picker("Xu hướng tính dục", selection: $selectedOrientation) {
                             Text("Tất cả").tag("")
                             ForEach(orientations.filter { !$0.isEmpty }, id: \.self) { o in
                                 Text(o).tag(o)
                             }
                         }
 
-                        Picker("Vai trò tự mô tả", selection: $selectedGender) {
+                        Picker("Vai trò tự mô tả", selection: $selectedRole) {
                             Text("Tất cả").tag("")
                             ForEach(communityRoles.filter { !$0.isEmpty }, id: \.self) { r in
                                 Text(r).tag(r)
                             }
                         }
+
+                        Picker("Mục đích kết nối", selection: $selectedIntent) {
+                            Text("Tất cả").tag("")
+                            ForEach(intents.filter { !$0.isEmpty }, id: \.self) { i in
+                                Text(i).tag(i)
+                            }
+                        }
+                    }
+
+                    Section("Trạng thái hoạt động") {
+                        Toggle("Đang online", isOn: $isOnlineOnly)
+                            .tint(KinnectTheme.accentBright)
+                        Toggle("Hoạt động gần đây", isOn: $isRecentOnly)
+                            .tint(KinnectTheme.accentBright)
                     }
                 }
             }

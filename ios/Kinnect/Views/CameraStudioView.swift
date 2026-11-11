@@ -1774,6 +1774,7 @@ final class CameraPreviewViewController: UIViewController {
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private let backdropLayer = CAGradientLayer()
     private let gridLayer = CAShapeLayer()
+    private var simulatedImageView: UIImageView?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -1792,6 +1793,7 @@ final class CameraPreviewViewController: UIViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         backdropLayer.frame = view.bounds
+        simulatedImageView?.frame = view.bounds
         updateGridPath()
         previewLayer?.frame = view.bounds
     }
@@ -1805,8 +1807,18 @@ final class CameraPreviewViewController: UIViewController {
         backdropLayer.locations = [0.0, 0.55, 1.0]
         view.layer.addSublayer(backdropLayer)
 
-        gridLayer.strokeColor = UIColor.white.withAlphaComponent(0.12).cgColor
-        gridLayer.lineWidth = 0.8
+        #if targetEnvironment(simulator)
+        let sim = UIImageView(image: UIReviewFixture.samplePreviewImage())
+        sim.contentMode = .scaleAspectFill
+        sim.clipsToBounds = true
+        sim.frame = view.bounds
+        view.addSubview(sim)
+        simulatedImageView = sim
+        #endif
+
+        // Grid & Crosshair overlay matching Google Camera in Android StudioActivity
+        gridLayer.strokeColor = UIColor(red: 0xFD / 255.0, green: 0xD6 / 255.0, blue: 0x63 / 255.0, alpha: 0.65).cgColor
+        gridLayer.lineWidth = 1.0
         gridLayer.fillColor = UIColor.clear.cgColor
         view.layer.addSublayer(gridLayer)
     }
@@ -1816,6 +1828,8 @@ final class CameraPreviewViewController: UIViewController {
         let h = view.bounds.height
         guard w > 0, h > 0 else { return }
         let path = UIBezierPath()
+
+        // 3x3 Grid
         path.move(to: CGPoint(x: w / 3, y: 0))
         path.addLine(to: CGPoint(x: w / 3, y: h))
         path.move(to: CGPoint(x: 2 * w / 3, y: 0))
@@ -1824,6 +1838,19 @@ final class CameraPreviewViewController: UIViewController {
         path.addLine(to: CGPoint(x: w, y: h / 3))
         path.move(to: CGPoint(x: 0, y: 2 * h / 3))
         path.addLine(to: CGPoint(x: w, y: 2 * h / 3))
+
+        // Amber balance center crosshair (+) matching Android StudioActivity lines 1795-1803
+        let cx = w / 2
+        let cy = h / 2
+        let cross: CGFloat = 12
+        path.move(to: CGPoint(x: cx - cross, y: cy))
+        path.addLine(to: CGPoint(x: cx + cross, y: cy))
+        path.move(to: CGPoint(x: cx, y: cy - cross))
+        path.addLine(to: CGPoint(x: cx, y: cy + cross))
+
+        // Center balance ring
+        path.addArc(withCenter: CGPoint(x: cx, y: cy), radius: 18, startAngle: 0, endAngle: .pi * 2, clockwise: true)
+
         gridLayer.path = path.cgPath
     }
 
@@ -1852,8 +1879,10 @@ final class CameraPreviewViewController: UIViewController {
         let layer = AVCaptureVideoPreviewLayer(session: ctrl.session)
         layer.videoGravity = .resizeAspectFill
         layer.frame = view.bounds
-        view.layer.addSublayer(layer)
+        view.layer.insertSublayer(layer, above: backdropLayer)
         previewLayer = layer
+        simulatedImageView?.removeFromSuperview()
+        simulatedImageView = nil
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleFocusTap(_:)))
         view.addGestureRecognizer(tap)
         let pan = UIPanGestureRecognizer(target: self, action: #selector(handleExposurePan(_:)))

@@ -175,19 +175,24 @@ struct ShortsVideoView: View {
             HStack(alignment: .bottom) {
                 // Bottom left: Author info & Caption
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        KinnectAvatarView(
-                            name: item.author.name,
-                            avatarURL: item.author.avatarUrl,
-                            colorHex: item.author.avatarColor,
-                            size: 40,
-                            isOnline: false
-                        )
-                        Text(item.author.name)
-                            .font(.headline.weight(.bold))
-                            .foregroundColor(.white)
-                            .shadow(radius: 2)
+                    Button {
+                        selectedAuthorProfile = item.author
+                    } label: {
+                        HStack(spacing: 8) {
+                            KinnectAvatarView(
+                                name: item.author.name,
+                                avatarURL: item.author.avatarUrl,
+                                colorHex: item.author.avatarColor,
+                                size: 36,
+                                isOnline: false
+                            )
+                            Text("@\(item.author.handle.isEmpty ? item.author.name : item.author.handle)")
+                                .font(.headline.weight(.bold))
+                                .foregroundColor(.white)
+                                .shadow(radius: 2)
+                        }
                     }
+                    .buttonStyle(.plain)
 
                     if !item.caption.isEmpty {
                         Text(item.caption)
@@ -212,7 +217,34 @@ struct ShortsVideoView: View {
                 Spacer()
 
                 // Right Action Sidebar
-                VStack(spacing: 18) {
+                VStack(spacing: 16) {
+                    // Author Avatar with Follow Badge matching Android 3321-3323
+                    Button {
+                        selectedAuthorProfile = item.author
+                    } label: {
+                        ZStack(alignment: .bottom) {
+                            KinnectAvatarView(
+                                name: item.author.name,
+                                avatarURL: item.author.avatarUrl,
+                                colorHex: item.author.avatarColor,
+                                size: 46
+                            )
+                            if item.author.id != appState.currentUser?.id {
+                                Circle()
+                                    .fill(item.author.isFollowed ? KinnectTheme.accentBright : KinnectTheme.danger)
+                                    .frame(width: 20, height: 20)
+                                    .overlay(
+                                        Image(systemName: item.author.isFollowed ? "checkmark" : "plus")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(.white)
+                                    )
+                                    .offset(y: 8)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.bottom, item.author.id != appState.currentUser?.id ? 8 : 0)
+
                     // Like button
                     Button {
                         toggleLike(at: index)
@@ -590,7 +622,7 @@ struct ShortCommentsSheet: View {
                     }
                     .accessibilityLabel("Nhắc tên thành viên")
 
-                    TextField("Bình luận về video này...", text: $text)
+                    TextField(replyingTo != nil ? "Trả lời @\(replyingTo!.author.name)..." : "Viết bình luận...", text: $text)
                         .padding(10)
                         .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated))
                         .foregroundColor(.white)

@@ -58,6 +58,7 @@ struct RootMainView: View {
     @State private var selectedTab: KinnectNavTab = .feed
     @State private var activeTopSection: KinnectTopSection? = nil
     @State private var showCameraStudioSheet = false
+    @State private var showProfileDetailSheet = false
     @State private var isShowingSplash = true
     @AppStorage("app_appearance_mode") private var appearanceMode: String = "system"
 
@@ -70,28 +71,18 @@ struct RootMainView: View {
         }
     }
 
-    // Shared leading brand logo for main tabs (Android parity)
+    // Shared leading brand logo for main tabs (Android parity: 40dp logo only)
     @ToolbarContentBuilder
     static func headerLeadingLogoStatic() -> some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
-            HStack(spacing: 8) {
-                KinnectBrandLogo(size: 30)
-                Text("Kinnect")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(KinnectTheme.textPrimary)
-            }
+            KinnectBrandLogo(size: 36)
         }
     }
 
     @ToolbarContentBuilder
     private func headerLeadingLogo() -> some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
-            HStack(spacing: 8) {
-                KinnectBrandLogo(size: 30)
-                Text("Kinnect")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(KinnectTheme.textPrimary)
-            }
+            KinnectBrandLogo(size: 36)
         }
     }
 
@@ -115,7 +106,7 @@ struct RootMainView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Ví Kinnect và Cửa hàng Kinnect")
+            .accessibilityLabel("Cửa hàng")
 
             // Friends
             Button { } label: {
@@ -198,7 +189,7 @@ struct RootMainView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Ví Kinnect và Cửa hàng Kinnect")
+            .accessibilityLabel("Cửa hàng")
 
             // Friends
             Button {
@@ -424,7 +415,7 @@ struct RootMainView: View {
                                     }
                                 } else if UIReviewFixture.activeScreen == "friends-suggestions" {
                                     NavigationStack {
-                                        FriendsView(initialTab: .suggestions)
+                                        FriendsView(initialTab: .friends)
                                             .toolbar { RootMainView.headerTrailingButtonsStatic() }
                                             .navigationTitle("Gợi ý kết bạn")
                                             .navigationBarTitleDisplayMode(.large)
@@ -561,6 +552,19 @@ struct RootMainView: View {
                                     CameraStudioView()
                                 }
                             }
+                            .sheet(isPresented: $showProfileDetailSheet) {
+                                NavigationStack {
+                                    ProfileView(
+                                        onOpenWallet: { activeTopSection = .wallet },
+                                        onOpenFriends: { activeTopSection = .friends }
+                                    )
+                                    .toolbar {
+                                        ToolbarItem(placement: .cancellationAction) {
+                                            Button("Đóng") { showProfileDetailSheet = false }
+                                        }
+                                    }
+                                }
+                            }
                         }
 
                         @ViewBuilder
@@ -695,9 +699,9 @@ struct RootMainView: View {
                                     }
                                 }
                             } else {
-                                // iPhone compact layout with fixed KinnectTopBar + native TabView (5 tabs)
+                                // iPhone compact layout with fixed KinnectTopBar + Material 3 KinnectBottomBar
                                 VStack(spacing: 0) {
-                                    if selectedTab == .feed || selectedTab == .discover || selectedTab == .create {
+                                    if selectedTab == .feed || selectedTab == .discover {
                                         KinnectTopBar(
                                             appState: appState,
                                             activeTopSection: $activeTopSection,
@@ -707,49 +711,30 @@ struct RootMainView: View {
                                         )
                                     }
 
-                                    TabView(selection: $selectedTab) {
-                                        FeedView(
-                                            onOpenCamera: { showCameraStudioSheet = true },
-                                            onOpenFriends: { activeTopSection = .friends }
-                                        )
-                                        .tag(KinnectNavTab.feed)
-                                        .tabItem {
-                                            Label("Bảng tin", systemImage: "house.fill")
+                                    ZStack {
+                                        switch selectedTab {
+                                        case .feed:
+                                            FeedView(
+                                                onOpenCamera: { showCameraStudioSheet = true },
+                                                onOpenFriends: { activeTopSection = .friends }
+                                            )
+                                        case .discover:
+                                            DiscoverView(onOpenCamera: { showCameraStudioSheet = true })
+                                        case .create:
+                                            CameraStudioView()
+                                        case .video:
+                                            ShortsVideoView()
+                                        case .live:
+                                            LiveStreamView(onOpenWallet: { activeTopSection = .wallet })
                                         }
+                                    }
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                                        DiscoverView(onOpenCamera: { showCameraStudioSheet = true })
-                                            .tag(KinnectNavTab.discover)
-                                            .tabItem {
-                                                Label("Khám phá", systemImage: "magnifyingglass")
-                                            }
-
-                                        CameraStudioView()
-                                            .tag(KinnectNavTab.create)
-                                            .tabItem {
-                                                Label("Tạo", systemImage: "plus.circle.fill")
-                                            }
-
-                                        ShortsVideoView()
-                                            .tag(KinnectNavTab.video)
-                                            .tabItem {
-                                                Label("Video", systemImage: "play.rectangle.fill")
-                                            }
-
-                                        LiveStreamView(onOpenWallet: { activeTopSection = .wallet })
-                                            .tag(KinnectNavTab.live)
-                                            .tabItem {
-                                                Label("Live", systemImage: "dot.radiowaves.left.and.right")
-                                            }
+                                    // Material 3 Bottom Navigation Bar (Android 1.2.12 lines 473-515)
+                                    KinnectBottomBar(selectedTab: $selectedTab) {
+                                        showCameraStudioSheet = true
                                     }
                                 }
-                                                                .onChange(of: selectedTab) { newTab in
-                                    // Haptic feedback on tab selection (P1)
-                                    let generator = UIImpactFeedbackGenerator(style: .light)
-                                    generator.impactOccurred()
-                                }
-                                .toolbarBackground(KinnectTheme.surface, for: .tabBar)
-                                .toolbarBackground(.visible, for: .tabBar)
-                                .toolbarColorScheme(activeColorScheme == .light ? .light : .dark, for: .tabBar)
                                 .sheet(item: $activeTopSection) { section in
                                     NavigationStack {
                                         switch section {
@@ -782,15 +767,18 @@ struct RootMainView: View {
                                                     }
                                                 }
                                         case .profile:
-                                            ProfileView(
-                                                onOpenWallet: { activeTopSection = .wallet },
-                                                onOpenFriends: { activeTopSection = .friends }
-                                            )
-                                            .toolbar {
-                                                ToolbarItem(placement: .cancellationAction) {
-                                                    Button("Đóng") { activeTopSection = nil }
+                                            AccountMenuView(
+                                                onOpenProfile: {
+                                                    activeTopSection = nil
+                                                    showProfileDetailSheet = true
+                                                },
+                                                onOpenWallet: {
+                                                    activeTopSection = .wallet
+                                                },
+                                                onOpenFriends: {
+                                                    activeTopSection = .friends
                                                 }
-                                            }
+                                            )
                                         }
                                     }
                                 }

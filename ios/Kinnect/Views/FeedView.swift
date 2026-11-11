@@ -323,7 +323,7 @@ struct FeedView: View {
                         showComposerSheet = true
                     } label: {
                         HStack {
-                            Text("Đăng bài...")
+                            Text("Bạn đang nghĩ gì?")
                                 .font(.subheadline)
                                 .foregroundColor(KinnectTheme.textSecondary)
                                 .lineLimit(nil)
@@ -459,9 +459,8 @@ private struct PostCardView: View {
     private let reactionOptions: [(key: String, emoji: String, title: String)] = [
         ("like", "👍", "Thích"),
         ("love", "❤️", "Yêu thích"),
-        ("care", "🥰", "Thương thương"),
         ("haha", "😆", "Haha"),
-        ("wow", "😮", "Ngạc nhiên"),
+        ("wow", "😮", "Wow"),
         ("sad", "😢", "Buồn"),
         ("angry", "😡", "Phẫn nộ")
     ]
@@ -719,9 +718,8 @@ private struct PostCardView: View {
     private func reactionTitle(for key: String) -> String {
         switch key.lowercased() {
         case "love": return "Yêu thích"
-        case "care": return "Thương thương"
         case "haha": return "Haha"
-        case "wow": return "Ngạc nhiên"
+        case "wow": return "Wow"
         case "sad": return "Buồn"
         case "angry": return "Phẫn nộ"
         default: return "Thích"
@@ -748,6 +746,8 @@ struct PostComposerSheet: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var text = ""
+    @State private var visibility = "public" // "public" | "followers"
+    @State private var showAudienceMenu = false
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var imageDataURL: String = ""
     @State private var previewImage: UIImage?
@@ -757,68 +757,120 @@ struct PostComposerSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    TextField("Chia sẻ câu chuyện hoặc khoảnh khắc của bạn...", text: $text, axis: .vertical)
-                        .lineLimit(4...10)
+                    // Author & Audience Header
+                    HStack(spacing: 12) {
+                        KinnectAvatarView(
+                            name: appState.currentUser?.name ?? "K",
+                            avatarURL: appState.currentUser?.avatarUrl ?? "",
+                            colorHex: appState.currentUser?.avatarColor ?? "#7C3AED",
+                            size: 44
+                        )
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(appState.currentUser?.name ?? "Bạn")
+                                .font(.subheadline.bold())
+                                .foregroundColor(KinnectTheme.textPrimary)
+
+                            // Audience selector matching Android visText
+                            Menu {
+                                Button {
+                                    visibility = "public"
+                                } label: {
+                                    Label("Mọi thành viên", systemImage: "globe")
+                                }
+                                Button {
+                                    visibility = "followers"
+                                } label: {
+                                    Label("Người theo dõi", systemImage: "person.2")
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: visibility == "public" ? "globe" : "person.2")
+                                        .font(.caption2)
+                                    Text(visibility == "public" ? "Mọi thành viên" : "Người theo dõi")
+                                        .font(.caption2.bold())
+                                    Image(systemName: "chevron.down")
+                                        .font(.system(size: 9))
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                                .foregroundColor(KinnectTheme.textSecondary)
+                            }
+                        }
+                        Spacer()
+                    }
+
+                    TextField("Bạn đang nghĩ gì?", text: $text, axis: .vertical)
+                        .lineLimit(4...12)
                         .padding(12)
                         .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated))
                         .foregroundColor(KinnectTheme.textPrimary)
 
                     if let previewImage {
-                        Image(uiImage: previewImage)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxHeight: 240)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                    }
+                        ZStack(alignment: .topTrailing) {
+                            Image(uiImage: previewImage)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxHeight: 240)
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
 
-                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                        Label("Chọn ảnh từ thư viện", systemImage: "photo.on.rectangle.angled")
-                            .font(.subheadline.weight(.semibold))
-                            .padding(12)
-                            .frame(maxWidth: .infinity)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                            .foregroundColor(KinnectTheme.accentBright)
-                    }
-                    .onChange(of: selectedPhotoItem) { newItem in
-                        guard let newItem else { return }
-                        Task {
-                            if let data = try? await newItem.loadTransferable(type: Data.self),
-                               let uiImg = UIImage(data: data),
-                               let compressed = uiImg.jpegData(compressionQuality: 0.72) {
-                                self.previewImage = uiImg
-                                self.imageDataURL = "data:image/jpeg;base64,\(compressed.base64EncodedString())"
+                            Button {
+                                self.previewImage = nil
+                                self.imageDataURL = ""
+                                self.selectedPhotoItem = nil
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.title2)
+                                    .foregroundColor(.white)
+                                    .padding(8)
                             }
                         }
                     }
 
-                    Button {
-                        Task { await submitPost() }
-                    } label: {
-                        HStack {
-                            Spacer()
-                            if isSubmitting {
-                                ProgressView().tint(.white)
-                            } else {
-                                Text("Đăng bài viết")
-                                    .font(.headline)
+                    // Media Tool row matching Android composeTool: Thêm ảnh, Thêm video
+                    HStack(spacing: 12) {
+                        PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "photo.on.rectangle.angled")
+                                    .foregroundColor(Color(red: 0.13, green: 0.65, blue: 0.4))
+                                Text("Thêm ảnh")
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundColor(KinnectTheme.textPrimary)
                             }
-                            Spacer()
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
                         }
-                        .padding(.vertical, 14)
-                        .background(KinnectTheme.primaryGradient)
-                        .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .onChange(of: selectedPhotoItem) { newItem in
+                            guard let newItem else { return }
+                            Task {
+                                if let data = try? await newItem.loadTransferable(type: Data.self),
+                                   let uiImg = UIImage(data: data),
+                                   let compressed = uiImg.jpegData(compressionQuality: 0.72) {
+                                    self.previewImage = uiImg
+                                    self.imageDataURL = "data:image/jpeg;base64,\(compressed.base64EncodedString())"
+                                }
+                            }
+                        }
+
+                        Spacer()
                     }
-                    .disabled(isSubmitting || (text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && imageDataURL.isEmpty))
                 }
                 .padding(16)
             }
             .background(KinnectTheme.background)
-            .navigationTitle("Tạo bài viết")
+            .navigationTitle("Bài viết mới")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Hủy") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Đăng") {
+                        Task { await submitPost() }
+                    }
+                    .font(.subheadline.bold())
+                    .disabled(isSubmitting || (text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && imageDataURL.isEmpty))
                 }
             }
         }
@@ -834,6 +886,7 @@ struct PostComposerSheet: View {
                 method: "POST",
                 body: KinnectWriteBody.post(
                     text: text.trimmingCharacters(in: .whitespacesAndNewlines),
+                    visibility: visibility,
                     mediaDataURL: imageDataURL
                 ),
                 requestId: reqId
@@ -881,7 +934,7 @@ struct StoryComposerSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    // Two prominent creation tiles (Android parity: "Quay tin" & "Ảnh kèm nhạc")
+                    // Two prominent creation tiles (100% Android parity MainActivity lines 6140-6152: "Quay tin" & "Ảnh kèm nhạc")
                     HStack(spacing: 12) {
                         PhotosPicker(selection: $selectedMediaItem, matching: .videos) {
                             VStack(spacing: 8) {
@@ -893,17 +946,17 @@ struct StoryComposerSheet: View {
                                         .font(.system(size: 20))
                                         .foregroundColor(.white)
                                 }
-                                Text("Quay tin / Video")
+                                Text("Quay tin")
                                     .font(.subheadline.bold())
                                     .foregroundColor(.white)
-                                Text("Video 24h • Nhạc")
+                                Text("Camera · Nhạc · Hiệu ứng")
                                     .font(.caption2)
                                     .foregroundColor(.white.opacity(0.85))
                             }
                             .frame(maxWidth: .infinity, minHeight: 110)
                             .background(
                                 LinearGradient(
-                                    colors: [Color(red: 0.51, green: 0.33, blue: 0.94), Color(red: 0.85, green: 0.30, blue: 0.68)],
+                                    colors: [Color(red: 0x83 / 255.0, green: 0x54 / 255.0, blue: 0xEF / 255.0), Color(red: 0xD9 / 255.0, green: 0x4C / 255.0, blue: 0xAE / 255.0)],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 )
@@ -911,22 +964,20 @@ struct StoryComposerSheet: View {
                             .clipShape(RoundedRectangle(cornerRadius: 18))
                         }
 
-                        Button {
-                            showMusicSheet = true
-                        } label: {
+                        PhotosPicker(selection: $selectedMediaItem, matching: .images) {
                             VStack(spacing: 8) {
                                 ZStack {
                                     Circle()
                                         .fill(Color.white.opacity(0.2))
                                         .frame(width: 44, height: 44)
-                                    Image(systemName: "music.note")
+                                    Image(systemName: "photo.fill")
                                         .font(.system(size: 20))
                                         .foregroundColor(.white)
                                 }
-                                Text("Chọn nhạc nền")
+                                Text("Ảnh kèm nhạc")
                                     .font(.subheadline.bold())
                                     .foregroundColor(.white)
-                                Text(selectedMusic?.title ?? "Thêm bài hát")
+                                Text("Chọn ảnh · thêm bài hát")
                                     .font(.caption2)
                                     .foregroundColor(.white.opacity(0.85))
                                     .lineLimit(1)
@@ -934,7 +985,7 @@ struct StoryComposerSheet: View {
                             .frame(maxWidth: .infinity, minHeight: 110)
                             .background(
                                 LinearGradient(
-                                    colors: [Color(red: 0.22, green: 0.48, blue: 0.91), Color(red: 0.45, green: 0.31, blue: 0.90)],
+                                    colors: [Color(red: 0x39 / 255.0, green: 0x7B / 255.0, blue: 0xE9 / 255.0), Color(red: 0x72 / 255.0, green: 0x4E / 255.0, blue: 0xE5 / 255.0)],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 )
@@ -942,6 +993,12 @@ struct StoryComposerSheet: View {
                             .clipShape(RoundedRectangle(cornerRadius: 18))
                         }
                     }
+
+                    // 24-hour visibility note (Android line 6154 parity)
+                    Text("Tin hiển thị 24 giờ cho những người theo dõi bạn.")
+                        .font(.caption)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                        .multilineTextAlignment(.center)
 
                     // Main Story Canvas Preview
                     ZStack {
@@ -1078,7 +1135,7 @@ struct StoryComposerSheet: View {
                 .padding(16)
             }
             .background(KinnectTheme.background)
-            .navigationTitle("Tạo Tin 24h")
+            .navigationTitle("Tạo tin")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -1378,7 +1435,7 @@ struct PostCommentsSheet: View {
                     }
                     .accessibilityLabel("Nhắc tên thành viên")
 
-                    TextField("Viết bình luận...", text: $newComment)
+                    TextField(replyingTo != nil ? "Trả lời @\(replyingTo!.author.name)..." : "Viết bình luận...", text: $newComment)
                         .padding(10)
                         .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
                         .foregroundColor(.white)
