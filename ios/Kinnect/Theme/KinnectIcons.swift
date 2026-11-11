@@ -47,6 +47,11 @@ enum KinnectGlyph: String, CaseIterable {
     // Semantic aliases used in Auth / Profile views
     static var lock: KinnectGlyph { .shield }
     static var eyeOff: KinnectGlyph { .eye }
+    static var games: KinnectGlyph { .game }
+    static var settings: KinnectGlyph { .more }
+    static var moon: KinnectGlyph { .studio }
+    static var help: KinnectGlyph { .report }
+    static var info: KinnectGlyph { .profile }
 
     var label: String {
         switch self {

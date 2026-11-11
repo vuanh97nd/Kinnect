@@ -46,7 +46,9 @@ struct AccountMenuView: View {
             .confirmationDialog("Đăng xuất khỏi Kinnect?", isPresented: $showLogoutConfirm, titleVisibility: .visible) {
                 Button("Đăng xuất", role: .destructive) {
                     dismiss()
-                    appState.logout()
+                    Task {
+                        await appState.logout()
+                    }
                 }
                 Button("Hủy", role: .cancel) { }
             } message: {

@@ -454,85 +454,9 @@ struct CreateLiveRoomSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Chế độ phát trực tiếp") {
-                    Picker("Chế độ", selection: $liveMode) {
-                        Text("💬 Trò chuyện trực tiếp").tag("chat")
-                        Text("🎮 Chơi game").tag("game")
-                    }
-                    .pickerStyle(.segmented)
-                }
-
-                Section("Thông tin phòng Live") {
-                    TextField("Tiêu đề buổi Live", text: $title)
-                    TextField("Chủ đề", text: $topic)
-                    if liveMode == "game" {
-                        Picker("Tựa game", selection: $gameTitle) {
-                            Text("Liên Quân Mobile").tag("Liên Quân Mobile")
-                            Text("Free Fire").tag("Free Fire")
-                            Text("PUBG Mobile").tag("PUBG Mobile")
-                            Text("Tốc Chiến").tag("Tốc Chiến")
-                            Text("Play Together").tag("Play Together")
-                            Text("Khác").tag("Khác")
-                        }
-                        Text("Lưu ý: Phát trực tiếp game sử dụng luồng âm thanh và camera native. Để truyền toàn màn hình ứng dụng bên ngoài trên iOS cần ReplayKit Broadcast Extension theo cơ chế bảo mật của Apple.")
-                            .font(.caption2)
-                            .foregroundColor(KinnectTheme.textSecondary)
-                    }
-                }
-
-                Section("Thiết bị & Hiệu ứng") {
-                    HStack(spacing: 12) {
-                        Button {
-                            NativeWebRTCManager.shared.flipCamera()
-                        } label: {
-                            VStack(spacing: 4) {
-                                Image(systemName: "camera.rotate.fill")
-                                    .font(.title3)
-                                Text("Lật camera")
-                                    .font(.caption2)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .background(KinnectTheme.surfaceElevated)
-                            .cornerRadius(10)
-                        }
-                        .buttonStyle(.plain)
-
-                        Button {
-                            showPreviewEffects = true
-                        } label: {
-                            VStack(spacing: 4) {
-                                Image(systemName: "wand.and.stars")
-                                    .font(.title3)
-                                    .foregroundColor(KinnectTheme.accentBright)
-                                Text("Làm đẹp")
-                                    .font(.caption2)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .background(KinnectTheme.surfaceElevated)
-                            .cornerRadius(10)
-                        }
-                        .buttonStyle(.plain)
-
-                        Button {
-                            previewMicEnabled.toggle()
-                        } label: {
-                            VStack(spacing: 4) {
-                                Image(systemName: previewMicEnabled ? "mic.fill" : "mic.slash.fill")
-                                    .font(.title3)
-                                    .foregroundColor(previewMicEnabled ? KinnectTheme.success : KinnectTheme.danger)
-                                Text("Micro")
-                                    .font(.caption2)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .background(KinnectTheme.surfaceElevated)
-                            .cornerRadius(10)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
+                liveModeSection
+                roomInfoSection
+                deviceSection
             }
             .scrollContentBackground(.hidden)
             .background(KinnectTheme.background)
@@ -562,6 +486,92 @@ struct CreateLiveRoomSheet: View {
                     blemish: $previewBlemish,
                     blush: $previewBlush
                 )
+            }
+        }
+    }
+
+    private var liveModeSection: some View {
+        Section("Chế độ phát trực tiếp") {
+            Picker("Chế độ", selection: $liveMode) {
+                Text("💬 Trò chuyện trực tiếp").tag("chat")
+                Text("🎮 Chơi game").tag("game")
+            }
+            .pickerStyle(.segmented)
+        }
+    }
+
+    private var roomInfoSection: some View {
+        Section("Thông tin phòng Live") {
+            TextField("Tiêu đề buổi Live", text: $title)
+            TextField("Chủ đề", text: $topic)
+            if liveMode == "game" {
+                Picker("Tựa game", selection: $gameTitle) {
+                    Text("Liên Quân Mobile").tag("Liên Quân Mobile")
+                    Text("Free Fire").tag("Free Fire")
+                    Text("PUBG Mobile").tag("PUBG Mobile")
+                    Text("Tốc Chiến").tag("Tốc Chiến")
+                    Text("Play Together").tag("Play Together")
+                    Text("Khác").tag("Khác")
+                }
+                Text("Lưu ý: Phát trực tiếp game sử dụng luồng âm thanh và camera native. Để truyền toàn màn hình ứng dụng bên ngoài trên iOS cần ReplayKit Broadcast Extension theo cơ chế bảo mật của Apple.")
+                    .font(.caption2)
+                    .foregroundColor(KinnectTheme.textSecondary)
+            }
+        }
+    }
+
+    private var deviceSection: some View {
+        Section("Thiết bị & Hiệu ứng") {
+            HStack(spacing: 12) {
+                Button {
+                    NativeWebRTCManager.shared.flipCamera()
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: "camera.rotate.fill")
+                            .font(.title3)
+                        Text("Lật camera")
+                            .font(.caption2)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(KinnectTheme.surfaceElevated)
+                    .cornerRadius(10)
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    showPreviewEffects = true
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: "wand.and.stars")
+                            .font(.title3)
+                            .foregroundColor(KinnectTheme.accentBright)
+                        Text("Làm đẹp")
+                            .font(.caption2)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(KinnectTheme.surfaceElevated)
+                    .cornerRadius(10)
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    previewMicEnabled.toggle()
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: previewMicEnabled ? "mic.fill" : "mic.slash.fill")
+                            .font(.title3)
+                            .foregroundColor(previewMicEnabled ? KinnectTheme.success : KinnectTheme.danger)
+                        Text("Micro")
+                            .font(.caption2)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(KinnectTheme.surfaceElevated)
+                    .cornerRadius(10)
+                }
+                .buttonStyle(.plain)
             }
         }
     }

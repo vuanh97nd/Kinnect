@@ -375,6 +375,12 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
     func setMuted(_ muted: Bool) {
         isMicMuted = muted
         localAudioTrack?.isEnabled = !muted
+        liveAudioTrack?.isEnabled = !muted
+    }
+
+    @MainActor
+    func setMicrophoneMuted(_ muted: Bool) {
+        setMuted(muted)
     }
 
     @MainActor
