@@ -83,6 +83,21 @@ public final class KinnectService extends Service implements NativeSocket.Events
 
  private static android.graphics.Bitmap circle(android.graphics.Bitmap src){int s=Math.min(src.getWidth(),src.getHeight());android.graphics.Bitmap out=android.graphics.Bitmap.createBitmap(s,s,android.graphics.Bitmap.Config.ARGB_8888);android.graphics.Canvas c=new android.graphics.Canvas(out);android.graphics.Paint p=new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);c.drawCircle(s/2f,s/2f,s/2f,p);p.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN));c.drawBitmap(src,(s-src.getWidth())/2f,(s-src.getHeight())/2f,p);return out;}
  private static String text(String kind){switch(kind){case "message":return I18n.t("đã gửi cho bạn một tin nhắn");case "group_message":return I18n.t("đã nhắn trong nhóm");case "missed_call":return I18n.t("Cuộc gọi nhỡ");case "like":return I18n.t("đã thích bài viết của bạn");case "comment":return I18n.t("đã bình luận bài viết của bạn");case "comment_reply":return I18n.t("đã trả lời bình luận của bạn");case "short_like":return I18n.t("đã thích video của bạn");case "short_comment":return I18n.t("đã bình luận video của bạn");case "friend_request":return I18n.t("đã gửi lời mời kết bạn");case "friend_accept":case "friend_accepted":return I18n.t("đã chấp nhận lời mời kết bạn");case "follow":return I18n.t("đã bắt đầu theo dõi bạn");case "gift":return I18n.t("đã gửi quà cho bạn");case "private_request":return I18n.t("muốn xem ảnh riêng tư của bạn");case "private_granted":return I18n.t("đã cho bạn xem ảnh riêng tư");case "private_revoked":return I18n.t("đã thu hồi quyền xem ảnh riêng tư");default:return I18n.t("có thông báo mới");}}
+  @Override public void onTaskRemoved(Intent rootIntent){
+    try {
+      Intent restart = new Intent(this, CallActionReceiver.class).setAction("restart-service");
+      PendingIntent pi = PendingIntent.getBroadcast(this, 99, restart, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+      AlarmManager am = (AlarmManager) getSystemService(ALARM_SERVICE);
+      if (am != null) {
+        if (Build.VERSION.SDK_INT >= 23) {
+          am.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, SystemClock.elapsedRealtime() + 1000, pi);
+        } else {
+          am.setExact(AlarmManager.ELAPSED_REALTIME_WAKEUP, SystemClock.elapsedRealtime() + 1000, pi);
+        }
+      }
+    } catch (Exception ignored) {}
+    super.onTaskRemoved(rootIntent);
+  }
  @Override public void onDestroy(){if(instance==this)instance=null;if(networkCallback!=null)try{getSystemService(android.net.ConnectivityManager.class).unregisterNetworkCallback(networkCallback);}catch(RuntimeException ignored){}main.removeCallbacksAndMessages(null);if(socket!=null){NativeSocket s=socket;socket=null;s.close();}super.onDestroy();}
  @Override public IBinder onBind(Intent i){return null;}
 }

@@ -9,5 +9,12 @@ public final class KinnectApplication extends android.app.Application {
     config.fontScale = config.fontScale * WebDesign.UI_SCALE;
     super.attachBaseContext(base.createConfigurationContext(config));
   }
-  @Override public void onCreate(){super.onCreate();I18n.initialize(this);}
+  @Override public void onCreate(){
+    super.onCreate();
+    I18n.initialize(this);
+    NativeApi.shared.initialize(this, ServerConfig.DEFAULT_ORIGIN);
+    if (!NativeApi.shared.cookieFor(ServerConfig.DEFAULT_ORIGIN).isEmpty()) {
+      KinnectService.start(this);
+    }
+  }
 }

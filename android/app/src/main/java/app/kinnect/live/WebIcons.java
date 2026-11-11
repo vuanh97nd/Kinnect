@@ -26,6 +26,8 @@ final class WebIcons {
       case "post_heart":web="heart";break;
       case "location_off":web="map_pin_off";break;
       case "circle_help":web="circle_help";break;
+      case "store":web="shopping_bag";break;
+      case "shopping_bag":web="shopping_bag";break;
 
       case "call": web = "phone"; break;
       case "attach": web = "paperclip"; break;
