@@ -184,7 +184,7 @@ struct KinnectAvatarView: View {
         self.avatarURL = user.avatarUrl
         self.colorHex = user.avatarColor
         self.size = size
-        self.isOnline = user.isActive
+        self.isOnline = user.isActive && user.showActivity
         _loadedImage = State(initialValue: ImageMemoryCache.shared.image(forKey: user.avatarUrl))
     }
 

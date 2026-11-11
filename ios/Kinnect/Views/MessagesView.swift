@@ -29,6 +29,8 @@ struct MessagesView: View {
     @State private var conversations: [[String: Any]] = []
     @State private var groups: [ChatGroupItem] = []
     @State private var showCreateGroupSheet = false
+    @State private var showNewDirectChatSheet = false
+    @State private var activeChatPeer: KinnectUser? = nil
     @State private var isLoading = false
     @State private var searchQuery: String = ""
 
@@ -57,24 +59,12 @@ struct MessagesView: View {
             .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
             .padding(.horizontal, 14)
 
-            HStack(spacing: 10) {
-                Picker("Loại tin nhắn", selection: $scope) {
-                    ForEach(ChatScope.allCases, id: \.self) { s in
-                        Text(s.rawValue).tag(s)
-                    }
-                }
-                .pickerStyle(.segmented)
-
-                if scope == .groups {
-                    KinnectIconButton(
-                        glyph: .add,
-                        label: "Tạo nhóm mới",
-                        tint: KinnectTheme.accentBright
-                    ) {
-                        showCreateGroupSheet = true
-                    }
+            Picker("Loại tin nhắn", selection: $scope) {
+                ForEach(ChatScope.allCases, id: \.self) { s in
+                    Text(s.rawValue).tag(s)
                 }
             }
+            .pickerStyle(.segmented)
             .padding(.horizontal, 14)
 
             // Android 1.2.12 MainActivity:2053 Parity Filter: [Tất cả | Chưa đọc]
@@ -180,6 +170,22 @@ struct MessagesView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .kinnectMessagesChanged)) { _ in
             Task { await loadChats() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("kinnect_open_new_chat"))) { _ in
+            showNewDirectChatSheet = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("kinnect_open_create_group"))) { _ in
+            showCreateGroupSheet = true
+        }
+        .sheet(isPresented: $showNewDirectChatSheet) {
+            NewDirectChatPickerSheet { peer in
+                activeChatPeer = peer
+            }
+        }
+        .sheet(item: $activeChatPeer) { peer in
+            NavigationStack {
+                DirectChatDetailView(peer: peer)
+            }
         }
         .sheet(isPresented: $showCreateGroupSheet) {
             CreateGroupSheet {
@@ -1761,6 +1767,108 @@ struct GroupChatDetailView: View {
     }
 }
 
+struct NewDirectChatPickerSheet: View {
+    let onSelectPeer: (KinnectUser) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
+    @State private var friends: [KinnectUser] = []
+    @State private var searchQuery = ""
+    @State private var isLoading = false
+
+    private var filteredFriends: [KinnectUser] {
+        if searchQuery.isEmpty { return friends }
+        let q = searchQuery.lowercased()
+        return friends.filter { $0.name.lowercased().contains(q) || $0.handle.lowercased().contains(q) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 10) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(KinnectTheme.textSecondary)
+                    TextField("Tìm bạn bè để nhắn tin…", text: $searchQuery)
+                        .font(.subheadline)
+                        .foregroundColor(KinnectTheme.textPrimary)
+                    if !searchQuery.isEmpty {
+                        Button { searchQuery = "" } label: {
+                            Image(systemName: "xmark.circle.fill").foregroundColor(KinnectTheme.textSecondary)
+                        }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
+                .padding(.horizontal, 14)
+
+                if isLoading {
+                    ProgressView().padding(.vertical, 30)
+                    Spacer()
+                } else if filteredFriends.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "person.crop.circle.badge.questionmark")
+                            .font(.system(size: 36))
+                            .foregroundColor(KinnectTheme.textSecondary)
+                        Text(searchQuery.isEmpty ? "Chưa có bạn bè nào để nhắn tin" : "Không tìm thấy bạn bè phù hợp")
+                            .font(.subheadline)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                    .padding(.vertical, 40)
+                    Spacer()
+                } else {
+                    List {
+                        ForEach(filteredFriends) { friend in
+                            Button {
+                                dismiss()
+                                onSelectPeer(friend)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    KinnectAvatarView(
+                                        name: friend.name,
+                                        avatarURL: friend.avatarUrl,
+                                        colorHex: friend.avatarColor,
+                                        size: 44,
+                                        isOnline: (friend.isActive && friend.showActivity) || appState.onlineUserIds.contains(friend.id)
+                                    )
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(friend.name)
+                                            .font(.subheadline.bold())
+                                            .foregroundColor(KinnectTheme.textPrimary)
+                                        Text("@\(friend.handle.isEmpty ? friend.name : friend.handle)")
+                                            .font(.caption)
+                                            .foregroundColor(KinnectTheme.textSecondary)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "bubble.right.fill")
+                                        .foregroundColor(KinnectTheme.accentBright)
+                                        .font(.subheadline)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
+                    }
+                    .listStyle(.plain)
+                }
+            }
+            .navigationTitle("Tin nhắn mới")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Đóng") { dismiss() }
+                }
+            }
+            .task {
+                isLoading = true
+                defer { isLoading = false }
+                if let res = try? await KinnectAPIClient.shared.requestJSON("/api/friends") {
+                    let list = (res["users"] as? [[String: Any]]) ?? (res["friends"] as? [[String: Any]]) ?? []
+                    self.friends = list.map(KinnectUser.from)
+                }
+            }
+        }
+    }
+}
+
 struct CreateGroupSheet: View {
     let onCreated: () -> Void
     @Environment(\.dismiss) private var dismiss
@@ -1817,7 +1925,8 @@ struct CreateGroupSheet: View {
             }
             .task {
                 if let res = try? await KinnectAPIClient.shared.requestJSON("/api/friends") {
-                    self.friends = (res["friends"] as? [[String: Any]] ?? []).map(KinnectUser.from)
+                    let list = (res["users"] as? [[String: Any]]) ?? (res["friends"] as? [[String: Any]]) ?? []
+                    self.friends = list.map(KinnectUser.from)
                 }
             }
         }
@@ -1834,7 +1943,9 @@ struct CreateGroupSheet: View {
                 body: [
                     "name": name.trimmingCharacters(in: .whitespacesAndNewlines),
                     "description": description.trimmingCharacters(in: .whitespacesAndNewlines),
+                    "members": Array(selectedIds),
                     "memberIds": Array(selectedIds)
+                ],
                 ],
                 requestId: reqId
             )

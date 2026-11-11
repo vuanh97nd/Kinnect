@@ -145,7 +145,7 @@ struct DiscoverView: View {
                             ForEach(visiblePeople) { person in
                                 DiscoverSquareUserTile(
                                     person: person,
-                                    isOnline: appState.onlineUserIds.contains(person.id),
+                                    isOnline: (person.isActive && person.showActivity) || appState.onlineUserIds.contains(person.id),
                                     onTap: { selectedUserForDetail = person }
                                 )
                             }
@@ -485,14 +485,24 @@ private struct DiscoverSquareUserTile: View {
                     // Overlay Meta: Distance & Name
                     VStack(alignment: .leading, spacing: 1) {
                         if let dist = person.distanceKm {
-                            Text(String(format: "%.1f km", dist))
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(Color.white.opacity(0.9))
+                            HStack(spacing: 3) {
+                                Image(systemName: "location.fill")
+                                    .font(.system(size: 8))
+                                    .foregroundColor(.white.opacity(0.85))
+                                Text(String(format: "%.1f km", dist))
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(Color.white.opacity(0.95))
+                            }
                         } else if !person.locationName.isEmpty {
-                            Text(person.locationName)
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(Color.white.opacity(0.9))
-                                .lineLimit(1)
+                            HStack(spacing: 3) {
+                                Image(systemName: "mappin.circle.fill")
+                                    .font(.system(size: 8))
+                                    .foregroundColor(.white.opacity(0.85))
+                                Text(person.locationName)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundColor(Color.white.opacity(0.9))
+                                    .lineLimit(1)
+                            }
                         }
                         Text(person.name)
                             .font(.system(size: 12, weight: .bold))

@@ -40,9 +40,25 @@ struct FriendsView: View {
                     case .friends:
                         if friends.isEmpty && !isLoading {
                             emptyPlaceholder("Chưa có bạn bè nào trong danh sách")
-                        }
-                        ForEach(friends) { user in
-                            friendRow(user: user)
+                        } else {
+                            let onlineFriends = friends.filter { $0.isActive && $0.showActivity }
+                            let offlineFriends = friends.filter { !($0.isActive && $0.showActivity) }
+
+                            if !onlineFriends.isEmpty {
+                                sectionHeader("Đang trực tuyến (\(onlineFriends.count))")
+                                ForEach(onlineFriends) { user in
+                                    friendRow(user: user)
+                                }
+                            }
+
+                            if !offlineFriends.isEmpty {
+                                if !onlineFriends.isEmpty {
+                                    sectionHeader("Ngoại tuyến (\(offlineFriends.count))")
+                                }
+                                ForEach(offlineFriends) { user in
+                                    friendRow(user: user)
+                                }
+                            }
                         }
 
                         if !suggestions.isEmpty {
@@ -125,7 +141,7 @@ struct FriendsView: View {
                         avatarURL: user.avatarUrl,
                         colorHex: user.avatarColor,
                         size: 46,
-                        isOnline: appState.onlineUserIds.contains(user.id)
+                        isOnline: (user.isActive && user.showActivity) || appState.onlineUserIds.contains(user.id)
                     )
                     VStack(alignment: .leading, spacing: 2) {
                         Text(user.name)
@@ -133,13 +149,12 @@ struct FriendsView: View {
                             .foregroundColor(KinnectTheme.textPrimary)
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
-                        if !user.handle.isEmpty {
-                            Text("@\(user.handle)")
-                                .font(.caption)
-                                .foregroundColor(KinnectTheme.textSecondary)
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                        }
+                        let active = (user.isActive && user.showActivity) || appState.onlineUserIds.contains(user.id)
+                        Text("@\(user.handle.isEmpty ? user.name : user.handle) • \(active ? "Đang hoạt động" : "Ngoại tuyến")")
+                            .font(.caption2)
+                            .foregroundColor(active ? Color(hex: "#2E9E66") : KinnectTheme.textSecondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                     }
                 }
             }
@@ -316,7 +331,7 @@ struct FriendsView: View {
     private func loadAll() async {
         if friends.isEmpty,
            let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/friends"),
-           let list = cached["friends"] as? [[String: Any]] {
+           let list = (cached["users"] as? [[String: Any]]) ?? (cached["friends"] as? [[String: Any]]) {
             self.friends = list.map(KinnectUser.from)
         }
         isLoading = true
@@ -327,7 +342,8 @@ struct FriendsView: View {
         async let sTask = KinnectAPIClient.shared.requestJSON("/api/friend-suggestions")
 
         if let fRes = try? await fTask {
-            self.friends = (fRes["friends"] as? [[String: Any]] ?? []).map(KinnectUser.from)
+            let list = (fRes["users"] as? [[String: Any]]) ?? (fRes["friends"] as? [[String: Any]]) ?? []
+            self.friends = list.map(KinnectUser.from)
         }
         if let rRes = try? await rTask {
             let inc = rRes["incoming"] as? [[String: Any]] ?? []
@@ -346,7 +362,8 @@ struct FriendsView: View {
             }
         }
         if let sRes = try? await sTask {
-            self.suggestions = (sRes["suggestions"] as? [[String: Any]] ?? []).map(KinnectUser.from)
+            let list = (sRes["users"] as? [[String: Any]]) ?? (sRes["suggestions"] as? [[String: Any]]) ?? []
+            self.suggestions = list.map(KinnectUser.from)
         }
     }
 

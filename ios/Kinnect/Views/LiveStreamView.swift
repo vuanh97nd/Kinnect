@@ -454,7 +454,6 @@ struct CreateLiveRoomSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                liveModeSection
                 roomInfoSection
                 deviceSection
             }
@@ -504,19 +503,6 @@ struct CreateLiveRoomSheet: View {
         Section("Thông tin phòng Live") {
             TextField("Tiêu đề buổi Live", text: $title)
             TextField("Chủ đề", text: $topic)
-            if liveMode == "game" {
-                Picker("Tựa game", selection: $gameTitle) {
-                    Text("Liên Quân Mobile").tag("Liên Quân Mobile")
-                    Text("Free Fire").tag("Free Fire")
-                    Text("PUBG Mobile").tag("PUBG Mobile")
-                    Text("Tốc Chiến").tag("Tốc Chiến")
-                    Text("Play Together").tag("Play Together")
-                    Text("Khác").tag("Khác")
-                }
-                Text("Lưu ý: Phát trực tiếp game sử dụng luồng âm thanh và camera native. Để truyền toàn màn hình ứng dụng bên ngoài trên iOS cần ReplayKit Broadcast Extension theo cơ chế bảo mật của Apple.")
-                    .font(.caption2)
-                    .foregroundColor(KinnectTheme.textSecondary)
-            }
         }
     }
 

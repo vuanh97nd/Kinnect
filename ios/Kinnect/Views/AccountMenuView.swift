@@ -122,11 +122,6 @@ struct AccountMenuView: View {
 
     private var mainMenuGroup: some View {
         VStack(spacing: 0) {
-            menuRow(glyph: .games, title: "Trò chơi", color: .purple) {
-                appState.showToast("Trò chơi: Nông trại, Đố vui, Chơi nhanh 1-1")
-            }
-            Divider().background(KinnectTheme.borderSoft)
-
             menuRow(glyph: .store, title: "Cửa hàng Kinnect", color: KinnectTheme.accentBright) {
                 dismiss()
                 onOpenStore?()

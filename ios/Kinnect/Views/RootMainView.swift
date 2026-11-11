@@ -959,15 +959,23 @@ struct RootMainView: View {
             }
 
         case .messages:
-            Button {
-                NotificationCenter.default.post(name: NSNotification.Name("kinnect_open_create_group"), object: nil)
+            Menu {
+                Button {
+                    NotificationCenter.default.post(name: NSNotification.Name("kinnect_open_new_chat"), object: nil)
+                } label: {
+                    Label("Tin nhắn mới", systemImage: "square.and.pencil")
+                }
+                Button {
+                    NotificationCenter.default.post(name: NSNotification.Name("kinnect_open_create_group"), object: nil)
+                } label: {
+                    Label("Tạo nhóm mới", systemImage: "person.3")
+                }
             } label: {
                 KinnectIcon(glyph: .add, size: 20, tint: KinnectTheme.accentBright)
                     .frame(width: 38, height: 38)
                     .background(Circle().fill(KinnectTheme.surfaceElevated))
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Tạo nhóm mới")
+            .accessibilityLabel("Tùy chọn tin nhắn mới")
 
         case .friends:
             Button {
