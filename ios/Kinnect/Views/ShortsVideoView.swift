@@ -7,7 +7,7 @@ struct ShortsVideoView: View {
     @ObservedObject private var appState = AppState.shared
     @State private var shortsTab: String = "for" // "for" (Đề xuất) | "following" (Đang theo dõi)
     @State private var items: [ShortItem] = []
-    @State private var currentIndex: Int = 0
+    @State private var currentIndex: Int? = 0
     @State private var isLoading = false
     @State private var activeCommentShort: ShortItem?
     @State private var activeOptionsShort: ShortItem?
@@ -46,16 +46,20 @@ struct ShortsVideoView: View {
                             .scrollTargetLayout()
                         }
                         .scrollTargetBehavior(.paging)
+                        .scrollPosition(id: $currentIndex)
                     } else {
-                        ScrollView(.vertical, showsIndicators: false) {
-                            LazyVStack(spacing: 0) {
-                                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                                    shortVideoCard(item, at: index)
-                                        .frame(width: geo.size.width, height: geo.size.height)
-                                        .id(index)
-                                }
+                        TabView(selection: $currentIndex) {
+                            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                                shortVideoCard(item, at: index)
+                                    .frame(width: geo.size.width, height: geo.size.height)
+                                    .rotationEffect(.degrees(-90))
+                                    .tag(Optional(index))
                             }
                         }
+                        .tabViewStyle(.page(indexDisplayMode: .never))
+                        .frame(width: geo.size.height, height: geo.size.width)
+                        .rotationEffect(.degrees(90))
+                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
                     }
                 }
                 .ignoresSafeArea(edges: .top)
@@ -155,7 +159,7 @@ struct ShortsVideoView: View {
     private func shortVideoCard(_ item: ShortItem, at index: Int) -> some View {
         ZStack(alignment: .bottomLeading) {
             Rectangle().fill(Color.black)
-            ShortClipPlayer(path: item.videoUrl, active: index == currentIndex)
+            ShortClipPlayer(path: item.videoUrl, active: index == currentIndex, muted: isMuted)
                 .allowsHitTesting(false)
 
             // Double tap detector for floating heart
@@ -401,6 +405,7 @@ struct ShortsVideoView: View {
 struct ShortClipPlayer: View {
     let path: String
     let active: Bool
+    var muted: Bool = false
     @ObservedObject private var calls = NativeWebRTCManager.shared
     @Environment(\.scenePhase) private var scenePhase
     @State private var player: AVPlayer?
@@ -440,6 +445,7 @@ struct ShortClipPlayer: View {
         }
         .task(id: path) { await load() }
         .onChange(of: active) { _ in syncPlayback() }
+        .onChange(of: muted) { player?.isMuted = $0 }
         .onChange(of: scenePhase) { _ in syncPlayback() }
         .onChange(of: calls.activeCall != nil) { _ in syncPlayback() }
         .onDisappear { stop() }
@@ -483,7 +489,7 @@ struct ShortClipPlayer: View {
 
     private func setupPlayer(with item: AVPlayerItem) {
         let next = AVPlayer(playerItem: item)
-        next.isMuted = false
+        next.isMuted = muted
         next.automaticallyWaitsToMinimizeStalling = false
         loopObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,

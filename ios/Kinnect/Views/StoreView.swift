@@ -27,6 +27,13 @@ struct StoreView: View {
     @State private var digitalProducts: [StoreDigitalProduct] = []
     @State private var accountUuid: UUID? = nil
     @State private var isLoading = false
+    @State private var transactionInProgress = false
+    @State private var purchaseRequestIds: [String: String] = [:]
+    @State private var coinSource = "gifted"
+    @State private var trialPackagePurchases = true
+    @State private var storeBalance = 0
+    @State private var loadError: String?
+    @State private var studioPackage: StorePackageItem?
     @State private var showStoreMenuDialog = false
     @State private var showStoreInfoAlert = false
     @State private var confirmBuyPackage: StorePackageItem? = nil
@@ -50,7 +57,16 @@ struct StoreView: View {
                     }
 
                     // Package Cards List
+                    if let loadError {
+                        Text(loadError).foregroundColor(KinnectTheme.danger)
+                    }
+                    Picker("Nguồn xu", selection: $coinSource) {
+                        if trialPackagePurchases { Text("Xu tặng").tag("gifted") }
+                        Text("Xu mua").tag("purchased")
+                    }
+                    .pickerStyle(.segmented)
                     packagesSection
+                        .disabled(transactionInProgress)
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 80)
@@ -101,6 +117,10 @@ struct StoreView: View {
                 Text("Gói: \(p.title)\nChi phí: \(p.priceCoins) xu Kinnect.")
             }
         }
+        .fullScreenCover(item: $studioPackage) { pkg in
+            CameraStudioView(initialMode: pkg.id.hasPrefix("studio_video_") ? .video : .photo,
+                             onClose: { studioPackage = nil })
+        }
         .task {
             await loadStoreData()
         }
@@ -141,7 +161,7 @@ struct StoreView: View {
                 HStack(spacing: 5) {
                     Text("🪙")
                         .font(.system(size: 13))
-                    Text("\(appState.currentUser?.coins ?? 0) xu")
+                    Text("\(storeBalance) xu")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundColor(KinnectTheme.warning)
                 }
@@ -343,7 +363,7 @@ struct StoreView: View {
 
     private func storePackageCard(_ pkg: StorePackageItem) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Visual Card Header
+            // Use the same bundled package artwork as Android.
             ZStack(alignment: .bottomLeading) {
                 LinearGradient(
                     colors: [Color(hex: pkg.accentColor), Color(hex: pkg.accentColor).opacity(0.4)],
@@ -386,6 +406,16 @@ struct StoreView: View {
                 }
                 .padding(14)
             }
+            .overlay {
+                if let artwork = packageArtwork(pkg) {
+                    Image(uiImage: artwork)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(height: 120)
+                        .clipped()
+                        .accessibilityLabel(pkg.title)
+                }
+            }
 
             // Description and Action
             VStack(alignment: .leading, spacing: 12) {
@@ -421,9 +451,9 @@ struct StoreView: View {
                     // Action: Buy / Equip button
                     if pkg.owned {
                         Button {
-                            Task { await equipPackage(pkg) }
+                            Task { await usePackage(pkg) }
                         } label: {
-                            Text(pkg.equipped ? "Đang dùng" : "Áp dụng")
+                            Text(ownedActionTitle(pkg))
                                 .font(.caption.bold())
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 16)
@@ -487,77 +517,119 @@ struct StoreView: View {
     }
 
     // MARK: - Actions
+    private func packageArtwork(_ pkg: StorePackageItem) -> UIImage? {
+        let key = pkg.id.hasPrefix("studio_video_") ? "studio_video_30"
+            : pkg.id.hasPrefix("studio_photo_") ? "studio_photo_30" : pkg.id
+        return UIImage(named: "store_pkg_" + key)
+    }
+
+    private func ownedActionTitle(_ pkg: StorePackageItem) -> String {
+        switch pkg.category {
+        case "studio": return "Mở Studio"
+        case "gift", "gifts": return "Xem kho quà"
+        case "member", "membership": return "Đang sử dụng"
+        default:
+            if pkg.id == "live_game_30" { return "Quyền Live Game" }
+            return pkg.equipped ? "Gỡ trang bị" : "Áp dụng"
+        }
+    }
+
+    private func applyStoreState(_ res: [String: Any]) {
+        let ownedIds = Set(res["ownedPackages"] as? [String] ?? [])
+        let expiries = res["packageExpiries"] as? [String: Any] ?? [:]
+        let appearance = res["appearance"] as? String ?? ""
+        let liveTheme = res["liveTheme"] as? String ?? ""
+        let membership = res["membership"] as? String ?? ""
+        packages = (res["packages"] as? [[String: Any]] ?? []).map { dict in
+            var item = StorePackageItem.from(dict)
+            item.owned = ownedIds.contains(item.id)
+            item.expiresAt = (expiries[item.id] as? NSNumber)?.int64Value
+            item.equipped = [appearance, liveTheme, membership].contains(item.id)
+            return item
+        }
+        trialPackagePurchases = res["trialPackagePurchases"] as? Bool ?? false
+        if !trialPackagePurchases { coinSource = "purchased" }
+        storeBalance = (res["purchasedCoins"] as? Int ?? 0)
+            + (res["giftedCoins"] as? Int ?? res["trialCoins"] as? Int ?? 0)
+    }
+
     private func loadStoreData() async {
         isLoading = true
         defer { isLoading = false }
-
-        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/store") {
-            if let uuidStr = res["accountUuid"] as? String, let uuid = UUID(uuidString: uuidStr) {
-                self.accountUuid = uuid
-            }
-            let rawPkgs = res["packages"] as? [[String: Any]] ?? []
-            let ownedIds = Set(res["ownedPackages"] as? [String] ?? [])
-            let expiries = res["packageExpiries"] as? [String: Any] ?? [:]
-            let liveTheme = res["liveTheme"] as? String ?? ""
-            let membership = res["membership"] as? String ?? ""
-
-            self.packages = rawPkgs.map { dict in
-                var item = StorePackageItem.from(dict)
-                let isOwned = ownedIds.contains(item.id)
-                item.owned = isOwned
-                if let exp = expiries[item.id] as? NSNumber {
-                    item.expiresAt = exp.int64Value
-                }
-                if item.id == liveTheme || (item.category == "membership" && item.id == membership) {
-                    item.equipped = true
-                }
-                return item
-            }
-        }
-    }
-
-    private func buyPackage(_ pkg: StorePackageItem) async {
         do {
-            let body: [String: Any] = [
-                "productId": pkg.id,
-                "packageId": pkg.id,
-                "priceCoins": pkg.priceCoins
-            ]
-            var res = try? await KinnectAPIClient.shared.requestJSON("/api/store/packages/buy", method: "POST", body: body)
-            if res == nil {
-                res = try await KinnectAPIClient.shared.requestJSON("/api/store/buy", method: "POST", body: body)
-            }
-            if let res, (res["ok"] as? Bool == true || res["success"] as? Bool == true) {
-                appState.showToast("Đã sở hữu \(pkg.title)!")
-                await loadStoreData()
-                await appState.refreshGlobalBadges()
-            } else {
-                let err = res?["error"] as? String ?? "Chưa hoàn tất giao dịch"
-                appState.showToast(err)
-            }
+            let res = try await KinnectAPIClient.shared.requestJSON("/api/store")
+            applyStoreState(res)
+            loadError = nil
         } catch {
-            appState.showToast("Giao dịch chưa thành công: \(error.localizedDescription)")
+            loadError = "Chưa tải được cửa hàng: \(error.localizedDescription)"
         }
     }
 
-    private func equipPackage(_ pkg: StorePackageItem) async {
+    @MainActor
+    private func buyPackage(_ pkg: StorePackageItem) async {
+        guard !transactionInProgress else { return }
+        transactionInProgress = true
+        defer { transactionInProgress = false }
+        // Retain this ID after a transport failure so retry cannot debit twice.
+        let key = pkg.id + ":" + coinSource
+        let requestId = purchaseRequestIds[key] ?? KinnectWriteBody.packageRequestId()
+        purchaseRequestIds[key] = requestId
         do {
-            let body: [String: Any] = [
-                "productId": pkg.id,
-                "theme": pkg.id
-            ]
-            let endpoint = (pkg.category == "style" || pkg.id.starts(with: "style_")) ? "/api/store/style" : "/api/store/packages/apply"
-            var res = try? await KinnectAPIClient.shared.requestJSON(endpoint, method: "POST", body: body)
-            if res == nil {
-                res = try await KinnectAPIClient.shared.requestJSON("/api/store/packages/apply", method: "POST", body: body)
+            let res = try await KinnectAPIClient.shared.requestJSON(
+                "/api/store/packages/buy", method: "POST",
+                body: KinnectWriteBody.packageBuy(productId: pkg.id, priceCoins: pkg.priceCoins,
+                                                  requestId: requestId, coinSource: coinSource),
+                requestId: requestId)
+            guard (res["ownedPackages"] as? [String] ?? []).contains(pkg.id) else {
+                throw KinnectAPIError.serverMessage("Máy chủ chưa xác nhận quyền sử dụng gói.")
             }
-            if let res, (res["ok"] as? Bool == true || res["success"] as? Bool == true || res["appearance"] != nil) {
-                appState.showToast("Đã kích hoạt \(pkg.title)!")
-                await loadStoreData()
+            purchaseRequestIds.removeValue(forKey: key)
+            applyStoreState(res)
+            appState.showToast("Đã sở hữu \(pkg.title)!")
+            await loadStoreData()
+            await appState.refreshGlobalBadges()
+        } catch {
+            appState.showToast("Giao dịch chưa hoàn tất: \(error.localizedDescription)")
+        }
+    }
+
+    @MainActor
+    private func usePackage(_ pkg: StorePackageItem) async {
+        switch pkg.category {
+        case "studio":
+            studioPackage = pkg
+        case "gift", "gifts":
+            onOpenWallet?()
+        case "member", "membership":
+            appState.showToast("Huy hiệu thành viên được áp dụng tự động trong thời hạn gói.")
+        default:
+            if pkg.id == "live_game_30" {
+                appState.showToast("Gói đã được ghi nhận. Phát màn hình game trên iOS đang được hoàn thiện.")
+            } else {
+                await equipPackage(pkg)
             }
+        }
+    }
+
+    @MainActor
+    private func equipPackage(_ pkg: StorePackageItem) async {
+        guard !transactionInProgress else { return }
+        transactionInProgress = true
+        defer { transactionInProgress = false }
+        do {
+            let style = pkg.category == "style" || pkg.id.hasPrefix("style_")
+            let endpoint = style ? "/api/store/style" : "/api/store/packages/apply"
+            let productId = pkg.equipped ? "" : pkg.id
+            let res = try await KinnectAPIClient.shared.requestJSON(
+                endpoint, method: "POST", body: KinnectWriteBody.packageApply(productId: productId))
+            let applied = res[style ? "appearance" : "liveTheme"] as? String
+            guard applied == productId else {
+                throw KinnectAPIError.serverMessage("Máy chủ chưa xác nhận trang trí.")
+            }
+            appState.showToast(productId.isEmpty ? "Đã gỡ trang bị." : "Đã kích hoạt \(pkg.title)!")
+            await loadStoreData()
         } catch {
             appState.showToast("Chưa kích hoạt được: \(error.localizedDescription)")
         }
     }
 }
-

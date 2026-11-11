@@ -336,7 +336,11 @@ final class AppState: ObservableObject {
             } else if let ranking = json["giftRanking"] as? [[String: Any]] {
                 self.liveGiftRanking = ranking
             }
-        case "live-gift-error":
+        case "live-gift-receipt":
+            NotificationCenter.default.post(name: Notification.Name("kinnectLiveGiftResult"), object: nil, userInfo: json)
+            Task { await refreshGlobalBadges() }
+        case "live-mode-error", "live-gift-error":
+            NotificationCenter.default.post(name: Notification.Name("kinnectLiveGiftResult"), object: nil, userInfo: json)
             if let message = json["message"] as? String {
                 showToast(message)
             }

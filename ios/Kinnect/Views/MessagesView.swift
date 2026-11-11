@@ -530,12 +530,12 @@ struct DirectChatDetailView: View {
 
                 Spacer(minLength: 4)
 
-                // Call action buttons (iOS HIG native phone & video icons)
+                // Call action buttons (iOS HIG native phone & video contour icons)
                 Button {
                     Task { await NativeWebRTCManager.shared.startOutgoingCall(targetUser: peer, mode: "audio") }
                 } label: {
-                    Image(systemName: "phone.fill")
-                        .font(.system(size: 15, weight: .semibold))
+                    Image(systemName: "phone")
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(KinnectTheme.callGreen)
                         .frame(width: 36, height: 36)
                         .background(Circle().fill(KinnectTheme.callGreen.opacity(0.15)))
@@ -545,8 +545,8 @@ struct DirectChatDetailView: View {
                 Button {
                     Task { await NativeWebRTCManager.shared.startOutgoingCall(targetUser: peer, mode: "video") }
                 } label: {
-                    Image(systemName: "video.fill")
-                        .font(.system(size: 15, weight: .semibold))
+                    Image(systemName: "video")
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(KinnectTheme.accentBright)
                         .frame(width: 36, height: 36)
                         .background(Circle().fill(KinnectTheme.accentBright.opacity(0.15)))
@@ -1131,6 +1131,7 @@ struct GroupChatDetailView: View {
     @State private var showForwardSheet = false
     @State private var showRenameSheet = false
     @State private var showAddMemberSheet = false
+    @State private var showMembersSheet = false
     @State private var newGroupName = ""
 
     private var currentMentionQuery: String? {
@@ -1510,6 +1511,11 @@ struct GroupChatDetailView: View {
                     } label: {
                         Label("Thêm thành viên", systemImage: "person.badge.plus")
                     }
+                    Button {
+                        showMembersSheet = true
+                    } label: {
+                        Label("Thành viên & phân quyền", systemImage: "person.3")
+                    }
                     Button(role: .destructive) {
                         Task { await leaveGroup() }
                     } label: {
@@ -1537,6 +1543,9 @@ struct GroupChatDetailView: View {
             }
             .transition(.move(edge: .bottom).combined(with: .opacity))
             .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showRenameSheet)
+        }
+        .sheet(isPresented: $showMembersSheet) {
+            GroupMembersView(groupId: group.id)
         }
         .sheet(isPresented: $showAddMemberSheet) {
             AddGroupMembersSheet(groupId: group.id) {

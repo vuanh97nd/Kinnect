@@ -66,7 +66,7 @@ struct CallOverlayView: View {
                     if call.isIncoming && call.state == .ringingIncoming {
                         HStack(spacing: 52) {
                             callActionButton(
-                                systemIcon: "phone.down.fill",
+                                systemIcon: "phone.down",
                                 label: "Từ chối",
                                 color: KinnectTheme.callRed
                             ) {
@@ -74,7 +74,7 @@ struct CallOverlayView: View {
                             }
 
                             callActionButton(
-                                systemIcon: call.mode == "video" ? "video.fill" : "phone.fill",
+                                systemIcon: call.mode == "video" ? "video" : "phone",
                                 label: "Trả lời",
                                 color: KinnectTheme.callGreen
                             ) {
@@ -123,7 +123,7 @@ struct CallOverlayView: View {
                             }
 
                             callActionButton(
-                                systemIcon: "phone.down.fill",
+                                systemIcon: "phone.down",
                                 label: "Kết thúc",
                                 color: KinnectTheme.callRed
                             ) {

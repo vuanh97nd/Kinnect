@@ -1130,13 +1130,13 @@
     {
       "resource": "ic_flow_web_phone",
       "source": "ic_web_phone",
-      "redrawn": false,
+      "redrawn": true,
       "category": "interface"
     },
     {
       "resource": "ic_flow_web_phone_off",
       "source": "ic_web_phone_off",
-      "redrawn": false,
+      "redrawn": true,
       "category": "interface"
     },
     {

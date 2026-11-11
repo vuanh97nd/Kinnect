@@ -411,10 +411,17 @@ public class MainActivity extends Activity {
     toolbar.addView(logo, new LinearLayout.LayoutParams(dp(40), dp(40))); // Logo to hơn
     toolbar.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
     if (me != null && navigation) {
-      toolbar.addView(topIcon("bell", I18n.t("Thông báo"), headerActive.equals("bell"), () -> notifications(), "bell"));
-      toolbar.addView(topIcon("store", I18n.t("Cửa hàng"), false, this::openStore, null));
-      toolbar.addView(topIcon("users_round", I18n.t("Bạn bè"), headerActive.equals("friends"), () -> friendsScreen(friendsCount > 0 ? "incoming" : "friends"), "friends"));
-      toolbar.addView(topIcon("message_square", I18n.t("Tin nhắn"), headerActive.equals("inbox"), () -> navigate("inbox"), "inbox"));
+      toolbar.addView(topIcon("bell", I18n.t("Thông báo"), "bell".equals(headerActive), this::notifications, "bell"));
+      toolbar.addView(topIcon("store", I18n.t("Cửa hàng"), "store".equals(headerActive), this::storeScreen, null));
+      toolbar.addView(topIcon("users_round", I18n.t("Bạn bè"), "friends".equals(headerActive), () -> friendsScreen(friendsCount > 0 ? "incoming" : "friends"), "friends"));
+      toolbar.addView(topIcon("message_square", I18n.t("Tin nhắn"), "inbox".equals(headerActive), () -> {
+        if ("inbox".equals(headerActive)) {
+          headerActive = "";
+          navigate("feed");
+        } else {
+          navigate("inbox");
+        }
+      }, "inbox"));
       FrameLayout meHolder = new FrameLayout(this);
       ImageView meButton = new ImageView(this);
       meButton.setScaleType(ImageView.ScaleType.CENTER_CROP);
@@ -441,7 +448,6 @@ public class MainActivity extends Activity {
     }
     root.addView(toolbar, new LinearLayout.LayoutParams(-1, dp(WebDesign.HEADER)));
     if(calls!=null)root.post(()->{if(calls!=null)calls.attachReturn(root);});
-    headerActive = "";
     View line = new View(this);
     line.setBackgroundColor(LINE);
     root.addView(line, new LinearLayout.LayoutParams(-1, 1));
@@ -742,7 +748,18 @@ public class MainActivity extends Activity {
   }
 
   private boolean storeReturning;
-  private void openStore(){storeReturning=true;startActivity(new Intent(this,StoreActivity.class));}
+  private void storeScreen() {
+    if ("store".equals(headerActive)) {
+      headerActive = "";
+      navigate(tab.isEmpty() || tab.equals("store") ? "feed" : tab);
+      return;
+    }
+    remember("store", () -> storeScreen());
+    headerActive = "store";
+    shell(I18n.t("Cửa hàng"), true);
+    new StoreUi(this, content, headActions, this::refreshPage);
+  }
+  private void openStore() { storeScreen(); }
   private void meMenu() {
     remember("account", () -> meMenu());
     shell(I18n.t("Tài khoản"), true);
@@ -2812,6 +2829,11 @@ public class MainActivity extends Activity {
   }
 
   private void notifications() {
+    if ("bell".equals(headerActive)) {
+      headerActive = "";
+      navigate(tab.isEmpty() ? "feed" : tab);
+      return;
+    }
     remember("notifications", () -> notifications());
     headerActive = "bell";
     badgesAt = 0;
@@ -3110,6 +3132,11 @@ public class MainActivity extends Activity {
 
 
   private void friendsScreen(final String selected) {
+    if ("friends".equals(headerActive) && (selected == null || selected.equals("friends"))) {
+      headerActive = "";
+      navigate(tab.isEmpty() ? "feed" : tab);
+      return;
+    }
     remember("friends", () -> friendsScreen(selected));
     headerActive = "friends";
     shell(I18n.t("Bạn bè"), true);
@@ -4606,17 +4633,37 @@ public class MainActivity extends Activity {
     if (me == null) return;
     LinearLayout box = column();
     box.setPadding(dp(20), dp(8), dp(20), 0);
-    EditText current = new KinnectInput(this), next = new KinnectInput(this);
+    EditText current = new KinnectInput(this), next = new KinnectInput(this), retype = new KinnectInput(this);
     current.setHint(I18n.t("Mật khẩu hiện tại"));
     next.setHint(I18n.t("Mật khẩu mới (tối thiểu 6 ký tự)"));
+    retype.setHint(I18n.t("Nhập lại mật khẩu mới"));
     current.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
     next.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-    box.addView(current);
-    box.addView(next);
-    new Sheet(this).setTitle(I18n.t("Đổi mật khẩu")).setView(box).setPositiveButton(I18n.t("Lưu"), (d, w) ->
-      api.call("POST", "/api/me/password", json("current", current.getText().toString(), "next", next.getText().toString()), (r, e, s) ->
-        Toast.makeText(this, e != null ? e : I18n.t("Đã đổi mật khẩu. Các thiết bị khác đã được đăng xuất."), Toast.LENGTH_LONG).show())
-    ).setNegativeButton(I18n.t("Hủy"), null).show();
+    retype.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+    lp.bottomMargin = dp(8);
+    box.addView(current, lp);
+    box.addView(next, lp);
+    box.addView(retype, lp);
+    new Sheet(this).setTitle(I18n.t("Đổi mật khẩu")).setView(box).setPositiveButton(I18n.t("Lưu"), (d, w) -> {
+      String cVal = current.getText().toString().trim();
+      String nVal = next.getText().toString().trim();
+      String rVal = retype.getText().toString().trim();
+      if (cVal.isEmpty()) {
+        Toast.makeText(this, I18n.t("Vui lòng nhập mật khẩu hiện tại."), Toast.LENGTH_SHORT).show();
+        return;
+      }
+      if (nVal.length() < 6) {
+        Toast.makeText(this, I18n.t("Mật khẩu mới phải có ít nhất 6 ký tự."), Toast.LENGTH_SHORT).show();
+        return;
+      }
+      if (!nVal.equals(rVal)) {
+        Toast.makeText(this, I18n.t("Mật khẩu nhập lại không khớp."), Toast.LENGTH_SHORT).show();
+        return;
+      }
+      api.call("POST", "/api/me/password", json("current", cVal, "next", nVal), (r, e, s) ->
+        Toast.makeText(this, e != null ? e : I18n.t("Đã đổi mật khẩu. Các thiết bị khác đã được đăng xuất."), Toast.LENGTH_LONG).show());
+    }).setNegativeButton(I18n.t("Hủy"), null).show();
   }
 
   // ----- Hồ sơ: số liệu, người theo dõi, bài viết

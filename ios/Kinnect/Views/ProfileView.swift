@@ -2321,12 +2321,12 @@ struct ChangePasswordSheet: View {
     }
 
     private var canSubmit: Bool {
-        !currentPassword.isEmpty && newPassword.count >= 6 && (confirmPassword.isEmpty || confirmPassword == newPassword)
+        !currentPassword.isEmpty && newPassword.count >= 6 && !confirmPassword.isEmpty && confirmPassword == newPassword
     }
 
     private func updatePassword() async {
         errorMessage = nil
-        guard newPassword == confirmPassword || confirmPassword.isEmpty else {
+        guard newPassword == confirmPassword else {
             errorMessage = "Mật khẩu xác nhận không khớp."
             return
         }

@@ -50,18 +50,8 @@ struct WalletView: View {
     @State private var isLoading = false
     @State private var showWalletInfoAlert = false
 
-    @State private var giftInventory: [GiftInventoryItem] = [
-        GiftInventoryItem(giftId: "rose", quantity: 12),
-        GiftInventoryItem(giftId: "coffee", quantity: 5),
-        GiftInventoryItem(giftId: "heart", quantity: 8),
-        GiftInventoryItem(giftId: "love_gun", quantity: 2),
-        GiftInventoryItem(giftId: "diamond", quantity: 3),
-        GiftInventoryItem(giftId: "crown", quantity: 1),
-        GiftInventoryItem(giftId: "sports_car", quantity: 0),
-        GiftInventoryItem(giftId: "yacht", quantity: 0),
-        GiftInventoryItem(giftId: "castle", quantity: 0),
-        GiftInventoryItem(giftId: "fireworks", quantity: 4)
-    ]
+    @State private var giftInventory: [GiftInventoryItem] = []
+    @State private var loadError: String?
 
     var body: some View {
         ZStack {
@@ -108,6 +98,9 @@ struct WalletView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    if let loadError {
+                        Text(loadError).foregroundColor(KinnectTheme.danger)
+                    }
                     heroBalanceCard
                     actionShortcutsRow
                     liveEarningsCard
@@ -830,18 +823,24 @@ struct WalletView: View {
     private func loadWalletData() async {
         isLoading = true
         defer { isLoading = false }
-
-        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/wallet") {
-            if let wallet = res["wallet"] as? [String: Any] {
-                self.availableBalance = wallet["availableBalance"] as? Int ?? (wallet["coins"] as? Int ?? 0)
-                self.earnedBalance = wallet["earnedBalance"] as? Int ?? 0
-                self.spentBalance = wallet["spentBalance"] as? Int ?? 0
-                self.purchasedCoins = wallet["purchasedCoins"] as? Int ?? (wallet["paidCoins"] as? Int ?? self.earnedBalance)
-                self.giftedCoins = wallet["giftedCoins"] as? Int ?? (wallet["trialCoins"] as? Int ?? max(0, self.availableBalance - self.purchasedCoins))
-                self.currencyLabel = wallet["currencyLabel"] as? String ?? "Xu Kinnect"
+        do {
+            let res = try await KinnectAPIClient.shared.requestJSON("/api/wallet")
+            let wallet = res["wallet"] as? [String: Any] ?? res
+            purchasedCoins = wallet["purchasedCoins"] as? Int ?? 0
+            giftedCoins = wallet["giftedCoins"] as? Int ?? wallet["trialCoins"] as? Int ?? 0
+            availableBalance = wallet["totalUsableCoins"] as? Int ?? (purchasedCoins + giftedCoins)
+            earnedBalance = wallet["earningsVnd"] as? Int ?? 0
+            spentBalance = wallet["spentCoins"] as? Int ?? 0
+            currencyLabel = "Xu Kinnect"
+            entries = (wallet["entries"] as? [[String: Any]] ?? []).map(WalletEntryItem.from)
+            loadError = nil
+            let store = try await KinnectAPIClient.shared.requestJSON("/api/store")
+            giftInventory = (store["giftInventory"] as? [[String: Any]] ?? []).compactMap { item in
+                guard let id = item["giftId"] as? String, let count = item["quantity"] as? Int, count > 0 else { return nil }
+                return GiftInventoryItem(giftId: id, quantity: count)
             }
-            let rawEntries = res["entries"] as? [[String: Any]] ?? []
-            self.entries = rawEntries.map(WalletEntryItem.from)
+        } catch {
+            loadError = "Chưa tải được dữ liệu ví: \(error.localizedDescription)"
         }
     }
 }

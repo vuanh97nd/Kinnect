@@ -852,7 +852,6 @@ struct LiveRoomFullScreenView: View {
                     gifts: giftCatalog,
                     priceVersion: giftPriceVersion,
                     onGiftSent: { gift, qty in
-                        triggerLiveReaction(symbol: gift.emoji, kind: gift.id, room: room.id)
                         triggerGiftEffect(gift: gift, qty: qty, senderName: appState.currentUser?.name ?? "Bạn")
                     }
                 )
@@ -945,6 +944,11 @@ struct LiveGiftDrawerSheet: View {
     var onGiftSent: ((LiveGiftCatalogItem, Int) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var selectedQuantity: Int = 1
+    @State private var pendingGift: LiveGiftCatalogItem?
+    @State private var pendingRequestId: String?
+    @State private var pendingQuantity = 1
+    @State private var confirmGift: LiveGiftCatalogItem?
+    @State private var giftError: String?
 
     private let quantities = [1, 2, 5, 10, 50]
 
@@ -952,6 +956,7 @@ struct LiveGiftDrawerSheet: View {
         NavigationStack {
             VStack(spacing: 0) {
                 // Quantity / Combo Multiplier Pills matching Android & Web
+                ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     Text("Số lượng:")
                         .font(.caption.bold())
@@ -985,18 +990,21 @@ struct LiveGiftDrawerSheet: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
                 .padding(.bottom, 8)
+                }
+                if let giftError { Text(giftError).foregroundColor(KinnectTheme.danger) }
 
                 ScrollView {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 12)], spacing: 12) {
                         ForEach(gifts) { gift in
                             Button {
-                                sendGift(gift)
+                                if gift.coins * selectedQuantity >= 1000 { confirmGift = gift }
+                                else { sendGift(gift) }
                             } label: {
                                 VStack(spacing: 6) {
                                     giftIconView(gift)
                                     Text(gift.label)
                                         .font(.caption.bold())
-                                        .foregroundColor(.white)
+                                        .foregroundColor(KinnectTheme.textPrimary)
                                         .lineLimit(1)
                                     HStack(spacing: 3) {
                                         KinnectIcon(glyph: .coin, size: 12, selected: true, tint: KinnectTheme.warning)
@@ -1022,7 +1030,31 @@ struct LiveGiftDrawerSheet: View {
                 }
             }
             .background(KinnectTheme.background)
+            .disabled(pendingRequestId != nil)
             .navigationTitle("Tặng quà phòng Live")
+            .alert("Xác nhận tặng quà?", isPresented: Binding(
+                get: { confirmGift != nil }, set: { if !$0 { confirmGift = nil } }
+            )) {
+                Button("Hủy", role: .cancel) { confirmGift = nil }
+                Button("Tặng quà") {
+                    if let gift = confirmGift { sendGift(gift) }
+                    confirmGift = nil
+                }
+            } message: {
+                Text("\(confirmGift?.label ?? "") · \((confirmGift?.coins ?? 0) * selectedQuantity) xu")
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("kinnectLiveGiftResult"))) { event in
+                guard let pendingRequestId, let data = event.userInfo else { return }
+                if data["type"] as? String == "live-gift-receipt",
+                   data["requestId"] as? String == pendingRequestId {
+                    if let gift = pendingGift { onGiftSent?(gift, pendingQuantity) }
+                    self.pendingRequestId = nil
+                    dismiss()
+                } else if data["type"] as? String == "live-gift-error" || data["type"] as? String == "live-mode-error" {
+                    giftError = data["message"] as? String ?? "Chưa gửi được quà."
+                    self.pendingRequestId = nil
+                }
+            }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -1059,7 +1091,16 @@ struct LiveGiftDrawerSheet: View {
     }
 
     private func sendGift(_ gift: LiveGiftCatalogItem) {
-        let reqId = "gift_\(gift.id)_\(UUID().uuidString)"
+        guard pendingRequestId == nil else { return }
+        guard NativeSocketClient.shared.isConnected else {
+            giftError = "Mất kết nối phòng Live. Hãy kết nối lại trước khi tặng quà."
+            return
+        }
+        let reqId = "gift_" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        pendingGift = gift
+        pendingRequestId = reqId
+        pendingQuantity = selectedQuantity
+        giftError = nil
         NativeSocketClient.shared.sendJSON([
             "type": "live-reaction",
             "room": roomId,
@@ -1069,8 +1110,12 @@ struct LiveGiftDrawerSheet: View {
             "requestId": reqId,
             "priceVersion": priceVersion
         ])
-        onGiftSent?(gift, selectedQuantity)
-        dismiss()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 12) {
+            if pendingRequestId == reqId {
+                giftError = "Chưa nhận được xác nhận. Kiểm tra số dư và lịch sử quà trước khi gửi lại."
+                // Keep the drawer from sending a second transaction after an ambiguous timeout.
+            }
+        }
     }
 }
 

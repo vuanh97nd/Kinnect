@@ -33,6 +33,7 @@ public final class KinnectService extends Service implements NativeSocket.Events
   if(Distribution.PLAY)backgroundBuilder.addAction(android.R.drawable.ic_media_pause,I18n.t("Dừng đồng bộ"),PendingIntent.getBroadcast(this,8,new Intent(this,CallActionReceiver.class).setAction("stop-sync").putExtra("token",ACTION_TOKEN),PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT));
   Notification n=backgroundBuilder.build();
   try{if(Build.VERSION.SDK_INT>=34)startForeground(ID_BG,n,android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING);else startForeground(ID_BG,n);}catch(RuntimeException blocked){if(!Distribution.PLAY){stopSelf();return START_NOT_STICKY;}}
+  try{if(Build.VERSION.SDK_INT>=24)stopForeground(STOP_FOREGROUND_REMOVE);else stopForeground(true);NotificationManager nm=getSystemService(NotificationManager.class);if(nm!=null)nm.cancel(ID_BG);}catch(RuntimeException ignored){}
   if(Distribution.PLAY&&!getSharedPreferences("play_privacy",0).getBoolean("background_messages",false)){try{stopForeground(true);}catch(RuntimeException ignored){}if(socket==null)connect();return START_NOT_STICKY;}
   if(NativeApi.shared.cookieFor(NativeApi.shared.origin()).isEmpty()){stopSelf();return START_NOT_STICKY;}
   if(socket==null)connect();return START_STICKY;}
