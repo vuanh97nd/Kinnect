@@ -42,6 +42,7 @@ enum KinnectNavTab: String, CaseIterable, Identifiable {
 
 enum KinnectTopSection: String, Identifiable {
     case notifications
+    case store
     case wallet
     case friends
     case messages
@@ -178,13 +179,13 @@ struct RootMainView: View {
 
             // Store
             Button {
-                activeTopSection = (activeTopSection == .wallet) ? nil : .wallet
+                activeTopSection = (activeTopSection == .store) ? nil : .store
             } label: {
                 KinnectIcon(
                     glyph: .store,
                     size: 22,
-                    selected: activeTopSection == .wallet,
-                    tint: activeTopSection == .wallet ? KinnectTheme.accentBright : KinnectTheme.textPrimary
+                    selected: activeTopSection == .store,
+                    tint: activeTopSection == .store ? KinnectTheme.accentBright : KinnectTheme.textPrimary
                 )
                 .frame(width: 38, height: 44)
                 .contentShape(Rectangle())
@@ -430,21 +431,21 @@ struct RootMainView: View {
                                     }
                                 } else if UIReviewFixture.activeScreen == "wallet" {
                                     NavigationStack {
-                                        WalletStoreView(initialTab: .wallet)
+                                        WalletView(onBack: { })
                                             .toolbar { RootMainView.headerTrailingButtonsStatic() }
                                             .navigationTitle("Ví Kinnect")
                                             .navigationBarTitleDisplayMode(.large)
                                     }
                                 } else if UIReviewFixture.activeScreen == "wallet-topup" {
                                     NavigationStack {
-                                        WalletStoreView(initialTab: .packages, initialStoreFilter: .style)
+                                        WalletView(onBack: { })
                                             .toolbar { RootMainView.headerTrailingButtonsStatic() }
                                             .navigationTitle("Nạp xu Kinnect")
                                             .navigationBarTitleDisplayMode(.large)
                                     }
                                 } else if UIReviewFixture.activeScreen == "wallet-packages" || UIReviewFixture.activeScreen == "store-packages" || UIReviewFixture.activeScreen == "store" {
                                     NavigationStack {
-                                        WalletStoreView(initialTab: .packages, initialStoreFilter: .style)
+                                        StoreView(onBack: { }, onOpenWallet: { })
                                             .toolbar { RootMainView.headerTrailingButtonsStatic() }
                                             .navigationTitle("Cửa hàng Kinnect")
                                             .navigationBarTitleDisplayMode(.large)
@@ -761,38 +762,70 @@ struct RootMainView: View {
 
     @ViewBuilder
     private func fullScreenSectionView(_ section: KinnectTopSection) -> some View {
-        VStack(spacing: 0) {
-            sectionCustomHeader(section)
-
-            Group {
-                switch section {
-                case .notifications:
-                    NotificationsView()
-                case .wallet:
-                    WalletStoreView(initialTab: .wallet)
-                case .friends:
-                    FriendsView(initialTab: .friends)
-                case .messages:
-                    NavigationStack {
-                        MessagesView(initialScope: .direct, onOpenFriends: { activeTopSection = .friends })
+        switch section {
+        case .store:
+            StoreView(
+                onBack: {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        activeTopSection = nil
                     }
-                case .profile:
-                    AccountMenuView(
-                        onOpenProfile: {
-                            showProfileDetailSheet = true
-                        },
-                        onOpenWallet: {
-                            activeTopSection = .wallet
-                        },
-                        onOpenFriends: {
-                            activeTopSection = .friends
-                        }
-                    )
+                },
+                onOpenWallet: {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        activeTopSection = .wallet
+                    }
                 }
+            )
+        case .wallet:
+            WalletView(
+                onBack: {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        activeTopSection = nil
+                    }
+                },
+                onOpenStore: {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        activeTopSection = .store
+                    }
+                }
+            )
+        default:
+            VStack(spacing: 0) {
+                sectionCustomHeader(section)
+
+                Group {
+                    switch section {
+                    case .notifications:
+                        NotificationsView()
+                    case .friends:
+                        FriendsView(initialTab: .friends)
+                    case .messages:
+                        NavigationStack {
+                            MessagesView(initialScope: .direct, onOpenFriends: { activeTopSection = .friends })
+                        }
+                    case .profile:
+                        AccountMenuView(
+                            onOpenProfile: {
+                                showProfileDetailSheet = true
+                            },
+                            onOpenStore: {
+                                activeTopSection = .store
+                            },
+                            onOpenWallet: {
+                                activeTopSection = .wallet
+                            },
+                            onOpenFriends: {
+                                activeTopSection = .friends
+                            }
+                        )
+                    default:
+                        EmptyView()
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(KinnectTheme.background.ignoresSafeArea())
         }
-        .background(KinnectTheme.background.ignoresSafeArea())
     }
 
     @ViewBuilder
@@ -844,7 +877,8 @@ struct RootMainView: View {
     private func sectionTitle(for section: KinnectTopSection) -> String {
         switch section {
         case .notifications: return "Thông báo"
-        case .wallet: return "Cửa hàng & Ví"
+        case .store: return "Cửa hàng"
+        case .wallet: return "Ví Kinnect"
         case .friends: return "Bạn bè"
         case .messages: return "Tin nhắn"
         case .profile: return "Tài khoản"
@@ -873,6 +907,26 @@ struct RootMainView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Đánh dấu tất cả đã đọc")
+
+        case .store:
+            if let user = appState.currentUser {
+                Button {
+                    activeTopSection = .wallet
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("🪙")
+                            .font(.system(size: 13))
+                        Text("\(user.coins) xu")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(KinnectTheme.warning)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Xem ví Kinnect")
+            }
 
         case .wallet:
             if let user = appState.currentUser {
@@ -961,6 +1015,10 @@ struct RootMainView: View {
                 onOpenFriends: {
                     showProfileDetailSheet = false
                     activeTopSection = .friends
+                },
+                onOpenStore: {
+                    showProfileDetailSheet = false
+                    activeTopSection = .store
                 }
             )
         }
@@ -973,8 +1031,16 @@ struct RootMainView: View {
                                 switch topSection {
                                 case .notifications:
                                     NotificationsView()
+                                case .store:
+                                    StoreView(
+                                        onBack: { activeTopSection = nil },
+                                        onOpenWallet: { activeTopSection = .wallet }
+                                    )
                                 case .wallet:
-                                    WalletStoreView()
+                                    WalletView(
+                                        onBack: { activeTopSection = nil },
+                                        onOpenStore: { activeTopSection = .store }
+                                    )
                                 case .friends:
                                     FriendsView()
                                 case .messages:
@@ -982,7 +1048,8 @@ struct RootMainView: View {
                                 case .profile:
                                     ProfileView(
                                         onOpenWallet: { activeTopSection = .wallet },
-                                        onOpenFriends: { activeTopSection = .friends }
+                                        onOpenFriends: { activeTopSection = .friends },
+                                        onOpenStore: { activeTopSection = .store }
                                     )
                                 }
                             } else {

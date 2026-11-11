@@ -43,6 +43,7 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
     var gender: String
     var orientation: String
     var communityRole: String
+    var coins: Int
     var height: Int
     var weight: Int
     var pronouns: String
@@ -83,6 +84,7 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         gender: String = "",
         orientation: String = "",
         communityRole: String = "",
+        coins: Int = 0,
         height: Int = 0,
         weight: Int = 0,
         pronouns: String = "",
@@ -120,6 +122,7 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         self.gender = gender
         self.orientation = orientation
         self.communityRole = communityRole
+        self.coins = coins
         self.height = height
         self.weight = weight
         self.pronouns = pronouns
@@ -197,6 +200,7 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
             gender: (dict["gender"] as? String) ?? "",
             orientation: (dict["orientation"] as? String) ?? (dict["sexualOrientation"] as? String) ?? "",
             communityRole: (dict["communityRole"] as? String) ?? (dict["role"] as? String) ?? "",
+            coins: (dict["coins"] as? Int) ?? (dict["coinBalance"] as? Int) ?? (dict["balance"] as? Int) ?? ((dict["coins"] as? NSNumber)?.intValue) ?? 0,
             height: (dict["height"] as? Int) ?? Int((dict["height"] as? String) ?? "") ?? 0,
             weight: (dict["weight"] as? Int) ?? Int((dict["weight"] as? String) ?? "") ?? 0,
             pronouns: (dict["pronouns"] as? String) ?? "",
@@ -676,5 +680,26 @@ struct StoreDigitalProduct: Identifiable, Equatable {
             priceLabel: (dict["priceLabel"] as? String) ?? fallbackPrice,
             coinsGranted: (dict["coinsGranted"] as? Int) ?? (dict["coins"] as? Int) ?? 0
         )
+    }
+}
+
+struct GiftInventoryItem: Identifiable, Equatable {
+    var id: String { giftId }
+    let giftId: String
+    var quantity: Int
+    var name: String {
+        switch giftId {
+        case "rose": return "Hoa hồng"
+        case "coffee": return "Cà phê"
+        case "heart": return "Trái tim"
+        case "love_gun": return "Súng bắn tim"
+        case "diamond": return "Kim cương"
+        case "crown": return "Vương miện"
+        case "sports_car": return "Siêu xe"
+        case "yacht": return "Du thuyền"
+        case "castle": return "Lâu đài"
+        case "fireworks": return "Pháo hoa"
+        default: return giftId
+        }
     }
 }

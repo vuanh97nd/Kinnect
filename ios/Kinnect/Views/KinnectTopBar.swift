@@ -35,9 +35,9 @@ struct KinnectTopBar: View {
             topBarButton(
                 glyph: .store,
                 label: "Cửa hàng",
-                isSelected: activeTopSection == .wallet
+                isSelected: activeTopSection == .store
             ) {
-                toggleSection(.wallet)
+                toggleSection(.store)
             }
 
             // Trailing icon 3: Friends / Bạn bè

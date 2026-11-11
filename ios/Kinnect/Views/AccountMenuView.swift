@@ -8,6 +8,7 @@ struct AccountMenuView: View {
     @Environment(\.dismiss) private var dismiss
 
     var onOpenProfile: () -> Void
+    var onOpenStore: (() -> Void)? = nil
     var onOpenWallet: () -> Void
     var onOpenFriends: () -> Void
 
@@ -176,6 +177,12 @@ struct AccountMenuView: View {
         VStack(spacing: 0) {
             menuRow(glyph: .games, title: "Trò chơi", color: .purple) {
                 appState.showToast("Trò chơi: Nông trại, Đố vui, Chơi nhanh 1-1")
+            }
+            Divider().background(KinnectTheme.borderSoft)
+
+            menuRow(glyph: .store, title: "Cửa hàng Kinnect", color: KinnectTheme.accentBright) {
+                dismiss()
+                onOpenStore?()
             }
             Divider().background(KinnectTheme.borderSoft)
 

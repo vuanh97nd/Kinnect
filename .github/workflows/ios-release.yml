@@ -99,7 +99,7 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release edit "$TAG" \
               --title "Kinnect iOS 1.2.12 (Build 119)" \
-              --notes "Gói cài đặt Kinnect iOS 1.2.12 Build 119 (.ipa) — Đồng bộ toàn diện Android 1.2.12 (Build 118). Mở toàn màn hình tất cả mục chính (Tin nhắn, Thông báo, Cửa hàng, Bạn bè, Hồ sơ), camera viewfinder phần cứng AVFoundation, hiển thị chân dung đầy đủ không bị cắt đầu, sửa lỗi thoát app khi đăng nhập."
+              --notes "Gói cài đặt Kinnect iOS 1.2.12 Build 119 (.ipa) — Đồng bộ toàn diện Android 1.2.12 (Build 118). Thiết kế tách riêng độc lập Ví Kinnect và Cửa hàng Kinnect theo chuẩn Android. Mở toàn màn hình tất cả các mục chính (Tin nhắn, Thông báo, Cửa hàng, Ví Kinnect, Bạn bè, Hồ sơ), camera viewfinder phần cứng AVFoundation, hiển thị chân dung đầy đủ không bị cắt đầu, sửa lỗi thoát app khi đăng nhập."
             gh release upload "$TAG" \
               dist/Kinnect-1.2.12-ios.ipa \
               dist/Kinnect-1.2.12-b119-ios.ipa \

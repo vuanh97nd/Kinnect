@@ -1,27 +1,6 @@
 import SwiftUI
 import UIKit
 
-struct GiftInventoryItem: Identifiable {
-    var id: String { giftId }
-    let giftId: String
-    let quantity: Int
-    var name: String {
-        switch giftId {
-        case "rose": return "Hoa hồng"
-        case "coffee": return "Cà phê"
-        case "heart": return "Trái tim"
-        case "love_gun": return "Súng bắn tim"
-        case "diamond": return "Kim cương"
-        case "crown": return "Vương miện"
-        case "sports_car": return "Siêu xe"
-        case "yacht": return "Du thuyền"
-        case "castle": return "Lâu đài"
-        case "fireworks": return "Pháo hoa"
-        default: return giftId
-        }
-    }
-}
-
 struct WalletStoreView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared

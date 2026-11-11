@@ -1454,7 +1454,7 @@ enum UIReviewFixture {
         case "wallet":
             return AnyView(
                 NavigationStack {
-                    WalletStoreView(initialTab: .wallet)
+                    WalletView()
                         .toolbar { RootMainView.headerTrailingButtonsStatic() }
                         .navigationTitle("Ví Kinnect")
                         .navigationBarTitleDisplayMode(.large)
@@ -1463,7 +1463,7 @@ enum UIReviewFixture {
         case "store", "wallet-packages", "store-packages":
             return AnyView(
                 NavigationStack {
-                    WalletStoreView(initialTab: .packages, initialStoreFilter: .style)
+                    StoreView()
                         .toolbar { RootMainView.headerTrailingButtonsStatic() }
                         .navigationTitle("Cửa hàng Kinnect")
                         .navigationBarTitleDisplayMode(.large)
@@ -1472,7 +1472,7 @@ enum UIReviewFixture {
         case "wallet-topup":
             return AnyView(
                 NavigationStack {
-                    WalletStoreView(initialTab: .topup)
+                    WalletView()
                         .toolbar { RootMainView.headerTrailingButtonsStatic() }
                         .navigationTitle("Nạp xu Kinnect")
                         .navigationBarTitleDisplayMode(.large)
