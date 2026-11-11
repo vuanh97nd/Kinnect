@@ -629,40 +629,7 @@ struct WalletView: View {
                     }
 
                     // StoreKit digital products
-                    if !digitalProducts.isEmpty {
-                        Text("Gói mua In-App Purchase")
-                            .font(.headline.bold())
-                            .foregroundColor(KinnectTheme.textPrimary)
-                            .padding(.top, 8)
-
-                        ForEach(digitalProducts) { prod in
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(prod.title)
-                                        .font(.subheadline.bold())
-                                        .foregroundColor(KinnectTheme.textPrimary)
-                                    Text(prod.description)
-                                        .font(.caption)
-                                        .foregroundColor(KinnectTheme.textSecondary)
-                                }
-                                Spacer()
-                                Button {
-                                    Task {
-                                        _ = try? await storeKit.purchaseProduct(productId: prod.id)
-                                        await loadWalletData()
-                                    }
-                                } label: {
-                                    Text(prod.priceLabel)
-                                        .font(.caption.bold())
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 8)
-                                        .background(Capsule().fill(KinnectTheme.primaryGradient))
-                                }
-                            }
-                            .kinnectCard()
-                        }
-                    }
+                    topUpStoreKitSection
 
                     Text("Xu nạp được sử dụng trong phòng Livestream và mua các vật phẩm độc quyền trên Cửa hàng Kinnect.")
                         .font(.caption2)
@@ -674,6 +641,49 @@ struct WalletView: View {
                 .padding(.bottom, 60)
             }
         }
+    }
+
+    @ViewBuilder
+    private var topUpStoreKitSection: some View {
+        if !digitalProducts.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Gói mua In-App Purchase")
+                    .font(.headline.bold())
+                    .foregroundColor(KinnectTheme.textPrimary)
+
+                ForEach(digitalProducts, id: \.id) { prod in
+                    digitalProductRow(prod)
+                }
+            }
+        }
+    }
+
+    private func digitalProductRow(_ prod: StoreDigitalProduct) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(prod.title)
+                    .font(.subheadline.bold())
+                    .foregroundColor(KinnectTheme.textPrimary)
+                Text(prod.description)
+                    .font(.caption)
+                    .foregroundColor(KinnectTheme.textSecondary)
+            }
+            Spacer()
+            Button {
+                Task {
+                    _ = try? await storeKit.purchaseProduct(productId: prod.id)
+                    await loadWalletData()
+                }
+            } label: {
+                Text(prod.priceLabel)
+                    .font(.caption.bold())
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Capsule().fill(KinnectTheme.primaryGradient))
+            }
+        }
+        .kinnectCard()
     }
 
     private func topUpOptionCard(coins: Int, price: String) -> some View {
