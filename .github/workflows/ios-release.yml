@@ -141,11 +141,9 @@ jobs:
         run: |
           TAG="ios-v1.2.12"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" \
-              dist/ios-ui-review/*.png \
-              dist/ios-ui-review/*.mp4 \
-              dist/ios-ui-review/*.html \
-              dist/ios-ui-review/*.md \
-              dist/ios-ui-review/*.json \
-              --clobber
+            shopt -s nullglob
+            FILES=(dist/ios-ui-review/*.png dist/ios-ui-review/*.mp4 dist/ios-ui-review/*.html dist/ios-ui-review/*.md dist/ios-ui-review/*.json)
+            if [ ${#FILES[@]} -gt 0 ]; then
+              gh release upload "$TAG" "${FILES[@]}" --clobber
+            fi
           fi

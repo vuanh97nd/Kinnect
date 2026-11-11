@@ -200,11 +200,10 @@ def build_contact_sheet(records):
             contact_path = OUT_DIR / "contact-sheet.png"
             sheet.save(contact_path)
             print(f"Generated PNG contact sheet: {contact_path}", flush=True)
-            return contact_path
         except Exception as err:
             print(f"Warning generating PNG contact sheet: {err}", flush=True)
 
-    # Fallback HTML contact sheet so a single view of all screens is always available
+    # Always generate HTML contact sheet as well so both visual formats are available
     html_lines = [
         "<!DOCTYPE html>",
         "<html lang='vi'>",
