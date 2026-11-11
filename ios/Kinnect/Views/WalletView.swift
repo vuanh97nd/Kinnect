@@ -671,7 +671,7 @@ struct WalletView: View {
             Spacer()
             Button {
                 Task {
-                    _ = try? await storeKit.purchaseProduct(productId: prod.id)
+                    _ = try? await storeKit.purchaseDigitalProduct(productId: prod.id)
                     await loadWalletData()
                 }
             } label: {
