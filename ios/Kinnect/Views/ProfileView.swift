@@ -323,7 +323,7 @@ struct ProfileView: View {
                     .accessibilityLabel("Đổi ảnh bìa")
                 }
             }
-            .frame(maxWidth: .infinity, height: 130)
+            .frame(maxWidth: .infinity, minHeight: 130, maxHeight: 130)
 
             // Identity Row (Parity Android lines 2230-2248: Avatar on Left overlapping cover by 28dp, Name & Handle on Right)
             HStack(alignment: .bottom, spacing: 14) {
