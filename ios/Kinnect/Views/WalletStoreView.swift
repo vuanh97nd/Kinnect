@@ -460,8 +460,8 @@ struct WalletStoreView: View {
                         .frame(width: 72, height: 72)
                         .background(Circle().fill(Color(hex: preview.accentColor).opacity(0.2)))
                         .overlay(
-                            Text("K")
-                                .font(.system(size: 32, weight: .bold))
+                            Image(systemName: preview.iconName)
+                                .font(.system(size: 30, weight: .bold))
                                 .foregroundColor(.white)
                         )
                         .shadow(color: Color(hex: preview.accentColor).opacity(0.6), radius: 10)
@@ -1023,8 +1023,8 @@ private struct StorePackageArtworkView: View {
                         .frame(width: 60, height: 60)
                         .background(Circle().fill(Color(hex: pkg.accentColor)))
                         .overlay(
-                            Text("K")
-                                .font(.system(size: 28, weight: .heavy))
+                            Image(systemName: pkg.iconName)
+                                .font(.system(size: 26, weight: .bold))
                                 .foregroundColor(.white)
                         )
                         .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)

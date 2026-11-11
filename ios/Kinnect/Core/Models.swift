@@ -662,6 +662,41 @@ struct StorePackageItem: Identifiable, Equatable {
 
     var kind: String { category }
 
+    var iconName: String {
+        Self.iconName(for: id, category: category)
+    }
+
+    static func iconName(for id: String, category: String) -> String {
+        if id.starts(with: "studio_video_") { return "film.fill" }
+        if id.starts(with: "studio_photo_") { return "photo.fill" }
+        switch id {
+        case "style_neon", "style_aurora", "style_forest": return "sparkles"
+        case "style_galaxy": return "star.fill"
+        case "style_ice": return "snowflake"
+        case "style_ruby": return "heart.fill"
+        case "style_paper": return "newspaper.fill"
+        case "style_ember": return "flame.fill"
+        case "live_chill": return "antenna.radiowaves.left.and.right"
+        case "live_gaming", "live_game_30": return "gamecontroller.fill"
+        case "live_spotlight": return "sparkles"
+        case "gift_love": return "heart.fill"
+        case "gift_speed": return "bolt.fill"
+        case "gift_royal": return "crown.fill"
+        case "member_plus": return "crown.fill"
+        case "member_creator": return "film.fill"
+        case "studio_7", "studio_30": return "slider.horizontal.3"
+        default:
+            switch category {
+            case "style", "frame": return "paintpalette.fill"
+            case "studio": return "film.fill"
+            case "live": return "antenna.radiowaves.left.and.right"
+            case "gift", "gifts": return "gift.fill"
+            case "member", "membership": return "crown.fill"
+            default: return "sparkles"
+            }
+        }
+    }
+
     static func from(_ dict: [String: Any]) -> StorePackageItem {
         let colors = dict["colors"] as? [String]
         return StorePackageItem(
