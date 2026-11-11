@@ -789,14 +789,30 @@ struct RootMainView: View {
                     }
                 }
             )
+        case .notifications:
+            NotificationsView(
+                onBack: {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        activeTopSection = nil
+                    }
+                },
+                onOpenFriends: {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        activeTopSection = .friends
+                    }
+                },
+                onOpenMessages: {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        activeTopSection = .messages
+                    }
+                }
+            )
         default:
             VStack(spacing: 0) {
                 sectionCustomHeader(section)
 
                 Group {
                     switch section {
-                    case .notifications:
-                        NotificationsView()
                     case .friends:
                         FriendsView(initialTab: .friends)
                     case .messages:
@@ -981,47 +997,25 @@ struct RootMainView: View {
     }
 
     private var fullScreenProfileDetailView: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.22)) {
-                        showProfileDetailSheet = false
-                    }
-                } label: {
-                    Image(systemName: "arrow.left")
-                        .font(.system(size: 19, weight: .semibold))
-                        .foregroundColor(KinnectTheme.textPrimary)
-                        .frame(width: 44, height: 44)
+        ProfileView(
+            onBack: {
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    showProfileDetailSheet = false
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Quay lại")
-
-                Text("Hồ sơ cá nhân")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(KinnectTheme.textPrimary)
-
-                Spacer()
+            },
+            onOpenWallet: {
+                showProfileDetailSheet = false
+                activeTopSection = .wallet
+            },
+            onOpenFriends: {
+                showProfileDetailSheet = false
+                activeTopSection = .friends
+            },
+            onOpenStore: {
+                showProfileDetailSheet = false
+                activeTopSection = .store
             }
-            .padding(.horizontal, 12)
-            .frame(height: 52)
-            .background(KinnectTheme.surface.ignoresSafeArea(edges: .top))
-            .overlay(Divider().background(KinnectTheme.borderSoft), alignment: .bottom)
-
-            ProfileView(
-                onOpenWallet: {
-                    showProfileDetailSheet = false
-                    activeTopSection = .wallet
-                },
-                onOpenFriends: {
-                    showProfileDetailSheet = false
-                    activeTopSection = .friends
-                },
-                onOpenStore: {
-                    showProfileDetailSheet = false
-                    activeTopSection = .store
-                }
-            )
-        }
+        )
         .background(KinnectTheme.background.ignoresSafeArea())
     }
 

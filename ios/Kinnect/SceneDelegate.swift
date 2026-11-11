@@ -43,10 +43,13 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         NativeSocketClient.shared.connectWithKeychainSession()
         Task { @MainActor in
             await AppState.shared.refreshGlobalBadges()
+            AppState.shared.reportActiveStatus(force: true)
+            AppState.shared.startActivityHeartbeat()
         }
     }
 
     func sceneDidEnterBackground(_ scene: UIScene) {
+        AppState.shared.stopActivityHeartbeat()
         // Do NOT use UIBackgroundTask WebSocket keepalive as a substitute for PushKit.
         // If there is no active CallKit/WebRTC call in progress, allow the foreground WebSocket to close cleanly.
         if NativeWebRTCManager.shared.activeCall == nil {

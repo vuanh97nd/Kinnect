@@ -176,6 +176,7 @@ final class AppState: ObservableObject {
         KeychainStore.shared.saveAccountId(user.id)
         NativeSocketClient.shared.connectWithKeychainSession()
         PushKitManager.shared.startRegistration()
+        startActivityHeartbeat()
     }
 
     func logout() async {
@@ -184,6 +185,7 @@ final class AppState: ObservableObject {
     }
 
     func clearSessionState() {
+        stopActivityHeartbeat()
         NativeWebRTCManager.shared.endOrRejectCurrentCall(sendSocket: false)
         NativeWebRTCManager.shared.stopLiveSession()
         CallKitManager.shared.endAllCalls()
@@ -383,7 +385,41 @@ final class AppState: ObservableObject {
         }
     }
 
+    // MARK: - Active Status Reporting (1:1 Android MainActivity.activity lines 5411-5415)
+    private var lastActivityReportTime: TimeInterval = 0
+    private var activityTimer: Timer?
+
+    func reportActiveStatus(force: Bool = false) {
+        guard currentUser != nil else { return }
+        let now = Date().timeIntervalSince1970
+        if !force && (now - lastActivityReportTime < 50.0) {
+            return
+        }
+        lastActivityReportTime = now
+        Task {
+            _ = try? await KinnectAPIClient.shared.requestJSON(
+                "/api/me/activity",
+                method: "POST",
+                body: [:]
+            )
+        }
+    }
+
+    func startActivityHeartbeat() {
+        activityTimer?.invalidate()
+        reportActiveStatus(force: true)
+        activityTimer = Timer.scheduledTimer(withTimeInterval: 50.0, repeats: true) { [weak self] _ in
+            self?.reportActiveStatus(force: true)
+        }
+    }
+
+    func stopActivityHeartbeat() {
+        activityTimer?.invalidate()
+        activityTimer = nil
+    }
+
     func navigate(to route: String) {
+        reportActiveStatus()
         NotificationCenter.default.post(name: .kinnectNavigateRoute, object: route)
     }
 

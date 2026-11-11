@@ -107,7 +107,36 @@ struct DiscoverView: View {
             // 3. Main Content: 3-Column Adaptive Grid (Android AdaptivePeopleGrid)
             ScrollView {
                 VStack(spacing: 12) {
-                    if isLoading && visiblePeople.isEmpty {
+                    if segment == .nearby && appState.currentUser?.hasLocation != true {
+                        VStack(spacing: 12) {
+                            KinnectIcon(glyph: .nearby, size: 40, tint: KinnectTheme.accentBright)
+                            Text("Khám phá quanh bạn")
+                                .font(.headline.bold())
+                                .foregroundColor(KinnectTheme.textPrimary)
+                            Text("Chỉ dùng vị trí gần đúng, lưu theo ô khoảng 5 km trong tối đa 24 giờ hiệu lực; không công khai tọa độ. Bạn có thể tắt và xóa ở Hồ sơ.")
+                                .font(.caption)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 20)
+                            Button {
+                                Task { await requestEnableLocation() }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "location.fill")
+                                    Text("Bật vị trí")
+                                        .font(.subheadline.bold())
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 10)
+                                .background(KinnectTheme.primaryGradient)
+                                .clipShape(Capsule())
+                            }
+                        }
+                        .padding(.vertical, 32)
+                        .frame(maxWidth: .infinity)
+                        .kinnectCard()
+                    } else if isLoading && visiblePeople.isEmpty {
                         ProgressView().tint(KinnectTheme.accentBright).padding(.vertical, 40)
                     } else if visiblePeople.isEmpty {
                         emptyDiscoveryView
@@ -290,30 +319,10 @@ struct DiscoverView: View {
             }
 
         case .nearby:
-            locationStatusText = "Đang xác định vị trí GPS..."
-            if let coord = await MediaPermissionHandler.shared.requestCurrentLocation() {
-                locationStatusText = String(format: "Vị trí: %.4f, %.4f (bán kính 50km)", coord.latitude, coord.longitude)
-                _ = try? await KinnectAPIClient.shared.requestJSON(
-                    "/api/me/location",
-                    method: "PATCH",
-                    body: [
-                        "lat": coord.latitude,
-                        "lng": coord.longitude
-                    ],
-                    requestId: "loc_\(Int(Date().timeIntervalSince1970))"
-                )
-                let path = "/api/discover?nearby=1&lat=\(coord.latitude)&lng=\(coord.longitude)&radiusKm=50\(filterParams)"
-                if let res = try? await KinnectAPIClient.shared.requestJSON(path) {
-                    self.people = (res["people"] as? [[String: Any]] ?? res["users"] as? [[String: Any]] ?? []).map(KinnectUser.from)
-                    self.posts = (res["posts"] as? [[String: Any]] ?? []).map(PostItem.from)
-                }
-            } else {
-                locationStatusText = "Chưa cấp quyền vị trí. Đang hiển thị khu vực mặc định."
-                let path = "/api/discover?nearby=1\(filterParams)"
-                if let res = try? await KinnectAPIClient.shared.requestJSON(path) {
-                    self.people = (res["people"] as? [[String: Any]] ?? res["users"] as? [[String: Any]] ?? []).map(KinnectUser.from)
-                    self.posts = (res["posts"] as? [[String: Any]] ?? []).map(PostItem.from)
-                }
+            let path = "/api/discover?nearby=1&radius=50&sort=new\(filterParams)"
+            if let res = try? await KinnectAPIClient.shared.requestJSON(path) {
+                self.people = (res["people"] as? [[String: Any]] ?? res["users"] as? [[String: Any]] ?? []).map(KinnectUser.from)
+                self.posts = (res["posts"] as? [[String: Any]] ?? []).map(PostItem.from)
             }
 
         case .following:
@@ -322,6 +331,31 @@ struct DiscoverView: View {
                 self.people = (res["people"] as? [[String: Any]] ?? res["users"] as? [[String: Any]] ?? []).map(KinnectUser.from)
                 self.posts = (res["posts"] as? [[String: Any]] ?? []).map(PostItem.from)
             }
+        }
+    }
+
+    private func requestEnableLocation() async {
+        locationStatusText = "Đang lấy vị trí gần đúng…"
+        if let coord = await MediaPermissionHandler.shared.requestCurrentLocation() {
+            let body: [String: Any] = [
+                "enabled": true,
+                "latitude": coord.latitude,
+                "longitude": coord.longitude
+            ]
+            _ = try? await KinnectAPIClient.shared.requestJSON(
+                "/api/me/location",
+                method: "PATCH",
+                body: body,
+                requestId: "loc_\(Int(Date().timeIntervalSince1970))"
+            )
+            if var me = appState.currentUser {
+                me.hasLocation = true
+                appState.currentUser = me
+            }
+            locationStatusText = "Đang tìm kiếm quanh đây trong bán kính 50 km"
+            await loadCurrentSegment()
+        } else {
+            locationStatusText = "Chưa cấp quyền vị trí. Bạn có thể bật vị trí trong Cài đặt máy."
         }
     }
 

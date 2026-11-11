@@ -58,6 +58,10 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
     var joinedAt: Int64
     var identityPublic: Bool
     var profileVisibility: [String: Bool]
+    var showActivity: Bool
+    var showDistance: Bool
+    var discoverable: Bool
+    var hasLocation: Bool
 
     var avatarURL: String? { avatarUrl.isEmpty ? nil : avatarUrl }
 
@@ -98,7 +102,11 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         postsCount: Int = 0,
         joinedAt: Int64 = 0,
         identityPublic: Bool = true,
-        profileVisibility: [String: Bool] = [:]
+        profileVisibility: [String: Bool] = [:],
+        showActivity: Bool = true,
+        showDistance: Bool = true,
+        discoverable: Bool = true,
+        hasLocation: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -137,6 +145,10 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         self.joinedAt = joinedAt
         self.identityPublic = identityPublic
         self.profileVisibility = profileVisibility
+        self.showActivity = showActivity
+        self.showDistance = showDistance
+        self.discoverable = discoverable
+        self.hasLocation = hasLocation
     }
 
     init(json: [String: Any]) {
@@ -214,7 +226,11 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
             postsCount: (dict["postsCount"] as? Int) ?? (dict["posts"] as? Int) ?? (dict["postCount"] as? Int) ?? 0,
             joinedAt: joined,
             identityPublic: (dict["identityPublic"] as? Bool) ?? true,
-            profileVisibility: visDict
+            profileVisibility: visDict,
+            showActivity: (dict["showActivity"] as? Bool) ?? ((dict["show_activity"] as? Int) == 1) ?? true,
+            showDistance: (dict["showDistance"] as? Bool) ?? ((dict["show_distance"] as? Int) == 1) ?? true,
+            discoverable: (dict["discoverable"] as? Bool) ?? ((dict["discoverable"] as? Int) == 1) ?? true,
+            hasLocation: (dict["hasLocation"] as? Bool) ?? false
         )
     }
 }

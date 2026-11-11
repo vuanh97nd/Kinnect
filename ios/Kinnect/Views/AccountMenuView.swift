@@ -33,17 +33,7 @@ struct AccountMenuView: View {
                 .padding(.top, 16)
             }
             .background(KinnectTheme.background.ignoresSafeArea())
-            .navigationTitle("Tài khoản")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Đóng") {
-                        dismiss()
-                    }
-                    .font(.body.weight(.semibold))
-                    .foregroundColor(KinnectTheme.accentBright)
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
             .confirmationDialog("Đăng xuất khỏi Kinnect?", isPresented: $showLogoutConfirm, titleVisibility: .visible) {
                 Button("Đăng xuất", role: .destructive) {
                     dismiss()
@@ -80,7 +70,6 @@ struct AccountMenuView: View {
 
     private var headerProfileCard: some View {
         Button {
-            dismiss()
             onOpenProfile()
         } label: {
             HStack(spacing: 16) {
@@ -265,23 +254,141 @@ struct AccountMenuView: View {
 // MARK: - Sub-sheets
 
 private struct PrivacySettingsView: View {
-    @State private var isPrivate = false
-    @State private var allowSearch = true
-    @State private var showOnlineStatus = true
+    @ObservedObject private var appState = AppState.shared
+    @State private var discoverable: Bool = true
+    @State private var showDistance: Bool = true
+    @State private var showActivity: Bool = true
+    @State private var dmFriendsOnly: Bool = false
+    @State private var isUpdating = false
 
     var body: some View {
         Form {
-            Section("Quyền riêng tư hồ sơ") {
-                Toggle("Hồ sơ riêng tư", isOn: $isPrivate)
-                Toggle("Cho phép tìm kiếm theo số điện thoại / email", isOn: $allowSearch)
-                Toggle("Hiển thị trạng thái hoạt động", isOn: $showOnlineStatus)
+            Section("Quyền riêng tư") {
+                Toggle(isOn: Binding(
+                    get: { showActivity },
+                    set: { val in
+                        showActivity = val
+                        updatePrivacySetting("showActivity", value: val)
+                    }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Trạng thái hoạt động")
+                            .font(.subheadline.bold())
+                        Text("Cho người khác biết khi bạn đang online")
+                            .font(.caption)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                }
+                .tint(KinnectTheme.accentBright)
+
+                Toggle(isOn: Binding(
+                    get: { discoverable },
+                    set: { val in
+                        discoverable = val
+                        updatePrivacySetting("discoverable", value: val)
+                    }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Cho phép tìm thấy tôi")
+                            .font(.subheadline.bold())
+                        Text("Xuất hiện trong Khám phá và Quanh đây")
+                            .font(.caption)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                }
+                .tint(KinnectTheme.accentBright)
+
+                Toggle(isOn: Binding(
+                    get: { showDistance },
+                    set: { val in
+                        showDistance = val
+                        updatePrivacySetting("showDistance", value: val)
+                    }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Hiển thị khoảng cách")
+                            .font(.subheadline.bold())
+                        Text("Chỉ hiện khoảng cách gần đúng")
+                            .font(.caption)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                }
+                .tint(KinnectTheme.accentBright)
             }
-            Section(footer: Text("Khi bật tài khoản riêng tư, chỉ những người bạn chấp nhận mới xem được bài viết và thông tin chi tiết.")) {
-                EmptyView()
+
+            Section("Tin nhắn trực tiếp") {
+                Toggle("Chỉ nhận tin nhắn từ bạn bè", isOn: Binding(
+                    get: { dmFriendsOnly },
+                    set: { val in
+                        dmFriendsOnly = val
+                        updateDmMode(val ? "friends" : "everyone")
+                    }
+                ))
+                .tint(KinnectTheme.accentBright)
+            }
+
+            Section("Vị trí và quanh đây") {
+                Button(role: .destructive) {
+                    Task { await turnOffLocation() }
+                } label: {
+                    HStack {
+                        Image(systemName: "location.slash")
+                        Text("Tắt tìm quanh đây")
+                    }
+                }
             }
         }
-        .navigationTitle("Quyền riêng tư")
+        .navigationTitle("Cài đặt & riêng tư")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            if let user = appState.currentUser {
+                self.discoverable = user.discoverable
+                self.showDistance = user.showDistance
+                self.showActivity = user.showActivity
+            }
+        }
+    }
+
+    private func updatePrivacySetting(_ key: String, value: Bool) {
+        if var user = appState.currentUser {
+            if key == "showActivity" { user.showActivity = value }
+            if key == "discoverable" { user.discoverable = value }
+            if key == "showDistance" { user.showDistance = value }
+            appState.currentUser = user
+        }
+        Task {
+            _ = try? await KinnectAPIClient.shared.requestJSON(
+                "/api/me",
+                method: "PATCH",
+                body: [key: value]
+            )
+            if key == "showActivity" && value {
+                appState.reportActiveStatus(force: true)
+            }
+        }
+    }
+
+    private func updateDmMode(_ mode: String) {
+        Task {
+            _ = try? await KinnectAPIClient.shared.requestJSON(
+                "/api/me",
+                method: "PATCH",
+                body: ["dmMode": mode]
+            )
+        }
+    }
+
+    private func turnOffLocation() async {
+        _ = try? await KinnectAPIClient.shared.requestJSON(
+            "/api/me/location",
+            method: "PATCH",
+            body: ["enabled": false]
+        )
+        if var user = appState.currentUser {
+            user.hasLocation = false
+            appState.currentUser = user
+        }
+        appState.showToast("Đã tắt tìm quanh đây")
     }
 }
 

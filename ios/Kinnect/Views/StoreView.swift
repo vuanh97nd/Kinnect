@@ -373,14 +373,14 @@ struct StoreView: View {
                     }
                     Spacer()
 
-                    // Visual Graphic / Icon
+                    // Visual Graphic / Icon (Parity Android StorePackageDesign)
                     Circle()
-                        .strokeBorder(Color.white.opacity(0.8), lineWidth: 3)
+                        .strokeBorder(Color.white.opacity(0.85), lineWidth: 2.5)
                         .frame(width: 48, height: 48)
-                        .background(Circle().fill(Color.white.opacity(0.2)))
+                        .background(Circle().fill(Color.white.opacity(0.22)))
                         .overlay(
-                            Text("K")
-                                .font(.title3.bold())
+                            Image(systemName: packageIconName(for: pkg.id, category: pkg.category))
+                                .font(.system(size: 22, weight: .bold))
                                 .foregroundColor(.white)
                         )
                 }
@@ -464,21 +464,52 @@ struct StoreView: View {
         )
     }
 
+    private func packageIconName(for id: String, category: String) -> String {
+        if id.starts(with: "studio_video_") { return "film.fill" }
+        if id.starts(with: "studio_photo_") { return "photo.fill" }
+        switch id {
+        case "style_neon", "style_aurora", "style_forest": return "sparkles"
+        case "style_galaxy": return "star.fill"
+        case "style_ice": return "snowflake"
+        case "style_ruby": return "heart.fill"
+        case "style_paper": return "newspaper.fill"
+        case "style_ember": return "flame.fill"
+        case "live_chill": return "antenna.radiowaves.left.and.right"
+        case "live_gaming", "live_game_30": return "gamecontroller.fill"
+        case "live_spotlight": return "sparkles"
+        case "gift_love": return "heart.fill"
+        case "gift_speed": return "bolt.fill"
+        case "gift_royal": return "crown.fill"
+        case "member_plus": return "crown.fill"
+        case "member_creator": return "film.fill"
+        case "studio_7", "studio_30": return "slider.horizontal.3"
+        default:
+            switch category {
+            case "style", "frame": return "paintpalette.fill"
+            case "studio": return "film.fill"
+            case "live": return "antenna.radiowaves.left.and.right"
+            case "gift", "gifts": return "gift.fill"
+            case "member", "membership": return "crown.fill"
+            default: return "sparkles"
+            }
+        }
+    }
+
     private func categoryIcon(for cat: StoreCategoryFilter, isSelected: Bool) -> some View {
         let tint = isSelected ? Color.white : KinnectTheme.textSecondary
         switch cat {
         case .style:
-            return AnyView(Image(systemName: "sparkles").font(.system(size: 13)).foregroundColor(tint))
-        case .live:
-            return AnyView(KinnectIcon(glyph: .live, size: 14, tint: tint))
+            return AnyView(Image(systemName: "paintpalette.fill").font(.system(size: 13)).foregroundColor(tint))
         case .studio:
-            return AnyView(Image(systemName: "camera.viewfinder").font(.system(size: 13)).foregroundColor(tint))
+            return AnyView(Image(systemName: "film.fill").font(.system(size: 13)).foregroundColor(tint))
+        case .live:
+            return AnyView(Image(systemName: "antenna.radiowaves.left.and.right").font(.system(size: 13)).foregroundColor(tint))
         case .gifts:
-            return AnyView(KinnectIcon(glyph: .gift, size: 14, tint: tint))
+            return AnyView(Image(systemName: "gift.fill").font(.system(size: 13)).foregroundColor(tint))
         case .member:
-            return AnyView(KinnectIcon(glyph: .profile, size: 14, tint: tint))
+            return AnyView(Image(systemName: "crown.fill").font(.system(size: 13)).foregroundColor(tint))
         case .owned:
-            return AnyView(Image(systemName: "checkmark.seal.fill").font(.system(size: 13)).foregroundColor(tint))
+            return AnyView(Image(systemName: "checkmark.circle.fill").font(.system(size: 13)).foregroundColor(tint))
         }
     }
 
@@ -514,13 +545,21 @@ struct StoreView: View {
 
     private func buyPackage(_ pkg: StorePackageItem) async {
         do {
-            let res = try await KinnectAPIClient.shared.requestJSON("/api/store/buy", method: "POST", body: ["packageId": pkg.id])
-            if res["ok"] as? Bool == true || res["success"] as? Bool == true {
+            let body: [String: Any] = [
+                "productId": pkg.id,
+                "packageId": pkg.id,
+                "priceCoins": pkg.priceCoins
+            ]
+            var res = try? await KinnectAPIClient.shared.requestJSON("/api/store/packages/buy", method: "POST", body: body)
+            if res == nil {
+                res = try await KinnectAPIClient.shared.requestJSON("/api/store/buy", method: "POST", body: body)
+            }
+            if let res, (res["ok"] as? Bool == true || res["success"] as? Bool == true) {
                 appState.showToast("Đã sở hữu \(pkg.title)!")
                 await loadStoreData()
                 await appState.refreshGlobalBadges()
             } else {
-                let err = res["error"] as? String ?? "Chưa hoàn tất giao dịch"
+                let err = res?["error"] as? String ?? "Chưa hoàn tất giao dịch"
                 appState.showToast(err)
             }
         } catch {
@@ -530,8 +569,15 @@ struct StoreView: View {
 
     private func equipPackage(_ pkg: StorePackageItem) async {
         do {
-            let res = try await KinnectAPIClient.shared.requestJSON("/api/profile/theme", method: "POST", body: ["theme": pkg.id])
-            if res["ok"] as? Bool == true || res["success"] as? Bool == true {
+            let body: [String: Any] = [
+                "productId": pkg.id,
+                "theme": pkg.id
+            ]
+            var res = try? await KinnectAPIClient.shared.requestJSON("/api/store/packages/apply", method: "POST", body: body)
+            if res == nil {
+                res = try await KinnectAPIClient.shared.requestJSON("/api/profile/theme", method: "POST", body: body)
+            }
+            if let res, (res["ok"] as? Bool == true || res["success"] as? Bool == true) {
                 appState.showToast("Đã kích hoạt \(pkg.title)!")
                 await loadStoreData()
             }
