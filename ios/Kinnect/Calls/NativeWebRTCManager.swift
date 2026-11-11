@@ -236,7 +236,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
             let msgType: String
             if current.isIncoming && current.state == .ringingIncoming {
                 msgType = "call-decline"
-            } else if !current.isIncoming && current.state == .ringingOutgoing {
+            } else if !current.isIncoming && current.state == .dialingOutgoing {
                 msgType = "call-cancel"
             } else {
                 msgType = "call-end"
