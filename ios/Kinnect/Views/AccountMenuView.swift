@@ -455,7 +455,7 @@ private struct AboutKinnectSheetView: View {
             Text("Kinnect")
                 .font(.title.weight(.bold))
                 .foregroundColor(KinnectTheme.textPrimary)
-            Text("Phiên bản 1.2.12 (Build 118)")
+            Text("Phiên bản 1.2.12 (Build 119)")
                 .font(.subheadline)
                 .foregroundColor(KinnectTheme.textSecondary)
             Text("Nền tảng mạng xã hội kết nối trực tiếp, livestream thời gian thực và tương tác đa phương tiện.")

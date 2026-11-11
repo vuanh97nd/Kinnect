@@ -14,7 +14,7 @@ enum AuthStage {
 }
 
 struct AuthView: View {
-    @EnvironmentObject private var appState: AppState
+    @ObservedObject private var appState = AppState.shared
     @StateObject private var oauth = OAuthManager.shared
     @ObservedObject private var loc = LocalizationManager.shared
 
@@ -299,6 +299,13 @@ struct AuthView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 10)
 
+            Text("Kinnect iOS v\(ServerConfig.appVersion) (Build \(ServerConfig.buildNumber))")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(LoginChrome.muted.opacity(0.8))
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 2)
+
         }
         .task {
             // Production always cycles; UI captures opt in explicitly to remain reproducible.
@@ -554,13 +561,16 @@ struct AuthView: View {
                         .font(.system(size: 8))
                         .foregroundColor(LoginChrome.ink)
 
-                    // Post Image with safe aspect ratio
-                    Image("WelcomeProfile")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 96)
-                        .clipShape(RoundedRectangle(cornerRadius: 7))
+                    // Post Image with safe aspect ratio and top alignment (Head/face fully visible - Android Parity)
+                    GeometryReader { geo in
+                        Image("WelcomeProfile")
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: geo.size.width, height: 112, alignment: .top)
+                            .clipped()
+                    }
+                    .frame(height: 112)
+                    .clipShape(RoundedRectangle(cornerRadius: 7))
 
                     // Action buttons: Heart, Comment, Share
                     HStack(spacing: 12) {
@@ -800,6 +810,13 @@ struct AuthView: View {
             Text(L10n.tr("Tiếp tục nghĩa là bạn đồng ý quy tắc cộng đồng."))
                 .font(.system(size: 12))
                 .foregroundColor(LoginChrome.muted)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 2)
+
+            Text("Kinnect iOS v\(ServerConfig.appVersion) (Build \(ServerConfig.buildNumber))")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(LoginChrome.muted.opacity(0.8))
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 2)

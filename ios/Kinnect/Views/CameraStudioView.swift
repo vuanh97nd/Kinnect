@@ -159,9 +159,20 @@ struct CameraStudioView: View {
 
     // Pickers
     @State private var selectedLibraryItem: PhotosPickerItem?
+    var onClose: (() -> Void)? = nil
 
-    init(initialMode: CaptureMode = .photo) {
+    init(initialMode: CaptureMode = .photo, onClose: (() -> Void)? = nil) {
         _captureMode = State(initialValue: initialMode)
+        self.onClose = onClose
+    }
+
+    private func closeCameraView() {
+        cameraController.stop()
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
+        }
     }
 
     var body: some View {
@@ -177,8 +188,12 @@ struct CameraStudioView: View {
         .background(KinnectTheme.background)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            cameraController.configureIfAuthorized()
-            cameraController.start()
+            Task {
+                _ = await MediaPermissionHandler.shared.requestCameraAccess()
+                _ = await MediaPermissionHandler.shared.requestMicrophoneAccess()
+                cameraController.configureIfAuthorized()
+                cameraController.start()
+            }
             cameraController.onCapturedImage = { uiImg in
                 self.originalImage = uiImg
                 self.photoProject.originalImage = uiImg
@@ -273,8 +288,7 @@ struct CameraStudioView: View {
         }
         .sheet(isPresented: $showCreateLiveSheet) {
             CreateLiveRoomSheet(onStarted: {
-                cameraController.stop()
-                dismiss()
+                closeCameraView()
             })
         }
     }
@@ -311,12 +325,42 @@ struct CameraStudioView: View {
                 }
             }
 
+            if cameraController.isPermissionDenied {
+                VStack(spacing: 16) {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 48))
+                        .foregroundColor(.white.opacity(0.85))
+                    Text("Cần quyền truy cập Camera")
+                        .font(.headline.weight(.bold))
+                        .foregroundColor(.white)
+                    Text("Vui lòng cấp quyền Camera và Micro trong Cài đặt iPhone để chụp ảnh, quay video và phát trực tiếp.")
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                    Button {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    } label: {
+                        Text("Mở Cài đặt iPhone")
+                            .font(.body.weight(.semibold))
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
+                            .background(Capsule().fill(Color.white))
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black.opacity(0.85))
+                .zIndex(15)
+            }
+
             VStack(spacing: 0) {
                 // Top Camera Chrome: Close, Aspect ratio 9:16, Music, Flash
                 HStack(spacing: 16) {
                     KinnectIconButton(glyph: .close, label: "Thoát Camera", tint: .white) {
-                        cameraController.stop()
-                        dismiss()
+                        closeCameraView()
                     }
 
                     Spacer()
@@ -1466,7 +1510,7 @@ struct CameraStudioView: View {
                     requestId: reqId
                 )
                 appState.showToast("Đã đăng video ngắn thành công!")
-                dismiss()
+                closeCameraView()
 
             case .feedPost:
                 _ = try await KinnectAPIClient.shared.requestJSON(
@@ -1476,7 +1520,7 @@ struct CameraStudioView: View {
                     requestId: reqId
                 )
                 appState.showToast("Đã đăng bài viết mới!")
-                dismiss()
+                closeCameraView()
 
             case .story:
                 _ = try await KinnectAPIClient.shared.requestJSON(
@@ -1486,7 +1530,7 @@ struct CameraStudioView: View {
                     requestId: reqId
                 )
                 appState.showToast("Đã đăng tin 24h!")
-                dismiss()
+                closeCameraView()
             }
         } catch {
             appState.showToast(error.localizedDescription)
@@ -1766,6 +1810,8 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
     @Published var availableLenses: [StudioLens] = []
     @Published var activeLens: StudioLens = .wide
     @Published var exposureBias: Float = 0
+    @Published var isPermissionDenied: Bool = false
+    @Published var isPermissionAuthorized: Bool = false
 
     var onCapturedImage: ((UIImage) -> Void)?
     var onCapturedVideoData: ((Data, URL) -> Void)?
@@ -1775,7 +1821,18 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
     func configureIfAuthorized() {
         #if !targetEnvironment(simulator)
         let status = AVCaptureDevice.authorizationStatus(for: .video)
+        if status == .denied || status == .restricted {
+            DispatchQueue.main.async {
+                self.isPermissionDenied = true
+                self.isPermissionAuthorized = false
+            }
+            return
+        }
         guard status == .authorized else { return }
+        DispatchQueue.main.async {
+            self.isPermissionDenied = false
+            self.isPermissionAuthorized = true
+        }
         if isConfigured {
             start()
             return
@@ -1787,7 +1844,8 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
            let input = try? AVCaptureDeviceInput(device: device), session.canAddInput(input) {
             session.addInput(input)
         }
-        if let audioDevice = AVCaptureDevice.default(for: .audio),
+        if AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
+           let audioDevice = AVCaptureDevice.default(for: .audio),
            let audioInput = try? AVCaptureDeviceInput(device: audioDevice), session.canAddInput(audioInput) {
             session.addInput(audioInput)
         }
@@ -1998,6 +2056,8 @@ final class CameraPreviewViewController: UIViewController {
     private let backdropLayer = CAGradientLayer()
     private let gridLayer = CAShapeLayer()
     private var simulatedImageView: UIImageView?
+    private var lastConfiguredPosition: AVCaptureDevice.Position? = nil
+    private var lastFlashState: Bool? = nil
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -2018,7 +2078,12 @@ final class CameraPreviewViewController: UIViewController {
         backdropLayer.frame = view.bounds
         simulatedImageView?.frame = view.bounds
         updateGridPath()
-        previewLayer?.frame = view.bounds
+        if let previewLayer {
+            previewLayer.frame = view.bounds
+            if let conn = previewLayer.connection, conn.isVideoOrientationSupported {
+                conn.videoOrientation = .portrait
+            }
+        }
     }
 
     private func setupViewfinderBackdrop() {
@@ -2099,17 +2164,27 @@ final class CameraPreviewViewController: UIViewController {
         #if !targetEnvironment(simulator)
         guard let ctrl = controller else { return }
         ctrl.configureIfAuthorized()
-        let layer = AVCaptureVideoPreviewLayer(session: ctrl.session)
-        layer.videoGravity = .resizeAspectFill
-        layer.frame = view.bounds
-        view.layer.insertSublayer(layer, above: backdropLayer)
-        previewLayer = layer
-        simulatedImageView?.removeFromSuperview()
-        simulatedImageView = nil
-        let tap = UITapGestureRecognizer(target: self, action: #selector(handleFocusTap(_:)))
-        view.addGestureRecognizer(tap)
-        let pan = UIPanGestureRecognizer(target: self, action: #selector(handleExposurePan(_:)))
-        view.addGestureRecognizer(pan)
+        if previewLayer == nil {
+            let layer = AVCaptureVideoPreviewLayer(session: ctrl.session)
+            layer.videoGravity = .resizeAspectFill
+            layer.frame = view.bounds
+            if let conn = layer.connection, conn.isVideoOrientationSupported {
+                conn.videoOrientation = .portrait
+            }
+            view.layer.insertSublayer(layer, at: 0)
+            previewLayer = layer
+            backdropLayer.isHidden = true
+            simulatedImageView?.removeFromSuperview()
+            simulatedImageView = nil
+            let tap = UITapGestureRecognizer(target: self, action: #selector(handleFocusTap(_:)))
+            view.addGestureRecognizer(tap)
+            let pan = UIPanGestureRecognizer(target: self, action: #selector(handleExposurePan(_:)))
+            view.addGestureRecognizer(pan)
+        } else {
+            previewLayer?.frame = view.bounds
+            backdropLayer.isHidden = true
+        }
+        ctrl.start()
         #endif
     }
 
@@ -2127,6 +2202,9 @@ final class CameraPreviewViewController: UIViewController {
 
     func setCamera(front: Bool) {
         #if !targetEnvironment(simulator)
+        let pos: AVCaptureDevice.Position = front ? .front : .back
+        guard pos != lastConfiguredPosition else { return }
+        lastConfiguredPosition = pos
         guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized,
               let session = controller?.session else { return }
         session.beginConfiguration()
@@ -2135,7 +2213,6 @@ final class CameraPreviewViewController: UIViewController {
                 session.removeInput(devInput)
             }
         }
-        let pos: AVCaptureDevice.Position = front ? .front : .back
         if let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: pos),
            let input = try? AVCaptureDeviceInput(device: device), session.canAddInput(input) {
             session.addInput(input)
@@ -2149,6 +2226,8 @@ final class CameraPreviewViewController: UIViewController {
 
     func setFlash(on: Bool) {
         #if !targetEnvironment(simulator)
+        guard on != lastFlashState else { return }
+        lastFlashState = on
         guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized,
               let device = AVCaptureDevice.default(for: .video), device.hasTorch else { return }
         try? device.lockForConfiguration()

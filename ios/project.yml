@@ -14,7 +14,7 @@ packages:
 settings:
   base:
     MARKETING_VERSION: "1.2.12"
-    CURRENT_PROJECT_VERSION: "118"
+    CURRENT_PROJECT_VERSION: "119"
     SWIFT_VERSION: "5.0"
     IPHONEOS_DEPLOYMENT_TARGET: "16.0"
     TARGETED_DEVICE_FAMILY: "1,2"
@@ -40,7 +40,7 @@ targets:
           - en
         ITSAppUsesNonExemptEncryption: false
         CFBundleShortVersionString: "1.2.12"
-        CFBundleVersion: "118"
+        CFBundleVersion: "119"
         LSRequiresIPhoneOS: true
         CFBundleURLTypes:
           - CFBundleTypeRole: Editor
@@ -77,7 +77,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: app.kinnect.live
         PRODUCT_NAME: Kinnect
         MARKETING_VERSION: "1.2.12"
-        CURRENT_PROJECT_VERSION: "118"
+        CURRENT_PROJECT_VERSION: "119"
         INFOPLIST_FILE: Kinnect/Resources/Info.plist
         CODE_SIGN_ENTITLEMENTS: Kinnect/Resources/Kinnect.entitlements
         GENERATE_INFOPLIST_FILE: NO

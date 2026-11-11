@@ -548,24 +548,6 @@ struct RootMainView: View {
                             .sheet(item: $appState.pendingPrivacyConsent) { req in
                                 PrivacyConsentSheet(request: req, onAccepted: {})
                             }
-                            .sheet(isPresented: $showCameraStudioSheet) {
-                                NavigationStack {
-                                    CameraStudioView()
-                                }
-                            }
-                            .sheet(isPresented: $showProfileDetailSheet) {
-                                NavigationStack {
-                                    ProfileView(
-                                        onOpenWallet: { activeTopSection = .wallet },
-                                        onOpenFriends: { activeTopSection = .friends }
-                                    )
-                                    .toolbar {
-                                        ToolbarItem(placement: .cancellationAction) {
-                                            Button("Đóng") { showProfileDetailSheet = false }
-                                        }
-                                    }
-                                }
-                            }
                         }
 
     @ViewBuilder
@@ -708,93 +690,281 @@ struct RootMainView: View {
     }
 
     private var iPhoneLayout: some View {
-        VStack(spacing: 0) {
-            if selectedTab == .feed || selectedTab == .discover {
-                KinnectTopBar(
-                    appState: appState,
-                    activeTopSection: $activeTopSection,
-                    onLogoTap: {
-                        selectedTab = .feed
-                    }
-                )
-            }
-
-            ZStack {
-                switch selectedTab {
-                case .feed:
-                    FeedView(
-                        onOpenCamera: { showCameraStudioSheet = true },
-                        onOpenFriends: { activeTopSection = .friends }
+        ZStack {
+            VStack(spacing: 0) {
+                if selectedTab == .feed || selectedTab == .discover {
+                    KinnectTopBar(
+                        appState: appState,
+                        activeTopSection: $activeTopSection,
+                        onLogoTap: {
+                            selectedTab = .feed
+                        }
                     )
-                case .discover:
-                    DiscoverView(onOpenCamera: { showCameraStudioSheet = true })
-                case .create:
-                    CameraStudioView()
-                case .video:
-                    ShortsVideoView()
-                case .live:
-                    LiveStreamView(onOpenWallet: { activeTopSection = .wallet })
+                }
+
+                ZStack {
+                    switch selectedTab {
+                    case .feed:
+                        FeedView(
+                            onOpenCamera: { showCameraStudioSheet = true },
+                            onOpenFriends: { activeTopSection = .friends }
+                        )
+                    case .discover:
+                        DiscoverView(onOpenCamera: { showCameraStudioSheet = true })
+                    case .create:
+                        CameraStudioView(onClose: { selectedTab = .feed })
+                    case .video:
+                        ShortsVideoView()
+                    case .live:
+                        LiveStreamView(onOpenWallet: { activeTopSection = .wallet })
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                // Material 3 Bottom Navigation Bar (Android 1.2.12 lines 473-515)
+                KinnectBottomBar(selectedTab: $selectedTab) {
+                    showCameraStudioSheet = true
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // Material 3 Bottom Navigation Bar (Android 1.2.12 lines 473-515)
-            KinnectBottomBar(selectedTab: $selectedTab) {
-                showCameraStudioSheet = true
+            // FULL SCREEN MAIN SECTIONS (TIN NHẮN, THÔNG BÁO, CỬA HÀNG & VÍ, BẠN BÈ, HỒ SƠ)
+            if let section = activeTopSection {
+                fullScreenSectionView(section)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing),
+                        removal: .move(edge: .trailing)
+                    ))
+                    .zIndex(30)
             }
-        }
-        .sheet(item: $activeTopSection) { section in
-            NavigationStack {
-                topSectionSheetDestination(section)
+
+            // FULL SCREEN CAMERA STUDIO (TẠO ẢNH / VIDEO)
+            if showCameraStudioSheet {
+                CameraStudioView(onClose: { showCameraStudioSheet = false })
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom),
+                        removal: .move(edge: .bottom)
+                    ))
+                    .zIndex(35)
+            }
+
+            // FULL SCREEN PROFILE DETAIL
+            if showProfileDetailSheet {
+                fullScreenProfileDetailView
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing),
+                        removal: .move(edge: .trailing)
+                    ))
+                    .zIndex(40)
             }
         }
     }
 
     @ViewBuilder
-    private func topSectionSheetDestination(_ section: KinnectTopSection) -> some View {
+    private func fullScreenSectionView(_ section: KinnectTopSection) -> some View {
+        VStack(spacing: 0) {
+            sectionCustomHeader(section)
+
+            Group {
+                switch section {
+                case .notifications:
+                    NotificationsView()
+                case .wallet:
+                    WalletStoreView(initialTab: .wallet)
+                case .friends:
+                    FriendsView(initialTab: .friends)
+                case .messages:
+                    NavigationStack {
+                        MessagesView(initialScope: .direct, onOpenFriends: { activeTopSection = .friends })
+                    }
+                case .profile:
+                    AccountMenuView(
+                        onOpenProfile: {
+                            showProfileDetailSheet = true
+                        },
+                        onOpenWallet: {
+                            activeTopSection = .wallet
+                        },
+                        onOpenFriends: {
+                            activeTopSection = .friends
+                        }
+                    )
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .background(KinnectTheme.background.ignoresSafeArea())
+    }
+
+    @ViewBuilder
+    private func sectionCustomHeader(_ section: KinnectTopSection) -> some View {
+        HStack(spacing: 12) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    activeTopSection = nil
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.left")
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundColor(KinnectTheme.textPrimary)
+                }
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Quay lại")
+
+            HStack(spacing: 8) {
+                Text(sectionTitle(for: section))
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(KinnectTheme.textPrimary)
+                    .lineLimit(1)
+
+                if section == .messages && appState.unreadMessagesCount > 0 {
+                    badgePill(appState.unreadMessagesCount)
+                }
+                if section == .notifications && appState.unreadNotificationsCount > 0 {
+                    badgePill(appState.unreadNotificationsCount)
+                }
+            }
+
+            Spacer()
+
+            sectionTrailingActions(section)
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 52)
+        .background(KinnectTheme.surface.ignoresSafeArea(edges: .top))
+        .overlay(
+            Divider().background(KinnectTheme.borderSoft),
+            alignment: .bottom
+        )
+    }
+
+    private func sectionTitle(for section: KinnectTopSection) -> String {
+        switch section {
+        case .notifications: return "Thông báo"
+        case .wallet: return "Cửa hàng & Ví"
+        case .friends: return "Bạn bè"
+        case .messages: return "Tin nhắn"
+        case .profile: return "Tài khoản"
+        }
+    }
+
+    @ViewBuilder
+    private func sectionTrailingActions(_ section: KinnectTopSection) -> some View {
         switch section {
         case .notifications:
-            NotificationsView()
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Đóng") { activeTopSection = nil }
-                    }
+            Button {
+                Task {
+                    await appState.refreshGlobalBadges()
                 }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("Đã đọc")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundColor(KinnectTheme.accentBright)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(KinnectTheme.surfaceElevated))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Đánh dấu tất cả đã đọc")
+
         case .wallet:
-            WalletStoreView(initialTab: .wallet)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Đóng") { activeTopSection = nil }
-                    }
+            if let user = appState.currentUser {
+                HStack(spacing: 4) {
+                    Text("🪙")
+                        .font(.system(size: 13))
+                    Text("\(user.coins) xu")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(KinnectTheme.warning)
                 }
-        case .friends:
-            FriendsView(initialTab: .friends)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Đóng") { activeTopSection = nil }
-                    }
-                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Capsule().fill(KinnectTheme.surfaceElevated))
+            }
+
         case .messages:
-            MessagesView(initialScope: .direct, onOpenFriends: { activeTopSection = .friends })
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Đóng") { activeTopSection = nil }
-                    }
-                }
+            Button {
+                NotificationCenter.default.post(name: NSNotification.Name("kinnect_open_create_group"), object: nil)
+            } label: {
+                KinnectIcon(glyph: .add, size: 20, tint: KinnectTheme.accentBright)
+                    .frame(width: 38, height: 38)
+                    .background(Circle().fill(KinnectTheme.surfaceElevated))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Tạo nhóm mới")
+
+        case .friends:
+            Button {
+                activeTopSection = .messages
+            } label: {
+                KinnectIcon(glyph: .messages, size: 20, tint: KinnectTheme.textPrimary)
+                    .frame(width: 38, height: 38)
+                    .background(Circle().fill(KinnectTheme.surfaceElevated))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Tin nhắn bạn bè")
+
         case .profile:
-            AccountMenuView(
-                onOpenProfile: {
-                    activeTopSection = nil
-                    showProfileDetailSheet = true
-                },
+            Button {
+                showProfileDetailSheet = true
+            } label: {
+                Text("Xem hồ sơ")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(KinnectTheme.accentBright)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(KinnectTheme.surfaceElevated))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Xem hồ sơ đầy đủ")
+        }
+    }
+
+    private var fullScreenProfileDetailView: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        showProfileDetailSheet = false
+                    }
+                } label: {
+                    Image(systemName: "arrow.left")
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundColor(KinnectTheme.textPrimary)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Quay lại")
+
+                Text("Hồ sơ cá nhân")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(KinnectTheme.textPrimary)
+
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 52)
+            .background(KinnectTheme.surface.ignoresSafeArea(edges: .top))
+            .overlay(Divider().background(KinnectTheme.borderSoft), alignment: .bottom)
+
+            ProfileView(
                 onOpenWallet: {
+                    showProfileDetailSheet = false
                     activeTopSection = .wallet
                 },
                 onOpenFriends: {
+                    showProfileDetailSheet = false
                     activeTopSection = .friends
                 }
             )
         }
+        .background(KinnectTheme.background.ignoresSafeArea())
     }
 
                         @ViewBuilder
