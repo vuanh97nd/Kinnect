@@ -182,7 +182,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         guard !callId.isEmpty else { return }
         if activeCall != nil && activeCall?.callId != callId {
             NativeSocketClient.shared.sendJSON([
-                "type": "call-reject",
+                "type": "call-decline",
                 "callId": callId,
                 "reason": "busy"
             ])
@@ -233,7 +233,14 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         guard let current = activeCall else { return }
         let callId = current.callId
         if sendSocket {
-            let msgType = (current.isIncoming && current.state == .ringingIncoming) ? "call-reject" : "call-end"
+            let msgType: String
+            if current.isIncoming && current.state == .ringingIncoming {
+                msgType = "call-decline"
+            } else if !current.isIncoming && current.state == .ringingOutgoing {
+                msgType = "call-cancel"
+            } else {
+                msgType = "call-end"
+            }
             NativeSocketClient.shared.sendJSON([
                 "type": msgType,
                 "callId": callId

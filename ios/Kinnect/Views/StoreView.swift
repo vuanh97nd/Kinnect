@@ -70,7 +70,7 @@ struct StoreView: View {
             }
             Button("Phong cách mặc định") {
                 Task {
-                    _ = try? await KinnectAPIClient.shared.requestJSON("/api/profile/theme", method: "POST", body: ["theme": ""])
+                    _ = try? await KinnectAPIClient.shared.requestJSON("/api/store/style", method: "POST", body: ["productId": ""])
                     appState.showToast("Đã chuyển về phong cách mặc định")
                     await loadStoreData()
                 }
@@ -573,11 +573,12 @@ struct StoreView: View {
                 "productId": pkg.id,
                 "theme": pkg.id
             ]
-            var res = try? await KinnectAPIClient.shared.requestJSON("/api/store/packages/apply", method: "POST", body: body)
+            let endpoint = (pkg.category == "style" || pkg.id.starts(with: "style_")) ? "/api/store/style" : "/api/store/packages/apply"
+            var res = try? await KinnectAPIClient.shared.requestJSON(endpoint, method: "POST", body: body)
             if res == nil {
-                res = try await KinnectAPIClient.shared.requestJSON("/api/profile/theme", method: "POST", body: body)
+                res = try await KinnectAPIClient.shared.requestJSON("/api/store/packages/apply", method: "POST", body: body)
             }
-            if let res, (res["ok"] as? Bool == true || res["success"] as? Bool == true) {
+            if let res, (res["ok"] as? Bool == true || res["success"] as? Bool == true || res["appearance"] != nil) {
                 appState.showToast("Đã kích hoạt \(pkg.title)!")
                 await loadStoreData()
             }

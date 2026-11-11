@@ -1464,7 +1464,7 @@ struct PrivateAlbumManageSheet: View {
 
 struct ProfileShortDetailSheet: View {
     let short: ShortItem
-    let onRefresh: () -> Void
+    var onRefresh: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
 
@@ -1528,7 +1528,7 @@ struct ProfileShortDetailSheet: View {
                 requestId: "del_short_\(short.id)"
             )
             appState.showToast("Đã xóa video ngắn.")
-            onRefresh()
+            onRefresh?()
             dismiss()
         } catch {
             appState.showToast(error.localizedDescription)

@@ -129,7 +129,7 @@ struct WalletStoreView: View {
             }
             Button("Phong cách mặc định") {
                 Task {
-                    _ = try? await KinnectAPIClient.shared.requestJSON("/api/profile/theme", method: "POST", body: ["theme": ""])
+                    _ = try? await KinnectAPIClient.shared.requestJSON("/api/store/style", method: "POST", body: ["productId": ""])
                     appState.showToast("Đã chuyển về phong cách mặc định")
                 }
             }

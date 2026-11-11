@@ -69,7 +69,7 @@ jobs:
         run: |
           mkdir -p build/Payload dist
           cp -R build/Kinnect.xcarchive/Products/Applications/Kinnect.app build/Payload/Kinnect.app
-          codesign --force --deep --sign - build/Payload/Kinnect.app
+          codesign --force --deep --sign - --entitlements ios/Kinnect/Resources/Kinnect.entitlements build/Payload/Kinnect.app
           cd build
           zip -qry "../dist/Kinnect-1.2.12-ios.ipa" Payload
           cd ../dist
