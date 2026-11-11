@@ -755,539 +755,489 @@ struct CameraStudioView: View {
     }
 
     // MARK: - Media Edit Mode (Real Mobile Editor with Parity to Android PhotoEditActivity)
-    private var mediaEditMode: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                // Header: Exit (top-left), Studio Pro Heading, Save to Photos, Studio Pro badge
-                HStack(spacing: 8) {
-                    KinnectIconButton(glyph: .close, label: "Thoát", tint: KinnectTheme.textPrimary) {
-                        originalImage = nil
-                        previewImage = nil
-                        videoDataURL = ""
-                        capturedVideoTempURL = nil
-                        videoProject = nil
+    @ViewBuilder
+    private var mediaEditHeader: some View {
+        HStack(spacing: 8) {
+            KinnectIconButton(glyph: .close, label: "Thoát", tint: KinnectTheme.textPrimary) {
+                originalImage = nil
+                previewImage = nil
+                videoDataURL = ""
+                capturedVideoTempURL = nil
+                videoProject = nil
+            }
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Studio Pro")
+                    .font(.headline.bold())
+                    .foregroundColor(.white)
+                Text(capturedVideoTempURL != nil || !videoDataURL.isEmpty ? "Video" : "Ảnh")
+                    .font(.caption2)
+                    .foregroundColor(KinnectTheme.textSecondary)
+            }
+
+            Spacer()
+
+            if isVideoActive {
+                Button {
+                    selectedTool = .audio
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "music.note")
+                            .font(.caption2.bold())
+                        Text(videoProject?.musicTitle.isEmpty == false ? videoProject!.musicTitle : (selectedMusicTrack.isEmpty ? "Gán nhạc" : selectedMusicTrack))
+                            .font(.caption2.bold())
+                            .lineLimit(1)
                     }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(videoProject?.musicURL != nil || !selectedMusicTrack.isEmpty ? KinnectTheme.accentBright.opacity(0.85) : Color.white.opacity(0.15)))
+                    .foregroundColor(.white)
+                }
+                .accessibilityLabel("Gán nhạc nền cho video")
+            }
 
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Studio Pro")
-                            .font(.headline.bold())
-                            .foregroundColor(.white)
-                        Text(capturedVideoTempURL != nil || !videoDataURL.isEmpty ? "Video" : "Ảnh")
-                            .font(.caption2)
-                            .foregroundColor(KinnectTheme.textSecondary)
-                    }
+            Button {
+                showStudioProSheet = true
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "sparkles")
+                        .font(.caption.bold())
+                    Text("Studio Pro")
+                        .font(.caption2.bold())
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(KinnectTheme.primaryGradient))
+                .foregroundColor(.white)
+            }
+            .accessibilityLabel("Mở bảng bộ lọc Studio Pro")
 
-                    Spacer()
+            Button {
+                saveMediaToPhotos()
+            } label: {
+                HStack(spacing: 4) {
+                    KinnectIcon(glyph: .save, size: 14, tint: .white)
+                    Text("Lưu về máy")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
+            }
+            .accessibilityLabel("Lưu vào thiết bị")
+        }
+        .padding(.horizontal, 4)
+    }
 
-                    if isVideoActive {
-                        Button {
-                            selectedTool = .audio
-                        } label: {
-                            HStack(spacing: 5) {
-                                Image(systemName: "music.note")
-                                    .font(.caption2.bold())
-                                Text(videoProject?.musicTitle.isEmpty == false ? videoProject!.musicTitle : (selectedMusicTrack.isEmpty ? "Gán nhạc" : selectedMusicTrack))
-                                    .font(.caption2.bold())
-                                    .lineLimit(1)
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Capsule().fill(videoProject?.musicURL != nil || !selectedMusicTrack.isEmpty ? KinnectTheme.accentBright.opacity(0.85) : Color.white.opacity(0.15)))
-                            .foregroundColor(.white)
-                        }
-                        .accessibilityLabel("Gán nhạc nền cho video")
-                    }
+    @ViewBuilder
+    private var mediaEditStage: some View {
+        ZStack(alignment: .bottom) {
+            if let vURL = capturedVideoTempURL ?? (UIReviewFixture.activeScreen == "camera-studio-video-edit" ? UIReviewFixture.samplePlayableVideoURL() : nil) {
+                StudioVideoPlayerView(videoURL: vURL, videoProject: videoProject ?? StudioVideoProject(sourceURL: vURL), revisionId: videoCompositionRevision)
+                    .frame(maxWidth: .infinity, minHeight: 280, maxHeight: 340)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+            } else {
+                let displayImg = isComparingOriginal
+                    ? (originalImage ?? UIReviewFixture.samplePreviewImage())
+                    : (previewImage ?? UIReviewFixture.samplePreviewImage())
+                Image(uiImage: displayImg)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, minHeight: 240, maxHeight: 340)
+                    .background(Color(red: 0.05, green: 0.04, blue: 0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(KinnectTheme.border, lineWidth: 1)
+                    )
+            }
 
-                    // Studio Pro Template Sheet Trigger
-                    Button {
-                        showStudioProSheet = true
-                    } label: {
+            if capturedVideoTempURL == nil && videoDataURL.isEmpty {
+                HStack {
+                    Button {} label: {
                         HStack(spacing: 4) {
-                            Image(systemName: "sparkles")
-                                .font(.caption.bold())
-                            Text("Studio Pro")
+                            Image(systemName: "eye.fill")
+                                .font(.caption2)
+                            Text(isComparingOriginal ? "Đang xem ảnh gốc" : "Giữ xem gốc")
                                 .font(.caption2.bold())
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background(Capsule().fill(KinnectTheme.primaryGradient))
-                        .foregroundColor(.white)
+                        .background(Capsule().fill(Color.black.opacity(0.75)))
+                        .foregroundColor(isComparingOriginal ? KinnectTheme.accentBright : .white)
                     }
-                    .accessibilityLabel("Mở bảng bộ lọc Studio Pro")
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { _ in isComparingOriginal = true }
+                            .onEnded { _ in isComparingOriginal = false }
+                    )
+                    .accessibilityLabel("Giữ để xem ảnh gốc")
 
-                    // Distinct Save Button (directly saves to Photos Library)
+                    Spacer()
+
                     Button {
-                        saveMediaToPhotos()
+                        photoProject.cropRatio = .original
+                        photoProject.rotation = 0
+                        photoProject.flipHorizontal = false
+                        updatePhotoPreview()
                     } label: {
-                        HStack(spacing: 4) {
-                            KinnectIcon(glyph: .save, size: 14, tint: .white)
-                            Text("Lưu về máy")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundColor(.white)
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
+                        Text("Vừa khung")
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(Color.black.opacity(0.75)))
+                            .foregroundColor(.white)
                     }
-                    .accessibilityLabel("Lưu vào thiết bị")
+                    .accessibilityLabel("Vừa khung hình ảnh")
                 }
-                .padding(.horizontal, 4)
+                .padding(12)
+            }
+        }
+    }
 
-                // Large Media Stage (Zoomable Photo Canvas or Native AVPlayer)
-                ZStack(alignment: .bottom) {
-                    if let vURL = capturedVideoTempURL ?? (UIReviewFixture.activeScreen == "camera-studio-video-edit" ? UIReviewFixture.samplePlayableVideoURL() : nil) {
-                        StudioVideoPlayerView(videoURL: vURL, videoProject: videoProject ?? StudioVideoProject(sourceURL: vURL), revisionId: videoCompositionRevision)
-                            .frame(maxWidth: .infinity, minHeight: 280, maxHeight: 340)
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
+    @ViewBuilder
+    private var mediaEditToolSelector: some View {
+        Picker("Công cụ chỉnh sửa", selection: $selectedTool) {
+            ForEach(StudioEditTool.allCases) { tool in
+                Text(tool.rawValue).tag(tool)
+            }
+        }
+        .pickerStyle(.segmented)
+    }
+
+    @ViewBuilder
+    private var mediaEditToolPanel: some View {
+        VStack(spacing: 12) {
+            switch selectedTool {
+            case .crop:
+                VStack(alignment: .leading, spacing: 10) {
+                    if isVideoActive {
+                        HStack {
+                            Text("Cắt thời lượng video (Trim):")
+                                .font(.caption.bold())
+                                .foregroundColor(KinnectTheme.textSecondary)
+                            Spacer()
+                            if let vp = videoProject {
+                                Text(String(format: "%.1fs - %.1fs (%.1fs)", vp.trimIn, vp.trimOut, max(0, vp.trimOut - vp.trimIn)))
+                                    .font(.caption.bold())
+                                    .foregroundColor(KinnectTheme.accentBright)
+                            }
+                        }
+
+                        if let vp = videoProject {
+                            VStack(spacing: 8) {
+                                HStack {
+                                    Text(L10n.tr("Điểm đầu"))
+                                        .font(.caption2)
+                                        .foregroundColor(KinnectTheme.textSecondary)
+                                        .frame(width: 50, alignment: .leading)
+                                    Slider(value: Binding(get: { vp.trimIn }, set: { vp.trimIn = min($0, max(0, vp.trimOut - 0.5)) }), in: 0...max(1, vp.duration), step: 0.1)
+                                        .tint(KinnectTheme.accentBright)
+                                }
+
+                                HStack {
+                                    Text(L10n.tr("Điểm cuối"))
+                                        .font(.caption2)
+                                        .foregroundColor(KinnectTheme.textSecondary)
+                                        .frame(width: 50, alignment: .leading)
+                                    Slider(value: Binding(get: { vp.trimOut }, set: { vp.trimOut = max($0, min(vp.duration, vp.trimIn + 0.5)) }), in: 0...max(1, vp.duration), step: 0.1)
+                                        .tint(KinnectTheme.accentBright)
+                                }
+                                HStack(spacing: 8) {
+                                    Text("Tốc độ")
+                                        .font(.caption2)
+                                        .foregroundColor(KinnectTheme.textSecondary)
+                                    ForEach([0.5, 1.0, 1.5, 2.0], id: \.self) { rate in
+                                        Button("\(String(format: "%.1fx", rate))") {
+                                            vp.playbackRate = rate
+                                        }
+                                        .font(.caption2.bold())
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Capsule().fill(abs(vp.playbackRate - rate) < 0.05 ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated))
+                                        .foregroundColor(.white)
+                                    }
+                                }
+                            }
+                        }
                     } else {
-                        let displayImg = isComparingOriginal
-                            ? (originalImage ?? UIReviewFixture.samplePreviewImage())
-                            : (previewImage ?? UIReviewFixture.samplePreviewImage())
-                        Image(uiImage: displayImg)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: .infinity, minHeight: 240, maxHeight: 340)
-                            .background(Color(red: 0.05, green: 0.04, blue: 0.08))
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(KinnectTheme.border, lineWidth: 1)
-                            )
+                        HStack(spacing: 12) {
+                            Button {
+                                photoProject.rotateLeft()
+                                updatePhotoPreview()
+                            } label: {
+                                Label("Xoay trái", systemImage: "rotate.left")
+                                    .font(.caption.bold())
+                                    .padding(8)
+                                    .background(RoundedRectangle(cornerRadius: 8).fill(KinnectTheme.surfaceElevated))
+                                    .foregroundColor(.white)
+                            }
+
+                            Button {
+                                photoProject.rotateRight()
+                                updatePhotoPreview()
+                            } label: {
+                                Label("Xoay phải", systemImage: "rotate.right")
+                                    .font(.caption.bold())
+                                    .padding(8)
+                                    .background(RoundedRectangle(cornerRadius: 8).fill(KinnectTheme.surfaceElevated))
+                                    .foregroundColor(.white)
+                            }
+
+                            Button {
+                                photoProject.flipHorizontal.toggle()
+                                updatePhotoPreview()
+                            } label: {
+                                Label("Lật", systemImage: "arrow.left.and.right.righttriangle.left.righttriangle.right.fill")
+                                    .font(.caption.bold())
+                                    .padding(8)
+                                    .background(RoundedRectangle(cornerRadius: 8).fill(KinnectTheme.surfaceElevated))
+                                    .foregroundColor(.white)
+                            }
+                        }
+                    }
+                }
+                .padding(14)
+                .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated.opacity(0.6)))
+
+            case .color:
+                VStack(spacing: 10) {
+                    studioSliderRow(name: "Độ sáng", value: $photoProject.brightness, range: -50...50)
+                    studioSliderRow(name: "Độ tương phản", value: $photoProject.contrast, range: -50...50)
+                    studioSliderRow(name: "Độ bão hòa", value: $photoProject.saturation, range: -50...50)
+                    studioSliderRow(name: "Độ ấm", value: $photoProject.warmth, range: -50...50)
+                    HStack {
+                        Spacer()
+                        Button("Đặt lại màu") {
+                            photoProject.resetColor()
+                            updatePhotoPreview()
+                        }
+                        .font(.caption.bold())
+                        .foregroundColor(KinnectTheme.accentBright)
+                    }
+                }
+                .padding(14)
+                .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated.opacity(0.6)))
+
+            case .beauty:
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Làm mịn da tự nhiên:")
+                        .font(.caption.bold())
+                        .foregroundColor(KinnectTheme.textSecondary)
+
+                    Text("Làm mịn theo tần số chỉ trên má, trán và cằm. Mắt, lông mày, môi và tóc được giữ nguyên khi nhận diện được khuôn mặt.")
+                        .font(.caption2)
+                        .foregroundColor(KinnectTheme.textSecondary)
+
+                    studioSliderRow(name: "Mức làm mịn", value: $photoProject.smooth, range: 0...100)
+                }
+                .padding(14)
+                .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated.opacity(0.6)))
+
+            case .audio:
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Image(systemName: "music.note")
+                            .foregroundColor(KinnectTheme.accentBright)
+                        Text("Gán nhạc nền & Cân bằng âm thanh:")
+                            .font(.caption.bold())
+                            .foregroundColor(KinnectTheme.textSecondary)
+                        Spacer()
                     }
 
-                    // Floating On-Stage Controls (Compare Original & Fit)
-                    if capturedVideoTempURL == nil && videoDataURL.isEmpty {
-                        HStack {
-                            Button {
-                                // Tap or hold to compare
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "eye.fill")
-                                        .font(.caption2)
-                                    Text(isComparingOriginal ? "Đang xem ảnh gốc" : "Giữ xem gốc")
-                                        .font(.caption2.bold())
-                                }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Capsule().fill(Color.black.opacity(0.75)))
-                                .foregroundColor(isComparingOriginal ? KinnectTheme.accentBright : .white)
+                    if isVideoActive, let vp = videoProject {
+                        HStack(spacing: 12) {
+                            ZStack {
+                                Circle()
+                                    .fill(KinnectTheme.accentBright.opacity(0.2))
+                                    .frame(width: 44, height: 44)
+                                Image(systemName: vp.musicURL != nil || !selectedMusicTrack.isEmpty ? "music.note.list" : "music.note")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(KinnectTheme.accentBright)
                             }
-                            .simultaneousGesture(
-                                DragGesture(minimumDistance: 0)
-                                    .onChanged { _ in isComparingOriginal = true }
-                                    .onEnded { _ in isComparingOriginal = false }
-                            )
-                            .accessibilityLabel("Giữ để xem ảnh gốc")
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(vp.musicTitle.isEmpty ? (selectedMusicTrack.isEmpty ? "Chưa chọn nhạc nền" : selectedMusicTrack) : vp.musicTitle)
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+                                Text(vp.musicURL != nil || !vp.musicTitle.isEmpty || !selectedMusicTrack.isEmpty ? "Nhạc đã gán • Sẽ trộn vào video khi xuất" : "Nhấn để chọn bài hát hoặc tải từ máy")
+                                    .font(.caption2)
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                            }
 
                             Spacer()
 
                             Button {
-                                photoProject.cropRatio = .original
-                                photoProject.rotation = 0
-                                photoProject.flipHorizontal = false
-                                updatePhotoPreview()
+                                showMusicPickerSheet = true
                             } label: {
-                                Text("Vừa khung")
-                                    .font(.caption2.bold())
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                                    .background(Capsule().fill(Color.black.opacity(0.75)))
+                                Text(vp.musicURL != nil || !selectedMusicTrack.isEmpty ? "Đổi bài" : "Chọn nhạc")
+                                    .font(.caption.bold())
                                     .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(Capsule().fill(KinnectTheme.primaryGradient))
                             }
-                            .accessibilityLabel("Vừa khung hình ảnh")
                         }
                         .padding(12)
-                    }
-                }
+                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surface))
 
-                // Studio Editor Tool Selector Strip (Crop & Rotate, Adjust, Smooth, Pro Filters)
-                Picker("Công cụ chỉnh sửa", selection: $selectedTool) {
-                    ForEach(StudioEditTool.allCases) { tool in
-                        Text(tool.rawValue).tag(tool)
-                    }
-                }
-                .pickerStyle(.segmented)
-
-                // Tool Control Panel
-                VStack(spacing: 12) {
-                    switch selectedTool {
-                    case .crop:
-                        VStack(alignment: .leading, spacing: 10) {
-                            if isVideoActive {
-                                HStack {
-                                    Text("Cắt thời lượng video (Trim):")
+                        if vp.musicURL != nil || !vp.musicTitle.isEmpty || !selectedMusicTrack.isEmpty {
+                            Button(role: .destructive) {
+                                vp.musicURL = nil
+                                vp.musicTitle = ""
+                                selectedMusicTrack = ""
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "trash")
+                                        .font(.caption)
+                                    Text("Gỡ bỏ nhạc nền")
                                         .font(.caption.bold())
-                                        .foregroundColor(KinnectTheme.textSecondary)
-                                    Spacer()
-                                    if let vp = videoProject {
-                                        Text(String(format: "%.1fs - %.1fs (%.1fs)", vp.trimIn, vp.trimOut, max(0, vp.trimOut - vp.trimIn)))
-                                            .font(.caption.bold())
-                                            .foregroundColor(KinnectTheme.accentBright)
-                                    }
                                 }
-
-                                if let vp = videoProject {
-                                    VStack(spacing: 8) {
-                                        HStack {
-                                            Text(L10n.tr("Điểm đầu"))
-                                                .font(.caption2)
-                                                .foregroundColor(KinnectTheme.textSecondary)
-                                                .frame(width: 50, alignment: .leading)
-                                            Slider(value: Binding(get: { vp.trimIn }, set: { vp.trimIn = min($0, max(0, vp.trimOut - 0.5)) }), in: 0...max(1, vp.duration), step: 0.1)
-                                                .tint(KinnectTheme.accentBright)
-                                        }
-
-                                        HStack {
-                                            Text(L10n.tr("Điểm cuối"))
-                                                .font(.caption2)
-                                                .foregroundColor(KinnectTheme.textSecondary)
-                                                .frame(width: 50, alignment: .leading)
-                                            Slider(value: Binding(get: { vp.trimOut }, set: { vp.trimOut = max($0, min(vp.duration, vp.trimIn + 0.5)) }), in: 0...max(1, vp.duration), step: 0.1)
-                                                .tint(KinnectTheme.accentBright)
-                                        }
-                                        HStack(spacing: 8) {
-                                            Text("Tốc độ")
-                                                .font(.caption2)
-                                                .foregroundColor(KinnectTheme.textSecondary)
-                                            ForEach([0.5, 1.0, 2.0], id: \.self) { rate in
-                                                Button {
-                                                    vp.playbackRate = rate
-                                                    videoCompositionRevision = UUID().uuidString
-                                                } label: {
-                                                    Text(rate == 1 ? "1x" : String(format: "%.1fx", rate))
-                                                        .font(.caption.bold())
-                                                        .padding(.horizontal, 10)
-                                                        .padding(.vertical, 6)
-                                                        .background(Capsule().fill(abs(vp.playbackRate - rate) < 0.01 ? KinnectTheme.accentBright : KinnectTheme.surface))
-                                                        .foregroundColor(.white)
-                                                }
-                                            }
-                                        }
-                                        TextField("Chữ trên video", text: $photoProject.overlayText)
-                                            .padding(8)
-                                            .background(RoundedRectangle(cornerRadius: 8).fill(KinnectTheme.surface))
-                                            .foregroundColor(.white)
-                                            .onChange(of: photoProject.overlayText) { _ in
-                                                vp.overlayText = photoProject.overlayText
-                                                videoCompositionRevision = UUID().uuidString
-                                            }
-                                    }
-                                }
-
-                                HStack(spacing: 12) {
-                                    Button {
-                                        photoProject.rotation = (photoProject.rotation + 90) % 360
-                                        if let vp = videoProject {
-                                            vp.rotation = photoProject.rotation
-                                            videoCompositionRevision = UUID().uuidString
-                                        }
-                                    } label: {
-                                        HStack(spacing: 6) {
-                                            Image(systemName: "rotate.right.fill")
-                                            Text(String(format: "%@ (%d°)", L10n.tr("Xoay 90°"), photoProject.rotation))
-                                                .font(.caption.bold())
-                                        }
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 8)
-                                        .background(Capsule().fill(KinnectTheme.surfaceElevated))
-                                        .foregroundColor(.white)
-                                    }
-                                    Spacer()
-                                }
-                            } else {
-                                Text("Tỉ lệ khung hình:")
-                                    .font(.caption.bold())
-                                    .foregroundColor(KinnectTheme.textSecondary)
-
-                                HStack(spacing: 8) {
-                                    ForEach(StudioCropRatio.allCases) { ratio in
-                                        Button {
-                                            photoProject.cropRatio = ratio
-                                            updatePhotoPreview()
-                                        } label: {
-                                            Text(ratio.rawValue)
-                                                .font(.caption.weight(photoProject.cropRatio == ratio ? .bold : .medium))
-                                                .padding(.horizontal, 12)
-                                                .padding(.vertical, 6)
-                                                .background(
-                                                    RoundedRectangle(cornerRadius: 8)
-                                                        .fill(photoProject.cropRatio == ratio ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
-                                                )
-                                                .foregroundColor(.white)
-                                        }
-                                    }
-                                }
-
-                                Divider().background(KinnectTheme.border)
-
-                                HStack(spacing: 16) {
-                                    Button {
-                                        photoProject.rotation = (photoProject.rotation + 90) % 360
-                                        updatePhotoPreview()
-                                    } label: {
-                                        HStack(spacing: 5) {
-                                            Image(systemName: "rotate.right.fill")
-                                            Text("Xoay 90° (\(photoProject.rotation)°)")
-                                        }
-                                        .font(.caption.bold())
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 8)
-                                        .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
-                                        .foregroundColor(.white)
-                                    }
-
-                                    Button {
-                                        photoProject.flipHorizontal.toggle()
-                                        updatePhotoPreview()
-                                    } label: {
-                                        HStack(spacing: 5) {
-                                            Image(systemName: "arrow.left.and.right.righttriangle.left.righttriangle.right.fill")
-                                            Text(photoProject.flipHorizontal ? "Đã lật" : "Lật ảnh")
-                                        }
-                                        .font(.caption.bold())
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 8)
-                                        .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
-                                        .foregroundColor(.white)
-                                    }
-                                }
+                                .foregroundColor(KinnectTheme.danger)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 6)
                             }
                         }
-                        .padding(14)
-                        .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated.opacity(0.6)))
 
-                    case .color:
-                        VStack(spacing: 10) {
-                            studioSliderRow(name: "Phơi sáng", value: $photoProject.exposure, range: -100...100)
-                            studioSliderRow(name: "Vùng sáng", value: $photoProject.highlights, range: -100...100)
-                            studioSliderRow(name: "Vùng tối", value: $photoProject.shadows, range: -100...100)
-                            studioSliderRow(name: "Tương phản", value: $photoProject.contrast, range: -80...100)
-                            studioSliderRow(name: "Độ rực", value: $photoProject.vibrance, range: -100...100)
-                            studioSliderRow(name: "Bão hòa", value: $photoProject.saturation, range: -100...100)
-                            studioSliderRow(name: "Nhiệt độ", value: $photoProject.warmth, range: -100...100)
-                            studioSliderRow(name: "Curve", value: $photoProject.curveAmount, range: 0...100)
+                        Divider().background(KinnectTheme.border)
 
+                        VStack(alignment: .leading, spacing: 10) {
                             HStack {
+                                Image(systemName: "video.fill")
+                                    .font(.caption2)
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                                Text("Âm lượng âm thanh gốc: \(Int(vp.originalAudioVolume * 100))%")
+                                    .font(.caption2.bold())
+                                    .foregroundColor(KinnectTheme.textSecondary)
                                 Spacer()
-                                Button("Đặt lại màu") {
-                                    photoProject.resetColor()
-                                    updatePhotoPreview()
-                                }
-                                .font(.caption.bold())
-                                .foregroundColor(KinnectTheme.accentBright)
                             }
-                        }
-                        .padding(14)
-                        .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated.opacity(0.6)))
+                            Slider(value: Binding(get: { vp.originalAudioVolume }, set: { vp.originalAudioVolume = $0 }), in: 0...1, step: 0.05)
+                                .tint(KinnectTheme.accentBright)
 
-                    case .beauty:
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Làm mịn da tự nhiên:")
-                                .font(.caption.bold())
-                                .foregroundColor(KinnectTheme.textSecondary)
-
-                            Text("Làm mịn theo tần số chỉ trên má, trán và cằm. Mắt, lông mày, môi và tóc được giữ nguyên khi nhận diện được khuôn mặt.")
-                                .font(.caption2)
-                                .foregroundColor(KinnectTheme.textSecondary)
-
-                            studioSliderRow(name: "Mức làm mịn", value: $photoProject.smooth, range: 0...100)
-                        }
-                        .padding(14)
-                        .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated.opacity(0.6)))
-
-                    case .audio:
-                        VStack(alignment: .leading, spacing: 12) {
                             HStack {
                                 Image(systemName: "music.note")
+                                    .font(.caption2)
                                     .foregroundColor(KinnectTheme.accentBright)
-                                Text("Gán nhạc nền & Cân bằng âm thanh:")
-                                    .font(.caption.bold())
-                                    .foregroundColor(KinnectTheme.textSecondary)
+                                Text("Âm lượng nhạc nền: \(Int(vp.musicVolume * 100))%")
+                                    .font(.caption2.bold())
+                                    .foregroundColor(KinnectTheme.accentBright)
                                 Spacer()
                             }
-
-                            if isVideoActive, let vp = videoProject {
-                                // Music track status card
-                                HStack(spacing: 12) {
-                                    ZStack {
-                                        Circle()
-                                            .fill(KinnectTheme.accentBright.opacity(0.2))
-                                            .frame(width: 44, height: 44)
-                                        Image(systemName: vp.musicURL != nil || !selectedMusicTrack.isEmpty ? "music.note.list" : "music.note")
-                                            .font(.system(size: 20))
-                                            .foregroundColor(KinnectTheme.accentBright)
-                                    }
-
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(vp.musicTitle.isEmpty ? (selectedMusicTrack.isEmpty ? "Chưa chọn nhạc nền" : selectedMusicTrack) : vp.musicTitle)
-                                            .font(.subheadline.bold())
-                                            .foregroundColor(.white)
-                                            .lineLimit(1)
-                                        Text(vp.musicURL != nil || !vp.musicTitle.isEmpty || !selectedMusicTrack.isEmpty ? "Nhạc đã gán • Sẽ trộn vào video khi xuất" : "Nhấn để chọn bài hát hoặc tải từ máy")
-                                            .font(.caption2)
-                                            .foregroundColor(KinnectTheme.textSecondary)
-                                    }
-
-                                    Spacer()
-
-                                    Button {
-                                        showMusicPickerSheet = true
-                                    } label: {
-                                        Text(vp.musicURL != nil || !selectedMusicTrack.isEmpty ? "Đổi bài" : "Chọn nhạc")
-                                            .font(.caption.bold())
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 6)
-                                            .background(Capsule().fill(KinnectTheme.primaryGradient))
-                                    }
-                                }
-                                .padding(12)
-                                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surface))
-
-                                if vp.musicURL != nil || !vp.musicTitle.isEmpty || !selectedMusicTrack.isEmpty {
-                                    Button(role: .destructive) {
-                                        vp.musicURL = nil
-                                        vp.musicTitle = ""
-                                        selectedMusicTrack = ""
-                                    } label: {
-                                        HStack(spacing: 6) {
-                                            Image(systemName: "trash")
-                                                .font(.caption)
-                                            Text("Gỡ bỏ nhạc nền")
-                                                .font(.caption.bold())
-                                        }
-                                        .foregroundColor(KinnectTheme.danger)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 6)
-                                    }
-                                }
-
-                                Divider().background(KinnectTheme.border)
-
-                                // Audio volume controls
-                                VStack(alignment: .leading, spacing: 10) {
-                                    HStack {
-                                        Image(systemName: "video.fill")
-                                            .font(.caption2)
-                                            .foregroundColor(KinnectTheme.textSecondary)
-                                        Text("Âm lượng âm thanh gốc: \(Int(vp.originalAudioVolume * 100))%")
-                                            .font(.caption2.bold())
-                                            .foregroundColor(KinnectTheme.textSecondary)
-                                        Spacer()
-                                    }
-                                    Slider(value: $vp.originalAudioVolume, in: 0...1, step: 0.05)
-                                        .tint(KinnectTheme.accentBright)
-
-                                    HStack {
-                                        Image(systemName: "music.note")
-                                            .font(.caption2)
-                                            .foregroundColor(KinnectTheme.accentBright)
-                                        Text("Âm lượng nhạc nền: \(Int(vp.musicVolume * 100))%")
-                                            .font(.caption2.bold())
-                                            .foregroundColor(KinnectTheme.accentBright)
-                                        Spacer()
-                                    }
-                                    Slider(value: $vp.musicVolume, in: 0...1, step: 0.05)
-                                        .tint(KinnectTheme.accentBright)
-                                }
-                            } else {
-                                VStack(spacing: 8) {
-                                    Image(systemName: "music.note")
-                                        .font(.title3)
-                                        .foregroundColor(KinnectTheme.textSecondary)
-                                    Text("Công cụ âm thanh chỉ áp dụng cho Video đã quay hoặc chọn từ thư viện.")
-                                        .font(.caption)
-                                        .foregroundColor(KinnectTheme.textSecondary)
-                                        .multilineTextAlignment(.center)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                            }
+                            Slider(value: Binding(get: { vp.musicVolume }, set: { vp.musicVolume = $0 }), in: 0...1, step: 0.05)
+                                .tint(KinnectTheme.accentBright)
                         }
-                        .padding(14)
-                        .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated.opacity(0.6)))
-
-                    case .filters:
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Mẫu màu Studio Pro:")
-                                .font(.caption.bold())
+                    } else {
+                        VStack(spacing: 8) {
+                            Image(systemName: "music.note")
+                                .font(.title3)
                                 .foregroundColor(KinnectTheme.textSecondary)
-
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    ForEach(StudioProPack.allCases) { pack in
-                                        Button {
-                                            photoProject.proPack = pack
-                                            updatePhotoPreview()
-                                        } label: {
-                                            Text(pack.rawValue)
-                                                .font(.caption.weight(photoProject.proPack == pack ? .bold : .medium))
-                                                .padding(.horizontal, 14)
-                                                .padding(.vertical, 8)
-                                                .background(
-                                                    RoundedRectangle(cornerRadius: 10)
-                                                        .fill(photoProject.proPack == pack ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
-                                                )
-                                                .foregroundColor(.white)
-                                        }
-                                    }
-                                }
-                            }
+                            Text("Công cụ âm thanh chỉ áp dụng cho Video đã quay hoặc chọn từ thư viện.")
+                                .font(.caption)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                                .multilineTextAlignment(.center)
                         }
-                        .padding(14)
-                        .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated.opacity(0.6)))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
                     }
                 }
+                .padding(14)
+                .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated.opacity(0.6)))
 
-                // Target Selector
+            case .filters:
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Đích đăng tải:")
+                    Text("Mẫu màu Studio Pro:")
                         .font(.caption.bold())
                         .foregroundColor(KinnectTheme.textSecondary)
 
-                    Picker("Đích đăng", selection: $target) {
-                        ForEach(PublishTarget.allCases, id: \.self) { t in
-                            Text(t.rawValue).tag(t)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(StudioProPack.allCases) { pack in
+                                Button {
+                                    photoProject.proPack = pack
+                                    updatePhotoPreview()
+                                } label: {
+                                    Text(pack.rawValue)
+                                        .font(.caption.weight(photoProject.proPack == pack ? .bold : .medium))
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 8)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 10)
+                                                .fill(photoProject.proPack == pack ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
+                                        )
+                                        .foregroundColor(.white)
+                                }
+                            }
                         }
                     }
-                    .pickerStyle(.segmented)
                 }
+                .padding(14)
+                .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated.opacity(0.6)))
+            }
+        }
+    }
 
-                // Title & Caption
-                if target == .shortVideo {
-                    TextField("Tiêu đề video ngắn...", text: $title)
-                        .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                        .foregroundColor(.white)
+    @ViewBuilder
+    private var mediaEditPublishSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Đích đăng tải:")
+                    .font(.caption.bold())
+                    .foregroundColor(KinnectTheme.textSecondary)
+
+                Picker("Đích đăng", selection: $target) {
+                    ForEach(PublishTarget.allCases, id: \.self) { t in
+                        Text(t.rawValue).tag(t)
+                    }
                 }
+                .pickerStyle(.segmented)
+            }
 
-                TextField("Mô tả / Nội dung bài viết...", text: $caption, axis: .vertical)
-                    .lineLimit(3...6)
+            if target == .shortVideo {
+                TextField("Tiêu đề video ngắn...", text: $title)
                     .padding(12)
                     .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
                     .foregroundColor(.white)
+            }
 
-                // Publish Action Button
-                Button {
-                    Task { await publishContent() }
-                } label: {
-                    HStack(spacing: 8) {
-                        Spacer()
-                        if isUploading {
-                            ProgressView().tint(.white)
-                        } else {
-                            KinnectIcon(glyph: .send, size: 20, selected: true, tint: .white)
-                            Text("Dùng ảnh/video & Đăng ngay")
-                                .font(.headline)
-                        }
-                        Spacer()
+            TextField("Mô tả / Nội dung bài viết...", text: $caption, axis: .vertical)
+                .lineLimit(3...6)
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                .foregroundColor(.white)
+
+            Button {
+                Task { await publishContent() }
+            } label: {
+                HStack(spacing: 8) {
+                    Spacer()
+                    if isUploading {
+                        ProgressView().tint(.white)
+                    } else {
+                        KinnectIcon(glyph: .send, size: 20, selected: true, tint: .white)
+                        Text("Dùng ảnh/video & Đăng ngay")
+                            .font(.headline)
                     }
-                    .padding(.vertical, 14)
-                    .background(KinnectTheme.primaryGradient)
-                    .foregroundColor(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    Spacer()
                 }
-                .disabled(isUploading)
+                .padding(.vertical, 14)
+                .background(KinnectTheme.primaryGradient)
+                .foregroundColor(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+            .disabled(isUploading)
+        }
+    }
+
+    private var mediaEditMode: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                mediaEditHeader
+                mediaEditStage
+                mediaEditToolSelector
+                mediaEditToolPanel
+                mediaEditPublishSection
             }
             .padding(16)
             .padding(.bottom, 36)

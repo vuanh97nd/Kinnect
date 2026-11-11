@@ -140,6 +140,15 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         self = Self.from(json)
     }
 
+    static var fallbackSelf: KinnectUser {
+        KinnectUser.from([
+            "id": "me",
+            "name": "Tôi",
+            "handle": "me",
+            "avatarColor": "#7C3AED"
+        ])
+    }
+
     static func from(_ dict: [String: Any]) -> KinnectUser {
         let uid = (dict["id"] as? String) ?? (dict["userId"] as? String) ?? ""
         let rawName = (dict["name"] as? String) ?? (dict["displayName"] as? String) ?? (dict["username"] as? String) ?? "Người dùng Kinnect"

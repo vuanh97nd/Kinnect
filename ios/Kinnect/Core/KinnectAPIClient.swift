@@ -43,6 +43,10 @@ final class KinnectAPIClient {
         return KeychainStore.shared.loadAccountId(for: ServerConfig.defaultOrigin)
     }
 
+    var baseURL: String {
+        return ServerConfig.currentOrigin
+    }
+
     private func isCacheableGET(_ path: String) -> Bool {
         let base = path.components(separatedBy: "?").first ?? path
         let allowedExact: Set<String> = [
