@@ -1,6 +1,7 @@
 import PhotosUI
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 private func isoString(from anyVal: Any?) -> String {
     if let s = anyVal as? String, !s.isEmpty {
@@ -339,6 +340,129 @@ struct MessagesView: View {
     }
 }
 
+private func mimeTypeForExt(_ ext: String) -> String {
+    let lower = ext.lowercased()
+    switch lower {
+    case "jpg", "jpeg": return "image/jpeg"
+    case "png": return "image/png"
+    case "webp": return "image/webp"
+    case "gif": return "image/gif"
+    case "pdf": return "application/pdf"
+    case "doc", "docx": return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    case "xls", "xlsx": return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    case "zip": return "application/zip"
+    case "rar": return "application/x-rar-compressed"
+    case "mp3": return "audio/mpeg"
+    case "m4a": return "audio/mp4"
+    case "wav": return "audio/wav"
+    case "mp4": return "video/mp4"
+    case "txt": return "text/plain"
+    default: return "application/octet-stream"
+    }
+}
+
+struct ChatAttachmentBubbleView: View {
+    let fileName: String
+    let fileUrl: String
+    let isMine: Bool
+
+    private var fileIconName: String {
+        let ext = (fileName as NSString).pathExtension.lowercased()
+        switch ext {
+        case "pdf": return "doc.text.fill"
+        case "doc", "docx": return "doc.richtext.fill"
+        case "xls", "xlsx", "csv": return "tablecells.fill"
+        case "zip", "rar", "tar", "gz": return "archivebox.fill"
+        case "mp3", "m4a", "wav", "aac": return "music.note"
+        case "mp4", "mov", "avi": return "video.fill"
+        default: return "doc.fill"
+        }
+    }
+
+    private var fileIconColor: Color {
+        let ext = (fileName as NSString).pathExtension.lowercased()
+        switch ext {
+        case "pdf": return Color(hex: "#EF4444")
+        case "doc", "docx": return Color(hex: "#3B82F6")
+        case "xls", "xlsx", "csv": return Color(hex: "#10B981")
+        case "zip", "rar", "tar", "gz": return Color(hex: "#8B5CF6")
+        case "mp3", "m4a", "wav", "aac": return Color(hex: "#F59E0B")
+        default: return KinnectTheme.accentBright
+        }
+    }
+
+    var body: some View {
+        Button {
+            openOrDownloadFile()
+        } label: {
+            HStack(spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(isMine ? Color.white.opacity(0.2) : fileIconColor.opacity(0.15))
+                        .frame(width: 40, height: 40)
+                    Image(systemName: fileIconName)
+                        .font(.system(size: 20))
+                        .foregroundColor(isMine ? .white : fileIconColor)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(fileName.isEmpty ? "Tệp đính kèm" : fileName)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(isMine ? .white : KinnectTheme.textPrimary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    Text("Tệp đính kèm • Chạm để mở")
+                        .font(.caption2)
+                        .foregroundColor(isMine ? Color.white.opacity(0.8) : KinnectTheme.textSecondary)
+                }
+
+                Spacer(minLength: 4)
+
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: 20))
+                    .foregroundColor(isMine ? Color.white.opacity(0.9) : KinnectTheme.accentBright)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: KinnectTheme.radiusLG)
+                    .fill(isMine ? AnyShapeStyle(Color.white.opacity(0.16)) : AnyShapeStyle(KinnectTheme.surfaceElevated))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: KinnectTheme.radiusLG)
+                            .stroke(isMine ? Color.white.opacity(0.3) : KinnectTheme.border, lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func openOrDownloadFile() {
+        guard !fileUrl.isEmpty else { return }
+        if fileUrl.hasPrefix("data:") {
+            if let commaIndex = fileUrl.firstIndex(of: ",") {
+                let base64 = String(fileUrl[fileUrl.index(after: commaIndex)...])
+                if let data = Data(base64Encoded: base64) {
+                    let temp = FileManager.default.temporaryDirectory.appendingPathComponent(fileName.isEmpty ? "attachment.dat" : fileName)
+                    try? data.write(to: temp)
+                    presentShareSheet(for: temp)
+                    return
+                }
+            }
+        }
+        let fullURLStr = fileUrl.hasPrefix("http") ? fileUrl : "\(KinnectAPIClient.shared.baseURL)\(fileUrl)"
+        if let targetURL = URL(string: fullURLStr) {
+            UIApplication.shared.open(targetURL)
+        }
+    }
+
+    private func presentShareSheet(for fileURL: URL) {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootVC = windowScene.windows.first?.rootViewController else { return }
+        let activityVC = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
+        rootVC.present(activityVC, animated: true)
+    }
+}
+
 struct DirectChatDetailView: View {
     let peer: KinnectUser
     @Environment(\.dismiss) private var dismiss
@@ -347,6 +471,7 @@ struct DirectChatDetailView: View {
     @State private var messages: [DirectMessageItem] = []
     @State private var text = ""
     @State private var selectedPhoto: PhotosPickerItem?
+    @State private var showFileImporter = false
     @State private var isSending = false
     @State private var editingMessageId: String?
     @State private var editingMessageText: String = ""
@@ -544,7 +669,7 @@ struct DirectChatDetailView: View {
             HStack(spacing: 10) {
                 PhotosPicker(selection: $selectedPhoto, matching: .images) {
                     KinnectIcon(glyph: .photo, size: 24, tint: KinnectTheme.accentBright)
-                        .frame(minWidth: 44, minHeight: 44)
+                        .frame(minWidth: 40, minHeight: 44)
                         .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Chọn ảnh gửi tin nhắn")
@@ -559,6 +684,17 @@ struct DirectChatDetailView: View {
                         }
                     }
                 }
+
+                Button {
+                    showFileImporter = true
+                } label: {
+                    Image(systemName: "paperclip")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundColor(KinnectTheme.accentBright)
+                        .frame(minWidth: 40, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("Đính kèm tệp gửi tin nhắn")
 
                 if editingMessageId != nil {
                     TextField(
@@ -618,6 +754,24 @@ struct DirectChatDetailView: View {
             Button("Thu hồi / Xóa tin nhắn", role: .destructive) {}
             Button("Hủy", role: .cancel) {}
         }
+        .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.item]) { result in
+            switch result {
+            case .success(let fileURL):
+                guard fileURL.startAccessingSecurityScopedResource() else { return }
+                defer { fileURL.stopAccessingSecurityScopedResource() }
+                let fileName = fileURL.lastPathComponent
+                if let data = try? Data(contentsOf: fileURL) {
+                    let base64 = data.base64EncodedString()
+                    let mime = mimeTypeForExt(fileURL.pathExtension)
+                    let dataURL = "data:\(mime);base64,\(base64)"
+                    Task {
+                        await sendFileMessage(name: fileName, dataURL: dataURL)
+                    }
+                }
+            case .failure(let err):
+                appState.showToast("Không thể chọn tệp: \(err.localizedDescription)")
+            }
+        }
         .task {
             await loadMessages()
         }
@@ -633,6 +787,9 @@ struct DirectChatDetailView: View {
                 // Message content on top
                 if !msg.imageUrl.isEmpty {
                     KinnectRemoteImageView(rawURL: msg.imageUrl, cornerRadius: KinnectTheme.radiusMD, maxHeight: 220)
+                }
+                if !msg.attachmentName.isEmpty {
+                    ChatAttachmentBubbleView(fileName: msg.attachmentName, fileUrl: msg.attachmentUrl, isMine: isMine)
                 }
                 if !msg.text.isEmpty {
                     Text(msg.text)
@@ -869,6 +1026,49 @@ struct DirectChatDetailView: View {
         }
     }
 
+    private func sendFileMessage(name: String, dataURL: String) async {
+        let isImg = dataURL.hasPrefix("data:image/") || name.hasSuffix(".jpg") || name.hasSuffix(".png") || name.hasSuffix(".webp")
+        let reqId = "dm_att_\(peer.id)_\(UUID().uuidString)"
+        let tempId = "opt_\(UUID().uuidString)"
+        let createdAt = ISO8601DateFormatter().string(from: Date())
+        let optimistic = DirectMessageItem(
+            id: tempId,
+            fromUserId: appState.currentUser?.id ?? "",
+            toUserId: peer.id,
+            text: "",
+            imageUrl: isImg ? dataURL : "",
+            attachmentName: isImg ? "" : name,
+            attachmentUrl: isImg ? "" : dataURL,
+            createdAt: createdAt,
+            deliveredAt: "",
+            seenAt: "",
+            reaction: "",
+            reactions: [:],
+            myReaction: ""
+        )
+        self.messages.append(optimistic)
+
+        let payload: [String: Any] = [
+            "body": "",
+            "text": "",
+            "attachment": ["name": name, "data": dataURL],
+            "requestId": reqId
+        ]
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/users/\(peer.id)/messages",
+                method: "POST",
+                body: payload,
+                requestId: reqId
+            )
+            await loadMessages()
+            NotificationCenter.default.post(name: .kinnectMessagesChanged, object: nil)
+        } catch {
+            self.messages.removeAll { $0.id == tempId }
+            appState.showToast("Không gửi được tệp: \(error.localizedDescription)")
+        }
+    }
+
     private func deleteMessage(_ msg: DirectMessageItem) async {
         let reqId = "del_dm_\(msg.id)"
         do {
@@ -916,6 +1116,9 @@ struct GroupChatDetailView: View {
     @State private var messages: [GroupMessageItem] = []
     @State private var groupMembers: [KinnectUser] = []
     @State private var text = ""
+    @State private var selectedPhoto: PhotosPickerItem? = nil
+    @State private var showFileImporter = false
+    @State private var isSending = false
     @State private var groupReactions: [String: String] = [:]
     @State private var forwardText = ""
     @State private var forwardImageUrl = ""
@@ -996,15 +1199,25 @@ struct GroupChatDetailView: View {
                         .font(.caption2.bold())
                         .foregroundColor(KinnectTheme.accentBright)
                 }
+                // Image preview if present
+                if !msg.imageUrl.isEmpty {
+                    KinnectRemoteImageView(rawURL: msg.imageUrl, cornerRadius: KinnectTheme.radiusMD, maxHeight: 220)
+                }
+                // File attachment card if present
+                if !msg.attachmentName.isEmpty {
+                    ChatAttachmentBubbleView(fileName: msg.attachmentName, fileUrl: msg.attachmentUrl, isMine: isMine)
+                }
                 // Content on top with Zalo-style member mention highlight
-                formattedBubbleText(msg.text, isMine: isMine)
-                    .kinnectMultiline()
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: KinnectTheme.radiusXL)
-                            .fill(isMine ? AnyShapeStyle(KinnectTheme.primaryGradient) : AnyShapeStyle(KinnectTheme.surfaceElevated))
-                    )
+                if !msg.text.isEmpty {
+                    formattedBubbleText(msg.text, isMine: isMine)
+                        .kinnectMultiline()
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: KinnectTheme.radiusXL)
+                                .fill(isMine ? AnyShapeStyle(KinnectTheme.primaryGradient) : AnyShapeStyle(KinnectTheme.surfaceElevated))
+                        )
+                }
                 // Bottom row: time, seen, reaction, more
                 groupMessageFooter(msg: msg, isMine: isMine)
             }
@@ -1183,6 +1396,35 @@ struct GroupChatDetailView: View {
     @ViewBuilder
     private var groupChatInputBar: some View {
         HStack(spacing: 8) {
+            PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                KinnectIcon(glyph: .photo, size: 22, tint: KinnectTheme.accentBright)
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Chọn ảnh gửi vào nhóm")
+            .onChange(of: selectedPhoto) { newItem in
+                guard let newItem else { return }
+                Task {
+                    if let data = try? await newItem.loadTransferable(type: Data.self),
+                       let uiImg = UIImage(data: data),
+                       let jpeg = uiImg.jpegData(compressionQuality: 0.72) {
+                        let dataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
+                        await sendGroupMessage(text: text, imageDataURL: dataURL)
+                    }
+                }
+            }
+
+            Button {
+                showFileImporter = true
+            } label: {
+                Image(systemName: "paperclip")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(KinnectTheme.accentBright)
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Đính kèm tệp gửi vào nhóm")
+
             // Mention shortcut button (@)
             Button {
                 if !text.hasSuffix("@") {
@@ -1211,9 +1453,9 @@ struct GroupChatDetailView: View {
                 label: "Gửi tin nhắn nhóm",
                 tint: KinnectTheme.accentBright
             ) {
-                Task { await sendGroupMessage() }
+                Task { await sendGroupMessage(text: text, imageDataURL: "") }
             }
-            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending)
         }
         .padding(12)
         .background(KinnectTheme.surface)
@@ -1296,6 +1538,24 @@ struct GroupChatDetailView: View {
             }
             .transition(.move(edge: .bottom).combined(with: .opacity))
             .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showAddMemberSheet)
+        }
+        .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.item]) { result in
+            switch result {
+            case .success(let fileURL):
+                guard fileURL.startAccessingSecurityScopedResource() else { return }
+                defer { fileURL.stopAccessingSecurityScopedResource() }
+                let fileName = fileURL.lastPathComponent
+                if let data = try? Data(contentsOf: fileURL) {
+                    let base64 = data.base64EncodedString()
+                    let mime = mimeTypeForExt(fileURL.pathExtension)
+                    let dataURL = "data:\(mime);base64,\(base64)"
+                    Task {
+                        await sendGroupFileMessage(name: fileName, dataURL: dataURL)
+                    }
+                }
+            case .failure(let err):
+                appState.showToast("Không thể chọn tệp: \(err.localizedDescription)")
+            }
         }
         .task {
             if groupMembers.isEmpty {
@@ -1380,14 +1640,42 @@ struct GroupChatDetailView: View {
         }
     }
 
-    private func sendGroupMessage() async {
+    private func sendGroupMessage(text: String, imageDataURL: String) async {
         let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !clean.isEmpty else { return }
-        let draft = text
-        text = ""
+        guard !clean.isEmpty || !imageDataURL.isEmpty else { return }
+        let draft = self.text
+        self.text = ""
+        isSending = true
+        defer { isSending = false }
         let reqId = "grp_msg_\(group.id)_\(UUID().uuidString)"
+        let tempId = "opt_\(UUID().uuidString)"
+        let createdAt = ISO8601DateFormatter().string(from: Date())
 
-        var payload: [String: Any] = ["body": clean]
+        let optimistic = GroupMessageItem(
+            id: tempId,
+            groupId: group.id,
+            sender: appState.currentUser ?? KinnectUser.fallbackSelf,
+            text: clean,
+            imageUrl: imageDataURL,
+            attachmentName: "",
+            attachmentUrl: "",
+            createdAt: createdAt,
+            seenCount: 1,
+            reaction: "",
+            reactions: [:],
+            myReaction: ""
+        )
+        self.messages.append(optimistic)
+
+        var payload: [String: Any] = [
+            "body": clean,
+            "text": clean,
+            "imageUrl": imageDataURL,
+            "requestId": reqId
+        ]
+        if !imageDataURL.isEmpty {
+            payload["attachment"] = ["name": "photo.jpg", "data": imageDataURL]
+        }
         let currentUserId = appState.currentUser?.id
         let mentionedIds = groupMembers.filter { m in
             m.id != currentUserId &&
@@ -1405,9 +1693,54 @@ struct GroupChatDetailView: View {
                 requestId: reqId
             )
             await loadGroupMessages()
+            NotificationCenter.default.post(name: .kinnectMessagesChanged, object: nil)
         } catch {
-            text = draft
+            self.messages.removeAll { $0.id == tempId }
+            self.text = draft
             appState.showToast(error.localizedDescription)
+        }
+    }
+
+    private func sendGroupFileMessage(name: String, dataURL: String) async {
+        let isImg = dataURL.hasPrefix("data:image/") || name.hasSuffix(".jpg") || name.hasSuffix(".png") || name.hasSuffix(".webp")
+        let reqId = "grp_att_\(group.id)_\(UUID().uuidString)"
+        let tempId = "opt_\(UUID().uuidString)"
+        let createdAt = ISO8601DateFormatter().string(from: Date())
+
+        let optimistic = GroupMessageItem(
+            id: tempId,
+            groupId: group.id,
+            sender: appState.currentUser ?? KinnectUser.fallbackSelf,
+            text: "",
+            imageUrl: isImg ? dataURL : "",
+            attachmentName: isImg ? "" : name,
+            attachmentUrl: isImg ? "" : dataURL,
+            createdAt: createdAt,
+            seenCount: 1,
+            reaction: "",
+            reactions: [:],
+            myReaction: ""
+        )
+        self.messages.append(optimistic)
+
+        let payload: [String: Any] = [
+            "body": "",
+            "text": "",
+            "attachment": ["name": name, "data": dataURL],
+            "requestId": reqId
+        ]
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/groups/\(group.id)/messages",
+                method: "POST",
+                body: payload,
+                requestId: reqId
+            )
+            await loadGroupMessages()
+            NotificationCenter.default.post(name: .kinnectMessagesChanged, object: nil)
+        } catch {
+            self.messages.removeAll { $0.id == tempId }
+            appState.showToast("Không gửi được tệp: \(error.localizedDescription)")
         }
     }
 

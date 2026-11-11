@@ -441,6 +441,29 @@ enum UIReviewFixture {
                         "text": "@minhanh_demo Cảm ơn bạn! Đã đồng bộ chuẩn 100% Android 1.2.12.",
                         "createdAt": "2026-11-07T01:31:00.000Z",
                         "seenCount": 3
+                    ],
+                    [
+                        "id": "fixture_gmsg_3",
+                        "groupId": "fixture_group_1",
+                        "sender": peerUserDict,
+                        "text": "Bản thiết kế và tài liệu thông số kỹ thuật đính kèm:",
+                        "attachment": [
+                            "name": "Kinnect-Thong-So-Ky-Thuat.pdf",
+                            "url": "/api/chat-attachments/fixture_pdf_1",
+                            "kind": "file",
+                            "type": "application/pdf"
+                        ],
+                        "createdAt": "2026-11-07T01:32:00.000Z",
+                        "seenCount": 4
+                    ],
+                    [
+                        "id": "fixture_gmsg_4",
+                        "groupId": "fixture_group_1",
+                        "sender": secondPeerDict,
+                        "text": "Ảnh chụp mẫu giao diện từ máy thật:",
+                        "imageUrl": sampleImageDataURL,
+                        "createdAt": "2026-11-07T01:33:00.000Z",
+                        "seenCount": 3
                     ]
                 ]
             ]
@@ -896,6 +919,33 @@ enum UIReviewFixture {
                             "deliveredAt": "2026-11-07T01:36:01.000Z",
                             "seenAt": "2026-11-07T01:36:05.000Z",
                             "isSeen": true
+                        ],
+                        [
+                            "id": "fixture_msg_3",
+                            "fromUserId": "fixture_user_peer",
+                            "toUserId": "fixture_user_me",
+                            "text": "Tài liệu so sánh tính năng Android & iOS v1.2.12:",
+                            "attachment": [
+                                "name": "Bao-Cao-So-Sanh-Android-iOS.pdf",
+                                "url": "/api/chat-attachments/fixture_doc_1",
+                                "kind": "file",
+                                "type": "application/pdf"
+                            ],
+                            "createdAt": "2026-11-07T01:37:00.000Z",
+                            "deliveredAt": "2026-11-07T01:37:01.000Z",
+                            "seenAt": "2026-11-07T01:37:05.000Z",
+                            "isSeen": true
+                        ],
+                        [
+                            "id": "fixture_msg_4",
+                            "fromUserId": "fixture_user_me",
+                            "toUserId": "fixture_user_peer",
+                            "text": "Ảnh chụp màn hình Studio Pro:",
+                            "imageUrl": sampleImageDataURL,
+                            "createdAt": "2026-11-07T01:38:00.000Z",
+                            "deliveredAt": "2026-11-07T01:38:01.000Z",
+                            "seenAt": "",
+                            "isSeen": false
                         ]
                     ]
                 ]
@@ -1094,6 +1144,62 @@ enum UIReviewFixture {
         sema.wait()
 
         return movieURL
+    }
+
+    /// Generates a valid playable PCM WAV audio file for background music muxing verification.
+    static func sampleAudioURL(named name: String = "kinnect_sample_music") -> URL {
+        let tempDir = FileManager.default.temporaryDirectory
+        let safeName = name.replacingOccurrences(of: " ", with: "_")
+        let fileURL = tempDir.appendingPathComponent("\(safeName).wav")
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            return fileURL
+        }
+        let sampleRate: Int32 = 44100
+        let numChannels: Int16 = 2
+        let bitsPerSample: Int16 = 16
+        let durationSeconds = 8
+        let numFrames = Int(sampleRate) * durationSeconds
+        let dataSize = Int32(numFrames * Int(numChannels) * Int(bitsPerSample / 8))
+        let totalSize = 36 + dataSize
+
+        var header = Data()
+        header.append(contentsOf: "RIFF".utf8)
+        var totalSizeLE = totalSize.littleEndian
+        header.append(Data(bytes: &totalSizeLE, count: 4))
+        header.append(contentsOf: "WAVE".utf8)
+        header.append(contentsOf: "fmt ".utf8)
+        var fmtChunkSize: Int32 = 16
+        header.append(Data(bytes: &fmtChunkSize, count: 4))
+        var audioFormat: Int16 = 1 // PCM
+        header.append(Data(bytes: &audioFormat, count: 2))
+        var channels = numChannels.littleEndian
+        header.append(Data(bytes: &channels, count: 2))
+        var rate = sampleRate.littleEndian
+        header.append(Data(bytes: &rate, count: 4))
+        var byteRate: Int32 = (sampleRate * Int32(numChannels) * Int32(bitsPerSample / 8)).littleEndian
+        header.append(Data(bytes: &byteRate, count: 4))
+        var blockAlign: Int16 = (numChannels * (bitsPerSample / 8)).littleEndian
+        header.append(Data(bytes: &blockAlign, count: 2))
+        var bps = bitsPerSample.littleEndian
+        header.append(Data(bytes: &bps, count: 2))
+        header.append(contentsOf: "data".utf8)
+        var dataSizeLE = dataSize.littleEndian
+        header.append(Data(bytes: &dataSizeLE, count: 4))
+
+        let freq: Double = name.contains("Lofi") ? 330.0 : name.contains("Acoustic") ? 440.0 : name.contains("EDM") ? 520.0 : 392.0
+        var samples = Data(capacity: Int(dataSize))
+        for i in 0..<numFrames {
+            let t = Double(i) / Double(sampleRate)
+            let val = sin(2.0 * .pi * freq * t) * 0.25 * sin(2.0 * .pi * (freq * 1.5) * t)
+            var sample = Int16(val * 32767.0).littleEndian
+            samples.append(Data(bytes: &sample, count: 2))
+            samples.append(Data(bytes: &sample, count: 2))
+        }
+
+        var fullData = header
+        fullData.append(samples)
+        try? fullData.write(to: fileURL)
+        return fileURL
     }
 
     /// Creates the appropriate SwiftUI view for the given screen name.

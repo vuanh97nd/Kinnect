@@ -5,11 +5,13 @@ import CoreImage.CIFilterBuiltins
 import PhotosUI
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 enum StudioEditTool: String, CaseIterable, Identifiable {
     case crop = "Cắt & xoay"
     case color = "Điều chỉnh"
     case beauty = "Làm mịn"
+    case audio = "Âm thanh"
     case filters = "Bộ lọc Pro"
 
     var id: String { rawValue }
@@ -193,6 +195,9 @@ struct CameraStudioView: View {
                 self.originalImage = nil
                 self.target = .shortVideo
                 let vp = StudioVideoProject(sourceURL: tempURL)
+                if !self.selectedMusicTrack.isEmpty {
+                    vp.musicTitle = self.selectedMusicTrack
+                }
                 self.videoProject = vp
                 self.syncVideoProjectSliders(to: vp)
                 if data.count > 8 * 1024 * 1024 {
@@ -208,8 +213,14 @@ struct CameraStudioView: View {
                 target = .shortVideo
                 title = "Video ngắn Kinnect Shorts"
                 caption = "Video ngắn quay bằng Camera Studio và phát qua AVPlayer native."
+                selectedMusicTrack = "Lofi Chill Sài Gòn"
                 if let movieURL = UIReviewFixture.samplePlayableVideoURL() {
                     self.capturedVideoTempURL = movieURL
+                    let vp = StudioVideoProject(sourceURL: movieURL)
+                    vp.musicTitle = "Lofi Chill Sài Gòn"
+                    vp.musicVolume = 0.8
+                    vp.originalAudioVolume = 1.0
+                    self.videoProject = vp
                     if let d = try? Data(contentsOf: movieURL) {
                         self.videoDataURL = "data:video/mp4;base64,\(d.base64EncodedString())"
                     }
@@ -229,7 +240,14 @@ struct CameraStudioView: View {
         }
         .sheet(isPresented: $showMusicPickerSheet) {
             NavigationStack {
-                StudioMusicPickerSheet(selectedTrack: $selectedMusicTrack)
+                StudioMusicPickerSheet(
+                    selectedTrack: $selectedMusicTrack,
+                    onSelectTrack: { title, url in
+                        selectedMusicTrack = title
+                        videoProject?.musicTitle = title
+                        videoProject?.musicURL = url
+                    }
+                )
             }
         }
         .sheet(isPresented: $showStudioProSheet) {
@@ -761,6 +779,25 @@ struct CameraStudioView: View {
 
                     Spacer()
 
+                    if isVideoActive {
+                        Button {
+                            selectedTool = .audio
+                        } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: "music.note")
+                                    .font(.caption2.bold())
+                                Text(videoProject?.musicTitle.isEmpty == false ? videoProject!.musicTitle : (selectedMusicTrack.isEmpty ? "Gán nhạc" : selectedMusicTrack))
+                                    .font(.caption2.bold())
+                                    .lineLimit(1)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(videoProject?.musicURL != nil || !selectedMusicTrack.isEmpty ? KinnectTheme.accentBright.opacity(0.85) : Color.white.opacity(0.15)))
+                            .foregroundColor(.white)
+                        }
+                        .accessibilityLabel("Gán nhạc nền cho video")
+                    }
+
                     // Studio Pro Template Sheet Trigger
                     Button {
                         showStudioProSheet = true
@@ -1054,6 +1091,118 @@ struct CameraStudioView: View {
                                 .foregroundColor(KinnectTheme.textSecondary)
 
                             studioSliderRow(name: "Mức làm mịn", value: $photoProject.smooth, range: 0...100)
+                        }
+                        .padding(14)
+                        .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated.opacity(0.6)))
+
+                    case .audio:
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Image(systemName: "music.note")
+                                    .foregroundColor(KinnectTheme.accentBright)
+                                Text("Gán nhạc nền & Cân bằng âm thanh:")
+                                    .font(.caption.bold())
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                                Spacer()
+                            }
+
+                            if isVideoActive, let vp = videoProject {
+                                // Music track status card
+                                HStack(spacing: 12) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(KinnectTheme.accentBright.opacity(0.2))
+                                            .frame(width: 44, height: 44)
+                                        Image(systemName: vp.musicURL != nil || !selectedMusicTrack.isEmpty ? "music.note.list" : "music.note")
+                                            .font(.system(size: 20))
+                                            .foregroundColor(KinnectTheme.accentBright)
+                                    }
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(vp.musicTitle.isEmpty ? (selectedMusicTrack.isEmpty ? "Chưa chọn nhạc nền" : selectedMusicTrack) : vp.musicTitle)
+                                            .font(.subheadline.bold())
+                                            .foregroundColor(.white)
+                                            .lineLimit(1)
+                                        Text(vp.musicURL != nil || !vp.musicTitle.isEmpty || !selectedMusicTrack.isEmpty ? "Nhạc đã gán • Sẽ trộn vào video khi xuất" : "Nhấn để chọn bài hát hoặc tải từ máy")
+                                            .font(.caption2)
+                                            .foregroundColor(KinnectTheme.textSecondary)
+                                    }
+
+                                    Spacer()
+
+                                    Button {
+                                        showMusicPickerSheet = true
+                                    } label: {
+                                        Text(vp.musicURL != nil || !selectedMusicTrack.isEmpty ? "Đổi bài" : "Chọn nhạc")
+                                            .font(.caption.bold())
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 6)
+                                            .background(Capsule().fill(KinnectTheme.primaryGradient))
+                                    }
+                                }
+                                .padding(12)
+                                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surface))
+
+                                if vp.musicURL != nil || !vp.musicTitle.isEmpty || !selectedMusicTrack.isEmpty {
+                                    Button(role: .destructive) {
+                                        vp.musicURL = nil
+                                        vp.musicTitle = ""
+                                        selectedMusicTrack = ""
+                                    } label: {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "trash")
+                                                .font(.caption)
+                                            Text("Gỡ bỏ nhạc nền")
+                                                .font(.caption.bold())
+                                        }
+                                        .foregroundColor(KinnectTheme.danger)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 6)
+                                    }
+                                }
+
+                                Divider().background(KinnectTheme.border)
+
+                                // Audio volume controls
+                                VStack(alignment: .leading, spacing: 10) {
+                                    HStack {
+                                        Image(systemName: "video.fill")
+                                            .font(.caption2)
+                                            .foregroundColor(KinnectTheme.textSecondary)
+                                        Text("Âm lượng âm thanh gốc: \(Int(vp.originalAudioVolume * 100))%")
+                                            .font(.caption2.bold())
+                                            .foregroundColor(KinnectTheme.textSecondary)
+                                        Spacer()
+                                    }
+                                    Slider(value: $vp.originalAudioVolume, in: 0...1, step: 0.05)
+                                        .tint(KinnectTheme.accentBright)
+
+                                    HStack {
+                                        Image(systemName: "music.note")
+                                            .font(.caption2)
+                                            .foregroundColor(KinnectTheme.accentBright)
+                                        Text("Âm lượng nhạc nền: \(Int(vp.musicVolume * 100))%")
+                                            .font(.caption2.bold())
+                                            .foregroundColor(KinnectTheme.accentBright)
+                                        Spacer()
+                                    }
+                                    Slider(value: $vp.musicVolume, in: 0...1, step: 0.05)
+                                        .tint(KinnectTheme.accentBright)
+                                }
+                            } else {
+                                VStack(spacing: 8) {
+                                    Image(systemName: "music.note")
+                                        .font(.title3)
+                                        .foregroundColor(KinnectTheme.textSecondary)
+                                    Text("Công cụ âm thanh chỉ áp dụng cho Video đã quay hoặc chọn từ thư viện.")
+                                        .font(.caption)
+                                        .foregroundColor(KinnectTheme.textSecondary)
+                                        .multilineTextAlignment(.center)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                            }
                         }
                         .padding(14)
                         .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated.opacity(0.6)))
@@ -1397,60 +1546,184 @@ struct CameraStudioView: View {
 
 struct StudioMusicPickerSheet: View {
     @Binding var selectedTrack: String
+    var onSelectTrack: ((String, URL?) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
+    @State private var showAudioFilePicker = false
+    @State private var playingTrackTitle: String? = nil
+    @State private var previewPlayer: AVPlayer? = nil
 
-    private let tracks: [(String, String)] = [
-        ("", "Không dùng nhạc nền"),
-        ("Lofi Chill Sài Gòn", "Giai điệu thư giãn • 85 BPM"),
-        ("Acoustic Ban Mai", "Guitar mộc nhẹ nhàng • 98 BPM"),
-        ("Synthwave Đêm", "Năng động hiện đại • 118 BPM"),
-        ("Piano Mùa Thu", "Cảm xúc sâu lắng • 76 BPM")
+    private let curatedTracks: [(id: String, title: String, subtitle: String, duration: String)] = [
+        ("lofi_saigon", "Lofi Chill Sài Gòn", "Giai điệu thư giãn nhẹ nhàng • 85 BPM", "0:45"),
+        ("acoustic_banmai", "Acoustic Ban Mai", "Guitar mộc trong sáng • 98 BPM", "0:50"),
+        ("synthwave_dem", "Synthwave Đêm", "Năng động hiện đại • 118 BPM", "1:00"),
+        ("piano_muathu", "Piano Mùa Thu", "Cảm xúc sâu lắng • 76 BPM", "0:40"),
+        ("edm_energy", "EDM Festival Energy", "Sôi động bùng nổ • 128 BPM", "0:55")
     ]
 
     var body: some View {
         List {
-            Section("Nhạc nền") {
-                Text("Chưa có file nhạc được cấp phép. Danh sách này không trộn âm thanh vào video.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                ForEach(tracks, id: \.0) { track, subtitle in
-                    Button {
-                        selectedTrack = track
-                        dismiss()
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: track.isEmpty ? "speaker.slash.fill" : "music.note.list")
-                                .foregroundColor(selectedTrack == track ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(track.isEmpty ? subtitle : track)
-                                    .font(.subheadline.bold())
+            Section("Tệp âm thanh trên máy") {
+                Button {
+                    showAudioFilePicker = true
+                } label: {
+                    HStack(spacing: 12) {
+                        ZStack {
+                            Circle()
+                                .fill(KinnectTheme.accentBright.opacity(0.2))
+                                .frame(width: 38, height: 38)
+                            Image(systemName: "folder.badge.plus")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(KinnectTheme.accentBright)
+                        }
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Chọn tệp âm thanh từ thiết bị...")
+                                .font(.subheadline.bold())
+                                .foregroundColor(.white)
+                            Text("Hỗ trợ MP3, M4A, WAV, AAC từ Tệp & iCloud")
+                                .font(.caption2)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                    .frame(minHeight: 44)
+                }
+            }
+
+            Section("Nhạc nền Kinnect đề xuất") {
+                // Remove music option
+                Button {
+                    stopPreview()
+                    selectedTrack = ""
+                    onSelectTrack?("", nil)
+                    dismiss()
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "speaker.slash.fill")
+                            .foregroundColor(selectedTrack.isEmpty ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Không dùng nhạc nền")
+                                .font(.subheadline.bold())
+                                .foregroundColor(.white)
+                            Text("Chỉ sử dụng âm thanh gốc từ video")
+                                .font(.caption2)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        }
+                        Spacer()
+                        if selectedTrack.isEmpty {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(KinnectTheme.accentBright)
+                        }
+                    }
+                    .frame(minHeight: 44)
+                }
+
+                ForEach(curatedTracks, id: \.id) { track in
+                    HStack(spacing: 12) {
+                        Button {
+                            togglePreview(for: track.title)
+                        } label: {
+                            ZStack {
+                                Circle()
+                                    .fill(playingTrackTitle == track.title ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
+                                    .frame(width: 36, height: 36)
+                                Image(systemName: playingTrackTitle == track.title ? "pause.fill" : "play.fill")
+                                    .font(.system(size: 14))
                                     .foregroundColor(.white)
-                                if !track.isEmpty {
-                                    Text(subtitle)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Nghe thử \(track.title)")
+
+                        Button {
+                            stopPreview()
+                            selectedTrack = track.title
+                            let audioURL = UIReviewFixture.sampleAudioURL(named: track.title)
+                            onSelectTrack?(track.title, audioURL)
+                            dismiss()
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(track.title)
+                                        .font(.subheadline.bold())
+                                        .foregroundColor(.white)
+                                    Text(track.subtitle)
                                         .font(.caption2)
                                         .foregroundColor(KinnectTheme.textSecondary)
                                 }
+                                Spacer()
+                                Text(track.duration)
+                                    .font(.caption2)
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                                    .padding(.trailing, 4)
+
+                                if selectedTrack == track.title {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(KinnectTheme.accentBright)
+                                }
                             }
-                            Spacer()
-                            if selectedTrack == track {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(KinnectTheme.accentBright)
-                            }
+                            .frame(minHeight: 44)
                         }
-                        .frame(minHeight: 44)
+                        .buttonStyle(.plain)
                     }
                 }
             }
         }
         .scrollContentBackground(.hidden)
         .background(KinnectTheme.background)
-        .navigationTitle("Thêm nhạc")
+        .navigationTitle("Thêm nhạc nền")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Đóng") { dismiss() }
+                Button("Đóng") {
+                    stopPreview()
+                    dismiss()
+                }
             }
         }
+        .fileImporter(isPresented: $showAudioFilePicker, allowedContentTypes: [.audio]) { result in
+            switch result {
+            case .success(let fileURL):
+                guard fileURL.startAccessingSecurityScopedResource() else { return }
+                defer { fileURL.stopAccessingSecurityScopedResource() }
+                let ext = fileURL.pathExtension
+                let dest = FileManager.default.temporaryDirectory.appendingPathComponent("Kinnect-Music-\(UUID().uuidString).\(ext)")
+                if let data = try? Data(contentsOf: fileURL) {
+                    try? data.write(to: dest)
+                    let name = fileURL.deletingPathExtension().lastPathComponent
+                    selectedTrack = name
+                    onSelectTrack?(name, dest)
+                    dismiss()
+                }
+            case .failure(let err):
+                print("Lỗi chọn tệp âm thanh: \(err.localizedDescription)")
+            }
+        }
+        .onDisappear {
+            stopPreview()
+        }
+    }
+
+    private func togglePreview(for title: String) {
+        if playingTrackTitle == title {
+            stopPreview()
+        } else {
+            playingTrackTitle = title
+            let audioURL = UIReviewFixture.sampleAudioURL(named: title)
+            previewPlayer = AVPlayer(url: audioURL)
+            previewPlayer?.play()
+        }
+    }
+
+    private func stopPreview() {
+        playingTrackTitle = nil
+        previewPlayer?.pause()
+        previewPlayer = nil
     }
 }
 

@@ -285,6 +285,10 @@ final class StudioVideoProject: ObservableObject {
     @Published var proPack: StudioProPack = .original
     @Published var playbackRate: Double = 1
     @Published var overlayText: String = ""
+    @Published var musicURL: URL? = nil
+    @Published var musicTitle: String = ""
+    @Published var musicVolume: Float = 0.8
+    @Published var originalAudioVolume: Float = 1.0
     @Published var isExporting = false
     @Published var exportProgress: Float = 0
     private var activeExport: AVAssetExportSession?
@@ -299,7 +303,8 @@ final class StudioVideoProject: ObservableObject {
 
     var hasEdits: Bool {
         trimIn > 0.05 || (duration > 0 && trimOut < duration - 0.05) ||
-        abs(playbackRate - 1) > 0.01 || rotation != 0 || !makeGrade().isNeutral
+        abs(playbackRate - 1) > 0.01 || rotation != 0 || !makeGrade().isNeutral ||
+        musicURL != nil || !musicTitle.isEmpty
     }
 
     func makeGrade() -> StudioGradeState {
@@ -385,7 +390,7 @@ final class StudioVideoProject: ObservableObject {
     /// Exports one clip. Speed other than 1x changes pitch. HEVC is used when the preset exists.
     func exportVideo() async throws -> URL {
         let source = AVURLAsset(url: sourceURL)
-        let exportAsset = try await assetForExport(from: source)
+        let (exportAsset, audioMix) = try await prepareAssetAndAudioMix(from: source)
         let composition = makeVideoComposition(for: exportAsset)
         let outputURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("Kinnect-Video-\(UUID().uuidString).mp4")
@@ -397,10 +402,13 @@ final class StudioVideoProject: ObservableObject {
         }
 
         exportSession.videoComposition = composition
+        if let audioMix {
+            exportSession.audioMix = audioMix
+        }
         exportSession.outputURL = outputURL
         exportSession.outputFileType = .mp4
         exportSession.shouldOptimizeForNetworkUse = true
-        if abs(playbackRate - 1) < 0.05 {
+        if abs(playbackRate - 1) < 0.05 && musicURL == nil && trimIn <= 0.05 && (duration <= 0 || trimOut >= duration - 0.05) {
             let startTime = CMTime(seconds: max(0, trimIn), preferredTimescale: 600)
             let endTime = CMTime(seconds: min(duration, trimOut > trimIn ? trimOut : duration), preferredTimescale: 600)
             exportSession.timeRange = CMTimeRange(start: startTime, end: endTime)
@@ -433,24 +441,61 @@ final class StudioVideoProject: ObservableObject {
         throw exportSession.error ?? NSError(domain: "KinnectStudio", code: -2, userInfo: [NSLocalizedDescriptionKey: "Xuất video không thành công."])
     }
 
-    private func assetForExport(from source: AVURLAsset) async throws -> AVAsset {
-        guard abs(playbackRate - 1) >= 0.05 else { return source }
+    private func prepareAssetAndAudioMix(from source: AVURLAsset) async throws -> (AVAsset, AVAudioMix?) {
+        let hasCustomAudio = (musicURL != nil)
+        let hasRateChange = abs(playbackRate - 1) >= 0.05
+        let hasTrim = trimIn > 0.05 || (duration > 0 && trimOut < duration - 0.05)
+
+        guard hasCustomAudio || hasRateChange || hasTrim else {
+            return (source, nil)
+        }
+
         let composition = AVMutableComposition()
         let start = CMTime(seconds: max(0, trimIn), preferredTimescale: 600)
         let length = CMTime(seconds: max(0.1, (trimOut > trimIn ? trimOut : duration) - trimIn), preferredTimescale: 600)
         let range = CMTimeRange(start: start, duration: length)
         let scaled = CMTimeMultiplyByFloat64(length, multiplier: 1.0 / playbackRate)
+
+        var inputParams: [AVMutableAudioMixInputParameters] = []
+
         if let video = try await source.loadTracks(withMediaType: .video).first,
            let track = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) {
             try track.insertTimeRange(range, of: video, at: .zero)
             track.scaleTimeRange(CMTimeRange(start: .zero, duration: length), toDuration: scaled)
             track.preferredTransform = try await video.load(.preferredTransform)
         }
+
         if let audio = try await source.loadTracks(withMediaType: .audio).first,
            let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
             try track.insertTimeRange(range, of: audio, at: .zero)
             track.scaleTimeRange(CMTimeRange(start: .zero, duration: length), toDuration: scaled)
+            let params = AVMutableAudioMixInputParameters(track: track)
+            params.setVolume(originalAudioVolume, at: .zero)
+            inputParams.append(params)
         }
-        return composition
+
+        if let mURL = musicURL {
+            let musicAsset = AVURLAsset(url: mURL)
+            if let mAudio = try? await musicAsset.loadTracks(withMediaType: .audio).first,
+               let mTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
+                let mDuration = (try? await musicAsset.load(.duration)) ?? CMTime(seconds: 30, preferredTimescale: 600)
+                var currentTime = CMTime.zero
+                let totalTarget = scaled
+                while currentTime < totalTarget {
+                    let remaining = CMTimeSubtract(totalTarget, currentTime)
+                    let insertDur = CMTimeMinimum(mDuration, remaining)
+                    let insertRange = CMTimeRange(start: .zero, duration: insertDur)
+                    try? mTrack.insertTimeRange(insertRange, of: mAudio, at: currentTime)
+                    currentTime = CMTimeAdd(currentTime, insertDur)
+                }
+                let params = AVMutableAudioMixInputParameters(track: mTrack)
+                params.setVolume(musicVolume, at: .zero)
+                inputParams.append(params)
+            }
+        }
+
+        let audioMix = AVMutableAudioMix()
+        audioMix.inputParameters = inputParams
+        return (composition, audioMix)
     }
 }
