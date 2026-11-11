@@ -73,6 +73,16 @@ enum KinnectTheme {
         })
     }
 
+    static var textTertiary: Color {
+        textSecondary.opacity(0.65)
+    }
+
+    // MARK: - Typography Fonts
+    static let body: Font = .system(size: 15)
+    static let bodyBold: Font = .system(size: 15, weight: .bold)
+    static let caption: Font = .system(size: 12)
+    static let captionBold: Font = .system(size: 12, weight: .bold)
+
     static let rose = Color(red: 0.93, green: 0.28, blue: 0.60)
     static let emerald = Color(red: 0.09, green: 0.64, blue: 0.45)
     static let online = Color(red: 0.13, green: 0.77, blue: 0.37)

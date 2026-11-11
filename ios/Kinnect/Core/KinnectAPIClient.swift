@@ -47,6 +47,13 @@ final class KinnectAPIClient {
         return ServerConfig.currentOrigin
     }
 
+    func absoluteURL(_ path: String) -> String {
+        if path.hasPrefix("http://") || path.hasPrefix("https://") {
+            return path
+        }
+        return ServerConfig.url(for: path)?.absoluteString ?? "\(baseURL)\(path.hasPrefix("/") ? "" : "/")\(path)"
+    }
+
     private func isCacheableGET(_ path: String) -> Bool {
         let base = path.components(separatedBy: "?").first ?? path
         let allowedExact: Set<String> = [

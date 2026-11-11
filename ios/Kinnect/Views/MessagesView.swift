@@ -1946,7 +1946,6 @@ struct CreateGroupSheet: View {
                     "members": Array(selectedIds),
                     "memberIds": Array(selectedIds)
                 ],
-                ],
                 requestId: reqId
             )
             onCreated()

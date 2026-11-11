@@ -83,130 +83,7 @@ struct ProfileView: View {
                 VStack(spacing: 16) {
                     if let user = activeUser {
                         // 1. Cover & Avatar Card with Handle, Bio & Stats (Parity Android 1.2.12 MainActivity.profileCard lines 2206-2278)
-                        VStack(alignment: .leading, spacing: 0) {
-                            // Cover Image (130dp height flush to edges with camera button for self)
-                            ZStack(alignment: .topTrailing) {
-                                if !user.coverUrl.isEmpty {
-                                    KinnectRemoteImageView(
-                                        rawURL: user.coverUrl,
-                                        contentMode: .fill,
-                                        cornerRadius: 0,
-                                        maxHeight: 130
-                                    )
-                                    .frame(maxWidth: .infinity, maxHeight: 130)
-                                    .clipped()
-                                } else {
-                                    RoundedRectangle(cornerRadius: 0)
-                                        .fill(KinnectTheme.primaryGradient)
-                                        .frame(maxWidth: .infinity, maxHeight: 130)
-                                }
-
-                                if isSelf {
-                                    PhotosPicker(selection: $selectedCoverItem, matching: .images) {
-                                        Image(systemName: "camera.fill")
-                                            .font(.system(size: 14, weight: .bold))
-                                            .foregroundColor(.white)
-                                            .frame(width: 36, height: 36)
-                                            .background(Circle().fill(Color.black.opacity(0.45)))
-                                    }
-                                    .padding(8)
-                                    .accessibilityLabel("Đổi ảnh bìa")
-                                }
-                            }
-                            .frame(maxWidth: .infinity, height: 130)
-
-                            // Identity Row (Parity Android lines 2230-2248: Avatar on Left overlapping cover by 28dp, Name & Handle on Right)
-                            HStack(alignment: .bottom, spacing: 14) {
-                                Group {
-                                    if isSelf {
-                                        PhotosPicker(selection: $selectedAvatarItem, matching: .images) {
-                                            avatarBadge(user: user, size: 88)
-                                        }
-                                        .accessibilityLabel("Đổi ảnh đại diện")
-                                    } else {
-                                        avatarBadge(user: user, size: 88)
-                                    }
-                                }
-                                .offset(y: -28)
-                                .padding(.bottom, -28)
-
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(user.name)
-                                        .font(.system(size: 20, weight: .bold))
-                                        .foregroundColor(KinnectTheme.textPrimary)
-                                        .lineLimit(1)
-
-                                    Text("@\(user.handle.isEmpty ? user.name : user.handle)")
-                                        .font(.system(size: 13))
-                                        .foregroundColor(KinnectTheme.textSecondary)
-                                        .lineLimit(1)
-                                }
-                                .padding(.bottom, 4)
-
-                                Spacer()
-                            }
-                            .padding(.horizontal, 14)
-
-                            // Action Button Row (Parity Android lines 2249-2270: full-width 44dp pencil "Chỉnh sửa hồ sơ" or peer actions)
-                            Group {
-                                if isSelf {
-                                    Button {
-                                        showEditProfileSheet = true
-                                    } label: {
-                                        HStack(spacing: 8) {
-                                            Image(systemName: "pencil")
-                                                .font(.subheadline.bold())
-                                            Text("Chỉnh sửa hồ sơ")
-                                                .font(.subheadline.bold())
-                                        }
-                                        .frame(maxWidth: .infinity, minHeight: 44)
-                                        .background(KinnectTheme.primaryGradient)
-                                        .foregroundColor(.white)
-                                        .clipShape(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD))
-                                    }
-                                    .padding(.top, 10)
-                                } else {
-                                    peerActionsRow(user: user)
-                                        .padding(.top, 10)
-                                }
-                            }
-                            .padding(.horizontal, 14)
-
-                            // Bio in Profile Card (Android parity lines 2272-2276: 13sp MUTED, lineSpacing 1.6f)
-                            if !user.bio.isEmpty {
-                                Text(user.bio)
-                                    .font(.system(size: 13))
-                                    .foregroundColor(KinnectTheme.textSecondary)
-                                    .lineSpacing(4)
-                                    .padding(.horizontal, 14)
-                                    .padding(.top, 10)
-                            }
-
-                            // Stats Bar: 3 soft cards (Android parity lines 4508-4529: bài viết, người theo dõi, đang theo dõi)
-                            HStack(spacing: 8) {
-                                statCard(count: user.postsCount, label: "bài viết") {
-                                    selectedTab = .posts
-                                }
-                                statCard(count: user.followersCount, label: "người theo dõi") {
-                                    selectedConnectionsInfo = ConnectionsInfo(kind: "followers", title: "Người theo dõi")
-                                }
-                                statCard(count: user.followingCount, label: "đang theo dõi") {
-                                    selectedConnectionsInfo = ConnectionsInfo(kind: "following", title: "Đang theo dõi")
-                                }
-                            }
-                            .padding(.horizontal, 14)
-                            .padding(.top, 12)
-                            .padding(.bottom, 14)
-                        }
-                        .background(
-                            RoundedRectangle(cornerRadius: KinnectTheme.radiusMD, style: .continuous)
-                                .fill(KinnectTheme.surface)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: KinnectTheme.radiusMD, style: .continuous)
-                                        .stroke(KinnectTheme.border, lineWidth: 1)
-                                )
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD, style: .continuous))
+                        profileCard(user: user)
 
                         // 2. Profile Tabs (Android 1.2.12 Parity)
                         Picker("Mục hồ sơ", selection: $selectedTab) {
@@ -221,21 +98,21 @@ struct ProfileView: View {
                         switch selectedTab {
                         case .about:
                             aboutTabContent(user: user)
-                    case .posts:
-                        postsTabContent(user: user)
-                    case .albums:
-                        if isSelf {
-                            albumsTabContent(user: user)
-                        } else {
-                            aboutTabContent(user: user)
+                        case .posts:
+                            postsTabContent(user: user)
+                        case .albums:
+                            if isSelf {
+                                albumsTabContent(user: user)
+                            } else {
+                                aboutTabContent(user: user)
+                            }
+                        case .videos:
+                            videosTabContent(user: user)
                         }
-                    case .videos:
-                        videosTabContent(user: user)
                     }
                 }
+                .padding(14)
             }
-            .padding(14)
-        }
         .background(KinnectTheme.background)
         .navigationTitle("")
         .toolbar(.hidden, for: .navigationBar)
@@ -412,6 +289,134 @@ struct ProfileView: View {
         .frame(height: 52)
         .background(KinnectTheme.surface.ignoresSafeArea(edges: .top))
         .overlay(Divider().background(KinnectTheme.borderSoft), alignment: .bottom)
+    }
+
+    @ViewBuilder
+    private func profileCard(user: KinnectUser) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Cover Image (130dp height flush to edges with camera button for self)
+            ZStack(alignment: .topTrailing) {
+                if !user.coverUrl.isEmpty {
+                    KinnectRemoteImageView(
+                        rawURL: user.coverUrl,
+                        contentMode: .fill,
+                        cornerRadius: 0,
+                        maxHeight: 130
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: 130)
+                    .clipped()
+                } else {
+                    RoundedRectangle(cornerRadius: 0)
+                        .fill(KinnectTheme.primaryGradient)
+                        .frame(maxWidth: .infinity, maxHeight: 130)
+                }
+
+                if isSelf {
+                    PhotosPicker(selection: $selectedCoverItem, matching: .images) {
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: 36, height: 36)
+                            .background(Circle().fill(Color.black.opacity(0.45)))
+                    }
+                    .padding(8)
+                    .accessibilityLabel("Đổi ảnh bìa")
+                }
+            }
+            .frame(maxWidth: .infinity, height: 130)
+
+            // Identity Row (Parity Android lines 2230-2248: Avatar on Left overlapping cover by 28dp, Name & Handle on Right)
+            HStack(alignment: .bottom, spacing: 14) {
+                Group {
+                    if isSelf {
+                        PhotosPicker(selection: $selectedAvatarItem, matching: .images) {
+                            avatarBadge(user: user, size: 88)
+                        }
+                        .accessibilityLabel("Đổi ảnh đại diện")
+                    } else {
+                        avatarBadge(user: user, size: 88)
+                    }
+                }
+                .offset(y: -28)
+                .padding(.bottom, -28)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(user.name)
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(KinnectTheme.textPrimary)
+                        .lineLimit(1)
+
+                    Text("@\(user.handle.isEmpty ? user.name : user.handle)")
+                        .font(.system(size: 13))
+                        .foregroundColor(KinnectTheme.textSecondary)
+                        .lineLimit(1)
+                }
+                .padding(.bottom, 4)
+
+                Spacer()
+            }
+            .padding(.horizontal, 14)
+
+            // Action Button Row (Parity Android lines 2249-2270: full-width 44dp pencil "Chỉnh sửa hồ sơ" or peer actions)
+            Group {
+                if isSelf {
+                    Button {
+                        showEditProfileSheet = true
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "pencil")
+                                .font(.subheadline.bold())
+                            Text("Chỉnh sửa hồ sơ")
+                                .font(.subheadline.bold())
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(KinnectTheme.primaryGradient)
+                        .foregroundColor(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD))
+                    }
+                    .padding(.top, 10)
+                } else {
+                    peerActionsRow(user: user)
+                        .padding(.top, 10)
+                }
+            }
+            .padding(.horizontal, 14)
+
+            // Bio in Profile Card (Android parity lines 2272-2276: 13sp MUTED, lineSpacing 1.6f)
+            if !user.bio.isEmpty {
+                Text(user.bio)
+                    .font(.system(size: 13))
+                    .foregroundColor(KinnectTheme.textSecondary)
+                    .lineSpacing(4)
+                    .padding(.horizontal, 14)
+                    .padding(.top, 10)
+            }
+
+            // Stats Bar: 3 soft cards (Android parity lines 4508-4529: bài viết, người theo dõi, đang theo dõi)
+            HStack(spacing: 8) {
+                statCard(count: user.postsCount, label: "bài viết") {
+                    selectedTab = .posts
+                }
+                statCard(count: user.followersCount, label: "người theo dõi") {
+                    selectedConnectionsInfo = ConnectionsInfo(kind: "followers", title: "Người theo dõi")
+                }
+                statCard(count: user.followingCount, label: "đang theo dõi") {
+                    selectedConnectionsInfo = ConnectionsInfo(kind: "following", title: "Đang theo dõi")
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 12)
+            .padding(.bottom, 14)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: KinnectTheme.radiusMD, style: .continuous)
+                .fill(KinnectTheme.surface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: KinnectTheme.radiusMD, style: .continuous)
+                        .stroke(KinnectTheme.border, lineWidth: 1)
+                )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD, style: .continuous))
     }
 
     private func avatarBadge(user: KinnectUser, size: CGFloat) -> some View {
