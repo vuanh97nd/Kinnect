@@ -366,12 +366,6 @@
       "category": "editor"
     },
     {
-      "resource": "ic_flow_editor_layer",
-      "source": "ic_editor_layer",
-      "redrawn": false,
-      "category": "editor"
-    },
-    {
       "resource": "ic_flow_editor_lips",
       "source": "ic_editor_lips",
       "redrawn": false,
@@ -456,12 +450,6 @@
       "category": "editor"
     },
     {
-      "resource": "ic_flow_editor_redo",
-      "source": "ic_editor_redo",
-      "redrawn": false,
-      "category": "editor"
-    },
-    {
       "resource": "ic_flow_editor_reset",
       "source": "ic_editor_reset",
       "redrawn": false,
@@ -518,12 +506,6 @@
     {
       "resource": "ic_flow_editor_transition",
       "source": "ic_editor_transition",
-      "redrawn": false,
-      "category": "editor"
-    },
-    {
-      "resource": "ic_flow_editor_undo",
-      "source": "ic_editor_undo",
       "redrawn": false,
       "category": "editor"
     },
@@ -612,6 +594,12 @@
       "category": "interface"
     },
     {
+      "resource": "ic_flow_layer",
+      "source": "ic_layer",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
       "resource": "ic_flow_like",
       "source": "ic_like",
       "redrawn": false,
@@ -690,6 +678,12 @@
       "category": "interface"
     },
     {
+      "resource": "ic_flow_redo",
+      "source": "ic_redo",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
       "resource": "ic_flow_search",
       "source": "ic_search",
       "redrawn": true,
@@ -746,6 +740,12 @@
     {
       "resource": "ic_flow_trash",
       "source": "ic_trash",
+      "redrawn": false,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_undo",
+      "source": "ic_undo",
       "redrawn": false,
       "category": "interface"
     },
@@ -1334,6 +1334,12 @@
     {
       "resource": "ic_flow_web_x",
       "source": "ic_web_x",
+      "redrawn": true,
+      "category": "interface"
+    },
+    {
+      "resource": "ic_flow_web_store",
+      "source": null,
       "redrawn": true,
       "category": "interface"
     },

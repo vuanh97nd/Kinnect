@@ -412,7 +412,7 @@ public class MainActivity extends Activity {
     toolbar.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
     if (me != null && navigation) {
       toolbar.addView(topIcon("bell", I18n.t("Thông báo"), headerActive.equals("bell"), () -> notifications(), "bell"));
-      toolbar.addView(topIcon("shopping_bag", I18n.t("Cửa hàng"), false, this::openStore, null));
+      toolbar.addView(topIcon("store", I18n.t("Cửa hàng"), false, this::openStore, null));
       toolbar.addView(topIcon("users_round", I18n.t("Bạn bè"), headerActive.equals("friends"), () -> friendsScreen(friendsCount > 0 ? "incoming" : "friends"), "friends"));
       toolbar.addView(topIcon("message_square", I18n.t("Tin nhắn"), headerActive.equals("inbox"), () -> navigate("inbox"), "inbox"));
       FrameLayout meHolder = new FrameLayout(this);
@@ -772,7 +772,7 @@ public class MainActivity extends Activity {
       groupRow(admin, "shield_check", I18n.t("Bảng quản trị"), false, () -> admin());
     }
     LinearLayout main = settingsGroup();
-    groupRow(main, "shopping_bag", I18n.t("Cửa hàng Kinnect"), false, this::openStore);
+    groupRow(main, "store", I18n.t("Cửa hàng Kinnect"), false, this::openStore);
     groupRow(main, "wallet", I18n.t("Ví Kinnect"), false, () -> startActivity(new Intent(this, WalletActivity.class)));
       groupRow(main, "settings", I18n.t("Cài đặt và quyền riêng tư"), false, () -> settings());
     groupRow(main, "shield_check", I18n.t("Bảo mật và đăng nhập"), false, () -> securityScreen());
