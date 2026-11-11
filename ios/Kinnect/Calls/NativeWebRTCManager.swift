@@ -89,6 +89,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
     private var liveProcessor: LiveVideoProcessor?
     @Published private(set) var liveEffects = LiveVideoSettings()
     private var pendingAnswerCallId: String?
+    private var isStartingCall = false
 
     @MainActor
     func updateLiveEffects(_ value: LiveVideoSettings) {
@@ -139,6 +140,9 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
 
     @MainActor
     func startOutgoingCall(targetUser: KinnectUser, mode: String) async {
+        guard activeCall == nil, !isStartingCall else { return }
+        isStartingCall = true
+        defer { isStartingCall = false }
         let isVideo = (mode != "audio")
         let micOk = await MediaPermissionHandler.shared.requestMicrophoneAccess()
         guard micOk else { return }
@@ -146,7 +150,12 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
             _ = await MediaPermissionHandler.shared.requestCameraAccess()
         }
 
+        guard await NativeSocketClient.shared.ensureConnected() else {
+            AppState.shared.showToast("Chưa kết nối được cuộc gọi. Vui lòng thử lại.")
+            return
+        }
         await refreshIceServers()
+        guard activeCall == nil else { return }
         let callId = "call_\(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(16))"
         let session = ActiveCallSession(
             callId: callId,
@@ -156,8 +165,9 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
             state: .dialingOutgoing
         )
         self.activeCall = session
-        MediaPermissionHandler.shared.configureAudioSessionForCall()
+        MediaPermissionHandler.shared.configureAudioSessionForCall(speaker: isVideo)
         prepareLocalCallMedia(isVideo: isVideo)
+        CallAudioFeedback.shared.ringback()
         CallKitManager.shared.startOutgoingCall(callId: callId, targetName: targetUser.name, isVideo: isVideo)
 
         NativeSocketClient.shared.sendJSON([
@@ -174,6 +184,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
     func handleCallRingingSocket(_ json: [String: Any]) {
         guard var current = activeCall else { return }
         if let serverCallId = json["callId"] as? String, !serverCallId.isEmpty {
+                CallKitManager.shared.remapCallId(from: current.callId, to: serverCallId)
                 let updated = ActiveCallSession(
                     callId: serverCallId,
                     peerUser: current.peerUser,
@@ -198,6 +209,8 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
             return
         }
 
+        if let current = activeCall, current.callId == callId,
+           current.state == .connecting || current.state == .connected { return }
         let mode = json["mode"] as? String ?? "video"
         let fromDict = json["from"] as? [String: Any] ?? [:]
         let caller = KinnectUser.from(fromDict)
@@ -225,6 +238,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
             return
         }
         if let callId, current.callId != callId { return }
+        guard current.state == .ringingIncoming else { return }
 
         let isVideo = (current.mode != "audio")
         _ = await MediaPermissionHandler.shared.requestMicrophoneAccess()
@@ -232,10 +246,13 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
             _ = await MediaPermissionHandler.shared.requestCameraAccess()
         }
         await refreshIceServers()
+        guard activeCall?.callId == current.callId,
+              activeCall?.state == .ringingIncoming else { return }
 
+        CallAudioFeedback.shared.stop()
         current.state = .connecting
         self.activeCall = current
-        MediaPermissionHandler.shared.configureAudioSessionForCall()
+        MediaPermissionHandler.shared.configureAudioSessionForCall(speaker: isVideo)
         prepareLocalCallMedia(isVideo: isVideo)
         setupCallPeerConnection()
 
@@ -248,6 +265,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
     @MainActor
     func endOrRejectCurrentCall(sendSocket: Bool = true, fallbackCallId: String? = nil) {
         pendingAnswerCallId = nil
+        CallAudioFeedback.shared.stop()
         guard let current = activeCall else {
             // CallKit can be answered or declined before the websocket finishes reconnecting.
             if sendSocket, let callId = fallbackCallId {
@@ -277,6 +295,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         CallKitManager.shared.reportCallEnded(callId: callId, reason: .remoteEnded)
         cleanupCallMedia()
         self.activeCall = nil
+        if sendSocket { CallAudioFeedback.shared.ended() }
     }
 
     @MainActor
@@ -285,12 +304,12 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         let callId = json["callId"] as? String ?? ""
         guard callId == current.callId else { return }
 
+        CallAudioFeedback.shared.stop()
         current.state = .connecting
         self.activeCall = current
-        CallKitManager.shared.reportCallConnected(callId: callId)
-
         setupCallPeerConnection()
-        guard let pc = callPeerConnection else { return }
+        // The caller creates the offer; the recipient answers it.
+        guard !current.isIncoming, let pc = callPeerConnection else { return }
         let constraints = RTCMediaConstraints(
             mandatoryConstraints: [
                 "OfferToReceiveAudio": "true",
@@ -389,13 +408,20 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
     @MainActor
     func handleCallEndedSocket(_ json: [String: Any]) {
         let callId = json["callId"] as? String ?? ""
-        if !callId.isEmpty {
-            CallKitManager.shared.reportCallEnded(callId: callId, reason: .remoteEnded)
+        let requestId = json["requestId"] as? String ?? ""
+        guard let current = activeCall else {
+            if !callId.isEmpty { CallKitManager.shared.reportCallEnded(callId: callId) }
+            return
         }
-        if activeCall == nil || activeCall?.callId == callId {
-            cleanupCallMedia()
-            activeCall = nil
-        }
+        guard current.callId == callId || current.callId == requestId else { return }
+        CallAudioFeedback.shared.stop()
+        CallKitManager.shared.reportCallEnded(callId: current.callId, reason: .remoteEnded)
+        cleanupCallMedia()
+        activeCall = nil
+        let reason = json["reason"] as? String ?? ""
+        CallAudioFeedback.shared.ended(busy: reason == "busy" || reason == "declined")
+        if reason == "busy" { AppState.shared.showToast("Người này đang bận.") }
+        if reason == "offline" { AppState.shared.showToast("Hiện chưa liên lạc được với người này.") }
     }
 
     // MARK: - Controls
@@ -452,7 +478,8 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
     private func prepareLocalCallMedia(isVideo: Bool) {
         isMicMuted = false
         isCameraOff = !isVideo
-        isSpeakerOn = true
+        isSpeakerOn = isVideo
+        usingFrontCamera = true
 
         let audioSource = factory.audioSource(with: RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil))
         let audioTrack = factory.audioTrack(with: audioSource, trackId: "kinnect_audio0")
@@ -718,8 +745,13 @@ extension NativeWebRTCManager: RTCPeerConnectionDelegate {
 
     func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCIceConnectionState) {
         DispatchQueue.main.async {
+            guard self.callPeerConnection === peerConnection else { return }
             if newState == .connected || newState == .completed {
                 if var current = self.activeCall {
+                    CallAudioFeedback.shared.stop()
+                    if current.state != .connected && !current.isIncoming {
+                        CallKitManager.shared.reportCallConnected(callId: current.callId)
+                    }
                     current.state = .connected
                     self.activeCall = current
                 }

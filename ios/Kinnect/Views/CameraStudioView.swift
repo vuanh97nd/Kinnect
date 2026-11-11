@@ -47,6 +47,7 @@ struct CameraStudioView: View {
     @State private var isFlashOn = false
     @State private var showMusicPickerSheet = false
     @State private var selectedMusicTrack = ""
+    @State private var selectedMusicURL: URL?
     @State private var showStudioProSheet = false
     @State private var showCreateLiveSheet = false
     @State private var studioProAppliedEffect = "Bộ lọc gốc"
@@ -212,6 +213,7 @@ struct CameraStudioView: View {
                 let vp = StudioVideoProject(sourceURL: tempURL)
                 if !self.selectedMusicTrack.isEmpty {
                     vp.musicTitle = self.selectedMusicTrack
+                    vp.musicURL = self.selectedMusicURL
                 }
                 self.videoProject = vp
                 self.syncVideoProjectSliders(to: vp)
@@ -259,6 +261,7 @@ struct CameraStudioView: View {
                     selectedTrack: $selectedMusicTrack,
                     onSelectTrack: { title, url in
                         selectedMusicTrack = title
+                        selectedMusicURL = url
                         videoProject?.musicTitle = title
                         videoProject?.musicURL = url
                     }
@@ -1132,6 +1135,7 @@ struct CameraStudioView: View {
                                 vp.musicURL = nil
                                 vp.musicTitle = ""
                                 selectedMusicTrack = ""
+                                selectedMusicURL = nil
                             } label: {
                                 HStack(spacing: 6) {
                                     Image(systemName: "trash")
@@ -1542,182 +1546,148 @@ struct StudioMusicPickerSheet: View {
     @Binding var selectedTrack: String
     var onSelectTrack: ((String, URL?) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var calls = NativeWebRTCManager.shared
     @State private var showAudioFilePicker = false
-    @State private var playingTrackTitle: String? = nil
-    @State private var previewPlayer: AVPlayer? = nil
+    @State private var previewPlayer: AVPlayer?
+    @State private var playingID: String?
+    @State private var tracks: [MusicTrack] = []
+    @State private var loading = false
+    @State private var busy = false
+    @State private var errorText = ""
+    @State private var query = ""
 
-    private let curatedTracks: [(id: String, title: String, subtitle: String, duration: String)] = [
-        ("lofi_saigon", "Lofi Chill Sài Gòn", "Giai điệu thư giãn nhẹ nhàng • 85 BPM", "0:45"),
-        ("acoustic_banmai", "Acoustic Ban Mai", "Guitar mộc trong sáng • 98 BPM", "0:50"),
-        ("synthwave_dem", "Synthwave Đêm", "Năng động hiện đại • 118 BPM", "1:00"),
-        ("piano_muathu", "Piano Mùa Thu", "Cảm xúc sâu lắng • 76 BPM", "0:40"),
-        ("edm_energy", "EDM Festival Energy", "Sôi động bùng nổ • 128 BPM", "0:55")
-    ]
+    struct MusicTrack: Identifiable {
+        let id: String
+        let title: String
+        let artist: String
+        let path: String
+    }
 
     var body: some View {
         List {
-            Section("Tệp âm thanh trên máy") {
-                Button {
-                    showAudioFilePicker = true
-                } label: {
-                    HStack(spacing: 12) {
-                        ZStack {
-                            Circle()
-                                .fill(KinnectTheme.accentBright.opacity(0.2))
-                                .frame(width: 38, height: 38)
-                            Image(systemName: "folder.badge.plus")
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(KinnectTheme.accentBright)
-                        }
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Chọn tệp âm thanh từ thiết bị...")
-                                .font(.subheadline.bold())
-                                .foregroundColor(.white)
-                            Text("Hỗ trợ MP3, M4A, WAV, AAC từ Tệp & iCloud")
-                                .font(.caption2)
-                                .foregroundColor(KinnectTheme.textSecondary)
-                        }
-
-                        Spacer()
-
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundColor(KinnectTheme.textSecondary)
-                    }
-                    .frame(minHeight: 44)
-                }
-            }
-
-            Section("Nhạc nền Kinnect đề xuất") {
-                // Remove music option
-                Button {
+            Section {
+                Button("Chọn tệp âm thanh từ thiết bị") { showAudioFilePicker = true }
+                Button("Không dùng nhạc nền") {
                     stopPreview()
                     selectedTrack = ""
                     onSelectTrack?("", nil)
                     dismiss()
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "speaker.slash.fill")
-                            .foregroundColor(selectedTrack.isEmpty ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Không dùng nhạc nền")
-                                .font(.subheadline.bold())
-                                .foregroundColor(.white)
-                            Text("Chỉ sử dụng âm thanh gốc từ video")
-                                .font(.caption2)
-                                .foregroundColor(KinnectTheme.textSecondary)
-                        }
-                        Spacer()
-                        if selectedTrack.isEmpty {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(KinnectTheme.accentBright)
-                        }
-                    }
-                    .frame(minHeight: 44)
                 }
-
-                ForEach(curatedTracks, id: \.id) { track in
+            }
+            Section("Thư viện âm thanh Kinnect") {
+                if loading { ProgressView("Đang tải danh sách nhạc…") }
+                if !errorText.isEmpty {
+                    Text(errorText).foregroundColor(.secondary)
+                    Button("Thử lại") { Task { await loadCatalog() } }
+                } else if !loading && tracks.isEmpty {
+                    Text("Chưa có âm thanh trong thư viện.")
+                }
+                ForEach(tracks.filter { query.isEmpty || ($0.title + " " + $0.artist).localizedCaseInsensitiveContains(query) }) { track in
                     HStack(spacing: 12) {
                         Button {
-                            togglePreview(for: track.title)
+                            Task { await preview(track) }
                         } label: {
-                            ZStack {
-                                Circle()
-                                    .fill(playingTrackTitle == track.title ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
-                                    .frame(width: 36, height: 36)
-                                Image(systemName: playingTrackTitle == track.title ? "pause.fill" : "play.fill")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.white)
-                            }
+                            Image(systemName: playingID == track.id ? "pause.circle.fill" : "play.circle.fill")
+                                .font(.system(size: 32))
+                                .frame(width: 44, height: 44)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Nghe thử \(track.title)")
-
                         Button {
-                            stopPreview()
-                            selectedTrack = track.title
-                            let audioURL = UIReviewFixture.sampleAudioURL(named: track.title)
-                            onSelectTrack?(track.title, audioURL)
-                            dismiss()
+                            Task { await select(track) }
                         } label: {
                             HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(track.title)
-                                        .font(.subheadline.bold())
-                                        .foregroundColor(.white)
-                                    Text(track.subtitle)
-                                        .font(.caption2)
-                                        .foregroundColor(KinnectTheme.textSecondary)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(track.title).font(.subheadline.bold())
+                                    Text(track.artist).font(.caption).foregroundColor(.secondary)
                                 }
                                 Spacer()
-                                Text(track.duration)
-                                    .font(.caption2)
-                                    .foregroundColor(KinnectTheme.textSecondary)
-                                    .padding(.trailing, 4)
-
-                                if selectedTrack == track.title {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(KinnectTheme.accentBright)
-                                }
+                                if selectedTrack == track.title { Image(systemName: "checkmark.circle.fill") }
                             }
                             .frame(minHeight: 44)
                         }
                         .buttonStyle(.plain)
                     }
+                    .disabled(busy)
                 }
             }
         }
-        .scrollContentBackground(.hidden)
-        .background(KinnectTheme.background)
+        .searchable(text: $query, prompt: "Tìm nhạc, nghệ sĩ")
         .navigationTitle("Thêm nhạc nền")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Đóng") {
-                    stopPreview()
-                    dismiss()
-                }
-            }
+            ToolbarItem(placement: .cancellationAction) { Button("Đóng") { dismiss() } }
         }
+        .task { await loadCatalog() }
+        .refreshable { await loadCatalog() }
+        .onDisappear { stopPreview() }
+        .onChange(of: calls.activeCall) { call in if call != nil { stopPreview() } }
         .fileImporter(isPresented: $showAudioFilePicker, allowedContentTypes: [.audio]) { result in
-            switch result {
-            case .success(let fileURL):
-                guard fileURL.startAccessingSecurityScopedResource() else { return }
-                defer { fileURL.stopAccessingSecurityScopedResource() }
-                let ext = fileURL.pathExtension
-                let dest = FileManager.default.temporaryDirectory.appendingPathComponent("Kinnect-Music-\(UUID().uuidString).\(ext)")
-                if let data = try? Data(contentsOf: fileURL) {
-                    try? data.write(to: dest)
-                    let name = fileURL.deletingPathExtension().lastPathComponent
-                    selectedTrack = name
-                    onSelectTrack?(name, dest)
-                    dismiss()
-                }
-            case .failure(let err):
-                print("Lỗi chọn tệp âm thanh: \(err.localizedDescription)")
-            }
-        }
-        .onDisappear {
-            stopPreview()
+            do {
+                let url = try result.get()
+                let granted = url.startAccessingSecurityScopedResource()
+                defer { if granted { url.stopAccessingSecurityScopedResource() } }
+                let destination = FileManager.default.temporaryDirectory.appendingPathComponent("Kinnect-Music-\(UUID().uuidString).\(url.pathExtension)")
+                try FileManager.default.copyItem(at: url, to: destination)
+                let title = url.deletingPathExtension().lastPathComponent
+                stopPreview()
+                selectedTrack = title
+                onSelectTrack?(title, destination)
+                dismiss()
+            } catch { errorText = error.localizedDescription }
         }
     }
 
-    private func togglePreview(for title: String) {
-        if playingTrackTitle == title {
-            stopPreview()
-        } else {
-            playingTrackTitle = title
-            let audioURL = UIReviewFixture.sampleAudioURL(named: title)
-            previewPlayer = AVPlayer(url: audioURL)
+    private func loadCatalog() async {
+        loading = true
+        errorText = ""
+        defer { loading = false }
+        do {
+            let result = try await KinnectAPIClient.shared.requestJSON("/api/music")
+            tracks = (result["tracks"] as? [[String: Any]] ?? []).compactMap { entry in
+                guard let path = entry["url"] as? String, !path.isEmpty else { return nil }
+                let title = entry["title"] as? String ?? entry["file"] as? String ?? "Âm thanh"
+                return MusicTrack(id: path, title: title, artist: entry["artist"] as? String ?? "", path: path)
+            }
+        } catch { errorText = error.localizedDescription }
+    }
+
+    private func localAudio(_ track: MusicTrack) async throws -> URL {
+        let ext = URL(string: track.path)?.pathExtension ?? "m4a"
+        return try await KinnectAuthenticatedFile.fetch(path: track.path, fileExtension: ext.isEmpty ? "m4a" : ext)
+    }
+
+    private func preview(_ track: MusicTrack) async {
+        if playingID == track.id { stopPreview(); return }
+        guard calls.activeCall == nil else { return }
+        stopPreview()
+        busy = true
+        defer { busy = false }
+        do {
+            let url = try await localAudio(track)
+            guard calls.activeCall == nil else { return }
+            playingID = track.id
+            previewPlayer = AVPlayer(url: url)
             previewPlayer?.play()
-        }
+        } catch { errorText = error.localizedDescription }
+    }
+
+    private func select(_ track: MusicTrack) async {
+        stopPreview()
+        busy = true
+        defer { busy = false }
+        do {
+            let url = try await localAudio(track)
+            selectedTrack = track.title
+            onSelectTrack?(track.title, url)
+            dismiss()
+        } catch { errorText = error.localizedDescription }
     }
 
     private func stopPreview() {
-        playingTrackTitle = nil
         previewPlayer?.pause()
         previewPlayer = nil
+        playingID = nil
     }
 }
 

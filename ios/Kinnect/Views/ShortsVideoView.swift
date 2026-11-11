@@ -14,6 +14,17 @@ struct ShortsVideoView: View {
     @State private var selectedAuthorProfile: KinnectUser? = nil
     @State private var isMuted: Bool = false
     @State private var floatingHearts: [FloatingHeart] = []
+    @State private var followingRequests: Set<String> = []
+    private let profileItems: [ShortItem]?
+
+    init(initialItems: [ShortItem]? = nil, initialShortID: String? = nil) {
+        profileItems = initialItems
+        if let initialItems {
+            let selected = initialItems.firstIndex { $0.id == initialShortID } ?? 0
+            let ordered = Array(initialItems.dropFirst(selected)) + Array(initialItems.prefix(selected))
+            _items = State(initialValue: ordered)
+        }
+    }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -62,7 +73,6 @@ struct ShortsVideoView: View {
                         .position(x: geo.size.width / 2, y: geo.size.height / 2)
                     }
                 }
-                .ignoresSafeArea(edges: .top)
             }
 
             // Top transparent floating bar (Đề xuất · Đang theo dõi) - Parity with Android 1.2.12
@@ -224,32 +234,25 @@ struct ShortsVideoView: View {
 
                 // Right Action Sidebar
                 VStack(spacing: 16) {
-                    // Author Avatar with Follow Badge matching Android 3321-3323
-                    Button {
-                        selectedAuthorProfile = item.author
-                    } label: {
-                        ZStack(alignment: .bottom) {
-                            KinnectAvatarView(
-                                name: item.author.name,
-                                avatarURL: item.author.avatarUrl,
-                                colorHex: item.author.avatarColor,
-                                size: 46
-                            )
-                            if item.author.id != appState.currentUser?.id {
-                                Circle()
-                                    .fill(item.author.isFollowed ? KinnectTheme.accentBright : KinnectTheme.danger)
-                                    .frame(width: 20, height: 20)
-                                    .overlay(
-                                        Image(systemName: item.author.isFollowed ? "checkmark" : "plus")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundColor(.white)
-                                    )
-                                    .offset(y: 8)
+                    VStack(spacing: 0) {
+                        Button { selectedAuthorProfile = item.author } label: {
+                            KinnectAvatarView(name: item.author.name, avatarURL: item.author.avatarUrl,
+                                              colorHex: item.author.avatarColor, size: 46)
+                        }
+                        .buttonStyle(.plain)
+                        if item.author.id != appState.currentUser?.id {
+                            Button { Task { await toggleFollow(item.author) } } label: {
+                                Image(systemName: item.author.isFollowed ? "checkmark" : "plus")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 26, height: 26)
+                                    .background(Circle().fill(item.author.isFollowed ? KinnectTheme.accentBright : KinnectTheme.danger))
+                                    .frame(width: 44, height: 44)
                             }
+                            .disabled(followingRequests.contains(item.author.id))
+                            .accessibilityLabel(item.author.isFollowed ? "Bỏ theo dõi" : "Theo dõi")
                         }
                     }
-                    .buttonStyle(.plain)
-                    .padding(.bottom, item.author.id != appState.currentUser?.id ? 8 : 0)
 
                     // Like button
                     Button {
@@ -362,6 +365,21 @@ struct ShortsVideoView: View {
         }
     }
 
+    private func toggleFollow(_ author: KinnectUser) async {
+        guard !followingRequests.contains(author.id) else { return }
+        followingRequests.insert(author.id)
+        defer { followingRequests.remove(author.id) }
+        do {
+            let result = try await KinnectAPIClient.shared.requestJSON(
+                "/api/users/\(author.id)/follow", method: author.isFollowed ? "DELETE" : "POST")
+            let user = result["user"] as? [String: Any]
+            let following = (user?["following"] as? Bool) ?? !author.isFollowed
+            for index in items.indices where items[index].author.id == author.id {
+                items[index].author.isFollowed = following
+            }
+        } catch { appState.showToast(error.localizedDescription) }
+    }
+
     private func deleteShort(_ item: ShortItem) async {
         do {
             _ = try await KinnectAPIClient.shared.requestJSON(
@@ -376,6 +394,7 @@ struct ShortsVideoView: View {
     }
 
     private func loadShorts() async {
+        if profileItems != nil { return }
         let cacheKey = "shorts_feed_\(shortsTab)"
         if let accountId = AccountCache.shared.activeAccountId {
             if let cached: [[String: Any]] = AccountCache.shared.loadJSONObject(forKey: cacheKey, accountId: accountId), items.isEmpty {
@@ -414,6 +433,7 @@ struct ShortClipPlayer: View {
     @State private var loading = false
     @State private var loopObserver: NSObjectProtocol?
     @State private var shouldPlay = false
+    @State private var statusObserver: NSKeyValueObservation?
 
     var body: some View {
         ZStack {
@@ -428,7 +448,12 @@ struct ShortClipPlayer: View {
             )
             .ignoresSafeArea()
 
-            if let player {
+            if failed {
+                VStack(spacing: 12) {
+                    Text("Không thể phát video.").foregroundColor(.white)
+                    Button("Thử lại") { Task { await load() } }.tint(.white)
+                }
+            } else if let player {
                 VideoPlayer(player: player)
                     .disabled(true)
             } else if loading {
@@ -439,7 +464,7 @@ struct ShortClipPlayer: View {
                     Text("Kinnect Video HD")
                         .font(.headline.bold())
                         .foregroundColor(.white)
-                    Text("Đang đồng bộ luồng video thịnh hành...")
+                    Text("Chưa có nguồn video khả dụng.")
                         .font(.caption)
                         .foregroundColor(.white.opacity(0.75))
                 }
@@ -464,15 +489,17 @@ struct ShortClipPlayer: View {
         defer { loading = false }
 
         // Configure audio session for smooth video audio playback
-        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [.mixWithOthers])
-        try? AVAudioSession.sharedInstance().setActive(true)
+        if calls.activeCall == nil {
+            try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+            try? AVAudioSession.sharedInstance().setActive(true)
+        }
 
         if path.hasPrefix("file://"), let localURL = URL(string: path) {
             setupPlayer(with: AVPlayerItem(url: localURL))
             return
         }
 
-        let origin = ServerConfig.currentOrigin
+        let origin = KinnectAPIClient.shared.mediaOrigin
         guard let remoteURL = ServerConfig.url(for: path, origin: origin) else {
             failed = true
             return
@@ -480,7 +507,7 @@ struct ShortClipPlayer: View {
 
         let cookie = KeychainStore.shared.cookieJarHeader(for: origin)
         var options: [String: Any] = [:]
-        if !cookie.isEmpty {
+        if !cookie.isEmpty, remoteURL.host == URL(string: origin)?.host {
             options["AVURLAssetHTTPHeaderFieldsKey"] = ["Cookie": cookie]
         }
 
@@ -491,6 +518,9 @@ struct ShortClipPlayer: View {
 
     private func setupPlayer(with item: AVPlayerItem) {
         let next = AVPlayer(playerItem: item)
+        statusObserver = item.observe(\.status, options: [.new]) { item, _ in
+            if item.status == .failed { DispatchQueue.main.async { failed = true } }
+        }
         next.isMuted = muted
         next.automaticallyWaitsToMinimizeStalling = false
         loopObserver = NotificationCenter.default.addObserver(
@@ -517,6 +547,8 @@ struct ShortClipPlayer: View {
     }
 
     private func stop() {
+        statusObserver?.invalidate()
+        statusObserver = nil
         shouldPlay = false
         player?.pause()
         player = nil

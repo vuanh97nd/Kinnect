@@ -1,202 +1,116 @@
 import SwiftUI
-import UIKit
 
 struct CallOverlayView: View {
     @ObservedObject private var webrtc = NativeWebRTCManager.shared
+    @State private var connectedAt: Date?
 
     var body: some View {
         if let call = webrtc.activeCall {
             ZStack {
-                KinnectTheme.background.ignoresSafeArea()
-
-                // Remote Video Fullscreen when in video mode
-                if call.mode == "video", let remoteTrack = webrtc.remoteVideoTrack {
-                    WebRTCVideoRendererView(track: remoteTrack, mirror: false)
-                        .ignoresSafeArea()
-                } else {
-                    LinearGradient(
-                        colors: [Color(red: 0.14, green: 0.08, blue: 0.28), KinnectTheme.background],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .ignoresSafeArea()
+                LinearGradient(colors: [Color(red: 0.16, green: 0.19, blue: 0.25), .black],
+                               startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+                if call.mode == "video", let track = webrtc.remoteVideoTrack {
+                    WebRTCVideoRendererView(track: track).ignoresSafeArea()
+                    LinearGradient(colors: [.black.opacity(0.55), .clear, .black.opacity(0.65)],
+                                   startPoint: .top, endPoint: .bottom).ignoresSafeArea()
                 }
-
-                VStack(spacing: 20) {
-                    // Caller / Peer info header
-                    VStack(spacing: 10) {
-                        KinnectAvatarView(
-                            name: call.peerUser.name,
-                            avatarURL: call.peerUser.avatarUrl,
-                            colorHex: call.peerUser.avatarColor,
-                            size: 88
-                        )
-
-                        Text(call.peerUser.name)
-                            .font(.title2.bold())
-                            .foregroundColor(.white)
-                            .kinnectMultiline()
-
-                        Text(statusLabel(for: call))
-                            .font(.subheadline.weight(.medium))
-                            .foregroundColor(KinnectTheme.textSecondary)
-                            .kinnectMultiline()
+                GeometryReader { geometry in
+                    ScrollView(showsIndicators: false) {
+                VStack(spacing: 16) {
+                    VStack(spacing: 12) {
+                        Label(call.mode == "video" ? "Kinnect Video" : "Kinnect Audio",
+                              systemImage: call.mode == "video" ? "video.fill" : "phone.fill")
+                            .font(.subheadline).foregroundColor(.white.opacity(0.75))
+                        if webrtc.remoteVideoTrack == nil {
+                            KinnectAvatarView(name: call.peerUser.name, avatarURL: call.peerUser.avatarUrl,
+                                              colorHex: call.peerUser.avatarColor, size: 104)
+                                .padding(.top, 20)
+                        }
+                        Text(call.peerUser.name).font(.system(size: 32, weight: .regular))
+                            .multilineTextAlignment(.center).foregroundColor(.white)
+                        if call.state == .connected, let connectedAt {
+                            Text(connectedAt, style: .timer).monospacedDigit().foregroundColor(.white.opacity(0.8))
+                        } else {
+                            Text(status(call)).font(.title3).foregroundColor(.white.opacity(0.8))
+                        }
                     }
-                    .padding(.top, 48)
-
-                    Spacer()
-
-                    // Local Video PiP
-                    if call.mode == "video", let localTrack = webrtc.localVideoTrack, !webrtc.isCameraOff {
+                    .padding(.top, 32)
+                    Spacer(minLength: 24)
+                    if call.mode == "video", let track = webrtc.localVideoTrack, !webrtc.isCameraOff {
                         HStack {
                             Spacer()
-                            WebRTCVideoRendererView(track: localTrack, mirror: webrtc.usingFrontCamera)
-                                .frame(width: 118, height: 168)
-                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                                )
-                                .shadow(radius: 10)
+                            WebRTCVideoRendererView(track: track, mirror: webrtc.usingFrontCamera)
+                                .frame(width: 108, height: 152)
+                                .clipShape(RoundedRectangle(cornerRadius: 18))
+                                .overlay(RoundedRectangle(cornerRadius: 18).stroke(.white.opacity(0.4)))
                         }
-                        .padding(.horizontal, 20)
                     }
-
-                    // Action Buttons (Apple iOS In-Call HIG style)
                     if call.isIncoming && call.state == .ringingIncoming {
-                        HStack(spacing: 52) {
-                            callActionButton(
-                                systemIcon: "phone.down",
-                                label: "Từ chối",
-                                color: KinnectTheme.callRed
-                            ) {
-                                webrtc.endOrRejectCurrentCall(sendSocket: true)
+                        HStack {
+                            control("phone.down.fill", "Từ chối", color: .red) {
+                                webrtc.endOrRejectCurrentCall()
                             }
-
-                            callActionButton(
-                                systemIcon: call.mode == "video" ? "video" : "phone",
-                                label: "Trả lời",
-                                color: KinnectTheme.callGreen
-                            ) {
+                            Spacer()
+                            control(call.mode == "video" ? "video.fill" : "phone.fill", "Trả lời", color: .green) {
                                 Task { await webrtc.acceptIncomingCall(callId: call.callId) }
                             }
-                        }
-                        .padding(.bottom, 48)
+                        }.padding(.horizontal, 28)
                     } else {
-                        HStack(spacing: 20) {
-                            callControlCircle(
-                                icon: webrtc.isMicMuted ? "mic.slash.fill" : "mic.fill",
-                                isToggledOn: webrtc.isMicMuted,
-                                label: webrtc.isMicMuted ? "Bật mic" : "Tắt mic",
-                                accessibilityStateValue: webrtc.isMicMuted ? "Đang tắt tiếng" : "Đang bật tiếng"
-                            ) {
-                                webrtc.toggleMute()
-                            }
-
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 24) {
+                            control(webrtc.isMicMuted ? "mic.slash.fill" : "mic.fill", "Tắt tiếng",
+                                    selected: webrtc.isMicMuted) { webrtc.toggleMute() }
+                            control("speaker.wave.3.fill", "Loa ngoài",
+                                    selected: webrtc.isSpeakerOn) { webrtc.toggleSpeaker() }
                             if call.mode == "video" {
-                                callControlCircle(
-                                    icon: webrtc.isCameraOff ? "video.slash.fill" : "video.fill",
-                                    isToggledOn: webrtc.isCameraOff,
-                                    label: "Camera",
-                                    accessibilityStateValue: webrtc.isCameraOff ? "Đang tắt camera" : "Đang bật camera"
-                                ) {
-                                    webrtc.toggleCamera()
-                                }
-
-                                callControlCircle(
-                                    icon: "camera.rotate.fill",
-                                    isToggledOn: false,
-                                    label: "Đổi cam",
-                                    accessibilityStateValue: webrtc.usingFrontCamera ? "Camera trước" : "Camera sau"
-                                ) {
-                                    webrtc.switchCamera()
-                                }
+                                control(webrtc.isCameraOff ? "video.slash.fill" : "video.fill", "Camera",
+                                        selected: webrtc.isCameraOff) { webrtc.toggleCamera() }
+                                control("camera.rotate.fill", "Đổi camera") { webrtc.switchCamera() }
                             }
-
-                            callControlCircle(
-                                icon: webrtc.isSpeakerOn ? "speaker.wave.3.fill" : "speaker.fill",
-                                isToggledOn: webrtc.isSpeakerOn,
-                                label: "Loa ngoài",
-                                accessibilityStateValue: webrtc.isSpeakerOn ? "Đang bật loa ngoài" : "Đang dùng loa trong"
-                            ) {
-                                webrtc.toggleSpeaker()
-                            }
-
-                            callActionButton(
-                                systemIcon: "phone.down",
-                                label: "Kết thúc",
-                                color: KinnectTheme.callRed
-                            ) {
-                                webrtc.endOrRejectCurrentCall(sendSocket: true)
-                            }
-                        }
-                        .padding(.bottom, 40)
+                        }.frame(maxWidth: 280)
+                        control("phone.down.fill", "Kết thúc", color: .red) { webrtc.endOrRejectCurrentCall() }
+                            .padding(.top, 10)
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 28)
+                .padding(.bottom, 28)
+                .frame(minHeight: geometry.size.height)
+                    }
+                }
             }
+            .onAppear { updateTimer(call) }
+            .onChange(of: call.state) { _ in updateTimer(call) }
+            .onChange(of: call.callId) { _ in connectedAt = nil; updateTimer(call) }
         }
     }
 
-    private func statusLabel(for call: ActiveCallSession) -> String {
+    private func updateTimer(_ call: ActiveCallSession) {
+        if call.state == .connected && connectedAt == nil { connectedAt = Date() }
+        if call.state != .connected { connectedAt = nil }
+    }
+
+    private func status(_ call: ActiveCallSession) -> String {
         switch call.state {
-        case .ringingIncoming:
-            return call.mode == "video" ? "Cuộc gọi video đến..." : "Cuộc gọi thoại đến..."
-        case .dialingOutgoing:
-            return "Đang đổ chuông..."
-        case .connecting:
-            return "Đang kết nối WebRTC..."
-        case .connected:
-            return "Đang trong cuộc gọi"
-        case .ended:
-            return "Đã kết thúc"
+        case .ringingIncoming: return call.mode == "video" ? "Cuộc gọi video đến" : "Cuộc gọi đến"
+        case .dialingOutgoing: return "Đang gọi…"
+        case .connecting: return "Đang kết nối…"
+        case .connected: return "Đã kết nối"
+        case .ended: return "Đã kết thúc"
         }
     }
 
-    private func callActionButton(systemIcon: String, label: String, color: Color, action: @escaping () -> Void) -> some View {
+    private func control(_ icon: String, _ title: String, color: Color? = nil,
+                         selected: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 8) {
-                Circle()
-                    .fill(color)
-                    .frame(width: 68, height: 68)
-                    .shadow(color: color.opacity(0.4), radius: 8, x: 0, y: 4)
-                    .overlay {
-                        Image(systemName: systemIcon)
-                            .font(.system(size: 28, weight: .semibold))
-                            .foregroundColor(.white)
-                    }
-                Text(label)
-                    .font(.caption.weight(.medium))
-                    .foregroundColor(.white)
+            VStack(spacing: 9) {
+                Image(systemName: icon).font(.system(size: 27, weight: .medium))
+                    .foregroundColor(selected && color == nil ? .black : .white)
+                    .frame(width: 72, height: 72)
+                    .background(color ?? (selected ? .white : .white.opacity(0.22)), in: Circle())
+                Text(title).font(.system(size: 13)).foregroundColor(.white).lineLimit(1)
             }
         }
-        .accessibilityLabel(label)
-    }
-
-    private func callControlCircle(
-        icon: String,
-        isToggledOn: Bool,
-        label: String,
-        accessibilityStateValue: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            VStack(spacing: 8) {
-                Circle()
-                    .fill(isToggledOn ? Color.white : Color.white.opacity(0.2))
-                    .frame(width: 58, height: 58)
-                    .overlay {
-                        Image(systemName: icon)
-                            .font(.system(size: 22, weight: .medium))
-                            .foregroundColor(isToggledOn ? .black : .white)
-                    }
-                Text(label)
-                    .font(.caption2.weight(.medium))
-                    .foregroundColor(.white)
-            }
-        }
-        .accessibilityLabel(label)
-        .accessibilityValue(accessibilityStateValue)
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityValue(color == nil ? (selected ? "Bật" : "Tắt") : "")
     }
 }
-

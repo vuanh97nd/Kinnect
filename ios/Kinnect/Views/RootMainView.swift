@@ -695,7 +695,7 @@ struct RootMainView: View {
     private var iPhoneLayout: some View {
         ZStack {
             VStack(spacing: 0) {
-                if selectedTab == .feed || selectedTab == .discover {
+                if selectedTab != .create {
                     KinnectTopBar(
                         appState: appState,
                         activeTopSection: $activeTopSection,

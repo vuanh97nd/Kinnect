@@ -108,7 +108,7 @@ struct FeedView: View {
         .onReceive(NotificationCenter.default.publisher(for: .kinnectContentModerated)) { _ in
             Task { await loadFeedAndStories() }
         }
-        .sheet(isPresented: $showComposerSheet) {
+        .fullScreenCover(isPresented: $showComposerSheet) {
             PostComposerSheet {
                 Task { await loadFeedAndStories() }
             }
@@ -443,7 +443,7 @@ struct FeedView: View {
     }
 }
 
-private struct PostCardView: View {
+struct PostCardView: View {
     let post: PostItem
     let currentUserId: String
     let isAuthorOnline: Bool
@@ -560,12 +560,7 @@ private struct PostCardView: View {
             }
 
             if !post.imageUrl.isEmpty {
-                KinnectRemoteImageView(
-                    rawURL: post.imageUrl,
-                    contentMode: .fill,
-                    cornerRadius: 14,
-                    maxHeight: 340
-                )
+                KinnectMediaTile(path: post.imageUrl, kind: post.mediaKind)
             }
 
             // Statistics Summary Row (Android parity: ❤️ 2 cảm xúc ... 0 bình luận)
@@ -743,159 +738,164 @@ struct PostComposerSheet: View {
     let onPosted: () -> Void
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
     @State private var text = ""
-    @State private var visibility = "public" // "public" | "followers"
-    @State private var showAudienceMenu = false
-    @State private var selectedPhotoItem: PhotosPickerItem?
-    @State private var imageDataURL: String = ""
+    @State private var visibility = "public"
+    @State private var photo: PhotosPickerItem?
+    @State private var video: PhotosPickerItem?
     @State private var previewImage: UIImage?
+    @State private var videoURL: URL?
+    @State private var mediaDataURL = ""
     @State private var isSubmitting = false
+    @State private var loadingMedia = false
+    @State private var showCamera = false
+    @State private var showMusic = false
+    @State private var musicTitle = ""
+    @State private var musicURL: URL?
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    // Author & Audience Header
+                VStack(alignment: .leading, spacing: 18) {
                     HStack(spacing: 12) {
-                        KinnectAvatarView(
-                            name: appState.currentUser?.name ?? "K",
+                        KinnectAvatarView(name: appState.currentUser?.name ?? "Bạn",
                             avatarURL: appState.currentUser?.avatarUrl ?? "",
-                            colorHex: appState.currentUser?.avatarColor ?? "#7C3AED",
-                            size: 44
-                        )
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(appState.currentUser?.name ?? "Bạn")
-                                .font(.subheadline.bold())
-                                .foregroundColor(KinnectTheme.textPrimary)
-
-                            // Audience selector matching Android visText
+                            colorHex: appState.currentUser?.avatarColor ?? "#7C3AED", size: 44)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(appState.currentUser?.name ?? "Bạn").font(.headline)
                             Menu {
-                                Button {
-                                    visibility = "public"
-                                } label: {
-                                    Label("Mọi thành viên", systemImage: "globe")
-                                }
-                                Button {
-                                    visibility = "followers"
-                                } label: {
-                                    Label("Người theo dõi", systemImage: "person.2")
-                                }
+                                Button("Mọi thành viên") { visibility = "public" }
+                                Button("Người theo dõi") { visibility = "followers" }
                             } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: visibility == "public" ? "globe" : "person.2")
-                                        .font(.caption2)
-                                    Text(visibility == "public" ? "Mọi thành viên" : "Người theo dõi")
-                                        .font(.caption2.bold())
-                                    Image(systemName: "chevron.down")
-                                        .font(.system(size: 9))
-                                }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Capsule().fill(KinnectTheme.surfaceElevated))
-                                .foregroundColor(KinnectTheme.textSecondary)
+                                Label(visibility == "public" ? "Mọi thành viên" : "Người theo dõi",
+                                      systemImage: visibility == "public" ? "globe" : "person.2")
+                                    .font(.caption.bold())
                             }
                         }
                         Spacer()
                     }
-
                     TextField("Bạn đang nghĩ gì?", text: $text, axis: .vertical)
-                        .lineLimit(4...12)
-                        .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated))
-                        .foregroundColor(KinnectTheme.textPrimary)
-
+                        .font(.system(size: 18)).lineLimit(6...16)
+                        .onChange(of: text) { value in if value.count > 2000 { text = String(value.prefix(2000)) } }
+                    if loadingMedia { ProgressView("Đang chuẩn bị media…") }
                     if let previewImage {
-                        ZStack(alignment: .topTrailing) {
-                            Image(uiImage: previewImage)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(maxHeight: 240)
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
-
-                            Button {
-                                self.previewImage = nil
-                                self.imageDataURL = ""
-                                self.selectedPhotoItem = nil
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.title2)
-                                    .foregroundColor(.white)
-                                    .padding(8)
-                            }
+                        Image(uiImage: previewImage).resizable().scaledToFit().frame(maxHeight: 360)
+                    }
+                    if let videoURL {
+                        ShortClipPlayer(path: videoURL.absoluteString, active: true).frame(height: 320)
+                        Button { showMusic = true } label: {
+                            Label(musicTitle.isEmpty ? "Thêm nhạc" : musicTitle, systemImage: "music.note")
                         }
                     }
-
-                    // Media Tool row matching Android composeTool: Thêm ảnh, Thêm video
-                    HStack(spacing: 12) {
-                        PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "photo.on.rectangle.angled")
-                                    .foregroundColor(Color(red: 0.13, green: 0.65, blue: 0.4))
-                                Text("Thêm ảnh")
-                                    .font(.subheadline.weight(.medium))
-                                    .foregroundColor(KinnectTheme.textPrimary)
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
+                    if !mediaDataURL.isEmpty || videoURL != nil {
+                        Button("Gỡ media", role: .destructive) {
+                            previewImage = nil; videoURL = nil; mediaDataURL = ""
+                            musicTitle = ""; musicURL = nil; photo = nil; video = nil
                         }
-                        .onChange(of: selectedPhotoItem) { newItem in
-                            guard let newItem else { return }
-                            Task {
-                                if let data = try? await newItem.loadTransferable(type: Data.self),
-                                   let uiImg = UIImage(data: data),
-                                   let compressed = uiImg.jpegData(compressionQuality: 0.72) {
-                                    self.previewImage = uiImg
-                                    self.imageDataURL = "data:image/jpeg;base64,\(compressed.base64EncodedString())"
-                                }
-                            }
-                        }
-
-                        Spacer()
                     }
                 }
                 .padding(16)
             }
             .background(KinnectTheme.background)
-            .navigationTitle("Bài viết mới")
-            .navigationBarTitleDisplayMode(.inline)
+            .safeAreaInset(edge: .bottom) {
+                HStack(spacing: 0) {
+                    PhotosPicker(selection: $photo, matching: .images) {
+                        Label("Ảnh", systemImage: "photo").frame(maxWidth: .infinity, minHeight: 52)
+                    }
+                    PhotosPicker(selection: $video, matching: .videos) {
+                        Label("Video", systemImage: "video").frame(maxWidth: .infinity, minHeight: 52)
+                    }
+                    Button {
+                        if UIImagePickerController.isSourceTypeAvailable(.camera) { showCamera = true }
+                        else { appState.showToast("Thiết bị chưa có camera khả dụng.") }
+                    } label: {
+                        Label("Chụp/quay", systemImage: "camera").frame(maxWidth: .infinity, minHeight: 52)
+                    }
+                }
+                .font(.subheadline).background(KinnectTheme.surfaceElevated)
+                .disabled(loadingMedia || isSubmitting)
+            }
+            .navigationTitle("Bài viết mới").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Hủy") { dismiss() }
+                    Button { dismiss() } label: { Image(systemName: "xmark") }
+                        .accessibilityLabel("Đóng")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Đăng") {
-                        Task { await submitPost() }
-                    }
-                    .font(.subheadline.bold())
-                    .disabled(isSubmitting || (text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && imageDataURL.isEmpty))
+                    Button(isSubmitting ? "Đang đăng…" : "Đăng") { Task { await submitPost() } }
+                        .font(.subheadline.bold())
+                        .disabled(isSubmitting || loadingMedia || (text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && mediaDataURL.isEmpty && videoURL == nil))
+                }
+            }
+        }
+        .onChange(of: photo) { item in
+            guard let item else { return }
+            Task {
+                loadingMedia = true
+                defer { loadingMedia = false }
+                if let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) {
+                    useImage(image)
+                } else { appState.showToast("Không đọc được ảnh đã chọn.") }
+            }
+        }
+        .onChange(of: video) { item in
+            guard let item else { return }
+            Task {
+                loadingMedia = true
+                defer { loadingMedia = false }
+                do {
+                    guard let data = try await item.loadTransferable(type: Data.self) else { return }
+                    let url = FileManager.default.temporaryDirectory.appendingPathComponent("Kinnect-Post-\(UUID().uuidString).mov")
+                    try data.write(to: url)
+                    videoURL = url; previewImage = nil; mediaDataURL = ""
+                } catch { appState.showToast(error.localizedDescription) }
+            }
+        }
+        .fullScreenCover(isPresented: $showCamera) {
+            KinnectComposerCamera { image, movie in
+                if let image { useImage(image) }
+                if let movie { videoURL = movie; previewImage = nil; mediaDataURL = "" }
+                showCamera = false
+            }
+            .ignoresSafeArea()
+        }
+        .sheet(isPresented: $showMusic) {
+            NavigationStack {
+                StudioMusicPickerSheet(selectedTrack: $musicTitle) { title, url in
+                    musicTitle = title; musicURL = url
                 }
             }
         }
     }
 
+    private func useImage(_ image: UIImage) {
+        guard let data = image.jpegData(compressionQuality: 0.72), data.count <= 20 * 1024 * 1024 else {
+            appState.showToast("Ảnh vượt quá giới hạn 20 MB."); return
+        }
+        previewImage = image; videoURL = nil
+        mediaDataURL = "data:image/jpeg;base64,\(data.base64EncodedString())"
+    }
+
     private func submitPost() async {
         isSubmitting = true
         defer { isSubmitting = false }
-        let reqId = "post_\(UUID().uuidString)"
         do {
-            _ = try await KinnectAPIClient.shared.requestJSON(
-                "/api/posts",
-                method: "POST",
-                body: KinnectWriteBody.post(
-                    text: text.trimmingCharacters(in: .whitespacesAndNewlines),
-                    visibility: visibility,
-                    mediaDataURL: imageDataURL
-                ),
-                requestId: reqId
-            )
-            onPosted()
-            dismiss()
-        } catch {
-            appState.showToast(error.localizedDescription)
-        }
+            var media = mediaDataURL
+            if let videoURL {
+                let project = StudioVideoProject(sourceURL: videoURL)
+                project.musicURL = musicURL; project.musicTitle = musicTitle
+                let output = try await project.exportVideo()
+                let data = try Data(contentsOf: output)
+                guard data.count <= 20 * 1024 * 1024 else {
+                    appState.showToast("Video vượt quá giới hạn 20 MB."); return
+                }
+                media = "data:video/mp4;base64,\(data.base64EncodedString())"
+            }
+            _ = try await KinnectAPIClient.shared.requestJSON("/api/posts", method: "POST",
+                body: KinnectWriteBody.post(text: text.trimmingCharacters(in: .whitespacesAndNewlines),
+                                           visibility: visibility, mediaDataURL: media),
+                requestId: "post_\(UUID().uuidString)")
+            onPosted(); dismiss()
+        } catch { appState.showToast(error.localizedDescription) }
     }
 }
 
@@ -922,13 +922,9 @@ struct StoryComposerSheet: View {
     @State private var isSubmitting = false
 
     private let colors = ["#7C3AED", "#EC4899", "#2563EB", "#059669", "#D97706"]
-    private let musicCatalog = [
-        StoryMusicTrack(id: "chill_1", title: "Kinnect Chill Beats", artist: "Lo-Fi Collective"),
-        StoryMusicTrack(id: "sunset_2", title: "Acoustic Sunset", artist: "Hoàng hôn Đà Nẵng"),
-        StoryMusicTrack(id: "cyber_3", title: "Cyber Wave 2026", artist: "Kinnect Studio"),
-        StoryMusicTrack(id: "summer_4", title: "Thanh âm mùa hạ", artist: "Nhạc cụ mộc"),
-        StoryMusicTrack(id: "dragon_5", title: "Nắng qua cầu Rồng", artist: "Vibes Sông Hàn")
-    ]
+    @State private var storyMusicTitle = ""
+    @State private var storyMusicURL: URL?
+    @State private var storyVideoURL: URL?
 
     var body: some View {
         NavigationStack {
@@ -1040,6 +1036,8 @@ struct StoryComposerSheet: View {
                                             .lineLimit(1)
                                         Button {
                                             selectedMusic = nil
+                                            storyMusicTitle = ""
+                                            storyMusicURL = nil
                                         } label: {
                                             Image(systemName: "xmark.circle.fill")
                                                 .font(.caption)
@@ -1101,12 +1099,17 @@ struct StoryComposerSheet: View {
                                    let jpeg = uiImg.jpegData(compressionQuality: 0.72) {
                                     previewImage = uiImg
                                     selectedVideoName = nil
+                                    storyVideoURL = nil
                                     imageDataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
                                 } else {
-                                    // Video selected
-                                    previewImage = nil
-                                    selectedVideoName = "Đã chọn video 24h (\(data.count / 1024 / 1024) MB)"
-                                    imageDataURL = "data:video/mp4;base64,\(data.base64EncodedString())"
+                                    do {
+                                        let url = FileManager.default.temporaryDirectory.appendingPathComponent("Kinnect-Story-\(UUID().uuidString).mov")
+                                        try data.write(to: url)
+                                        storyVideoURL = url
+                                        previewImage = nil
+                                        selectedVideoName = "Đã chọn video 24h (\(data.count / 1024 / 1024) MB)"
+                                        imageDataURL = "data:video/mp4;base64,\(data.base64EncodedString())"
+                                    } catch { appState.showToast(error.localizedDescription) }
                                 }
                             }
                         }
@@ -1144,47 +1147,12 @@ struct StoryComposerSheet: View {
             }
             .sheet(isPresented: $showMusicSheet) {
                 NavigationStack {
-                    List(musicCatalog) { track in
-                        Button {
-                            selectedMusic = track
-                            showMusicSheet = false
-                        } label: {
-                            HStack(spacing: 12) {
-                                ZStack {
-                                    Circle()
-                                        .fill(KinnectTheme.accent.opacity(0.2))
-                                        .frame(width: 40, height: 40)
-                                    Image(systemName: "music.note")
-                                        .foregroundColor(KinnectTheme.accentBright)
-                                }
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(track.title)
-                                        .font(.subheadline.bold())
-                                        .foregroundColor(KinnectTheme.textPrimary)
-                                    Text(track.artist)
-                                        .font(.caption)
-                                        .foregroundColor(KinnectTheme.textSecondary)
-                                }
-                                Spacer()
-                                if selectedMusic?.id == track.id {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(KinnectTheme.accentBright)
-                                }
-                            }
-                            .padding(.vertical, 4)
-                        }
-                    }
-                    .listStyle(.plain)
-                    .background(KinnectTheme.background)
-                    .navigationTitle("Chọn bài hát")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Đóng") { showMusicSheet = false }
-                        }
+                    StudioMusicPickerSheet(selectedTrack: $storyMusicTitle) { title, url in
+                        selectedMusic = title.isEmpty ? nil : StoryMusicTrack(id: url?.absoluteString ?? title, title: title, artist: "")
+                        storyMusicTitle = title
+                        storyMusicURL = url
                     }
                 }
-                .presentationDetents([.medium])
             }
         }
     }
@@ -1194,13 +1162,29 @@ struct StoryComposerSheet: View {
         defer { isSubmitting = false }
         let reqId = "story_\(UUID().uuidString)"
         do {
+            var media = imageDataURL
+            let source: URL?
+            if let storyVideoURL { source = storyVideoURL }
+            else if storyMusicURL != nil, let previewImage { source = try await KinnectStillVideo.make(image: previewImage) }
+            else { source = nil }
+            if storyMusicURL != nil && source == nil {
+                throw KinnectAPIError.serverMessage("Chọn ảnh hoặc video để ghép nhạc.")
+            }
+            if let source {
+                let project = StudioVideoProject(sourceURL: source)
+                project.musicURL = storyMusicURL
+                let output = try await project.exportVideo()
+                let data = try Data(contentsOf: output)
+                guard data.count <= 20 * 1024 * 1024 else { throw KinnectAPIError.serverMessage("Tin vượt quá giới hạn 20 MB.") }
+                media = "data:video/mp4;base64,\(data.base64EncodedString())"
+            }
             _ = try await KinnectAPIClient.shared.requestJSON(
                 "/api/stories",
                 method: "POST",
                 body: KinnectWriteBody.story(
                     text: text.trimmingCharacters(in: .whitespacesAndNewlines),
                     colorHex: backgroundColor,
-                    mediaDataURL: imageDataURL
+                    mediaDataURL: media
                 ),
                 requestId: reqId
             )
@@ -1246,12 +1230,7 @@ struct StoryDetailSheet: View {
                         .frame(maxWidth: .infinity, minHeight: 340)
 
                     if !story.imageUrl.isEmpty {
-                        KinnectRemoteImageView(
-                            rawURL: story.imageUrl,
-                            contentMode: .fit,
-                            cornerRadius: 22,
-                            maxHeight: 380
-                        )
+                        KinnectMediaTile(path: story.imageUrl, kind: story.mediaKind)
                     }
 
                     if !story.text.isEmpty {

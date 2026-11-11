@@ -73,10 +73,10 @@ jobs:
           cd build
           zip -qry "../dist/Kinnect-1.2.12-ios.ipa" Payload
           cd ../dist
-          cp "Kinnect-1.2.12-ios.ipa" "Kinnect-1.2.12-b120-ios.ipa"
+          cp "Kinnect-1.2.12-ios.ipa" "Kinnect-1.2.12-b121-ios.ipa"
           cp "Kinnect-1.2.12-ios.ipa" "Kinnect-1.2.12-sideload.ipa"
           shasum -a 256 "Kinnect-1.2.12-ios.ipa" > "Kinnect-1.2.12-ios.ipa.sha256"
-          shasum -a 256 "Kinnect-1.2.12-b120-ios.ipa" > "Kinnect-1.2.12-b120-ios.ipa.sha256"
+          shasum -a 256 "Kinnect-1.2.12-b121-ios.ipa" > "Kinnect-1.2.12-b121-ios.ipa.sha256"
           shasum -a 256 "Kinnect-1.2.12-sideload.ipa" > "Kinnect-1.2.12-sideload.ipa.sha256"
           ls -lh Kinnect-1.2.12*.ipa
           python3 -c 'import json,os,plistlib; p=plistlib.load(open("../build/Payload/Kinnect.app/Info.plist","rb")); json.dump({"commit":os.environ["GITHUB_SHA"],"runId":os.environ["GITHUB_RUN_ID"],"version":p["CFBundleShortVersionString"],"build":p["CFBundleVersion"]},open("build-info.json","w"),indent=2)'
@@ -87,7 +87,7 @@ jobs:
           name: Kinnect-1.2.12-ios-ipa
           path: |
             dist/Kinnect-1.2.12-ios.ipa
-            dist/Kinnect-1.2.12-b120-ios.ipa
+            dist/Kinnect-1.2.12-b121-ios.ipa
             dist/Kinnect-1.2.12-sideload.ipa
             dist/*.sha256
             dist/build-info.json
@@ -105,20 +105,52 @@ jobs:
               --notes "Gói cài đặt Kinnect iOS 1.2.12 Build 120 (.ipa) — Đồng bộ toàn diện Android 1.2.12 (Build 118). Thiết kế tách riêng độc lập Ví Kinnect và Cửa hàng Kinnect theo chuẩn Android. Mở toàn màn hình tất cả các mục chính (Tin nhắn, Thông báo, Cửa hàng, Ví Kinnect, Bạn bè, Hồ sơ), camera viewfinder phần cứng AVFoundation, hiển thị chân dung đầy đủ không bị cắt đầu, sửa lỗi thoát app khi đăng nhập."
             gh release upload "$TAG" \
               dist/Kinnect-1.2.12-ios.ipa \
-              dist/Kinnect-1.2.12-b120-ios.ipa \
+              dist/Kinnect-1.2.12-b121-ios.ipa \
               dist/Kinnect-1.2.12-sideload.ipa \
               dist/*.sha256 \
               --clobber
           else
             gh release create "$TAG" \
               dist/Kinnect-1.2.12-ios.ipa \
-              dist/Kinnect-1.2.12-b120-ios.ipa \
+              dist/Kinnect-1.2.12-b121-ios.ipa \
               dist/Kinnect-1.2.12-sideload.ipa \
               dist/*.sha256 \
               --title "Kinnect iOS 1.2.12 (Build 120)" \
               --notes "Gói cài đặt Kinnect iOS (.ipa) — Cài đặt lên iPhone/iPad từ Windows qua Sideloadly hoặc AltStore bằng Apple ID cá nhân miễn phí." \
               --prerelease
           fi
+
+  parity-fixes-screenshots:
+    name: Capture focused iPhone parity screens
+    if: github.ref == 'refs/heads/codex/ios-b121-parity-20261111'
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+          xcodegen generate
+
+      - name: Capture five focused simulator screens
+        run: |
+          set -o pipefail
+          python3 ios/scripts/capture-parity-fixes.py 2>&1 | tee parity-simulator.log
+
+      - name: Upload focused visual review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kinnect-ios-b121-parity-screens
+          path: |
+            dist/ios-parity-fixes/
+            parity-simulator.log
+          if-no-files-found: error
 
   ui-review-screenshots:
     name: Capture iOS Simulator UI Review Screenshots

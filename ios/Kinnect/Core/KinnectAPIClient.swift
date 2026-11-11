@@ -44,14 +44,16 @@ final class KinnectAPIClient {
     }
 
     var baseURL: String {
-        return ServerConfig.currentOrigin
+        return activeOrigin
     }
+
+    var mediaOrigin: String { activeOrigin }
 
     func absoluteURL(_ path: String) -> String {
         if path.hasPrefix("http://") || path.hasPrefix("https://") {
             return path
         }
-        return ServerConfig.url(for: path)?.absoluteString ?? "\(baseURL)\(path.hasPrefix("/") ? "" : "/")\(path)"
+        return ServerConfig.url(for: path, origin: activeOrigin)?.absoluteString ?? "\(baseURL)\(path.hasPrefix("/") ? "" : "/")\(path)"
     }
 
     private func isCacheableGET(_ path: String) -> Bool {
@@ -265,13 +267,13 @@ enum KinnectAuthenticatedFile {
         if path.hasPrefix("file://"), let url = URL(string: path) {
             return url
         }
-        let origin = ServerConfig.currentOrigin
+        let origin = KinnectAPIClient.shared.mediaOrigin
         guard let remote = ServerConfig.url(for: path, origin: origin) else {
             throw KinnectAPIError.invalidURL
         }
         var request = URLRequest(url: remote)
         let cookie = KeychainStore.shared.cookieJarHeader(for: origin)
-        if !cookie.isEmpty {
+        if !cookie.isEmpty, remote.host == URL(string: origin)?.host {
             request.setValue(cookie, forHTTPHeaderField: "Cookie")
         }
         let (temporary, response) = try await URLSession.shared.download(for: request)

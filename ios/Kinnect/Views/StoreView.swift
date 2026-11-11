@@ -420,9 +420,9 @@ struct StoreView: View {
                 if let artwork = packageArtwork(pkg) {
                     Image(uiImage: artwork)
                         .resizable()
-                        .scaledToFill()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity)
                         .frame(height: 120)
-                        .clipped()
                         .accessibilityLabel(pkg.title)
                 }
             }
