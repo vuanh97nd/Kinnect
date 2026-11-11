@@ -5,7 +5,7 @@ import SwiftUI
 /// 1. Thông báo, 2. Cửa hàng, 3. Bạn bè, 4. Tin nhắn, 5. Tài khoản.
 struct KinnectTopBar: View {
     @ObservedObject var appState: AppState
-    @Binding var activeTopSection: RootMainView.TopSection?
+    @Binding var activeTopSection: KinnectTopSection?
     var onLogoTap: (() -> Void)? = nil
 
     var body: some View {
@@ -104,7 +104,7 @@ struct KinnectTopBar: View {
         )
     }
 
-    private func toggleSection(_ section: RootMainView.TopSection) {
+    private func toggleSection(_ section: KinnectTopSection) {
         if activeTopSection == section {
             activeTopSection = nil
         } else {

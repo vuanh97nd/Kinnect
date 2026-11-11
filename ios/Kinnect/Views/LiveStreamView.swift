@@ -1438,7 +1438,6 @@ struct LiveEffectsSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 12) {
-                // 3 Tabs: Làm đẹp · Hiệu ứng · Màu
                 Picker("Chế độ", selection: $selectedTab) {
                     Text("Làm đẹp").tag(0)
                     Text("Hiệu ứng").tag(1)
@@ -1448,151 +1447,13 @@ struct LiveEffectsSheet: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 10)
 
-                if selectedTab == 0 {
-                    // Tab Làm đẹp
-                    ScrollView {
-                        VStack(spacing: 16) {
-                            // Quick look preset tiles
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 10) {
-                                    lookPresetButton(id: "off", name: "Gốc", icon: "slash.circle") {
-                                        beautyEnabled = false
-                                        smooth = 0
-                                        whiten = 0
-                                        slim = 0
-                                        eyes = 0
-                                        lips = 0
-                                        blemish = 0
-                                        blush = 0
-                                    }
-                                    lookPresetButton(id: "natural", name: "Tự nhiên", icon: "sparkles") {
-                                        beautyEnabled = true
-                                        smooth = 0.55; blemish = 0.5; eyes = 0.08; lips = 0.05; slim = 0.2; whiten = 0.3; blush = 0.1
-                                    }
-                                    lookPresetButton(id: "glass", name: "Da căng", icon: "drop.fill") {
-                                        beautyEnabled = true
-                                        smooth = 0.78; blemish = 0.85; eyes = 0.15; lips = 0.2; slim = 0.25; whiten = 0.45; blush = 0.15
-                                    }
-                                    lookPresetButton(id: "peach", name: "Đào", icon: "heart.fill") {
-                                        beautyEnabled = true
-                                        smooth = 0.62; blemish = 0.65; eyes = 0.14; lips = 0.13; blush = 0.4; whiten = 0.35; slim = 0.2
-                                    }
-                                    lookPresetButton(id: "doll", name: "Búp bê", icon: "face.smiling.inverse") {
-                                        beautyEnabled = true
-                                        smooth = 0.7; eyes = 0.72; lips = 0.27; slim = 0.4; whiten = 0.4; blemish = 0.6; blush = 0.35
-                                    }
-                                    lookPresetButton(id: "eyes", name: "Mắt to", icon: "eye.fill") {
-                                        beautyEnabled = true
-                                        eyes = 0.9; smooth = 0.55; whiten = 0.3
-                                    }
-                                    lookPresetButton(id: "lips", name: "Môi đầy", icon: "mouth.fill") {
-                                        beautyEnabled = true
-                                        lips = 0.78; blush = 0.25; smooth = 0.55; whiten = 0.3
-                                    }
-                                }
-                                .padding(.horizontal, 16)
-                            }
-
-                            // 7 Canonical Beauty Sliders matching BeautyCatalog.ITEMS
-                            VStack(spacing: 12) {
-                                beautySliderRow(label: "Mịn da", value: $smooth)
-                                beautySliderRow(label: "Sáng da", value: $whiten)
-                                beautySliderRow(label: "Gọn mặt", value: $slim)
-                                beautySliderRow(label: "Giảm đốm", value: $blemish)
-                                beautySliderRow(label: "Mắt to", value: $eyes)
-                                beautySliderRow(label: "Môi đầy", value: $lips)
-                                beautySliderRow(label: "Má hồng", value: $blush)
-                            }
-                            .padding(.horizontal, 16)
-
-                            Button {
-                                beautyEnabled = true
-                                smooth = 0.5
-                                whiten = 0.3
-                                slim = 0.2
-                                eyes = 0.2
-                                lips = 0.0
-                                blemish = 0.4
-                                blush = 0.0
-                            } label: {
-                                Text("Đặt lại mặc định")
-                                    .font(.caption.bold())
-                                    .foregroundColor(KinnectTheme.textSecondary)
-                                    .padding(.vertical, 8)
-                            }
-                        }
-                        .padding(.vertical, 8)
-                    }
-                } else if selectedTab == 1 {
-                    // Tab Hiệu ứng (22 Stickers from FxEngine.STICKERS)
-                    ScrollView {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 72))], spacing: 14) {
-                            ForEach(stickerList, id: \.id) { s in
-                                Button {
-                                    activeSticker = s.id
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                } label: {
-                                    VStack(spacing: 4) {
-                                        ZStack {
-                                            Circle()
-                                                .fill(activeSticker == s.id ? KinnectTheme.accent.opacity(0.3) : KinnectTheme.surfaceElevated)
-                                                .frame(width: 52, height: 52)
-                                                .overlay(
-                                                    Circle().stroke(activeSticker == s.id ? KinnectTheme.accentBright : Color.clear, lineWidth: 2)
-                                                )
-                                            Text(s.emoji)
-                                                .font(.system(size: 26))
-                                        }
-                                        Text(s.name)
-                                            .font(.caption2)
-                                            .foregroundColor(activeSticker == s.id ? KinnectTheme.accentBright : .white)
-                                            .lineLimit(1)
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                    }
-                } else {
-                    // Tab Màu (24 Filters from FxEngine.FILTERS)
-                    ScrollView {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 72))], spacing: 14) {
-                            ForEach(filterList, id: \.id) { f in
-                                Button {
-                                    activeFilter = f.id
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                } label: {
-                                    VStack(spacing: 4) {
-                                        ZStack {
-                                            Circle()
-                                                .fill(f.color.opacity(0.35))
-                                                .frame(width: 52, height: 52)
-                                                .overlay(
-                                                    Circle().stroke(activeFilter == f.id ? KinnectTheme.accentBright : KinnectTheme.line, lineWidth: activeFilter == f.id ? 2.5 : 1)
-                                                )
-                                            if f.id == "none" {
-                                                Image(systemName: "circle.slash")
-                                                    .font(.title3)
-                                                    .foregroundColor(.white)
-                                            } else {
-                                                Circle()
-                                                    .fill(f.color)
-                                                    .frame(width: 22, height: 22)
-                                            }
-                                        }
-                                        Text(f.name)
-                                            .font(.caption2)
-                                            .foregroundColor(activeFilter == f.id ? KinnectTheme.accentBright : .white)
-                                            .lineLimit(1)
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
+                Group {
+                    if selectedTab == 0 {
+                        beautyTab
+                    } else if selectedTab == 1 {
+                        stickersTab
+                    } else {
+                        filtersTab
                     }
                 }
 
@@ -1610,6 +1471,141 @@ struct LiveEffectsSheet: View {
             }
         }
         .presentationDetents([.height(420), .medium, .large])
+    }
+
+    private var beautyTab: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        lookPresetButton(id: "off", name: "Gốc", icon: "slash.circle") {
+                            beautyEnabled = false
+                            smooth = 0; whiten = 0; slim = 0; eyes = 0; lips = 0; blemish = 0; blush = 0
+                        }
+                        lookPresetButton(id: "natural", name: "Tự nhiên", icon: "sparkles") {
+                            beautyEnabled = true
+                            smooth = 0.55; blemish = 0.5; eyes = 0.08; lips = 0.05; slim = 0.2; whiten = 0.3; blush = 0.1
+                        }
+                        lookPresetButton(id: "glass", name: "Da căng", icon: "drop.fill") {
+                            beautyEnabled = true
+                            smooth = 0.78; blemish = 0.85; eyes = 0.15; lips = 0.2; slim = 0.25; whiten = 0.45; blush = 0.15
+                        }
+                        lookPresetButton(id: "peach", name: "Đào", icon: "heart.fill") {
+                            beautyEnabled = true
+                            smooth = 0.62; blemish = 0.65; eyes = 0.14; lips = 0.13; blush = 0.4; whiten = 0.35; slim = 0.2
+                        }
+                        lookPresetButton(id: "doll", name: "Búp bê", icon: "face.smiling.inverse") {
+                            beautyEnabled = true
+                            smooth = 0.7; eyes = 0.72; lips = 0.27; slim = 0.4; whiten = 0.4; blemish = 0.6; blush = 0.35
+                        }
+                        lookPresetButton(id: "eyes", name: "Mắt to", icon: "eye.fill") {
+                            beautyEnabled = true
+                            eyes = 0.9; smooth = 0.55; whiten = 0.3
+                        }
+                        lookPresetButton(id: "lips", name: "Môi đầy", icon: "mouth.fill") {
+                            beautyEnabled = true
+                            lips = 0.78; blush = 0.25; smooth = 0.55; whiten = 0.3
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+
+                VStack(spacing: 12) {
+                    beautySliderRow(label: "Mịn da", value: $smooth)
+                    beautySliderRow(label: "Sáng da", value: $whiten)
+                    beautySliderRow(label: "Gọn mặt", value: $slim)
+                    beautySliderRow(label: "Giảm đốm", value: $blemish)
+                    beautySliderRow(label: "Mắt to", value: $eyes)
+                    beautySliderRow(label: "Môi đầy", value: $lips)
+                    beautySliderRow(label: "Má hồng", value: $blush)
+                }
+                .padding(.horizontal, 16)
+
+                Button {
+                    beautyEnabled = true
+                    smooth = 0.5; whiten = 0.3; slim = 0.2; eyes = 0.2; lips = 0.0; blemish = 0.4; blush = 0.0
+                } label: {
+                    Text("Đặt lại mặc định")
+                        .font(.caption.bold())
+                        .foregroundColor(KinnectTheme.textSecondary)
+                        .padding(.vertical, 8)
+                }
+            }
+            .padding(.vertical, 8)
+        }
+    }
+
+    private var stickersTab: some View {
+        ScrollView {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 72))], spacing: 14) {
+                ForEach(stickerList, id: \.id) { s in
+                    Button {
+                        activeSticker = s.id
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    } label: {
+                        VStack(spacing: 4) {
+                            ZStack {
+                                Circle()
+                                    .fill(activeSticker == s.id ? KinnectTheme.accent.opacity(0.3) : KinnectTheme.surfaceElevated)
+                                    .frame(width: 52, height: 52)
+                                    .overlay(
+                                        Circle().stroke(activeSticker == s.id ? KinnectTheme.accentBright : Color.clear, lineWidth: 2)
+                                    )
+                                Text(s.emoji)
+                                    .font(.system(size: 26))
+                            }
+                            Text(s.name)
+                                .font(.caption2)
+                                .foregroundColor(activeSticker == s.id ? KinnectTheme.accentBright : .white)
+                                .lineLimit(1)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+        }
+    }
+
+    private var filtersTab: some View {
+        ScrollView {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 72))], spacing: 14) {
+                ForEach(filterList, id: \.id) { f in
+                    Button {
+                        activeFilter = f.id
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    } label: {
+                        VStack(spacing: 4) {
+                            ZStack {
+                                Circle()
+                                    .fill(f.color.opacity(0.35))
+                                    .frame(width: 52, height: 52)
+                                    .overlay(
+                                        Circle().stroke(activeFilter == f.id ? KinnectTheme.accentBright : KinnectTheme.line, lineWidth: activeFilter == f.id ? 2.5 : 1)
+                                    )
+                                if f.id == "none" {
+                                    Image(systemName: "circle.slash")
+                                        .font(.title3)
+                                        .foregroundColor(.white)
+                                } else {
+                                    Circle()
+                                        .fill(f.color)
+                                        .frame(width: 22, height: 22)
+                                }
+                            }
+                            Text(f.name)
+                                .font(.caption2)
+                                .foregroundColor(activeFilter == f.id ? KinnectTheme.accentBright : .white)
+                                .lineLimit(1)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+        }
     }
 
     private func lookPresetButton(id: String, name: String, icon: String, action: @escaping () -> Void) -> some View {

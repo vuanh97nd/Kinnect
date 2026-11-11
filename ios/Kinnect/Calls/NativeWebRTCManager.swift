@@ -401,6 +401,11 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         }
     }
 
+    @MainActor
+    func flipCamera() {
+        switchCamera()
+    }
+
     // MARK: - Private Call Setup
 
     private func prepareLocalCallMedia(isVideo: Bool) {

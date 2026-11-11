@@ -34,6 +34,16 @@ enum KinnectTheme {
         })
     }
 
+    static var borderSoft: Color {
+        Color(UIColor { trait in
+            trait.userInterfaceStyle == .light
+                    ? UIColor.black.withAlphaComponent(0.08)
+                    : UIColor.white.withAlphaComponent(0.10)
+        })
+    }
+
+    static var line: Color { border }
+
         // MARK: - Corner Radius Scale
         static let radiusXS: CGFloat = 8
         static let radiusSM: CGFloat = 12

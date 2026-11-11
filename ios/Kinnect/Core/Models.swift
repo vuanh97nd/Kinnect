@@ -28,6 +28,10 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
     var followingCount: Int
     var friendsCount: Int
     var isFollowing: Bool
+    var isFollowed: Bool {
+        get { isFollowing }
+        set { isFollowing = newValue }
+    }
     var friendshipStatus: String
     var distanceKm: Double?
     var isActive: Bool
