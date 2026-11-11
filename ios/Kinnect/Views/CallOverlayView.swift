@@ -61,34 +61,31 @@ struct CallOverlayView: View {
                         .padding(.horizontal, 20)
                     }
 
-                    // Action Buttons
+                    // Action Buttons (Apple iOS In-Call HIG style)
                     if call.isIncoming && call.state == .ringingIncoming {
-                        HStack(spacing: 48) {
+                        HStack(spacing: 52) {
                             callActionButton(
                                 systemIcon: "phone.down.fill",
-                                glyph: nil,
                                 label: "Từ chối",
-                                color: KinnectTheme.danger
+                                color: Color(uiColor: .systemRed)
                             ) {
                                 webrtc.endOrRejectCurrentCall(sendSocket: true)
                             }
 
                             callActionButton(
-                                systemIcon: nil,
-                                glyph: call.mode == "video" ? .videoCall : .phone,
+                                systemIcon: call.mode == "video" ? "video.fill" : "phone.fill",
                                 label: "Trả lời",
-                                color: KinnectTheme.online
+                                color: Color(uiColor: .systemGreen)
                             ) {
                                 Task { await webrtc.acceptIncomingCall(callId: call.callId) }
                             }
                         }
-                        .padding(.bottom, 44)
+                        .padding(.bottom, 48)
                     } else {
-                        HStack(spacing: 22) {
+                        HStack(spacing: 20) {
                             callControlCircle(
-                                glyphWhenActive: .microphone,
-                                slashedSystemIconWhenOff: "mic.slash.fill",
-                                active: !webrtc.isMicMuted,
+                                icon: webrtc.isMicMuted ? "mic.slash.fill" : "mic.fill",
+                                isToggledOn: webrtc.isMicMuted,
                                 label: webrtc.isMicMuted ? "Bật mic" : "Tắt mic",
                                 accessibilityStateValue: webrtc.isMicMuted ? "Đang tắt tiếng" : "Đang bật tiếng"
                             ) {
@@ -97,9 +94,8 @@ struct CallOverlayView: View {
 
                             if call.mode == "video" {
                                 callControlCircle(
-                                    glyphWhenActive: .videoCall,
-                                    slashedSystemIconWhenOff: "video.slash.fill",
-                                    active: !webrtc.isCameraOff,
+                                    icon: webrtc.isCameraOff ? "video.slash.fill" : "video.fill",
+                                    isToggledOn: webrtc.isCameraOff,
                                     label: "Camera",
                                     accessibilityStateValue: webrtc.isCameraOff ? "Đang tắt camera" : "Đang bật camera"
                                 ) {
@@ -107,9 +103,8 @@ struct CallOverlayView: View {
                                 }
 
                                 callControlCircle(
-                                    glyphWhenActive: .refresh,
-                                    slashedSystemIconWhenOff: "arrow.triangle.2.circlepath.camera.fill",
-                                    active: true,
+                                    icon: "camera.rotate.fill",
+                                    isToggledOn: false,
                                     label: "Đổi cam",
                                     accessibilityStateValue: webrtc.usingFrontCamera ? "Camera trước" : "Camera sau"
                                 ) {
@@ -118,9 +113,8 @@ struct CallOverlayView: View {
                             }
 
                             callControlCircle(
-                                glyphWhenActive: nil,
-                                slashedSystemIconWhenOff: webrtc.isSpeakerOn ? "speaker.wave.3.fill" : "speaker.fill",
-                                active: webrtc.isSpeakerOn,
+                                icon: webrtc.isSpeakerOn ? "speaker.wave.3.fill" : "speaker.fill",
+                                isToggledOn: webrtc.isSpeakerOn,
                                 label: "Loa ngoài",
                                 accessibilityStateValue: webrtc.isSpeakerOn ? "Đang bật loa ngoài" : "Đang dùng loa trong"
                             ) {
@@ -129,9 +123,8 @@ struct CallOverlayView: View {
 
                             callActionButton(
                                 systemIcon: "phone.down.fill",
-                                glyph: nil,
                                 label: "Kết thúc",
-                                color: KinnectTheme.danger
+                                color: Color(uiColor: .systemRed)
                             ) {
                                 webrtc.endOrRejectCurrentCall(sendSocket: true)
                             }
@@ -159,20 +152,17 @@ struct CallOverlayView: View {
         }
     }
 
-    private func callActionButton(systemIcon: String?, glyph: KinnectGlyph?, label: String, color: Color, action: @escaping () -> Void) -> some View {
+    private func callActionButton(systemIcon: String, label: String, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 6) {
+            VStack(spacing: 8) {
                 Circle()
                     .fill(color)
-                    .frame(width: 64, height: 64)
+                    .frame(width: 68, height: 68)
+                    .shadow(color: color.opacity(0.4), radius: 8, x: 0, y: 4)
                     .overlay {
-                        if let glyph = glyph {
-                            KinnectIcon(glyph: glyph, size: 26, selected: true, tint: .white)
-                        } else if let systemIcon = systemIcon {
-                            Image(systemName: systemIcon)
-                                .font(.title2.bold())
-                                .foregroundColor(.white)
-                        }
+                        Image(systemName: systemIcon)
+                            .font(.system(size: 28, weight: .semibold))
+                            .foregroundColor(.white)
                     }
                 Text(label)
                     .font(.caption.weight(.medium))
@@ -183,29 +173,24 @@ struct CallOverlayView: View {
     }
 
     private func callControlCircle(
-        glyphWhenActive: KinnectGlyph?,
-        slashedSystemIconWhenOff: String,
-        active: Bool,
+        icon: String,
+        isToggledOn: Bool,
         label: String,
         accessibilityStateValue: String,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            VStack(spacing: 6) {
+            VStack(spacing: 8) {
                 Circle()
-                    .fill(active ? Color.white.opacity(0.2) : KinnectTheme.danger.opacity(0.8))
-                    .frame(width: 54, height: 54)
+                    .fill(isToggledOn ? Color.white : Color.white.opacity(0.2))
+                    .frame(width: 58, height: 58)
                     .overlay {
-                        if active, let glyph = glyphWhenActive {
-                            KinnectIcon(glyph: glyph, size: 24, selected: true, tint: .white)
-                        } else {
-                            Image(systemName: slashedSystemIconWhenOff)
-                                .font(.headline)
-                                .foregroundColor(.white)
-                        }
+                        Image(systemName: icon)
+                            .font(.system(size: 22, weight: .medium))
+                            .foregroundColor(isToggledOn ? .black : .white)
                     }
                 Text(label)
-                    .font(.caption2)
+                    .font(.caption2.weight(.medium))
                     .foregroundColor(.white)
             }
         }

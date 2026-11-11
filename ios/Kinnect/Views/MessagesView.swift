@@ -399,21 +399,28 @@ struct DirectChatDetailView: View {
 
                 Spacer(minLength: 4)
 
-                KinnectIconButton(
-                    glyph: .phone,
-                    label: "Gọi thoại",
-                    tint: KinnectTheme.online
-                ) {
+                // Call action buttons (iOS HIG native phone & video icons)
+                Button {
                     Task { await NativeWebRTCManager.shared.startOutgoingCall(targetUser: peer, mode: "audio") }
+                } label: {
+                    Image(systemName: "phone.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(Color(uiColor: .systemGreen))
+                        .frame(width: 36, height: 36)
+                        .background(Circle().fill(Color(uiColor: .systemGreen).opacity(0.15)))
                 }
+                .accessibilityLabel("Gọi thoại")
 
-                KinnectIconButton(
-                    glyph: .videoCall,
-                    label: "Gọi video",
-                    tint: KinnectTheme.accentBright
-                ) {
+                Button {
                     Task { await NativeWebRTCManager.shared.startOutgoingCall(targetUser: peer, mode: "video") }
+                } label: {
+                    Image(systemName: "video.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(KinnectTheme.accentBright)
+                        .frame(width: 36, height: 36)
+                        .background(Circle().fill(KinnectTheme.accentBright.opacity(0.15)))
                 }
+                .accessibilityLabel("Gọi video")
 
                 Menu {
                     Button {
@@ -907,6 +914,7 @@ struct GroupChatDetailView: View {
     @ObservedObject private var appState = AppState.shared
 
     @State private var messages: [GroupMessageItem] = []
+    @State private var groupMembers: [KinnectUser] = []
     @State private var text = ""
     @State private var groupReactions: [String: String] = [:]
     @State private var forwardText = ""
@@ -915,6 +923,50 @@ struct GroupChatDetailView: View {
     @State private var showRenameSheet = false
     @State private var showAddMemberSheet = false
     @State private var newGroupName = ""
+
+    private var currentMentionQuery: String? {
+        guard let lastAt = text.lastIndex(of: "@") else { return nil }
+        if lastAt > text.startIndex {
+            let before = text[text.index(before: lastAt)]
+            if !before.isWhitespace && before != "(" && before != "[" {
+                return nil
+            }
+        }
+        let after = text[text.index(after: lastAt)...]
+        if after.contains(" ") {
+            return nil
+        }
+        return String(after).lowercased()
+    }
+
+    private var filteredMentionMembers: [KinnectUser] {
+        let currentId = appState.currentUser?.id
+        let pool = groupMembers.filter { $0.id != currentId }
+        guard let query = currentMentionQuery, !query.isEmpty else { return pool }
+        return pool.filter {
+            $0.name.lowercased().contains(query) ||
+            $0.username.lowercased().contains(query)
+        }
+    }
+
+    private func insertMention(tag: String) {
+        guard let lastAt = text.lastIndex(of: "@") else { return }
+        let prefix = text[..<lastAt]
+        text = "\(prefix)@\(tag) "
+    }
+
+    private func attributedMessageText(_ rawText: String, isMine: Bool) -> AttributedString {
+        var attr = AttributedString(rawText)
+        let words = rawText.split(separator: " ")
+        for word in words where word.hasPrefix("@") {
+            if let range = attr.range(of: String(word)) {
+                attr[range].font = .subheadline.bold()
+                attr[range].foregroundColor = isMine ? .white : KinnectTheme.accentBright
+                attr[range].underlineStyle = .single
+            }
+        }
+        return attr
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -938,8 +990,8 @@ struct GroupChatDetailView: View {
                                         .font(.caption2.bold())
                                         .foregroundColor(KinnectTheme.accentBright)
                                 }
-                                // Content on top
-                                Text(msg.text)
+                                // Content on top with Zalo-style member mention highlight
+                                Text(attributedMessageText(msg.text, isMine: isMine))
                                     .font(.subheadline)
                                     .foregroundColor(isMine ? .white : KinnectTheme.textPrimary)
                                     .kinnectMultiline()
@@ -1034,7 +1086,111 @@ struct GroupChatDetailView: View {
                 .padding(14)
             }
 
-            HStack(spacing: 10) {
+            // Zalo-Style Member Mention Suggestion Bar
+            if currentMentionQuery != nil {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Nhắc thành viên (@)")
+                            .font(.caption2.bold())
+                            .foregroundColor(KinnectTheme.textSecondary)
+                        Spacer()
+                        Button {
+                            text.append(" ")
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.caption2)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.top, 6)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            // @Tất cả (Zalo Tag All)
+                            Button {
+                                insertMention(tag: "Tất cả")
+                            } label: {
+                                HStack(spacing: 6) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(KinnectTheme.accentBright.opacity(0.2))
+                                            .frame(width: 28, height: 28)
+                                        Image(systemName: "person.3.fill")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(KinnectTheme.accentBright)
+                                    }
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text("@Tất cả")
+                                            .font(.caption.bold())
+                                            .foregroundColor(KinnectTheme.accentBright)
+                                        Text("Cả nhóm")
+                                            .font(.system(size: 9))
+                                            .foregroundColor(KinnectTheme.textSecondary)
+                                    }
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated))
+                            }
+                            .buttonStyle(.plain)
+
+                            // Group members
+                            ForEach(filteredMentionMembers) { u in
+                                Button {
+                                    let tag = u.username.isEmpty ? u.name : u.username
+                                    insertMention(tag: tag)
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        KinnectAvatarView(
+                                            name: u.name,
+                                            avatarURL: u.avatarUrl,
+                                            colorHex: u.avatarColor,
+                                            size: 28
+                                        )
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text(u.name)
+                                                .font(.caption.weight(.semibold))
+                                                .foregroundColor(KinnectTheme.textPrimary)
+                                            Text("@\(u.username.isEmpty ? u.name : u.username)")
+                                                .font(.system(size: 9))
+                                                .foregroundColor(KinnectTheme.textSecondary)
+                                        }
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.bottom, 6)
+                    }
+                }
+                .background(KinnectTheme.surface)
+                .overlay(Rectangle().frame(height: 1).foregroundColor(KinnectTheme.border), alignment: .bottom)
+            }
+
+            HStack(spacing: 8) {
+                // Mention shortcut button (@)
+                Button {
+                    if !text.hasSuffix("@") {
+                        if text.isEmpty || text.hasSuffix(" ") {
+                            text.append("@")
+                        } else {
+                            text.append(" @")
+                        }
+                    }
+                } label: {
+                    Text("@")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(KinnectTheme.accentBright)
+                        .frame(width: 36, height: 36)
+                        .background(Circle().fill(KinnectTheme.surfaceElevated))
+                }
+                .accessibilityLabel("Nhắc tên thành viên")
+
                 TextField("Nhập tin nhắn trong nhóm...", text: $text)
                     .padding(10)
                     .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
@@ -1116,10 +1272,21 @@ struct GroupChatDetailView: View {
             .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showAddMemberSheet)
         }
         .task {
+            if groupMembers.isEmpty {
+                groupMembers = group.members
+            }
             await loadGroupMessages()
         }
         .onReceive(NotificationCenter.default.publisher(for: .kinnectMessagesChanged)) { _ in
             Task { await loadGroupMessages() }
+        }
+    }
+
+    private func syncGroupMembersFromMessages() {
+        for m in self.messages {
+            if !groupMembers.contains(where: { $0.id == m.sender.id }) {
+                groupMembers.append(m.sender)
+            }
         }
     }
 
@@ -1131,6 +1298,7 @@ struct GroupChatDetailView: View {
             for m in self.messages where !m.reaction.isEmpty {
                 groupReactions[m.id] = m.reaction
             }
+            syncGroupMembersFromMessages()
         }
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/groups/\(group.id)/messages") {
             let list = res["messages"] as? [[String: Any]] ?? []
@@ -1138,6 +1306,7 @@ struct GroupChatDetailView: View {
             for m in self.messages where !m.reaction.isEmpty {
                 groupReactions[m.id] = m.reaction
             }
+            syncGroupMembersFromMessages()
         }
     }
 
@@ -1191,11 +1360,22 @@ struct GroupChatDetailView: View {
         let draft = text
         text = ""
         let reqId = "grp_msg_\(group.id)_\(UUID().uuidString)"
+
+        var payload: [String: Any] = ["body": clean]
+        let currentUserId = appState.currentUser?.id
+        let mentionedIds = groupMembers.filter { m in
+            m.id != currentUserId &&
+            (clean.contains("@\(m.username)") || (!m.name.isEmpty && clean.contains("@\(m.name)")))
+        }.map(\.id)
+        if !mentionedIds.isEmpty {
+            payload["mentions"] = mentionedIds
+        }
+
         do {
             _ = try await KinnectAPIClient.shared.requestJSON(
                 "/api/groups/\(group.id)/messages",
                 method: "POST",
-                body: ["body": clean],
+                body: payload,
                 requestId: reqId
             )
             await loadGroupMessages()

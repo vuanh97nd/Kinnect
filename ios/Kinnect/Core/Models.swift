@@ -390,9 +390,11 @@ struct ChatGroupItem: Identifiable, Hashable, Equatable {
     var lastMessageText: String
     var unreadCount: Int
     var updatedAt: String
+    var members: [KinnectUser] = []
 
     static func from(_ dict: [String: Any]) -> ChatGroupItem {
-        let members = dict["members"] as? [Any]
+        let membersArray = (dict["members"] as? [[String: Any]])?.map(KinnectUser.from) ?? []
+        let rawMembers = dict["members"] as? [Any]
         let lastObj = (dict["lastMessage"] as? [String: Any]) ?? (dict["last"] as? [String: Any])
         let lastText = (lastObj?["text"] as? String) ?? (lastObj?["body"] as? String) ?? (dict["lastMessageText"] as? String) ?? ""
         let updated = (lastObj?["createdAt"] as? String) ?? (dict["updatedAt"] as? String) ?? ""
@@ -401,10 +403,11 @@ struct ChatGroupItem: Identifiable, Hashable, Equatable {
             name: (dict["name"] as? String) ?? "Nhóm Kinnect",
             description: (dict["description"] as? String) ?? "",
             avatarColor: (dict["avatarColor"] as? String) ?? "#7C3AED",
-            membersCount: (dict["membersCount"] as? Int) ?? members?.count ?? 1,
+            membersCount: (dict["membersCount"] as? Int) ?? rawMembers?.count ?? 1,
             lastMessageText: lastText,
             unreadCount: (dict["unreadCount"] as? Int) ?? (dict["unread"] as? Int) ?? 0,
-            updatedAt: updated
+            updatedAt: updated,
+            members: membersArray
         )
     }
 }

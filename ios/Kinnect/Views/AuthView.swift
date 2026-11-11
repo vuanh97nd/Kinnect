@@ -485,21 +485,100 @@ struct AuthView: View {
                 }
         default:
             VStack(alignment: .leading, spacing: 6) {
-                HStack {
+                // Story row: Tạo tin + Story Minh Anh (Android 1.2.12 MainActivity.java:4278)
+                HStack(spacing: 8) {
+                    VStack(spacing: 2) {
+                        ZStack {
+                            Circle()
+                                .fill(LoginChrome.wash)
+                                .frame(width: 26, height: 26)
+                            Image(systemName: "plus")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(LoginChrome.purple)
+                        }
+                        Text(L10n.tr("Tạo tin"))
+                            .font(.system(size: 7))
+                            .foregroundColor(LoginChrome.muted)
+                    }
+
+                    VStack(spacing: 2) {
+                        Image("WelcomeProfile")
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 26, height: 26)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(LoginChrome.purple, lineWidth: 1.5))
+                        Text("Minh Anh")
+                            .font(.system(size: 7))
+                            .foregroundColor(LoginChrome.muted)
+                    }
+                    Spacer()
+                }
+
+                // Composer box: Bạn đang nghĩ gì?
+                HStack(spacing: 6) {
                     Image("WelcomeProfile")
                         .resizable()
-                        .frame(width: 22, height: 22)
+                        .scaledToFill()
+                        .frame(width: 18, height: 18)
                         .clipShape(Circle())
-                    Text("Minh Anh · 27")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(LoginChrome.ink)
+                    Text(L10n.tr("Bạn đang nghĩ gì?"))
+                        .font(.system(size: 8))
+                        .foregroundColor(LoginChrome.muted)
+                    Spacer()
                 }
-                Text(L10n.tr("Hồ sơ minh họa"))
-                    .font(.system(size: 10))
-                    .foregroundColor(LoginChrome.muted)
-                welcomePortrait("WelcomeProfile")
-                    .frame(height: 110)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                .padding(.horizontal, 7)
+                .padding(.vertical, 4)
+                .background(RoundedRectangle(cornerRadius: 8).fill(LoginChrome.wash))
+
+                // Post Card
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 5) {
+                        Image("WelcomeProfile")
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 20, height: 20)
+                            .clipShape(Circle())
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("Minh Anh · 27")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundColor(LoginChrome.ink)
+                            Text(L10n.tr("Hồ sơ minh họa"))
+                                .font(.system(size: 7))
+                                .foregroundColor(LoginChrome.muted)
+                        }
+                        Spacer()
+                    }
+
+                    Text("Tập luyện mỗi ngày")
+                        .font(.system(size: 8))
+                        .foregroundColor(LoginChrome.ink)
+
+                    // Post Image with safe aspect ratio
+                    Image("WelcomeProfile")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 96)
+                        .clipShape(RoundedRectangle(cornerRadius: 7))
+
+                    // Action buttons: Heart, Comment, Share
+                    HStack(spacing: 12) {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(Color(red: 0.93, green: 0.28, blue: 0.6))
+                        Image(systemName: "message.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(LoginChrome.muted)
+                        Image(systemName: "arrowshape.turn.up.right.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(LoginChrome.muted)
+                        Spacer()
+                    }
+                    .padding(.top, 2)
+                }
+                .padding(6)
+                .background(RoundedRectangle(cornerRadius: 8).fill(LoginChrome.wash.opacity(0.7)))
             }
         }
     }
