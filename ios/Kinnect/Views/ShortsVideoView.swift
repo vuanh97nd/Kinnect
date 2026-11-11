@@ -1,6 +1,7 @@
-import SwiftUI
 import AVFoundation
 import AVKit
+import SwiftUI
+import UIKit
 
 struct ShortsVideoView: View {
     @ObservedObject private var appState = AppState.shared

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Dedicated Account Menu screen matching Android 1.2.12 MainActivity.meMenu() (lines 742-790)
 /// Features user profile header card, games, wallet, privacy, security, notifications, theme, support, password, logout.

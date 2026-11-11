@@ -74,14 +74,14 @@ struct RootMainView: View {
     // Shared leading brand logo for main tabs (Android parity: 40dp logo only)
     @ToolbarContentBuilder
     static func headerLeadingLogoStatic() -> some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) {
+        ToolbarItem(placement: .navigationBarLeading) {
             KinnectBrandLogo(size: 36)
         }
     }
 
     @ToolbarContentBuilder
     private func headerLeadingLogo() -> some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) {
+        ToolbarItem(placement: .navigationBarLeading) {
             KinnectBrandLogo(size: 36)
         }
     }
@@ -89,7 +89,7 @@ struct RootMainView: View {
     // Shared trailing toolbar for all tabs (P1) - static version for UI Review Fixture
     @ToolbarContentBuilder
     static func headerTrailingButtonsStatic() -> some ToolbarContent {
-        ToolbarItemGroup(placement: .topBarTrailing) {
+        ToolbarItemGroup(placement: .navigationBarTrailing) {
             // Notifications
             Button { } label: {
                 KinnectIcon(glyph: .notifications, size: 22, tint: KinnectTheme.textPrimary)
@@ -150,7 +150,7 @@ struct RootMainView: View {
         // Shared trailing toolbar for all tabs (P1) - instance version
     @ToolbarContentBuilder
         private func headerTrailingButtons() -> some ToolbarContent {
-        ToolbarItemGroup(placement: .topBarTrailing) {
+        ToolbarItemGroup(placement: .navigationBarTrailing) {
             // Notifications
             Button {
                 activeTopSection = (activeTopSection == .notifications) ? nil : .notifications

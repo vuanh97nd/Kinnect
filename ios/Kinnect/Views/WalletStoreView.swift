@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct WalletStoreView: View {
     @Environment(\.dismiss) private var dismiss

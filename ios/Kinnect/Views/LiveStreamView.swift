@@ -1,6 +1,7 @@
 import AVFoundation
 import AVKit
 import SwiftUI
+import UIKit
 
 struct LiveStreamView: View {
     let onOpenWallet: () -> Void

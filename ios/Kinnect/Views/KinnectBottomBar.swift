@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Native Material 3 Bottom Navigation Bar matching Android 1.2.12 MainActivity (lines 473-515)
 /// Height: 68pt, background: CARD, top 1px border.
