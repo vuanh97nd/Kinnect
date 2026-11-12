@@ -27,10 +27,10 @@ struct FeedView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 14) {
-                storiesStrip
-
+            LazyVStack(spacing: 16) {
                 quickComposeRow
+
+                storiesStrip
 
                 if isLoading && posts.isEmpty {
                     ForEach(0..<3, id: \.self) { _ in
@@ -88,13 +88,13 @@ struct FeedView: View {
                     }
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
             .padding(.bottom, 72)
             .frame(maxWidth: 680)
             .frame(maxWidth: .infinity)
         }
-        .background(KinnectTheme.background)
+        .background(Color(uiColor: .systemGroupedBackground))
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: 72)
         }
@@ -147,14 +147,18 @@ struct FeedView: View {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Lưu") {
                             Task {
-                                _ = try? await KinnectAPIClient.shared.requestJSON(
-                                    "/api/posts/\(post.id)",
-                                    method: "PATCH",
-                                    body: ["body": editingPostText]
-                                )
-                                editingPost = nil
-                                await loadFeedAndStories()
-                                appState.showToast("Đã lưu bài viết!")
+                                do {
+                                    _ = try await KinnectAPIClient.shared.requestJSON(
+                                        "/api/posts/\(post.id)",
+                                        method: "PATCH",
+                                        body: ["body": editingPostText]
+                                    )
+                                    editingPost = nil
+                                    await loadFeedAndStories()
+                                    appState.showToast("Đã lưu bài viết!")
+                                } catch {
+                                    appState.showToast(error.localizedDescription)
+                                }
                             }
                         }
                     }
@@ -169,24 +173,12 @@ struct FeedView: View {
             if let p = audiencePost {
                 Button("Mọi thành viên (Công khai)") {
                     Task {
-                        _ = try? await KinnectAPIClient.shared.requestJSON(
-                            "/api/posts/\(p.id)",
-                            method: "PATCH",
-                            body: ["visibility": "public"]
-                        )
-                        appState.showToast("Đã đổi đối tượng xem thành Mọi thành viên.")
-                        await loadFeedAndStories()
+                        await changeAudience(post: p, visibility: "public", title: "Mọi thành viên")
                     }
                 }
-                Button("Người theo dõi (Bạn bè)") {
+                Button("Người theo dõi") {
                     Task {
-                        _ = try? await KinnectAPIClient.shared.requestJSON(
-                            "/api/posts/\(p.id)",
-                            method: "PATCH",
-                            body: ["visibility": "followers"]
-                        )
-                        appState.showToast("Đã đổi đối tượng xem thành Người theo dõi.")
-                        await loadFeedAndStories()
+                        await changeAudience(post: p, visibility: "followers", title: "Người theo dõi")
                     }
                 }
                 Button("Hủy", role: .cancel) {}
@@ -194,6 +186,20 @@ struct FeedView: View {
         }
         .fullScreenCover(item: $selectedAuthorProfile) { user in
             ProfileView(targetUser: user)
+        }
+    }
+
+    private func changeAudience(post: PostItem, visibility: String, title: String) async {
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/posts/\(post.id)",
+                method: "PATCH",
+                body: ["visibility": visibility]
+            )
+            appState.showToast("Đã đổi đối tượng xem thành \(title).")
+            await loadFeedAndStories()
+        } catch {
+            appState.showToast(error.localizedDescription)
         }
     }
 
@@ -334,11 +340,11 @@ struct FeedView: View {
                         .padding(.vertical, 12)
                         .background(
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(KinnectTheme.surfaceElevated)
+                                .fill(Color(uiColor: .tertiarySystemGroupedBackground))
                         )
                     }
                 }
-                .kinnectCard()
+                .modifier(FeedCardStyle())
             } else {
                 HStack(spacing: 10) {
                     KinnectAvatarView(
@@ -360,7 +366,7 @@ struct FeedView: View {
                         }
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
-                        .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                        .background(Capsule().fill(Color(uiColor: .tertiarySystemGroupedBackground)))
                     }
 
                     KinnectIconButton(
@@ -370,7 +376,7 @@ struct FeedView: View {
                         action: onOpenCamera
                     )
                 }
-                .kinnectCard()
+                .modifier(FeedCardStyle())
             }
         }
     }
@@ -489,20 +495,20 @@ struct PostCardView: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(post.author.name)
-                            .font(.subheadline.weight(.bold))
+                            .font(.headline)
                             .foregroundColor(KinnectTheme.textPrimary)
                             .kinnectMultiline()
                         HStack(spacing: 6) {
                             if !post.author.handle.isEmpty {
                                 Text("@\(post.author.handle)")
-                                    .font(.caption2)
+                                    .font(.caption)
                                     .foregroundColor(KinnectTheme.textSecondary)
                                 Text("•")
-                                    .font(.caption2)
+                                    .font(.caption)
                                     .foregroundColor(KinnectTheme.textSecondary)
                             }
                             Text(formatRelativeDate(post.createdAt))
-                                .font(.caption2)
+                                .font(.caption)
                                 .foregroundColor(KinnectTheme.textSecondary)
                         }
                     }
@@ -588,7 +594,7 @@ struct PostCardView: View {
             .padding(.top, 2)
             .padding(.bottom, 2)
 
-            Divider().background(KinnectTheme.border)
+            Divider()
 
             if showReactionDock {
                 HStack(spacing: 8) {
@@ -605,7 +611,7 @@ struct PostCardView: View {
                                     .font(.system(size: 26))
                                 Text(item.title)
                                     .font(.system(size: 9, weight: .bold))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(KinnectTheme.textPrimary)
                             }
                             .padding(.horizontal, 4)
                             .padding(.vertical, 4)
@@ -617,9 +623,9 @@ struct PostCardView: View {
                 .padding(.vertical, 6)
                 .background(
                     Capsule()
-                        .fill(KinnectTheme.surfaceElevated)
-                        .shadow(color: Color.black.opacity(0.4), radius: 12, y: 4)
-                        .overlay(Capsule().stroke(KinnectTheme.accentBright.opacity(0.4), lineWidth: 1))
+                        .fill(Color(uiColor: .secondarySystemGroupedBackground))
+                        .shadow(color: Color.black.opacity(0.12), radius: 12, y: 4)
+                        .overlay(Capsule().stroke(KinnectTheme.borderSoft, lineWidth: 1))
                 )
                 .transition(.asymmetric(
                     insertion: .scale(scale: 0.8, anchor: .bottomLeading).combined(with: .opacity),
@@ -698,7 +704,7 @@ struct PostCardView: View {
                 .accessibilityLabel("Chia sẻ bài viết")
             }
         }
-        .kinnectCard()
+        .modifier(FeedCardStyle())
     }
 
     private var postShareURL: URL {
@@ -1330,21 +1336,59 @@ struct PostCommentsSheet: View {
 
     @State private var comments: [CommentItem] = []
     @State private var newComment = ""
+    @State private var pendingCommentReactions: Set<String> = []
     @State private var replyingTo: CommentItem? = nil
     @State private var isLoading = false
 
     private let quickEmojis = ["😍", "😂", "🔥", "👏", "🥰", "😮", "😢", "💜"]
 
-    private var rootComments: [CommentItem] {
-        let roots = comments.filter { $0.parentId == nil || $0.parentId?.isEmpty == true }
-        if roots.isEmpty && !comments.isEmpty {
-            return comments
-        }
-        return roots
+    private let commentReactionOptions: [(key: String, emoji: String, title: String)] = [
+        ("like", "??", "Th?ch"), ("love", "??", "Y?u th?ch"),
+        ("haha", "??", "Haha"), ("wow", "??", "Wow"),
+        ("sad", "??", "Bu?n"), ("angry", "??", "Ph?n n?")
+    ]
+
+    private struct CommentRow: Identifiable {
+        let comment: CommentItem
+        let depth: Int
+        let parentAuthorName: String?
+        var id: String { comment.id }
     }
 
-    private func childReplies(for rootId: String) -> [CommentItem] {
-        comments.filter { $0.parentId == rootId }
+    private var commentRows: [CommentRow] {
+        let ids = Set(comments.map { $0.id })
+        let children = Dictionary(grouping: comments, by: { $0.parentId ?? "" })
+        var visited = Set<String>()
+        var rows: [CommentRow] = []
+        func appendThread(_ start: CommentItem) {
+            var stack: [(CommentItem, Int, String?)] = [(start, 0, nil)]
+            while let (comment, depth, parentName) = stack.popLast() {
+                guard visited.insert(comment.id).inserted else { continue }
+                rows.append(CommentRow(comment: comment, depth: depth, parentAuthorName: parentName))
+                for child in (children[comment.id] ?? []).reversed() {
+                    stack.append((child, depth + 1, comment.author.name))
+                }
+            }
+        }
+        for comment in comments where comment.parentId == nil || !ids.contains(comment.parentId ?? "") {
+            appendThread(comment)
+        }
+        // Also render malformed cycles once, without recursive SwiftUI views.
+        for comment in comments where !visited.contains(comment.id) {
+            appendThread(comment)
+        }
+        return rows
+    }
+
+    private func replyRoot(for comment: CommentItem) -> CommentItem {
+        var root = comment
+        var visited: Set<String> = [comment.id]
+        while let parentId = root.parentId,
+              let parent = comments.first(where: { $0.id == parentId }),
+              visited.insert(parent.id).inserted {
+            root = parent
+        }
+        return root
     }
 
     var body: some View {
@@ -1365,12 +1409,8 @@ struct PostCommentsSheet: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List {
-                        ForEach(rootComments) { root in
-                            commentRowView(root, depth: 0)
-
-                            ForEach(childReplies(for: root.id)) { reply in
-                                commentRowView(reply, depth: 1, parentAuthorName: root.author.name)
-                            }
+                        ForEach(commentRows) { row in
+                            commentRowView(row.comment, depth: min(row.depth, 1), parentAuthorName: row.parentAuthorName)
                         }
                     }
                     .listStyle(.plain)
@@ -1378,20 +1418,21 @@ struct PostCommentsSheet: View {
                 }
 
                 // Quick emoji reaction bar
-                HStack(spacing: 10) {
-                    ForEach(quickEmojis, id: \.self) { emoji in
-                        Button {
-                            newComment.append(emoji)
-                        } label: {
-                            Text(emoji)
-                                .font(.title3)
-                                .frame(minWidth: 32, minHeight: 32)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(quickEmojis, id: \.self) { emoji in
+                            Button {
+                                newComment.append(emoji)
+                            } label: {
+                                Text(emoji)
+                                    .font(.title3)
+                                    .frame(minWidth: 32, minHeight: 32)
+                            }
                         }
                     }
-                    Spacer()
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 4)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 4)
                 .background(KinnectTheme.surface)
 
                 // Replying banner
@@ -1498,7 +1539,7 @@ struct PostCommentsSheet: View {
                 // Action bar: Trả lời, Thả cảm xúc, Thời gian
                 HStack(spacing: 14) {
                     Button {
-                        replyingTo = c
+                        replyingTo = replyRoot(for: c)
                     } label: {
                         Text("Trả lời")
                             .font(.caption2.bold())
@@ -1507,10 +1548,10 @@ struct PostCommentsSheet: View {
                     .buttonStyle(.plain)
 
                     Button {
-                        toggleCommentLike(c)
+                        setCommentReaction(c, reaction: c.liked ? nil : "like")
                     } label: {
                         HStack(spacing: 3) {
-                            Image(systemName: c.liked ? "heart.fill" : "heart")
+                            Text(commentReactionOptions.first(where: { $0.key == c.myReaction })?.emoji ?? "?")
                                 .font(.caption2)
                                 .foregroundColor(c.liked ? KinnectTheme.danger : KinnectTheme.textSecondary)
                             if c.likesCount > 0 {
@@ -1521,6 +1562,24 @@ struct PostCommentsSheet: View {
                         }
                     }
                     .buttonStyle(.plain)
+
+                    .disabled(pendingCommentReactions.contains(c.id))
+                    .contextMenu {
+                        ForEach(commentReactionOptions, id: \.key) { option in
+                            Button {
+                                setCommentReaction(c, reaction: option.key)
+                            } label: {
+                                Text("\(option.emoji) \(option.title)")
+                            }
+                        }
+                        if c.liked {
+                            Button("G? c?m x?c", role: .destructive) {
+                                setCommentReaction(c, reaction: nil)
+                            }
+                        }
+                    }
+                    .accessibilityLabel("C?m x?c b?nh lu?n")
+                    .accessibilityHint("Nh?n gi? ?? ch?n m?t trong s?u c?m x?c")
 
                     Text(formatRelativeDate(c.createdAt))
                         .font(.caption2)
@@ -1533,18 +1592,26 @@ struct PostCommentsSheet: View {
         .listRowBackground(KinnectTheme.surface)
     }
 
-    private func toggleCommentLike(_ item: CommentItem) {
-        if let idx = comments.firstIndex(where: { $0.id == item.id }) {
-            comments[idx].liked.toggle()
-            comments[idx].likesCount += comments[idx].liked ? 1 : -1
-            if comments[idx].likesCount < 0 { comments[idx].likesCount = 0 }
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            Task {
-                _ = try? await KinnectAPIClient.shared.requestJSON(
-                    "/api/posts/\(post.id)/comments/\(item.id)/like",
+    private func setCommentReaction(_ item: CommentItem, reaction: String?) {
+        guard !pendingCommentReactions.contains(item.id) else { return }
+        pendingCommentReactions.insert(item.id)
+        Task {
+            defer { pendingCommentReactions.remove(item.id) }
+            do {
+                let response = try await KinnectAPIClient.shared.requestJSON(
+                    "/api/posts/\(post.id)/comments/\(item.id)/reaction",
                     method: "POST",
-                    body: [:]
+                    body: ["reaction": reaction.map { $0 as Any } ?? NSNull()]
                 )
+                if let updated = response["comment"] as? [String: Any],
+                   let idx = comments.firstIndex(where: { $0.id == item.id }) {
+                    var updatedComment = CommentItem.from(updated)
+                    updatedComment.author = comments[idx].author
+                    comments[idx] = updatedComment
+                }
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            } catch {
+                appState.showToast(error.localizedDescription)
             }
         }
     }
@@ -1563,7 +1630,8 @@ struct PostCommentsSheet: View {
         guard !clean.isEmpty else { return }
         let draft = newComment
         newComment = ""
-        let parent = replyingTo?.id
+        let replyTarget = replyingTo
+        let parent = replyTarget?.id
         replyingTo = nil
         let reqId = "comment_\(post.id)_\(UUID().uuidString)"
         do {
@@ -1581,6 +1649,7 @@ struct PostCommentsSheet: View {
             onChanged()
         } catch {
             newComment = draft
+            replyingTo = replyTarget
             appState.showToast(error.localizedDescription)
         }
     }
@@ -1614,3 +1683,15 @@ func formatRelativeDate(_ iso: String) -> String {
     return rel.localizedString(for: date, relativeTo: Date())
 }
 
+
+// Feed-only styling keeps the rest of the app's card appearance unchanged.
+private struct FeedCardStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color(uiColor: .secondarySystemGroupedBackground))
+            )
+    }
+}

@@ -1399,6 +1399,12 @@ struct GroupChatDetailView: View {
     @State private var showAddMemberSheet = false
     @State private var showMembersSheet = false
     @State private var newGroupName = ""
+    // Reaction state (Android parity)
+    @State private var groupReactions: [String: String] = [:]
+    @State private var showingReactionPicker = false
+    @State private var reactionPickerMessageId: String = ""
+    @State private var reactionPickerIsDirect = false
+    @State private var reactionPickerFrame: CGRect = .zero
 
     private var currentMentionQuery: String? {
         guard let lastAt = text.lastIndex(of: "@") else { return nil }
@@ -1429,6 +1435,18 @@ struct GroupChatDetailView: View {
         guard let lastAt = text.lastIndex(of: "@") else { return }
         let prefix = text[..<lastAt]
         text = "\(prefix)@\(tag) "
+    }
+
+    private func showReactionPicker(for messageId: String, isDirect: Bool, frame: CGRect) {
+        reactionPickerMessageId = messageId
+        reactionPickerIsDirect = isDirect
+        reactionPickerFrame = frame
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            showingReactionPicker = true
+        }
+        // Haptic feedback
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
     }
 
     private func formattedBubbleText(_ rawText: String, isMine: Bool) -> Text {
@@ -1556,8 +1574,7 @@ struct GroupChatDetailView: View {
     }
 
     @ViewBuilder
-    @ViewBuilder
-        private func groupMessageFooter(msg: GroupMessageItem, isMine: Bool) -> some View {
+    private func groupMessageFooter(msg: GroupMessageItem, isMine: Bool) -> some View {
             HStack(spacing: 6) {
                 Text(formatRelativeDate(msg.createdAt))
                     .font(.system(size: 11))

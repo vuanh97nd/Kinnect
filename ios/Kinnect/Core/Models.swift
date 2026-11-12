@@ -305,6 +305,7 @@ struct CommentItem: Identifiable, Equatable {
     var likesCount: Int = 0
     var liked: Bool = false
     var parentId: String? = nil
+    var myReaction: String = ""
 
     static func from(_ dict: [String: Any]) -> CommentItem {
         let authorDict = (dict["author"] as? [String: Any]) ?? (dict["user"] as? [String: Any]) ?? dict
@@ -314,9 +315,10 @@ struct CommentItem: Identifiable, Equatable {
             author: KinnectUser.from(authorDict),
             text: (dict["text"] as? String) ?? (dict["body"] as? String) ?? (dict["content"] as? String) ?? "",
             createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
-            likesCount: (dict["likesCount"] as? Int) ?? (dict["likes"] as? Int) ?? 0,
-            liked: (dict["liked"] as? Bool) ?? false,
-            parentId: (pId != nil && !pId!.isEmpty) ? pId : nil
+            likesCount: (dict["likesCount"] as? Int) ?? (dict["likes"] as? Int) ?? (dict["reactions"] as? [String: Int])?.values.reduce(0, +) ?? 0,
+            liked: (dict["liked"] as? Bool) ?? !((dict["myReaction"] as? String) ?? "").isEmpty,
+            parentId: (pId != nil && !pId!.isEmpty) ? pId : nil,
+            myReaction: (dict["myReaction"] as? String) ?? ((dict["liked"] as? Bool) == true ? "like" : "")
         )
     }
 }
