@@ -58,24 +58,23 @@ struct AccountMenuView: View {
         } message: {
             Text("Bạn có thể đăng nhập lại bất kỳ lúc nào.")
         }
-        .navigationDestination(isPresented: $showPrivacySheet) {
+        .sheet(isPresented: $showPrivacySheet) {
             PrivacySettingsView()
         }
-        .navigationDestination(isPresented: $showSecuritySheet) {
+        .sheet(isPresented: $showSecuritySheet) {
             SecuritySettingsView()
         }
-        .navigationDestination(isPresented: $showPasswordSheet) {
+        .sheet(isPresented: $showPasswordSheet) {
             ChangePasswordSheetView()
         }
-        .navigationDestination(isPresented: $showAppearanceSheet) {
-                AppearanceSettingsSheetView()
-            }
-            .navigationDestination(isPresented: $showSupportSheet) {
-                HelpSupportSheetView()
-            }
-            .navigationDestination(isPresented: $showAboutSheet) {
-                AboutKinnectSheetView()
-            }
+        .sheet(isPresented: $showAppearanceSheet) {
+            AppearanceSettingsSheetView()
+        }
+        .sheet(isPresented: $showSupportSheet) {
+            HelpSupportSheetView()
+        }
+        .sheet(isPresented: $showAboutSheet) {
+            AboutKinnectSheetView()
         }
     }
 

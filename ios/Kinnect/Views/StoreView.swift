@@ -411,17 +411,19 @@ struct StoreView: View {
     // MARK: - Package Artwork View (Android parity: 1:1 fill with proper scaling)
     private struct PackageArtworkView: View {
         let package: StorePackageItem
+        let frameImage: UIImage?
+        let giftImage: UIImage?
+        let artworkImage: UIImage?
+        let iconName: String
 
         @State private var containerSize: CGSize = .zero
 
         var body: some View {
             GeometryReader { geo in
                 let size = min(geo.size.width, geo.size.height)
-                let centerX = geo.size.width / 2
-                let centerY = geo.size.height / 2
 
                 ZStack {
-                    if let frame = packageFrameImage(package) {
+                    if let frame = frameImage {
                         // Avatar frame: circle background + frame image (84% of container)
                         Circle()
                             .fill(Color(hex: "#23183D"))
@@ -435,7 +437,7 @@ struct StoreView: View {
                             .scaledToFill()
                             .frame(width: size * 0.84, height: size * 0.84)
                             .clipped()
-                    } else if let gift = packageGiftImage(package) {
+                    } else if let gift = giftImage {
                         // Gift: centered, 70% of container
                         Image(uiImage: gift)
                             .resizable()
@@ -443,7 +445,7 @@ struct StoreView: View {
                             .frame(width: size * 0.7, height: size * 0.7)
                             .clipped()
                             .shadow(color: Color(hex: package.accentColor).opacity(0.4), radius: size * 0.08)
-                    } else if let artwork = packageArtwork(package) {
+                    } else if let artwork = artworkImage {
                         // Artwork: fill entire container
                         Image(uiImage: artwork)
                             .resizable()
@@ -452,7 +454,7 @@ struct StoreView: View {
                             .clipped()
                     } else {
                         // Fallback icon
-                        Image(systemName: packageIconName(for: package.id, category: package.category))
+                        Image(systemName: iconName)
                             .font(.system(size: size * 0.28, weight: .bold))
                             .foregroundColor(.white)
                     }
@@ -476,7 +478,13 @@ struct StoreView: View {
                     )
 
                 // Render 1:1 artwork - fill the container properly
-                PackageArtworkView(package: pkg)
+                PackageArtworkView(
+                    package: pkg,
+                    frameImage: packageFrameImage(pkg),
+                    giftImage: packageGiftImage(pkg),
+                    artworkImage: packageArtwork(pkg),
+                    iconName: packageIconName(for: pkg.id, category: pkg.category)
+                )
 
                 // Top badges
                 HStack {
