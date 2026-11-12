@@ -37,7 +37,14 @@ jobs:
         run: bash scripts/prepare-android-tools.sh
 
       - name: Build testing APK
-        run: bash scripts/build-apk.sh
+        run: |
+          set -o pipefail
+          bash scripts/build-apk.sh 2>&1 | tee build-apk.log
+
+      - name: Print build failure log
+        if: failure()
+        run: |
+          if [ -f build-apk.log ]; then cat build-apk.log | tail -n 100; fi
 
       - name: Verify testing APK
         run: |

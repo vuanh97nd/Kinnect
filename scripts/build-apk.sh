@@ -9,8 +9,8 @@ mapfile -t NETWORK_JARS < <(python3 -c 'import json; print("\n".join(d["file"] f
 NETWORK_CLASSPATH="$(IFS=:; echo "${NETWORK_JARS[*]}")"
 mkdir -p android/build/classes android/build/dex dist
 "$TOOLS/aapt2" compile --dir android/app/src/main/res -o android/build/resources.zip
-"$TOOLS/aapt2" link -R android/build/resources.zip -I "$PLATFORM" --manifest android/app/src/main/AndroidManifest.xml -o android/build/unsigned.apk
-java -jar "$KINNECT_TOOLS/ecj.jar" -1.8 -encoding UTF-8 -proc:none -bootclasspath "$PLATFORM:$TOOLS/core-lambda-stubs.jar" -classpath "$KINNECT_TOOLS/deps/webrtc/classes.jar:$NETWORK_CLASSPATH" -d android/build/classes android/app/src/main/java/app/kinnect/live/*.java
+"$TOOLS/aapt2" link --auto-add-overlay -R android/build/resources.zip -I "$PLATFORM" --manifest android/app/src/main/AndroidManifest.xml -o android/build/unsigned.apk
+java -jar "$KINNECT_TOOLS/ecj.jar" -1.8 -encoding UTF-8 -proc:none -warn:none -bootclasspath "$PLATFORM:$TOOLS/core-lambda-stubs.jar" -classpath "$KINNECT_TOOLS/deps/webrtc/classes.jar:$NETWORK_CLASSPATH" -d android/build/classes android/app/src/main/java/app/kinnect/live/*.java
 find android/build/classes -name '*.class' -print > android/build/classes.list
 "$TOOLS/d8" --min-api 26 --lib "$PLATFORM" --output android/build/dex @android/build/classes.list "$KINNECT_TOOLS/deps/webrtc/classes.jar" "${NETWORK_JARS[@]}"
 (cd android/build/dex && zip -q -u ../unsigned.apk classes*.dex)
