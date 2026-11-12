@@ -1,0 +1,460 @@
+{
+  "platform": "android",
+  "provenance": {
+    "sourceCommit": "61a698a8a7ace6e1d1590c24d0f2f21484ea4415",
+    "targetSdk": 35,
+    "minSdk": 26,
+    "apkPackage": "app.kinnect.live",
+    "deviceProfile": "Pixel 6 (Google APIs x86_64)",
+    "apiLevel": 34,
+    "capturedAt": "2026-11-12T22:30:43Z"
+  },
+  "stats": {
+    "totalScreens": 49,
+    "captured": 49,
+    "duplicateWarnings": 0
+  },
+  "captures": [
+    {
+      "screen_id": "SCR-01",
+      "screen_name": "Splash / Intro",
+      "file": "screenshots/01_splash_intro.png",
+      "sha256": "9b66872d6089d8518701899205d64ef18b9a48b98345f5165f1f27a950745896",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-02",
+      "screen_name": "Welcome & Login Options",
+      "file": "screenshots/02_auth_welcome.png",
+      "sha256": "18df81fe466a9bf1f1657782d14ab0d7d02936d71b294af36c101cb2ef66f174",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-03",
+      "screen_name": "Login Form",
+      "file": "screenshots/03_auth_login.png",
+      "sha256": "cc30a1048a587f7d7b8e7976f02154e2318c804538dd43a544c1f44f33dc1081",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-04",
+      "screen_name": "Register Form",
+      "file": "screenshots/04_auth_register.png",
+      "sha256": "a8f8d62e51c241a496da07a1048d15266991827c9650b80029d9dd27ff192cea",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-05",
+      "screen_name": "Forgot Password",
+      "file": "screenshots/05_auth_forgot_password.png",
+      "sha256": "62cf0583cb5c314abea1cf2d2aeba5c504714514c2fa5cf784659d02fccc51a9",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-06",
+      "screen_name": "News Feed Main",
+      "file": "screenshots/06_feed_home.png",
+      "sha256": "39d5769d5145a54759c6bb2b06af3adedcd14e9a209f331c55ae13750306390a",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-07",
+      "screen_name": "Story 24h Bar & Viewer",
+      "file": "screenshots/07_feed_story.png",
+      "sha256": "4a0a61968e2ab7cfc4607849eb34486a233fc08027abaf1db5d653552353d2bf",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-08",
+      "screen_name": "Post Detail",
+      "file": "screenshots/08_feed_post_detail.png",
+      "sha256": "b31a04b5650bd0ef9b8cc43101417ec1dcfaa58b1385782e37eb2df221538315",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-09",
+      "screen_name": "Comments Sheet",
+      "file": "screenshots/09_feed_comments.png",
+      "sha256": "bdd0fed6da10a2d8d41ebd714f8dce915bcdd9f64da2ecd012b8c0558d85fc57",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-10",
+      "screen_name": "Reaction Picker (6 reactions)",
+      "file": "screenshots/10_feed_reactions.png",
+      "sha256": "e0979f09723a5574ca75ba1ecb8fabe0660c9f15239a68a5e55bd0488f5727d8",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-11",
+      "screen_name": "Discover & Search",
+      "file": "screenshots/11_discover_search.png",
+      "sha256": "f2b62e37319c6a86e82ad70a76b1690e805f4ba0bf1be0ab4b907e8adf21c7fa",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-12",
+      "screen_name": "Discover Suggestions",
+      "file": "screenshots/12_discover_results.png",
+      "sha256": "2f8a9919797d7d0cf04a79602d614869839e6a03ea04c4c1bce503a679dcaac1",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-13",
+      "screen_name": "Discover Empty Search",
+      "file": "screenshots/13_discover_empty.png",
+      "sha256": "ad575d1f711f3506d059867280efda5413a0f23762bd45758ec4a7751b0afaae",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-14",
+      "screen_name": "Shorts Fullscreen Player",
+      "file": "screenshots/14_shorts_player.png",
+      "sha256": "e71f3cbedb2af3dc1c6cc668fcf4bd48861082899b3a29f6a9d72094cb34686c",
+      "theme": "dark",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-15",
+      "screen_name": "Shorts Comments Drawer",
+      "file": "screenshots/15_shorts_comments.png",
+      "sha256": "e2810cb1e837e81b6969b700be972763a1b9fd9f2679547414aeb35d716cffd1",
+      "theme": "dark",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-16",
+      "screen_name": "Messages Inbox",
+      "file": "screenshots/16_inbox_list.png",
+      "sha256": "989383839b398d34ed0b8e7438a7c50b383db04aa70fdb95b0eb79c9941a4299",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-17",
+      "screen_name": "Direct Chat Conversation",
+      "file": "screenshots/17_chat_direct.png",
+      "sha256": "707e403fec938066a36f147dee88d29c631c569fc316747605bd328e1b2e3614",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-18",
+      "screen_name": "Group Chat Conversation",
+      "file": "screenshots/18_chat_group.png",
+      "sha256": "37c299fdc74f934b8db501fc7b346b25dbb78893bae43b0494fa31c2bd016515",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-19",
+      "screen_name": "Chat Conversation Menu",
+      "file": "screenshots/19_chat_menu.png",
+      "sha256": "35319f6f89ba0ef3069375a4ab64c8810df71b2db24c5a32ebd4ed9bbb46fd0e",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-20",
+      "screen_name": "Friends List",
+      "file": "screenshots/20_friends_list.png",
+      "sha256": "c5c217975b436521052a8965a058696e1903fb8d105c43d36df90db4b784ad84",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-21",
+      "screen_name": "Friend Requests",
+      "file": "screenshots/21_friends_requests.png",
+      "sha256": "02119011617eae56fe762b4413b7712d5cdc7ed94a8ad57defb34ecacbeebbb8",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-22",
+      "screen_name": "Profile Main View",
+      "file": "screenshots/22_profile_main.png",
+      "sha256": "c456fdc98b04c416fb0432fd86a7b74d8fe999f399028f554207c5a789e4161d",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-23",
+      "screen_name": "Edit Profile Sheet",
+      "file": "screenshots/23_profile_edit.png",
+      "sha256": "a7cc647238ab2951f5e47a07ada53c4e0ec062353fab31b0470f562f9e0652f3",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-24",
+      "screen_name": "Profile Albums & Privacy",
+      "file": "screenshots/24_profile_albums.png",
+      "sha256": "b2fd80c771042a0d8a24a44feea8fab18b7e0c3e2c0a8d38fc819d4a7c033579",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-25",
+      "screen_name": "Account Menu",
+      "file": "screenshots/25_account_menu.png",
+      "sha256": "6292baf8889a60b50fc0815c2f21ad00e9cbbf45a20f049ad15635a0f1af0076",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-26",
+      "screen_name": "Appearance Settings (Theme)",
+      "file": "screenshots/26_appearance_settings.png",
+      "sha256": "890b5c18d3b85a27772bf4d2aedbf84b8c5706e4d39d2adf8d566de77032412d",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-27",
+      "screen_name": "Change Password Sheet",
+      "file": "screenshots/27_security_password.png",
+      "sha256": "1cd0d4b21ec8095fe2c8dfc0e43c382d72a2cfa2552b0609b957fa5b9d033f5f",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-28",
+      "screen_name": "Active Login Sessions",
+      "file": "screenshots/28_sessions_devices.png",
+      "sha256": "db664791d04d53bd6347f4dacd0b89941ba53621aeaa63726d5df120b9056da3",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-29",
+      "screen_name": "Notifications Screen",
+      "file": "screenshots/29_notifications_screen.png",
+      "sha256": "73f6aaf76648f915ded31180628e8b5b58e0ccb7c02e2e56aa29bfa0162e3644",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-30",
+      "screen_name": "Notification Preferences",
+      "file": "screenshots/30_notifications_settings.png",
+      "sha256": "1400048a90b2726f87cd7f6b380d553580f3dbb5e33f90e4a394cbfc65881fce",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-31",
+      "screen_name": "Privacy Settings",
+      "file": "screenshots/31_privacy_settings.png",
+      "sha256": "f93820bcad846776615e93ffad96da379d74511ff33de943bc4f874ad449183d",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-32",
+      "screen_name": "Language Settings",
+      "file": "screenshots/32_language_settings.png",
+      "sha256": "b83eba7bac139c4b2843eef7f777e67f3f27532721d12d4ec8cefc3a8e41fceb",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-33",
+      "screen_name": "Help & Support",
+      "file": "screenshots/33_help_support.png",
+      "sha256": "a4be705559d65852f4380975a74b6c15ab9e66a215ff3b469f96870cca174172",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-34",
+      "screen_name": "About App",
+      "file": "screenshots/34_about_screen.png",
+      "sha256": "899cb47e64ad42e0206ff40b54c7f3be30a963c13982fa88a151bf2a4f26ecdb",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-35",
+      "screen_name": "Delete Account Confirmation",
+      "file": "screenshots/35_delete_account_confirm.png",
+      "sha256": "0264754e89c2046a39fa59ac5c6d2897969af7c7cc96ebe423776162651a3b3e",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-36",
+      "screen_name": "Wallet Balance & Coin",
+      "file": "screenshots/36_wallet_main.png",
+      "sha256": "86545c8348a1c7f244127918a52d5cb19e50f9e864694f58cbe69d163e9c73eb",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-37",
+      "screen_name": "Store Packages",
+      "file": "screenshots/37_store_packages.png",
+      "sha256": "5a9ca006c1b283d2fa8ade1e644d034afb9657a5b4b152e7baa6eaa356e7f8f6",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-38",
+      "screen_name": "Live Streaming Rooms List",
+      "file": "screenshots/38_live_list.png",
+      "sha256": "e0d66525e1f21388d9bdd2ec8363eb6ed3d5d689fb213ba054fcfe261fb538e5",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-39",
+      "screen_name": "Live Setup Sheet (Chat/Game)",
+      "file": "screenshots/39_live_setup_sheet.png",
+      "sha256": "a99dc46c758bfdd738c5d18bd5a0fb3d1173aabb6fe43cc290c2d1e9fa6ec5e9",
+      "theme": "dark",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-40",
+      "screen_name": "Live Gifts Drawer & Combos",
+      "file": "screenshots/40_live_gifts_drawer.png",
+      "sha256": "3d4a720ac3458f37519e14d7ca223ea22a2a2028c17c76b263be07cd7aab1f06",
+      "theme": "dark",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-41",
+      "screen_name": "Incoming Call UI",
+      "file": "screenshots/41_call_incoming.png",
+      "sha256": "7047b093353ba464790182f15f094b2f569bff50eea71c1074d8650df6deaf2a",
+      "theme": "dark",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-42",
+      "screen_name": "Camera Studio Mode",
+      "file": "screenshots/42_studio_camera.png",
+      "sha256": "6169e6d7996b97369195baacbe847e99fc81a10fd5e16c3ef339489f48061340",
+      "theme": "dark",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-43",
+      "screen_name": "Studio Music Picker Sheet",
+      "file": "screenshots/43_studio_music_picker.png",
+      "sha256": "14e2698bd9d251a8bb0063d4af8d1f4954e17001c1a0b16309484ce8811391d1",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-44",
+      "screen_name": "News Feed (Dark Theme)",
+      "file": "screenshots/44_feed_dark.png",
+      "sha256": "50a9e88abf6ef31e7a8acff04fa06f286c59978eeae2ce99a30c7623d54e4d80",
+      "theme": "dark",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-45",
+      "screen_name": "Account Menu (Dark Theme)",
+      "file": "screenshots/45_account_dark.png",
+      "sha256": "aaa58688680e73dea21b29cbb05e1f3e01e64e1183cef99ed7934ec36d1c3593",
+      "theme": "dark",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-46",
+      "screen_name": "News Feed (Large Text fontScale=1.3)",
+      "file": "screenshots/46_feed_font13.png",
+      "sha256": "17568de0165af210d7d8e24a98a6fb1517663cb91db2c01c3d95103d43a6fd66",
+      "theme": "light",
+      "fontScale": "1.3",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-47",
+      "screen_name": "Account Menu (Large Text fontScale=1.3)",
+      "file": "screenshots/47_account_font13.png",
+      "sha256": "184bdade316e86adff5728602ccb354570f99d3764e9baef298cc08865bcc125",
+      "theme": "light",
+      "fontScale": "1.3",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-48",
+      "screen_name": "News Feed (Narrow Screen 720x1520)",
+      "file": "screenshots/48_feed_narrow.png",
+      "sha256": "6e93e5f1e59b4fc0e9219caf7262a033f486ac0b798d9cbaa84a940deb495c74",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    },
+    {
+      "screen_id": "SCR-49",
+      "screen_name": "Comments Sheet (Narrow Screen 720x1520)",
+      "file": "screenshots/49_comments_narrow.png",
+      "sha256": "26628c6fef8b2e635b691905e36946e5557f6bd9e6b82fe9832df37c6f98dae2",
+      "theme": "light",
+      "fontScale": "1.0",
+      "status": "captured"
+    }
+  ]
+}
