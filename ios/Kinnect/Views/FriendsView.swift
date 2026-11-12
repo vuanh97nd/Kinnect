@@ -172,13 +172,30 @@ struct FriendsView: View {
         }
     }
 
-    private func sectionHeader(_ text: String) -> some View {
-        HStack {
+    private func sectionHeader(_ text: String, count: Int? = nil, color: Color = KinnectTheme.textSecondary) -> some View {
+        HStack(spacing: 6) {
             Text(text)
                 .font(.caption.weight(.bold))
-                .foregroundColor(KinnectTheme.textSecondary)
+                .foregroundColor(color)
+            if let count {
+                Text("\(count)")
+                    .font(.caption2.weight(.bold))
+                    .foregroundColor(color)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(color.opacity(0.15)))
+            }
             Spacer()
         }
+    }
+
+    private var groupedCardBackground: some View {
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(KinnectTheme.surface)
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(KinnectTheme.borderSoft.opacity(0.8), lineWidth: 0.8)
+            )
     }
 
     private func emptyPlaceholder(_ text: String) -> some View {
