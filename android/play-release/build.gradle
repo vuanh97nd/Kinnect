@@ -1,11 +1,11 @@
 plugins { id 'com.android.application' version '8.13.2' }
 def repo = rootDir.toPath().resolve('../..').normalize().toFile()
-layout.buildDirectory = file("${repo}/android/build/play-release-124")
+layout.buildDirectory = file("${repo}/android/build/play-release-1213")
 android {
  namespace 'app.kinnect.live'
  compileSdk 36
  buildToolsVersion '36.0.0'
- defaultConfig { applicationId 'app.kinnect.live'; minSdk 26; targetSdk 36; versionCode 110; versionName '1.2.6' }
+ defaultConfig { applicationId 'app.kinnect.live'; minSdk 26; targetSdk 36; versionCode 120; versionName '1.2.13' }
  signingConfigs {
   debug { storeFile file("${repo}/android/debug.keystore"); storePassword 'android'; keyAlias 'androiddebugkey'; keyPassword 'android' }
   release { storeFile file("${repo}/work/play-signing/upload.jks"); storePassword System.getenv('KINNECT_PLAY_PASS'); keyAlias 'kinnect-upload'; keyPassword System.getenv('KINNECT_PLAY_PASS') }
