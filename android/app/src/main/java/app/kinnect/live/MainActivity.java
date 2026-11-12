@@ -86,7 +86,7 @@ public class MainActivity extends Activity {
       if("vi".equals(lang)||"en".equals(lang))try{I18n.select(this,lang);}catch(Exception ignored){}
     }
     if(isDebug && intent.getBooleanExtra("ui_review_fixture",false)){
-      NativeApi.enableFixture(true);
+      NativeApi.enableFixture(this, true);
       if(me==null)try{
         me=new JSONObject("{\"id\":\"usr_qa_review\",\"username\":\"minhanh\",\"name\":\"Minh Anh\",\"role\":\"user\",\"coins\":1200,\"bio\":\"Kinnect QA Review\",\"followersCount\":128,\"followingCount\":64}");
         onUserSignedIn(me);
@@ -95,26 +95,150 @@ public class MainActivity extends Activity {
     String destination=intent.getStringExtra("commerce_destination");
     if(destination!=null){
       intent.removeExtra("commerce_destination");
-      if(destination.equals("login")){auth(false);return;}
-      if(destination.equals("register")){auth(true);return;}
-      if(destination.equals("forgot")){forgot();return;}
       if(destination.equals("intro")){intro();return;}
+      if(destination.equals("welcome")){auth(false);return;}
+      if(destination.equals("login")||destination.equals("auth_login")){auth(false);return;}
+      if(destination.equals("register")||destination.equals("auth_register")){auth(true);return;}
+      if(destination.equals("forgot")||destination.equals("auth_forgot")){forgot();return;}
       if(me!=null){
-        if(destination.equals("account"))meMenu();
-        else if(destination.equals("profile_edit"))editProfile();
-        else if(destination.equals("password"))changePassword();
-        else if(destination.equals("language"))languageMenu();
-        else if(destination.equals("notifications"))notifications();
-        else if(destination.equals("friends"))friendsScreen("friends");
-        else if(destination.equals("friend_requests"))friendsScreen("requests");
-        else if(destination.equals("create"))openCreateMenu();
-        else if(destination.equals("store"))storeScreen();
-        else if(destination.equals("settings"))settings();
+        if(destination.equals("feed")||destination.equals("feed_home")||destination.equals("feed_dark")||destination.equals("feed_font13")||destination.equals("feed_narrow")){
+          feed();
+        }
+        else if(destination.equals("feed_story")){
+          feed();
+          try{
+            JSONArray arr=new JSONArray("[{\"id\":\"st_1\",\"mediaUrl\":\"/story.jpg\",\"user\":{\"id\":\"usr_story\",\"name\":\"Linh Nhi\",\"username\":\"linhnhi\"}}]");
+            story(arr,0);
+          }catch(Exception ignored){}
+        }
+        else if(destination.equals("feed_post_detail")){
+          postDetail("post_1",null);
+        }
+        else if(destination.equals("feed_comments")||destination.equals("comments_narrow")){
+          comments("/api/posts/post_1/comments",()->{},this::feed,"Bảng tin");
+        }
+        else if(destination.equals("feed_reactions")){
+          postDetail("post_1",null);
+          reactorsSheet("post_1");
+        }
+        else if(destination.equals("discover")||destination.equals("discover_search")){
+          discover();
+        }
+        else if(destination.equals("discover_results")){
+          discover();
+          nearQuery="cà phê";
+          renderPeopleSearch();
+        }
+        else if(destination.equals("discover_empty")){
+          discover();
+          nearQuery="___khong_tim_thay___";
+          renderPeopleSearch();
+        }
+        else if(destination.equals("shorts")||destination.equals("shorts_player")){
+          shorts();
+        }
+        else if(destination.equals("shorts_comments")){
+          shorts();
+          try{
+            shortComments(new JSONObject("{\"id\":\"s1\",\"title\":\"Khoảnh khắc cuộc sống\",\"author\":{\"id\":\"usr_qa_review\",\"name\":\"Minh Anh\"},\"comments\":12}"));
+          }catch(Exception ignored){}
+        }
+        else if(destination.equals("inbox")||destination.equals("inbox_list")){
+          inbox();
+        }
         else if(destination.equals("chat_direct")){
           try{chat(new JSONObject("{\"id\":\"usr_chat_mock\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\",\"isActive\":true}"));}catch(Exception ignored){}
         }
         else if(destination.equals("chat_group")){
           try{groupChat(new JSONObject("{\"id\":\"grp_mock\",\"name\":\"Nhóm Âm Nhạc\",\"members\":[{},{},{}]}"));}catch(Exception ignored){}
+        }
+        else if(destination.equals("chat_menu")){
+          try{
+            JSONObject mockUser=new JSONObject("{\"id\":\"usr_chat_mock\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\"}");
+            chat(mockUser);
+            directChatMenu(mockUser);
+          }catch(Exception ignored){}
+        }
+        else if(destination.equals("friends")||destination.equals("friends_list")){
+          friendsScreen("friends");
+        }
+        else if(destination.equals("friend_requests")||destination.equals("friends_requests")){
+          friendsScreen("requests");
+        }
+        else if(destination.equals("profile")||destination.equals("profile_main")){
+          profile();
+        }
+        else if(destination.equals("profile_edit")){
+          editProfile();
+        }
+        else if(destination.equals("profile_albums")){
+          privateAlbum(me);
+        }
+        else if(destination.equals("account")||destination.equals("account_menu")||destination.equals("account_dark")||destination.equals("account_font13")){
+          meMenu();
+        }
+        else if(destination.equals("appearance_settings")){
+          appearanceScreen();
+        }
+        else if(destination.equals("password")||destination.equals("security_password")){
+          changePassword();
+        }
+        else if(destination.equals("sessions_devices")){
+          sessionsScreen();
+        }
+        else if(destination.equals("notifications")||destination.equals("notifications_screen")){
+          notifications();
+        }
+        else if(destination.equals("notifications_settings")){
+          nativeNotificationSettings();
+        }
+        else if(destination.equals("privacy_settings")){
+          nativeDocument("privacy",this::settings);
+        }
+        else if(destination.equals("language")||destination.equals("language_settings")){
+          languageMenu();
+        }
+        else if(destination.equals("help_support")){
+          helpScreen();
+        }
+        else if(destination.equals("about_screen")){
+          aboutScreen();
+        }
+        else if(destination.equals("delete_account_confirm")){
+          deleteAccountScreen();
+        }
+        else if(destination.equals("wallet_main")){
+          startActivity(new Intent(this,WalletActivity.class));
+        }
+        else if(destination.equals("store")||destination.equals("store_packages")){
+          startActivity(new Intent(this,StoreActivity.class));
+        }
+        else if(destination.equals("live")||destination.equals("live_list")){
+          live();
+        }
+        else if(destination.equals("live_setup_sheet")){
+          startActivity(new Intent(this,LiveActivity.class).putExtra(LiveActivity.EXTRA_HOST,true));
+        }
+        else if(destination.equals("live_gifts_drawer")){
+          startActivity(new Intent(this,LiveActivity.class).putExtra("show_gifts",true));
+        }
+        else if(destination.equals("call_incoming")){
+          try{
+            KinnectService.pendingIncoming=new JSONObject("{\"callId\":\"call_qa_01\",\"from\":{\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\"},\"mode\":\"video\"}");
+            startActivity(new Intent(this,IncomingCallActivity.class));
+          }catch(Exception ignored){}
+        }
+        else if(destination.equals("studio_camera")){
+          startActivity(new Intent(this,StudioActivity.class));
+        }
+        else if(destination.equals("studio_music_picker")){
+          startActivity(new Intent(this,StudioActivity.class).putExtra("open_music",true));
+        }
+        else if(destination.equals("create")){
+          openCreateMenu();
+        }
+        else if(destination.equals("settings")){
+          settings();
         }
         else navigate(destination);
       }
@@ -163,7 +287,7 @@ public class MainActivity extends Activity {
     splash();
     boolean isDebug = (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
     if (isDebug && getIntent() != null && getIntent().getBooleanExtra("ui_review_fixture", false)) {
-      NativeApi.enableFixture(true);
+      NativeApi.enableFixture(this, true);
       try {
         me = new JSONObject("{\"id\":\"usr_qa_review\",\"username\":\"minhanh\",\"name\":\"Minh Anh\",\"role\":\"user\",\"coins\":1200,\"bio\":\"Kinnect QA Review\",\"followersCount\":128,\"followingCount\":64}");
         onUserSignedIn(me);
@@ -187,7 +311,13 @@ public class MainActivity extends Activity {
         }, wait);
       });
     }
-    else startupHandler.postDelayed(() -> { if (!isDestroyed() && !isFinishing()) { intro(); handleLink(getIntent()); } }, 700);
+    else {
+      if (getIntent() != null && getIntent().hasExtra("commerce_destination")) {
+        handleExtras(getIntent());
+      } else {
+        startupHandler.postDelayed(() -> { if (!isDestroyed() && !isFinishing()) { intro(); handleLink(getIntent()); } }, 700);
+      }
+    }
   }
 
   private void splash() {

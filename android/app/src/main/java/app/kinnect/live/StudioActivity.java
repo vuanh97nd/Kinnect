@@ -108,6 +108,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     root.setBackgroundColor(0xff000000);
     setContentView(root);
     root.setOnApplyWindowInsetsListener((v, i) -> { v.setPadding(0, i.getSystemWindowInsetTop(), 0, i.getSystemWindowInsetBottom()); return i; });
+    if (getIntent().getBooleanExtra("open_music", false)) root.postDelayed(this::chooseMusic, 400);
 
     // Khung ngắm chuẩn Google Camera: bo góc 24dp trên nền đen tuyệt đối
     stage = new FrameLayout(this);

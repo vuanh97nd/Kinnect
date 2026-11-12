@@ -35,14 +35,12 @@ def dismiss_system_dialogs():
         pass
 
 def ensure_app_foreground(activity="MainActivity"):
-    target = f"app.kinnect.live/.{activity}"
     for _ in range(8):
         focus = adb("shell", "dumpsys", "window")
         if "mCurrentFocus" in focus and "app.kinnect.live" in focus:
             return True
         dismiss_system_dialogs()
-        adb("shell", "am", "start", "-n", target, "--ez", "ui_review_fixture", "true")
-        time.sleep(1.5)
+        time.sleep(0.5)
     return False
 
 def get_file_sha256(filepath):
@@ -101,54 +99,54 @@ def main():
     # Detailed mapping to exercise specific nested sub-screens
     DEST_MAP = {
         "SCR-01": ("MainActivity", "intro", "intro"),
-        "SCR-02": ("MainActivity", "intro", "welcome"),
-        "SCR-03": ("MainActivity", "login", "auth_login"),
-        "SCR-04": ("MainActivity", "register", "auth_register"),
-        "SCR-05": ("MainActivity", "forgot", "auth_forgot"),
-        "SCR-06": ("MainActivity", "feed", "feed_home"),
-        "SCR-07": ("MainActivity", "feed", "feed_story"),
-        "SCR-08": ("MainActivity", "feed", "feed_post_detail"),
-        "SCR-09": ("MainActivity", "feed", "feed_comments"),
-        "SCR-10": ("MainActivity", "feed", "feed_reactions"),
-        "SCR-11": ("MainActivity", "discover", "discover_search"),
-        "SCR-12": ("MainActivity", "discover", "discover_results"),
-        "SCR-13": ("MainActivity", "discover", "discover_empty"),
-        "SCR-14": ("MainActivity", "shorts", "shorts_player"),
-        "SCR-15": ("MainActivity", "shorts", "shorts_comments"),
-        "SCR-16": ("MainActivity", "inbox", "inbox_list"),
+        "SCR-02": ("MainActivity", "welcome", "welcome"),
+        "SCR-03": ("MainActivity", "auth_login", "auth_login"),
+        "SCR-04": ("MainActivity", "auth_register", "auth_register"),
+        "SCR-05": ("MainActivity", "auth_forgot", "auth_forgot"),
+        "SCR-06": ("MainActivity", "feed_home", "feed_home"),
+        "SCR-07": ("MainActivity", "feed_story", "feed_story"),
+        "SCR-08": ("MainActivity", "feed_post_detail", "feed_post_detail"),
+        "SCR-09": ("MainActivity", "feed_comments", "feed_comments"),
+        "SCR-10": ("MainActivity", "feed_reactions", "feed_reactions"),
+        "SCR-11": ("MainActivity", "discover_search", "discover_search"),
+        "SCR-12": ("MainActivity", "discover_results", "discover_results"),
+        "SCR-13": ("MainActivity", "discover_empty", "discover_empty"),
+        "SCR-14": ("MainActivity", "shorts_player", "shorts_player"),
+        "SCR-15": ("MainActivity", "shorts_comments", "shorts_comments"),
+        "SCR-16": ("MainActivity", "inbox_list", "inbox_list"),
         "SCR-17": ("MainActivity", "chat_direct", "chat_direct"),
         "SCR-18": ("MainActivity", "chat_group", "chat_group"),
-        "SCR-19": ("MainActivity", "inbox", "chat_menu"),
-        "SCR-20": ("MainActivity", "friends", "friends_list"),
-        "SCR-21": ("MainActivity", "friend_requests", "friends_requests"),
-        "SCR-22": ("MainActivity", "account", "profile_main"),
+        "SCR-19": ("MainActivity", "chat_menu", "chat_menu"),
+        "SCR-20": ("MainActivity", "friends_list", "friends_list"),
+        "SCR-21": ("MainActivity", "friends_requests", "friends_requests"),
+        "SCR-22": ("MainActivity", "profile_main", "profile_main"),
         "SCR-23": ("MainActivity", "profile_edit", "profile_edit"),
-        "SCR-24": ("MainActivity", "account", "profile_albums"),
-        "SCR-25": ("MainActivity", "account", "account_menu"),
-        "SCR-26": ("MainActivity", "settings", "appearance_settings"),
-        "SCR-27": ("MainActivity", "password", "security_password"),
-        "SCR-28": ("MainActivity", "settings", "sessions_devices"),
-        "SCR-29": ("MainActivity", "notifications", "notifications_screen"),
-        "SCR-30": ("MainActivity", "settings", "notifications_settings"),
-        "SCR-31": ("MainActivity", "settings", "privacy_settings"),
-        "SCR-32": ("MainActivity", "language", "language_settings"),
-        "SCR-33": ("MainActivity", "settings", "help_support"),
-        "SCR-34": ("MainActivity", "settings", "about_screen"),
-        "SCR-35": ("MainActivity", "settings", "delete_account_confirm"),
-        "SCR-36": ("MainActivity", "store", "wallet_main"),
-        "SCR-37": ("MainActivity", "store", "store_packages"),
-        "SCR-38": ("MainActivity", "live", "live_list"),
-        "SCR-39": ("MainActivity", "live", "live_setup_sheet"),
-        "SCR-40": ("MainActivity", "live", "live_gifts_drawer"),
-        "SCR-41": ("MainActivity", "feed", "call_incoming"),
-        "SCR-42": ("MainActivity", "create", "studio_camera"),
-        "SCR-43": ("MainActivity", "create", "studio_music_picker"),
-        "SCR-44": ("MainActivity", "feed", "feed_dark"),
-        "SCR-45": ("MainActivity", "account", "account_dark"),
-        "SCR-46": ("MainActivity", "feed", "feed_font13"),
-        "SCR-47": ("MainActivity", "account", "account_font13"),
-        "SCR-48": ("MainActivity", "feed", "feed_narrow"),
-        "SCR-49": ("MainActivity", "feed", "comments_narrow")
+        "SCR-24": ("MainActivity", "profile_albums", "profile_albums"),
+        "SCR-25": ("MainActivity", "account_menu", "account_menu"),
+        "SCR-26": ("MainActivity", "appearance_settings", "appearance_settings"),
+        "SCR-27": ("MainActivity", "security_password", "security_password"),
+        "SCR-28": ("MainActivity", "sessions_devices", "sessions_devices"),
+        "SCR-29": ("MainActivity", "notifications_screen", "notifications_screen"),
+        "SCR-30": ("MainActivity", "notifications_settings", "notifications_settings"),
+        "SCR-31": ("MainActivity", "privacy_settings", "privacy_settings"),
+        "SCR-32": ("MainActivity", "language_settings", "language_settings"),
+        "SCR-33": ("MainActivity", "help_support", "help_support"),
+        "SCR-34": ("MainActivity", "about_screen", "about_screen"),
+        "SCR-35": ("MainActivity", "delete_account_confirm", "delete_account_confirm"),
+        "SCR-36": ("MainActivity", "wallet_main", "wallet_main"),
+        "SCR-37": ("MainActivity", "store_packages", "store_packages"),
+        "SCR-38": ("MainActivity", "live_list", "live_list"),
+        "SCR-39": ("MainActivity", "live_setup_sheet", "live_setup_sheet"),
+        "SCR-40": ("MainActivity", "live_gifts_drawer", "live_gifts_drawer"),
+        "SCR-41": ("MainActivity", "call_incoming", "call_incoming"),
+        "SCR-42": ("MainActivity", "studio_camera", "studio_camera"),
+        "SCR-43": ("MainActivity", "studio_music_picker", "studio_music_picker"),
+        "SCR-44": ("MainActivity", "feed_dark", "feed_dark"),
+        "SCR-45": ("MainActivity", "account_dark", "account_dark"),
+        "SCR-46": ("MainActivity", "feed_font13", "feed_font13"),
+        "SCR-47": ("MainActivity", "account_font13", "account_font13"),
+        "SCR-48": ("MainActivity", "feed_narrow", "feed_narrow"),
+        "SCR-49": ("MainActivity", "comments_narrow", "comments_narrow")
     }
 
     current_theme = "light"
@@ -194,6 +192,8 @@ def main():
             time.sleep(1)
             
         dismiss_system_dialogs()
+        adb("shell", "am", "force-stop", "app.kinnect.live")
+        time.sleep(0.3)
         
         # Launch target screen with fixture enabled
         is_fixture = "true" if scr_id not in ("SCR-01", "SCR-02") else "false"
