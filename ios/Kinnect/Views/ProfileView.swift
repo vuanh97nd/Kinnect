@@ -2069,15 +2069,16 @@ struct ActiveSessionsSheet: View {
             List {
                 ForEach(Array(sessions.enumerated()), id: \.offset) { _, s in
                     let sid = s["id"] as? String ?? ""
-                    let ua = s["userAgent"] as? String ?? "Thiết bị Kinnect"
+                    let label = (s["label"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Thiết bị Kinnect"
                     let current = s["current"] as? Bool ?? false
+                    let expires = (s["expires"] as? NSNumber)?.int64Value ?? (s["expires"] as? Int64) ?? Int64((s["expires"] as? Int) ?? 0)
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(ua)
+                            Text(label)
                                 .font(.subheadline.bold())
                                 .foregroundColor(KinnectTheme.textPrimary)
                                 .kinnectMultiline()
-                            Text(current ? "Phiên hiện tại trên thiết bị này" : "Phiên hoạt động")
+                            Text(current ? "Thiết bị hiện tại" : Self.sessionExpiry(expires))
                                 .font(.caption)
                                 .foregroundColor(current ? KinnectTheme.online : KinnectTheme.textSecondary)
                         }
@@ -2110,6 +2111,15 @@ struct ActiveSessionsSheet: View {
                 await loadSessions()
             }
         }
+    }
+
+    private static func sessionExpiry(_ expires: Int64) -> String {
+        guard expires > 0 else { return "Phiên hoạt động" }
+        let date = Date(timeIntervalSince1970: TimeInterval(expires) / 1000)
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "vi_VN")
+        formatter.dateFormat = "dd/MM/yyyy"
+        return "Hết hạn \(formatter.string(from: date))"
     }
 
     private func loadSessions() async {
@@ -2268,7 +2278,7 @@ struct ChangePasswordSheet: View {
             return
         }
         if UIReviewFixture.activeScreen != nil {
-            appState.showToast("Đã đổi mật khẩu thành công.")
+            appState.showToast("Đã đổi mật khẩu. Các thiết bị khác đã được đăng xuất.")
             dismiss()
             return
         }
@@ -2279,11 +2289,11 @@ struct ChangePasswordSheet: View {
                 "/api/me/password",
                 method: "POST",
                 body: [
-                    "currentPassword": currentPassword,
-                    "newPassword": newPassword
+                    "current": currentPassword,
+                    "next": newPassword
                 ]
             )
-            appState.showToast("Đã đổi mật khẩu thành công.")
+            appState.showToast("Đã đổi mật khẩu. Các thiết bị khác đã được đăng xuất.")
             dismiss()
         } catch {
             errorMessage = error.localizedDescription

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import json
 import os
+import plistlib
+import re
 import signal
 import subprocess
 import sys
@@ -10,6 +12,8 @@ from pathlib import Path
 OUT_DIR = Path("dist/ios-ui-review")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 DEFAULT_BUNDLE_ID = "app.kinnect.live"
+SOURCE_INFO_PLIST = Path("ios/Kinnect/Resources/Info.plist")
+SOURCE_PROJECT_YML = Path("ios/project.yml")
 
 
 def run(cmd, check=True, capture=True):
@@ -20,6 +24,122 @@ def run(cmd, check=True, capture=True):
         print("STDERR:", res.stderr, flush=True)
         raise RuntimeError(f"Command failed ({res.returncode}): {' '.join(cmd)}")
     return res
+
+
+def read_plist_value(plist_path, key):
+    if not plist_path.exists():
+        return None
+    try:
+        if Path("/usr/libexec/PlistBuddy").exists():
+            res = subprocess.run(
+                ["/usr/libexec/PlistBuddy", "-c", f"Print :{key}", str(plist_path)],
+                capture_output=True, text=True
+            )
+            val = res.stdout.strip()
+            if res.returncode == 0 and val:
+                return val
+    except Exception as e:
+        print(f"Warning: PlistBuddy read failed for {key}: {e}", flush=True)
+    try:
+        with open(plist_path, "rb") as fh:
+            data = plistlib.load(fh)
+        val = data.get(key)
+        if val is not None and str(val).strip():
+            return str(val).strip()
+    except Exception as e:
+        print(f"Warning: plistlib read failed for {key}: {e}", flush=True)
+    return None
+
+
+def read_project_yml_versions():
+    if not SOURCE_PROJECT_YML.exists():
+        return None, None
+    try:
+        text = SOURCE_PROJECT_YML.read_text(encoding="utf-8")
+    except Exception as e:
+        print(f"Warning: could not read {SOURCE_PROJECT_YML}: {e}", flush=True)
+        return None, None
+    marketing = None
+    build = None
+    m = re.search(r'MARKETING_VERSION:\s*"([^"]+)"', text)
+    if m:
+        marketing = m.group(1).strip()
+    b = re.search(r'CURRENT_PROJECT_VERSION:\s*"([^"]+)"', text)
+    if b:
+        build = b.group(1).strip()
+    return marketing, build
+
+
+def resolve_app_versions():
+    """Read live MARKETING_VERSION / CURRENT_PROJECT_VERSION from source plist before build."""
+    marketing = read_plist_value(SOURCE_INFO_PLIST, "CFBundleShortVersionString")
+    build = read_plist_value(SOURCE_INFO_PLIST, "CFBundleVersion")
+    yml_marketing, yml_build = read_project_yml_versions()
+    if not marketing and yml_marketing:
+        marketing = yml_marketing
+        print(f"Using MARKETING_VERSION from project.yml: {marketing}", flush=True)
+    if not build and yml_build:
+        build = yml_build
+        print(f"Using CURRENT_PROJECT_VERSION from project.yml: {build}", flush=True)
+    if not marketing or not build:
+        raise RuntimeError(
+            "Could not resolve MARKETING_VERSION / CURRENT_PROJECT_VERSION from "
+            f"{SOURCE_INFO_PLIST} (or {SOURCE_PROJECT_YML} fallback). "
+            "Refusing stale hardcoded overrides."
+        )
+    print(
+        f"Resolved versions from source before build: "
+        f"MARKETING_VERSION={marketing} CURRENT_PROJECT_VERSION={build}",
+        flush=True,
+    )
+    return marketing, build
+
+
+def get_git_sha():
+    env_sha = (
+        os.environ.get("GITHUB_SHA")
+        or os.environ.get("GIT_COMMIT")
+        or os.environ.get("COMMIT_SHA")
+        or ""
+    ).strip()
+    if env_sha:
+        return env_sha
+    try:
+        res = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True, text=True, check=False
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            return res.stdout.strip()
+    except Exception as e:
+        print(f"Warning: git rev-parse failed: {e}", flush=True)
+    return "unknown"
+
+
+def write_provenance_manifest(marketing_version, build_number, extra=None):
+    provenance = {
+        "gitSha": get_git_sha(),
+        "marketingVersion": marketing_version,
+        "buildNumber": build_number,
+        "CFBundleShortVersionString": marketing_version,
+        "CFBundleVersion": build_number,
+        "MARKETING_VERSION": marketing_version,
+        "CURRENT_PROJECT_VERSION": build_number,
+        "sourceInfoPlist": str(SOURCE_INFO_PLIST).replace("\\", "/"),
+        "capturedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "githubRunId": os.environ.get("GITHUB_RUN_ID"),
+        "githubRunAttempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+        "githubRef": os.environ.get("GITHUB_REF"),
+        "githubRepository": os.environ.get("GITHUB_REPOSITORY"),
+        "workflow": os.environ.get("GITHUB_WORKFLOW"),
+        "actor": os.environ.get("GITHUB_ACTOR"),
+    }
+    if extra:
+        provenance.update(extra)
+    path = OUT_DIR / "provenance.json"
+    path.write_text(json.dumps(provenance, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"Wrote provenance manifest: {path}", flush=True)
+    return provenance
 
 
 def get_bundle_id(app_path):
@@ -203,51 +323,23 @@ def build_contact_sheet(records):
         except Exception as err:
             print(f"Warning generating PNG contact sheet: {err}", flush=True)
 
-    # Always generate HTML contact sheet as well so both visual formats are available
-    html_lines = [
-        "<!DOCTYPE html>",
-        "<html lang='vi'>",
-        "<head>",
-        "  <meta charset='utf-8'>",
-        "  <title>Kinnect iOS Native SwiftUI — UI Review Contact Sheet</title>",
-        "  <style>",
-        "    body { background: #0E0B18; color: #fff; font-family: -apple-system, sans-serif; margin: 24px; }",
-        "    h1 { color: #8A3FFC; margin-bottom: 8px; }",
-        "    p.sub { color: #A8A29E; margin-bottom: 24px; font-size: 14px; }",
-        "    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }",
-        "    .card { background: #181326; border: 1px solid #332454; border-radius: 12px; padding: 12px; }",
-        "    .card img { width: 100%; height: auto; border-radius: 8px; border: 1px solid #231B3A; }",
-        "    .card h4 { margin: 8px 0 4px 0; font-size: 14px; color: #D4BBFF; }",
-        "    .card p { margin: 0 0 4px 0; font-size: 12px; color: #E0E0E0; }",
-        "    .card small { font-size: 11px; color: #A8A29E; }",
-        "  </style>",
-        "</head>",
-        "<body>",
-        "  <h1>Kinnect iOS Native SwiftUI — Actual Simulator UI Review</h1>",
-        f"  <p class='sub'>Tập hợp {len(records)} ảnh chụp thực tế từ iPhone 16 Pro, iPhone 16e và iPad Pro 11-inch.</p>",
-        "  <div class='grid'>"
-    ]
-    for r in records:
-        f_name = Path(r["file"]).name
-        html_lines.append(f"    <div class='card'>")
-        html_lines.append(f"      <img src='{f_name}' alt='{r['slug']}'>")
-        html_lines.append(f"      <h4>{r['slug']}</h4>")
-        html_lines.append(f"      <p>{r['description']}</p>")
-        html_lines.append(f"      <small>{r['device']}</small>")
-        html_lines.append(f"    </div>")
-    html_lines.extend(["  </div>", "</body>", "</html>"])
-    html_path = OUT_DIR / "contact-sheet.html"
-    html_path.write_text("\n".join(html_lines), encoding="utf-8")
-    print(f"Generated HTML contact sheet: {html_path}", flush=True)
-    return html_path
+    # Real PNG contact sheet only — no HTML screenshots.
+    return OUT_DIR / "contact-sheet.png" if (OUT_DIR / "contact-sheet.png").exists() else None
 
 
 def main():
+    marketing_version, build_number = resolve_app_versions()
+    provenance = write_provenance_manifest(marketing_version, build_number)
+
     devices = ensure_xcode_with_simulator_runtime()
     xcode_ver = run(["xcodebuild", "-version"]).stdout.strip().replace("\n", " | ")
     runtimes_txt = run(["xcrun", "simctl", "list", "runtimes"]).stdout
 
-    print("Building Kinnect.app for iphonesimulator...", flush=True)
+    print(
+        f"Building Kinnect.app for iphonesimulator "
+        f"(MARKETING_VERSION={marketing_version} CURRENT_PROJECT_VERSION={build_number})...",
+        flush=True,
+    )
     run([
         "xcodebuild", "build",
         "-project", "ios/Kinnect.xcodeproj",
@@ -255,8 +347,8 @@ def main():
         "-configuration", "Debug",
         "-sdk", "iphonesimulator",
         "-derivedDataPath", "build/SimDerivedData",
-        "MARKETING_VERSION=1.2.12",
-        "CURRENT_PROJECT_VERSION=118",
+        f"MARKETING_VERSION={marketing_version}",
+        f"CURRENT_PROJECT_VERSION={build_number}",
         "CODE_SIGN_IDENTITY=",
         "CODE_SIGNING_REQUIRED=NO",
         "CODE_SIGNING_ALLOWED=NO",
@@ -593,19 +685,43 @@ def main():
 
     contact_sheet = build_contact_sheet(records)
 
+    built_marketing = read_plist_value(app_path / "Info.plist", "CFBundleShortVersionString") or marketing_version
+    built_build = read_plist_value(app_path / "Info.plist", "CFBundleVersion") or build_number
+    provenance = write_provenance_manifest(
+        marketing_version,
+        build_number,
+        extra={
+            "xcodeVersion": xcode_ver,
+            "simulatorRuntimes": runtimes_txt.strip().splitlines() if runtimes_txt else [],
+            "builtAppPath": str(app_path).replace("\\", "/"),
+            "builtCFBundleShortVersionString": built_marketing,
+            "builtCFBundleVersion": built_build,
+            "screenshotCount": len(records),
+            "standardIphone": standard_iphone["name"] if standard_iphone else None,
+            "compactIphone": compact_iphone["name"] if compact_iphone else None,
+            "ipad": ipad["name"] if ipad else None,
+        },
+    )
+
     manifest = {
         "xcodeVersion": xcode_ver,
+        "gitSha": provenance["gitSha"],
+        "marketingVersion": marketing_version,
+        "buildNumber": build_number,
+        "provenance": provenance,
         "standardIphone": standard_iphone,
         "compactIphone": compact_iphone,
         "ipad": ipad,
         "screenshots": records,
-        "contactSheet": str(contact_sheet)
+        "contactSheet": str(contact_sheet) if contact_sheet else None,
     }
     (OUT_DIR / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
 
     report_lines = [
         "# Báo cáo Chụp thử Giao diện Thực tế Kinnect iOS Native (`dist/ios-ui-review`)",
         "",
+        f"- **Git SHA**: `{provenance['gitSha']}`",
+        f"- **Version / Build**: `{marketing_version}` / `{build_number}`",
         f"- **Xcode & SDK**: `{xcode_ver}`",
         f"- **Thiết bị iPhone chuẩn**: `{standard_iphone['name']}` (`{standard_iphone['runtime']}`)",
         f"- **Thiết bị iPhone kiểm tra màn hình nhỏ**: `{compact_iphone['name'] if compact_iphone else 'N/A'}`",
