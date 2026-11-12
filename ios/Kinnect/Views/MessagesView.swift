@@ -596,6 +596,12 @@ struct DirectChatDetailView: View {
     @State private var editingMessageId: String?
     @State private var editingMessageText: String = ""
     @State private var messageReactions: [String: String] = [:]
+    @State private var groupReactions: [String: String] = [:]
+    // Reaction Picker state (Android parity)
+    @State private var showingReactionPicker = false
+    @State private var reactionPickerMessageId: String = ""
+    @State private var reactionPickerIsDirect = true
+    @State private var reactionPickerFrame: CGRect = .zero
     @State private var forwardText: String = ""
     @State private var forwardImageUrl: String = ""
     @State private var showForwardSheet = false
@@ -1036,18 +1042,15 @@ struct DirectChatDetailView: View {
 
                     // Floating Tapback reaction badge
                     if let reacted = messageReactions[msg.id] {
-                        Text(DirectMessageItem.emoji(for: reacted))
-                            .font(.system(size: 13))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 3)
-                            .background(
-                                Capsule()
-                                    .fill(KinnectTheme.surfaceElevated)
-                                    .shadow(color: Color.black.opacity(0.35), radius: 3, y: 1)
-                                    .overlay(Capsule().stroke(KinnectTheme.borderSoft, lineWidth: 0.8))
-                            )
-                            .offset(x: isMine ? -8 : 8, y: -10)
+                        FloatingReactionBadge(reaction: reacted, isMine: isMine)
                     }
+                }
+
+                // Reaction Summary (Android parity) - shows reaction counts on message
+                if !msg.reactions.isEmpty {
+                    ReactionSummary(reactions: msg.reactions, myReaction: messageReactions[msg.id])
+                        .padding(.horizontal, isMine ? 0 : 4)
+                        .padding(.top, -2)
                 }
 
                 // Bottom row: time, delivery state, reaction trigger & more options
@@ -1076,18 +1079,25 @@ struct DirectChatDetailView: View {
                         }
                     }
 
-                    Menu {
-                        ForEach(["👍", "❤️", "😂", "😮", "😢", "😡"], id: \.self) { emoji in
-                            Button(emoji) {
-                                Task { await reactToMessage(msgId: msg.id, emoji: emoji) }
-                            }
-                        }
+                    // Reaction Picker Button - Long press to show picker, tap to quick react
+                    Button {
+                        // Quick react with default (love) on tap
+                        Task { await reactToMessage(msgId: msg.id, emoji: "❤️") }
                     } label: {
                         Image(systemName: "face.smiling")
                             .font(.system(size: 12))
                             .foregroundColor(messageReactions[msg.id] != nil ? KinnectTheme.accentBright : Color(UIColor.tertiaryLabel))
+                            .frame(width: 32, height: 32)
+                            .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
                     .accessibilityLabel("Thả cảm xúc tin nhắn")
+                    .simultaneousGesture(
+                        LongPressGesture(minimumDuration: 0.35)
+                            .onEnded { _ in
+                                showReactionPicker(for: msg.id, isDirect: true, frame: .zero)
+                            }
+                    )
 
                     Menu {
                         if isMine {
@@ -1129,7 +1139,10 @@ struct DirectChatDetailView: View {
                         Image(systemName: "ellipsis")
                             .font(.system(size: 12))
                             .foregroundColor(Color(UIColor.tertiaryLabel))
+                            .frame(width: 32, height: 32)
+                            .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
                     .accessibilityLabel("Tùy chọn tin nhắn")
                 }
                 .padding(.horizontal, 4)
@@ -1137,6 +1150,26 @@ struct DirectChatDetailView: View {
 
             if !isMine { Spacer(minLength: 44) }
         }
+        // Reaction Picker Overlay (Android-style popup)
+        .overlay(
+            Group {
+                if showingReactionPicker && reactionPickerMessageId == msg.id && reactionPickerIsDirect {
+                    ReactionPicker(
+                        messageId: msg.id,
+                        currentReaction: messageReactions[msg.id],
+                        reactionCounts: msg.reactions,
+                        isMine: isMine,
+                        onReact: { reactionKey in
+                            Task { await reactToMessage(msgId: msg.id, emoji: reactionKey) }
+                        },
+                        onDismiss: { showingReactionPicker = false }
+                    )
+                    .transition(.scale.combined(with: .opacity).combined(with: .move(edge: .top)))
+                    .zIndex(100)
+                }
+            },
+            alignment: isMine ? .topTrailing : .topLeading
+        )
     }
 
     private func loadMessages() async {
@@ -1201,6 +1234,20 @@ struct DirectChatDetailView: View {
             }
             appState.showToast("Không thể gửi cảm xúc: \(error.localizedDescription)")
         }
+    }
+
+    // MARK: - Reaction Picker Helpers (Android parity)
+
+    private func showReactionPicker(for messageId: String, isDirect: Bool, frame: CGRect) {
+        reactionPickerMessageId = messageId
+        reactionPickerIsDirect = isDirect
+        reactionPickerFrame = frame
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            showingReactionPicker = true
+        }
+        // Haptic feedback
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
     }
 
     private func sendMessage(text: String, imageDataURL: String) async {
@@ -1345,7 +1392,6 @@ struct GroupChatDetailView: View {
     @State private var selectedPhoto: PhotosPickerItem? = nil
     @State private var showFileImporter = false
     @State private var isSending = false
-    @State private var groupReactions: [String: String] = [:]
     @State private var forwardText = ""
     @State private var forwardImageUrl = ""
     @State private var showForwardSheet = false
@@ -1471,18 +1517,15 @@ struct GroupChatDetailView: View {
 
                     // Floating Tapback reaction badge
                     if let reacted = groupReactions[msg.id] {
-                        Text(DirectMessageItem.emoji(for: reacted))
-                            .font(.system(size: 13))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 3)
-                            .background(
-                                Capsule()
-                                    .fill(KinnectTheme.surfaceElevated)
-                                    .shadow(color: Color.black.opacity(0.35), radius: 3, y: 1)
-                                    .overlay(Capsule().stroke(KinnectTheme.borderSoft, lineWidth: 0.8))
-                            )
-                            .offset(x: isMine ? -8 : 8, y: -10)
+                        FloatingReactionBadge(reaction: reacted, isMine: isMine)
                     }
+                }
+
+                // Reaction Summary (Android parity) - shows reaction counts on message
+                if !msg.reactions.isEmpty {
+                    ReactionSummary(reactions: msg.reactions, myReaction: groupReactions[msg.id])
+                        .padding(.horizontal, isMine ? 0 : 4)
+                        .padding(.top, -2)
                 }
 
                 // Bottom row: time, seen count, reaction, more
@@ -1490,71 +1533,102 @@ struct GroupChatDetailView: View {
             }
             if !isMine { Spacer(minLength: 44) }
         }
+        // Reaction Picker Overlay (Android-style popup)
+        .overlay(
+            Group {
+                if showingReactionPicker && reactionPickerMessageId == msg.id && !reactionPickerIsDirect {
+                    ReactionPicker(
+                        messageId: msg.id,
+                        currentReaction: groupReactions[msg.id],
+                        reactionCounts: msg.reactions,
+                        isMine: isMine,
+                        onReact: { reactionKey in
+                            Task { await reactToGroupMessage(msgId: msg.id, emoji: reactionKey) }
+                        },
+                        onDismiss: { showingReactionPicker = false }
+                    )
+                    .transition(.scale.combined(with: .opacity).combined(with: .move(edge: .top)))
+                    .zIndex(100)
+                }
+            },
+            alignment: isMine ? .topTrailing : .topLeading
+        )
     }
 
     @ViewBuilder
-    private func groupMessageFooter(msg: GroupMessageItem, isMine: Bool) -> some View {
-        HStack(spacing: 6) {
-            Text(formatRelativeDate(msg.createdAt))
-                .font(.system(size: 11))
-                .foregroundColor(Color(UIColor.tertiaryLabel))
-
-            HStack(spacing: 2) {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 10, weight: .bold))
-                Text("\(max(msg.seenCount, 1))")
-                    .font(.system(size: 11, weight: .medium))
-            }
-            .foregroundColor(KinnectTheme.accentBright)
-
-            Menu {
-                ForEach(["👍", "❤️", "😂", "😮", "😢", "😡"], id: \.self) { emoji in
-                    Button(emoji) {
-                        Task { await reactToGroupMessage(msgId: msg.id, emoji: emoji) }
-                    }
-                }
-            } label: {
-                Image(systemName: "face.smiling")
-                    .font(.system(size: 12))
-                    .foregroundColor(groupReactions[msg.id] != nil ? KinnectTheme.accentBright : Color(UIColor.tertiaryLabel))
-            }
-            .accessibilityLabel("Thả cảm xúc tin nhắn nhóm")
-
-            Menu {
-                Button {
-                    forwardText = msg.text
-                    forwardImageUrl = msg.imageUrl
-                    showForwardSheet = true
-                } label: {
-                    Label("Chuyển tiếp", systemImage: "arrow.turn.up.right")
-                }
-
-                if !isMine {
-                    Button(role: .destructive) {
-                        appState.activeReportContext = UGCReportContext(
-                            targetType: "group_message",
-                            targetId: msg.id,
-                            targetUserId: msg.sender.id,
-                            targetTitle: "Tin nhắn nhóm của \(msg.sender.name)"
-                        )
-                    } label: {
-                        Label("Báo cáo tin nhắn", systemImage: "exclamationmark.bubble")
-                    }
-                    Button(role: .destructive) {
-                        Task { await appState.blockUser(userId: msg.sender.id, userName: msg.sender.name) }
-                    } label: {
-                        Label("Chặn người gửi", systemImage: "hand.raised.fill")
-                    }
-                }
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 12))
+    @ViewBuilder
+        private func groupMessageFooter(msg: GroupMessageItem, isMine: Bool) -> some View {
+            HStack(spacing: 6) {
+                Text(formatRelativeDate(msg.createdAt))
+                    .font(.system(size: 11))
                     .foregroundColor(Color(UIColor.tertiaryLabel))
+
+                HStack(spacing: 2) {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .bold))
+                    Text("\(max(msg.seenCount, 1))")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .foregroundColor(KinnectTheme.accentBright)
+
+                // Reaction Picker Button - Long press to show picker, tap to quick react
+                Button {
+                    // Quick react with default (love) on tap
+                    Task { await reactToGroupMessage(msgId: msg.id, emoji: "❤️") }
+                } label: {
+                    Image(systemName: "face.smiling")
+                        .font(.system(size: 12))
+                        .foregroundColor(groupReactions[msg.id] != nil ? KinnectTheme.accentBright : Color(UIColor.tertiaryLabel))
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Thả cảm xúc tin nhắn nhóm")
+                .simultaneousGesture(
+                    LongPressGesture(minimumDuration: 0.35)
+                        .onEnded { _ in
+                            showReactionPicker(for: msg.id, isDirect: false, frame: .zero)
+                        }
+                )
+
+                Menu {
+                    Button {
+                        forwardText = msg.text
+                        forwardImageUrl = msg.imageUrl
+                        showForwardSheet = true
+                    } label: {
+                        Label("Chuyển tiếp", systemImage: "arrow.turn.up.right")
+                    }
+
+                    if !isMine {
+                        Button(role: .destructive) {
+                            appState.activeReportContext = UGCReportContext(
+                                targetType: "group_message",
+                                targetId: msg.id,
+                                targetUserId: msg.sender.id,
+                                targetTitle: "Tin nhắn nhóm của \(msg.sender.name)"
+                            )
+                        } label: {
+                            Label("Báo cáo tin nhắn", systemImage: "exclamationmark.bubble")
+                        }
+                        Button(role: .destructive) {
+                            Task { await appState.blockUser(userId: msg.sender.id, userName: msg.sender.name) }
+                        } label: {
+                            Label("Chặn người gửi", systemImage: "hand.raised.fill")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 12))
+                        .foregroundColor(Color(UIColor.tertiaryLabel))
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Tùy chọn tin nhắn nhóm")
             }
-            .accessibilityLabel("Tùy chọn tin nhắn nhóm")
+            .padding(.horizontal, 4)
         }
-        .padding(.horizontal, 4)
-    }
 
     @ViewBuilder
     private var mentionSuggestionBar: some View {

@@ -39,8 +39,23 @@ struct StoreView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Pinned Dedicated Header Bar matching Android StoreActivity
-            storeHeaderBar
+            // Pinned Dedicated Header Bar matching Android StoreActivity - using PinnedHeaderBar component
+            PinnedHeaderBar(
+                title: "Cửa hàng",
+                onBack: onBack ?? { dismiss() },
+                trailingActions: [
+                    PinnedHeaderBar.TrailingAction(
+                        systemImage: "ellipsis",
+                        accessibilityLabel: "Tùy chọn cửa hàng",
+                        action: { showStoreMenuDialog = true }
+                    ),
+                    PinnedHeaderBar.TrailingAction(
+                        systemImage: "bitcoinsign.circle.fill",
+                        accessibilityLabel: "Xem ví Kinnect",
+                        action: { onOpenWallet?() }
+                    )
+                ]
+            )
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {

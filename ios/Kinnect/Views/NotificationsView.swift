@@ -26,8 +26,20 @@ struct NotificationsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Pinned Dedicated Header Bar (No duplicate title)
-            headerBar
+            // Pinned Dedicated Header Bar - matches Android accountHeader pattern
+            PinnedHeaderBar.standard(
+                title: "Thông báo",
+                onBack: onBack ?? { dismiss() },
+                trailingActions: [
+                    PinnedHeaderBar.TrailingAction(
+                        systemImage: "checkmark.circle.fill",
+                        accessibilityLabel: "Đánh dấu đã đọc tất cả",
+                        action: { Task { await markAllRead() } },
+                        badgeCount: appState.unreadNotificationsCount > 0 ? appState.unreadNotificationsCount : nil,
+                        badgeColor: KinnectTheme.accentBright
+                    )
+                ]
+            )
 
             VStack(spacing: 10) {
                 // Search Bar (Parity with Android searchField)
@@ -168,6 +180,8 @@ struct NotificationsView: View {
         .background(KinnectTheme.surface.ignoresSafeArea(edges: .top))
         .overlay(Divider().background(KinnectTheme.borderSoft), alignment: .bottom)
     }
+
+    // MARK: - Filtered Notifications
 
     private var filteredNotifications: [NotificationItem] {
         let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
