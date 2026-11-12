@@ -1138,7 +1138,6 @@ struct DirectChatDetailView: View {
             if !isMine { Spacer(minLength: 44) }
         }
     }
-    }
 
     private func loadMessages() async {
         if messages.isEmpty,
