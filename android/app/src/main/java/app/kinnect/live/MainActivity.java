@@ -4301,6 +4301,7 @@ public class MainActivity extends Activity {
   protected void onResume() {
     super.onResume();
     stopped = false;
+    try{getSystemService(android.app.NotificationManager.class).cancel(KinnectService.ID_BG);}catch(RuntimeException ignored){}
     if(storeReturning&&me!=null){storeReturning=false;api.call("GET","/api/me",null,(data,error,status)->{if(error==null&&data!=null&&!isDestroyed()){JSONObject fresh=data.optJSONObject("user");boolean styleChanged=fresh!=null&&!fresh.optString("storeStyle").equals(me.optString("storeStyle"));if(fresh!=null)me=fresh;if(styleChanged)refreshPage();}});}
     KinnectService.appVisible = true;
     notificationHandler.removeCallbacksAndMessages(null);

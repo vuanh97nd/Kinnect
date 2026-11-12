@@ -408,6 +408,60 @@ struct StoreView: View {
         }
     }
 
+    // MARK: - Package Artwork View (Android parity: 1:1 fill with proper scaling)
+    private struct PackageArtworkView: View {
+        let package: StorePackageItem
+
+        @State private var containerSize: CGSize = .zero
+
+        var body: some View {
+            GeometryReader { geo in
+                let size = min(geo.size.width, geo.size.height)
+                let centerX = geo.size.width / 2
+                let centerY = geo.size.height / 2
+
+                ZStack {
+                    if let frame = packageFrameImage(package) {
+                        // Avatar frame: circle background + frame image (84% of container)
+                        Circle()
+                            .fill(Color(hex: "#23183D"))
+                            .frame(width: size * 0.72, height: size * 0.72)
+                            .shadow(color: Color(hex: package.accentColor).opacity(0.4), radius: size * 0.08)
+                        Text("K")
+                            .font(.system(size: size * 0.22, weight: .bold))
+                            .foregroundColor(.white)
+                        Image(uiImage: frame)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: size * 0.84, height: size * 0.84)
+                            .clipped()
+                    } else if let gift = packageGiftImage(package) {
+                        // Gift: centered, 70% of container
+                        Image(uiImage: gift)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: size * 0.7, height: size * 0.7)
+                            .clipped()
+                            .shadow(color: Color(hex: package.accentColor).opacity(0.4), radius: size * 0.08)
+                    } else if let artwork = packageArtwork(package) {
+                        // Artwork: fill entire container
+                        Image(uiImage: artwork)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: geo.size.width, height: geo.size.height)
+                            .clipped()
+                    } else {
+                        // Fallback icon
+                        Image(systemName: packageIconName(for: package.id, category: package.category))
+                            .font(.system(size: size * 0.28, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                }
+                .frame(width: geo.size.width, height: geo.size.height)
+            }
+        }
+    }
+
     private func storePackageCard(_ pkg: StorePackageItem) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             // 1:1 Square Artwork Container (Parity with Android 1x1 store without cropping)
@@ -421,40 +475,8 @@ struct StoreView: View {
                         )
                     )
 
-                // Render 1:1 artwork
-                Group {
-                    if let frame = packageFrameImage(pkg) {
-                        ZStack {
-                            Circle()
-                                .fill(Color(hex: "#23183D"))
-                                .frame(width: 68, height: 68)
-                                .shadow(color: Color(hex: pkg.accentColor).opacity(0.4), radius: 8)
-                            Text("K")
-                                .font(.system(size: 26, weight: .bold))
-                                .foregroundColor(.white)
-                            Image(uiImage: frame)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 96, height: 96)
-                        }
-                    } else if let gift = packageGiftImage(pkg) {
-                        Image(uiImage: gift)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 84, height: 84)
-                            .shadow(color: Color(hex: pkg.accentColor).opacity(0.4), radius: 8)
-                    } else if let artwork = packageArtwork(pkg) {
-                        Image(uiImage: artwork)
-                            .resizable()
-                            .scaledToFit()
-                            .padding(8)
-                    } else {
-                        Image(systemName: packageIconName(for: pkg.id, category: pkg.category))
-                            .font(.system(size: 32, weight: .bold))
-                            .foregroundColor(.white)
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // Render 1:1 artwork - fill the container properly
+                PackageArtworkView(package: pkg)
 
                 // Top badges
                 HStack {
