@@ -73,10 +73,10 @@ jobs:
           cd build
           zip -qry "../dist/Kinnect-1.2.12-ios.ipa" Payload
           cd ../dist
-          cp "Kinnect-1.2.12-ios.ipa" "Kinnect-1.2.12-b123-ios.ipa"
+          cp "Kinnect-1.2.12-ios.ipa" "Kinnect-1.2.12-b124-ios.ipa"
           cp "Kinnect-1.2.12-ios.ipa" "Kinnect-1.2.12-sideload.ipa"
           shasum -a 256 "Kinnect-1.2.12-ios.ipa" > "Kinnect-1.2.12-ios.ipa.sha256"
-          shasum -a 256 "Kinnect-1.2.12-b123-ios.ipa" > "Kinnect-1.2.12-b123-ios.ipa.sha256"
+          shasum -a 256 "Kinnect-1.2.12-b124-ios.ipa" > "Kinnect-1.2.12-b124-ios.ipa.sha256"
           shasum -a 256 "Kinnect-1.2.12-sideload.ipa" > "Kinnect-1.2.12-sideload.ipa.sha256"
           ls -lh Kinnect-1.2.12*.ipa
           python3 -c 'import json,os,plistlib; p=plistlib.load(open("../build/Payload/Kinnect.app/Info.plist","rb")); json.dump({"commit":os.environ["GITHUB_SHA"],"runId":os.environ["GITHUB_RUN_ID"],"version":p["CFBundleShortVersionString"],"build":p["CFBundleVersion"]},open("build-info.json","w"),indent=2)'
@@ -87,7 +87,7 @@ jobs:
           name: Kinnect-1.2.12-ios-ipa
           path: |
             dist/Kinnect-1.2.12-ios.ipa
-            dist/Kinnect-1.2.12-b123-ios.ipa
+            dist/Kinnect-1.2.12-b124-ios.ipa
             dist/Kinnect-1.2.12-sideload.ipa
             dist/*.sha256
             dist/build-info.json

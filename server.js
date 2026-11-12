@@ -178,10 +178,6 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     }
     // Thư viện nhạc dùng chung cho Studio. Chỉ đặt vào MUSIC_DIR những bản nhạc được phép sử dụng.
     if (path === "/api/music" || path.startsWith("/music/")) {
-      if (!social.authenticate(req)) {
-        res.writeHead(401, { "Content-Type": "application/json; charset=utf-8" });
-        return res.end(JSON.stringify({ error: "Vui lòng đăng nhập." }));
-      }
       const dir = resolve(process.env.MUSIC_DIR || "music");
       const me = social.authenticate(req);
       const creditsFile = resolve(dir, "credits.json");
@@ -215,6 +211,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
       }
       // Quản trị viên tải nhạc lên / xoá nhạc khỏi thư viện chung
       if (path === "/api/music" && (req.method === "POST" || req.method === "DELETE")) {
+        if (!me) return sendJson(401, { error: "Vui lòng đăng nhập." });
         if (me.role !== "admin") return sendJson(403, { error: "Chỉ quản trị viên được quản lý thư viện nhạc." });
         if (req.headers.origin) {
           try {

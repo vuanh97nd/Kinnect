@@ -514,11 +514,13 @@ struct StoreView: View {
                     .font(.subheadline.bold())
                     .foregroundColor(.white)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
 
                 Text(pkg.subtitle)
                     .font(.caption2)
                     .foregroundColor(KinnectTheme.textSecondary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
 
                 HStack(spacing: 3) {
                     KinnectIcon(glyph: .coin, size: 12, selected: true, tint: KinnectTheme.warning)

@@ -923,7 +923,7 @@ test("music library: members list tracks, only admins upload or delete, rights c
         headers: { Cookie: cookie, ...(body ? { "Content-Type": "application/json" } : {}) },
         body: body ? JSON.stringify(body) : undefined,
       });
-    assert.equal((await fetch(app.url + "/api/music")).status, 401);
+    assert.equal((await fetch(app.url + "/api/music")).status, 200);
     const track = { data: mp3, title: "Bai thu", artist: "Ban", license: "CC0", rights: true };
     assert.equal((await call(member.cookie, "POST", track)).status, 403);
     assert.equal((await call(admin.cookie, "POST", { ...track, rights: false })).status, 400);
