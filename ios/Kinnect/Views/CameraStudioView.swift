@@ -1550,6 +1550,10 @@ struct StudioMusicPickerSheet: View {
     @State private var showAudioFilePicker = false
     @State private var previewPlayer: AVPlayer?
     @State private var playingID: String?
+    @State private var query: String = ""
+    @State private var loading: Bool = false
+    @State private var busy: Bool = false
+    @State private var errorText: String = ""
     struct MusicTrack: Identifiable, Hashable {
         let id: String
         let title: String
