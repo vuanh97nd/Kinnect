@@ -1,4 +1,4 @@
-﻿import SwiftUI
+import SwiftUI
 import UIKit
 
 /// Dedicated Account Menu screen matching Android 1.2.12 MainActivity.meMenu() (lines 742-790)
@@ -463,7 +463,7 @@ private struct SecuritySettingsView: View {
     }
 }
 
-﻿private struct ChangePasswordSheetView: View {
+private struct ChangePasswordSheetView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var oldPassword = ""
     @State private var newPassword = ""
