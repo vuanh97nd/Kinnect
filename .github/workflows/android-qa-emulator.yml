@@ -13,6 +13,8 @@ jobs:
   android-emulator-capture:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      KINNECT_TOOLS: /tmp/kinnect-android-tools
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
