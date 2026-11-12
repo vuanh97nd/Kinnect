@@ -98,7 +98,7 @@ def main():
     
     # Detailed mapping to exercise specific nested sub-screens
     DEST_MAP = {
-        "SCR-01": ("MainActivity", "intro", "intro"),
+        "SCR-01": ("MainActivity", "splash", "intro"),
         "SCR-02": ("MainActivity", "welcome", "welcome"),
         "SCR-03": ("MainActivity", "auth_login", "auth_login"),
         "SCR-04": ("MainActivity", "auth_register", "auth_register"),

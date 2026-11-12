@@ -95,17 +95,17 @@ public class MainActivity extends Activity {
     String destination=intent.getStringExtra("commerce_destination");
     if(destination!=null){
       intent.removeExtra("commerce_destination");
-      if(destination.equals("intro")){intro();return;}
-      if(destination.equals("welcome")){auth(false);return;}
+      if(destination.equals("splash")){splash();return;}
+      if(destination.equals("intro")||destination.equals("welcome")){intro();return;}
       if(destination.equals("login")||destination.equals("auth_login")){auth(false);return;}
       if(destination.equals("register")||destination.equals("auth_register")){auth(true);return;}
       if(destination.equals("forgot")||destination.equals("auth_forgot")){forgot();return;}
       if(me!=null){
         if(destination.equals("feed")||destination.equals("feed_home")||destination.equals("feed_dark")||destination.equals("feed_font13")||destination.equals("feed_narrow")){
-          feed();
+          navigate("feed");
         }
         else if(destination.equals("feed_story")){
-          feed();
+          navigate("feed");
           try{
             JSONArray arr=new JSONArray("[{\"id\":\"st_1\",\"mediaUrl\":\"/story.jpg\",\"user\":{\"id\":\"usr_story\",\"name\":\"Linh Nhi\",\"username\":\"linhnhi\"}}]");
             story(arr,0);
@@ -115,36 +115,36 @@ public class MainActivity extends Activity {
           postDetail("post_1",null);
         }
         else if(destination.equals("feed_comments")||destination.equals("comments_narrow")){
-          comments("/api/posts/post_1/comments",()->{},this::feed,"Bảng tin");
+          comments("/api/posts/post_1/comments",()->{},()->navigate("feed"),"Bảng tin");
         }
         else if(destination.equals("feed_reactions")){
           postDetail("post_1",null);
           reactorsSheet("post_1");
         }
         else if(destination.equals("discover")||destination.equals("discover_search")){
-          discover();
+          navigate("discover");
         }
         else if(destination.equals("discover_results")){
-          discover();
+          navigate("discover");
           nearQuery="cà phê";
           renderPeopleSearch();
         }
         else if(destination.equals("discover_empty")){
-          discover();
+          navigate("discover");
           nearQuery="___khong_tim_thay___";
           renderPeopleSearch();
         }
         else if(destination.equals("shorts")||destination.equals("shorts_player")){
-          shorts();
+          navigate("shorts");
         }
         else if(destination.equals("shorts_comments")){
-          shorts();
+          navigate("shorts");
           try{
             shortComments(new JSONObject("{\"id\":\"s1\",\"title\":\"Khoảnh khắc cuộc sống\",\"author\":{\"id\":\"usr_qa_review\",\"name\":\"Minh Anh\"},\"comments\":12}"));
           }catch(Exception ignored){}
         }
         else if(destination.equals("inbox")||destination.equals("inbox_list")){
-          inbox();
+          navigate("inbox");
         }
         else if(destination.equals("chat_direct")){
           try{chat(new JSONObject("{\"id\":\"usr_chat_mock\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\",\"isActive\":true}"));}catch(Exception ignored){}
@@ -166,7 +166,7 @@ public class MainActivity extends Activity {
           friendsScreen("requests");
         }
         else if(destination.equals("profile")||destination.equals("profile_main")){
-          profile();
+          navigate("profile");
         }
         else if(destination.equals("profile_edit")){
           editProfile();
@@ -175,6 +175,7 @@ public class MainActivity extends Activity {
           privateAlbum(me);
         }
         else if(destination.equals("account")||destination.equals("account_menu")||destination.equals("account_dark")||destination.equals("account_font13")){
+          headerActive = "";
           meMenu();
         }
         else if(destination.equals("appearance_settings")){
@@ -291,6 +292,7 @@ public class MainActivity extends Activity {
       try {
         me = new JSONObject("{\"id\":\"usr_qa_review\",\"username\":\"minhanh\",\"name\":\"Minh Anh\",\"role\":\"user\",\"coins\":1200,\"bio\":\"Kinnect QA Review\",\"followersCount\":128,\"followingCount\":64}");
         onUserSignedIn(me);
+        navigate("feed");
         handleExtras(getIntent());
         return;
       } catch (Exception ignored) {}
