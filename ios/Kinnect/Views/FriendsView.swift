@@ -31,6 +31,17 @@ struct FriendsView: View {
         return friends.filter { $0.name.lowercased().contains(q) || $0.handle.lowercased().contains(q) }
     }
 
+    // Suggestions filtered by search, max 6 - matches Android discover integration
+    private var filteredSuggestions: [KinnectUser] {
+        let clean = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        var filtered = suggestions
+        if !clean.isEmpty {
+            let q = clean.hasPrefix("@") ? String(clean.dropFirst()) : clean
+            filtered = filtered.filter { $0.name.lowercased().contains(q) || $0.handle.lowercased().contains(q) }
+        }
+        return Array(filtered.prefix(6))
+    }
+
     var body: some View {
         VStack(spacing: 10) {
             Picker("Bạn bè", selection: $tab) {
@@ -65,7 +76,7 @@ struct FriendsView: View {
                 LazyVStack(spacing: 14) {
                     switch tab {
                     case .friends:
-                        if filteredFriends.isEmpty && !isLoading {
+                        if filteredFriends.isEmpty && !isLoading && filteredSuggestions.isEmpty {
                             emptyPlaceholder(searchQuery.isEmpty ? "Chưa có bạn bè nào trong danh sách" : "Không tìm thấy bạn bè phù hợp")
                         } else {
                             let online = filteredFriends.filter { ($0.isActive && $0.showActivity) || appState.onlineUserIds.contains($0.id) }
@@ -96,19 +107,20 @@ struct FriendsView: View {
                                 }
                                 .background(groupedCardBackground)
                             }
-                        }
 
-                        if !suggestions.isEmpty {
-                            sectionHeader("Gợi ý kết bạn", count: suggestions.count, color: KinnectTheme.accentBright)
-                            VStack(spacing: 0) {
-                                ForEach(suggestions) { user in
-                                    suggestionRow(user: user)
-                                    if user.id != suggestions.last?.id {
-                                        Divider().background(KinnectTheme.borderSoft).padding(.leading, 64)
+                            // Suggestions integrated at bottom of friends tab (max 6, search-filtered) - matches Android
+                            if !filteredSuggestions.isEmpty {
+                                sectionHeader("Gợi ý kết bạn", count: filteredSuggestions.count, color: KinnectTheme.accentBright)
+                                VStack(spacing: 0) {
+                                    ForEach(filteredSuggestions) { user in
+                                        friendRow(user: user)
+                                        if user.id != filteredSuggestions.last?.id {
+                                            Divider().background(KinnectTheme.borderSoft).padding(.leading, 64)
+                                        }
                                     }
                                 }
+                                .background(groupedCardBackground)
                             }
-                            .background(groupedCardBackground)
                         }
 
                     case .requests:
@@ -205,6 +217,73 @@ struct FriendsView: View {
             .padding(.vertical, 36)
     }
 
+    // MARK: - Friendship Status Chip (matches Android personTile friendship actions)
+    @ViewBuilder
+    private func friendshipStatusChip(for user: KinnectUser) -> some View {
+        let status = user.friendshipStatus.lowercased()
+        let isOnline = (user.isActive && user.showActivity) || appState.onlineUserIds.contains(user.id)
+
+        switch status {
+        case "friends":
+            // Already friends - show "Nhắn tin" primary action
+            Button {
+                activeChatPeer = user
+            } label: {
+                Text("Nhắn tin")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(Capsule().fill(KinnectTheme.primaryGradient))
+            }
+            .accessibilityLabel("Nhắn tin với \(user.name)")
+
+        case "incoming":
+            // Incoming friend request - show "Chấp nhận" / "Từ chối"
+            HStack(spacing: 6) {
+                Button("Chấp nhận") {
+                    Task { await respondRequest(user: user, action: "accept") }
+                }
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(Capsule().fill(KinnectTheme.primaryGradient))
+                .foregroundColor(.white)
+
+                Button("Từ chối") {
+                    Task { await respondRequest(user: user, action: "reject") }
+                }
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                .foregroundColor(KinnectTheme.textSecondary)
+            }
+
+        case "outgoing":
+            // Outgoing friend request - show "Huỷ lời mời"
+            Button("Huỷ lời mời") {
+                Task { await cancelRequest(user) }
+            }
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(Capsule().fill(KinnectTheme.surfaceElevated))
+            .foregroundColor(KinnectTheme.danger)
+
+        default:
+            // Not friends - show "Kết bạn"
+            Button("Kết bạn") {
+                Task { await sendRequest(user) }
+            }
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(Capsule().fill(KinnectTheme.primaryGradient))
+            .foregroundColor(.white)
+        }
+    }
+
     private func friendRow(user: KinnectUser) -> some View {
         HStack(spacing: 10) {
             Button {
@@ -237,6 +316,9 @@ struct FriendsView: View {
             .layoutPriority(1)
 
             Spacer(minLength: 6)
+
+            // Friendship status chip - matches Android personTile friendship actions
+            friendshipStatusChip(for: user)
 
             HStack(spacing: 4) {
                 Button {
@@ -363,42 +445,6 @@ struct FriendsView: View {
             .padding(.vertical, 7)
             .background(Capsule().fill(KinnectTheme.surfaceElevated))
             .foregroundColor(KinnectTheme.danger)
-        }
-        .kinnectCard()
-    }
-
-    private func suggestionRow(user: KinnectUser) -> some View {
-        HStack(spacing: 12) {
-            Button {
-                selectedProfileUser = user
-            } label: {
-                HStack(spacing: 10) {
-                    KinnectAvatarView(name: user.name, avatarURL: user.avatarUrl, colorHex: user.avatarColor, size: 46)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(user.name)
-                            .font(.subheadline.bold())
-                            .foregroundColor(KinnectTheme.textPrimary)
-                            .kinnectMultiline()
-                        if !user.bio.isEmpty {
-                            Text(user.bio)
-                                .font(.caption)
-                                .foregroundColor(KinnectTheme.textSecondary)
-                                .kinnectMultiline()
-                        }
-                    }
-                }
-            }
-            .buttonStyle(.plain)
-
-            Spacer()
-            Button("Kết bạn") {
-                Task { await sendRequest(user) }
-            }
-            .font(.caption.bold())
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(Capsule().fill(KinnectTheme.primaryGradient))
-            .foregroundColor(.white)
         }
         .kinnectCard()
     }
