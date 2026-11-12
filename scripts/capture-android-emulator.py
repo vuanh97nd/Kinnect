@@ -196,7 +196,7 @@ def main():
         time.sleep(0.3)
         
         # Launch target screen with fixture enabled
-        is_fixture = "true" if scr_id not in ("SCR-01", "SCR-02") else "false"
+        is_fixture = "false" if scr_id in ("SCR-01", "SCR-02", "SCR-03", "SCR-04", "SCR-05") else "true"
         adb("shell", "am", "start", "-n", f"app.kinnect.live/.{act_name}",
             "--ez", "ui_review_fixture", is_fixture,
             "-e", "commerce_destination", dest,

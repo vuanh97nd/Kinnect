@@ -71,7 +71,12 @@ public class MainActivity extends Activity {
     resumeVideos.clear();
   }
   private NativeCalls calls;
-  private void onUserSignedIn(JSONObject user){me=user;KinnectService.start(this);ensureCalls();}
+  private void onUserSignedIn(JSONObject user){
+    me=user;
+    if(NativeApi.isFixtureEnabled())return;
+    KinnectService.start(this);
+    ensureCalls();
+  }
   private void ensureCalls(){if(me!=null&&!mediaCallListening){mediaCallListening=true;KinnectService.listen(mediaCallEvents);}if(KinnectService.pendingIncoming!=null){mediaCallGate.update("call-incoming",KinnectService.pendingIncoming.optString("callId"));mediaCallBlocked=mediaCallGate.blocked();pauseForCall();}if(me!=null&&calls==null){calls=new NativeCalls(this,server());setupBackground();}}
   // Một lần: xin đủ quyền thông báo/cuộc gọi, cho phép toàn màn hình và chạy nền.
   private void setupBackground(){if(Distribution.PLAY){if(Build.VERSION.SDK_INT>=33&&checkSelfPermission("android.permission.POST_NOTIFICATIONS")!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"},950);return;}android.content.SharedPreferences p=getSharedPreferences("native_setup",0);if(p.getBoolean("asked_v1",false)){backgroundExtras(false);return;}p.edit().putBoolean("asked_v1",true).apply();java.util.ArrayList<String> want=new java.util.ArrayList<>();if(Build.VERSION.SDK_INT>=33)want.add("android.permission.POST_NOTIFICATIONS");want.add(Manifest.permission.RECORD_AUDIO);want.add(Manifest.permission.CAMERA);if(Build.VERSION.SDK_INT>=31)want.add("android.permission.BLUETOOTH_CONNECT");java.util.ArrayList<String> missing=new java.util.ArrayList<>();for(String w:want)if(checkSelfPermission(w)!=PackageManager.PERMISSION_GRANTED)missing.add(w);if(missing.isEmpty())backgroundExtras(true);else requestPermissions(missing.toArray(new String[0]),950);}
@@ -125,14 +130,12 @@ public class MainActivity extends Activity {
           navigate("discover");
         }
         else if(destination.equals("discover_results")){
-          navigate("discover");
           nearQuery="cà phê";
-          renderPeopleSearch();
+          navigate("discover");
         }
         else if(destination.equals("discover_empty")){
-          navigate("discover");
           nearQuery="___khong_tim_thay___";
-          renderPeopleSearch();
+          navigate("discover");
         }
         else if(destination.equals("shorts")||destination.equals("shorts_player")){
           navigate("shorts");
@@ -160,10 +163,12 @@ public class MainActivity extends Activity {
           }catch(Exception ignored){}
         }
         else if(destination.equals("friends")||destination.equals("friends_list")){
+          headerActive = "";
           friendsScreen("friends");
         }
         else if(destination.equals("friend_requests")||destination.equals("friends_requests")){
-          friendsScreen("requests");
+          headerActive = "";
+          friendsScreen("incoming");
         }
         else if(destination.equals("profile")||destination.equals("profile_main")){
           navigate("profile");
@@ -1677,8 +1682,10 @@ public class MainActivity extends Activity {
     subBack = null;
     currentPage = () -> navigate(next);
     currentKey = "tab:" + next;
-    ensureCalls();
-    activity();
+    if(!NativeApi.isFixtureEnabled()){
+      ensureCalls();
+      activity();
+    }
     tab = next;
     shell(
       next.equals("inbox")
