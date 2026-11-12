@@ -21,6 +21,40 @@ final class KeychainStore {
     private init() {
         let remembered = UserDefaults.standard.object(forKey: "kinnect_session_remembered") as? Bool ?? true
         self.isPersistent = remembered
+        syncToHTTPCookieStorage(origin: ServerConfig.defaultOrigin)
+    }
+
+    func syncToHTTPCookieStorage(origin: String = ServerConfig.defaultOrigin) {
+        guard let url = URL(string: origin) else { return }
+        let host = url.host ?? ""
+        let sessionVal = loadSessionCookie(for: origin)
+        let token = sessionVal.contains("=") ? sessionVal.components(separatedBy: "=").dropFirst().joined(separator: "=") : sessionVal
+        if !token.isEmpty {
+            let props: [HTTPCookiePropertyKey: Any] = [
+                .name: "kinnect_session",
+                .value: token,
+                .domain: host,
+                .path: "/",
+                .secure: url.scheme == "https"
+            ]
+            if let c = HTTPCookie(properties: props) {
+                HTTPCookieStorage.shared.setCookie(c)
+            }
+        }
+        let deviceVal = loadDeviceCookie(for: origin)
+        let deviceToken = deviceVal.contains("=") ? deviceVal.components(separatedBy: "=").dropFirst().joined(separator: "=") : deviceVal
+        if !deviceToken.isEmpty {
+            let props: [HTTPCookiePropertyKey: Any] = [
+                .name: "kinnect_device",
+                .value: deviceToken,
+                .domain: host,
+                .path: "/",
+                .secure: url.scheme == "https"
+            ]
+            if let c = HTTPCookie(properties: props) {
+                HTTPCookieStorage.shared.setCookie(c)
+            }
+        }
     }
 
     func setRememberMe(_ remember: Bool, for origin: String = ServerConfig.defaultOrigin) {
@@ -70,6 +104,7 @@ final class KeychainStore {
             deleteItemLocked(account: "session:\(key)")
         }
         lock.unlock()
+        syncToHTTPCookieStorage(origin: origin)
     }
 
     func loadSessionCookie(for origin: String = ServerConfig.defaultOrigin) -> String {
@@ -103,6 +138,7 @@ final class KeychainStore {
             deleteItemLocked(account: "device:\(key)")
         }
         lock.unlock()
+        syncToHTTPCookieStorage(origin: origin)
     }
 
     func loadDeviceCookie(for origin: String = ServerConfig.defaultOrigin) -> String {
@@ -195,6 +231,12 @@ final class KeychainStore {
         deleteItemLocked(account: "session:\(key)")
         deleteItemLocked(account: "uid:\(key)")
         lock.unlock()
+
+        if let url = URL(string: origin), let cookies = HTTPCookieStorage.shared.cookies(for: url) {
+            for c in cookies where c.name == "kinnect_session" || c.name == "kinnect_device" {
+                HTTPCookieStorage.shared.deleteCookie(c)
+            }
+        }
     }
 
     func clearAll() {

@@ -15,7 +15,7 @@ public final class KinnectService extends Service implements NativeSocket.Events
  private static KinnectService instance;private static final List<NativeSocket.Events> listeners=new java.util.concurrent.CopyOnWriteArrayList<>();
  static JSONObject pendingIncoming;static boolean pendingAccept;static volatile boolean appVisible;
  private NativeSocket socket;private boolean ready;private final Handler main=new Handler(Looper.getMainLooper());private long retry=1000;private android.net.ConnectivityManager.NetworkCallback networkCallback;
- static void start(Context c){try{Intent i=new Intent(c,KinnectService.class);if(Build.VERSION.SDK_INT>=26&&(!Distribution.PLAY||c.getSharedPreferences("play_privacy",0).getBoolean("background_messages",false)))c.startForegroundService(i);else c.startService(i);}catch(RuntimeException blocked){}}
+ static void start(Context c){try{Intent i=new Intent(c,KinnectService.class);if(Build.VERSION.SDK_INT>=26&&(!Distribution.PLAY||c.getSharedPreferences("play_privacy",0).getBoolean("background_messages",true)))c.startForegroundService(i);else c.startService(i);}catch(RuntimeException blocked){}}
  static void stop(Context c){if(NativeApi.shared.cookieFor(NativeApi.shared.origin()).isEmpty())NativeCallEnds.clear();c.stopService(new Intent(c,KinnectService.class));}
  static void listen(NativeSocket.Events e){if(!listeners.contains(e))listeners.add(e);if(instance!=null&&instance.ready)e.event(NativeSocket.json("type","welcome"));}
  static void unlisten(NativeSocket.Events e){listeners.remove(e);}
@@ -34,7 +34,7 @@ public final class KinnectService extends Service implements NativeSocket.Events
   Notification n=backgroundBuilder.build();
   try{if(Build.VERSION.SDK_INT>=34)startForeground(ID_BG,n,android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING);else startForeground(ID_BG,n);}catch(RuntimeException blocked){if(!Distribution.PLAY){stopSelf();return START_NOT_STICKY;}}
   try{if(Build.VERSION.SDK_INT>=24)stopForeground(STOP_FOREGROUND_REMOVE);else stopForeground(true);NotificationManager nm=getSystemService(NotificationManager.class);if(nm!=null)nm.cancel(ID_BG);}catch(RuntimeException ignored){}
-  if(Distribution.PLAY&&!getSharedPreferences("play_privacy",0).getBoolean("background_messages",false)){try{stopForeground(true);}catch(RuntimeException ignored){}if(socket==null)connect();return START_NOT_STICKY;}
+  if(Distribution.PLAY&&!getSharedPreferences("play_privacy",0).getBoolean("background_messages",true)){try{stopForeground(true);}catch(RuntimeException ignored){}if(socket==null)connect();return START_NOT_STICKY;}
   if(NativeApi.shared.cookieFor(NativeApi.shared.origin()).isEmpty()){stopSelf();return START_NOT_STICKY;}
   if(socket==null)connect();return START_STICKY;}
  private void connect(){socket=new NativeSocket(NativeApi.shared.origin(),this);}

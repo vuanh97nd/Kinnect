@@ -20,8 +20,11 @@ struct FriendsView: View {
     @State private var selectedProfileUser: KinnectUser? = nil
     @State private var activeChatPeer: KinnectUser? = nil
 
-    init(initialTab: FriendTab = .friends) {
+    var onBack: (() -> Void)? = nil
+
+    init(initialTab: FriendTab = .friends, onBack: (() -> Void)? = nil) {
         _tab = State(initialValue: initialTab)
+        self.onBack = onBack
     }
 
     private var filteredFriends: [KinnectUser] {
@@ -47,7 +50,7 @@ struct FriendsView: View {
             // Pinned Header Bar (matching Android accountHeader pattern)
             PinnedHeaderBar(
                 title: "Bạn bè",
-                onBack: { dismiss() },
+                onBack: onBack ?? { dismiss() },
                 trailingActions: []
             )
 

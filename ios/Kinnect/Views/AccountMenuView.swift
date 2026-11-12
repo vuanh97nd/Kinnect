@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 
 /// Dedicated Account Menu screen matching Android 1.2.12 MainActivity.meMenu() (lines 742-790)
-/// Features user profile header card, games, wallet, privacy, security, notifications, theme, support, password, logout.
+/// Features user profile header card, store, wallet, friends, privacy, security, theme, support, password, logout.
 struct AccountMenuView: View {
     @ObservedObject private var appState = AppState.shared
     @Environment(\.dismiss) private var dismiss
@@ -11,70 +11,78 @@ struct AccountMenuView: View {
     var onOpenStore: (() -> Void)? = nil
     var onOpenWallet: () -> Void
     var onOpenFriends: () -> Void
+    var onBack: (() -> Void)? = nil
 
-    @State private var showPrivacySheet = false
-    @State private var showSecuritySheet = false
-    @State private var showPasswordSheet = false
-    @State private var showSupportSheet = false
-    @State private var showAboutSheet = false
+    enum AccountSubScreen: Hashable {
+        case privacy
+        case security
+        case password
+        case appearance
+        case support
+        case about
+    }
+
+    @State private var activeSubScreen: AccountSubScreen? = nil
     @State private var showLogoutConfirm = false
-    @State private var showAppearanceSheet = false
 
     var body: some View {
         VStack(spacing: 0) {
-            // Pinned Header Bar (matching Android accountHeader pattern)
-            PinnedHeaderBar(
-                title: "TÃ i khoáº£n",
-                onBack: { dismiss() },
-                trailingActions: []
-            )
-
-            ScrollView {
-                VStack(spacing: 16) {
-                    headerProfileCard
-                    mainMenuGroup
-                    socialGroup
-                    securityGroup
-                    supportGroup
-                    accountActionsGroup
-                    footerLabel
+            if let sub = activeSubScreen {
+                switch sub {
+                case .privacy:
+                    PrivacySettingsView(onBack: { withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = nil } })
+                case .security:
+                    SecuritySettingsView(onBack: { withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = nil } })
+                case .password:
+                    ChangePasswordSheetView(onBack: { withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = nil } })
+                case .appearance:
+                    AppearanceSettingsSheetView(onBack: { withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = nil } })
+                case .support:
+                    HelpSupportSheetView(onBack: { withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = nil } })
+                case .about:
+                    AboutKinnectSheetView(onBack: { withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = nil } })
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
-                .padding(.bottom, 24)
+            } else {
+                // Pinned Header Bar (matching Android accountHeader pattern)
+                PinnedHeaderBar(
+                    title: "Tài khoản",
+                    onBack: onBack ?? { dismiss() },
+                    trailingActions: []
+                )
+
+                ScrollView {
+                    VStack(spacing: 16) {
+                        headerProfileCard
+                        mainMenuGroup
+                        socialGroup
+                        securityGroup
+                        supportGroup
+                        accountActionsGroup
+                        footerLabel
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    .padding(.bottom, 24)
+                }
+                .background(KinnectTheme.background.ignoresSafeArea())
             }
-            .background(KinnectTheme.background.ignoresSafeArea())
         }
         .background(KinnectTheme.background.ignoresSafeArea())
         .navigationBarHidden(true)
-        .confirmationDialog("ÄÄƒng xuáº¥t khá»i Kinnect?", isPresented: $showLogoutConfirm, titleVisibility: .visible) {
-            Button("ÄÄƒng xuáº¥t", role: .destructive) {
-                dismiss()
+        .confirmationDialog("Đăng xuất khỏi Kinnect?", isPresented: $showLogoutConfirm, titleVisibility: .visible) {
+            Button("Đăng xuất", role: .destructive) {
+                if let onBack = onBack {
+                    onBack()
+                } else {
+                    dismiss()
+                }
                 Task {
                     await appState.logout()
                 }
             }
-            Button("Há»§y", role: .cancel) { }
+            Button("Hủy", role: .cancel) { }
         } message: {
-            Text("Báº¡n cÃ³ thá»ƒ Ä‘Äƒng nháº­p láº¡i báº¥t ká»³ lÃºc nÃ o.")
-        }
-        .sheet(isPresented: $showPrivacySheet) {
-            PrivacySettingsView()
-        }
-        .sheet(isPresented: $showSecuritySheet) {
-            SecuritySettingsView()
-        }
-        .sheet(isPresented: $showPasswordSheet) {
-            ChangePasswordSheetView()
-        }
-        .sheet(isPresented: $showAppearanceSheet) {
-            AppearanceSettingsSheetView()
-        }
-        .sheet(isPresented: $showSupportSheet) {
-            HelpSupportSheetView()
-        }
-        .sheet(isPresented: $showAboutSheet) {
-            AboutKinnectSheetView()
+            Text("Bạn có thể đăng nhập lại bất kỳ lúc nào.")
         }
     }
 
@@ -103,7 +111,7 @@ struct AccountMenuView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(appState.currentUser?.name ?? "NgÆ°á»i dÃ¹ng Kinnect")
+                    Text(appState.currentUser?.name ?? "Người dùng Kinnect")
                         .font(.title3.weight(.bold))
                         .foregroundColor(KinnectTheme.textPrimary)
 
@@ -129,19 +137,17 @@ struct AccountMenuView: View {
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Trang cÃ¡ nhÃ¢n")
+        .accessibilityLabel("Trang cá nhân")
     }
 
     private var mainMenuGroup: some View {
         VStack(spacing: 0) {
-            menuRow(systemName: "bag.fill", gradient: [Color(hex: "#8E2DE2"), Color(hex: "#4A00E0")], title: "Cá»­a hÃ ng Kinnect") {
-                dismiss()
+            menuRow(systemName: "bag.fill", gradient: [Color(hex: "#8E2DE2"), Color(hex: "#4A00E0")], title: "Cửa hàng Kinnect") {
                 onOpenStore?()
             }
             menuDivider
 
-            menuRow(systemName: "creditcard.fill", gradient: [Color(hex: "#F59E0B"), Color(hex: "#D97706")], title: "VÃ­ Kinnect") {
-                dismiss()
+            menuRow(systemName: "creditcard.fill", gradient: [Color(hex: "#F59E0B"), Color(hex: "#D97706")], title: "Ví Kinnect") {
                 onOpenWallet()
             }
         }
@@ -150,21 +156,22 @@ struct AccountMenuView: View {
 
     private var socialGroup: some View {
         VStack(spacing: 0) {
-            menuRow(systemName: "person.2.fill", gradient: [Color(hex: "#3B82F6"), Color(hex: "#1D4ED8")], title: "Báº¡n bÃ¨") {
-                dismiss()
+            menuRow(systemName: "person.2.fill", gradient: [Color(hex: "#3B82F6"), Color(hex: "#1D4ED8")], title: "Bạn bè") {
                 onOpenFriends()
             }
             menuDivider
 
-            menuRow(systemName: "bell.badge.fill", gradient: [Color(hex: "#EF4444"), Color(hex: "#DC2626")], title: "CÃ i Ä‘áº·t thÃ´ng bÃ¡o") {
+            menuRow(systemName: "bell.badge.fill", gradient: [Color(hex: "#EF4444"), Color(hex: "#DC2626")], title: "Cài đặt thông báo") {
                 if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
                     UIApplication.shared.open(url)
                 }
             }
             menuDivider
 
-            menuRow(systemName: "circle.lefthalf.filled", gradient: [Color(hex: "#6366F1"), Color(hex: "#4F46E5")], title: "Giao diá»‡n") {
-                showAppearanceSheet = true
+            menuRow(systemName: "circle.lefthalf.filled", gradient: [Color(hex: "#6366F1"), Color(hex: "#4F46E5")], title: "Giao diện") {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    activeSubScreen = .appearance
+                }
             }
         }
         .background(settingsGroupBackground)
@@ -172,18 +179,24 @@ struct AccountMenuView: View {
 
     private var securityGroup: some View {
         VStack(spacing: 0) {
-            menuRow(systemName: "hand.raised.fill", gradient: [Color(hex: "#64748B"), Color(hex: "#475569")], title: "CÃ i Ä‘áº·t vÃ  quyá»n riÃªng tÆ°") {
-                showPrivacySheet = true
+            menuRow(systemName: "hand.raised.fill", gradient: [Color(hex: "#64748B"), Color(hex: "#475569")], title: "Cài đặt & quyền riêng tư") {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    activeSubScreen = .privacy
+                }
             }
             menuDivider
 
-            menuRow(systemName: "lock.shield.fill", gradient: [Color(hex: "#0EA5E9"), Color(hex: "#0284C7")], title: "Báº£o máº­t vÃ  Ä‘Äƒng nháº­p") {
-                showSecuritySheet = true
+            menuRow(systemName: "lock.shield.fill", gradient: [Color(hex: "#0EA5E9"), Color(hex: "#0284C7")], title: "Bảo mật & đăng nhập") {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    activeSubScreen = .security
+                }
             }
             menuDivider
 
-            menuRow(systemName: "key.fill", gradient: [Color(hex: "#10B981"), Color(hex: "#059669")], title: "Äá»•i máº­t kháº©u") {
-                showPasswordSheet = true
+            menuRow(systemName: "key.fill", gradient: [Color(hex: "#10B981"), Color(hex: "#059669")], title: "Đổi mật khẩu") {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    activeSubScreen = .password
+                }
             }
         }
         .background(settingsGroupBackground)
@@ -191,13 +204,17 @@ struct AccountMenuView: View {
 
     private var supportGroup: some View {
         VStack(spacing: 0) {
-            menuRow(systemName: "questionmark.circle.fill", gradient: [Color(hex: "#06B6D4"), Color(hex: "#0891B2")], title: "Trá»£ giÃºp vÃ  há»— trá»£") {
-                showSupportSheet = true
+            menuRow(systemName: "questionmark.circle.fill", gradient: [Color(hex: "#06B6D4"), Color(hex: "#0891B2")], title: "Trợ giúp & hỗ trợ") {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    activeSubScreen = .support
+                }
             }
             menuDivider
 
-            menuRow(systemName: "info.circle.fill", gradient: [Color(hex: "#8B5CF6"), Color(hex: "#7C3AED")], title: "Giá»›i thiá»‡u Kinnect") {
-                showAboutSheet = true
+            menuRow(systemName: "info.circle.fill", gradient: [Color(hex: "#8B5CF6"), Color(hex: "#7C3AED")], title: "Giới thiệu Kinnect") {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    activeSubScreen = .about
+                }
             }
         }
         .background(settingsGroupBackground)
@@ -208,7 +225,7 @@ struct AccountMenuView: View {
             menuRow(
                 systemName: "rectangle.portrait.and.arrow.right.fill",
                 gradient: [Color(hex: "#F43F5E"), Color(hex: "#E11D48")],
-                title: "ÄÄƒng xuáº¥t",
+                title: "Đăng xuất",
                 isDestructive: true
             ) {
                 showLogoutConfirm = true
@@ -234,7 +251,7 @@ struct AccountMenuView: View {
     }
 
     private var footerLabel: some View {
-        Text("Kinnect Â· Káº¿t ná»‘i Ä‘Ãºng gu Â· Sá»‘ng Ä‘Ãºng mÃ¬nh")
+        Text("Kinnect · Kết nối đúng gu · Sống đúng mình")
             .font(.footnote)
             .foregroundColor(KinnectTheme.textSecondary)
             .padding(.top, 4)
@@ -285,11 +302,13 @@ struct AccountMenuView: View {
     }
 }
 
-// MARK: - Sub-sheets
+// MARK: - Sub-screens with Pinned Header Bar (1:1 Android Parity)
 
 private struct PrivacySettingsView: View {
     @ObservedObject private var appState = AppState.shared
-    @Environment(\ .dismiss) private var dismiss
+    @Environment(\.dismiss) private var dismiss
+    var onBack: (() -> Void)? = nil
+
     @State private var discoverable: Bool = true
     @State private var showDistance: Bool = true
     @State private var showActivity: Bool = true
@@ -299,13 +318,13 @@ private struct PrivacySettingsView: View {
     var body: some View {
         VStack(spacing: 0) {
             PinnedHeaderBar(
-                title: "CÃ i Ä‘áº·t & riÃªng tÆ°",
-                onBack: { dismiss() },
+                title: "Cài đặt & riêng tư",
+                onBack: onBack ?? { dismiss() },
                 trailingActions: []
             )
 
             Form {
-                Section("Quyá»n riÃªng tÆ°") {
+                Section("Quyền riêng tư") {
                     Toggle(isOn: Binding(
                         get: { showActivity },
                         set: { val in
@@ -314,9 +333,9 @@ private struct PrivacySettingsView: View {
                         }
                     )) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Tráº¡ng thÃ¡i hoáº¡t Ä‘á»™ng")
+                            Text("Trạng thái hoạt động")
                                 .font(.subheadline.bold())
-                            Text("Cho ngÆ°á»i khÃ¡c biáº¿t khi báº¡n Ä‘ang online")
+                            Text("Cho người khác biết khi bạn đang online")
                                 .font(.caption)
                                 .foregroundColor(KinnectTheme.textSecondary)
                         }
@@ -331,9 +350,9 @@ private struct PrivacySettingsView: View {
                         }
                     )) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Cho phÃ©p tÃ¬m tháº¥y tÃ´i")
+                            Text("Cho phép tìm thấy tôi")
                                 .font(.subheadline.bold())
-                            Text("Xuáº¥t hiá»‡n trong KhÃ¡m phÃ¡ vÃ  Quanh Ä‘Ã¢y")
+                            Text("Xuất hiện trong Khám phá và Quanh đây")
                                 .font(.caption)
                                 .foregroundColor(KinnectTheme.textSecondary)
                         }
@@ -348,9 +367,9 @@ private struct PrivacySettingsView: View {
                         }
                     )) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Hiá»ƒn thá»‹ khoáº£ng cÃ¡ch")
+                            Text("Hiển thị khoảng cách")
                                 .font(.subheadline.bold())
-                            Text("Chá»‰ hiá»‡n khoáº£ng cÃ¡ch gáº§n Ä‘Ãºng")
+                            Text("Chỉ hiện khoảng cách gần đúng")
                                 .font(.caption)
                                 .foregroundColor(KinnectTheme.textSecondary)
                         }
@@ -358,8 +377,8 @@ private struct PrivacySettingsView: View {
                     .tint(KinnectTheme.accentBright)
                 }
 
-                Section("Tin nháº¯n trá»±c tiáº¿p") {
-                    Toggle("Chá»‰ nháº­n tin nháº¯n tá»« báº¡n bÃ¨", isOn: Binding(
+                Section("Tin nhắn trực tiếp") {
+                    Toggle("Chỉ nhận tin nhắn từ bạn bè", isOn: Binding(
                         get: { dmFriendsOnly },
                         set: { val in
                             dmFriendsOnly = val
@@ -369,13 +388,13 @@ private struct PrivacySettingsView: View {
                     .tint(KinnectTheme.accentBright)
                 }
 
-                Section("Vá»‹ trÃ­ vÃ  quanh Ä‘Ã¢y") {
+                Section("Vị trí và quanh đây") {
                     Button(role: .destructive) {
                         Task { await turnOffLocation() }
                     } label: {
                         HStack {
                             Image(systemName: "location.slash")
-                            Text("Táº¯t tÃ¬m quanh Ä‘Ã¢y")
+                            Text("Tắt tìm quanh đây")
                         }
                     }
                 }
@@ -429,33 +448,35 @@ private struct PrivacySettingsView: View {
             user.hasLocation = false
             appState.currentUser = user
         }
-        appState.showToast("ÄÃ£ táº¯t tÃ¬m quanh Ä‘Ã¢y")
+        appState.showToast("Đã tắt tìm quanh đây")
     }
 }
 
 private struct SecuritySettingsView: View {
-    @Environment(\ .dismiss) private var dismiss
+    @Environment(\.dismiss) private var dismiss
+    var onBack: (() -> Void)? = nil
+
     @State private var twoFactor = false
     @State private var biometrics = true
 
     var body: some View {
         VStack(spacing: 0) {
             PinnedHeaderBar(
-                title: "Báº£o máº­t",
-                onBack: { dismiss() },
+                title: "Bảo mật & đăng nhập",
+                onBack: onBack ?? { dismiss() },
                 trailingActions: []
             )
 
             Form {
-                Section("Báº£o máº­t bá»• sung") {
-                    Toggle("XÃ¡c thá»±c 2 yáº¿u tá»‘ (2FA)", isOn: $twoFactor)
-                    Toggle("Má»Ÿ khÃ³a báº±ng Face ID / Touch ID", isOn: $biometrics)
+                Section("Bảo mật bổ sung") {
+                    Toggle("Xác thực 2 yếu tố (2FA)", isOn: $twoFactor)
+                    Toggle("Mở khóa bằng Face ID / Touch ID", isOn: $biometrics)
                 }
-                Section("PhiÃªn Ä‘Äƒng nháº­p") {
+                Section("Phiên đăng nhập") {
                     HStack {
-                        Text("Thiáº¿t bá»‹ nÃ y")
+                        Text("Thiết bị này")
                         Spacer()
-                        Text("Äang hoáº¡t Ä‘á»™ng").foregroundColor(KinnectTheme.online)
+                        Text("Đang hoạt động").foregroundColor(KinnectTheme.online)
                     }
                 }
             }
@@ -465,6 +486,8 @@ private struct SecuritySettingsView: View {
 
 private struct ChangePasswordSheetView: View {
     @Environment(\.dismiss) private var dismiss
+    var onBack: (() -> Void)? = nil
+
     @State private var oldPassword = ""
     @State private var newPassword = ""
     @State private var confirmPassword = ""
@@ -474,7 +497,7 @@ private struct ChangePasswordSheetView: View {
         VStack(spacing: 0) {
             PinnedHeaderBar(
                 title: "Đổi mật khẩu",
-                onBack: { dismiss() },
+                onBack: onBack ?? { dismiss() },
                 trailingActions: []
             )
 
@@ -500,7 +523,11 @@ private struct ChangePasswordSheetView: View {
                             return
                         }
                         AppState.shared.showToast("Đã đổi mật khẩu thành công")
-                        dismiss()
+                        if let onBack = onBack {
+                            onBack()
+                        } else {
+                            dismiss()
+                        }
                     }
                     .font(.body.weight(.semibold))
                     .foregroundColor(KinnectTheme.accentBright)
@@ -513,12 +540,13 @@ private struct ChangePasswordSheetView: View {
 private struct AppearanceSettingsSheetView: View {
     @AppStorage("kinnect_color_scheme") private var colorSchemeSetting: String = "system"
     @Environment(\.dismiss) private var dismiss
+    var onBack: (() -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 0) {
             PinnedHeaderBar(
                 title: "Giao diện",
-                onBack: { dismiss() },
+                onBack: onBack ?? { dismiss() },
                 trailingActions: []
             )
 
@@ -568,12 +596,13 @@ private struct AppearanceSettingsSheetView: View {
 
 private struct HelpSupportSheetView: View {
     @Environment(\.dismiss) private var dismiss
+    var onBack: (() -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 0) {
             PinnedHeaderBar(
-                title: "Trợ giúp",
-                onBack: { dismiss() },
+                title: "Trợ giúp & hỗ trợ",
+                onBack: onBack ?? { dismiss() },
                 trailingActions: []
             )
 
@@ -590,12 +619,13 @@ private struct HelpSupportSheetView: View {
 
 private struct AboutKinnectSheetView: View {
     @Environment(\.dismiss) private var dismiss
+    var onBack: (() -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 0) {
             PinnedHeaderBar(
-                title: "Giới thiệu",
-                onBack: { dismiss() },
+                title: "Giới thiệu Kinnect",
+                onBack: onBack ?? { dismiss() },
                 trailingActions: []
             )
 
@@ -618,6 +648,3 @@ private struct AboutKinnectSheetView: View {
         }
     }
 }
-
-
-

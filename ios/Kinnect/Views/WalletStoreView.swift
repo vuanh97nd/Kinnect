@@ -979,9 +979,8 @@ private struct StorePackageArtworkView: View {
             if let img = resolvedImage {
                 Image(uiImage: img)
                     .resizable()
-                    .aspectRatio(16/9, contentMode: .fill)
+                    .aspectRatio(16/9, contentMode: .fit)
                     .frame(maxWidth: .infinity, maxHeight: 140)
-                    .clipped()
             } else {
                 // Background Gradient with Package Accent Colors
                 LinearGradient(

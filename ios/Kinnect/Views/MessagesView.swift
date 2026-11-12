@@ -17,6 +17,7 @@ private func isoString(from anyVal: Any?) -> String {
 
 struct MessagesView: View {
     let onOpenFriends: () -> Void
+    var onBack: (() -> Void)? = nil
     @ObservedObject private var appState = AppState.shared
 
     enum ChatScope: String, CaseIterable {
@@ -34,8 +35,9 @@ struct MessagesView: View {
     @State private var isLoading = false
     @State private var searchQuery: String = ""
 
-    init(initialScope: ChatScope = .direct, onOpenFriends: @escaping () -> Void = {}) {
+    init(initialScope: ChatScope = .direct, onOpenFriends: @escaping () -> Void = {}, onBack: (() -> Void)? = nil) {
         self.onOpenFriends = onOpenFriends
+        self.onBack = onBack
         _scope = State(initialValue: initialScope)
     }
 
@@ -44,7 +46,7 @@ struct MessagesView: View {
             // Pinned Header Bar (matching Android accountHeader pattern)
             PinnedHeaderBar(
                 title: "Tin nhắn",
-                onBack: nil,
+                onBack: onBack,
                 trailingActions: [
                     PinnedHeaderBar.TrailingAction(
                         systemImage: scope == .direct ? "square.and.pencil" : "person.2.badge.plus",

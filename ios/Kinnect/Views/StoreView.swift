@@ -434,24 +434,21 @@ struct StoreView: View {
                             .foregroundColor(.white)
                         Image(uiImage: frame)
                             .resizable()
-                            .scaledToFill()
+                            .scaledToFit()
                             .frame(width: size * 0.84, height: size * 0.84)
-                            .clipped()
                     } else if let gift = giftImage {
                         // Gift: centered, 70% of container
                         Image(uiImage: gift)
                             .resizable()
-                            .scaledToFill()
+                            .scaledToFit()
                             .frame(width: size * 0.7, height: size * 0.7)
-                            .clipped()
                             .shadow(color: Color(hex: package.accentColor).opacity(0.4), radius: size * 0.08)
                     } else if let artwork = artworkImage {
-                        // Artwork: fill entire container
+                        // Artwork: fit entire container so any text on artwork is fully readable
                         Image(uiImage: artwork)
                             .resizable()
-                            .scaledToFill()
-                            .frame(width: geo.size.width, height: geo.size.height)
-                            .clipped()
+                            .scaledToFit()
+                            .frame(maxWidth: geo.size.width, maxHeight: geo.size.height)
                     } else {
                         // Fallback icon
                         Image(systemName: iconName)

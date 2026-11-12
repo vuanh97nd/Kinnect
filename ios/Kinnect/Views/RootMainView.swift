@@ -698,46 +698,86 @@ struct RootMainView: View {
                 if selectedTab != .create {
                     KinnectTopBar(
                         appState: appState,
-                        activeTopSection: $activeTopSection,
+                        activeTopSection: Binding(
+                            get: { activeTopSection },
+                            set: { nextSection in
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    showProfileDetailSheet = false
+                                    activeTopSection = nextSection
+                                }
+                            }
+                        ),
                         onLogoTap: {
-                            selectedTab = .feed
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                activeTopSection = nil
+                                showProfileDetailSheet = false
+                                selectedTab = .feed
+                            }
                         }
                     )
                 }
 
                 ZStack {
-                    switch selectedTab {
-                    case .feed:
-                        FeedView(
-                            onOpenCamera: { showCameraStudioSheet = true },
-                            onOpenFriends: { activeTopSection = .friends }
+                    if showProfileDetailSheet {
+                        ProfileView(
+                            onBack: {
+                                withAnimation(.easeInOut(duration: 0.22)) {
+                                    showProfileDetailSheet = false
+                                }
+                            },
+                            onOpenWallet: {
+                                showProfileDetailSheet = false
+                                activeTopSection = .wallet
+                            },
+                            onOpenFriends: {
+                                showProfileDetailSheet = false
+                                activeTopSection = .friends
+                            },
+                            onOpenStore: {
+                                showProfileDetailSheet = false
+                                activeTopSection = .store
+                            }
                         )
-                    case .discover:
-                        DiscoverView(onOpenCamera: { showCameraStudioSheet = true })
-                    case .create:
-                        CameraStudioView(onClose: { selectedTab = .feed })
-                    case .video:
-                        ShortsVideoView()
-                    case .live:
-                        LiveStreamView(onOpenWallet: { activeTopSection = .wallet })
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .trailing),
+                            removal: .move(edge: .trailing)
+                        ))
+                    } else if let section = activeTopSection {
+                        sectionBodyView(section)
+                            .transition(.opacity)
+                    } else {
+                        switch selectedTab {
+                        case .feed:
+                            FeedView(
+                                onOpenCamera: { showCameraStudioSheet = true },
+                                onOpenFriends: { activeTopSection = .friends }
+                            )
+                        case .discover:
+                            DiscoverView(onOpenCamera: { showCameraStudioSheet = true })
+                        case .create:
+                            CameraStudioView(onClose: { selectedTab = .feed })
+                        case .video:
+                            ShortsVideoView()
+                        case .live:
+                            LiveStreamView(onOpenWallet: { activeTopSection = .wallet })
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 // Material 3 Bottom Navigation Bar (Android 1.2.12 lines 473-515)
-                KinnectBottomBar(selectedTab: $selectedTab) {
+                KinnectBottomBar(selectedTab: Binding(
+                    get: { selectedTab },
+                    set: { newTab in
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            activeTopSection = nil
+                            showProfileDetailSheet = false
+                            selectedTab = newTab
+                        }
+                    }
+                )) {
                     showCameraStudioSheet = true
                 }
-            }
-
-            // FULL SCREEN MAIN SECTIONS (TIN NHẮN, THÔNG BÁO, CỬA HÀNG & VÍ, BẠN BÈ, HỒ SƠ)
-            if let section = activeTopSection {
-                fullScreenSectionView(section)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .trailing),
-                        removal: .move(edge: .trailing)
-                    ))
-                    .zIndex(30)
             }
 
             // FULL SCREEN CAMERA STUDIO (TẠO ẢNH / VIDEO)
@@ -749,21 +789,11 @@ struct RootMainView: View {
                     ))
                     .zIndex(35)
             }
-
-            // FULL SCREEN PROFILE DETAIL
-            if showProfileDetailSheet {
-                fullScreenProfileDetailView
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .trailing),
-                        removal: .move(edge: .trailing)
-                    ))
-                    .zIndex(40)
-            }
         }
     }
 
     @ViewBuilder
-    private func fullScreenSectionView(_ section: KinnectTopSection) -> some View {
+    private func sectionBodyView(_ section: KinnectTopSection) -> some View {
         switch section {
         case .store:
             StoreView(
@@ -809,257 +839,70 @@ struct RootMainView: View {
                     }
                 }
             )
-        default:
-            VStack(spacing: 0) {
-                sectionCustomHeader(section)
-
-                Group {
-                    switch section {
-                    case .friends:
-                        FriendsView(initialTab: .friends)
-                    case .messages:
-                        NavigationStack {
-                            MessagesView(initialScope: .direct, onOpenFriends: { activeTopSection = .friends })
-                        }
-                    case .profile:
-                        AccountMenuView(
-                            onOpenProfile: {
-                                showProfileDetailSheet = true
-                            },
-                            onOpenStore: {
-                                activeTopSection = .store
-                            },
-                            onOpenWallet: {
-                                activeTopSection = .wallet
-                            },
-                            onOpenFriends: {
-                                activeTopSection = .friends
-                            }
-                        )
-                    default:
-                        EmptyView()
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            .background(KinnectTheme.background.ignoresSafeArea())
-        }
-    }
-
-    @ViewBuilder
-    private func sectionCustomHeader(_ section: KinnectTopSection) -> some View {
-        HStack(spacing: 12) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.22)) {
-                    activeTopSection = nil
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.left")
-                        .font(.system(size: 19, weight: .semibold))
-                        .foregroundColor(KinnectTheme.textPrimary)
-                }
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Quay lại")
-
-            HStack(spacing: 8) {
-                Text(sectionTitle(for: section))
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(KinnectTheme.textPrimary)
-                    .lineLimit(1)
-
-                if section == .messages && appState.unreadMessagesCount > 0 {
-                    badgePill(appState.unreadMessagesCount)
-                }
-                if section == .notifications && appState.unreadNotificationsCount > 0 {
-                    badgePill(appState.unreadNotificationsCount)
-                }
-            }
-
-            Spacer()
-
-            sectionTrailingActions(section)
-        }
-        .padding(.horizontal, 12)
-        .frame(height: 52)
-        .background(KinnectTheme.surface.ignoresSafeArea(edges: .top))
-        .overlay(
-            Divider().background(KinnectTheme.borderSoft),
-            alignment: .bottom
-        )
-    }
-
-    private func sectionTitle(for section: KinnectTopSection) -> String {
-        switch section {
-        case .notifications: return "Thông báo"
-        case .store: return "Cửa hàng"
-        case .wallet: return "Ví Kinnect"
-        case .friends: return "Bạn bè"
-        case .messages: return "Tin nhắn"
-        case .profile: return "Tài khoản"
-        }
-    }
-
-    @ViewBuilder
-    private func sectionTrailingActions(_ section: KinnectTopSection) -> some View {
-        switch section {
-        case .notifications:
-            Button {
-                Task {
-                    await appState.refreshGlobalBadges()
-                }
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "checkmark.circle")
-                        .font(.system(size: 13, weight: .semibold))
-                    Text("Đã đọc")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-                .foregroundColor(KinnectTheme.accentBright)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Capsule().fill(KinnectTheme.surfaceElevated))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Đánh dấu tất cả đã đọc")
-
-        case .store:
-            if let user = appState.currentUser {
-                Button {
-                    activeTopSection = .wallet
-                } label: {
-                    HStack(spacing: 4) {
-                        Text("🪙")
-                            .font(.system(size: 13))
-                        Text("\(user.coins) xu")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(KinnectTheme.warning)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Capsule().fill(KinnectTheme.surfaceElevated))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Xem ví Kinnect")
-            }
-
-        case .wallet:
-            if let user = appState.currentUser {
-                HStack(spacing: 4) {
-                    Text("🪙")
-                        .font(.system(size: 13))
-                    Text("\(user.coins) xu")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(KinnectTheme.warning)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Capsule().fill(KinnectTheme.surfaceElevated))
-            }
-
-        case .messages:
-            Menu {
-                Button {
-                    NotificationCenter.default.post(name: NSNotification.Name("kinnect_open_new_chat"), object: nil)
-                } label: {
-                    Label("Tin nhắn mới", systemImage: "square.and.pencil")
-                }
-                Button {
-                    NotificationCenter.default.post(name: NSNotification.Name("kinnect_open_create_group"), object: nil)
-                } label: {
-                    Label("Tạo nhóm mới", systemImage: "person.3")
-                }
-            } label: {
-                KinnectIcon(glyph: .add, size: 20, tint: KinnectTheme.accentBright)
-                    .frame(width: 38, height: 38)
-                    .background(Circle().fill(KinnectTheme.surfaceElevated))
-            }
-            .accessibilityLabel("Tùy chọn tin nhắn mới")
-
         case .friends:
-            Button {
-                activeTopSection = .messages
-            } label: {
-                KinnectIcon(glyph: .messages, size: 20, tint: KinnectTheme.textPrimary)
-                    .frame(width: 38, height: 38)
-                    .background(Circle().fill(KinnectTheme.surfaceElevated))
+            FriendsView(
+                initialTab: .friends,
+                onBack: {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        activeTopSection = nil
+                    }
+                }
+            )
+        case .messages:
+            NavigationStack {
+                MessagesView(
+                    initialScope: .direct,
+                    onOpenFriends: {
+                        withAnimation(.easeInOut(duration: 0.22)) {
+                            activeTopSection = .friends
+                        }
+                    },
+                    onBack: {
+                        withAnimation(.easeInOut(duration: 0.22)) {
+                            activeTopSection = nil
+                        }
+                    }
+                )
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Tin nhắn bạn bè")
-
         case .profile:
-            Button {
-                showProfileDetailSheet = true
-            } label: {
-                Text("Xem hồ sơ")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(KinnectTheme.accentBright)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Capsule().fill(KinnectTheme.surfaceElevated))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Xem hồ sơ đầy đủ")
+            AccountMenuView(
+                onOpenProfile: {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        showProfileDetailSheet = true
+                    }
+                },
+                onOpenStore: {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        activeTopSection = .store
+                    }
+                },
+                onOpenWallet: {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        activeTopSection = .wallet
+                    }
+                },
+                onOpenFriends: {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        activeTopSection = .friends
+                    }
+                },
+                onBack: {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        activeTopSection = nil
+                    }
+                }
+            )
         }
     }
 
-    private var fullScreenProfileDetailView: some View {
-        ProfileView(
-            onBack: {
-                withAnimation(.easeInOut(duration: 0.22)) {
-                    showProfileDetailSheet = false
-                }
-            },
-            onOpenWallet: {
-                showProfileDetailSheet = false
-                activeTopSection = .wallet
-            },
-            onOpenFriends: {
-                showProfileDetailSheet = false
-                activeTopSection = .friends
-            },
-            onOpenStore: {
-                showProfileDetailSheet = false
-                activeTopSection = .store
-            }
-        )
-        .background(KinnectTheme.background.ignoresSafeArea())
+    @ViewBuilder
+    private var mainSectionContent: some View {
+        if let topSection = activeTopSection {
+            sectionBodyView(topSection)
+        } else {
+            tabContent(for: selectedTab)
+        }
     }
-
-                        @ViewBuilder
-                        private var mainSectionContent: some View {
-                            if let topSection = activeTopSection {
-                                switch topSection {
-                                case .notifications:
-                                    NotificationsView()
-                                case .store:
-                                    StoreView(
-                                        onBack: { activeTopSection = nil },
-                                        onOpenWallet: { activeTopSection = .wallet }
-                                    )
-                                case .wallet:
-                                    WalletView(
-                                        onBack: { activeTopSection = nil },
-                                        onOpenStore: { activeTopSection = .store }
-                                    )
-                                case .friends:
-                                    FriendsView()
-                                case .messages:
-                                    MessagesView(onOpenFriends: { activeTopSection = .friends })
-                                case .profile:
-                                    ProfileView(
-                                        onOpenWallet: { activeTopSection = .wallet },
-                                        onOpenFriends: { activeTopSection = .friends },
-                                        onOpenStore: { activeTopSection = .store }
-                                    )
-                                }
-                            } else {
-                                tabContent(for: selectedTab)
-                            }
-                        }
 
                         @ViewBuilder
                         private func tabContent(for tab: KinnectNavTab) -> some View {

@@ -17,11 +17,14 @@ final class NativeSocketClient: NSObject, URLSessionWebSocketDelegate {
         super.init()
         let config = URLSessionConfiguration.default
         config.waitsForConnectivity = true
+        config.httpCookieStorage = HTTPCookieStorage.shared
+        config.httpShouldSetCookies = true
         self.session = URLSession(configuration: config, delegate: self, delegateQueue: .main)
     }
 
     func connectWithKeychainSession() {
         let origin = KinnectAPIClient.shared.baseURL
+        KeychainStore.shared.syncToHTTPCookieStorage(origin: origin)
         let cookieHeader = KeychainStore.shared.cookieJarHeader(for: origin)
         guard !cookieHeader.isEmpty else {
             disconnect()
@@ -34,8 +37,14 @@ final class NativeSocketClient: NSObject, URLSessionWebSocketDelegate {
         webSocketTask?.cancel(with: .goingAway, reason: nil)
         webSocketTask = nil
 
-        guard let url = URL(string: origin.replacingOccurrences(of: "https://", with: "wss://") + "/") else { return }
+        let wsScheme = origin.lowercased().hasPrefix("https://") ? "wss://" : "ws://"
+        let cleanHost = origin
+            .replacingOccurrences(of: "https://", with: "", options: .caseInsensitive)
+            .replacingOccurrences(of: "http://", with: "", options: .caseInsensitive)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard let url = URL(string: "\(wsScheme)\(cleanHost)/") else { return }
         var request = URLRequest(url: url)
+        request.httpShouldHandleCookies = true
         request.setValue(origin, forHTTPHeaderField: "Origin")
         request.setValue(cookieHeader, forHTTPHeaderField: "Cookie")
 

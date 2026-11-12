@@ -3127,7 +3127,7 @@ public class MainActivity extends Activity {
     privacyToggle(privacy, "showActivity", I18n.t("Trạng thái hoạt động"), I18n.t("Cho người khác biết khi bạn đang online"));
     groupRow(privacy, "message_square", I18n.t("Ai có thể nhắn tin · ") + (me.optString("dmMode").equals("everyone") ? I18n.t("Mọi thành viên") : I18n.t("Bạn bè")), false, () -> new Sheet(this).setTitle(I18n.t("Ai có thể nhắn tin")).setItemIcons(new String[]{"globe","users_round"}).setItems(new String[] { I18n.t("Mọi thành viên"), I18n.t("Bạn bè") }, (d, w) -> request("PATCH", "/api/me", json("dmMode", w == 0 ? "everyone" : "friends"), r -> { me = r.optJSONObject("user"); settings(); })).show());
     if(Distribution.PLAY){
-      groupTitle("message_square",I18n.t("Đồng bộ giữa các thiết bị"));LinearLayout sync=settingsGroup();android.content.SharedPreferences preferences=getSharedPreferences("play_privacy",0);Switch toggle=new Switch(this);toggle.setText(I18n.t("Đồng bộ tin nhắn nền"));toggle.setTextSize(14);toggle.setTextColor(TEXT);toggle.setChecked(preferences.getBoolean("background_messages",false));sync.addView(toggle);sync.addView(label(I18n.t("Tùy chọn giữ thông báo đang hoạt động để tiếp tục đồng bộ tin nhắn giữa web và điện thoại. Có thể tắt bất cứ lúc nào; khi tắt, Android có thể ngừng kết nối nền."),12,MUTED));toggle.setOnCheckedChangeListener((button,enabled)->{preferences.edit().putBoolean("background_messages",enabled).apply();KinnectService.stop(this);KinnectService.start(this);});
+      groupTitle("message_square",I18n.t("Đồng bộ giữa các thiết bị"));LinearLayout sync=settingsGroup();android.content.SharedPreferences preferences=getSharedPreferences("play_privacy",0);Switch toggle=new Switch(this);toggle.setText(I18n.t("Đồng bộ tin nhắn nền"));toggle.setTextSize(14);toggle.setTextColor(TEXT);toggle.setChecked(preferences.getBoolean("background_messages",true));sync.addView(toggle);sync.addView(label(I18n.t("Tùy chọn giữ thông báo đang hoạt động để tiếp tục đồng bộ tin nhắn giữa web và điện thoại. Có thể tắt bất cứ lúc nào; khi tắt, Android có thể ngừng kết nối nền."),12,MUTED));toggle.setOnCheckedChangeListener((button,enabled)->{preferences.edit().putBoolean("background_messages",enabled).apply();KinnectService.stop(this);KinnectService.start(this);});
     } else {
       groupTitle("bell",I18n.t("Thông báo & hoạt động nền"));
       LinearLayout bgSettings=settingsGroup();
@@ -3217,6 +3217,7 @@ public class MainActivity extends Activity {
       navigate(tab.isEmpty() ? "feed" : tab);
       return;
     }
+    final int generation = screen;
     remember("friends", () -> friendsScreen(selected));
     headerActive = "friends";
     shell(I18n.t("Bạn bè"), true);
@@ -3231,37 +3232,87 @@ public class MainActivity extends Activity {
     final EditText search = searchField(content, I18n.t("Tên hoặc @username"));
     final LinearLayout list = column();
     content.addView(list, new LinearLayout.LayoutParams(-1, -2));
-    final JSONArray[] loaded = { null }, suggested = { null };
+    final JSONArray[] loaded = { null }, suggested = { null }, discoverResults = { null };
+    final Handler searchHandler = new Handler(Looper.getMainLooper());
     final Runnable render = () -> {
       list.removeAllViews();
-      JSONArray users = loaded[0];
       String q = search.getText().toString().trim().toLowerCase(Locale.ROOT).replaceFirst("^@", "");
-      List<JSONObject> rows = new ArrayList<>();
+      List<JSONObject> myFriends = new ArrayList<>();
+      Set<String> friendIds = new HashSet<>();
+      JSONArray users = loaded[0];
       for (int i = 0; users != null && i < users.length(); i++) {
         JSONObject u = users.optJSONObject(i);
-        if (q.isEmpty() || (u.optString("name") + " " + u.optString("username")).toLowerCase(Locale.ROOT).contains(q)) rows.add(u);
+        if (u == null) continue;
+        friendIds.add(u.optString("id"));
+        if (q.isEmpty() || (u.optString("name") + " " + u.optString("username")).toLowerCase(Locale.ROOT).contains(q)) myFriends.add(u);
       }
-      if (rows.isEmpty()) {
-        list.addView(emptyBlock("users_round", q.isEmpty() ? I18n.t("Chưa có ") + names[Math.max(0, Arrays.asList(keys).indexOf(selected))].toLowerCase(Locale.ROOT) : I18n.t("Không tìm thấy bạn bè"), q.isEmpty() ? I18n.t("Lời mời và kết nối mới sẽ hiển thị tại đây.") : I18n.t("Bạn có thể tìm thêm thành viên trong Khám phá.")));
-      } else if (selected.equals("friends")) {
-        List<JSONObject> online = new ArrayList<>(), offline = new ArrayList<>();
-        for (JSONObject u : rows) (u.optBoolean("isActive") && u.optBoolean("activityShared", true) ? online : offline).add(u);
-        friendSection(list, I18n.t("Đang trực tuyến"), online, selected);
-        friendSection(list, I18n.t("Ngoại tuyến"), offline, selected);
-      } else friendSection(list, names[Arrays.asList(keys).indexOf(selected)], rows, selected);
-      if (selected.equals("friends")) {
-        List<JSONObject> suggestions = new ArrayList<>();
-        for (int i = 0; suggested[0] != null && i < suggested[0].length() && suggestions.size() < 6; i++) {
-          JSONObject u = suggested[0].optJSONObject(i);
-          if (q.isEmpty() || (u.optString("name") + " " + u.optString("username")).toLowerCase(Locale.ROOT).contains(q)) suggestions.add(u);
+      if (q.isEmpty()) {
+        if (myFriends.isEmpty()) {
+          list.addView(emptyBlock("users_round", I18n.t("Chưa có ") + names[Math.max(0, Arrays.asList(keys).indexOf(selected))].toLowerCase(Locale.ROOT), I18n.t("Lời mời và kết nối mới sẽ hiển thị tại đây.")));
+        } else if (selected.equals("friends")) {
+          List<JSONObject> online = new ArrayList<>(), offline = new ArrayList<>();
+          for (JSONObject u : myFriends) (u.optBoolean("isActive") && u.optBoolean("activityShared", true) ? online : offline).add(u);
+          friendSection(list, I18n.t("Đang trực tuyến"), online, selected, selected);
+          friendSection(list, I18n.t("Ngoại tuyến"), offline, selected, selected);
+        } else friendSection(list, names[Arrays.asList(keys).indexOf(selected)], myFriends, selected, selected);
+        if (selected.equals("friends")) {
+          List<JSONObject> suggestions = new ArrayList<>();
+          for (int i = 0; suggested[0] != null && i < suggested[0].length() && suggestions.size() < 6; i++) {
+            JSONObject u = suggested[0].optJSONObject(i);
+            suggestions.add(u);
+          }
+          if (!suggestions.isEmpty()) friendSection(list, I18n.t("Gợi ý kết bạn"), suggestions, "suggestion", selected);
         }
-        if (!suggestions.isEmpty()) friendSection(list, I18n.t("Gợi ý kết bạn"), suggestions, "suggestion");
+      } else {
+        if (!myFriends.isEmpty()) {
+          if (selected.equals("friends")) friendSection(list, I18n.t("Bạn bè của bạn"), myFriends, selected, selected);
+          else friendSection(list, names[Arrays.asList(keys).indexOf(selected)], myFriends, selected, selected);
+        }
+        if (selected.equals("friends")) {
+          List<JSONObject> otherPeople = new ArrayList<>();
+          String myId = me != null ? me.optString("id") : "";
+          for (int i = 0; discoverResults[0] != null && i < discoverResults[0].length(); i++) {
+            JSONObject u = discoverResults[0].optJSONObject(i);
+            if (u == null) continue;
+            String uid = u.optString("id");
+            if (uid.equals(myId) || friendIds.contains(uid)) continue;
+            otherPeople.add(u);
+          }
+          if (!otherPeople.isEmpty()) {
+            friendSection(list, I18n.t("Mọi người trên Kinnect"), otherPeople, "discover", selected);
+          }
+          if (myFriends.isEmpty() && otherPeople.isEmpty()) {
+            if (discoverResults[0] != null) {
+              list.addView(emptyBlock("users_round", I18n.t("Không tìm thấy kết quả"), I18n.t("Không có thành viên nào khớp với \"") + q + "\"."));
+            }
+          }
+        } else if (myFriends.isEmpty()) {
+          list.addView(emptyBlock("users_round", I18n.t("Không tìm thấy"), I18n.t("Thử tìm kiếm với từ khóa khác.")));
+        }
       }
     };
     search.addTextChangedListener(new android.text.TextWatcher() {
       public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
       public void onTextChanged(CharSequence s, int a, int b, int c) {}
-      public void afterTextChanged(android.text.Editable s) { render.run(); }
+      public void afterTextChanged(android.text.Editable s) {
+        final String q = search.getText().toString().trim().toLowerCase(Locale.ROOT).replaceFirst("^@", "");
+        render.run();
+        searchHandler.removeCallbacksAndMessages(null);
+        if (q.length() >= 1 && selected.equals("friends")) {
+          searchHandler.postDelayed(() -> {
+            if (generation != screen || isDestroyed()) return;
+            request("GET", "/api/discover?q=" + encode(q), null, data -> {
+              if (generation != screen || isDestroyed()) return;
+              String activeQ = search.getText().toString().trim().toLowerCase(Locale.ROOT).replaceFirst("^@", "");
+              if (!activeQ.equals(q)) return;
+              discoverResults[0] = data == null ? null : data.optJSONArray("users");
+              render.run();
+            });
+          }, 300);
+        } else {
+          discoverResults[0] = null;
+        }
+      }
     });
     cachedRequest(selected.equals("friends") ? "/api/friends" : "/api/friend-requests", data -> {
       loaded[0] = data.optJSONArray(selected.equals("friends") ? "users" : selected);
@@ -3273,7 +3324,7 @@ public class MainActivity extends Activity {
     });
   }
 
-  private void friendSection(LinearLayout list, String title, List<JSONObject> users, final String kind) {
+  private void friendSection(LinearLayout list, String title, List<JSONObject> users, final String kind, final String selected) {
     if (users.isEmpty()) return;
     LinearLayout head = row();
     head.setPadding(dp(4), dp(18), 0, dp(8));
@@ -3312,12 +3363,13 @@ public class MainActivity extends Activity {
       who.addView(sub);
       r.addView(who, new LinearLayout.LayoutParams(0, -2, 1));
       String id = u.optString("id");
-      if (kind.equals("friends")) r.addView(roundAction("message_square", I18n.t("Nhắn tin"), true, () -> chat(u)));
-      else if (kind.equals("incoming")) {
-        r.addView(roundAction("check", I18n.t("Chấp nhận"), true, () -> request("POST", "/api/users/" + id + "/friend-request/respond", json("action", "accept"), d -> { say(I18n.t("Đã chấp nhận kết bạn")); friendsScreen("incoming"); })));
-        r.addView(roundAction("x", I18n.t("Từ chối"), false, () -> request("POST", "/api/users/" + id + "/friend-request/respond", json("action", "decline"), d -> friendsScreen("incoming"))));
-      } else if (kind.equals("outgoing")) r.addView(roundAction("user_check", I18n.t("Huỷ lời mời"), false, () -> request("DELETE", "/api/users/" + id + "/friend-request", json(), d -> friendsScreen("outgoing"))));
-      else r.addView(roundAction("user_plus", I18n.t("Kết bạn"), true, () -> request("POST", "/api/users/" + id + "/friend-request", json(), d -> { say(I18n.t("Đã gửi lời mời kết bạn")); friendsScreen("friends"); })));
+      String fs = u.optString("friendship", "none");
+      if (kind.equals("friends") || fs.equals("friends")) r.addView(roundAction("message_square", I18n.t("Nhắn tin"), true, () -> chat(u)));
+      else if (kind.equals("incoming") || fs.equals("incoming")) {
+        r.addView(roundAction("check", I18n.t("Chấp nhận"), true, () -> request("POST", "/api/users/" + id + "/friend-request/respond", json("action", "accept"), d -> { say(I18n.t("Đã chấp nhận kết bạn")); friendsScreen(selected); })));
+        r.addView(roundAction("x", I18n.t("Từ chối"), false, () -> request("POST", "/api/users/" + id + "/friend-request/respond", json("action", "decline"), d -> friendsScreen(selected))));
+      } else if (kind.equals("outgoing") || fs.equals("outgoing")) r.addView(roundAction("user_check", I18n.t("Huỷ lời mời"), false, () -> request("DELETE", "/api/users/" + id + "/friend-request", json(), d -> friendsScreen(selected))));
+      else r.addView(roundAction("user_plus", I18n.t("Kết bạn"), true, () -> request("POST", "/api/users/" + id + "/friend-request", json(), d -> { say(I18n.t("Đã gửi lời mời kết bạn")); try { u.put("friendship", "outgoing"); } catch (JSONException ignored) {} friendsScreen(selected); })));
       r.setOnClickListener(v -> person(u));
       group.addView(r, new LinearLayout.LayoutParams(-1, -2));
     }
@@ -4548,25 +4600,30 @@ public class MainActivity extends Activity {
       for (int i = 0; i < accounts.length(); i++) {
         final JSONObject a = accounts.optJSONObject(i);
         LinearLayout r = row();
-        r.setPadding(dp(16), dp(12), dp(8), dp(12));
-        r.setBackground(outlined(CARD, 24));
-        avatar(a, r, 44);
+        r.setPadding(dp(12), dp(8), dp(6), dp(8));
+        r.setBackground(outlined(CARD, 14));
+        avatar(a, r, 34);
         LinearLayout t = column();
-        t.setPadding(dp(16), 0, 0, 0);
-        TextView n = label(a.optString("name"), 16, TEXT);
-        n.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        t.setPadding(dp(10), 0, dp(4), 0);
+        TextView n = label(a.optString("name"), 14, TEXT);
+        n.setTypeface(ApprovedTypography.font(this, Typeface.BOLD));
+        n.setSingleLine(true);
+        n.setEllipsize(android.text.TextUtils.TruncateAt.END);
         t.addView(n);
-        t.addView(label("@" + a.optString("username"), 13, MUTED));
+        TextView u = label("@" + a.optString("username"), 12, MUTED);
+        u.setSingleLine(true);
+        u.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        t.addView(u);
         r.addView(t, new LinearLayout.LayoutParams(0, -2, 1));
         FrameLayout go = new FrameLayout(this);
-        go.addView(icon("log_in", 20, ACCENT), new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
-        r.addView(go, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        go.addView(icon("log_in", 16, ACCENT), new FrameLayout.LayoutParams(dp(16), dp(16), Gravity.CENTER));
+        r.addView(go, new LinearLayout.LayoutParams(dp(30), dp(30)));
         FrameLayout remove = new FrameLayout(this);
-        remove.addView(icon("x", 18, MUTED), new FrameLayout.LayoutParams(dp(18), dp(18), Gravity.CENTER));
-        remove.setBackground(pressable(CARD, 99));
+        remove.addView(icon("x", 14, MUTED), new FrameLayout.LayoutParams(dp(14), dp(14), Gravity.CENTER));
+        remove.setBackground(pressable(SOFT, 99));
         remove.setContentDescription(I18n.t("Gỡ tài khoản khỏi thiết bị"));
         remove.setOnClickListener(v -> api.call("DELETE", "/api/remembered/" + a.optString("id"), json(), (d, e, s) -> { if (generation == screen && !isDestroyed()) { if (e != null) say(e); else auth(false); } }));
-        r.addView(remove, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        r.addView(remove, new LinearLayout.LayoutParams(dp(30), dp(30)));
         r.setContentDescription(I18n.t("Đăng nhập nhanh ") + a.optString("name"));
         r.setOnClickListener(v -> api.call("POST", "/api/remembered/login", json("userId", a.optString("id")), (d, e, s) -> {
           if (generation != screen || isDestroyed()) return;
@@ -4575,7 +4632,7 @@ public class MainActivity extends Activity {
           navigate("feed");
         }));
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
-        p.setMargins(0, dp(12), 0, 0);
+        p.setMargins(0, dp(8), 0, 0);
         recent.addView(r, p);
       }
     });

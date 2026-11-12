@@ -325,7 +325,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         let constraints = RTCMediaConstraints(
             mandatoryConstraints: [
                 "OfferToReceiveAudio": "true",
-                "OfferToReceiveVideo": current.mode == "video" ? "true" : "false"
+                "OfferToReceiveVideo": "true"
             ],
             optionalConstraints: nil
         )
@@ -378,7 +378,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
                     let constraints = RTCMediaConstraints(
                         mandatoryConstraints: [
                             "OfferToReceiveAudio": "true",
-                            "OfferToReceiveVideo": current.mode == "video" ? "true" : "false"
+                            "OfferToReceiveVideo": "true"
                         ],
                         optionalConstraints: nil
                     )
@@ -407,7 +407,10 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         } else if let cand = cand,
                   let sdp = cand["candidate"] as? String {
             let sdpMid = cand["sdpMid"] as? String
-            let sdpMLineIndex = Int32(cand["sdpMLineIndex"] as? Int ?? 0)
+            let sdpMLineIndex: Int32 = (cand["sdpMLineIndex"] as? NSNumber)?.int32Value
+                ?? (cand["sdpMLineIndex"] as? Int).map(Int32.init)
+                ?? (cand["sdpMLineIndex"] as? String).flatMap(Int32.init)
+                ?? 0
             let ice = RTCIceCandidate(sdp: sdp, sdpMLineIndex: sdpMLineIndex, sdpMid: sdpMid)
             if pc.remoteDescription != nil {
                 pc.add(ice) { _ in }
@@ -680,7 +683,10 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         } else if let cand = signal["candidate"] as? [String: Any],
                   let sdp = cand["candidate"] as? String {
             let sdpMid = cand["sdpMid"] as? String
-            let sdpMLineIndex = Int32(cand["sdpMLineIndex"] as? Int ?? 0)
+            let sdpMLineIndex: Int32 = (cand["sdpMLineIndex"] as? NSNumber)?.int32Value
+                ?? (cand["sdpMLineIndex"] as? Int).map(Int32.init)
+                ?? (cand["sdpMLineIndex"] as? String).flatMap(Int32.init)
+                ?? 0
             let ice = RTCIceCandidate(sdp: sdp, sdpMLineIndex: sdpMLineIndex, sdpMid: sdpMid)
             box.pc.add(ice) { _ in }
         }

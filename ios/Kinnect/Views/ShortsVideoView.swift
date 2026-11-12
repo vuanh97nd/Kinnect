@@ -501,6 +501,7 @@ struct ShortClipPlayer: View {
         }
 
         let origin = KinnectAPIClient.shared.mediaOrigin
+        KeychainStore.shared.syncToHTTPCookieStorage(origin: origin)
         guard let remoteURL = ServerConfig.url(for: path, origin: origin) else {
             failed = true
             return
