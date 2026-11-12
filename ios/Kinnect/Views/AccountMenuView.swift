@@ -463,7 +463,7 @@ private struct SecuritySettingsView: View {
     }
 }
 
-private struct ChangePasswordSheetView: View {
+﻿private struct ChangePasswordSheetView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var oldPassword = ""
     @State private var newPassword = ""
@@ -471,123 +471,153 @@ private struct ChangePasswordSheetView: View {
     @State private var errorMessage = ""
 
     var body: some View {
-        Form {
-            Section {
-                SecureField("Máº­t kháº©u hiá»‡n táº¡i", text: $oldPassword)
-                SecureField("Máº­t kháº©u má»›i", text: $newPassword)
-                SecureField("Nháº­p láº¡i máº­t kháº©u má»›i", text: $confirmPassword)
-            }
-            if !errorMessage.isEmpty {
+        VStack(spacing: 0) {
+            PinnedHeaderBar(
+                title: "Đổi mật khẩu",
+                onBack: { dismiss() },
+                trailingActions: []
+            )
+
+            Form {
                 Section {
-                    Text(errorMessage).foregroundColor(KinnectTheme.danger)
+                    SecureField("Mật khẩu hiện tại", text: $oldPassword)
+                    SecureField("Mật khẩu mới", text: $newPassword)
+                    SecureField("Nhập lại mật khẩu mới", text: $confirmPassword)
                 }
-            }
-            Section {
-                Button("Cáº­p nháº­t máº­t kháº©u") {
-                    if newPassword.count < 6 {
-                        errorMessage = "Máº­t kháº©u pháº£i tá»« 6 kÃ½ tá»± trá»Ÿ lÃªn"
-                        return
+                if !errorMessage.isEmpty {
+                    Section {
+                        Text(errorMessage).foregroundColor(KinnectTheme.danger)
                     }
-                    if newPassword != confirmPassword {
-                        errorMessage = "Máº­t kháº©u má»›i khÃ´ng khá»›p"
-                        return
-                    }
-                    AppState.shared.showToast("ÄÃ£ Ä‘á»•i máº­t kháº©u thÃ nh cÃ´ng")
-                    dismiss()
                 }
-                .font(.body.weight(.semibold))
-                .foregroundColor(KinnectTheme.accentBright)
+                Section {
+                    Button("Cập nhật mật khẩu") {
+                        if newPassword.count < 6 {
+                            errorMessage = "Mật khẩu phải từ 6 ký tự trở lên"
+                            return
+                        }
+                        if newPassword != confirmPassword {
+                            errorMessage = "Mật khẩu mới không khớp"
+                            return
+                        }
+                        AppState.shared.showToast("Đã đổi mật khẩu thành công")
+                        dismiss()
+                    }
+                    .font(.body.weight(.semibold))
+                    .foregroundColor(KinnectTheme.accentBright)
+                }
             }
         }
-        .navigationTitle("Äá»•i máº­t kháº©u")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
 private struct AppearanceSettingsSheetView: View {
     @AppStorage("kinnect_color_scheme") private var colorSchemeSetting: String = "system"
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        Form {
-            Section("Giao diá»‡n á»©ng dá»¥ng") {
-                Button {
-                    colorSchemeSetting = "light"
-                } label: {
-                    HStack {
-                        Text("SÃ¡ng")
-                            .foregroundColor(KinnectTheme.textPrimary)
-                        Spacer()
-                        if colorSchemeSetting == "light" {
-                            Image(systemName: "checkmark").foregroundColor(KinnectTheme.accentBright)
+        VStack(spacing: 0) {
+            PinnedHeaderBar(
+                title: "Giao diện",
+                onBack: { dismiss() },
+                trailingActions: []
+            )
+
+            Form {
+                Section("Giao diện ứng dụng") {
+                    Button {
+                        colorSchemeSetting = "light"
+                    } label: {
+                        HStack {
+                            Text("Sáng")
+                                .foregroundColor(KinnectTheme.textPrimary)
+                            Spacer()
+                            if colorSchemeSetting == "light" {
+                                Image(systemName: "checkmark").foregroundColor(KinnectTheme.accentBright)
+                            }
                         }
                     }
-                }
-                Button {
-                    colorSchemeSetting = "dark"
-                } label: {
-                    HStack {
-                        Text("Tá»‘i")
-                            .foregroundColor(KinnectTheme.textPrimary)
-                        Spacer()
-                        if colorSchemeSetting == "dark" {
-                            Image(systemName: "checkmark").foregroundColor(KinnectTheme.accentBright)
+                    Button {
+                        colorSchemeSetting = "dark"
+                    } label: {
+                        HStack {
+                            Text("Tối")
+                                .foregroundColor(KinnectTheme.textPrimary)
+                            Spacer()
+                            if colorSchemeSetting == "dark" {
+                                Image(systemName: "checkmark").foregroundColor(KinnectTheme.accentBright)
+                            }
                         }
                     }
-                }
-                Button {
-                    colorSchemeSetting = "system"
-                } label: {
-                    HStack {
-                        Text("Theo há»‡ thá»‘ng")
-                            .foregroundColor(KinnectTheme.textPrimary)
-                        Spacer()
-                        if colorSchemeSetting == "system" {
-                            Image(systemName: "checkmark").foregroundColor(KinnectTheme.accentBright)
+                    Button {
+                        colorSchemeSetting = "system"
+                    } label: {
+                        HStack {
+                            Text("Theo hệ thống")
+                                .foregroundColor(KinnectTheme.textPrimary)
+                            Spacer()
+                            if colorSchemeSetting == "system" {
+                                Image(systemName: "checkmark").foregroundColor(KinnectTheme.accentBright)
+                            }
                         }
                     }
                 }
             }
         }
-        .navigationTitle("Giao diá»‡n")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
 private struct HelpSupportSheetView: View {
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
-        List {
-            Section("LiÃªn há»‡ há»— trá»£") {
-                Link("Trung tÃ¢m trá»£ giÃºp Kinnect", destination: URL(string: "https://kinnect.app")!)
-                Link("Äiá»u khoáº£n dá»‹ch vá»¥", destination: URL(string: "https://kinnect.app")!)
-                Link("ChÃ­nh sÃ¡ch quyá»n riÃªng tÆ°", destination: URL(string: "https://kinnect.app")!)
+        VStack(spacing: 0) {
+            PinnedHeaderBar(
+                title: "Trợ giúp",
+                onBack: { dismiss() },
+                trailingActions: []
+            )
+
+            List {
+                Section("Liên hệ hỗ trợ") {
+                    Link("Trung tâm trợ giúp Kinnect", destination: URL(string: "https://kinnect.app")!)
+                    Link("Điều khoản dịch vụ", destination: URL(string: "https://kinnect.app")!)
+                    Link("Chính sách quyền riêng tư", destination: URL(string: "https://kinnect.app")!)
+                }
             }
         }
-        .navigationTitle("Trá»£ giÃºp")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
 private struct AboutKinnectSheetView: View {
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
-        VStack(spacing: 16) {
-            KinnectBrandLogo(size: 72)
-                .padding(.top, 32)
-            Text("Kinnect")
-                .font(.title.weight(.bold))
-                .foregroundColor(KinnectTheme.textPrimary)
-            Text("PhiÃªn báº£n 1.2.12 (Build 119)")
-                .font(.subheadline)
-                .foregroundColor(KinnectTheme.textSecondary)
-            Text("Ná»n táº£ng máº¡ng xÃ£ há»™i káº¿t ná»‘i trá»±c tiáº¿p, livestream thá»i gian thá»±c vÃ  tÆ°Æ¡ng tÃ¡c Ä‘a phÆ°Æ¡ng tiá»‡n.")
-                .font(.body)
-                .multilineTextAlignment(.center)
-                .foregroundColor(KinnectTheme.textPrimary)
-                .padding(.horizontal, 32)
-            Spacer()
+        VStack(spacing: 0) {
+            PinnedHeaderBar(
+                title: "Giới thiệu",
+                onBack: { dismiss() },
+                trailingActions: []
+            )
+
+            VStack(spacing: 16) {
+                KinnectBrandLogo(size: 72)
+                    .padding(.top, 32)
+                Text("Kinnect")
+                    .font(.title.weight(.bold))
+                    .foregroundColor(KinnectTheme.textPrimary)
+                Text("Phiên bản 1.2.12 (Build 122)")
+                    .font(.subheadline)
+                    .foregroundColor(KinnectTheme.textSecondary)
+                Text("Nền tảng mạng xã hội kết nối trực tiếp, livestream thời gian thực và tương tác đa phương tiện.")
+                    .font(.body)
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(KinnectTheme.textPrimary)
+                    .padding(.horizontal, 32)
+                Spacer()
+            }
         }
-        .navigationTitle("Giá»›i thiá»‡u")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
+
 
 
