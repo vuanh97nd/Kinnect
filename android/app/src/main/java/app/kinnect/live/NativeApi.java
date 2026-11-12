@@ -150,6 +150,9 @@ public final class NativeApi {
         return new FixtureResult(new JSONObject("{\"comment\":{\"id\":\"c_new\",\"content\":\"Cảm ơn mọi người!\",\"author\":{\"id\":\"usr_qa_review\",\"name\":\"Minh Anh\",\"username\":\"minhanh\"},\"createdAt\":\"2026-11-13T00:10:00Z\"}}"), null, 200);
       }
       if ("GET".equals(method) && "/api/discover".equals(cleanPath)) {
+        if (path.contains("khong_tim_thay")) {
+          return new FixtureResult(new JSONObject("{\"users\":[],\"total\":0}"), null, 200);
+        }
         return new FixtureResult(new JSONObject("{\"users\":[{\"id\":\"u2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\",\"bio\":\"Nhiếp ảnh & Sáng tạo nội dung\"},{\"id\":\"u3\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\",\"bio\":\"Yêu âm nhạc & Du lịch\"}]}"), null, 200);
       }
       if ("GET".equals(method) && "/api/shorts".equals(cleanPath)) {

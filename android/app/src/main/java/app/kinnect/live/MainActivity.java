@@ -130,12 +130,14 @@ public class MainActivity extends Activity {
           navigate("discover");
         }
         else if(destination.equals("discover_results")){
-          nearQuery="cà phê";
           navigate("discover");
+          nearQuery="cà phê";
+          renderPeopleSearch();
         }
         else if(destination.equals("discover_empty")){
-          nearQuery="___khong_tim_thay___";
           navigate("discover");
+          nearQuery="___khong_tim_thay___";
+          renderPeopleSearch();
         }
         else if(destination.equals("shorts")||destination.equals("shorts_player")){
           navigate("shorts");
