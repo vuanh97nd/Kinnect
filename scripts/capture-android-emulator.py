@@ -23,18 +23,25 @@ def dismiss_system_dialogs():
     """Dismiss any launcher ANR / system crash overlays."""
     try:
         adb("shell", "am", "broadcast", "-a", "android.intent.action.CLOSE_SYSTEM_DIALOGS")
-        adb("shell", "input", "keyevent", "4")  # KEYCODE_BACK
-        adb("shell", "input", "keyevent", "66") # KEYCODE_ENTER
+        time.sleep(0.5)
+        # Check if an ANR dialog is visible
+        dump = adb("shell", "dumpsys", "window", "windows")
+        if "Application Not Responding" in dump or "is not responding" in dump:
+            print("[ANR] Detected system crash dialog, dismissing...")
+            adb("shell", "input", "keyevent", "66") # KEYCODE_ENTER (Wait)
+            time.sleep(0.5)
+            adb("shell", "input", "keyevent", "4")  # KEYCODE_BACK
     except Exception:
         pass
 
-def ensure_app_foreground():
-    for _ in range(5):
+def ensure_app_foreground(activity="MainActivity"):
+    target = f"app.kinnect.live/.{activity}"
+    for _ in range(8):
         focus = adb("shell", "dumpsys", "window")
-        if "app.kinnect.live" in focus:
+        if "mCurrentFocus" in focus and "app.kinnect.live" in focus:
             return True
         dismiss_system_dialogs()
-        adb("shell", "am", "start", "-n", "app.kinnect.live/.MainActivity", "--ez", "ui_review_fixture", "true")
+        adb("shell", "am", "start", "-n", target, "--ez", "ui_review_fixture", "true")
         time.sleep(1.5)
     return False
 
@@ -50,14 +57,14 @@ def main():
     subprocess.run(["adb", "wait-for-device"], check=True)
     
     # Wait for boot completion
-    for _ in range(30):
+    for _ in range(40):
         boot = adb("shell", "getprop", "sys.boot_completed")
         if boot == "1":
             break
         time.sleep(2)
     
     print("[Emulator] Device boot complete. Stabilizing system UI...")
-    time.sleep(4)
+    time.sleep(5)
     dismiss_system_dialogs()
     
     # Device metrics
@@ -76,7 +83,6 @@ def main():
     time.sleep(2)
     dismiss_system_dialogs()
     
-    # Load screen inventory
     if not INVENTORY_PATH.exists():
         print(f"[Error] Inventory not found at {INVENTORY_PATH}")
         sys.exit(1)
@@ -92,57 +98,57 @@ def main():
     seen_hashes = {}
     captures = []
     
-    # Map screen_id to intent destinations
+    # Detailed mapping to exercise specific nested sub-screens
     DEST_MAP = {
-        "SCR-01": "intro",
-        "SCR-02": "intro",
-        "SCR-03": "login",
-        "SCR-04": "register",
-        "SCR-05": "forgot",
-        "SCR-06": "feed",
-        "SCR-07": "feed",
-        "SCR-08": "feed",
-        "SCR-09": "feed",
-        "SCR-10": "feed",
-        "SCR-11": "discover",
-        "SCR-12": "discover",
-        "SCR-13": "discover",
-        "SCR-14": "shorts",
-        "SCR-15": "shorts",
-        "SCR-16": "inbox",
-        "SCR-17": "inbox",
-        "SCR-18": "inbox",
-        "SCR-19": "inbox",
-        "SCR-20": "friends",
-        "SCR-21": "friends",
-        "SCR-22": "account",
-        "SCR-23": "account",
-        "SCR-24": "account",
-        "SCR-25": "account",
-        "SCR-26": "settings",
-        "SCR-27": "settings",
-        "SCR-28": "settings",
-        "SCR-29": "notifications",
-        "SCR-30": "notifications",
-        "SCR-31": "settings",
-        "SCR-32": "settings",
-        "SCR-33": "settings",
-        "SCR-34": "settings",
-        "SCR-35": "settings",
-        "SCR-36": "store",
-        "SCR-37": "store",
-        "SCR-38": "live",
-        "SCR-39": "live",
-        "SCR-40": "live",
-        "SCR-41": "feed",
-        "SCR-42": "create",
-        "SCR-43": "create",
-        "SCR-44": "feed",
-        "SCR-45": "account",
-        "SCR-46": "feed",
-        "SCR-47": "account",
-        "SCR-48": "feed",
-        "SCR-49": "feed"
+        "SCR-01": ("MainActivity", "intro", "intro"),
+        "SCR-02": ("MainActivity", "intro", "welcome"),
+        "SCR-03": ("MainActivity", "login", "auth_login"),
+        "SCR-04": ("MainActivity", "register", "auth_register"),
+        "SCR-05": ("MainActivity", "forgot", "auth_forgot"),
+        "SCR-06": ("MainActivity", "feed", "feed_home"),
+        "SCR-07": ("MainActivity", "feed", "feed_story"),
+        "SCR-08": ("MainActivity", "feed", "feed_post_detail"),
+        "SCR-09": ("MainActivity", "feed", "feed_comments"),
+        "SCR-10": ("MainActivity", "feed", "feed_reactions"),
+        "SCR-11": ("MainActivity", "discover", "discover_search"),
+        "SCR-12": ("MainActivity", "discover", "discover_results"),
+        "SCR-13": ("MainActivity", "discover", "discover_empty"),
+        "SCR-14": ("MainActivity", "shorts", "shorts_player"),
+        "SCR-15": ("MainActivity", "shorts", "shorts_comments"),
+        "SCR-16": ("MainActivity", "inbox", "inbox_list"),
+        "SCR-17": ("MainActivity", "chat_direct", "chat_direct"),
+        "SCR-18": ("MainActivity", "chat_group", "chat_group"),
+        "SCR-19": ("MainActivity", "inbox", "chat_menu"),
+        "SCR-20": ("MainActivity", "friends", "friends_list"),
+        "SCR-21": ("MainActivity", "friend_requests", "friends_requests"),
+        "SCR-22": ("MainActivity", "account", "profile_main"),
+        "SCR-23": ("MainActivity", "profile_edit", "profile_edit"),
+        "SCR-24": ("MainActivity", "account", "profile_albums"),
+        "SCR-25": ("MainActivity", "account", "account_menu"),
+        "SCR-26": ("MainActivity", "settings", "appearance_settings"),
+        "SCR-27": ("MainActivity", "password", "security_password"),
+        "SCR-28": ("MainActivity", "settings", "sessions_devices"),
+        "SCR-29": ("MainActivity", "notifications", "notifications_screen"),
+        "SCR-30": ("MainActivity", "settings", "notifications_settings"),
+        "SCR-31": ("MainActivity", "settings", "privacy_settings"),
+        "SCR-32": ("MainActivity", "language", "language_settings"),
+        "SCR-33": ("MainActivity", "settings", "help_support"),
+        "SCR-34": ("MainActivity", "settings", "about_screen"),
+        "SCR-35": ("MainActivity", "settings", "delete_account_confirm"),
+        "SCR-36": ("MainActivity", "store", "wallet_main"),
+        "SCR-37": ("MainActivity", "store", "store_packages"),
+        "SCR-38": ("MainActivity", "live", "live_list"),
+        "SCR-39": ("MainActivity", "live", "live_setup_sheet"),
+        "SCR-40": ("MainActivity", "live", "live_gifts_drawer"),
+        "SCR-41": ("MainActivity", "feed", "call_incoming"),
+        "SCR-42": ("MainActivity", "create", "studio_camera"),
+        "SCR-43": ("MainActivity", "create", "studio_music_picker"),
+        "SCR-44": ("MainActivity", "feed", "feed_dark"),
+        "SCR-45": ("MainActivity", "account", "account_dark"),
+        "SCR-46": ("MainActivity", "feed", "feed_font13"),
+        "SCR-47": ("MainActivity", "account", "account_font13"),
+        "SCR-48": ("MainActivity", "feed", "feed_narrow"),
+        "SCR-49": ("MainActivity", "feed", "comments_narrow")
     }
 
     current_theme = "light"
@@ -156,7 +162,7 @@ def main():
     
     for row in rows:
         scr_id = row["screen_id"]
-        dest = DEST_MAP.get(scr_id, "feed")
+        act_name, dest, state_label = DEST_MAP.get(scr_id, ("MainActivity", "feed", "default"))
         theme = row.get("theme", "light")
         font_scale = row.get("fontScale", "1.0")
         res = row.get("resolution", "1080x2400")
@@ -189,15 +195,15 @@ def main():
             
         dismiss_system_dialogs()
         
-        # Launch target screen
+        # Launch target screen with fixture enabled
         is_fixture = "true" if scr_id not in ("SCR-01", "SCR-02") else "false"
-        adb("shell", "am", "start", "-n", "app.kinnect.live/.MainActivity",
+        adb("shell", "am", "start", "-n", f"app.kinnect.live/.{act_name}",
             "--ez", "ui_review_fixture", is_fixture,
             "-e", "commerce_destination", dest,
             "-e", "app_language", row.get("language", "vi"))
         time.sleep(2.5)
         
-        ensure_app_foreground()
+        ensure_app_foreground(act_name)
         
         # Screencap
         subprocess.run(["adb", "exec-out", "screencap", "-p"], stdout=open(target_path, "wb"), check=True)

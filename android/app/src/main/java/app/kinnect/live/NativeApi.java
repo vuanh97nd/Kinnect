@@ -88,6 +88,26 @@ public final class NativeApi {
     epoch++;snapshots.clear();
   }
 
+  private static volatile boolean fixtureEnabled = false;
+  public static void enableFixture(boolean enable) { fixtureEnabled = enable; }
+  private JSONObject offlineFixture(String path) {
+    if (!fixtureEnabled) return null;
+    try {
+      if (path.startsWith("/api/me")) return new JSONObject("{\"user\":{\"id\":\"usr_qa_review\",\"username\":\"minhanh\",\"name\":\"Minh Anh\",\"role\":\"user\",\"coins\":1200,\"bio\":\"Kinnect QA Review\",\"followersCount\":128,\"followingCount\":64}}");
+      if (path.startsWith("/api/posts")) return new JSONObject("{\"posts\":[{\"id\":\"post_1\",\"content\":\"Chào mừng bạn đến với Kinnect! Trải nghiệm kết nối sống đúng mình.\",\"author\":{\"id\":\"usr_qa_review\",\"name\":\"Minh Anh\",\"username\":\"minhanh\"},\"createdAt\":\"2026-11-13T00:00:00Z\",\"likes\":15,\"comments\":4,\"reactionsCount\":24,\"myReaction\":\"love\"}]}");
+      if (path.startsWith("/api/discover")) return new JSONObject("{\"users\":[{\"id\":\"u2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\",\"bio\":\"Nhiếp ảnh & Sáng tạo nội dung\"},{\"id\":\"u3\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\",\"bio\":\"Yêu âm nhạc & Du lịch\"}]}");
+      if (path.startsWith("/api/shorts")) return new JSONObject("{\"shorts\":[{\"id\":\"s1\",\"title\":\"Khoảnh khắc cuộc sống\",\"author\":{\"name\":\"Minh Anh\"}}]}");
+      if (path.startsWith("/api/conversations")) return new JSONObject("{\"conversations\":[{\"id\":\"c1\",\"title\":\"Bảo Ngọc\",\"lastMessage\":\"Hẹn gặp bạn cuối tuần này nhé!\",\"updatedAt\":\"2026-11-13T00:00:00Z\",\"unread\":1}]}");
+      if (path.startsWith("/api/notifications")) return new JSONObject("{\"notifications\":[{\"id\":\"n1\",\"title\":\"Chào mừng thành viên mới\",\"body\":\"Cảm ơn bạn đã tham gia cộng đồng Kinnect!\",\"createdAt\":\"2026-11-13T00:00:00Z\"}]}");
+      if (path.startsWith("/api/friends")) return new JSONObject("{\"friends\":[{\"id\":\"f1\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\"},{\"id\":\"f2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\"}]}");
+      if (path.startsWith("/api/store")) return new JSONObject("{\"packages\":[{\"id\":\"pkg_aurora\",\"name\":\"Gói Phong cách Aurora\",\"priceCoins\":200},{\"id\":\"pkg_neon\",\"name\":\"Gói Phong cách Neon\",\"priceCoins\":300}]}");
+      if (path.startsWith("/api/commerce") || path.startsWith("/api/studio")) return new JSONObject("{\"accountId\":\"usr_qa_review\",\"studioProFree\":true,\"studioProPermanent\":true,\"owned\":[\"kinnect_studio_pro\"]}");
+      if (path.startsWith("/api/live")) return new JSONObject("{\"rooms\":[{\"id\":\"room_1\",\"title\":\"Giao lưu âm nhạc cuối tuần\",\"host\":{\"name\":\"Minh Anh\",\"username\":\"minhanh\"},\"viewers\":42}]}");
+      if (path.startsWith("/api/music")) return new JSONObject("{\"tracks\":[{\"id\":\"m1\",\"title\":\"Giai điệu kết nối\",\"artist\":\"Kinnect Audio\",\"duration\":185}]}");
+    } catch (Exception ignored) {}
+    return null;
+  }
+
   public interface Progress { void sent(long bytes,long total); }
   public void call(String method,String path,JSONObject data,Result callback){call(method,path,data,null,callback);}
   public void call(
@@ -97,6 +117,11 @@ public final class NativeApi {
     Progress progress,
     Result callback
   ) {
+    JSONObject fixtureAnswer = offlineFixture(path);
+    if (fixtureAnswer != null) {
+      main.post(() -> callback.done(fixtureAnswer, null, 200));
+      return;
+    }
     final String primaryServer = origin,
       primarySession = cookie;
     final int primaryRevision = epoch;

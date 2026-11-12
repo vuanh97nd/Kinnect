@@ -80,12 +80,14 @@ public class MainActivity extends Activity {
   private void openAutostartSettings(){String m=Build.MANUFACTURER.toLowerCase(java.util.Locale.ROOT);Intent i=new Intent();try{if(m.contains("xiaomi")||m.contains("redmi")||m.contains("poco")){i.setComponent(new ComponentName("com.miui.securitycenter","com.miui.permcenter.autostart.AutoStartManagementActivity"));}else if(m.contains("oppo")||m.contains("realme")){try{i.setComponent(new ComponentName("com.coloros.safecenter","com.coloros.safecenter.permission.startup.StartupAppListActivity"));}catch(Exception e){i.setComponent(new ComponentName("com.oppo.safe","com.oppo.safe.permission.startup.StartupAppListActivity"));}}else if(m.contains("vivo")){try{i.setComponent(new ComponentName("com.iqoo.secure","com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity"));}catch(Exception e){i.setComponent(new ComponentName("com.vivo.permissionmanager","com.vivo.permissionmanager.activity.BgStartUpManagerActivity"));}}else if(m.contains("huawei")||m.contains("honor")){i.setComponent(new ComponentName("com.huawei.systemmanager","com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"));}else if(m.contains("samsung")){i.setComponent(new ComponentName("com.samsung.android.lool","com.samsung.android.sm.battery.ui.BatteryActivity"));}else{i=new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:"+getPackageName()));}i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);startActivity(i);}catch(Exception fallback){try{startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:"+getPackageName())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));}catch(Exception ignored){}}}
   private void handleExtras(Intent intent){
     if(intent==null)return;
+    boolean isDebug = (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
     if(intent.hasExtra("app_language")){
       String lang=intent.getStringExtra("app_language");
       if("vi".equals(lang)||"en".equals(lang))try{I18n.select(this,lang);}catch(Exception ignored){}
     }
-    if(intent.getBooleanExtra("ui_review_fixture",false)&&me==null){
-      try{
+    if(isDebug && intent.getBooleanExtra("ui_review_fixture",false)){
+      NativeApi.enableFixture(true);
+      if(me==null)try{
         me=new JSONObject("{\"id\":\"usr_qa_review\",\"username\":\"minhanh\",\"name\":\"Minh Anh\",\"role\":\"user\",\"coins\":1200,\"bio\":\"Kinnect QA Review\",\"followersCount\":128,\"followingCount\":64}");
         onUserSignedIn(me);
       }catch(Exception ignored){}
@@ -99,11 +101,21 @@ public class MainActivity extends Activity {
       if(destination.equals("intro")){intro();return;}
       if(me!=null){
         if(destination.equals("account"))meMenu();
+        else if(destination.equals("profile_edit"))editProfile();
+        else if(destination.equals("password"))changePassword();
+        else if(destination.equals("language"))languageMenu();
         else if(destination.equals("notifications"))notifications();
         else if(destination.equals("friends"))friendsScreen("friends");
+        else if(destination.equals("friend_requests"))friendsScreen("requests");
         else if(destination.equals("create"))openCreateMenu();
         else if(destination.equals("store"))storeScreen();
         else if(destination.equals("settings"))settings();
+        else if(destination.equals("chat_direct")){
+          try{chat(new JSONObject("{\"id\":\"usr_chat_mock\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\",\"isActive\":true}"));}catch(Exception ignored){}
+        }
+        else if(destination.equals("chat_group")){
+          try{groupChat(new JSONObject("{\"id\":\"grp_mock\",\"name\":\"Nhóm Âm Nhạc\",\"members\":[{},{},{}]}"));}catch(Exception ignored){}
+        }
         else navigate(destination);
       }
     }
@@ -149,7 +161,9 @@ public class MainActivity extends Activity {
     if (!WebTheme.isDark(this))
       getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
     splash();
-    if (getIntent() != null && getIntent().getBooleanExtra("ui_review_fixture", false)) {
+    boolean isDebug = (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+    if (isDebug && getIntent() != null && getIntent().getBooleanExtra("ui_review_fixture", false)) {
+      NativeApi.enableFixture(true);
       try {
         me = new JSONObject("{\"id\":\"usr_qa_review\",\"username\":\"minhanh\",\"name\":\"Minh Anh\",\"role\":\"user\",\"coins\":1200,\"bio\":\"Kinnect QA Review\",\"followersCount\":128,\"followingCount\":64}");
         onUserSignedIn(me);
@@ -187,7 +201,8 @@ public class MainActivity extends Activity {
     c.addView(logo, new LinearLayout.LayoutParams(dp(96), dp(96)));
     TextView name = label("Kinnect", 26, ACCENT);
     name.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
-    name.setPadding(0, dp(18), 0, dp(18));
+    name.setIncludeFontPadding(true);
+    name.setPadding(dp(16), dp(18), dp(16), dp(18));
     c.addView(name);
     FrameLayout rings=new FrameLayout(this);for(int i=0;i<2;i++){View ring=new View(this);GradientDrawable outline=background(0x00000000,99);outline.setStroke(dp(2),i==0?ACCENT:PINK);ring.setBackground(outline);FrameLayout.LayoutParams rp=new FrameLayout.LayoutParams(dp(20),dp(20),Gravity.CENTER);rings.addView(ring,rp);ring.setTranslationX(dp(i==0?-16:16));ring.animate().translationX(dp(i==0?-5:5)).setDuration(400).start();}LinearLayout.LayoutParams space=new LinearLayout.LayoutParams(-1,dp(42));space.topMargin=dp(18);c.addView(rings,space);
     s.addView(c, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
