@@ -14,7 +14,7 @@ packages:
 settings:
   base:
     MARKETING_VERSION: "1.2.12"
-    CURRENT_PROJECT_VERSION: "122"
+    CURRENT_PROJECT_VERSION: "123"
     SWIFT_VERSION: "5.0"
     IPHONEOS_DEPLOYMENT_TARGET: "16.0"
     TARGETED_DEVICE_FAMILY: "1,2"
@@ -40,7 +40,7 @@ targets:
           - en
         ITSAppUsesNonExemptEncryption: false
         CFBundleShortVersionString: "1.2.12"
-        CFBundleVersion: "122"
+        CFBundleVersion: "123"
         LSRequiresIPhoneOS: true
         CFBundleURLTypes:
           - CFBundleTypeRole: Editor

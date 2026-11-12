@@ -403,7 +403,7 @@ public class MainActivity extends Activity {
     getWindow().setNavigationBarColor(CARD);
     // Thanh trên giống web: logo · Live · Tin nhắn · Thông báo · tài khoản
     toolbar = row();
-    toolbar.setPadding(dp(16), 0, dp(12), 0); // Khoảng cách hai bên giống Pixel
+    toolbar.setPadding(dp(14), 0, dp(8), 0); // Thu nhỏ lề phải, dịch cụm biểu tượng sang phải
     toolbar.setBackgroundColor(CARD);
     toolbar.setElevation(dp(2)); // Drop shadow nhẹ ở Top App Bar
     ImageView logo = new ImageView(this);
@@ -434,11 +434,11 @@ public class MainActivity extends Activity {
       meButton.setClipToOutline(true);
       meButton.setImageBitmap(initials(me, dp(40)));
       loadAvatarInto(me, meButton);
-      meHolder.addView(meButton, new FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER));
+      meHolder.addView(meButton, new FrameLayout.LayoutParams(dp(26), dp(26), Gravity.CENTER));
       meHolder.setContentDescription(I18n.t("Tài khoản"));
       meHolder.setOnClickListener(v -> meMenu());
-      LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(dp(48), dp(48));
-      mp.setMargins(dp(4), 0, 0, 0);
+      LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(dp(38), dp(38));
+      mp.setMargins(dp(2), 0, 0, 0);
       toolbar.addView(meHolder, mp);
       refreshBadges();
     } else if (me == null) {
@@ -579,24 +579,24 @@ public class MainActivity extends Activity {
 
   private FrameLayout topIcon(String name, String label, boolean active, Runnable action, String badgeKey) {
     FrameLayout f = new FrameLayout(this);
-    ImageView i = icon(name, 24, active ? ACCENT : TEXT); // Tăng size M3 chuẩn 24dp cho TopBar icon
-    f.addView(i, new FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER));
+    ImageView i = icon(name, 22, active ? ACCENT : TEXT);
+    f.addView(i, new FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER));
     f.setBackground(pressable(active ? PRIMARY_SOFT : CARD, 99));
     if (badgeKey != null) {
       TextView badge = label("", 1, WHITE);
-      GradientDrawable bd = background(WebDesign.DANGER[WebTheme.isDark(this) ? 1 : 0], 99); // Màu đỏ thông báo chưa đọc
+      GradientDrawable bd = background(WebDesign.DANGER[WebTheme.isDark(this) ? 1 : 0], 99);
       bd.setStroke(dp(2), CARD);
       badge.setBackground(bd);
       badge.setVisibility(View.GONE);
-      FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(dp(12), dp(12), Gravity.TOP | Gravity.END); // Badge nhỉnh lên 12dp
-      bp.setMargins(0, dp(8), dp(6), 0);
+      FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(dp(10), dp(10), Gravity.TOP | Gravity.END);
+      bp.setMargins(0, dp(4), dp(4), 0);
       f.addView(badge, bp);
       if (badgeKey.equals("inbox")) inboxBadge = badge; else if (badgeKey.equals("friends")) friendsBadge = badge; else bellBadge = badge;
       showBadge(badge, badgeKey.equals("inbox") ? inboxCount : badgeKey.equals("friends") ? friendsCount : bellCount);
     }
     f.setContentDescription(label);
     f.setOnClickListener(v -> action.run());
-    f.setLayoutParams(new LinearLayout.LayoutParams(dp(48), dp(48))); // M3 touch target 48x48
+    f.setLayoutParams(new LinearLayout.LayoutParams(dp(38), dp(38)));
     return f;
   }
 
@@ -3217,10 +3217,10 @@ public class MainActivity extends Activity {
       navigate(tab.isEmpty() ? "feed" : tab);
       return;
     }
-    final int generation = screen;
     remember("friends", () -> friendsScreen(selected));
     headerActive = "friends";
     shell(I18n.t("Bạn bè"), true);
+    final int generation = screen;
     final String[] keys = { "friends", "incoming", "outgoing" };
     final String[] names = { "Bạn bè", "Lời mời", "Đã gửi" };
     int index = Arrays.asList(keys).indexOf(selected);
@@ -3236,7 +3236,9 @@ public class MainActivity extends Activity {
     final Handler searchHandler = new Handler(Looper.getMainLooper());
     final Runnable render = () -> {
       list.removeAllViews();
-      String q = search.getText().toString().trim().toLowerCase(Locale.ROOT).replaceFirst("^@", "");
+      String rawQ = search.getText().toString().trim();
+      String q = rawQ.toLowerCase(Locale.ROOT).replaceFirst("^@", "");
+      String normQ = LiveGamePicker.normalized(q);
       List<JSONObject> myFriends = new ArrayList<>();
       Set<String> friendIds = new HashSet<>();
       JSONArray users = loaded[0];
@@ -3244,9 +3246,18 @@ public class MainActivity extends Activity {
         JSONObject u = users.optJSONObject(i);
         if (u == null) continue;
         friendIds.add(u.optString("id"));
-        if (q.isEmpty() || (u.optString("name") + " " + u.optString("username")).toLowerCase(Locale.ROOT).contains(q)) myFriends.add(u);
+        if (normQ.isEmpty()) {
+          myFriends.add(u);
+        } else {
+          String name = u.optString("name", "");
+          String username = u.optString("username", "");
+          String normTarget = LiveGamePicker.normalized(name + " " + username + " @" + username);
+          if (normTarget.contains(normQ) || (name + " " + username).toLowerCase(Locale.ROOT).contains(q)) {
+            myFriends.add(u);
+          }
+        }
       }
-      if (q.isEmpty()) {
+      if (normQ.isEmpty()) {
         if (myFriends.isEmpty()) {
           list.addView(emptyBlock("users_round", I18n.t("Chưa có ") + names[Math.max(0, Arrays.asList(keys).indexOf(selected))].toLowerCase(Locale.ROOT), I18n.t("Lời mời và kết nối mới sẽ hiển thị tại đây.")));
         } else if (selected.equals("friends")) {
@@ -3259,7 +3270,7 @@ public class MainActivity extends Activity {
           List<JSONObject> suggestions = new ArrayList<>();
           for (int i = 0; suggested[0] != null && i < suggested[0].length() && suggestions.size() < 6; i++) {
             JSONObject u = suggested[0].optJSONObject(i);
-            suggestions.add(u);
+            if (u != null) suggestions.add(u);
           }
           if (!suggestions.isEmpty()) friendSection(list, I18n.t("Gợi ý kết bạn"), suggestions, "suggestion", selected);
         }
@@ -3283,7 +3294,13 @@ public class MainActivity extends Activity {
           }
           if (myFriends.isEmpty() && otherPeople.isEmpty()) {
             if (discoverResults[0] != null) {
-              list.addView(emptyBlock("users_round", I18n.t("Không tìm thấy kết quả"), I18n.t("Không có thành viên nào khớp với \"") + q + "\"."));
+              list.addView(emptyBlock("users_round", I18n.t("Không tìm thấy kết quả"), I18n.t("Không có thành viên nào khớp với \"") + rawQ + "\"."));
+            } else {
+              LinearLayout loading = row();
+              loading.setGravity(Gravity.CENTER);
+              loading.setPadding(0, dp(24), 0, dp(16));
+              loading.addView(label(I18n.t("Đang tìm kiếm trên Kinnect…"), 14, MUTED));
+              list.addView(loading);
             }
           }
         } else if (myFriends.isEmpty()) {
@@ -3291,28 +3308,37 @@ public class MainActivity extends Activity {
         }
       }
     };
+    final Runnable doSearch = () -> {
+      final String rawQ = search.getText().toString().trim();
+      final String q = rawQ.toLowerCase(Locale.ROOT).replaceFirst("^@", "");
+      if (q.length() >= 1 && selected.equals("friends")) {
+        request("GET", "/api/discover?q=" + encode(q), null, data -> {
+          if (generation != screen || isDestroyed()) return;
+          String activeQ = search.getText().toString().trim().toLowerCase(Locale.ROOT).replaceFirst("^@", "");
+          if (!activeQ.equals(q)) return;
+          discoverResults[0] = data == null ? null : data.optJSONArray("users");
+          render.run();
+        });
+      } else {
+        discoverResults[0] = null;
+      }
+    };
     search.addTextChangedListener(new android.text.TextWatcher() {
       public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
       public void onTextChanged(CharSequence s, int a, int b, int c) {}
       public void afterTextChanged(android.text.Editable s) {
-        final String q = search.getText().toString().trim().toLowerCase(Locale.ROOT).replaceFirst("^@", "");
         render.run();
         searchHandler.removeCallbacksAndMessages(null);
-        if (q.length() >= 1 && selected.equals("friends")) {
-          searchHandler.postDelayed(() -> {
-            if (generation != screen || isDestroyed()) return;
-            request("GET", "/api/discover?q=" + encode(q), null, data -> {
-              if (generation != screen || isDestroyed()) return;
-              String activeQ = search.getText().toString().trim().toLowerCase(Locale.ROOT).replaceFirst("^@", "");
-              if (!activeQ.equals(q)) return;
-              discoverResults[0] = data == null ? null : data.optJSONArray("users");
-              render.run();
-            });
-          }, 300);
-        } else {
-          discoverResults[0] = null;
-        }
+        searchHandler.postDelayed(() -> {
+          if (generation != screen || isDestroyed()) return;
+          doSearch.run();
+        }, 250);
       }
+    });
+    search.setOnEditorActionListener((v, actionId, event) -> {
+      searchHandler.removeCallbacksAndMessages(null);
+      doSearch.run();
+      return false;
     });
     cachedRequest(selected.equals("friends") ? "/api/friends" : "/api/friend-requests", data -> {
       loaded[0] = data.optJSONArray(selected.equals("friends") ? "users" : selected);
@@ -4526,7 +4552,7 @@ public class MainActivity extends Activity {
 
 
   private TextView welcomeText(String text,int size,int color,boolean bold){TextView v=label(text,size,color);v.setPadding(0,0,0,0);v.setLineSpacing(dp(3),1f);if(bold)v.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));return v;}
-  private LinearLayout welcomeBrand(){LinearLayout brand=row();brand.setBaselineAligned(false);ImageView logo=new ImageView(this);logo.setImageResource(getResources().getIdentifier("kinnect_logo","drawable",getPackageName()));logo.setScaleType(ImageView.ScaleType.FIT_CENTER);brand.addView(logo,new LinearLayout.LayoutParams(dp(34),dp(34)));TextView name=welcomeText("Kinnect",19,ACCENT,true);name.setPadding(dp(9),0,0,0);name.setSingleLine(true);name.setAutoSizeTextTypeUniformWithConfiguration(12,19,1,android.util.TypedValue.COMPLEX_UNIT_SP);name.setEllipsize(android.text.TextUtils.TruncateAt.END);brand.addView(name,new LinearLayout.LayoutParams(0,-2,1));return brand;}
+  private LinearLayout welcomeBrand(){LinearLayout brand=row();brand.setBaselineAligned(false);ImageView logo=new ImageView(this);logo.setImageResource(getResources().getIdentifier("kinnect_logo","drawable",getPackageName()));logo.setScaleType(ImageView.ScaleType.FIT_CENTER);brand.addView(logo,new LinearLayout.LayoutParams(dp(34),dp(34)));TextView name=welcomeText("Kinnect",19,ACCENT,true);name.setPadding(dp(9),0,0,0);name.setSingleLine(true);brand.addView(name,new LinearLayout.LayoutParams(-2,-2));brand.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));return brand;}
   private void welcomeFeature(String glyph,String title,String description,int color){
     LinearLayout panel=column();panel.setPadding(dp(18),dp(19),dp(18),dp(19));panel.setBackground(outlined(CARD,20));LinearLayout line=row();FrameLayout bubble=new FrameLayout(this);bubble.setBackground(background((color&0x00ffffff)|0x18000000,14));bubble.addView(icon(glyph,23,color),new FrameLayout.LayoutParams(dp(23),dp(23),Gravity.CENTER));line.addView(bubble,new LinearLayout.LayoutParams(dp(46),dp(46)));LinearLayout words=column();words.setPadding(dp(13),0,0,0);words.addView(welcomeText(title,17,TEXT,true));TextView detail=welcomeText(description,14,MUTED,false);detail.setPadding(0,dp(6),0,0);words.addView(detail);line.addView(words,new LinearLayout.LayoutParams(0,-2,1));panel.addView(line);LinearLayout.LayoutParams space=new LinearLayout.LayoutParams(-1,-2);space.topMargin=dp(10);content.addView(panel,space);
   }
@@ -6106,9 +6132,9 @@ public class MainActivity extends Activity {
   }
 
   private FrameLayout chatHeaderButton(String glyph,String description,Runnable action){
-    FrameLayout button=new FrameLayout(this);button.setBackgroundColor(android.graphics.Color.TRANSPARENT);ImageView image=new ImageView(this);
+    FrameLayout button=new FrameLayout(this);button.setBackground(pressable(PRIMARY_SOFT,99));ImageView image=new ImageView(this);
     if(glyph.equals("menu_lines"))image.setImageDrawable(new SettingsGlyph("menu_lines",ACCENT,PRIMARY_SOFT));else image.setImageDrawable(WebIcons.load(this,glyph));image.setImageTintList(android.content.res.ColorStateList.valueOf(ACCENT));
-    button.addView(image,new FrameLayout.LayoutParams(dp(22),dp(22),Gravity.CENTER));button.setContentDescription(description);button.setOnClickListener(v->action.run());LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(dp(44),dp(44));p.leftMargin=dp(6);button.setLayoutParams(p);return button;
+    button.addView(image,new FrameLayout.LayoutParams(dp(20),dp(20),Gravity.CENTER));button.setContentDescription(description);button.setOnClickListener(v->action.run());LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(dp(38),dp(38));p.leftMargin=dp(6);button.setLayoutParams(p);return button;
   }
   private JSONArray mentionIds(String body,JSONObject group){JSONArray ids=new JSONArray(),members=group==null?null:group.optJSONArray("members");for(int i=0;members!=null&&i<members.length();i++){JSONObject u=members.optJSONObject(i);if(!u.optString("id").equals(me.optString("id"))&&ChatTextPolicy.mentionIndex(body,u.optString("username"))>=0)ids.put(u.optString("id"));}return ids;}
   private void installMentions(final EditText input,final JSONObject group){
@@ -6127,11 +6153,11 @@ public class MainActivity extends Activity {
 
   private FrameLayout softIconButton(String name, String label, Runnable action) {
     FrameLayout f = new FrameLayout(this);
-    f.setBackgroundColor(android.graphics.Color.TRANSPARENT);
-    f.addView(icon(name, 22, ACCENT), new FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER));
+    f.setBackground(pressable(PRIMARY_SOFT, 99));
+    f.addView(icon(name, 20, ACCENT), new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
     f.setContentDescription(label);
     f.setOnClickListener(v -> action.run());
-    LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(dp(44), dp(44));
+    LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(dp(38), dp(38));
     p.leftMargin = dp(6);
     f.setLayoutParams(p);
     return f;

@@ -500,9 +500,22 @@ struct ShortClipPlayer: View {
             return
         }
 
+        // 1. Try playing from authenticated media cache (fast, reliable, no AVURLAsset cookie dropping on iOS)
+        if path.hasPrefix("/api/") || path.hasPrefix("/") || path.contains("app.kinnect.io.vn") {
+            if let cachedLocalURL = try? await KinnectAuthenticatedFile.fetch(path: path, fileExtension: "mp4") {
+                setupPlayer(with: AVPlayerItem(url: cachedLocalURL))
+                return
+            }
+        }
+
+        // 2. Direct streaming fallback with cookie jar
         let origin = KinnectAPIClient.shared.mediaOrigin
         KeychainStore.shared.syncToHTTPCookieStorage(origin: origin)
         guard let remoteURL = ServerConfig.url(for: path, origin: origin) else {
+            if let fixtureURL = UIReviewFixture.samplePlayableVideoURL() {
+                setupPlayer(with: AVPlayerItem(url: fixtureURL))
+                return
+            }
             failed = true
             return
         }

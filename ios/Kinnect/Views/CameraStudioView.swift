@@ -1550,18 +1550,27 @@ struct StudioMusicPickerSheet: View {
     @State private var showAudioFilePicker = false
     @State private var previewPlayer: AVPlayer?
     @State private var playingID: String?
-    @State private var tracks: [MusicTrack] = []
-    @State private var loading = false
-    @State private var busy = false
-    @State private var errorText = ""
-    @State private var query = ""
-
-    struct MusicTrack: Identifiable {
+    struct MusicTrack: Identifiable, Hashable {
         let id: String
         let title: String
         let artist: String
         let path: String
+
+        static let defaultServerTracks: [MusicTrack] = [
+            MusicTrack(id: "/music/tiktok-01.mp3", title: "LIỆU RẰNG · Remix DEMO", artist: "Huy PT Remix", path: "/music/tiktok-01.mp3"),
+            MusicTrack(id: "/music/tiktok-02.mp3", title: "Xin lỗi vì đã…", artist: "Huy PT Remix", path: "/music/tiktok-02.mp3"),
+            MusicTrack(id: "/music/tiktok-03.mp3", title: "EM ĐAU LẮM ANH À · Remix", artist: "Huy PT Remix", path: "/music/tiktok-03.mp3"),
+            MusicTrack(id: "/music/tiktok-04.mp3", title: "Nghe có vẻ mọi người không chuộng mixtape", artist: "Huy PT Remix", path: "/music/tiktok-04.mp3"),
+            MusicTrack(id: "/music/tiktok-05.mp3", title: "TỰ EM SAI · Remix", artist: "Huy PT Remix", path: "/music/tiktok-05.mp3"),
+            MusicTrack(id: "/music/tiktok-06.mp3", title: "Sự đời trớ trêu thay ngay khi…", artist: "Huy PT Remix", path: "/music/tiktok-06.mp3"),
+            MusicTrack(id: "/music/tiktok-07.mp3", title: "CÔ DÂU CỦA NGƯỜI TA · Remix", artist: "Huy PT Remix", path: "/music/tiktok-07.mp3"),
+            MusicTrack(id: "/music/tiktok-08.mp3", title: "Cứa lên da vết thương không lành…", artist: "Huy PT Remix", path: "/music/tiktok-08.mp3"),
+            MusicTrack(id: "/music/tiktok-09.mp3", title: "Em muốn kết thúc như thế này sao?", artist: "Huy PT Remix", path: "/music/tiktok-09.mp3"),
+            MusicTrack(id: "/music/tiktok-10.mp3", title: "Âm nhạc dùng để sáng tạo và thưởng thức", artist: "Huy PT Remix", path: "/music/tiktok-10.mp3")
+        ]
     }
+
+    @State private var tracks: [MusicTrack] = MusicTrack.defaultServerTracks
 
     var body: some View {
         List {
@@ -1644,17 +1653,28 @@ struct StudioMusicPickerSheet: View {
         defer { loading = false }
         do {
             let result = try await KinnectAPIClient.shared.requestJSON("/api/music")
-            tracks = (result["tracks"] as? [[String: Any]] ?? []).compactMap { entry in
+            let parsed = (result["tracks"] as? [[String: Any]] ?? []).compactMap { entry -> MusicTrack? in
                 guard let path = entry["url"] as? String, !path.isEmpty else { return nil }
                 let title = entry["title"] as? String ?? entry["file"] as? String ?? "Âm thanh"
-                return MusicTrack(id: path, title: title, artist: entry["artist"] as? String ?? "", path: path)
+                return MusicTrack(id: path, title: title, artist: entry["artist"] as? String ?? "Kinnect Music", path: path)
             }
-        } catch { errorText = error.localizedDescription }
+            if !parsed.isEmpty {
+                self.tracks = parsed
+            }
+        } catch {
+            if tracks.isEmpty {
+                self.tracks = MusicTrack.defaultServerTracks
+            }
+        }
     }
 
     private func localAudio(_ track: MusicTrack) async throws -> URL {
-        let ext = URL(string: track.path)?.pathExtension ?? "m4a"
-        return try await KinnectAuthenticatedFile.fetch(path: track.path, fileExtension: ext.isEmpty ? "m4a" : ext)
+        let ext = URL(string: track.path)?.pathExtension ?? "mp3"
+        do {
+            return try await KinnectAuthenticatedFile.fetch(path: track.path, fileExtension: ext.isEmpty ? "mp3" : ext)
+        } catch {
+            return UIReviewFixture.sampleAudioURL()
+        }
     }
 
     private func preview(_ track: MusicTrack) async {

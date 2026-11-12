@@ -809,8 +809,22 @@ extension NativeWebRTCManager: RTCPeerConnectionDelegate {
 
     func peerConnection(_ peerConnection: RTCPeerConnection, didOpen dataChannel: RTCDataChannel) {}
 
+    func peerConnection(_ peerConnection: RTCPeerConnection, didAdd stream: RTCMediaStream) {
+        DispatchQueue.main.async {
+            guard self.callPeerConnection === peerConnection else { return }
+            if let track = stream.videoTracks.first {
+                self.remoteVideoTrack = track
+            }
+        }
+    }
+
     func peerConnection(_ peerConnection: RTCPeerConnection, didAdd rtpReceiver: RTCRtpReceiver, streams mediaStreams: [RTCMediaStream]) {
         if let track = rtpReceiver.track as? RTCVideoTrack {
+            DispatchQueue.main.async {
+                guard self.callPeerConnection === peerConnection else { return }
+                self.remoteVideoTrack = track
+            }
+        } else if let track = mediaStreams.first?.videoTracks.first {
             DispatchQueue.main.async {
                 guard self.callPeerConnection === peerConnection else { return }
                 self.remoteVideoTrack = track

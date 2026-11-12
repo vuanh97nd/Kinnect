@@ -21,9 +21,9 @@ CORE={
 'shopping_bag':['M4 8H20V18.5Q20 21 17.5 21H6.5Q4 21 4 18.5Z','M4 8L6.5 3H17.5L20 8M8 8V10Q8 14 12 14Q16 14 16 10V8'],
 'wallet':['M20.5 7V4.5H6Q3 4.5 3 7.5V17.5Q3 20.5 6 20.5H21V9H6Q3 9 3 7.5','M21 12H15.5Q14 12 14 13.5V16Q14 17.5 15.5 17.5H21M17 14.8H17.1'],
 'camera':['M4.8 6H7L8.7 3.5H15.3L17 6H19.2Q21.5 6 21.5 8.5V18Q21.5 20.5 19 20.5H5Q2.5 20.5 2.5 18V8.5Q2.5 6 4.8 6Z','M16 13A4 4 0 1 1 8 13A4 4 0 1 1 16 13Z'],
-'video':['M5 5H14Q17 5 17 8V16Q17 19 14 19H5Q2 19 2 16V8Q2 5 5 5Z','M17 9L22 6V18L17 15Z'],
-'phone':['M22 16.9V19.9Q22 22 19.8 22Q3 21 2 4.2Q2 2 4.1 2H7.1Q9.1 2 9.5 3.7L10.5 6.3Q11 7.7 9.9 8.8L8.7 10Q11 14.5 15 16.8L16.2 15.6Q17.3 14.5 18.7 15L21.3 16Q22 16.4 22 16.9Z'],
-'phone_off':['M3 3L21 21M9 3H5Q3 3 3 5Q3 15 13 21Q15 21 17 21V17L12 15L10 17M9 9L11 7L9 3'],
+'video':['M4 6h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z','M16 10.5l5.22-3.48a.5.5 0 0 1 .78.42v9.12a.5.5 0 0 1-.78.42L16 13.5v-3z'],
+'phone':['M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z'],
+'phone_off':['M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91','M22 2L2 22'],
 'mic':['M15.5 6V11Q15.5 14.5 12 14.5Q8.5 14.5 8.5 11V6Q8.5 2.5 12 2.5Q15.5 2.5 15.5 6Z','M5 11Q5 18 12 18Q19 18 19 11M12 18V22M8 22H16'],
 'volume_2':['M10 5L5.5 9H2.5V15H5.5L10 19Z','M14 8Q18 12 14 16M17 4.5Q24 12 17 19.5'],
 'switch_camera':['M4 8Q9 0 17 4L21 8M21 3V8H16','M20 16Q15 24 7 20L3 16M3 21V16H8'],
@@ -99,7 +99,7 @@ for key,paths in CORE.items():
  if not any(x['resource']==name for x in catalog):
   E.ElementTree(vector(paths)).write(D/(name+'.xml'),encoding='utf-8');catalog.append({'resource':name,'source':None,'redrawn':True,'category':'interface'})
 # System notifications cannot load a runtime wrapper, so use the same new vector there.
-for name in ['bell','message_circle','video']:
+for name in ['bell','message_circle','video','phone']:
  flow=D/('ic_flow_web_'+name+'.xml')
  if flow.exists():(D/('ic_web_'+name+'.xml')).write_bytes(flow.read_bytes())
 target=R/'android/design/icon-family.json';target.parent.mkdir(exist_ok=True)

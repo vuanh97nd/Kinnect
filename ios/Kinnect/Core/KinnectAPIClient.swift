@@ -62,7 +62,7 @@ final class KinnectAPIClient {
             "/api/me", "/api/posts", "/api/stories", "/api/discover", "/api/shorts",
             "/api/conversations", "/api/groups", "/api/notifications",
             "/api/friends", "/api/friend-requests", "/api/friend-suggestions",
-            "/api/store", "/api/wallet", "/api/live/gifts"
+            "/api/store", "/api/wallet", "/api/live/gifts", "/api/music"
         ]
         if allowedExact.contains(base) { return true }
         if base.hasPrefix("/api/users/") || base.hasPrefix("/api/groups/") || base.hasPrefix("/api/chat-preferences/") {
@@ -267,23 +267,34 @@ enum KinnectAuthenticatedFile {
         if path.hasPrefix("file://"), let url = URL(string: path) {
             return url
         }
+        let safeExt = fileExtension.trimmingCharacters(in: CharacterSet(charactersIn: ".")).lowercased()
+        let cleanExt = safeExt.isEmpty ? "mp4" : safeExt
+        let safeKey = "media_" + path.replacingOccurrences(of: "[^a-zA-Z0-9_-]", with: "_", options: .regularExpression).prefix(64) + ".\(cleanExt)"
+        let destination = FileManager.default.temporaryDirectory.appendingPathComponent(safeKey)
+
+        if FileManager.default.fileExists(atPath: destination.path),
+           let attrs = try? FileManager.default.attributesOfItem(atPath: destination.path),
+           let size = attrs[.size] as? UInt64, size > 1024 {
+            return destination
+        }
+
         let origin = KinnectAPIClient.shared.mediaOrigin
         guard let remote = ServerConfig.url(for: path, origin: origin) else {
             throw KinnectAPIError.invalidURL
         }
         var request = URLRequest(url: remote)
+        request.setValue(origin, forHTTPHeaderField: "Origin")
+        request.setValue("KinnectiOS/\(ServerConfig.appVersion) (Build \(ServerConfig.buildNumber))", forHTTPHeaderField: "User-Agent")
         let cookie = KeychainStore.shared.cookieJarHeader(for: origin)
-        if !cookie.isEmpty, remote.host == URL(string: origin)?.host {
+        if !cookie.isEmpty {
             request.setValue(cookie, forHTTPHeaderField: "Cookie")
         }
         let (temporary, response) = try await URLSession.shared.download(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw KinnectAPIError.networkError("Không tải được media.")
+            throw KinnectAPIError.networkError("Không tải được media (mã \((response as? HTTPURLResponse)?.statusCode ?? 0)).")
         }
-        let destination = FileManager.default.temporaryDirectory
-            .appendingPathComponent("kinnect-media-\(UUID().uuidString).\(fileExtension)")
         if FileManager.default.fileExists(atPath: destination.path) {
-            try FileManager.default.removeItem(at: destination)
+            try? FileManager.default.removeItem(at: destination)
         }
         try FileManager.default.moveItem(at: temporary, to: destination)
         return destination

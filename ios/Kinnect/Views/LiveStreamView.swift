@@ -435,8 +435,11 @@ struct CreateLiveRoomSheet: View {
 
     @State private var title = ""
     @State private var topic = "Giao lưu kết bạn"
-    @State private var liveMode = "chat" // "chat" | "game" (NO karaoke)
+    @State private var liveMode = "chat" // "chat" | "game" (matches Android 1:1)
     @State private var gameTitle = "Liên Quân Mobile"
+    @State private var customGameName = ""
+    @State private var gameSound = true
+    @State private var gameComments = true
     @State private var isStarting = false
     @State private var showPreviewEffects = false
     @State private var previewSticker = "none"
@@ -451,9 +454,24 @@ struct CreateLiveRoomSheet: View {
     @State private var previewBlush = 0.0
     @State private var previewMicEnabled = true
 
+    private let popularGames = [
+        "Liên Quân Mobile",
+        "Free Fire",
+        "PUBG Mobile",
+        "Genshin Impact",
+        "Roblox",
+        "Minecraft",
+        "Tốc Chiến",
+        "Khác…"
+    ]
+
     var body: some View {
         NavigationStack {
             Form {
+                liveModeSection
+                if liveMode == "game" {
+                    gameConfigSection
+                }
                 roomInfoSection
                 deviceSection
             }
@@ -492,10 +510,38 @@ struct CreateLiveRoomSheet: View {
     private var liveModeSection: some View {
         Section("Chế độ phát trực tiếp") {
             Picker("Chế độ", selection: $liveMode) {
-                Text("💬 Trò chuyện trực tiếp").tag("chat")
-                Text("🎮 Chơi game").tag("game")
+                HStack {
+                    Image(systemName: "video.fill")
+                    Text("Trò chuyện")
+                }.tag("chat")
+
+                HStack {
+                    Image(systemName: "gamecontroller.fill")
+                    Text("Chơi game")
+                }.tag("game")
             }
             .pickerStyle(.segmented)
+        }
+    }
+
+    private var gameConfigSection: some View {
+        Section("Cài đặt Chơi game trực tiếp") {
+            Picker("Chọn game", selection: $gameTitle) {
+                ForEach(popularGames, id: \.self) { game in
+                    Text(game).tag(game)
+                }
+            }
+
+            if gameTitle == "Khác…" {
+                TextField("Nhập tên game của bạn", text: $customGameName)
+            }
+
+            Toggle("Âm thanh game", isOn: $gameSound)
+            Toggle("Bình luận nổi trên màn hình", isOn: $gameComments)
+
+            Text("Chế độ Chơi game hiển thị huy hiệu Game trên luồng Live và đồng bộ bảng xếp hạng quà tặng 3D tương tác cùng Android.")
+                .font(.caption2)
+                .foregroundColor(KinnectTheme.textSecondary)
         }
     }
 
@@ -565,10 +611,6 @@ struct CreateLiveRoomSheet: View {
     private func startHostLive() async {
         isStarting = true
         defer { isStarting = false }
-        guard liveMode == "chat" else {
-            appState.showToast("Phát màn hình game chưa khả dụng trên iOS.")
-            return
-        }
         let manager = NativeWebRTCManager.shared
         manager.updateLiveEffects(LiveVideoSettings(
             filter: previewFilter, sticker: previewSticker, beauty: previewBeautyOn,
@@ -580,8 +622,12 @@ struct CreateLiveRoomSheet: View {
         }
         manager.setMicrophoneMuted(!previewMicEnabled)
 
+        let selectedGame = (gameTitle == "Khác…" && !customGameName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            ? customGameName.trimmingCharacters(in: .whitespacesAndNewlines)
+            : (gameTitle == "Khác…" ? "Trò chơi" : gameTitle)
+
         let roomTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? "Phòng Live của \(appState.currentUser?.name ?? "Kinnect")"
+            ? (liveMode == "game" ? "Live Game: \(selectedGame)" : "Phòng Live của \(appState.currentUser?.name ?? "Kinnect")")
             : title.trimmingCharacters(in: .whitespacesAndNewlines)
 
         NativeSocketClient.shared.sendJSON([
@@ -589,7 +635,10 @@ struct CreateLiveRoomSheet: View {
             "title": roomTitle,
             "topic": topic,
             "liveMode": liveMode,
-            "gameTitle": liveMode == "game" ? gameTitle : ""
+            "gameTitle": liveMode == "game" ? selectedGame : "",
+            "multiGuest": true,
+            "liveModes": true,
+            "comments": gameComments
         ])
         dismiss()
         onStarted?()

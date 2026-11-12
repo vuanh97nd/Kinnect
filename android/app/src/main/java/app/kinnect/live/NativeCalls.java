@@ -46,7 +46,7 @@ final class NativeCalls implements NativeSocket.Events {
  private GradientDrawable oval(int color){GradientDrawable g=new GradientDrawable();g.setShape(GradientDrawable.OVAL);g.setColor(color);return g;}
  private ImageView glyph(String name,int color){ImageView i=new ImageView(activity);android.graphics.drawable.Drawable d=WebIcons.load(activity,name);d.setTint(color);i.setImageDrawable(d);return i;}
  /** Round control with caption, styled like a phone dialer. */
- private LinearLayout control(String icon,String label,int size,int fill,Runnable task){LinearLayout c=new LinearLayout(activity);c.setOrientation(1);c.setGravity(Gravity.CENTER_HORIZONTAL);FrameLayout b=new FrameLayout(activity);b.setBackground(new RippleDrawable(ColorStateList.valueOf(0x55ffffff),oval(fill),null));b.addView(glyph(icon,0xffffffff),new FrameLayout.LayoutParams(dp(size*.42f),dp(size*.42f),Gravity.CENTER));b.setOnClickListener(v->task.run());c.addView(b,new LinearLayout.LayoutParams(dp(size),dp(size)));TextView t=new KinnectText(activity);t.setText(I18n.t(label));t.setTextSize(12);t.setTextColor(0xe6ffffff);t.setPadding(0,dp(10),0,0);t.setMaxLines(2);t.setGravity(Gravity.CENTER);t.setIncludeFontPadding(false);c.addView(t,new LinearLayout.LayoutParams(-1,dp(40)));return c;}
+ private LinearLayout control(String icon,String label,int size,int fill,Runnable task){LinearLayout c=new LinearLayout(activity);c.setOrientation(1);c.setGravity(Gravity.CENTER_HORIZONTAL);FrameLayout b=new FrameLayout(activity);b.setBackground(new RippleDrawable(ColorStateList.valueOf(0x55ffffff),oval(fill),null));b.addView(glyph(icon,0xffffffff),new FrameLayout.LayoutParams(dp(size*.48f),dp(size*.48f),Gravity.CENTER));b.setOnClickListener(v->task.run());c.addView(b,new LinearLayout.LayoutParams(dp(size),dp(size)));TextView t=new KinnectText(activity);t.setText(I18n.t(label));t.setTextSize(12);t.setTextColor(0xe6ffffff);t.setPadding(0,dp(10),0,0);t.setMaxLines(2);t.setGravity(Gravity.CENTER);t.setIncludeFontPadding(false);c.addView(t,new LinearLayout.LayoutParams(-1,dp(40)));return c;}
  /** Highlighted = solid white with dark glyph (speaker on, mic muted, camera off). */
  private void toggle(LinearLayout c,boolean on){FrameLayout b=(FrameLayout)c.getChildAt(0);b.setBackground(new RippleDrawable(ColorStateList.valueOf(0x55888888),oval(on?0xffffffff:0x33ffffff),null));((ImageView)b.getChildAt(0)).setColorFilter(on?0xff1b1240:0xffffffff);}
  private void open(JSONObject person){ending=false;String name=person==null?"Kinnect":person.optString("name","Kinnect");boolean video=!mode.equals("audio");
@@ -74,15 +74,15 @@ final class NativeCalls implements NativeSocket.Events {
   final LinearLayout[] spk=new LinearLayout[1],micB=new LinearLayout[1],camB=new LinearLayout[1];
   speaker=video;spk[0]=control("volume_2","Loa",56,0x33ffffff,()->{speaker=!speaker;if(audio!=null)audio.setSpeakerphoneOn(speaker);toggle(spk[0],speaker);});toggle(spk[0],speaker);
   micB[0]=control("mic","Mic",56,0x33ffffff,()->{if(rtc==null)return;mic[0]=!mic[0];rtc.microphone(mic[0]);toggle(micB[0],!mic[0]);});
-  LinearLayout endB=control("phone_off","Kết thúc",56,0xffff3b4f,()->end(true));
+  LinearLayout endB=control("call_decline","Kết thúc",56,0xffff3b4f,()->end(true));
   if(video){camB[0]=control("video","Camera",56,0x33ffffff,()->{if(rtc==null)return;cam[0]=!cam[0];rtc.camera(cam[0]);toggle(camB[0],!cam[0]);});
    row.addView(camB[0],new LinearLayout.LayoutParams(0,-2,1));row.addView(micB[0],new LinearLayout.LayoutParams(0,-2,1));row.addView(spk[0],new LinearLayout.LayoutParams(0,-2,1));
    row.addView(endB,new LinearLayout.LayoutParams(0,-2,1));bar.addView(row,new LinearLayout.LayoutParams(-1,-2));}
   else{row.setGravity(Gravity.CENTER_VERTICAL);row.addView(spk[0],new LinearLayout.LayoutParams(0,-2,1));row.addView(endB,new LinearLayout.LayoutParams(0,-2,1));row.addView(micB[0],new LinearLayout.LayoutParams(0,-2,1));bar.addView(row,new LinearLayout.LayoutParams(-1,-2));}
   controls=bar;
   LinearLayout inc=new LinearLayout(activity);inc.setGravity(Gravity.CENTER);
-  inc.addView(control("phone_off","Từ chối",56,0xffff3b4f,()->end(true)),new LinearLayout.LayoutParams(0,-2,1));
-  LinearLayout ok=control(video?"video":"phone","Nhận",56,0xff22c55e,this::accept);inc.addView(ok,new LinearLayout.LayoutParams(0,-2,1));
+  inc.addView(control("call_decline","Từ chối",56,0xffff3b4f,()->end(true)),new LinearLayout.LayoutParams(0,-2,1));
+  LinearLayout ok=control(video?"video":"call_accept","Nhận",56,0xff22c55e,this::accept);inc.addView(ok,new LinearLayout.LayoutParams(0,-2,1));
   
   incomingBar=inc;
   FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM);cp.setMargins(dp(16),0,dp(16),dp(72));

@@ -125,7 +125,7 @@ struct FriendsView: View {
                                 sectionHeader("Gợi ý kết bạn", count: filteredSuggestions.count, color: KinnectTheme.accentBright)
                                 VStack(spacing: 0) {
                                     ForEach(filteredSuggestions) { user in
-                                        friendRow(user: user)
+                                        suggestionRow(user: user)
                                         if user.id != filteredSuggestions.last?.id {
                                             Divider().background(KinnectTheme.borderSoft).padding(.leading, 64)
                                         }
@@ -233,7 +233,6 @@ struct FriendsView: View {
     @ViewBuilder
     private func friendshipStatusChip(for user: KinnectUser) -> some View {
         let status = user.friendshipStatus.lowercased()
-        let isOnline = (user.isActive && user.showActivity) || appState.onlineUserIds.contains(user.id)
 
         switch status {
         case "friends":
@@ -244,10 +243,12 @@ struct FriendsView: View {
                 Text("Nhắn tin")
                     .font(.caption.weight(.semibold))
                     .foregroundColor(.white)
+                    .lineLimit(1)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 7)
                     .background(Capsule().fill(KinnectTheme.primaryGradient))
             }
+            .fixedSize()
             .accessibilityLabel("Nhắn tin với \(user.name)")
 
         case "incoming":
@@ -257,20 +258,23 @@ struct FriendsView: View {
                     Task { await respondRequest(user: user, action: "accept") }
                 }
                 .font(.caption.weight(.semibold))
+                .foregroundColor(.white)
+                .lineLimit(1)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
                 .background(Capsule().fill(KinnectTheme.primaryGradient))
-                .foregroundColor(.white)
 
                 Button("Từ chối") {
                     Task { await respondRequest(user: user, action: "reject") }
                 }
                 .font(.caption.weight(.semibold))
+                .foregroundColor(KinnectTheme.textSecondary)
+                .lineLimit(1)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 7)
                 .background(Capsule().fill(KinnectTheme.surfaceElevated))
-                .foregroundColor(KinnectTheme.textSecondary)
             }
+            .fixedSize()
 
         case "outgoing":
             // Outgoing friend request - show "Huỷ lời mời"
@@ -278,10 +282,12 @@ struct FriendsView: View {
                 Task { await cancelRequest(user) }
             }
             .font(.caption.weight(.semibold))
+            .foregroundColor(KinnectTheme.danger)
+            .lineLimit(1)
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .background(Capsule().fill(KinnectTheme.surfaceElevated))
-            .foregroundColor(KinnectTheme.danger)
+            .fixedSize()
 
         default:
             // Not friends - show "Kết bạn"
@@ -289,10 +295,12 @@ struct FriendsView: View {
                 Task { await sendRequest(user) }
             }
             .font(.caption.weight(.semibold))
+            .foregroundColor(.white)
+            .lineLimit(1)
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
             .background(Capsule().fill(KinnectTheme.primaryGradient))
-            .foregroundColor(.white)
+            .fixedSize()
         }
     }
 
@@ -313,8 +321,8 @@ struct FriendsView: View {
                         Text(user.name)
                             .font(.subheadline.bold())
                             .foregroundColor(KinnectTheme.textPrimary)
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                         let active = (user.isActive && user.showActivity) || appState.onlineUserIds.contains(user.id)
                         Text("@\(user.handle.isEmpty ? user.name : user.handle) • \(active ? "Đang hoạt động" : "Ngoại tuyến")")
                             .font(.caption2)
@@ -325,14 +333,11 @@ struct FriendsView: View {
                 }
             }
             .buttonStyle(.plain)
-            .layoutPriority(1)
 
-            Spacer(minLength: 6)
+            Spacer(minLength: 8)
 
-            // Friendship status chip - matches Android personTile friendship actions
-            friendshipStatusChip(for: user)
-
-            HStack(spacing: 4) {
+            // Friends action icons (Tin nhắn, Gọi thoại, Gọi video, Thêm) - matches Android roundAction layout
+            HStack(spacing: 6) {
                 Button {
                     activeChatPeer = user
                 } label: {
@@ -387,6 +392,43 @@ struct FriendsView: View {
                 }
                 .accessibilityLabel("Tùy chọn bạn bè")
             }
+        }
+        .kinnectCard()
+    }
+
+    private func suggestionRow(user: KinnectUser) -> some View {
+        HStack(spacing: 10) {
+            Button {
+                selectedProfileUser = user
+            } label: {
+                HStack(spacing: 10) {
+                    KinnectAvatarView(
+                        name: user.name,
+                        avatarURL: user.avatarUrl,
+                        colorHex: user.avatarColor,
+                        size: 46,
+                        isOnline: (user.isActive && user.showActivity) || appState.onlineUserIds.contains(user.id)
+                    )
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(user.name)
+                            .font(.subheadline.bold())
+                            .foregroundColor(KinnectTheme.textPrimary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        let active = (user.isActive && user.showActivity) || appState.onlineUserIds.contains(user.id)
+                        Text("@\(user.handle.isEmpty ? user.name : user.handle) • \(active ? "Đang hoạt động" : "Ngoại tuyến")")
+                            .font(.caption2)
+                            .foregroundColor(active ? Color(hex: "#2E9E66") : KinnectTheme.textSecondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+
+            Spacer(minLength: 8)
+
+            friendshipStatusChip(for: user)
         }
         .kinnectCard()
     }

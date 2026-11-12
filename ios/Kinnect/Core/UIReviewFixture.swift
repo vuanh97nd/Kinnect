@@ -369,6 +369,22 @@ enum UIReviewFixture {
                 ]
             ]
 
+        case "/api/music":
+            return [
+                "tracks": [
+                    ["file": "tiktok-01.mp3", "title": "LIỆU RẰNG · Remix DEMO", "artist": "Huy PT Remix", "url": "/music/tiktok-01.mp3"],
+                    ["file": "tiktok-02.mp3", "title": "Xin lỗi vì đã…", "artist": "Huy PT Remix", "url": "/music/tiktok-02.mp3"],
+                    ["file": "tiktok-03.mp3", "title": "EM ĐAU LẮM ANH À · Remix", "artist": "Huy PT Remix", "url": "/music/tiktok-03.mp3"],
+                    ["file": "tiktok-04.mp3", "title": "Nghe có vẻ mọi người không chuộng mixtape", "artist": "Huy PT Remix", "url": "/music/tiktok-04.mp3"],
+                    ["file": "tiktok-05.mp3", "title": "TỰ EM SAI · Remix", "artist": "Huy PT Remix", "url": "/music/tiktok-05.mp3"],
+                    ["file": "tiktok-06.mp3", "title": "Sự đời trớ trêu thay ngay khi…", "artist": "Huy PT Remix", "url": "/music/tiktok-06.mp3"],
+                    ["file": "tiktok-07.mp3", "title": "CÔ DÂU CỦA NGƯỜI TA · Remix", "artist": "Huy PT Remix", "url": "/music/tiktok-07.mp3"],
+                    ["file": "tiktok-08.mp3", "title": "Cứa lên da vết thương không lành…", "artist": "Huy PT Remix", "url": "/music/tiktok-08.mp3"],
+                    ["file": "tiktok-09.mp3", "title": "Em muốn kết thúc như thế này sao?", "artist": "Huy PT Remix", "url": "/music/tiktok-09.mp3"],
+                    ["file": "tiktok-10.mp3", "title": "Âm nhạc dùng để sáng tạo và thưởng thức", "artist": "Huy PT Remix", "url": "/music/tiktok-10.mp3"]
+                ]
+            ]
+
         case "/api/conversations":
             return [
                 "conversations": [
