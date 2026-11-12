@@ -425,11 +425,16 @@ public class MainActivity extends Activity {
         }
       }, "inbox"));
       FrameLayout meHolder = new FrameLayout(this);
+      boolean meActive = "account".equals(headerActive);
+      meHolder.setBackground(pressable(meActive ? PRIMARY_SOFT : CARD, 99));
       ImageView meButton = new ImageView(this);
       meButton.setScaleType(ImageView.ScaleType.CENTER_CROP);
       GradientDrawable round = new GradientDrawable();
       round.setShape(GradientDrawable.OVAL);
       round.setColor(PRIMARY_SOFT);
+      if (meActive) {
+        round.setStroke(dp(2), ACCENT);
+      }
       meButton.setBackground(round);
       meButton.setClipToOutline(true);
       meButton.setImageBitmap(initials(me, dp(40)));
@@ -503,7 +508,7 @@ public class MainActivity extends Activity {
           bottom.addView(holder, new LinearLayout.LayoutParams(0, dp(64), 1));
           continue;
         }
-        boolean active = tab.equals(it[0]);
+        boolean active = headerActive.isEmpty() && tab.equals(it[0]);
         LinearLayout b = column();
         b.setGravity(Gravity.CENTER);
         FrameLayout pill = new FrameLayout(this);
@@ -777,6 +782,12 @@ public class MainActivity extends Activity {
   }
   private void openStore() { storeScreen(); }
   private void meMenu() {
+    if ("account".equals(headerActive)) {
+      headerActive = "";
+      navigate(tab.isEmpty() ? "feed" : tab);
+      return;
+    }
+    headerActive = "account";
     remember("account", () -> meMenu());
     shell(I18n.t("Tài khoản"), true);
     LinearLayout profile = row();

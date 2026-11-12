@@ -1384,9 +1384,15 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     list.setPadding(dp(6), 0, dp(6), dp(8));
     scroll.addView(list);
     sheet.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+    final View barDivider = new View(this);
+    barDivider.setBackgroundColor(soft);
+    barDivider.setVisibility(View.GONE);
+    sheet.addView(barDivider, new LinearLayout.LayoutParams(-1, dp(1)));
     final LinearLayout bar = new LinearLayout(this);
+    bar.setOrientation(LinearLayout.HORIZONTAL);
     bar.setGravity(Gravity.CENTER_VERTICAL);
-    bar.setPadding(dp(14), dp(10), dp(14), dp(14));
+    bar.setPadding(dp(16), dp(10), dp(16), dp(14));
+    bar.setBackgroundColor(bg);
     bar.setVisibility(View.GONE);
     final TextView nowTitle = plain("", 15, ink, true), nowSub = plain("", 12, muted, false);
     LinearLayout now = new LinearLayout(this);
@@ -1401,11 +1407,14 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     ug.setCornerRadius(dp(999));
     use.setBackground(ug);
     bar.addView(use, new LinearLayout.LayoutParams(-2, dp(44)));
-    sheet.addView(bar);
+    sheet.addView(bar, new LinearLayout.LayoutParams(-1, -2));
     final JSONArray[] tracks = { new JSONArray() };
+    final boolean[] loading = { true };
+    final String[] loadError = { null };
     final String[] tab = { "lib" }, picked = { null, null, null }, playing = { null };
     final int[] shown = { 60 };
     final Runnable[] render = new Runnable[1];
+    final Runnable[] loadMusicList = new Runnable[1];
     final Runnable drawTabs = new Runnable() {
       public void run() {
         tabs.removeAllViews();
@@ -1425,11 +1434,13 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
       picked[0] = t[0]; picked[1] = t[1]; picked[2] = t[2];
       nowTitle.setText(t[1]);
       nowSub.setText(t[2].isEmpty() ? I18n.t("Nhạc của bạn") : t[2]);
+      barDivider.setVisibility(View.VISIBLE);
       bar.setVisibility(View.VISIBLE);
     };
     render[0] = () -> {
       list.removeAllViews();
-      String q = query.getText().toString().trim().toLowerCase(Locale.ROOT);
+      String rawQ = query.getText().toString().trim();
+      String nq = LiveGamePicker.normalized(rawQ);
       if (tab[0].equals("own")) {
         LinearLayout up = new LinearLayout(this);
         up.setGravity(Gravity.CENTER_VERTICAL);
@@ -1454,11 +1465,49 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         list.addView(up);
         return;
       }
+      if (loading[0]) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setGravity(Gravity.CENTER);
+        box.setPadding(0, dp(40), 0, dp(40));
+        ProgressBar pb = new ProgressBar(this);
+        box.addView(pb, new LinearLayout.LayoutParams(dp(36), dp(36)));
+        TextView t = plain(I18n.t("Đang tải thư viện nhạc…"), 14, muted, false);
+        t.setPadding(0, dp(12), 0, 0);
+        box.addView(t);
+        list.addView(box, new LinearLayout.LayoutParams(-1, -2));
+        return;
+      }
+      if (loadError[0] != null && tracks[0].length() == 0) {
+        LinearLayout errBox = new LinearLayout(this);
+        errBox.setOrientation(LinearLayout.VERTICAL);
+        errBox.setGravity(Gravity.CENTER);
+        errBox.setPadding(0, dp(40), 0, dp(40));
+        TextView et = plain(loadError[0], 14, muted, false);
+        errBox.addView(et);
+        TextView retry = plain(I18n.t("Thử lại"), 14, 0xff6c47e0, true);
+        retry.setPadding(dp(18), dp(8), dp(18), dp(8));
+        retry.setBackground(round(soft, 999));
+        retry.setOnClickListener(v -> loadMusicList[0].run());
+        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-2, -2);
+        rp.topMargin = dp(12);
+        errBox.addView(retry, rp);
+        list.addView(errBox, new LinearLayout.LayoutParams(-1, -2));
+        return;
+      }
       int count = 0, total = 0;
       for (int i = 0; i < tracks[0].length(); i++) {
         final JSONObject t = tracks[0].optJSONObject(i);
+        if (t == null) continue;
         String name = t.optString("title"), artist = t.optString("artist");
-        if (!q.isEmpty() && !(name + " " + artist).toLowerCase(Locale.ROOT).contains(q)) continue;
+        if (!nq.isEmpty()) {
+          String normTarget = LiveGamePicker.normalized(name + " " + artist);
+          boolean matches = true;
+          for (String word : nq.split("\\s+")) {
+            if (!word.isEmpty() && !normTarget.contains(word)) { matches = false; break; }
+          }
+          if (!matches) continue;
+        }
         total++;
         if (count >= shown[0]) continue;
         count++;
@@ -1469,12 +1518,13 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         row.setPadding(dp(8), dp(8), dp(8), dp(8));
         row.setBackground(round(sel ? on : 0x00000000, 14));
         float hue = Math.abs(name.hashCode()) % 360;
-        TextView art = plain("♪", 22, 0xffffffff, true);
-        art.setGravity(Gravity.CENTER);
+        FrameLayout art = new FrameLayout(this);
         GradientDrawable ag = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { Color.HSVToColor(new float[] { hue, 0.65f, 0.85f }), Color.HSVToColor(new float[] { (hue + 50) % 360, 0.75f, 0.6f }) });
-        ag.setCornerRadius(dp(10));
+        ag.setCornerRadius(dp(12));
         art.setBackground(ag);
-        row.addView(art, new LinearLayout.LayoutParams(dp(52), dp(52)));
+        ImageView note = icon("music", 0xffffffff);
+        art.addView(note, new FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER));
+        row.addView(art, new LinearLayout.LayoutParams(dp(50), dp(50)));
         LinearLayout meta = new LinearLayout(this);
         meta.setOrientation(LinearLayout.VERTICAL);
         meta.setPadding(dp(12), 0, dp(8), 0);
@@ -1482,16 +1532,17 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         tt.setSingleLine(true);
         tt.setEllipsize(android.text.TextUtils.TruncateAt.END);
         meta.addView(tt);
-        TextView st = plain(artist.isEmpty() ? I18n.t("Thư viện Kinnect") : artist, 12, muted, false);
+        int durSec = t.optInt("duration", 0);
+        String durStr = durSec > 0 ? String.format(Locale.ROOT, " · %d:%02d", durSec / 60, durSec % 60) : "";
+        TextView st = plain((artist.isEmpty() ? I18n.t("Thư viện Kinnect") : artist) + durStr, 12, muted, false);
         st.setSingleLine(true);
         st.setEllipsize(android.text.TextUtils.TruncateAt.END);
         meta.addView(st);
         row.addView(meta, new LinearLayout.LayoutParams(0, -2, 1));
         FrameLayout play = new FrameLayout(this);
         play.setBackground(round(sel ? 0xff6c47e0 : soft, 999));
-        TextView glyph = plain(url.equals(playing[0]) ? "❚❚" : "▶", 13, sel ? 0xffffffff : ink, true);
-        glyph.setGravity(Gravity.CENTER);
-        play.addView(glyph, new FrameLayout.LayoutParams(-1, -1));
+        ImageView glyph = icon(url.equals(playing[0]) ? "pause" : "play", sel ? 0xffffffff : ink);
+        play.addView(glyph, new FrameLayout.LayoutParams(dp(18), dp(18), Gravity.CENTER));
         row.addView(play, new LinearLayout.LayoutParams(dp(38), dp(38)));
         final String[] entry = { url, name, artist };
         View.OnClickListener tap = v -> {
@@ -1506,7 +1557,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         list.addView(row);
       }
       if (total == 0) {
-        TextView e = plain(q.isEmpty() ? I18n.t("Thư viện chưa có bài nào.") : I18n.t("Không tìm thấy bài phù hợp."), 14, muted, false);
+        TextView e = plain(nq.isEmpty() ? I18n.t("Thư viện chưa có bài nào.") : I18n.t("Không tìm thấy bài phù hợp."), 14, muted, false);
         e.setGravity(Gravity.CENTER);
         e.setPadding(0, dp(30), 0, dp(30));
         list.addView(e, new LinearLayout.LayoutParams(-1, -2));
@@ -1523,6 +1574,23 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
         list.addView(more, mp);
       }
     };
+    loadMusicList[0] = () -> {
+      loading[0] = true;
+      loadError[0] = null;
+      render[0].run();
+      api.call("GET", "/api/music", null, (data, error, status) -> {
+        if (isFinishing()) return;
+        loading[0] = false;
+        JSONArray list2 = data == null ? null : data.optJSONArray("tracks");
+        if (list2 != null) {
+          tracks[0] = list2;
+          loadError[0] = null;
+        } else {
+          loadError[0] = error != null && !error.isEmpty() ? error : I18n.t("Không thể tải nhạc từ máy chủ.");
+        }
+        render[0].run();
+      });
+    };
     query.addTextChangedListener(new android.text.TextWatcher() {
       public void beforeTextChanged(CharSequence a, int b, int c, int d) {}
       public void onTextChanged(CharSequence a, int b, int c, int d) {}
@@ -1531,24 +1599,29 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     use.setOnClickListener(v -> { if (picked[0] != null) setMusic(picked[0], null, picked[1]); dialog.dismiss(); });
     dialog.setOnDismissListener(x -> stopPreview());
     drawTabs.run();
-    render[0].run();
     dialog.setContentView(sheet);
     Window w = dialog.getWindow();
     if (w != null) {
       w.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0));
-      w.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, Math.round(getResources().getDisplayMetrics().heightPixels * 0.86f));
-      ApprovedTypography.sheet(w.getDecorView());w.setGravity(Gravity.BOTTOM);
+      ApprovedTypography.sheet(w.getDecorView());
+      w.setGravity(Gravity.BOTTOM);
       w.setDimAmount(0.5f);
       w.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
     }
-    dialog.show();
-    if (music != null) music.pause();
-    api.call("GET", "/api/music", null, (data, error, status) -> {
-      if (isFinishing()) return;
-      JSONArray list2 = data == null ? null : data.optJSONArray("tracks");
-      if (list2 != null) tracks[0] = list2;
-      render[0].run();
+    dialog.setOnShowListener(d -> {
+      Window win = dialog.getWindow();
+      if (win != null) {
+        win.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, Math.round(getResources().getDisplayMetrics().heightPixels * 0.86f));
+        win.setGravity(Gravity.BOTTOM);
+      }
     });
+    dialog.show();
+    if (dialog.getWindow() != null) {
+      dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, Math.round(getResources().getDisplayMetrics().heightPixels * 0.86f));
+      dialog.getWindow().setGravity(Gravity.BOTTOM);
+    }
+    if (music != null) music.pause();
+    loadMusicList[0].run();
   }
 
   private TextView plain(String s, float size, int color, boolean bold) {

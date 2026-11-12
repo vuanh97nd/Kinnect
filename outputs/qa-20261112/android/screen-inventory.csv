@@ -1,0 +1,50 @@
+image_path,screen_id,screen_name,state,device,resolution,density,fontScale,theme,language,fixture_or_live,status,blocker_or_reason
+screenshots/01_splash_intro.png,SCR-01,Splash / Intro,default,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/02_auth_welcome.png,SCR-02,Welcome & Login Options,default,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/03_auth_login.png,SCR-03,Login Form,form_ready,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/04_auth_register.png,SCR-04,Register Form,form_ready,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/05_auth_forgot_password.png,SCR-05,Forgot Password,form_ready,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/06_feed_home.png,SCR-06,News Feed Main,populated,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/07_feed_story.png,SCR-07,Story 24h Bar & Viewer,viewing,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/08_feed_post_detail.png,SCR-08,Post Detail,single_post,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/09_feed_comments.png,SCR-09,Comments Sheet,nested_replies,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/10_feed_reactions.png,SCR-10,Reaction Picker (6 reactions),open,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/11_discover_search.png,SCR-11,Discover & Search,search_input,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/12_discover_results.png,SCR-12,Discover Suggestions,list,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/13_discover_empty.png,SCR-13,Discover Empty Search,empty_state,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/14_shorts_player.png,SCR-14,Shorts Fullscreen Player,playing,Pixel 6,1080x2400,420dpi,1.0,dark,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/15_shorts_comments.png,SCR-15,Shorts Comments Drawer,open,Pixel 6,1080x2400,420dpi,1.0,dark,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/16_inbox_list.png,SCR-16,Messages Inbox,chat_list,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/17_chat_direct.png,SCR-17,Direct Chat Conversation,active_chat,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/18_chat_group.png,SCR-18,Group Chat Conversation,active_chat,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/19_chat_menu.png,SCR-19,Chat Conversation Menu,menu_open,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/20_friends_list.png,SCR-20,Friends List,list,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/21_friends_requests.png,SCR-21,Friend Requests,pending_list,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/22_profile_main.png,SCR-22,Profile Main View,profile_view,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/23_profile_edit.png,SCR-23,Edit Profile Sheet,form_ready,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/24_profile_albums.png,SCR-24,Profile Albums & Privacy,albums_grid,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/25_account_menu.png,SCR-25,Account Menu,open,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/26_appearance_settings.png,SCR-26,Appearance Settings (Theme),picker,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/27_security_password.png,SCR-27,Change Password Sheet,form_ready,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/28_sessions_devices.png,SCR-28,Active Login Sessions,list,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/29_notifications_screen.png,SCR-29,Notifications Screen,list,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/30_notifications_settings.png,SCR-30,Notification Preferences,toggles,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/31_privacy_settings.png,SCR-31,Privacy Settings,options,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/32_language_settings.png,SCR-32,Language Settings,options,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/33_help_support.png,SCR-33,Help & Support,info,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/34_about_screen.png,SCR-34,About App,info,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/35_delete_account_confirm.png,SCR-35,Delete Account Confirmation,warning_dialog,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/36_wallet_main.png,SCR-36,Wallet Balance & Coin,overview,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/37_store_packages.png,SCR-37,Store Packages,packages_grid,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/38_live_list.png,SCR-38,Live Streaming Rooms List,rooms_grid,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/39_live_setup_sheet.png,SCR-39,Live Setup Sheet (Chat/Game),sheet_open,Pixel 6,1080x2400,420dpi,1.0,dark,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/40_live_gifts_drawer.png,SCR-40,Live Gifts Drawer & Combos,drawer_open,Pixel 6,1080x2400,420dpi,1.0,dark,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/41_call_incoming.png,SCR-41,Incoming Call UI,ringing,Pixel 6,1080x2400,420dpi,1.0,dark,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/42_studio_camera.png,SCR-42,Camera Studio Mode,viewfinder,Pixel 6,1080x2400,420dpi,1.0,dark,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/43_studio_music_picker.png,SCR-43,Studio Music Picker Sheet,picker_open,Pixel 6,1080x2400,420dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/44_feed_dark.png,SCR-44,News Feed (Dark Theme),populated,Pixel 6,1080x2400,420dpi,1.0,dark,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/45_account_dark.png,SCR-45,Account Menu (Dark Theme),open,Pixel 6,1080x2400,420dpi,1.0,dark,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/46_feed_font13.png,SCR-46,News Feed (Large Text fontScale=1.3),large_text,Pixel 6,1080x2400,420dpi,1.3,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/47_account_font13.png,SCR-47,Account Menu (Large Text fontScale=1.3),large_text,Pixel 6,1080x2400,420dpi,1.3,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/48_feed_narrow.png,SCR-48,News Feed (Narrow Screen 720x1520),narrow_screen,Pixel 6,720x1520,320dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution
+screenshots/49_comments_narrow.png,SCR-49,Comments Sheet (Narrow Screen 720x1520),narrow_screen,Pixel 6,720x1520,320dpi,1.0,light,vi,fixture,planned,Awaiting GitHub Actions KVM runner execution

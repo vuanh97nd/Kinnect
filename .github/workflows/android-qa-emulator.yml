@@ -1,0 +1,63 @@
+name: Android QA Emulator Screenshots
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/android-qa-20261113
+
+permissions:
+  contents: read
+
+jobs:
+  android-emulator-capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Prepare verified toolchain
+        run: bash scripts/prepare-android-tools.sh
+
+      - name: Build testing APK
+        run: bash scripts/build-apk.sh
+
+      - name: Verify testing APK
+        run: |
+          test -f dist/kinnect-live-debug.apk
+          ls -lh dist/kinnect-live-debug.apk
+
+      - name: Run Android Emulator & Full Screen Capture
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          script: python3 scripts/capture-android-emulator.py
+
+      - name: Upload Emulator Screenshots & Manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-emulator-screenshots
+          path: |
+            outputs/qa-20261112/android/screenshots
+            outputs/qa-20261112/android/manifest.json
+            outputs/qa-20261112/android/screen-inventory.csv
+          if-no-files-found: warn

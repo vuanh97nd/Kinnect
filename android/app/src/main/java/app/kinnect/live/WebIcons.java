@@ -34,6 +34,8 @@ final class WebIcons {
       case "attach": web = "paperclip"; break;
       case "sound": web = "volume_2"; break;
       case "music": web = "music_2"; break;
+      case "play": web = "play"; break;
+      case "pause": web = "pause"; break;
       case "flip": web = "switch_camera"; break;
       case "send_horizontal":web="send_horizontal";break;
       case "shield_check":web="shield_check";break;
