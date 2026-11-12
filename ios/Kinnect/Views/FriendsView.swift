@@ -43,7 +43,15 @@ struct FriendsView: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 0) {
+            // Pinned Header Bar (matching Android accountHeader pattern)
+            PinnedHeaderBar(
+                title: "Bạn bè",
+                onBack: { dismiss() },
+                trailingActions: []
+            )
+
+            // Tab Picker
             Picker("Bạn bè", selection: $tab) {
                 ForEach(FriendTab.allCases, id: \.self) { item in
                     Text(item.rawValue).tag(item)
@@ -52,6 +60,7 @@ struct FriendsView: View {
             .pickerStyle(.segmented)
             .padding(.horizontal, 16)
             .padding(.top, 8)
+            .padding(.bottom, 8)
 
             // Search Bar matching Android searchField
             HStack(spacing: 8) {

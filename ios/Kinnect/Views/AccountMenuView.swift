@@ -21,7 +21,14 @@ struct AccountMenuView: View {
     @State private var showAppearanceSheet = false
 
     var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
+            // Pinned Header Bar (matching Android accountHeader pattern)
+            PinnedHeaderBar(
+                title: "Tài khoản",
+                onBack: { dismiss() },
+                trailingActions: []
+            )
+
             ScrollView {
                 VStack(spacing: 16) {
                     headerProfileCard
@@ -34,30 +41,33 @@ struct AccountMenuView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
+                .padding(.bottom, 24)
             }
             .background(KinnectTheme.background.ignoresSafeArea())
-            .toolbar(.hidden, for: .navigationBar)
-            .confirmationDialog("Đăng xuất khỏi Kinnect?", isPresented: $showLogoutConfirm, titleVisibility: .visible) {
-                Button("Đăng xuất", role: .destructive) {
-                    dismiss()
-                    Task {
-                        await appState.logout()
-                    }
+        }
+        .background(KinnectTheme.background.ignoresSafeArea())
+        .navigationBarHidden(true)
+        .confirmationDialog("Đăng xuất khỏi Kinnect?", isPresented: $showLogoutConfirm, titleVisibility: .visible) {
+            Button("Đăng xuất", role: .destructive) {
+                dismiss()
+                Task {
+                    await appState.logout()
                 }
-                Button("Hủy", role: .cancel) { }
-            } message: {
-                Text("Bạn có thể đăng nhập lại bất kỳ lúc nào.")
             }
-            .navigationDestination(isPresented: $showPrivacySheet) {
-                PrivacySettingsView()
-            }
-            .navigationDestination(isPresented: $showSecuritySheet) {
-                SecuritySettingsView()
-            }
-            .navigationDestination(isPresented: $showPasswordSheet) {
-                ChangePasswordSheetView()
-            }
-            .navigationDestination(isPresented: $showAppearanceSheet) {
+            Button("Hủy", role: .cancel) { }
+        } message: {
+            Text("Bạn có thể đăng nhập lại bất kỳ lúc nào.")
+        }
+        .navigationDestination(isPresented: $showPrivacySheet) {
+            PrivacySettingsView()
+        }
+        .navigationDestination(isPresented: $showSecuritySheet) {
+            SecuritySettingsView()
+        }
+        .navigationDestination(isPresented: $showPasswordSheet) {
+            ChangePasswordSheetView()
+        }
+        .navigationDestination(isPresented: $showAppearanceSheet) {
                 AppearanceSettingsSheetView()
             }
             .navigationDestination(isPresented: $showSupportSheet) {

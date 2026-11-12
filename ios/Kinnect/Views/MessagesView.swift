@@ -41,36 +41,24 @@ struct MessagesView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // iOS Messages Header
-            HStack {
-                Text("Tin nhắn")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(KinnectTheme.textPrimary)
-
-                Spacer()
-
-                Button {
-                    if scope == .direct {
-                        showNewDirectChatSheet = true
-                    } else {
-                        showCreateGroupSheet = true
-                    }
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(KinnectTheme.surfaceElevated)
-                            .frame(width: 36, height: 36)
-                        Image(systemName: scope == .direct ? "square.and.pencil" : "person.2.badge.plus")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(KinnectTheme.accentBright)
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(scope == .direct ? "Soạn tin nhắn mới" : "Tạo nhóm mới")
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-            .padding(.bottom, 8)
+            // Pinned Header Bar (matching Android accountHeader pattern)
+            PinnedHeaderBar(
+                title: "Tin nhắn",
+                onBack: nil,
+                trailingActions: [
+                    PinnedHeaderBar.TrailingAction(
+                        systemImage: scope == .direct ? "square.and.pencil" : "person.2.badge.plus",
+                        accessibilityLabel: scope == .direct ? "Soạn tin nhắn mới" : "Tạo nhóm mới",
+                        action: {
+                            if scope == .direct {
+                                showNewDirectChatSheet = true
+                            } else {
+                                showCreateGroupSheet = true
+                            }
+                        }
+                    )
+                ]
+            )
 
             // Search Bar
             HStack(spacing: 8) {

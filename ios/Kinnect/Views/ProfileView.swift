@@ -239,57 +239,17 @@ struct ProfileView: View {
 
     // MARK: - Header & Visual Helpers (Parity Android shell & profileCard)
     private var profilePinnedHeader: some View {
-        HStack(spacing: 12) {
-            Button {
-                if let onBack = onBack {
-                    onBack()
-                } else {
-                    dismiss()
-                }
-            } label: {
-                Image(systemName: "arrow.left")
-                    .font(.system(size: 19, weight: .semibold))
-                    .foregroundColor(KinnectTheme.textPrimary)
-                    .frame(width: 44, height: 44)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Quay lại")
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(isSelf ? "Trang cá nhân" : (activeUser?.name ?? "Hồ sơ"))
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(KinnectTheme.textPrimary)
-                    .lineLimit(1)
-
-                if let u = activeUser {
-                    Text("@\(u.handle.isEmpty ? u.name : u.handle)")
-                        .font(.caption)
-                        .foregroundColor(KinnectTheme.textSecondary)
-                        .lineLimit(1)
-                }
-            }
-
-            Spacer()
-
-            if isSelf {
-                Button {
-                    showEditProfileSheet = true
-                } label: {
-                    Image(systemName: "pencil")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(KinnectTheme.accentBright)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Capsule().fill(KinnectTheme.surfaceElevated))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Chỉnh sửa hồ sơ")
-            }
-        }
-        .padding(.horizontal, 12)
-        .frame(height: 52)
-        .background(KinnectTheme.surface.ignoresSafeArea(edges: .top))
-        .overlay(Divider().background(KinnectTheme.borderSoft), alignment: .bottom)
+        PinnedHeaderBar(
+            title: isSelf ? "Trang cá nhân" : (activeUser?.name ?? "Hồ sơ"),
+            onBack: onBack ?? { dismiss() },
+            trailingActions: isSelf ? [
+                PinnedHeaderBar.TrailingAction(
+                    systemImage: "pencil",
+                    accessibilityLabel: "Chỉnh sửa hồ sơ",
+                    action: { showEditProfileSheet = true }
+                )
+            ] : []
+        )
     }
 
     @ViewBuilder
