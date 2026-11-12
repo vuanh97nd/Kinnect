@@ -1,0 +1,84 @@
+import http from 'node:http';
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {createApp} from '../server.js';
+async function setup(t){
+ const app=createApp({authLimit:100});await new Promise(r=>app.server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+app.server.address().port;
+ t.after(async()=>{for(const ws of app.wss.clients)ws.terminate();app.wss.close();app.server.closeAllConnections();await new Promise(r=>app.server.close(r));app.social.close();});
+ const req=async(path,{portal='admin',method='GET',data,cookie,origin=true}={})=>{const host=portal==='local'?'localhost:'+app.server.address().port:portal+'.kinnect.io.vn';const payload=data?JSON.stringify(data):null;return new Promise((resolve,reject)=>{const request=http.request(base+path,{method,headers:{Host:host,...(cookie?{Cookie:cookie}:{}),...(payload?{'Content-Type':'application/json','Content-Length':Buffer.byteLength(payload)}:{}),...(method==='POST'&&origin?{Origin:origin===true?'https://'+host:origin}:{})}},r=>{const chunks=[];r.on('data',c=>chunks.push(c));r.on('end',()=>{const text=Buffer.concat(chunks).toString();resolve({status:r.statusCode,body:r.headers['content-type']?.includes('application/json')?JSON.parse(text):text,cookie:r.headers['set-cookie']?.[0]?.split(';')[0],headers:r.headers});});});request.on('error',reject);request.end(payload);});};
+ const reg=async username=>{const r=await fetch(base+'/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password:'test-long-password-123!',name:username,agree18:true,acceptPrivacyNotice:true,acceptTerms:true})});assert.equal(r.status,200);return(await r.json()).user;};
+ const admin=await reg('console_owner'),member=await reg('console_member');app.social.db.prepare("UPDATE users SET role='admin' WHERE id=?").run(admin.id);
+ const login=await req('/api/console/login',{method:'POST',data:{username:admin.username,password:'test-long-password-123!'}});assert.equal(login.status,200,JSON.stringify(login.body));return {...app,base,req,reg,admin,member,adminCookie:login.cookie};
+}
+test('console isolation, same-origin auth, native routing and protected admin hierarchy',async t=>{
+ const a=await setup(t),{req}=a;
+ assert.equal((await req('/')).status,200);
+ assert.equal((await req('/',{portal:'local'})).status,410);
+ assert.equal((await req('/admin',{portal:'app'})).status,404);
+ assert.equal((await req('/api/console/overview')).status,401);
+ assert.equal((await req('/api/console/login',{method:'POST',origin:false,data:{username:a.admin.username,password:'test-long-password-123!'}})).status,403);
+ assert.equal((await req('/api/console/login',{method:'POST',origin:'https://evil.example',data:{username:a.admin.username,password:'test-long-password-123!'}})).status,403);
+ assert.equal((await req('/api/console/login',{method:'POST',data:{username:a.member.username,password:'test-long-password-123!'}})).status,401);
+ const me=await req('/api/console/me',{cookie:a.adminCookie});assert.equal(me.body.user.role,'admin');assert.equal(me.body.user.key,undefined);
+ assert.equal((await req('/api/console/moderate',{method:'POST',cookie:a.adminCookie,data:{action:'suspend-user',target:a.admin.id}})).status,403);
+ assert.equal((await req('/api/console/overview',{portal:'hotro',cookie:a.adminCookie})).status,401);
+ const api=await fetch(a.base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:a.member.username,password:'test-long-password-123!'})});assert.equal(api.status,200);
+});
+test('support accounts require password change, cannot manage staff/admin and revoke sessions immediately',async t=>{
+ const a=await setup(t),{req}=a;
+ const create=await req('/api/console/team',{method:'POST',cookie:a.adminCookie,data:{action:'create',username:'hotro01',name:'Hỗ trợ 01'}});assert.equal(create.status,200);
+ const temp=create.body.temporaryPassword;assert(temp.length>=20);
+ assert.equal((await req('/api/console/login',{method:'POST',data:{username:'hotro01',password:temp}})).status,401);
+ const login=await req('/api/console/login',{portal:'hotro',method:'POST',data:{username:'hotro01',password:temp}});assert.equal(login.status,200);assert.equal(login.body.user.mustChange,true);
+ const staffCookie=login.cookie;
+ assert.equal((await req('/api/console/users',{portal:'hotro',cookie:staffCookie})).status,403);
+ assert.equal((await req('/api/console/password',{portal:'hotro',method:'POST',cookie:staffCookie,data:{current:temp,password:'short'}})).status,400);
+ assert.equal((await req('/api/console/password',{portal:'hotro',method:'POST',cookie:staffCookie,data:{current:temp,password:'new-support-password-123!'}})).status,200);
+ assert.equal((await req('/api/console/me',{portal:'hotro',cookie:staffCookie})).status,401);
+ const logged=await req('/api/console/login',{portal:'hotro',method:'POST',data:{username:'hotro01',password:'new-support-password-123!'}});assert.equal(logged.status,200);const cookie=logged.cookie;
+ assert.equal((await req('/api/console/team',{portal:'hotro',cookie})).status,403);
+ assert.equal((await req('/api/console/team',{portal:'hotro',cookie,method:'POST',data:{action:'create',username:'evil_staff',name:'test'}})).status,403);
+ assert.equal((await req('/api/console/moderate',{portal:'hotro',cookie,method:'POST',data:{action:'suspend-user',target:a.admin.id}})).status,403);
+ assert.equal((await req('/api/console/moderate',{portal:'hotro',cookie,method:'POST',data:{action:'suspend-user',target:a.member.id}})).status,200);
+ assert.equal(a.social.user(a.member.id).suspended,1);
+ const staff=a.social.db.prepare('SELECT * FROM console_staff WHERE username=?').get('hotro01');
+ assert.equal((await req('/api/console/team',{method:'POST',cookie:a.adminCookie,data:{action:'suspend',id:staff.id}})).status,200);
+ assert.equal((await req('/api/console/overview',{portal:'hotro',cookie})).status,401);
+ assert.equal((await req('/api/console/login',{portal:'hotro',method:'POST',data:{username:'hotro01',password:'new-support-password-123!'}})).status,401);
+ assert.equal((await req('/api/console/activity',{cookie:a.adminCookie})).body.entries.some(x=>x.action==='suspend-support'),true);
+ assert.equal((await req('/api/console/logout',{cookie:a.adminCookie,method:'POST',data:{}})).status,200);
+ assert.equal((await req('/api/console/me',{cookie:a.adminCookie})).status,401);
+});
+test('report rendering preserves untrusted text and staff login is rate limited',async t=>{
+ const a=await setup(t),{req}=a;
+ a.social.db.prepare('INSERT INTO posts VALUES(?,?,?,?,?,?)').run('report-post',a.member.id,'<img src=x onerror=alert(1)>','public',0,Date.now());
+ const columns=a.social.db.prepare('PRAGMA table_info(reports)').all().map(x=>x.name);assert(columns.includes('target_type'));
+ const data={id:'report-fixture',reporter:a.member.id,user_id:a.member.id,reporter_id:a.member.id,target_type:'post',target_id:'report-post',reason:'<script>untrusted</script>',status:'open',created:Date.now()};
+ const required=a.social.db.prepare('PRAGMA table_info(reports)').all().filter(x=>data[x.name]!==undefined).map(x=>x.name);
+ a.social.db.prepare('INSERT INTO reports('+required.join(',')+') VALUES('+required.map(()=>'?').join(',')+')').run(...required.map(x=>data[x]));
+ const reports=await req('/api/console/reports',{cookie:a.adminCookie});assert.equal(reports.status,200);assert.equal(reports.body.reports[0].subject.body,'<img src=x onerror=alert(1)>');
+ assert.equal((await req('/api/console/moderate',{cookie:a.adminCookie,method:'POST',data:{action:'hide-post',target:'report-post'}})).status,200);
+ assert.equal(a.social.db.prepare('SELECT hidden FROM posts WHERE id=?').get('report-post').hidden,1);
+ for(let i=0;i<12;i++)await req('/api/console/login',{portal:'hotro',method:'POST',data:{username:'missing',password:'wrong-password-123'}});
+ assert.equal((await req('/api/console/login',{portal:'hotro',method:'POST',data:{username:'missing',password:'wrong-password-123'}})).status,429);
+});
+
+test('finance portal is isolated, team changes revoke privileges, and cases connect the three teams',async t=>{
+ const a=await setup(t),{req}=a;
+ const create=await req('/api/console/team',{method:'POST',cookie:a.adminCookie,data:{action:'create',username:'finance01',name:'Tài chính 01',team:'finance'}});assert.equal(create.status,200);
+ const login=await req('/api/console/login',{portal:'taichinh',method:'POST',data:{username:'finance01',password:create.body.temporaryPassword}});assert.equal(login.status,200);assert.equal(login.body.user.team,'finance');
+ await req('/api/console/password',{portal:'taichinh',method:'POST',cookie:login.cookie,data:{current:create.body.temporaryPassword,password:'finance-new-password-123!'}});
+ const ready=await req('/api/console/login',{portal:'taichinh',method:'POST',data:{username:'finance01',password:'finance-new-password-123!'}});assert.equal(ready.status,200);const cookie=ready.cookie;
+ assert.equal((await req('/api/console/finance',{portal:'taichinh',cookie})).status,200);
+ for(const path of ['/api/console/users','/api/console/resets','/api/console/reports','/api/console/team','/api/console/operations'])assert.equal((await req(path,{portal:'taichinh',cookie})).status,403,path);
+ assert.equal((await req('/api/console/me',{portal:'hotro',cookie})).status,401);
+ const relog=await req('/api/console/login',{portal:'taichinh',method:'POST',data:{username:'finance01',password:'finance-new-password-123!'}});
+ const c=await req('/api/console/tickets',{method:'POST',cookie:a.adminCookie,data:{subject:'Đối soát giao dịch',description:'Kiểm tra mã giao dịch thử nghiệm',team:'finance',priority:'high'}});assert.equal(c.status,200);
+ const detail=await req('/api/console/tickets/'+c.body.ticket.id,{portal:'taichinh',cookie:relog.cookie});assert.equal(detail.status,200);assert.equal(detail.body.events.length,1);
+ const note=await req('/api/console/tickets/'+c.body.ticket.id+'/events',{portal:'taichinh',cookie:relog.cookie,method:'POST',data:{action:'note',message:'Đã tiếp nhận kiểm tra',version:detail.body.ticket.version}});assert.equal(note.status,200);
+ const staff=a.social.db.prepare('SELECT id FROM console_staff WHERE username=?').get('finance01');
+ assert.equal((await req('/api/console/team',{method:'POST',cookie:a.adminCookie,data:{action:'move',id:staff.id,team:'support'}})).status,200);
+ assert.equal((await req('/api/console/me',{portal:'taichinh',cookie:relog.cookie})).status,401);
+ assert.equal((await req('/api/console/login',{portal:'taichinh',method:'POST',data:{username:'finance01',password:'finance-new-password-123!'}})).status,401);
+ assert.equal((await req('/api/console/login',{portal:'hotro',method:'POST',data:{username:'finance01',password:'finance-new-password-123!'}})).status,200);
+});

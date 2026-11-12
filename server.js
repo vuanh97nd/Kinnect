@@ -1,3 +1,9 @@
+if (!process.env.UV_THREADPOOL_SIZE) process.env.UV_THREADPOOL_SIZE = '16';
+import {createServerRestart} from './lib/server-restart.js';
+import {createAdminCloudBridge} from './lib/admin-cloud-bridge.js';
+import {createAdminAuthority} from './lib/admin-authority.js';
+import {createAdminConsole} from './lib/admin-console.js';
+import {startSupabaseSecondarySync} from './lib/supabase-secondary-sync.js';
 import {createLiveGifts} from './lib/live-gifts.js';
 import {createPcCloudBridge} from './lib/pc-cloud-bridge.js';
 import {createSharedSession} from './lib/shared-session.js';
@@ -10,8 +16,9 @@ import { publishedApk } from './lib/apk-releases.js';
 import {createTyping} from './lib/typing.js';
 import {createCalls} from "./lib/calls.js";
 import { createWebPush } from "./lib/webpush.js";
+import { createApplePush } from "./lib/apple-push.js";
 import http from "node:http";
-import { mkdirSync, createReadStream } from "node:fs";
+import { mkdirSync, createReadStream, statSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { openSocial } from "./lib/social.js";
 import { loadMailEnv, mailConfigured, smtpConfigured, sendMail } from "./lib/mailer.js";
@@ -22,7 +29,7 @@ import { randomUUID } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { fileURLToPath } from "node:url";
 
-export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSender, emailReady, allowEmailDelivery = false, storeVerifier,storeEnv,liveEnv,apkDirectory=fileURLToPath(new URL("./dist/",import.meta.url)) } = {}) {
+export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSender, emailReady, allowEmailDelivery = false, storeVerifier,appleStoreVerifier,appleKeyResolver,storeEnv,liveEnv,clock,apkDirectory=fileURLToPath(new URL("./dist/",import.meta.url)) } = {}) {
   loadMailEnv();
   loadMailEnv("oauth.env");
   loadMailEnv("turn.env");
@@ -42,7 +49,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     onNotification: ({ userId, id }) => { notifyNotifications(userId); if (id) pushNotification(userId, id); },
     onAIStream: event => notifyAIStream(event),
     onCallMessage: ({ userIds }) => notifyCallMessage(userIds),
-    fetchImpl,authLimit,storeVerifier,storeEnv,
+    fetchImpl,authLimit,storeVerifier,appleStoreVerifier,appleKeyResolver,storeEnv,clock,
     sharedSession: (dbPath===":memory:"||process.env.NODE_TEST_CONTEXT)?null:createSharedSession(),
     sendEmail:deliverEmail,mailReady:emailAvailable,
     // Báo về email quản trị khi có người gửi yêu cầu quên mật khẩu.
@@ -83,10 +90,60 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     return versionCache.value;
   }
   let latestApk = null;
-  const sharedCoreBridge=(dbPath===":memory:"||process.env.NODE_TEST_CONTEXT)?null:createPcCloudBridge(social,{syncFeedEnabled:resolve(dbPath)===resolve(process.env.DATA_DIR||'data','kinnect.sqlite')});
+  const supabaseSecondarySync = (dbPath === ':memory:' || process.env.NODE_TEST_CONTEXT) ? null : startSupabaseSecondarySync({ db: social.db, intervalMs: 60000 });
+  const sharedCoreBridge = null;
+  const consoleInstanceId=randomUUID();
+  const restartServer=(dbPath===':memory:'||process.env.NODE_TEST_CONTEXT)?null:createServerRestart({serverFile:fileURLToPath(import.meta.url),dbPath,port:()=>server.address().port,shutdown:()=>{server.close();for(const ws of wss.clients)ws.terminate();setTimeout(()=>{server.closeAllConnections();social.close();process.exit(0);},500);}});
+  const probes={sockets:()=>0,rooms:()=>0,sfu:()=>({configured:false,ready:false,maxViewers:0,maxRooms:0})};
+  const appStatus=()=>{const mem=process.memoryUsage();let databaseMb=null;if(dbPath&&dbPath!==':memory:'){try{databaseMb=Math.round(statSync(dbPath).size/1048576*10)/10;}catch{}}const ai=social.ai.status(),now=Date.now();const q=(sql,...v)=>{try{return social.db.prepare(sql).get(...v);}catch{return null;}};return{ok:true,maintenance:!!global.__KINNECT_MAINTENANCE_MODE,uptime:Math.floor(process.uptime()),memoryMb:Math.round(mem.rss/1048576),heapUsedMb:Math.round(mem.heapUsed/1048576),heapTotalMb:Math.round(mem.heapTotal/1048576),platform:process.platform+' '+process.arch,node:process.version,pid:process.pid,sockets:probes.sockets(),liveRooms:probes.rooms(),sfu:probes.sfu(),databaseMb,aiQueue:ai.queue||0,aiFailed:ai.failed||0,visitors:{online:q('SELECT count(*) n FROM users WHERE last_active>? AND suspended=0',now-90000)?.n??0,sessions:q('SELECT count(*) n FROM sessions WHERE expires>?',now)?.n??0,members:q("SELECT count(*) n FROM users WHERE role='user'")?.n??0,suspended:q('SELECT count(*) n FROM users WHERE suspended=1')?.n??0}};};
+  const adminCloud=(dbPath===':memory:'||process.env.NODE_TEST_CONTEXT)?null:createAdminCloudBridge(social,{dispatch:(req,res)=>adminConsole(req,res),appStatus});
+  const adminConsole = createAdminConsole(social, {
+    trustedPrincipal:req=>adminCloud?.trustedPrincipal(req),
+    restartServer, databasePath:dbPath, instanceId:consoleInstanceId, runtimeStatus:()=>({sockets:probes.sockets(),liveRooms:probes.rooms(),sfu:probes.sfu()}),
+    authority: createAdminAuthority(dbPath),
+    getPcTelemetry: () => ({
+      activeConnections: wss ? wss.clients.size : 0,
+      activeUsers: wss ? new Set([...wss.clients].map(c => c.userId).filter(Boolean)).size : 0,
+      heapMb: Math.round(process.memoryUsage().heapUsed / 1048576),
+      uptime: Math.round(process.uptime())
+    }),
+    loginAdmin: async (username, password) => {
+      const base = 'http://127.0.0.1:' + server.address().port;
+      const response = await fetch(base + '/api/login', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username, password}), signal: AbortSignal.timeout(20000),
+      });
+      if (!response.ok) return null;
+      const result = await response.json();
+      const cookie = response.headers.get('set-cookie')?.split(';')[0];
+      if (cookie) await fetch(base + '/api/logout', {method: 'POST', headers: {Cookie: cookie}, signal: AbortSignal.timeout(10000)}).catch(() => {});
+      return result.user?.role === 'admin' ? result.user : null;
+    },
+  });
+  let wss = null;
   const server = http.createServer(async (req, res) => {
+    if(adminCloud&&await adminCloud.handle(req,res))return;
+
+    if (await adminConsole(req, res)) return;
     if(sharedCoreBridge&&await sharedCoreBridge(req,res))return;
     const path = new URL(req.url, "http://localhost").pathname;
+    if (global.__KINNECT_MAINTENANCE_MODE && path !== '/health') {
+      res.writeHead(503, { "Content-Type": "application/json; charset=utf-8", "Retry-After": "120" });
+      res.end(JSON.stringify({
+        error: "Hệ thống đang được nâng cấp bảo trì bởi Bộ phận Kỹ thuật Kinnect. Vui lòng quay lại sau ít phút.",
+        maintenance: true,
+        timestamp: Date.now()
+      }));
+      return;
+    }
+    // Retire browser app entrypoints; native APIs, downloads and account deletion stay available.
+    const browserAppPaths = new Set(["/", "/index.html", "/ios", "/ios/", "/v2", "/v2/", "/v2.html", "/login", "/login/", "/register", "/register/", "/signup", "/signup/", "/native-welcome.html", "/install-ios", "/install-ios/", "/install-ios.html", "/install-ios-manifest", "/install-ios-manifest.html", "/Kinnect.mobileconfig", "/offline.html"]);
+    if ((req.method === "GET" || req.method === "HEAD") && browserAppPaths.has(path)) {
+      const msg = "Kinnect - Ứng dụng web đã ngừng hỗ trợ. Vui lòng tải ứng dụng di động chính thức.";
+      res.writeHead(410, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "Content-Length": Buffer.byteLength(msg), "X-Robots-Tag": "noindex, nofollow" });
+      return res.end(msg);
+    }
+
     // Danh sách buổi live đang phát (cho tab "Trực tiếp" ở trang Video, web và app).
     if (path === "/api/live/rooms" && req.method === "GET") {
       const me = social.authenticate(req);
@@ -159,7 +216,16 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
       // Quản trị viên tải nhạc lên / xoá nhạc khỏi thư viện chung
       if (path === "/api/music" && (req.method === "POST" || req.method === "DELETE")) {
         if (me.role !== "admin") return sendJson(403, { error: "Chỉ quản trị viên được quản lý thư viện nhạc." });
-        if (req.headers["sec-fetch-site"] === "cross-site" || !(req.headers["content-type"] || "").startsWith("application/json"))
+        if (req.headers.origin) {
+          try {
+            if (new URL(req.headers.origin).host !== req.headers.host) return sendJson(403, { error: "Yêu cầu không hợp lệ." });
+          } catch {
+            return sendJson(403, { error: "Yêu cầu không hợp lệ." });
+          }
+        } else if (req.headers["sec-fetch-site"] === "cross-site") {
+          return sendJson(403, { error: "Yêu cầu không hợp lệ." });
+        }
+        if (!(req.headers["content-type"] || "").startsWith("application/json"))
           return sendJson(403, { error: "Yêu cầu không hợp lệ." });
         let size = 0;
         const chunks = [];
@@ -243,6 +309,57 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         return res.end();
       }
     }
+    // Tải trực tiếp bản phát hành iOS Sideload IPA
+    if (path === "/download/ios" || path === "/download/ipa") {
+      try {
+        const file = resolve("dist/ios/Kinnect-1.2.12-sideload.ipa");
+        const info = await stat(file);
+        res.writeHead(200, {
+          "Content-Type": "application/octet-stream",
+          "Content-Length": info.size,
+          "Content-Disposition": 'attachment; filename="Kinnect-1.2.12-sideload.ipa"',
+          "Cache-Control": "no-store"
+        });
+        return createReadStream(file).pipe(res);
+      } catch {
+        res.writeHead(404);
+        return res.end();
+      }
+    }
+    // Tải gói Google Play Store AAB
+    if (path === "/download/play-bundle" || path === "/download/aab") {
+      try {
+        const file = resolve("dist/google-play/Kinnect-1.2.12-play.aab");
+        const info = await stat(file);
+        res.writeHead(200, {
+          "Content-Type": "application/octet-stream",
+          "Content-Length": info.size,
+          "Content-Disposition": 'attachment; filename="Kinnect-1.2.12-play.aab"',
+          "Cache-Control": "no-store"
+        });
+        return createReadStream(file).pipe(res);
+      } catch {
+        res.writeHead(404);
+        return res.end();
+      }
+    }
+    // Tải bộ hồ sơ xuất bản Google Play hoàn chỉnh (AAB, Checks, Store Assets)
+    if (path === "/download/play-submission") {
+      try {
+        const file = resolve("dist/google-play/Kinnect-1.2.12-submission.zip");
+        const info = await stat(file);
+        res.writeHead(200, {
+          "Content-Type": "application/zip",
+          "Content-Length": info.size,
+          "Content-Disposition": 'attachment; filename="Kinnect-1.2.12-submission.zip"',
+          "Cache-Control": "no-store"
+        });
+        return createReadStream(file).pipe(res);
+      } catch {
+        res.writeHead(404);
+        return res.end();
+      }
+    }
     // Bản APK thử nghiệm chưa phát hành: chỉ ai có link mới tải được, nút cập nhật trong app không thấy.
     if (path === "/download/android-test") {
       try {
@@ -255,26 +372,6 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         const info = await stat(file);
         res.writeHead(200, { "Content-Type": "application/vnd.android.package-archive", "Content-Length": info.size, "Content-Disposition": 'attachment; filename="' + name + '"', "Cache-Control": "no-store" });
         return createReadStream(file).pipe(res);
-      } catch {
-        res.writeHead(404);
-        return res.end();
-      }
-    }
-    // Module Nông trại: APK riêng, tải khi người dùng muốn chơi.
-    if (path === "/download/farm-game") {
-      if (!["GET", "HEAD"].includes(req.method)) { res.writeHead(405, {Allow: "GET, HEAD"}); return res.end(); }
-      try {
-        const dir = new URL("./dist/", import.meta.url);
-        const builds = [];
-        for (const entry of await readdir(dir)) if (/^(?:FarmGame|farm-game)(?:-[\d.]+)?(?:-debug)?\.apk$/.test(entry)) builds.push({ entry, at: (await stat(new URL(entry, dir))).mtimeMs });
-        if (!builds.length) throw Error("Chưa có module");
-        const name = builds.sort((a, b) => b.at - a.at)[0].entry;
-        const file = new URL(name, dir);
-        const info = await stat(file);
-        res.writeHead(200, {"Content-Type": "application/vnd.android.package-archive", "Content-Length": info.size, "Content-Disposition": 'attachment; filename="' + name + '"', "Cache-Control": "no-store"});
-        if (req.method === "HEAD") { res.end(); return true; }
-        createReadStream(file).pipe(res);
-        return true;
       } catch {
         res.writeHead(404);
         return res.end();
@@ -303,8 +400,31 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
       return res.end();
     }
     if (path === "/health") {
+      const isExternal = !!(req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for']);
+      const isLocal = !isExternal && ['127.0.0.1', 'localhost', '::1'].includes(req.socket.remoteAddress);
+      const wsClients = wss ? wss.clients.size : 0;
+      const wsUsers = wss ? new Set([...wss.clients].map(c => c.userId).filter(Boolean)).size : 0;
+      const mem = process.memoryUsage();
       res.writeHead(200, { "Content-Type": "application/json" });
-      return res.end(JSON.stringify({ ok: true, version: "0.3.1", uiVersion: "2026-10-26-new-ui", liveChatHistory: true, storyViewers: true,liveGuests:true,liveMaxGuests:3,liveSfu:liveSFU.status() }));
+      return res.end(JSON.stringify({
+        ok: true,
+        version: "0.3.1",
+        uiVersion: "2026-10-26-new-ui",
+        ...(isLocal ? { pid: process.pid } : {}),
+        instanceId: consoleInstanceId,
+        liveChatHistory: true,
+        storyViewers: true,
+        liveGuests: true,
+        liveMaxGuests: 3,
+        liveSfu: liveSFU.status(),
+        telemetry: {
+          activeConnections: wsClients,
+          activeUsers: wsUsers,
+          heapMb: Math.round(mem.heapUsed / 1048576),
+          rssMb: Math.round(mem.rss / 1048576),
+          uptime: Math.round(process.uptime())
+        }
+      }));
     }
     const files = {
       "/third-party-notices.txt": ["third-party-notices.txt", "text/plain"],
@@ -463,14 +583,24 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
       res.end();
     }
   });
-  const wss = new WebSocketServer({ server, maxPayload: 32768 });
+  server.keepAliveTimeout = 65000;
+  server.headersTimeout = 66000;
+  wss = new WebSocketServer({ server, maxPayload: 32768 });
   const send = (ws, data) => {
     if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data));
   };
   notifyAIStream = ({userId,...event}) => {
     for(const client of wss.clients)if(client.userId===userId&&social.authenticate(client.authRequest))send(client,{type:'ai-stream',...event});
   };
-  const webPush = createWebPush({ social, fetchImpl: fetchImpl || fetch });
+  const browserPush = createWebPush({ social, fetchImpl: fetchImpl || fetch });
+  const applePush = createApplePush({ social });
+  const webPush = {
+    ...browserPush,
+    has: id => browserPush.has(id) || applePush.hasVoip(id),
+    call: (id, session, from) => { browserPush.call(id, session, from); applePush.call(id, session, from); },
+    callEnded: (id, session, reason, from) => { browserPush.callEnded(id, session, reason, from); applePush.callEnded(id, session, reason); },
+    notification: (id, notification) => { browserPush.notification(id, notification); applePush.notification(id, notification); }
+  };
   pushNotification = (userId, id) => { if (!visible(userId)) webPush.notification(userId, id); };
   // A user "sees" Kinnect when one of their browser tabs reports it is visible.
   const visible = (userId) => [...wss.clients].some((c) => c.userId === userId && c.visible && social.authenticate(c.authRequest));
@@ -557,7 +687,14 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     }
   }
   const liveSFU=createLiveSFU({env:liveEnv??((dbPath===":memory:"||process.env.NODE_TEST_CONTEXT)?{}:process.env),send,social,fetchImpl,onUnavailable:id=>{const room=rooms.get(id);if(room?.mediaTransport==='sfu')leave(room.host);}});
+  probes.sockets=()=>wss.clients.size;probes.rooms=()=>rooms.size;probes.sfu=()=>liveSFU.status();
   server.once('close',()=>{clearTimeout(listingTimer);for(const room of rooms.values())clearTimeout(room.presenceTimer);liveSFU.close();});
+  server.on('error', (err) => {
+    console.error('[HTTP SERVER ERROR]', new Date().toISOString(), err?.stack || err);
+  });
+  wss.on('error', (err) => {
+    console.error('[WSS ERROR]', new Date().toISOString(), err?.stack || err);
+  });
   const liveGuests=createLiveGuests({send,social,sfu:liveSFU});
   const liveModes=createLiveModes({send,social,listing});
   const liveGifts=createLiveGifts({send,social,env:(dbPath===":memory:"||process.env.NODE_TEST_CONTEXT)?{}:process.env});
@@ -590,7 +727,18 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         return ws.close(1008);
       }
     }
-    const account = social.authenticate(req);
+    let account = social.authenticate(req);
+    // Chỉ gia hạn nếu phiên đang hợp lệ và chưa hết hạn (ngăn chặn hồi sinh token đã chết)
+    if (account) {
+      const cookie = req.headers.cookie || "";
+      const token = cookie.split(";").map(x=>x.trim()).find(x=>x.startsWith("kinnect_session="))?.slice(16);
+      if (token) {
+        try {
+          const tokenHash = createHash("sha256").update(token).digest("hex");
+          social.db.prepare("UPDATE sessions SET expires=? WHERE token=? AND expires>?").run(Date.now() + 7 * 86400000, tokenHash, Date.now());
+        } catch {}
+      }
+    }
     if (!account) return ws.close(4401, "Login required");
     ws.authRequest = req;
     ws.userId = account.id;
@@ -603,7 +751,7 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     send(ws, { type: "welcome", id: ws.id, callResume: true, push: true, liveGifts:liveGifts.catalog(ws.userId) });
     calls.join(ws);
     listing();
-    ws.on("message", (raw) => {
+    ws.on("message", async (raw) => {
       const account = social.authenticate(req);
       if (!account) {
         leave(ws);
@@ -708,6 +856,8 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
         social.ai.enqueue('live',room.id,ws.userId,{text:'Kiểm tra khung hình livestream lấy mẫu. Phòng '+room.id,image});return;
       }
       if(m.type==='viewers'){const users=[...new Map([...room.members.values()].filter(peer=>peer!==room.host&&social.user(peer.userId)?.suspended===0&&!social.blocked(ws.userId,peer.userId)).map(peer=>[peer.userId,social.publicUser(social.user(peer.userId),ws.userId)])).values()];send(ws,{type:'viewers',room:room.id,users});return;}
+      if(sharedCoreBridge&&['gift','live-reaction'].includes(m.type)&&m.kind!=='heart'){try{await sharedCoreBridge.syncCredits(ws.userId);}catch{return error('Chưa đồng bộ được số dư cloud. Vui lòng thử lại.');}}
+      if(rooms.get(ws.room)!==room)return;
       if(liveGifts.handle(room,ws,m,account))return;
       if (m.type === "gift") {
         try {
@@ -771,9 +921,16 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
     });
     ws.on("close", () => {typing.disconnect(ws);calls.disconnect(ws);leave(ws);});
   });
+  server.once('close',()=>{adminConsole.close?.();adminCloud?.close();});
   return { server, wss, rooms, social };
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  process.on('uncaughtException', (err) => {
+    console.error('[UNCAUGHT EXCEPTION]', new Date().toISOString(), err?.stack || err);
+  });
+  process.on('unhandledRejection', (reason) => {
+    console.error('[UNHANDLED REJECTION]', new Date().toISOString(), reason?.stack || reason);
+  });
   const dbPath = resolve(process.env.DATA_DIR || "data", "kinnect.sqlite");
   mkdirSync(dirname(dbPath), { recursive: true });
   const { server } = createApp({ dbPath, allowEmailDelivery: true });

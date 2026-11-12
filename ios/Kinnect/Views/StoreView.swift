@@ -28,7 +28,6 @@ struct StoreView: View {
     @State private var accountUuid: UUID? = nil
     @State private var isLoading = false
     @State private var transactionInProgress = false
-    @State private var purchaseRequestIds: [String: String] = [:]
     @State private var coinSource = "gifted"
     @State private var trialPackagePurchases = true
     @State private var storeBalance = 0
@@ -80,15 +79,26 @@ struct StoreView: View {
         .confirmationDialog("Cửa hàng Kinnect", isPresented: $showStoreMenuDialog, titleVisibility: .visible) {
             Button("Khôi phục giao dịch") {
                 Task {
-                    _ = try? await storeKit.restorePurchases()
-                    await loadStoreData()
+                    do {
+                        let outcome = try await storeKit.restorePurchases()
+                        appState.showToast(outcome.failed.isEmpty
+                            ? "Đã kiểm tra và khôi phục các giao dịch hợp lệ."
+                            : "Một số giao dịch chưa xác minh được. Hãy thử lại.")
+                        await loadStoreData()
+                    } catch {
+                        appState.showToast("Chưa khôi phục được: \(error.localizedDescription)")
+                    }
                 }
             }
             Button("Phong cách mặc định") {
                 Task {
-                    _ = try? await KinnectAPIClient.shared.requestJSON("/api/store/style", method: "POST", body: ["productId": ""])
-                    appState.showToast("Đã chuyển về phong cách mặc định")
-                    await loadStoreData()
+                    do {
+                        _ = try await KinnectAPIClient.shared.requestJSON("/api/store/style", method: "POST", body: ["productId": ""])
+                        appState.showToast("Đã chuyển về phong cách mặc định")
+                        await loadStoreData()
+                    } catch {
+                        appState.showToast("Chưa đổi được phong cách: \(error.localizedDescription)")
+                    }
                 }
             }
             Button("Thông tin cửa hàng") {
@@ -280,16 +290,36 @@ struct StoreView: View {
                 }
             }
 
-            Circle()
-                .strokeBorder(Color(hex: preview.accentColor), lineWidth: 4)
-                .frame(width: 72, height: 72)
-                .background(Circle().fill(Color(hex: preview.accentColor).opacity(0.2)))
-                .overlay(
-                    Image(systemName: preview.iconName)
-                        .font(.system(size: 30, weight: .bold))
-                        .foregroundColor(.white)
-                )
-                .shadow(color: Color(hex: preview.accentColor).opacity(0.6), radius: 10)
+            ZStack {
+                Circle()
+                    .fill(Color(hex: "#23183D"))
+                    .frame(width: 68, height: 68)
+                Text("K")
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundColor(.white)
+                if let frame = packageFrameImage(preview) {
+                    Image(uiImage: frame)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 96, height: 96)
+                } else if let gift = packageGiftImage(preview) {
+                    Image(uiImage: gift)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 76, height: 76)
+                } else {
+                    Circle()
+                        .strokeBorder(Color(hex: preview.accentColor), lineWidth: 4)
+                        .frame(width: 72, height: 72)
+                        .background(Circle().fill(Color(hex: preview.accentColor).opacity(0.2)))
+                        .overlay(
+                            Image(systemName: preview.iconName)
+                                .font(.system(size: 30, weight: .bold))
+                                .foregroundColor(.white)
+                        )
+                }
+            }
+            .shadow(color: Color(hex: preview.accentColor).opacity(0.6), radius: 10)
 
             Text("Xin chào! Đây là bản xem thử.")
                 .font(.subheadline.weight(.medium))
@@ -341,8 +371,8 @@ struct StoreView: View {
     }
 
     private var packagesSection: some View {
-        VStack(spacing: 14) {
-            let list = filteredPackages
+        let list = filteredPackages
+        return Group {
             if list.isEmpty {
                 VStack(spacing: 8) {
                     KinnectIcon(glyph: .store, size: 36, tint: KinnectTheme.textSecondary)
@@ -354,8 +384,10 @@ struct StoreView: View {
                 .padding(.vertical, 36)
                 .kinnectCard()
             } else {
-                ForEach(list) { pkg in
-                    storePackageCard(pkg)
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+                    ForEach(list) { pkg in
+                        storePackageCard(pkg)
+                    }
                 }
             }
         }
@@ -363,114 +395,132 @@ struct StoreView: View {
 
     private func storePackageCard(_ pkg: StorePackageItem) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Use the same bundled package artwork as Android.
-            ZStack(alignment: .bottomLeading) {
-                LinearGradient(
-                    colors: [Color(hex: pkg.accentColor), Color(hex: pkg.accentColor).opacity(0.4)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .frame(height: 120)
+            // 1:1 Square Artwork Container (Parity with Android 1x1 store without cropping)
+            ZStack(alignment: .topTrailing) {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(hex: pkg.accentColor), Color(hex: "#161329")],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
 
-                Circle()
-                    .fill(Color.white.opacity(0.15))
-                    .frame(width: 90, height: 90)
-                    .offset(x: -20, y: -20)
-
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        if !pkg.badgeText.isEmpty {
-                            Text(pkg.badgeText.uppercased())
-                                .font(.system(size: 9, weight: .black))
+                // Render 1:1 artwork
+                Group {
+                    if let frame = packageFrameImage(pkg) {
+                        ZStack {
+                            Circle()
+                                .fill(Color(hex: "#23183D"))
+                                .frame(width: 68, height: 68)
+                                .shadow(color: Color(hex: pkg.accentColor).opacity(0.4), radius: 8)
+                            Text("K")
+                                .font(.system(size: 26, weight: .bold))
                                 .foregroundColor(.white)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Capsule().fill(Color.black.opacity(0.35)))
+                            Image(uiImage: frame)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 96, height: 96)
                         }
-                        Text(pkg.title)
-                            .font(.headline.bold())
+                    } else if let gift = packageGiftImage(pkg) {
+                        Image(uiImage: gift)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 84, height: 84)
+                            .shadow(color: Color(hex: pkg.accentColor).opacity(0.4), radius: 8)
+                    } else if let artwork = packageArtwork(pkg) {
+                        Image(uiImage: artwork)
+                            .resizable()
+                            .scaledToFit()
+                            .padding(8)
+                    } else {
+                        Image(systemName: packageIconName(for: pkg.id, category: pkg.category))
+                            .font(.system(size: 32, weight: .bold))
                             .foregroundColor(.white)
                     }
-                    Spacer()
-
-                    // Visual Graphic / Icon (Parity Android StorePackageDesign)
-                    Circle()
-                        .strokeBorder(Color.white.opacity(0.85), lineWidth: 2.5)
-                        .frame(width: 48, height: 48)
-                        .background(Circle().fill(Color.white.opacity(0.22)))
-                        .overlay(
-                            Image(systemName: packageIconName(for: pkg.id, category: pkg.category))
-                                .font(.system(size: 22, weight: .bold))
-                                .foregroundColor(.white)
-                        )
                 }
-                .padding(14)
-            }
-            .overlay {
-                if let artwork = packageArtwork(pkg) {
-                    Image(uiImage: artwork)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(height: 120)
-                        .clipped()
-                        .accessibilityLabel(pkg.title)
-                }
-            }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // Description and Action
-            VStack(alignment: .leading, spacing: 12) {
-                Text(pkg.subtitle)
-                    .font(.caption)
-                    .foregroundColor(KinnectTheme.textSecondary)
-                    .lineLimit(2)
-
-                HStack(alignment: .center) {
-                    HStack(spacing: 4) {
-                        KinnectIcon(glyph: .coin, size: 14, selected: true, tint: KinnectTheme.warning)
-                        Text("\(pkg.priceCoins) xu")
-                            .font(.subheadline.bold())
-                            .foregroundColor(KinnectTheme.warning)
+                // Top badges
+                HStack {
+                    if pkg.equipped {
+                        Text("Đang dùng")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(KinnectTheme.online))
                     }
-
                     Spacer()
+                    if !pkg.badgeText.isEmpty {
+                        Text(pkg.badgeText.uppercased())
+                            .font(.system(size: 8, weight: .black))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(Color.black.opacity(0.5)))
+                    }
+                }
+                .padding(6)
+            }
+            .aspectRatio(1, contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
-                    // Action: Xem thử button
+            // Info and Actions
+            VStack(alignment: .leading, spacing: 6) {
+                Text(pkg.title)
+                    .font(.subheadline.bold())
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+
+                Text(pkg.subtitle)
+                    .font(.caption2)
+                    .foregroundColor(KinnectTheme.textSecondary)
+                    .lineLimit(1)
+
+                HStack(spacing: 3) {
+                    KinnectIcon(glyph: .coin, size: 12, selected: true, tint: KinnectTheme.warning)
+                    Text("\(pkg.priceCoins) xu")
+                        .font(.caption.bold())
+                        .foregroundColor(KinnectTheme.warning)
+                }
+
+                HStack(spacing: 6) {
                     Button {
                         withAnimation {
                             previewPackage = pkg
                         }
                     } label: {
                         Text("Xem thử")
-                            .font(.caption.bold())
+                            .font(.system(size: 11, weight: .bold))
                             .foregroundColor(KinnectTheme.accentBright)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 7)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 5)
                             .background(Capsule().fill(KinnectTheme.surfaceElevated))
                     }
+                    .buttonStyle(.plain)
 
-                    // Action: Buy / Equip button
                     if pkg.owned {
                         Button {
                             Task { await usePackage(pkg) }
                         } label: {
-                            Text(ownedActionTitle(pkg))
-                                .font(.caption.bold())
+                            Text(pkg.equipped ? "Gỡ" : "Dùng")
+                                .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(.white)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                                .background(
-                                    Capsule().fill(pkg.equipped ? KinnectTheme.surfaceElevated : KinnectTheme.online)
-                                )
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 5)
+                                .background(Capsule().fill(pkg.equipped ? KinnectTheme.surfaceElevated : KinnectTheme.online))
                         }
+                        .buttonStyle(.plain)
                     } else {
                         Button {
                             confirmBuyPackage = pkg
                         } label: {
-                            Text("Đổi gói")
-                                .font(.caption.bold())
+                            Text("Đổi")
+                                .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(.white)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 5)
                                 .background(
                                     Capsule().fill(
                                         LinearGradient(
@@ -481,17 +531,30 @@ struct StoreView: View {
                                     )
                                 )
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }
-            .padding(14)
+            .padding(8)
             .background(KinnectTheme.surface)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
-            RoundedRectangle(cornerRadius: 18)
+            RoundedRectangle(cornerRadius: 16)
                 .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
         )
+    }
+
+    private func packageFrameImage(_ pkg: StorePackageItem) -> UIImage? {
+        let suffix = pkg.id.hasPrefix("style_") ? String(pkg.id.dropFirst(6)) : pkg.id
+        return UIImage(named: "avatar_frame_" + suffix)
+    }
+
+    private func packageGiftImage(_ pkg: StorePackageItem) -> UIImage? {
+        let giftName = pkg.id == "gift_love" ? "gift_rose"
+            : pkg.id == "gift_speed" ? "gift_sports_car"
+            : pkg.id == "gift_royal" ? "gift_crown" : ""
+        return giftName.isEmpty ? nil : UIImage(named: giftName)
     }
 
     private func packageIconName(for id: String, category: String) -> String {
@@ -571,9 +634,10 @@ struct StoreView: View {
         transactionInProgress = true
         defer { transactionInProgress = false }
         // Retain this ID after a transport failure so retry cannot debit twice.
-        let key = pkg.id + ":" + coinSource
-        let requestId = purchaseRequestIds[key] ?? KinnectWriteBody.packageRequestId()
-        purchaseRequestIds[key] = requestId
+        let key = "kinnect-package-request:" + ServerConfig.currentOrigin + ":"
+            + (appState.currentUser?.id ?? "") + ":" + pkg.id + ":" + coinSource
+        let requestId = UserDefaults.standard.string(forKey: key) ?? KinnectWriteBody.packageRequestId()
+        UserDefaults.standard.set(requestId, forKey: key)
         do {
             let res = try await KinnectAPIClient.shared.requestJSON(
                 "/api/store/packages/buy", method: "POST",
@@ -583,7 +647,7 @@ struct StoreView: View {
             guard (res["ownedPackages"] as? [String] ?? []).contains(pkg.id) else {
                 throw KinnectAPIError.serverMessage("Máy chủ chưa xác nhận quyền sử dụng gói.")
             }
-            purchaseRequestIds.removeValue(forKey: key)
+            UserDefaults.standard.removeObject(forKey: key)
             applyStoreState(res)
             appState.showToast("Đã sở hữu \(pkg.title)!")
             await loadStoreData()

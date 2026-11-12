@@ -36,6 +36,18 @@
       "category": "interface"
     },
     {
+      "resource": "ic_flow_call_accept",
+      "source": "ic_call_accept",
+      "redrawn": false,
+      "category": "call"
+    },
+    {
+      "resource": "ic_flow_call_decline",
+      "source": "ic_call_decline",
+      "redrawn": false,
+      "category": "call"
+    },
+    {
       "resource": "ic_flow_call_flip",
       "source": "ic_call_flip",
       "redrawn": false,
@@ -50,6 +62,12 @@
     {
       "resource": "ic_flow_call_phone_off",
       "source": "ic_call_phone_off",
+      "redrawn": false,
+      "category": "call"
+    },
+    {
+      "resource": "ic_flow_call_video",
+      "source": "ic_call_video",
       "redrawn": false,
       "category": "call"
     },

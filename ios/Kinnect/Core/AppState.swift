@@ -94,9 +94,9 @@ final class AppState: ObservableObject {
                 await NativeWebRTCManager.shared.acceptIncomingCall(callId: callId)
             }
         }
-        CallKitManager.shared.onEndCall = { _ in
+        CallKitManager.shared.onEndCall = { callId in
             Task { @MainActor in
-                NativeWebRTCManager.shared.endOrRejectCurrentCall(sendSocket: true)
+                NativeWebRTCManager.shared.endOrRejectCurrentCall(sendSocket: true, fallbackCallId: callId)
             }
         }
         CallKitManager.shared.onSetMuted = { _, isMuted in
@@ -180,6 +180,7 @@ final class AppState: ObservableObject {
     }
 
     func logout() async {
+        await PushKitManager.shared.unregisterStoredTokens()
         _ = try? await KinnectAPIClient.shared.requestJSON("/api/logout", method: "POST", body: [:])
         clearSessionState()
     }

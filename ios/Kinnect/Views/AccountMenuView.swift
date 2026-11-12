@@ -26,7 +26,10 @@ struct AccountMenuView: View {
                 VStack(spacing: 16) {
                     headerProfileCard
                     mainMenuGroup
-                    accountSettingsGroup
+                    socialGroup
+                    securityGroup
+                    supportGroup
+                    accountActionsGroup
                     footerLabel
                 }
                 .padding(.horizontal, 16)
@@ -122,124 +125,151 @@ struct AccountMenuView: View {
 
     private var mainMenuGroup: some View {
         VStack(spacing: 0) {
-            menuRow(glyph: .store, title: "Cửa hàng Kinnect", color: KinnectTheme.accentBright) {
+            menuRow(systemName: "bag.fill", gradient: [Color(hex: "#8E2DE2"), Color(hex: "#4A00E0")], title: "Cửa hàng Kinnect") {
                 dismiss()
                 onOpenStore?()
             }
-            Divider().background(KinnectTheme.borderSoft)
+            menuDivider
 
-            menuRow(glyph: .wallet, title: "Ví Kinnect", color: KinnectTheme.warning) {
+            menuRow(systemName: "creditcard.fill", gradient: [Color(hex: "#F59E0B"), Color(hex: "#D97706")], title: "Ví Kinnect") {
                 dismiss()
                 onOpenWallet()
             }
-            Divider().background(KinnectTheme.borderSoft)
+        }
+        .background(settingsGroupBackground)
+    }
 
-            menuRow(glyph: .settings, title: "Cài đặt và quyền riêng tư", color: .blue) {
-                showPrivacySheet = true
+    private var socialGroup: some View {
+        VStack(spacing: 0) {
+            menuRow(systemName: "person.2.fill", gradient: [Color(hex: "#3B82F6"), Color(hex: "#1D4ED8")], title: "Bạn bè") {
+                dismiss()
+                onOpenFriends()
             }
-            Divider().background(KinnectTheme.borderSoft)
+            menuDivider
 
-            menuRow(glyph: .shield, title: "Bảo mật và đăng nhập", color: .green) {
-                showSecuritySheet = true
-            }
-            Divider().background(KinnectTheme.borderSoft)
-
-            menuRow(glyph: .notifications, title: "Cài đặt thông báo", color: .orange) {
+            menuRow(systemName: "bell.badge.fill", gradient: [Color(hex: "#EF4444"), Color(hex: "#DC2626")], title: "Cài đặt thông báo") {
                 if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
                     UIApplication.shared.open(url)
                 }
             }
-            Divider().background(KinnectTheme.borderSoft)
+            menuDivider
 
-            menuRow(glyph: .moon, title: "Giao diện", color: .indigo) {
+            menuRow(systemName: "circle.lefthalf.filled", gradient: [Color(hex: "#6366F1"), Color(hex: "#4F46E5")], title: "Giao diện") {
                 showAppearanceSheet = true
             }
-            Divider().background(KinnectTheme.borderSoft)
+        }
+        .background(settingsGroupBackground)
+    }
 
-            menuRow(glyph: .help, title: "Trợ giúp và hỗ trợ", color: .teal) {
+    private var securityGroup: some View {
+        VStack(spacing: 0) {
+            menuRow(systemName: "hand.raised.fill", gradient: [Color(hex: "#64748B"), Color(hex: "#475569")], title: "Cài đặt và quyền riêng tư") {
+                showPrivacySheet = true
+            }
+            menuDivider
+
+            menuRow(systemName: "lock.shield.fill", gradient: [Color(hex: "#0EA5E9"), Color(hex: "#0284C7")], title: "Bảo mật và đăng nhập") {
+                showSecuritySheet = true
+            }
+            menuDivider
+
+            menuRow(systemName: "key.fill", gradient: [Color(hex: "#10B981"), Color(hex: "#059669")], title: "Đổi mật khẩu") {
+                showPasswordSheet = true
+            }
+        }
+        .background(settingsGroupBackground)
+    }
+
+    private var supportGroup: some View {
+        VStack(spacing: 0) {
+            menuRow(systemName: "questionmark.circle.fill", gradient: [Color(hex: "#06B6D4"), Color(hex: "#0891B2")], title: "Trợ giúp và hỗ trợ") {
                 showSupportSheet = true
             }
-            Divider().background(KinnectTheme.borderSoft)
+            menuDivider
 
-            menuRow(glyph: .info, title: "Giới thiệu Kinnect", color: .pink) {
+            menuRow(systemName: "info.circle.fill", gradient: [Color(hex: "#8B5CF6"), Color(hex: "#7C3AED")], title: "Giới thiệu Kinnect") {
                 showAboutSheet = true
             }
         }
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(KinnectTheme.surface)
-                .overlay(RoundedRectangle(cornerRadius: 16).stroke(KinnectTheme.borderSoft, lineWidth: 1))
-        )
+        .background(settingsGroupBackground)
     }
 
-    private var accountSettingsGroup: some View {
+    private var accountActionsGroup: some View {
         VStack(spacing: 0) {
-            menuRow(glyph: .lock, title: "Đổi mật khẩu", color: .mint) {
-                showPasswordSheet = true
-            }
-            Divider().background(KinnectTheme.borderSoft)
-
-            Button {
+            menuRow(
+                systemName: "rectangle.portrait.and.arrow.right.fill",
+                gradient: [Color(hex: "#F43F5E"), Color(hex: "#E11D48")],
+                title: "Đăng xuất",
+                isDestructive: true
+            ) {
                 showLogoutConfirm = true
-            } label: {
-                HStack(spacing: 12) {
-                    ZStack {
-                        Circle()
-                            .fill(KinnectTheme.danger.opacity(0.15))
-                            .frame(width: 34, height: 34)
-                        KinnectIcon(glyph: .logout, size: 18, tint: KinnectTheme.danger)
-                    }
-                    Text("Đăng xuất")
-                        .font(.body.weight(.medium))
-                        .foregroundColor(KinnectTheme.danger)
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundColor(KinnectTheme.textSecondary)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
         }
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(KinnectTheme.surface)
-                .overlay(RoundedRectangle(cornerRadius: 16).stroke(KinnectTheme.borderSoft, lineWidth: 1))
-        )
+        .background(settingsGroupBackground)
+    }
+
+    private var menuDivider: some View {
+        HStack {
+            Spacer().frame(width: 58)
+            Divider().background(KinnectTheme.borderSoft.opacity(0.8))
+        }
+    }
+
+    private var settingsGroupBackground: some View {
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(KinnectTheme.surface)
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(KinnectTheme.borderSoft.opacity(0.8), lineWidth: 0.8)
+            )
     }
 
     private var footerLabel: some View {
-        Text("Kinnect · Kết nối theo cách của bạn.")
+        Text("Kinnect · Kết nối đúng gu · Sống đúng mình")
             .font(.footnote)
             .foregroundColor(KinnectTheme.textSecondary)
-            .padding(.top, 8)
+            .padding(.top, 4)
             .padding(.bottom, 24)
     }
 
-    private func menuRow(glyph: KinnectGlyph, title: String, color: Color, action: @escaping () -> Void) -> some View {
+    private func menuRow(
+        systemName: String,
+        gradient: [Color],
+        title: String,
+        isDestructive: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
-            HStack(spacing: 12) {
+            HStack(spacing: 14) {
                 ZStack {
-                    Circle()
-                        .fill(color.opacity(0.15))
-                        .frame(width: 34, height: 34)
-                    KinnectIcon(glyph: glyph, size: 18, tint: color)
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: gradient,
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .frame(width: 32, height: 32)
+                        .shadow(color: gradient.first?.opacity(0.3) ?? .clear, radius: 2, y: 1)
+
+                    Image(systemName: systemName)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white)
                 }
 
                 Text(title)
-                    .font(.body)
-                    .foregroundColor(KinnectTheme.textPrimary)
+                    .font(.system(size: 16, weight: isDestructive ? .medium : .regular))
+                    .foregroundColor(isDestructive ? KinnectTheme.danger : KinnectTheme.textPrimary)
 
                 Spacer()
 
                 Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(KinnectTheme.textSecondary)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(Color(UIColor.tertiaryLabel))
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .padding(.vertical, 12)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

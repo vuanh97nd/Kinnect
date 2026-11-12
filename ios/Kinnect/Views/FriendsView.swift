@@ -11,6 +11,7 @@ struct FriendsView: View {
     }
 
     @State private var tab: FriendTab = .friends
+    @State private var searchQuery: String = ""
     @State private var friends: [KinnectUser] = []
     @State private var incoming: [KinnectUser] = []
     @State private var outgoing: [KinnectUser] = []
@@ -23,8 +24,15 @@ struct FriendsView: View {
         _tab = State(initialValue: initialTab)
     }
 
+    private var filteredFriends: [KinnectUser] {
+        let clean = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if clean.isEmpty { return friends }
+        let q = clean.hasPrefix("@") ? String(clean.dropFirst()) : clean
+        return friends.filter { $0.name.lowercased().contains(q) || $0.handle.lowercased().contains(q) }
+    }
+
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             Picker("Bạn bè", selection: $tab) {
                 ForEach(FriendTab.allCases, id: \.self) { item in
                     Text(item.rawValue).tag(item)
@@ -34,58 +42,108 @@ struct FriendsView: View {
             .padding(.horizontal, 16)
             .padding(.top, 8)
 
+            // Search Bar matching Android searchField
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(KinnectTheme.textSecondary)
+                TextField("Tên hoặc @username", text: $searchQuery)
+                    .font(.subheadline)
+                    .foregroundColor(KinnectTheme.textPrimary)
+                if !searchQuery.isEmpty {
+                    Button { searchQuery = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+            .padding(.horizontal, 16)
+
             ScrollView {
-                LazyVStack(spacing: 12) {
+                LazyVStack(spacing: 14) {
                     switch tab {
                     case .friends:
-                        if friends.isEmpty && !isLoading {
-                            emptyPlaceholder("Chưa có bạn bè nào trong danh sách")
+                        if filteredFriends.isEmpty && !isLoading {
+                            emptyPlaceholder(searchQuery.isEmpty ? "Chưa có bạn bè nào trong danh sách" : "Không tìm thấy bạn bè phù hợp")
                         } else {
-                            let onlineFriends = friends.filter { $0.isActive && $0.showActivity }
-                            let offlineFriends = friends.filter { !($0.isActive && $0.showActivity) }
+                            let online = filteredFriends.filter { ($0.isActive && $0.showActivity) || appState.onlineUserIds.contains($0.id) }
+                            let offline = filteredFriends.filter { !(($0.isActive && $0.showActivity) || appState.onlineUserIds.contains($0.id)) }
 
-                            if !onlineFriends.isEmpty {
-                                sectionHeader("Đang trực tuyến (\(onlineFriends.count))")
-                                ForEach(onlineFriends) { user in
-                                    friendRow(user: user)
+                            if !online.isEmpty {
+                                sectionHeader("Đang trực tuyến", count: online.count, color: Color(hex: "#2E9E66"))
+                                VStack(spacing: 0) {
+                                    ForEach(online) { user in
+                                        friendRow(user: user)
+                                        if user.id != online.last?.id {
+                                            Divider().background(KinnectTheme.borderSoft).padding(.leading, 64)
+                                        }
+                                    }
                                 }
+                                .background(groupedCardBackground)
                             }
 
-                            if !offlineFriends.isEmpty {
-                                if !onlineFriends.isEmpty {
-                                    sectionHeader("Ngoại tuyến (\(offlineFriends.count))")
+                            if !offline.isEmpty {
+                                sectionHeader("Ngoại tuyến", count: offline.count, color: KinnectTheme.textSecondary)
+                                VStack(spacing: 0) {
+                                    ForEach(offline) { user in
+                                        friendRow(user: user)
+                                        if user.id != offline.last?.id {
+                                            Divider().background(KinnectTheme.borderSoft).padding(.leading, 64)
+                                        }
+                                    }
                                 }
-                                ForEach(offlineFriends) { user in
-                                    friendRow(user: user)
-                                }
+                                .background(groupedCardBackground)
                             }
                         }
 
                         if !suggestions.isEmpty {
-                            sectionHeader("Gợi ý kết bạn")
-                            ForEach(suggestions) { user in
-                                suggestionRow(user: user)
+                            sectionHeader("Gợi ý kết bạn", count: suggestions.count, color: KinnectTheme.accentBright)
+                            VStack(spacing: 0) {
+                                ForEach(suggestions) { user in
+                                    suggestionRow(user: user)
+                                    if user.id != suggestions.last?.id {
+                                        Divider().background(KinnectTheme.borderSoft).padding(.leading, 64)
+                                    }
+                                }
                             }
+                            .background(groupedCardBackground)
                         }
 
                     case .requests:
                         if incoming.isEmpty && !isLoading {
                             emptyPlaceholder("Không có lời mời kết bạn nào")
-                        }
-                        ForEach(incoming) { user in
-                            incomingRequestRow(user: user)
+                        } else {
+                            VStack(spacing: 0) {
+                                ForEach(incoming) { user in
+                                    incomingRequestRow(user: user)
+                                    if user.id != incoming.last?.id {
+                                        Divider().background(KinnectTheme.borderSoft).padding(.leading, 64)
+                                    }
+                                }
+                            }
+                            .background(groupedCardBackground)
                         }
 
                     case .outgoing:
                         if outgoing.isEmpty && !isLoading {
                             emptyPlaceholder("Không có lời mời nào đã gửi")
-                        }
-                        ForEach(outgoing) { user in
-                            outgoingRequestRow(user: user)
+                        } else {
+                            VStack(spacing: 0) {
+                                ForEach(outgoing) { user in
+                                    outgoingRequestRow(user: user)
+                                    if user.id != outgoing.last?.id {
+                                        Divider().background(KinnectTheme.borderSoft).padding(.leading, 64)
+                                    }
+                                }
+                            }
+                            .background(groupedCardBackground)
                         }
                     }
                 }
-                .padding(14)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 20)
             }
             .refreshable {
                 await loadAll()

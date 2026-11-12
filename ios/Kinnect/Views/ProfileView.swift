@@ -172,6 +172,7 @@ struct ProfileView: View {
         .fullScreenCover(item: $activeShortItem) { short in
             ProfileShortDetailSheet(
                 short: short,
+                shorts: userShorts,
                 onRefresh: { Task { await refreshMe() } }
             )
             .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -425,7 +426,7 @@ struct ProfileView: View {
             avatarURL: user.avatarUrl,
             colorHex: user.avatarColor,
             size: size,
-            isOnline: isSelf ? user.showActivity : ((user.isActive && user.showActivity) || appState.onlineUserIds.contains(user.id))
+            isOnline: !isSelf && user.showActivity && (user.isActive || appState.onlineUserIds.contains(user.id))
         )
         .overlay(
             Circle().stroke(KinnectTheme.surface, lineWidth: 4)
@@ -649,7 +650,7 @@ struct ProfileView: View {
 
     private func postsTabContent(user: KinnectUser) -> some View {
         VStack(spacing: 12) {
-            let myPosts = userPosts.filter { $0.author.id == user.id || userPosts.count <= 3 }
+            let myPosts = userPosts.filter { $0.author.id == user.id }
             if myPosts.isEmpty {
                 VStack(spacing: 8) {
                     KinnectIcon(glyph: .feed, size: 36, tint: KinnectTheme.textSecondary)
@@ -666,22 +667,35 @@ struct ProfileView: View {
                 .kinnectCard()
             } else {
                 ForEach(myPosts) { post in
-                    ProfilePostCard(
+                    PostCardView(
                         post: post,
-                        author: user,
-                        isSelf: isSelf,
-                        onDelete: {
+                        currentUserId: appState.currentUser?.id ?? "",
+                        isAuthorOnline: !isSelf && user.showActivity && appState.onlineUserIds.contains(user.id),
+                        onReact: { reaction in
                             Task {
-                                _ = try? await KinnectAPIClient.shared.requestJSON(
-                                    "/api/posts/\(post.id)",
-                                    method: "DELETE"
-                                )
-                                userPosts.removeAll { $0.id == post.id }
-                                appState.showToast("Đã xóa bài viết")
+                                do {
+                                    let remove = post.liked && post.userReaction == reaction
+                                    _ = try await KinnectAPIClient.shared.requestJSON(
+                                        "/api/posts/\(post.id)/like",
+                                        method: remove ? "DELETE" : "POST",
+                                        body: remove ? [:] : ["reaction": reaction])
+                                    if isSelf { await refreshMe() }
+                                    else { await refreshPeer(target: user) }
+                                } catch { appState.showToast(error.localizedDescription) }
                             }
                         },
-                        onOpenComments: {
-                            activeCommentsPost = post
+                        onOpenComments: { activeCommentsPost = post },
+                        onDelete: {
+                            Task {
+                                do {
+                                    _ = try await KinnectAPIClient.shared.requestJSON("/api/posts/\(post.id)", method: "DELETE")
+                                    userPosts.removeAll { $0.id == post.id }
+                                    appState.showToast("Đã xóa bài viết")
+                                } catch { appState.showToast(error.localizedDescription) }
+                            }
+                        },
+                        onReport: {
+                            appState.activeReportContext = UGCReportContext(targetType: "post", targetId: post.id, targetUserId: post.author.id, targetTitle: "Bài viết của \(post.author.name)")
                         }
                     )
                 }
@@ -759,7 +773,7 @@ struct ProfileView: View {
     }
 
     private func videosTabContent(user: KinnectUser) -> some View {
-        let myShorts = userShorts.filter { $0.author.id == user.id || userShorts.count <= 4 }
+        let myShorts = userShorts.filter { $0.author.id == user.id }
         return VStack(spacing: 12) {
             if myShorts.isEmpty {
                 VStack(spacing: 8) {
@@ -1233,7 +1247,7 @@ struct PublicAlbumManageSheet: View {
                                     .font(.subheadline)
                                     .foregroundColor(KinnectTheme.textPrimary)
                                 if !post.imageUrl.isEmpty {
-                                    KinnectRemoteImageView(rawURL: post.imageUrl, contentMode: .fill, cornerRadius: KinnectTheme.radiusSM, maxHeight: 160)
+                                    KinnectMediaTile(path: post.imageUrl, kind: post.mediaKind)
                                 }
                             }
                             .padding(.vertical, 4)
@@ -1490,59 +1504,22 @@ struct PrivateAlbumManageSheet: View {
 
 struct ProfileShortDetailSheet: View {
     let short: ShortItem
+    var shorts: [ShortItem] = []
     var onRefresh: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 16) {
-                RoundedRectangle(cornerRadius: KinnectTheme.radiusXL)
-                    .fill(KinnectTheme.surfaceElevated)
-                    .frame(maxWidth: .infinity, maxHeight: 360)
-                    .overlay(
-                        VStack(spacing: 12) {
-                            KinnectIcon(glyph: .video, size: 48, selected: true, tint: KinnectTheme.accentBright)
-                            Text(short.title.isEmpty ? "Video Shorts" : short.title)
-                                .font(.headline.bold())
-                                .foregroundColor(.white)
-                            Text(short.caption)
-                                .font(.subheadline)
-                                .foregroundColor(KinnectTheme.textSecondary)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 20)
-                            HStack(spacing: 18) {
-                                Label("\(short.likesCount) lượt thích", systemImage: "heart.fill")
-                                Label("\(short.commentsCount) bình luận", systemImage: "bubble.right.fill")
-                            }
-                            .font(.caption.bold())
-                            .foregroundColor(KinnectTheme.accentBright)
-                        }
-                    )
-
-                if short.author.id == appState.currentUser?.id {
-                    Button(role: .destructive) {
-                        Task { await deleteShort() }
-                    } label: {
-                        Label("Xóa video ngắn này", systemImage: "trash.fill")
-                            .font(.subheadline.bold())
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.danger.opacity(0.18)))
-                            .foregroundColor(KinnectTheme.danger)
-                    }
+        ShortsVideoView(initialItems: shorts.isEmpty ? [short] : shorts, initialShortID: short.id)
+            .overlay(alignment: .topLeading) {
+                Button { onRefresh?(); dismiss() } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.headline).foregroundColor(.white)
+                        .frame(width: 44, height: 44)
+                        .background(Circle().fill(Color.black.opacity(0.55)))
                 }
-                Spacer()
+                .padding(12).accessibilityLabel("Đóng video")
             }
-            .padding(16)
-            .background(KinnectTheme.background)
-            .navigationTitle("Chi tiết Video")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Đóng") { dismiss() }
-                }
-            }
-        }
     }
 
     private func deleteShort() async {
@@ -3041,15 +3018,18 @@ final class VideoThumbnailLoader: ObservableObject {
 
     func load(urlString: String) {
         guard let url = URL(string: KinnectAPIClient.shared.absoluteURL(urlString)) else { return }
-        let key = url.absoluteString as NSString
+        let key = "\(KinnectAPIClient.shared.currentAccountId):\(url.absoluteString)" as NSString
         if let cached = Self.cache.object(forKey: key) {
             self.image = cached
             return
         }
 
         task?.cancel()
+        let origin = KinnectAPIClient.shared.mediaOrigin
+        let cookie = KeychainStore.shared.cookieJarHeader(for: origin)
+        let headers = url.host == URL(string: origin)?.host && !cookie.isEmpty ? ["Cookie": cookie] : [:]
         task = Task.detached(priority: .userInitiated) {
-            let asset = AVURLAsset(url: url)
+            let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true
             generator.maximumSize = CGSize(width: 360, height: 576)

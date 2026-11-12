@@ -3,6 +3,7 @@ import CallKit
 import Foundation
 import UIKit
 import UserNotifications
+import WebRTC
 
 final class CallKitManager: NSObject, CXProviderDelegate {
     static let shared = CallKitManager()
@@ -60,6 +61,10 @@ final class CallKitManager: NSObject, CXProviderDelegate {
         provider.reportNewIncomingCall(with: uuid, update: update) { [weak self] error in
             if let error = error {
                 print("[KinnectCallKit] Failed to report incoming call: \(error)")
+                if self?.callUUIDs[callId] == uuid {
+                    self?.callUUIDs.removeValue(forKey: callId)
+                    self?.callIDs.removeValue(forKey: uuid)
+                }
                 self?.postFallbackCallNotification(callId: callId, callerName: callerName, isVideo: isVideo)
             }
             completion?()
@@ -79,10 +84,21 @@ final class CallKitManager: NSObject, CXProviderDelegate {
         callController.request(transaction) { error in
             if let error = error {
                 print("[KinnectCallKit] Start outgoing call transaction failed: \(error.localizedDescription)")
+                if self.callUUIDs[callId] == uuid {
+                    self.callUUIDs.removeValue(forKey: callId)
+                    self.callIDs.removeValue(forKey: uuid)
+                    self.onEndCall?(callId)
+                }
             } else {
                 self.provider.reportOutgoingCall(with: uuid, startedConnectingAt: Date())
             }
         }
+    }
+
+    func remapCallId(from previous: String, to canonical: String) {
+        guard previous != canonical, let uuid = callUUIDs.removeValue(forKey: previous) else { return }
+        callUUIDs[canonical] = uuid
+        callIDs[uuid] = canonical
     }
 
     func reportCallConnected(callId: String) {
@@ -131,12 +147,16 @@ final class CallKitManager: NSObject, CXProviderDelegate {
     // MARK: - CXProviderDelegate
 
     func providerDidReset(_ provider: CXProvider) {
+        let endedCallIDs = Array(callUUIDs.keys)
         callUUIDs.removeAll()
         callIDs.removeAll()
+        for callId in endedCallIDs {
+            onEndCall?(callId)
+        }
     }
 
     func provider(_ provider: CXProvider, perform action: CXStartCallAction) {
-        MediaPermissionHandler.shared.configureAudioSessionForCall()
+        MediaPermissionHandler.shared.configureAudioSessionForCall(speaker: NativeWebRTCManager.shared.isSpeakerOn)
         action.fulfill()
     }
 
@@ -170,10 +190,16 @@ final class CallKitManager: NSObject, CXProviderDelegate {
     }
 
     func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
-        MediaPermissionHandler.shared.configureAudioSessionForCall()
+        // Forward the external activation to WebRTC. Without this, a call
+        // answered while locked can retain an interrupted audio device.
+        RTCAudioSession.sharedInstance().audioSessionDidActivate(audioSession)
+        MediaPermissionHandler.shared.configureAudioSessionForCall(
+            speaker: NativeWebRTCManager.shared.isSpeakerOn)
     }
 
     func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {
-        MediaPermissionHandler.shared.configureAudioSessionForMedia()
+        RTCAudioSession.sharedInstance().audioSessionDidDeactivate(audioSession)
+        // CallKit owns deactivation. Do not reactivate a media playback session
+        // here while another system call or interruption is taking ownership.
     }
 }

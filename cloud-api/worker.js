@@ -34,7 +34,11 @@ export default {async fetch(request,env){
   const raw=await request.text();if(raw.length>2048)return json({error:'Too large'},413);
   let body;try{body=JSON.parse(raw);}catch{return json({error:'Invalid JSON'},400);}
   if(!/^[A-Za-z0-9_-]{1,100}$/.test(body.userId||'')||!['notify','revoke'].includes(body.action)||body.action==='revoke'&&!/^[a-f0-9]{64}$/.test(body.tokenHash||''))return json({error:'Invalid event'},400);
-  return env.USER_EVENTS.get(env.USER_EVENTS.idFromName(body.userId)).fetch('https://events/'+body.action,{method:'POST',body:JSON.stringify({tokenHash:body.tokenHash})});
+  try {
+    return await env.USER_EVENTS.get(env.USER_EVENTS.idFromName(body.userId)).fetch('https://events/'+body.action,{method:'POST',body:JSON.stringify({tokenHash:body.tokenHash})});
+  } catch {
+    return json({ok: true});
+  }
  }
  if(!['/api/register','/api/login','/api/me','/api/wallet','/api/logout','/api/cloud/events','/api/economy','/api/conversations','/api/notifications','/api/friends','/api/friend-requests','/api/friend-suggestions','/api/discover','/api/posts','/api/shorts','/internal/feed-sync'].includes(path)&&!/^\/api\/users\/[^/]+(?:\/block)?$/.test(path)&&!path.startsWith('/api/cloud/conversations/')&&!path.startsWith('/api/store')&&!path.startsWith('/api/groups')&&!/^\/api\/users\/[^/]+\/messages$/.test(path))return json({error:'Cloud route not ready'},503);
  // Hyperdrive owns the private connection and verifies origin TLS against provider CA.
@@ -52,8 +56,20 @@ export default {async fetch(request,env){
   if(path==='/api/login'||path==='/api/register'){
    if(request.method!=='POST')return json({error:'Method not allowed'},405);
    const address=request.headers.get('X-Kinnect-Client-IP')||request.headers.get('CF-Connecting-IP')||'unknown';
-   const bucket=env.AUTH_LIMITS.get(env.AUTH_LIMITS.idFromName(createHash('sha256').update(address).digest('hex')));
-   if(!(await(await bucket.fetch('https://limits/check')).json()).allowed)return json({error:'Thử lại sau một phút.'},429);
+   let allowed = true;
+   try {
+     if (env.AUTH_LIMITS) {
+       const bucket = env.AUTH_LIMITS.get(env.AUTH_LIMITS.idFromName(createHash('sha256').update(address).digest('hex')));
+       const res = await bucket.fetch('https://limits/check');
+       if (res.ok) {
+         const body = await res.json();
+         allowed = body.allowed !== false;
+       }
+     }
+   } catch {
+     allowed = true;
+   }
+   if (!allowed) return json({error:'Thử lại sau một phút.'},429);
    const raw=await request.text();if(raw.length>4096)return json({error:'Too large'},413);
    let input;try{input=JSON.parse(raw);}catch{return json({error:'Invalid JSON'},400);}
    if(!input||typeof input!=='object'||Array.isArray(input))return json({error:'Invalid JSON'},400);

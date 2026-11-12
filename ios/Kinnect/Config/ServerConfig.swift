@@ -4,7 +4,7 @@ enum ServerConfig {
     static let defaultOrigin = "https://app.kinnect.io.vn"
     static let fallbackOrigin = "https://kinnect-allocation.vuanh97nd.workers.dev"
     static let appVersion = "1.2.12"
-    static let buildNumber = "119"
+    static let buildNumber = "121"
     static let bundleId = "app.kinnect.live"
 
     private static let savedOriginKey = "kinnect.server.origin"

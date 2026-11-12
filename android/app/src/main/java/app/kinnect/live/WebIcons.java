@@ -29,6 +29,8 @@ final class WebIcons {
       case "shopping_bag":web="shopping_bag";break;
 
       case "call": web = "phone"; break;
+      case "call_accept": web = "call_accept"; break;
+      case "call_decline": web = "call_decline"; break;
       case "attach": web = "paperclip"; break;
       case "sound": web = "volume_2"; break;
       case "music": web = "music_2"; break;

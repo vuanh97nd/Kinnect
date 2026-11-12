@@ -12,6 +12,7 @@
     "test:e2e:v2": "playwright test --config=playwright.v2.config.js"
   },
   "dependencies": {
+    "@apple/app-store-server-library": "3.1.0",
     "ws": "8.22.0"
   },
   "engines": {

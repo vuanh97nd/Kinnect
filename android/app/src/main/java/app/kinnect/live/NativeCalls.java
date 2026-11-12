@@ -52,7 +52,7 @@ final class NativeCalls implements NativeSocket.Events {
  private void open(JSONObject person){ending=false;String name=person==null?"Kinnect":person.optString("name","Kinnect");boolean video=!mode.equals("audio");
   dialog=new Dialog(activity,android.R.style.Theme_Material_NoActionBar_Fullscreen);Window w=dialog.getWindow();w.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON|WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED|WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);w.setNavigationBarColor(0xff000000);
   FrameLayout stage=new FrameLayout(activity);callStage=stage;stage.setBackground(video?new ColorDrawable(0xff0b0b10):new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0xff31343b,0xff202227,0xff0e0f12}));
-  remote=new SurfaceViewRenderer(activity);local=new SurfaceViewRenderer(activity);remote.setZOrderMediaOverlay(true);
+  remote=new SurfaceViewRenderer(activity);local=new SurfaceViewRenderer(activity);remote.setZOrderMediaOverlay(false);
   LinearLayout info=new LinearLayout(activity);info.setOrientation(1);info.setGravity(Gravity.CENTER_HORIZONTAL);
   TextView title=new KinnectText(activity);title.setText(name);title.setTextColor(0xffffffff);title.setTypeface(Typeface.DEFAULT_BOLD);title.setGravity(Gravity.CENTER);title.setMaxLines(2);title.setAutoSizeTextTypeUniformWithConfiguration(12,video?22:28,1,android.util.TypedValue.COMPLEX_UNIT_SP);
   status=new KinnectText(activity);status.setText(incoming?(video?I18n.t("Cuộc gọi video đến…"):I18n.t("Cuộc gọi thoại đến…")):I18n.t("Đang chuẩn bị…"));status.setTextColor(0xffbfc2c9);status.setTextSize(13);status.setGravity(Gravity.CENTER);status.setPadding(0,dp(6),0,0);

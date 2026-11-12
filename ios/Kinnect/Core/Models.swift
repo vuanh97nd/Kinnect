@@ -246,6 +246,7 @@ struct PostItem: Identifiable, Equatable {
     var commentsCount: Int
     var liked: Bool
     var userReaction: String
+    var mediaKind: String = "image"
 
     static func from(_ dict: [String: Any]) -> PostItem {
         let authorDict = (dict["author"] as? [String: Any]) ?? (dict["user"] as? [String: Any]) ?? dict
@@ -261,7 +262,8 @@ struct PostItem: Identifiable, Equatable {
             likesCount: (dict["likesCount"] as? Int) ?? (dict["likes"] as? Int) ?? 0,
             commentsCount: (dict["commentsCount"] as? Int) ?? (dict["comments"] as? Int) ?? 0,
             liked: (dict["liked"] as? Bool) ?? false,
-            userReaction: (dict["userReaction"] as? String) ?? (dict["myReaction"] as? String) ?? "like"
+            userReaction: (dict["userReaction"] as? String) ?? (dict["myReaction"] as? String) ?? "like",
+            mediaKind: (mediaDict?["kind"] as? String) ?? (dict["mediaKind"] as? String) ?? (img.lowercased().contains(".mp4") ? "video" : "image")
         )
     }
 }
@@ -275,6 +277,7 @@ struct StoryItem: Identifiable, Equatable {
     var createdAt: String
     var viewsCount: Int
     var viewed: Bool
+    var mediaKind: String = "image"
 
     static func from(_ dict: [String: Any]) -> StoryItem {
         let authorDict = (dict["author"] as? [String: Any]) ?? (dict["user"] as? [String: Any]) ?? dict
@@ -288,7 +291,8 @@ struct StoryItem: Identifiable, Equatable {
             backgroundColor: (dict["backgroundColor"] as? String) ?? (dict["bgColor"] as? String) ?? "#7C3AED",
             createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
             viewsCount: (dict["viewsCount"] as? Int) ?? (dict["viewCount"] as? Int) ?? 0,
-            viewed: (dict["viewed"] as? Bool) ?? false
+            viewed: (dict["viewed"] as? Bool) ?? false,
+            mediaKind: (mediaDict?["kind"] as? String) ?? (img.lowercased().contains(".mp4") ? "video" : "image")
         )
     }
 }

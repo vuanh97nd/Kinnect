@@ -383,6 +383,7 @@ public class MainActivity extends Activity {
     chatUser = null;
     chatReload = null;
     profileEditorAvatar = null;
+    if (!"store".equals(headerActive)) closeStoreUi();
     root = column();
     bottom = null;
     root.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob) -> { if(r-l!=or-ol || b-t!=ob-ot) adaptShell(); });
@@ -411,8 +412,8 @@ public class MainActivity extends Activity {
     toolbar.addView(logo, new LinearLayout.LayoutParams(dp(40), dp(40))); // Logo to hơn
     toolbar.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
     if (me != null && navigation) {
-      toolbar.addView(topIcon("bell", I18n.t("Thông báo"), "bell".equals(headerActive), this::notifications, "bell"));
-      toolbar.addView(topIcon("store", I18n.t("Cửa hàng"), "store".equals(headerActive), this::storeScreen, null));
+      toolbar.addView(topIcon("bell", I18n.t("Thông báo"), "bell".equals(headerActive), this::toggleNotifications, "bell"));
+      toolbar.addView(topIcon("store", I18n.t("Cửa hàng"), "store".equals(headerActive), this::toggleStore, null));
       toolbar.addView(topIcon("users_round", I18n.t("Bạn bè"), "friends".equals(headerActive), () -> friendsScreen(friendsCount > 0 ? "incoming" : "friends"), "friends"));
       toolbar.addView(topIcon("message_square", I18n.t("Tin nhắn"), "inbox".equals(headerActive), () -> {
         if ("inbox".equals(headerActive)) {
@@ -748,16 +749,30 @@ public class MainActivity extends Activity {
   }
 
   private boolean storeReturning;
-  private void storeScreen() {
+  private StoreUi currentStoreUi;
+  private void closeStoreUi() {
+    if (currentStoreUi != null) {
+      try { currentStoreUi.close(); } catch (Exception ignored) {}
+      currentStoreUi = null;
+    }
+  }
+
+  private void toggleStore() {
     if ("store".equals(headerActive)) {
       headerActive = "";
+      closeStoreUi();
       navigate(tab.isEmpty() || tab.equals("store") ? "feed" : tab);
-      return;
+    } else {
+      openStore();
     }
-    remember("store", () -> storeScreen());
+  }
+
+  private void storeScreen() {
     headerActive = "store";
+    remember("store", this::storeScreen);
+    closeStoreUi();
     shell(I18n.t("Cửa hàng"), true);
-    new StoreUi(this, content, headActions, this::refreshPage);
+    currentStoreUi = new StoreUi(this, content, headActions, this::storeScreen);
   }
   private void openStore() { storeScreen(); }
   private void meMenu() {
@@ -2111,33 +2126,84 @@ public class MainActivity extends Activity {
         say(I18n.t("Chưa có bạn bè để nhắn tin. Hãy tìm bạn ở Khám phá!"));
         return;
       }
-      Sheet picker = new Sheet(this).setTitle(I18n.t("Tin nhắn mới"));
+      Sheet picker = new Sheet(this).setTitle(I18n.t("Chọn bạn bè"));
+      LinearLayout container = column();
+      container.setPadding(0, 0, 0, dp(4));
+
+      // Ô tìm kiếm bạn bè
+      EditText searchInput = new KinnectInput(this);
+      searchInput.setHint(I18n.t("Tìm bạn bè để nhắn tin…"));
+      searchInput.setTextSize(14);
+      searchInput.setTextColor(TEXT);
+      searchInput.setHintTextColor(MUTED);
+      searchInput.setBackground(background(SOFT, 12));
+      searchInput.setPadding(dp(14), dp(10), dp(14), dp(10));
+      searchInput.setSingleLine(true);
+      LinearLayout.LayoutParams sip = new LinearLayout.LayoutParams(-1, dp(44));
+      sip.bottomMargin = dp(10);
+      container.addView(searchInput, sip);
+
       LinearLayout list = column();
-      list.setPadding(dp(12), dp(8), dp(12), dp(16));
-      ScrollView scroll = new ScrollView(this);
-      scroll.addView(list);
-      android.app.Dialog dialog = picker.setView(scroll).setNegativeButton(I18n.t("Hủy"), null).show();
+      list.setPadding(0, 0, 0, dp(8));
+
+      final android.app.Dialog[] dialogRef = new android.app.Dialog[1];
+      final List<View> rowViews = new ArrayList<>();
+
       for (JSONObject friend : friends) {
         LinearLayout row = row();
-        row.setPadding(dp(10), dp(10), dp(10), dp(10));
+        row.setPadding(dp(12), dp(10), dp(12), dp(10));
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setBackground(pressable(SOFT, 12));
         avatar(friend, row, 44);
         LinearLayout text = column();
         text.setPadding(dp(12), 0, 0, 0);
-        TextView name = label(friend.optString("name"), 15, TEXT);
+        String friendName = friend.optString("name");
+        String username = friend.optString("username");
+        TextView name = label(friendName, 15, TEXT);
         name.setTypeface(ApprovedTypography.font(this, Typeface.BOLD));
         text.addView(name);
-        text.addView(label("@" + friend.optString("username"), 12, MUTED));
+        text.addView(label("@" + username, 12, MUTED));
         row.addView(text, new LinearLayout.LayoutParams(0, -2, 1));
         row.setOnClickListener(v -> {
-          dialog.dismiss();
+          if (dialogRef[0] != null) dialogRef[0].dismiss();
           chat(friend);
         });
+        row.setTag(friendName.toLowerCase() + " " + username.toLowerCase());
         LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2);
         rp.bottomMargin = dp(6);
         list.addView(row, rp);
+        rowViews.add(row);
       }
+
+      final TextView emptyHint = label(I18n.t("Không tìm thấy bạn bè phù hợp"), 14, MUTED);
+      emptyHint.setGravity(Gravity.CENTER);
+      emptyHint.setPadding(0, dp(28), 0, dp(28));
+      emptyHint.setVisibility(View.GONE);
+      list.addView(emptyHint);
+
+      searchInput.addTextChangedListener(new android.text.TextWatcher() {
+        public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+        public void onTextChanged(CharSequence s, int start, int before, int count) {}
+        public void afterTextChanged(android.text.Editable s) {
+          String q = s == null ? "" : s.toString().trim().toLowerCase();
+          int visibleCount = 0;
+          for (View r : rowViews) {
+            String tag = (String) r.getTag();
+            boolean match = q.isEmpty() || (tag != null && tag.contains(q));
+            r.setVisibility(match ? View.VISIBLE : View.GONE);
+            if (match) visibleCount++;
+          }
+          emptyHint.setVisibility(visibleCount == 0 ? View.VISIBLE : View.GONE);
+        }
+      });
+
+      ScrollView scroll = new ScrollView(this);
+      scroll.addView(list);
+      int maxH = getResources().getDisplayMetrics().heightPixels * 6 / 10;
+      int targetH = Math.min(maxH, Math.max(friends.size() * dp(64) + dp(12), dp(280)));
+      container.addView(scroll, new LinearLayout.LayoutParams(-1, targetH));
+
+      dialogRef[0] = picker.setView(container).setNegativeButton(I18n.t("Hủy"), null).show();
     });
   }
 
@@ -2828,17 +2894,25 @@ public class MainActivity extends Activity {
     });
   }
 
-  private void notifications() {
+  private void toggleNotifications() {
     if ("bell".equals(headerActive)) {
       headerActive = "";
       navigate(tab.isEmpty() ? "feed" : tab);
-      return;
+    } else {
+      notificationsScreen();
     }
-    remember("notifications", () -> notifications());
+  }
+
+  private void notifications() {
+    notificationsScreen();
+  }
+
+  private void notificationsScreen() {
     headerActive = "bell";
+    remember("notifications", this::notificationsScreen);
     badgesAt = 0;
     shell(I18n.t("Thông báo"), true);
-    if (headActions != null) headActions.addView(roundAction("check", I18n.t("Đánh dấu tất cả đã đọc"), false, () -> request("POST", "/api/notifications", json("scope","social"), d -> { bellCount = 0; badgesAt = 0; notifications(); })));
+    if (headActions != null) headActions.addView(roundAction("check", I18n.t("Đánh dấu tất cả đã đọc"), false, () -> request("POST", "/api/notifications", json("scope","social"), d -> { bellCount = 0; badgesAt = 0; notificationsScreen(); })));
     final LinearLayout notices=column();content.addView(notices);
     cachedRequest("/api/notifications", data -> {
       notices.removeAllViews();
@@ -3932,7 +4006,16 @@ public class MainActivity extends Activity {
   @Override
   protected void onActivityResult(int request, int result, Intent data) {
     super.onActivityResult(request, result, data);
-    if(request==309){if(result==RESULT_OK&&data!=null&&data.getData()!=null&&photoGroup!=null){final JSONObject g=photoGroup;try{request("POST","/api/groups/"+g.optString("id")+"/avatar",json("data",dataUrl(data.getData(),1024*1024,null)),d->groupChat(d.optJSONObject("group")));}catch(Exception error){say(I18n.t("Chọn ảnh PNG/JPEG/WebP nhỏ hơn 1 MB."));}}photoGroup=null;return;}
+    if(request==319){if(result==RESULT_OK&&data!=null&&data.getData()!=null&&photoGroup!=null){final JSONObject g=photoGroup;try{request("POST","/api/groups/"+g.optString("id")+"/avatar",json("data",dataUrl(data.getData(),1024*1024,null)),d->groupChat(d.optJSONObject("group")));}catch(Exception error){say(I18n.t("Chọn ảnh PNG/JPEG/WebP nhỏ hơn 1 MB."));}}photoGroup=null;return;}
+
+    if (request == 701 && result == RESULT_OK && data != null && data.getData() != null) {
+      startActivity(new Intent(this, PhotoEditActivity.class).setData(data.getData()).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION));
+      return;
+    }
+    if (request == 700 && result == RESULT_OK && data != null && data.getData() != null) {
+      startActivity(new Intent(this, MediaEditActivity.class).setData(data.getData()).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION).putExtra("store_pro", true));
+      return;
+    }
 
     if (result == RESULT_OK && data != null && data.getData() != null) {
       try { getContentResolver().takePersistableUriPermission(data.getData(), data.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION); }
@@ -4232,6 +4315,7 @@ public class MainActivity extends Activity {
 
   @Override
   protected void onDestroy() {
+    closeStoreUi();
     previewLoader.shutdownNow();
     if(mediaCallListening)KinnectService.unlisten(mediaCallEvents);
     startupHandler.removeCallbacksAndMessages(null);
@@ -4646,9 +4730,9 @@ public class MainActivity extends Activity {
     box.addView(next, lp);
     box.addView(retype, lp);
     new Sheet(this).setTitle(I18n.t("Đổi mật khẩu")).setView(box).setPositiveButton(I18n.t("Lưu"), (d, w) -> {
-      String cVal = current.getText().toString().trim();
-      String nVal = next.getText().toString().trim();
-      String rVal = retype.getText().toString().trim();
+      String cVal = current.getText() == null ? "" : current.getText().toString();
+      String nVal = next.getText() == null ? "" : next.getText().toString();
+      String rVal = retype.getText() == null ? "" : retype.getText().toString();
       if (cVal.isEmpty()) {
         Toast.makeText(this, I18n.t("Vui lòng nhập mật khẩu hiện tại."), Toast.LENGTH_SHORT).show();
         return;
@@ -5706,7 +5790,7 @@ public class MainActivity extends Activity {
     LinearLayout choices=column();String[] presets={"violet","ocean","sunset","forest"},names={"Tím kết nối","Biển xanh","Hoàng hôn","Rừng xanh"};
     final android.app.Dialog[] photoDialog={null};final Sheet sheet=new Sheet(this).setTitle(I18n.t("Ảnh đại diện nhóm"));
     for(int i=0;i<presets.length;i++){final String preset=presets[i];LinearLayout item=row();ImageView preview=new ImageView(this);preview.setImageBitmap(groupSample(preset,dp(52)));item.addView(preview,new LinearLayout.LayoutParams(dp(52),dp(52)));TextView title=label(I18n.t(names[i]),15,TEXT);title.setPadding(dp(12),0,0,0);item.addView(title);item.setPadding(dp(8),dp(8),dp(8),dp(8));item.setOnClickListener(v->{if(photoDialog[0]!=null)photoDialog[0].dismiss();request("POST","/api/groups/"+g.optString("id")+"/avatar",json("preset",preset),d->groupChat(d.optJSONObject("group")));});choices.addView(item);}
-    choices.addView(primary(I18n.t("Chọn ảnh từ thư viện"),()->{if(photoDialog[0]!=null)photoDialog[0].dismiss();photoGroup=g;pickFile(309,"image/*");}));photoDialog[0]=sheet.setView(choices).setNegativeButton(I18n.t("Quay lại"),(d,w)->groupMenu(g)).show();
+    choices.addView(primary(I18n.t("Chọn ảnh từ thư viện"),()->{if(photoDialog[0]!=null)photoDialog[0].dismiss();photoGroup=g;pickFile(319,"image/*");}));photoDialog[0]=sheet.setView(choices).setNegativeButton(I18n.t("Quay lại"),(d,w)->groupMenu(g)).show();
   }
   private void profileCompletion(){
     if(me==null||getSharedPreferences("kinnect_profile",0).getBoolean("completion_dismissed:"+me.optString("id"),false))return;

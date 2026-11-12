@@ -18,6 +18,13 @@ final class PushKitManager: NSObject, ObservableObject, PKPushRegistryDelegate {
     }
 
     func startRegistration() {
+        // A VoIP push may launch the app without creating a SwiftUI scene.
+        // Install answer/end and websocket callbacks before CallKit can deliver actions.
+        _ = AppState.shared
+        guard voipRegistry == nil else {
+            uploadStoredTokens()
+            return
+        }
         let registry = PKPushRegistry(queue: .main)
         registry.delegate = self
         registry.desiredPushTypes = [.voIP]
@@ -27,10 +34,10 @@ final class PushKitManager: NSObject, ObservableObject, PKPushRegistryDelegate {
         if let tokenData = registry.pushToken(for: .voIP), !tokenData.isEmpty {
             let hex = tokenData.map { String(format: "%02x", $0) }.joined()
             self.voipTokenHex = hex
-            self.voipRegistrationStatus = "PushKit VoIP đã kích hoạt (\(hex.prefix(8))...)"
+            self.voipRegistrationStatus = "Đã nhận token cuộc gọi Apple, đang đăng ký với máy chủ..."
             self.uploadToken(kind: "voip", token: hex)
         } else {
-            self.voipRegistrationStatus = "Chưa có chứng chỉ VoIP Apple Developer trả phí (chế độ cài thử Sideload chỉ nhận cuộc gọi khi ứng dụng đang mở)"
+            self.voipRegistrationStatus = "Đang chờ Apple cấp token cuộc gọi. Bản cài đặt cần quyền Push Notifications hợp lệ."
         }
 
         // Request standard APNs notification registration if authorized
@@ -62,7 +69,7 @@ final class PushKitManager: NSObject, ObservableObject, PKPushRegistryDelegate {
         let hex = pushCredentials.token.map { String(format: "%02x", $0) }.joined()
         Task { @MainActor in
             self.voipTokenHex = hex
-            self.voipRegistrationStatus = "PushKit VoIP đã kích hoạt (\(hex.prefix(8))...)"
+            self.voipRegistrationStatus = "Đã nhận token cuộc gọi Apple, đang đăng ký với máy chủ..."
             self.uploadToken(kind: "voip", token: hex)
         }
     }
@@ -96,6 +103,13 @@ final class PushKitManager: NSObject, ObservableObject, PKPushRegistryDelegate {
         let mode = (dict["mode"] as? String) ?? "video"
         let isVideo = (mode != "audio")
 
+        // Keep callbacks available even on a cold background launch.
+        // Report to CallKit immediately; reconnect signalling in parallel, without
+        // waiting for network access before presenting the system incoming UI.
+        DispatchQueue.main.async {
+            _ = AppState.shared
+            NativeSocketClient.shared.connectWithKeychainSession()
+        }
         // iOS 13+ strict requirement: reportNewIncomingCall MUST be invoked synchronously before completion()
         CallKitManager.shared.reportIncomingCall(
             callId: callId,
@@ -103,6 +117,21 @@ final class PushKitManager: NSObject, ObservableObject, PKPushRegistryDelegate {
             isVideo: isVideo,
             completion: completion
         )
+        DispatchQueue.main.asyncAfter(deadline: .now() + 45) {
+            let current = NativeWebRTCManager.shared.activeCall
+            if current == nil || (current?.callId == callId && current?.state == .ringingIncoming) {
+                CallKitManager.shared.reportCallEnded(callId: callId, reason: .unanswered)
+            }
+        }
+    }
+
+    func unregisterStoredTokens() async {
+        for (kind, token) in [("voip", voipTokenHex), ("apns", apnsTokenHex)] {
+            if let token {
+                _ = try? await KinnectAPIClient.shared.requestJSON(
+                    "/api/devices/push", method: "DELETE", body: ["kind": kind, "token": token])
+            }
+        }
     }
 
     func uploadStoredTokens() {
@@ -116,11 +145,20 @@ final class PushKitManager: NSObject, ObservableObject, PKPushRegistryDelegate {
 
     private func uploadToken(kind: String, token: String) {
         Task {
-            _ = try? await KinnectAPIClient.shared.requestJSON(
-                "/api/devices/push",
-                method: "POST",
-                body: ["kind": kind, "token": token]
-            )
+            do {
+                _ = try await KinnectAPIClient.shared.requestJSON(
+                    "/api/devices/push",
+                    method: "POST",
+                    body: ["kind": kind, "token": token]
+                )
+                if kind == "voip", self.voipTokenHex == token {
+                    self.voipRegistrationStatus = "Đã đăng ký thiết bị nhận cuộc gọi với máy chủ."
+                }
+            } catch {
+                if kind == "voip", self.voipTokenHex == token {
+                    self.voipRegistrationStatus = "Chưa đăng ký được thiết bị nhận cuộc gọi. Đang chờ kết nối máy chủ."
+                }
+            }
         }
     }
 

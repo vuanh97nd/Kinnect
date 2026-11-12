@@ -1273,11 +1273,11 @@ enum UIReviewFixture {
                     StudioProSheet(appliedEffect: .constant("Cinematic Teal & Orange"), onApply: { _ in })
                 }
             )
-        case "video", "shorts":
-            return AnyView(
-                ShortsVideoView()
-            )
-        case "live", "live-room":
+        case "video", "shorts", "live":
+            // Exercise the real main container so header/safe-area regressions
+            // are visible in simulator captures.
+            return AnyView(RootMainView())
+        case "live-room":
             return AnyView(
                 LiveStreamView(onOpenWallet: {})
             )
@@ -1304,13 +1304,14 @@ enum UIReviewFixture {
                     GroupChatDetailView(group: ChatGroupItem.from(UIReviewFixture.fixtureGroupDict), onLeftGroup: {})
                 }
             )
-        case "call-overlay", "call-incoming":
+        case "call-overlay", "call-incoming", "call-outgoing", "call-connected":
             NativeWebRTCManager.shared.activeCall = ActiveCallSession(
                 callId: "fixture_call_1",
                 peerUser: KinnectUser.from(UIReviewFixture.peerUserDict),
                 mode: "video",
-                isIncoming: true,
-                state: .ringingIncoming
+                isIncoming: screenName != "call-outgoing",
+                state: screenName == "call-connected" ? .connected
+                    : screenName == "call-outgoing" ? .dialingOutgoing : .ringingIncoming
             )
             return AnyView(
                 CallOverlayView()

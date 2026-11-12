@@ -527,6 +527,8 @@ struct RootMainView: View {
                             .onReceive(NotificationCenter.default.publisher(for: .kinnectNavigateRoute)) { notif in
                                 guard let route = notif.object as? String else { return }
                                 switch route {
+                                case "notifications":
+                                    activeTopSection = .notifications
                                 case "messages":
                                     activeTopSection = .messages
                                 case "profile":
@@ -693,7 +695,7 @@ struct RootMainView: View {
     private var iPhoneLayout: some View {
         ZStack {
             VStack(spacing: 0) {
-                if selectedTab == .feed || selectedTab == .discover {
+                if selectedTab != .create {
                     KinnectTopBar(
                         appState: appState,
                         activeTopSection: $activeTopSection,

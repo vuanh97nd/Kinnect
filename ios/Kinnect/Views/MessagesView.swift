@@ -181,6 +181,8 @@ struct MessagesView: View {
             NewDirectChatPickerSheet { peer in
                 activeChatPeer = peer
             }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
         .sheet(item: $activeChatPeer) { peer in
             NavigationStack {
@@ -1790,6 +1792,14 @@ struct NewDirectChatPickerSheet: View {
         return friends.filter { $0.name.lowercased().contains(q) || $0.handle.lowercased().contains(q) }
     }
 
+    private var onlineFriends: [KinnectUser] {
+        filteredFriends.filter { ($0.isActive && $0.showActivity) || appState.onlineUserIds.contains($0.id) }
+    }
+
+    private var offlineFriends: [KinnectUser] {
+        filteredFriends.filter { !(($0.isActive && $0.showActivity) || appState.onlineUserIds.contains($0.id)) }
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 10) {
@@ -1826,37 +1836,33 @@ struct NewDirectChatPickerSheet: View {
                     Spacer()
                 } else {
                     List {
-                        ForEach(filteredFriends) { friend in
-                            Button {
-                                dismiss()
-                                onSelectPeer(friend)
-                            } label: {
-                                HStack(spacing: 12) {
-                                    KinnectAvatarView(
-                                        name: friend.name,
-                                        avatarURL: friend.avatarUrl,
-                                        colorHex: friend.avatarColor,
-                                        size: 44,
-                                        isOnline: (friend.isActive && friend.showActivity) || appState.onlineUserIds.contains(friend.id)
-                                    )
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(friend.name)
-                                            .font(.subheadline.bold())
-                                            .foregroundColor(KinnectTheme.textPrimary)
-                                        Text("@\(friend.handle.isEmpty ? friend.name : friend.handle)")
-                                            .font(.caption)
-                                            .foregroundColor(KinnectTheme.textSecondary)
-                                    }
-                                    Spacer()
-                                    Image(systemName: "bubble.right.fill")
-                                        .foregroundColor(KinnectTheme.accentBright)
-                                        .font(.subheadline)
+                        if !onlineFriends.isEmpty {
+                            Section {
+                                ForEach(onlineFriends) { friend in
+                                    friendPickerRow(friend)
                                 }
-                                .padding(.vertical, 4)
+                            } header: {
+                                Text("Đang trực tuyến (\(onlineFriends.count))")
+                                    .font(.caption.bold())
+                                    .foregroundColor(Color(hex: "#2E9E66"))
+                            }
+                        }
+
+                        if !offlineFriends.isEmpty {
+                            Section {
+                                ForEach(offlineFriends) { friend in
+                                    friendPickerRow(friend)
+                                }
+                            } header: {
+                                Text("Ngoại tuyến (\(offlineFriends.count))")
+                                    .font(.caption.bold())
+                                    .foregroundColor(KinnectTheme.textSecondary)
                             }
                         }
                     }
-                    .listStyle(.plain)
+                    .listStyle(.insetGrouped)
+                    .scrollContentBackground(.hidden)
+                    .background(KinnectTheme.background)
                 }
             }
             .navigationTitle("Tin nhắn mới")
@@ -1874,6 +1880,36 @@ struct NewDirectChatPickerSheet: View {
                     self.friends = list.map(KinnectUser.from)
                 }
             }
+        }
+    }
+
+    private func friendPickerRow(_ friend: KinnectUser) -> some View {
+        Button {
+            dismiss()
+            onSelectPeer(friend)
+        } label: {
+            HStack(spacing: 12) {
+                KinnectAvatarView(
+                    name: friend.name,
+                    avatarURL: friend.avatarUrl,
+                    colorHex: friend.avatarColor,
+                    size: 44,
+                    isOnline: (friend.isActive && friend.showActivity) || appState.onlineUserIds.contains(friend.id)
+                )
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(friend.name)
+                        .font(.subheadline.bold())
+                        .foregroundColor(KinnectTheme.textPrimary)
+                    Text("@\(friend.handle.isEmpty ? friend.name : friend.handle)")
+                        .font(.caption)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                }
+                Spacer()
+                Image(systemName: "bubble.right.fill")
+                    .foregroundColor(KinnectTheme.accentBright)
+                    .font(.subheadline)
+            }
+            .padding(.vertical, 4)
         }
     }
 }

@@ -119,9 +119,11 @@ public final class IncomingCallActivity extends Activity {
     actions.setClipChildren(false);
     actions.setClipToPadding(false);
     col.setClipChildren(false);
+    int acceptRes = getResources().getIdentifier(video ? "ic_call_video" : "ic_call_accept", "drawable", getPackageName());
+    int declineRes = getResources().getIdentifier("ic_call_decline", "drawable", getPackageName());
     // Google Material 3 Red (#EA4335) & Green (#34A853)
-    actions.addView(action(I18n.t("Từ chối"), 0xffea4335, "phone_off", "phone", true, this::decline), new LinearLayout.LayoutParams(0, -2, 1));
-    actions.addView(action(video ? I18n.t("Trả lời video") : I18n.t("Trả lời"), 0xff34a853, video ? "video" : "phone", null, false, this::accept), new LinearLayout.LayoutParams(0, -2, 1));
+    actions.addView(action(I18n.t("Từ chối"), 0xffea4335, declineRes, false, this::decline), new LinearLayout.LayoutParams(0, -2, 1));
+    actions.addView(action(video ? I18n.t("Trả lời video") : I18n.t("Trả lời"), 0xff34a853, acceptRes, true, this::accept), new LinearLayout.LayoutParams(0, -2, 1));
     col.addView(actions, new LinearLayout.LayoutParams(-1, -2));
     root.addView(col, new FrameLayout.LayoutParams(-1, -1));
     setContentView(root);
@@ -137,39 +139,70 @@ public final class IncomingCallActivity extends Activity {
     return t;
   }
 
-  private View action(String label, int color, String icon, String fallback, boolean tilt, Runnable task) {
+  private View action(String label, int color, int iconRes, boolean isAnswer, Runnable task) {
     LinearLayout c = new LinearLayout(this);
     c.setOrientation(LinearLayout.VERTICAL);
     c.setGravity(Gravity.CENTER_HORIZONTAL);
     c.setClipChildren(false);
     c.setClipToPadding(false);
-    c.setPadding(0, dp(16), 0, 0);
+    c.setPadding(0, dp(12), 0, 0);
+
+    FrameLayout container = new FrameLayout(this);
+    container.setClipChildren(false);
+    container.setClipToPadding(false);
+
+    // Glowing pulsing halo ring behind the answer button
+    if (isAnswer) {
+      View haloRing = new View(this);
+      GradientDrawable haloBg = new GradientDrawable();
+      haloBg.setShape(GradientDrawable.OVAL);
+      haloBg.setColor(0x3034a853);
+      haloBg.setStroke(dp(2), 0x5534a853);
+      haloRing.setBackground(haloBg);
+      int haloSize = dp(96);
+      container.addView(haloRing, new FrameLayout.LayoutParams(haloSize, haloSize, Gravity.CENTER));
+
+      ObjectAnimator hx = ObjectAnimator.ofFloat(haloRing, "scaleX", 0.78f, 1.14f);
+      ObjectAnimator hy = ObjectAnimator.ofFloat(haloRing, "scaleY", 0.78f, 1.14f);
+      ObjectAnimator ha = ObjectAnimator.ofFloat(haloRing, "alpha", 0.85f, 0.0f);
+      for (ObjectAnimator o : new ObjectAnimator[] { hx, hy, ha }) {
+        o.setRepeatCount(ValueAnimator.INFINITE);
+        o.setDuration(1400);
+        o.start();
+        animators.add(o);
+      }
+    }
+
     FrameLayout b = new FrameLayout(this);
     GradientDrawable g = new GradientDrawable();
     g.setShape(GradientDrawable.OVAL);
     g.setColor(color);
     b.setBackground(new RippleDrawable(ColorStateList(), g, null));
-    b.setElevation(dp(6));
+    b.setElevation(dp(8));
+
     ImageView i = new ImageView(this);
-    int id = WebIcons.resolve(this, icon);
-    if (id == 0 && fallback != null) id = WebIcons.resolve(this, fallback);
-    if (id != 0) i.setImageDrawable(getDrawable(id).mutate());
+    if (iconRes != 0) {
+      try { i.setImageDrawable(getDrawable(iconRes).mutate()); } catch (Exception ignored) {}
+    }
     i.setColorFilter(0xffffffff);
-    if (tilt && WebIcons.resolve(this, icon) == 0) i.setRotation(135);
-    b.addView(i, new FrameLayout.LayoutParams(dp(30), dp(30), Gravity.CENTER));
+    b.addView(i, new FrameLayout.LayoutParams(dp(36), dp(36), Gravity.CENTER));
     b.setOnClickListener(v -> task.run());
-    if (!tilt) {
-      ObjectAnimator bounce = ObjectAnimator.ofFloat(b, "translationY", 0, -dp(8), 0);
-      bounce.setDuration(1000);
+
+    if (isAnswer) {
+      ObjectAnimator bounce = ObjectAnimator.ofFloat(b, "translationY", 0, -dp(6), 0);
+      bounce.setDuration(1100);
       bounce.setRepeatCount(ValueAnimator.INFINITE);
-      bounce.setStartDelay(300);
+      bounce.setStartDelay(250);
       bounce.start();
       animators.add(bounce);
     }
-    c.addView(b, new LinearLayout.LayoutParams(dp(72), dp(72)));
-    TextView t = text(label, 14, 0xffe8eaed);
-    t.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-    t.setPadding(0, dp(10), 0, 0);
+
+    container.addView(b, new FrameLayout.LayoutParams(dp(76), dp(76), Gravity.CENTER));
+    c.addView(container, new LinearLayout.LayoutParams(dp(96), dp(96)));
+
+    TextView t = text(label, 14, 0xfff0f2f5);
+    t.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+    t.setPadding(0, dp(8), 0, 0);
     c.addView(t, new LinearLayout.LayoutParams(-1, -2));
     return c;
   }
