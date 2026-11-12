@@ -5,7 +5,7 @@ android {
  namespace 'app.kinnect.live'
  compileSdk 36
  buildToolsVersion '36.0.0'
- defaultConfig { applicationId 'app.kinnect.live'; minSdk 26; targetSdk 36; versionCode 120; versionName '1.2.13' }
+ defaultConfig { applicationId 'app.kinnect.live'; minSdk 26; targetSdk 36; versionCode 125; versionName '1.2.13' }
  signingConfigs {
   debug { storeFile file("${repo}/android/debug.keystore"); storePassword 'android'; keyAlias 'androiddebugkey'; keyPassword 'android' }
   release { storeFile file("${repo}/work/play-signing/upload.jks"); storePassword System.getenv('KINNECT_PLAY_PASS'); keyAlias 'kinnect-upload'; keyPassword System.getenv('KINNECT_PLAY_PASS') }

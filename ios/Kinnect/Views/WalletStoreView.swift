@@ -964,8 +964,7 @@ private struct StorePackageArtworkView: View {
         // Fallback to direct bundle file lookup
         let candidatePaths = [
             Bundle.main.path(forResource: assetImageName, ofType: "png"),
-            Bundle.main.path(forResource: assetImageName, ofType: "webp"),
-            Bundle.main.path(forResource: "Graphics/\(assetImageName)", ofType: "png")
+            Bundle.main.path(forResource: assetImageName, ofType: "webp")
         ]
         for p in candidatePaths.compactMap({ $0 }) {
             if let img = UIImage(contentsOfFile: p) {
