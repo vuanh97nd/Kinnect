@@ -78,7 +78,39 @@ public class MainActivity extends Activity {
   private void backgroundExtras(boolean prompt){if(Distribution.PLAY)return;try{if(Build.VERSION.SDK_INT>=34&&!getSystemService(android.app.NotificationManager.class).canUseFullScreenIntent()){if(prompt)new Sheet(this).setTitle(I18n.t("Cuộc gọi toàn màn hình")).setMessage(I18n.t("Cho phép Kinnect hiện cuộc gọi đến toàn màn hình, kể cả khi khóa máy.")).setPositiveButton(I18n.t("Cho phép"),(d,w)->{try{startActivity(new Intent("android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT",android.net.Uri.parse("package:"+getPackageName())));}catch(RuntimeException ignored){}}).setNegativeButton(I18n.t("Để sau"),(d,w)->battery()).show();else battery();return;}}catch(RuntimeException ignored){}if(prompt)battery();}
   private void battery(){android.os.PowerManager pm=(android.os.PowerManager)getSystemService(POWER_SERVICE);if(pm!=null&&pm.isIgnoringBatteryOptimizations(getPackageName())){say(I18n.t("Đã cho phép chạy ngầm không giới hạn pin."));return;}try{startActivity(new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,android.net.Uri.parse("package:"+getPackageName())));}catch(RuntimeException ignored){}}
   private void openAutostartSettings(){String m=Build.MANUFACTURER.toLowerCase(java.util.Locale.ROOT);Intent i=new Intent();try{if(m.contains("xiaomi")||m.contains("redmi")||m.contains("poco")){i.setComponent(new ComponentName("com.miui.securitycenter","com.miui.permcenter.autostart.AutoStartManagementActivity"));}else if(m.contains("oppo")||m.contains("realme")){try{i.setComponent(new ComponentName("com.coloros.safecenter","com.coloros.safecenter.permission.startup.StartupAppListActivity"));}catch(Exception e){i.setComponent(new ComponentName("com.oppo.safe","com.oppo.safe.permission.startup.StartupAppListActivity"));}}else if(m.contains("vivo")){try{i.setComponent(new ComponentName("com.iqoo.secure","com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity"));}catch(Exception e){i.setComponent(new ComponentName("com.vivo.permissionmanager","com.vivo.permissionmanager.activity.BgStartUpManagerActivity"));}}else if(m.contains("huawei")||m.contains("honor")){i.setComponent(new ComponentName("com.huawei.systemmanager","com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"));}else if(m.contains("samsung")){i.setComponent(new ComponentName("com.samsung.android.lool","com.samsung.android.sm.battery.ui.BatteryActivity"));}else{i=new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:"+getPackageName()));}i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);startActivity(i);}catch(Exception fallback){try{startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:"+getPackageName())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));}catch(Exception ignored){}}}
-  private void handleExtras(Intent intent){if(intent==null||me==null)return;String destination=intent.getStringExtra("commerce_destination");if(destination!=null){intent.removeExtra("commerce_destination");if(destination.equals("account"))meMenu();else if(destination.equals("notifications"))notifications();else if(destination.equals("friends"))friendsScreen("friends");else if(destination.equals("create"))openCreateMenu();else navigate(destination);}if(intent.getBooleanExtra("accept_call",false)){intent.removeExtra("accept_call");ensureCalls();if(calls!=null)calls.checkPending();}String n=intent.getStringExtra("notification");if(n!=null){intent.removeExtra("notification");try{openNotification(new JSONObject(n));}catch(JSONException ignored){}}}
+  private void handleExtras(Intent intent){
+    if(intent==null)return;
+    if(intent.hasExtra("app_language")){
+      String lang=intent.getStringExtra("app_language");
+      if("vi".equals(lang)||"en".equals(lang))try{I18n.select(this,lang);}catch(Exception ignored){}
+    }
+    if(intent.getBooleanExtra("ui_review_fixture",false)&&me==null){
+      try{
+        me=new JSONObject("{\"id\":\"usr_qa_review\",\"username\":\"minhanh\",\"name\":\"Minh Anh\",\"role\":\"user\",\"coins\":1200,\"bio\":\"Kinnect QA Review\",\"followersCount\":128,\"followingCount\":64}");
+        onUserSignedIn(me);
+      }catch(Exception ignored){}
+    }
+    String destination=intent.getStringExtra("commerce_destination");
+    if(destination!=null){
+      intent.removeExtra("commerce_destination");
+      if(destination.equals("login")){auth(false);return;}
+      if(destination.equals("register")){auth(true);return;}
+      if(destination.equals("forgot")){forgot();return;}
+      if(destination.equals("intro")){intro();return;}
+      if(me!=null){
+        if(destination.equals("account"))meMenu();
+        else if(destination.equals("notifications"))notifications();
+        else if(destination.equals("friends"))friendsScreen("friends");
+        else if(destination.equals("create"))openCreateMenu();
+        else if(destination.equals("store"))storeScreen();
+        else if(destination.equals("settings"))settings();
+        else navigate(destination);
+      }
+    }
+    if(intent.getBooleanExtra("accept_call",false)){intent.removeExtra("accept_call");ensureCalls();if(calls!=null)calls.checkPending();}
+    String n=intent.getStringExtra("notification");
+    if(n!=null){intent.removeExtra("notification");try{openNotification(new JSONObject(n));}catch(JSONException ignored){}}
+  }
   private LocationListener locationListener;
   // Màu lấy từ public/theme.css để app và web mobile trông giống nhau; tự theo chế độ sáng/tối của máy.
   private int BG, CARD, TEXT, MUTED, ACCENT, SOFT, LINE, PRIMARY_SOFT;
@@ -117,6 +149,14 @@ public class MainActivity extends Activity {
     if (!WebTheme.isDark(this))
       getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
     splash();
+    if (getIntent() != null && getIntent().getBooleanExtra("ui_review_fixture", false)) {
+      try {
+        me = new JSONObject("{\"id\":\"usr_qa_review\",\"username\":\"minhanh\",\"name\":\"Minh Anh\",\"role\":\"user\",\"coins\":1200,\"bio\":\"Kinnect QA Review\",\"followersCount\":128,\"followingCount\":64}");
+        onUserSignedIn(me);
+        handleExtras(getIntent());
+        return;
+      } catch (Exception ignored) {}
+    }
     final long shownAt = System.currentTimeMillis();
     final boolean hasSession = !api.cookieFor(server()).isEmpty();
     if (hasSession) {

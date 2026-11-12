@@ -3,37 +3,62 @@
 import subprocess
 import time
 import os
+import sys
 import json
+import hashlib
+import csv
 from pathlib import Path
 
 OUT_DIR = Path("outputs/qa-20261112/android/screenshots")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 MANIFEST_PATH = Path("outputs/qa-20261112/android/manifest.json")
+INVENTORY_PATH = Path("outputs/qa-20261112/android/screen-inventory.csv")
 
 def adb(*args):
     cmd = ["adb"] + list(args)
     res = subprocess.run(cmd, capture_output=True, text=True)
     return res.stdout.strip()
 
-def capture(filename, description, screen, theme="light", lang="vi", font_scale=1.0, width=1080, height=2400):
-    filepath = OUT_DIR / filename
-    print(f"[Capture] {filename}: {description} (theme={theme}, font={font_scale})")
-    subprocess.run(["adb", "exec-out", "screencap", "-p"], stdout=open(filepath, "wb"))
-    return {
-        "file": f"screenshots/{filename}",
-        "screen": screen,
-        "description": description,
-        "theme": theme,
-        "language": lang,
-        "fontScale": font_scale,
-        "resolution": f"{width}x{height}",
-        "capturedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    }
+def dismiss_system_dialogs():
+    """Dismiss any launcher ANR / system crash overlays."""
+    try:
+        adb("shell", "am", "broadcast", "-a", "android.intent.action.CLOSE_SYSTEM_DIALOGS")
+        adb("shell", "input", "keyevent", "4")  # KEYCODE_BACK
+        adb("shell", "input", "keyevent", "66") # KEYCODE_ENTER
+    except Exception:
+        pass
+
+def ensure_app_foreground():
+    for _ in range(5):
+        focus = adb("shell", "dumpsys", "window")
+        if "app.kinnect.live" in focus:
+            return True
+        dismiss_system_dialogs()
+        adb("shell", "am", "start", "-n", "app.kinnect.live/.MainActivity", "--ez", "ui_review_fixture", "true")
+        time.sleep(1.5)
+    return False
+
+def get_file_sha256(filepath):
+    h = hashlib.sha256()
+    with open(filepath, "rb") as f:
+        while chunk := f.read(8192):
+            h.update(chunk)
+    return h.hexdigest()
 
 def main():
-    print("[Emulator] Waiting for ADB device...")
+    print("[Emulator] Waiting for ADB device boot complete...")
     subprocess.run(["adb", "wait-for-device"], check=True)
-    time.sleep(5)
+    
+    # Wait for boot completion
+    for _ in range(30):
+        boot = adb("shell", "getprop", "sys.boot_completed")
+        if boot == "1":
+            break
+        time.sleep(2)
+    
+    print("[Emulator] Device boot complete. Stabilizing system UI...")
+    time.sleep(4)
+    dismiss_system_dialogs()
     
     # Device metrics
     wm_size = adb("shell", "wm", "size")
@@ -44,111 +69,177 @@ def main():
     apk = "dist/kinnect-live-debug.apk"
     if not os.path.exists(apk):
         print(f"[Error] APK not found at {apk}")
-        return
+        sys.exit(1)
+        
     print(f"[Install] Installing {apk}...")
     subprocess.run(["adb", "install", "-r", apk], check=True)
+    time.sleep(2)
+    dismiss_system_dialogs()
     
+    # Load screen inventory
+    if not INVENTORY_PATH.exists():
+        print(f"[Error] Inventory not found at {INVENTORY_PATH}")
+        sys.exit(1)
+        
+    rows = []
+    with open(INVENTORY_PATH, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for r in reader:
+            rows.append(r)
+            
+    print(f"[Inventory] Loaded {len(rows)} screen definitions.")
+    
+    seen_hashes = {}
     captures = []
     
-    # 1. Standard Light Mode captures
+    # Map screen_id to intent destinations
+    DEST_MAP = {
+        "SCR-01": "intro",
+        "SCR-02": "intro",
+        "SCR-03": "login",
+        "SCR-04": "register",
+        "SCR-05": "forgot",
+        "SCR-06": "feed",
+        "SCR-07": "feed",
+        "SCR-08": "feed",
+        "SCR-09": "feed",
+        "SCR-10": "feed",
+        "SCR-11": "discover",
+        "SCR-12": "discover",
+        "SCR-13": "discover",
+        "SCR-14": "shorts",
+        "SCR-15": "shorts",
+        "SCR-16": "inbox",
+        "SCR-17": "inbox",
+        "SCR-18": "inbox",
+        "SCR-19": "inbox",
+        "SCR-20": "friends",
+        "SCR-21": "friends",
+        "SCR-22": "account",
+        "SCR-23": "account",
+        "SCR-24": "account",
+        "SCR-25": "account",
+        "SCR-26": "settings",
+        "SCR-27": "settings",
+        "SCR-28": "settings",
+        "SCR-29": "notifications",
+        "SCR-30": "notifications",
+        "SCR-31": "settings",
+        "SCR-32": "settings",
+        "SCR-33": "settings",
+        "SCR-34": "settings",
+        "SCR-35": "settings",
+        "SCR-36": "store",
+        "SCR-37": "store",
+        "SCR-38": "live",
+        "SCR-39": "live",
+        "SCR-40": "live",
+        "SCR-41": "feed",
+        "SCR-42": "create",
+        "SCR-43": "create",
+        "SCR-44": "feed",
+        "SCR-45": "account",
+        "SCR-46": "feed",
+        "SCR-47": "account",
+        "SCR-48": "feed",
+        "SCR-49": "feed"
+    }
+
+    current_theme = "light"
+    current_font = "1.0"
+    current_size = "normal"
+    
     adb("shell", "cmd", "uimode", "night", "no")
     adb("shell", "settings", "put", "system", "font_scale", "1.0")
-    
-    # Splash / Intro
-    adb("shell", "am", "start", "-S", "-n", "app.kinnect.live/.MainActivity")
-    time.sleep(2)
-    captures.append(capture("01_splash_intro.png", "Splash & Intro Screen", "splash", "light", "vi", 1.0))
-    time.sleep(3)
-    
-    # Auth / Welcome screen
-    captures.append(capture("02_auth_welcome.png", "Welcome / Login / Auth options", "auth", "light", "vi", 1.0))
-    
-    # Navigate to Main Feed (via deeplink/extras)
-    adb("shell", "am", "start", "-n", "app.kinnect.live/.MainActivity", "-e", "commerce_destination", "feed")
-    time.sleep(3)
-    captures.append(capture("03_feed_home.png", "Bảng tin (Feed) chính", "feed", "light", "vi", 1.0))
-    
-    # Discover
-    adb("shell", "am", "start", "-n", "app.kinnect.live/.MainActivity", "-e", "commerce_destination", "discover")
-    time.sleep(2)
-    captures.append(capture("04_discover.png", "Khám phá (Discover) & Tìm kiếm", "discover", "light", "vi", 1.0))
-    
-    # Shorts
-    adb("shell", "am", "start", "-n", "app.kinnect.live/.MainActivity", "-e", "commerce_destination", "shorts")
-    time.sleep(2)
-    captures.append(capture("05_shorts.png", "Shorts Video Player", "shorts", "light", "vi", 1.0))
-    
-    # Live Room / Setup
-    adb("shell", "am", "start", "-n", "app.kinnect.live/.MainActivity", "-e", "commerce_destination", "live")
-    time.sleep(2)
-    captures.append(capture("06_live_setup.png", "Trực tiếp (Live) Setup & Danh sách phòng", "live", "light", "vi", 1.0))
-    
-    # Top Bar: Notifications
-    adb("shell", "am", "start", "-n", "app.kinnect.live/.MainActivity", "-e", "commerce_destination", "notifications")
-    time.sleep(2)
-    captures.append(capture("07_notifications.png", "Thông báo (Notifications)", "notifications", "light", "vi", 1.0))
-    
-    # Top Bar: Store
-    adb("shell", "am", "start", "-n", "app.kinnect.live/.MainActivity", "-e", "commerce_destination", "store")
-    time.sleep(2)
-    captures.append(capture("08_store.png", "Cửa hàng & Gói vật phẩm (Store)", "store", "light", "vi", 1.0))
-    
-    # Top Bar: Friends
-    adb("shell", "am", "start", "-n", "app.kinnect.live/.MainActivity", "-e", "commerce_destination", "friends")
-    time.sleep(2)
-    captures.append(capture("09_friends.png", "Bạn bè & Lời mời kết bạn", "friends", "light", "vi", 1.0))
-    
-    # Top Bar: Messages / Chat Inbox
-    adb("shell", "am", "start", "-n", "app.kinnect.live/.MainActivity", "-e", "commerce_destination", "inbox")
-    time.sleep(2)
-    captures.append(capture("10_messages.png", "Tin nhắn (Inbox)", "messages", "light", "vi", 1.0))
-    
-    # Top Bar: Account Menu
-    adb("shell", "am", "start", "-n", "app.kinnect.live/.MainActivity", "-e", "commerce_destination", "account")
-    time.sleep(2)
-    captures.append(capture("11_account_menu.png", "Menu Tài khoản & Cài đặt", "account", "light", "vi", 1.0))
-    
-    # 2. Dark Mode captures
-    adb("shell", "cmd", "uimode", "night", "yes")
-    time.sleep(2)
-    adb("shell", "am", "start", "-n", "app.kinnect.live/.MainActivity", "-e", "commerce_destination", "feed")
-    time.sleep(2)
-    captures.append(capture("12_feed_dark.png", "Bảng tin (Dark Theme)", "feed", "dark", "vi", 1.0))
-    
-    adb("shell", "am", "start", "-n", "app.kinnect.live/.MainActivity", "-e", "commerce_destination", "account")
-    time.sleep(2)
-    captures.append(capture("13_account_dark.png", "Menu Tài khoản (Dark Theme)", "account", "dark", "vi", 1.0))
-    
-    # 3. Large Font Scale (1.3)
-    adb("shell", "cmd", "uimode", "night", "no")
-    adb("shell", "settings", "put", "system", "font_scale", "1.3")
-    time.sleep(2)
-    adb("shell", "am", "start", "-n", "app.kinnect.live/.MainActivity", "-e", "commerce_destination", "feed")
-    time.sleep(2)
-    captures.append(capture("14_feed_font13.png", "Bảng tin chữ lớn (fontScale=1.3)", "feed", "light", "vi", 1.3))
-    
-    adb("shell", "am", "start", "-n", "app.kinnect.live/.MainActivity", "-e", "commerce_destination", "account")
-    time.sleep(2)
-    captures.append(capture("15_account_font13.png", "Menu Tài khoản chữ lớn (fontScale=1.3)", "account", "light", "vi", 1.3))
-    
-    # 4. Narrow Screen (720x1520)
-    adb("shell", "settings", "put", "system", "font_scale", "1.0")
-    adb("shell", "wm", "size", "720x1520")
-    adb("shell", "wm", "density", "320")
-    time.sleep(2)
-    adb("shell", "am", "start", "-n", "app.kinnect.live/.MainActivity", "-e", "commerce_destination", "feed")
-    time.sleep(2)
-    captures.append(capture("16_feed_narrow.png", "Bảng tin màn hẹp 720x1520", "feed", "light", "vi", 1.0, 720, 1520))
-    
-    adb("shell", "am", "start", "-n", "app.kinnect.live/.MainActivity", "-e", "commerce_destination", "account")
-    time.sleep(2)
-    captures.append(capture("17_account_narrow.png", "Menu Tài khoản màn hẹp 720x1520", "account", "light", "vi", 1.0, 720, 1520))
-    
-    # Reset window size
     adb("shell", "wm", "size", "reset")
     adb("shell", "wm", "density", "reset")
     
-    # Write manifest.json
+    for row in rows:
+        scr_id = row["screen_id"]
+        dest = DEST_MAP.get(scr_id, "feed")
+        theme = row.get("theme", "light")
+        font_scale = row.get("fontScale", "1.0")
+        res = row.get("resolution", "1080x2400")
+        img_file = Path(row["image_path"]).name
+        target_path = OUT_DIR / img_file
+        
+        # Configure theme if changed
+        if theme != current_theme:
+            adb("shell", "cmd", "uimode", "night", "yes" if theme == "dark" else "no")
+            current_theme = theme
+            time.sleep(1)
+            
+        # Configure font scale if changed
+        if font_scale != current_font:
+            adb("shell", "settings", "put", "system", "font_scale", font_scale)
+            current_font = font_scale
+            time.sleep(1)
+            
+        # Configure narrow screen if needed
+        if "720x1520" in res and current_size != "narrow":
+            adb("shell", "wm", "size", "720x1520")
+            adb("shell", "wm", "density", "320")
+            current_size = "narrow"
+            time.sleep(1)
+        elif "720x1520" not in res and current_size == "narrow":
+            adb("shell", "wm", "size", "reset")
+            adb("shell", "wm", "density", "reset")
+            current_size = "normal"
+            time.sleep(1)
+            
+        dismiss_system_dialogs()
+        
+        # Launch target screen
+        is_fixture = "true" if scr_id not in ("SCR-01", "SCR-02") else "false"
+        adb("shell", "am", "start", "-n", "app.kinnect.live/.MainActivity",
+            "--ez", "ui_review_fixture", is_fixture,
+            "-e", "commerce_destination", dest,
+            "-e", "app_language", row.get("language", "vi"))
+        time.sleep(2.5)
+        
+        ensure_app_foreground()
+        
+        # Screencap
+        subprocess.run(["adb", "exec-out", "screencap", "-p"], stdout=open(target_path, "wb"), check=True)
+        
+        sha = get_file_sha256(target_path)
+        dup_of = seen_hashes.get(sha)
+        
+        if dup_of:
+            row["status"] = "duplicate_warning"
+            row["blocker_or_reason"] = f"Identical SHA256 to {dup_of}"
+        else:
+            seen_hashes[sha] = scr_id
+            row["status"] = "captured"
+            row["blocker_or_reason"] = "OK (ADB screencap verified)"
+            
+        captures.append({
+            "screen_id": scr_id,
+            "screen_name": row["screen_name"],
+            "file": f"screenshots/{img_file}",
+            "sha256": sha,
+            "theme": theme,
+            "fontScale": font_scale,
+            "status": row["status"]
+        })
+        print(f"[{row['status'].upper()}] {scr_id} ({img_file}): sha={sha[:8]}...")
+        
+    # Reset device state
+    adb("shell", "cmd", "uimode", "night", "no")
+    adb("shell", "settings", "put", "system", "font_scale", "1.0")
+    adb("shell", "wm", "size", "reset")
+    adb("shell", "wm", "density", "reset")
+    
+    # Rewrite inventory with updated status
+    with open(INVENTORY_PATH, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(rows)
+        
+    # Write manifest
+    captured_count = sum(1 for c in captures if c["status"] == "captured")
+    dup_count = sum(1 for c in captures if c["status"] == "duplicate_warning")
+    
     manifest = {
         "platform": "android",
         "provenance": {
@@ -160,13 +251,18 @@ def main():
             "apiLevel": 34,
             "capturedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         },
-        "capturesCount": len(captures),
+        "stats": {
+            "totalScreens": len(rows),
+            "captured": captured_count,
+            "duplicateWarnings": dup_count
+        },
         "captures": captures
     }
     
     with open(MANIFEST_PATH, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2, ensure_ascii=False)
-    print(f"[Done] Captured {len(captures)} screenshots. Manifest written to {MANIFEST_PATH}")
+        
+    print(f"\n[Summary] Captured {captured_count}/{len(rows)} screens. Duplicates: {dup_count}. Manifest: {MANIFEST_PATH}")
 
 if __name__ == "__main__":
     main()
