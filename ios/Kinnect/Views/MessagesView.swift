@@ -40,109 +40,108 @@ struct MessagesView: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 0) {
+            // iOS Messages Header
+            HStack {
+                Text("Tin nhắn")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundColor(KinnectTheme.textPrimary)
+
+                Spacer()
+
+                Button {
+                    if scope == .direct {
+                        showNewDirectChatSheet = true
+                    } else {
+                        showCreateGroupSheet = true
+                    }
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(KinnectTheme.surfaceElevated)
+                            .frame(width: 36, height: 36)
+                        Image(systemName: scope == .direct ? "square.and.pencil" : "person.2.badge.plus")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(KinnectTheme.accentBright)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(scope == .direct ? "Soạn tin nhắn mới" : "Tạo nhóm mới")
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 8)
+
             // Search Bar
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
-                    .foregroundColor(KinnectTheme.textSecondary)
+                    .foregroundColor(Color(UIColor.tertiaryLabel))
                 TextField("Tìm cuộc trò chuyện…", text: $searchQuery)
-                    .font(.subheadline)
+                    .font(.system(size: 15))
                     .foregroundColor(KinnectTheme.textPrimary)
                 if !searchQuery.isEmpty {
                     Button { searchQuery = "" } label: {
-                        Image(systemName: "xmark.circle.fill").foregroundColor(KinnectTheme.textSecondary)
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(Color(UIColor.tertiaryLabel))
                     }
                 }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
-            .padding(.horizontal, 14)
+            .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(KinnectTheme.surfaceElevated))
+            .padding(.horizontal, 16)
+            .padding(.bottom, 8)
 
+            // Scope Segmented Control
             Picker("Loại tin nhắn", selection: $scope) {
                 ForEach(ChatScope.allCases, id: \.self) { s in
                     Text(s.rawValue).tag(s)
                 }
             }
             .pickerStyle(.segmented)
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 8)
 
-            // Android 1.2.12 MainActivity:2053 Parity Filter: [Tất cả | Chưa đọc]
+            // Filters: [Tất cả | Chưa đọc]
             if scope == .direct {
                 HStack(spacing: 8) {
-                    Button {
+                    filterCapsule(title: "Tất cả", isSelected: !unreadOnly) {
                         unreadOnly = false
-                    } label: {
-                        Text("Tất cả")
-                            .font(.caption.weight(!unreadOnly ? .bold : .medium))
-                            .foregroundColor(!unreadOnly ? .white : KinnectTheme.textSecondary)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 6)
-                            .background(Capsule().fill(!unreadOnly ? KinnectTheme.accent : KinnectTheme.surfaceElevated))
                     }
-                    .buttonStyle(.plain)
-
-                    Button {
+                    filterCapsule(title: "Chưa đọc", isSelected: unreadOnly) {
                         unreadOnly = true
-                    } label: {
-                        Text("Chưa đọc")
-                            .font(.caption.weight(unreadOnly ? .bold : .medium))
-                            .foregroundColor(unreadOnly ? .white : KinnectTheme.textSecondary)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 6)
-                            .background(Capsule().fill(unreadOnly ? KinnectTheme.accent : KinnectTheme.surfaceElevated))
                     }
-                    .buttonStyle(.plain)
-
                     Spacer()
                 }
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 6)
             }
 
             ScrollView {
-                LazyVStack(spacing: 10) {
+                LazyVStack(spacing: 0) {
                     if scope == .direct {
                         let rows = filteredConversations
                         if rows.isEmpty && !isLoading {
-                            VStack(spacing: 12) {
-                                Text(unreadOnly ? "Không có tin nhắn chưa đọc." : "Chưa có cuộc trò chuyện riêng nào")
-                                    .font(.subheadline)
-                                    .foregroundColor(KinnectTheme.textSecondary)
-                                if !unreadOnly {
-                                    Button("Mở danh sách bạn bè", action: onOpenFriends)
-                                        .font(.caption.bold())
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 8)
-                                        .background(Capsule().fill(KinnectTheme.primaryGradient))
-                                        .foregroundColor(.white)
-                                }
-                            }
-                            .padding(.vertical, 36)
+                            emptyDirectView
                         }
 
-                        ForEach(rows, id: \.0) { _, conv, peer in
+                        ForEach(rows, id: \.0) { index, conv, peer in
                             NavigationLink {
                                 DirectChatDetailView(peer: peer)
                             } label: {
                                 directConversationRow(conv: conv, peer: peer)
                             }
+                            .buttonStyle(.plain)
+
+                            if index != rows.last?.0 {
+                                Divider()
+                                    .background(KinnectTheme.borderSoft.opacity(0.8))
+                                    .padding(.leading, 82)
+                            }
                         }
                     } else {
                         if groups.isEmpty && !isLoading {
-                            VStack(spacing: 12) {
-                                Text("Bạn chưa tham gia nhóm trò chuyện nào")
-                                    .font(.subheadline)
-                                    .foregroundColor(KinnectTheme.textSecondary)
-                                Button("Tạo nhóm mới") {
-                                    showCreateGroupSheet = true
-                                }
-                                .font(.caption.bold())
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(Capsule().fill(KinnectTheme.primaryGradient))
-                                .foregroundColor(.white)
-                            }
-                            .padding(.vertical, 36)
+                            emptyGroupsView
                         }
 
                         ForEach(groups) { group in
@@ -153,10 +152,16 @@ struct MessagesView: View {
                             } label: {
                                 groupConversationRow(group)
                             }
+                            .buttonStyle(.plain)
+
+                            if group.id != groups.last?.id {
+                                Divider()
+                                    .background(KinnectTheme.borderSoft.opacity(0.8))
+                                    .padding(.leading, 82)
+                            }
                         }
                     }
                 }
-                .padding(14)
             }
             .refreshable {
                 await loadChats()
@@ -223,6 +228,61 @@ struct MessagesView: View {
         return KinnectUser.from(conv)
     }
 
+    private func filterCapsule(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                .foregroundColor(isSelected ? .white : KinnectTheme.textSecondary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(isSelected ? AnyShapeStyle(KinnectTheme.primaryGradient) : AnyShapeStyle(KinnectTheme.surfaceElevated))
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var emptyDirectView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: unreadOnly ? "tray" : "bubble.left.and.bubble.right")
+                .font(.system(size: 40))
+                .foregroundColor(Color(UIColor.tertiaryLabel))
+            Text(unreadOnly ? "Không có tin nhắn chưa đọc." : "Chưa có cuộc trò chuyện riêng nào")
+                .font(.subheadline)
+                .foregroundColor(KinnectTheme.textSecondary)
+            if !unreadOnly {
+                Button("Mở danh sách bạn bè", action: onOpenFriends)
+                    .font(.caption.bold())
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 9)
+                    .background(Capsule().fill(KinnectTheme.primaryGradient))
+                    .foregroundColor(.white)
+            }
+        }
+        .padding(.vertical, 48)
+    }
+
+    private var emptyGroupsView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "person.3")
+                .font(.system(size: 40))
+                .foregroundColor(Color(UIColor.tertiaryLabel))
+            Text("Bạn chưa tham gia nhóm trò chuyện nào")
+                .font(.subheadline)
+                .foregroundColor(KinnectTheme.textSecondary)
+            Button("Tạo nhóm mới") {
+                showCreateGroupSheet = true
+            }
+            .font(.caption.bold())
+            .padding(.horizontal, 16)
+            .padding(.vertical, 9)
+            .background(Capsule().fill(KinnectTheme.primaryGradient))
+            .foregroundColor(.white)
+        }
+        .padding(.vertical, 48)
+    }
+
     private func directConversationRow(conv: [String: Any], peer: KinnectUser) -> some View {
         let lastObj = conv["last"] as? [String: Any]
         let lastMsg = (lastObj?["body"] as? String)
@@ -234,91 +294,127 @@ struct MessagesView: View {
             ?? (conv["updatedAt"] as? String)
             ?? (conv["lastTime"] as? String)
             ?? ""
+        let isOnline = appState.onlineUserIds.contains(peer.id) || (peer.isActive && peer.showActivity)
 
-        return HStack(spacing: 12) {
+        return HStack(spacing: 14) {
             KinnectAvatarView(
                 name: peer.name,
                 avatarURL: peer.avatarUrl,
                 colorHex: peer.avatarColor,
-                size: 48,
-                isOnline: appState.onlineUserIds.contains(peer.id)
+                size: 52,
+                isOnline: isOnline
             )
 
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .firstTextBaseline) {
                     Text(peer.name)
-                        .font(.subheadline.bold())
+                        .font(.system(size: 16, weight: unread > 0 ? .bold : .semibold))
                         .foregroundColor(KinnectTheme.textPrimary)
                         .lineLimit(1)
-                    Spacer()
+
+                    Spacer(minLength: 8)
+
                     if !rawTime.isEmpty {
                         Text(formatRelativeDate(rawTime))
-                            .font(.caption2)
-                            .foregroundColor(unread > 0 ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
+                            .font(.system(size: 13, weight: unread > 0 ? .semibold : .regular))
+                            .foregroundColor(unread > 0 ? KinnectTheme.accentBright : Color(UIColor.tertiaryLabel))
                     }
                 }
-                HStack {
+
+                HStack(alignment: .top) {
                     Text(lastMsg)
-                        .font(.caption)
+                        .font(.system(size: 14, weight: unread > 0 ? .medium : .regular))
                         .foregroundColor(unread > 0 ? KinnectTheme.textPrimary : KinnectTheme.textSecondary)
                         .lineLimit(2)
-                    Spacer()
+                        .multilineTextAlignment(.leading)
+
+                    Spacer(minLength: 8)
+
                     if unread > 0 {
                         Text("\(unread)")
-                            .font(.caption2.bold())
+                            .font(.system(size: 12, weight: .bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)
-                            .background(Capsule().fill(KinnectTheme.accentBright))
+                            .background(
+                                Capsule().fill(
+                                    LinearGradient(
+                                        colors: [Color(hex: "#8E2DE2"), Color(hex: "#4A00E0")],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                            )
                     }
                 }
             }
         }
-        .kinnectCard()
+        .padding(.vertical, 10)
+        .padding(.horizontal, 16)
+        .contentShape(Rectangle())
     }
 
     private func groupConversationRow(_ group: ChatGroupItem) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
             KinnectAvatarView(
                 name: group.name,
                 avatarURL: "",
                 colorHex: group.avatarColor,
-                size: 48
+                size: 52
             )
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text(group.name)
-                        .font(.subheadline.bold())
-                        .foregroundColor(KinnectTheme.textPrimary)
-                        .lineLimit(1)
-                    Text("(\(group.membersCount) TV)")
-                        .font(.caption2)
-                        .foregroundColor(KinnectTheme.textSecondary)
-                    Spacer()
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .firstTextBaseline) {
+                    HStack(spacing: 6) {
+                        Text(group.name)
+                            .font(.system(size: 16, weight: group.unreadCount > 0 ? .bold : .semibold))
+                            .foregroundColor(KinnectTheme.textPrimary)
+                            .lineLimit(1)
+                        Text("(\(group.membersCount))")
+                            .font(.system(size: 13))
+                            .foregroundColor(Color(UIColor.tertiaryLabel))
+                    }
+
+                    Spacer(minLength: 8)
+
                     if !group.updatedAt.isEmpty {
                         Text(formatRelativeDate(group.updatedAt))
-                            .font(.caption2)
-                            .foregroundColor(group.unreadCount > 0 ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
+                            .font(.system(size: 13, weight: group.unreadCount > 0 ? .semibold : .regular))
+                            .foregroundColor(group.unreadCount > 0 ? KinnectTheme.accentBright : Color(UIColor.tertiaryLabel))
                     }
                 }
-                HStack {
+
+                HStack(alignment: .top) {
                     Text(group.lastMessageText.isEmpty ? group.description : group.lastMessageText)
-                        .font(.caption)
-                        .foregroundColor(KinnectTheme.textSecondary)
+                        .font(.system(size: 14, weight: group.unreadCount > 0 ? .medium : .regular))
+                        .foregroundColor(group.unreadCount > 0 ? KinnectTheme.textPrimary : KinnectTheme.textSecondary)
                         .lineLimit(2)
-                    Spacer()
+                        .multilineTextAlignment(.leading)
+
+                    Spacer(minLength: 8)
+
                     if group.unreadCount > 0 {
                         Text("\(group.unreadCount)")
-                            .font(.caption2.bold())
+                            .font(.system(size: 12, weight: .bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)
-                            .background(Capsule().fill(KinnectTheme.accentBright))
+                            .background(
+                                Capsule().fill(
+                                    LinearGradient(
+                                        colors: [Color(hex: "#8E2DE2"), Color(hex: "#4A00E0")],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                            )
                     }
                 }
             }
         }
-        .kinnectCard()
+        .padding(.vertical, 10)
+        .padding(.horizontal, 16)
+        .contentShape(Rectangle())
     }
 
     private func loadChats() async {
@@ -366,6 +462,22 @@ private func mimeTypeForExt(_ ext: String) -> String {
     case "mp4": return "video/mp4"
     case "txt": return "text/plain"
     default: return "application/octet-stream"
+    }
+}
+
+struct MessageBubbleShape: Shape {
+    let isMine: Bool
+
+    func path(in rect: CGRect) -> Path {
+        let corners: UIRectCorner = isMine
+            ? [.topLeft, .topRight, .bottomLeft]
+            : [.topLeft, .topRight, .bottomRight]
+        let path = UIBezierPath(
+            roundedRect: rect,
+            byRoundingCorners: corners,
+            cornerRadii: CGSize(width: 18, height: 18)
+        )
+        return Path(path.cgPath)
     }
 }
 
@@ -495,36 +607,55 @@ struct DirectChatDetailView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Conversational Header Bar (Back + Peer Avatar + Peer Name + Call/Video/More)
+            // Conversational Header Bar (iOS Native Style)
             HStack(spacing: 8) {
-                KinnectIconButton(
-                    glyph: .back,
-                    label: "Quay lại",
-                    tint: KinnectTheme.textPrimary
-                ) {
+                Button {
                     dismiss()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(KinnectTheme.accentBright)
+                        .frame(width: 36, height: 44)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Quay lại")
 
                 Button {
                     showPeerProfile = true
                 } label: {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 10) {
                         KinnectAvatarView(
                             name: peer.name,
                             avatarURL: peer.avatarUrl,
                             colorHex: peer.avatarColor,
-                            size: 36,
-                            isOnline: true
+                            size: 38,
+                            isOnline: appState.onlineUserIds.contains(peer.id) || (peer.isActive && peer.showActivity)
                         )
 
-                        VStack(alignment: .leading, spacing: 1) {
+                        VStack(alignment: .leading, spacing: 2) {
                             Text(peer.name)
-                                .font(.subheadline.bold())
+                                .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(KinnectTheme.textPrimary)
                                 .lineLimit(1)
-                            Text("Đang hoạt động")
-                                .font(.caption2)
-                                .foregroundColor(KinnectTheme.online)
+
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(
+                                        (appState.onlineUserIds.contains(peer.id) || (peer.isActive && peer.showActivity))
+                                            ? Color(hex: "#2E9E66")
+                                            : Color(UIColor.tertiaryLabel)
+                                    )
+                                    .frame(width: 7, height: 7)
+
+                                Text(
+                                    (appState.onlineUserIds.contains(peer.id) || (peer.isActive && peer.showActivity))
+                                        ? "Đang trực tuyến"
+                                        : "Ngoại tuyến"
+                                )
+                                .font(.system(size: 12))
+                                .foregroundColor(Color(UIColor.secondaryLabel))
+                            }
                         }
                     }
                 }
@@ -533,98 +664,107 @@ struct DirectChatDetailView: View {
                 Spacer(minLength: 4)
 
                 // Call action buttons (iOS HIG native phone & video contour icons)
-                Button {
-                    Task { await NativeWebRTCManager.shared.startOutgoingCall(targetUser: peer, mode: "audio") }
-                } label: {
-                    Image(systemName: "phone")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(KinnectTheme.callGreen)
-                        .frame(width: 36, height: 36)
-                        .background(Circle().fill(KinnectTheme.callGreen.opacity(0.15)))
-                }
-                .accessibilityLabel("Gọi thoại")
-
-                Button {
-                    Task { await NativeWebRTCManager.shared.startOutgoingCall(targetUser: peer, mode: "video") }
-                } label: {
-                    Image(systemName: "video")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(KinnectTheme.accentBright)
-                        .frame(width: 36, height: 36)
-                        .background(Circle().fill(KinnectTheme.accentBright.opacity(0.15)))
-                }
-                .accessibilityLabel("Gọi video")
-
-                Menu {
+                HStack(spacing: 8) {
                     Button {
-                        Task {
-                            let next = !isPinned
-                            do {
-                                _ = try await KinnectAPIClient.shared.requestJSON(
-                                    "/api/chat-preferences/direct/\(peer.id)",
-                                    method: "POST",
-                                    body: ["pinned": next]
-                                )
-                                isPinned = next
-                                appState.showToast(isPinned ? "Đã ghim hội thoại." : "Đã bỏ ghim.")
-                            } catch {
-                                appState.showToast(error.localizedDescription)
-                            }
-                        }
+                        Task { await NativeWebRTCManager.shared.startOutgoingCall(targetUser: peer, mode: "audio") }
                     } label: {
-                        Label(isPinned ? "Bỏ ghim hội thoại" : "Ghim hội thoại", systemImage: isPinned ? "pin.slash" : "pin")
+                        ZStack {
+                            Circle()
+                                .fill(Color(hex: "#2E9E66").opacity(0.18))
+                                .frame(width: 36, height: 36)
+                            Image(systemName: "phone.fill")
+                                .font(.system(size: 15))
+                                .foregroundColor(Color(hex: "#2E9E66"))
+                        }
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Gọi thoại")
+
                     Button {
-                        Task {
-                            let next = !isMuted
-                            do {
-                                _ = try await KinnectAPIClient.shared.requestJSON(
-                                    "/api/chat-preferences/direct/\(peer.id)",
-                                    method: "POST",
-                                    body: ["muted": next]
-                                )
-                                isMuted = next
-                                appState.showToast(isMuted ? "Đã tắt thông báo." : "Đã bật thông báo.")
-                            } catch {
-                                appState.showToast(error.localizedDescription)
+                        Task { await NativeWebRTCManager.shared.startOutgoingCall(targetUser: peer, mode: "video") }
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(KinnectTheme.accentBright.opacity(0.18))
+                                .frame(width: 36, height: 36)
+                            Image(systemName: "video.fill")
+                                .font(.system(size: 15))
+                                .foregroundColor(KinnectTheme.accentBright)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Gọi video")
+
+                    Menu {
+                        Button {
+                            Task {
+                                let next = !isPinned
+                                do {
+                                    _ = try await KinnectAPIClient.shared.requestJSON(
+                                        "/api/chat-preferences/direct/\(peer.id)",
+                                        method: "POST",
+                                        body: ["pinned": next]
+                                    )
+                                    isPinned = next
+                                    appState.showToast(isPinned ? "Đã ghim hội thoại." : "Đã bỏ ghim.")
+                                } catch {
+                                    appState.showToast(error.localizedDescription)
+                                }
                             }
+                        } label: {
+                            Label(isPinned ? "Bỏ ghim hội thoại" : "Ghim hội thoại", systemImage: isPinned ? "pin.slash" : "pin")
+                        }
+                        Button {
+                            Task {
+                                let next = !isMuted
+                                do {
+                                    _ = try await KinnectAPIClient.shared.requestJSON(
+                                        "/api/chat-preferences/direct/\(peer.id)",
+                                        method: "POST",
+                                        body: ["muted": next]
+                                    )
+                                    isMuted = next
+                                    appState.showToast(isMuted ? "Đã tắt thông báo." : "Đã bật thông báo.")
+                                } catch {
+                                    appState.showToast(error.localizedDescription)
+                                }
+                            }
+                        } label: {
+                            Label(isMuted ? "Bật thông báo" : "Tắt thông báo", systemImage: isMuted ? "bell" : "bell.slash")
+                        }
+                        Button(role: .destructive) {
+                            appState.activeReportContext = UGCReportContext(
+                                targetType: "user",
+                                targetId: peer.id,
+                                targetUserId: peer.id,
+                                targetTitle: peer.name
+                            )
+                        } label: {
+                            Label("Báo cáo người dùng", systemImage: "exclamationmark.bubble")
+                        }
+                        Button(role: .destructive) {
+                            Task { await appState.blockUser(userId: peer.id, userName: peer.name) }
+                        } label: {
+                            Label("Chặn người dùng", systemImage: "hand.raised.fill")
                         }
                     } label: {
-                        Label(isMuted ? "Bật thông báo" : "Tắt thông báo", systemImage: isMuted ? "bell" : "bell.slash")
-                    }
-                    Button(role: .destructive) {
-                        appState.activeReportContext = UGCReportContext(
-                            targetType: "user",
-                            targetId: peer.id,
-                            targetUserId: peer.id,
-                            targetTitle: peer.name
-                        )
-                    } label: {
-                        HStack {
-                            Text("Báo cáo người dùng")
-                            KinnectIcon(glyph: .report, size: 18, tint: KinnectTheme.danger)
+                        ZStack {
+                            Circle()
+                                .fill(KinnectTheme.surfaceElevated)
+                                .frame(width: 36, height: 36)
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundColor(KinnectTheme.textSecondary)
                         }
                     }
-                    Button(role: .destructive) {
-                        Task { await appState.blockUser(userId: peer.id, userName: peer.name) }
-                    } label: {
-                        HStack {
-                            Text("Chặn người dùng")
-                            KinnectIcon(glyph: .block, size: 18, tint: KinnectTheme.danger)
-                        }
-                    }
-                } label: {
-                    KinnectIcon(glyph: .more, size: 22, tint: KinnectTheme.textSecondary)
-                        .frame(minWidth: 40, minHeight: 44)
-                        .contentShape(Rectangle())
+                    .accessibilityLabel("Tùy chọn cuộc trò chuyện")
                 }
-                .accessibilityLabel("Tùy chọn cuộc trò chuyện")
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
             .background(KinnectTheme.surface)
             .overlay(alignment: .bottom) {
-                Rectangle().fill(KinnectTheme.border).frame(height: 1)
+                Divider().background(KinnectTheme.borderSoft)
             }
 
             ScrollViewReader { proxy in
@@ -649,7 +789,9 @@ struct DirectChatDetailView: View {
 
             if let editId = editingMessageId {
                 HStack(spacing: 8) {
-                    KinnectIcon(glyph: .edit, size: 18, selected: true, tint: KinnectTheme.accentBright)
+                    Image(systemName: "pencil.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(KinnectTheme.accentBright)
                     Text("Đang sửa tin nhắn")
                         .font(.caption.bold())
                         .foregroundColor(KinnectTheme.accentBright)
@@ -674,13 +816,32 @@ struct DirectChatDetailView: View {
                 .background(KinnectTheme.surfaceElevated)
             }
 
-            HStack(spacing: 10) {
-                PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                    KinnectIcon(glyph: .photo, size: 24, tint: KinnectTheme.accentBright)
-                        .frame(minWidth: 40, minHeight: 44)
-                        .contentShape(Rectangle())
+            // Apple iMessage Input Bar
+            HStack(alignment: .bottom, spacing: 8) {
+                Menu {
+                    PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                        Label("Thư viện ảnh", systemImage: "photo.on.rectangle.angled")
+                    }
+                    Button {
+                        showFileImporter = true
+                    } label: {
+                        Label("Tệp & Tài liệu", systemImage: "folder")
+                    }
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 28))
+                        .foregroundColor(Color(UIColor.tertiaryLabel))
+                        .frame(width: 34, height: 38)
                 }
-                .accessibilityLabel("Chọn ảnh gửi tin nhắn")
+                .accessibilityLabel("Đính kèm tệp hoặc ảnh")
+
+                PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(KinnectTheme.textSecondary)
+                        .frame(width: 32, height: 38)
+                }
+                .accessibilityLabel("Chọn ảnh nhanh")
                 .onChange(of: selectedPhoto) { newItem in
                     guard let newItem else { return }
                     Task {
@@ -693,48 +854,83 @@ struct DirectChatDetailView: View {
                     }
                 }
 
-                Button {
-                    showFileImporter = true
-                } label: {
-                    Image(systemName: "paperclip")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(KinnectTheme.accentBright)
-                        .frame(minWidth: 40, minHeight: 44)
-                        .contentShape(Rectangle())
-                }
-                .accessibilityLabel("Đính kèm tệp gửi tin nhắn")
-
                 if editingMessageId != nil {
                     TextField(
                         "",
                         text: $editingMessageText,
                         prompt: Text("Nội dung tin nhắn mới...").foregroundColor(KinnectTheme.textSecondary)
                     )
-                    .padding(10)
-                    .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
+                    .font(.system(size: 16))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(KinnectTheme.surfaceElevated)
+                            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(KinnectTheme.borderSoft, lineWidth: 0.8))
+                    )
                     .foregroundColor(KinnectTheme.textPrimary)
                 } else {
-                    TextField(
-                        "",
-                        text: $text,
-                        prompt: Text("Nhắn tin...").foregroundColor(KinnectTheme.textSecondary)
-                    )
-                    .padding(10)
-                    .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
-                    .foregroundColor(KinnectTheme.textPrimary)
+                    HStack(alignment: .bottom, spacing: 6) {
+                        TextField(
+                            "",
+                            text: $text,
+                            prompt: Text("Tin nhắn…").foregroundColor(KinnectTheme.textSecondary),
+                            axis: .vertical
+                        )
+                        .lineLimit(1...5)
+                        .font(.system(size: 16))
+                        .foregroundColor(KinnectTheme.textPrimary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
 
-                    KinnectIconButton(
-                        glyph: .send,
-                        label: "Gửi tin nhắn",
-                        tint: KinnectTheme.accentBright
-                    ) {
-                        Task { await sendMessage(text: text, imageDataURL: "") }
+                        if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Button {
+                                Task { await sendMessage(text: text, imageDataURL: "") }
+                            } label: {
+                                Image(systemName: "arrow.up.circle.fill")
+                                    .font(.system(size: 30))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [Color(hex: "#8E2DE2"), Color(hex: "#4A00E0")],
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        )
+                                    )
+                            }
+                            .disabled(isSending)
+                            .padding(.trailing, 4)
+                            .padding(.bottom, 3)
+                            .transition(.scale.combined(with: .opacity))
+                        }
                     }
-                    .disabled(isSending || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .fill(KinnectTheme.surfaceElevated)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                    .stroke(KinnectTheme.borderSoft.opacity(0.8), lineWidth: 0.8)
+                            )
+                    )
+
+                    if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Button {
+                            appState.showToast("Ghi âm tin nhắn thoại (Đang hoàn thiện)")
+                        } label: {
+                            Image(systemName: "mic.fill")
+                                .font(.system(size: 18))
+                                .foregroundColor(KinnectTheme.textSecondary)
+                                .frame(width: 32, height: 38)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
-            .padding(12)
-            .background(KinnectTheme.surface)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(KinnectTheme.surface.ignoresSafeArea(edges: .bottom))
+            .overlay(alignment: .top) {
+                Divider().background(KinnectTheme.borderSoft)
+            }
         }
         .background(KinnectTheme.background)
         .navigationTitle("")
@@ -789,46 +985,94 @@ struct DirectChatDetailView: View {
     }
 
     private func directMessageBubble(msg: DirectMessageItem, isMine: Bool) -> some View {
-        HStack {
+        HStack(alignment: .bottom, spacing: 6) {
             if isMine { Spacer(minLength: 44) }
-            VStack(alignment: isMine ? .trailing : .leading, spacing: 6) {
-                // Message content on top
-                if !msg.imageUrl.isEmpty {
-                    KinnectRemoteImageView(rawURL: msg.imageUrl, cornerRadius: KinnectTheme.radiusMD, maxHeight: 220)
-                }
-                if !msg.attachmentName.isEmpty {
-                    ChatAttachmentBubbleView(fileName: msg.attachmentName, fileUrl: msg.attachmentUrl, isMine: isMine)
-                }
-                if !msg.text.isEmpty {
-                    Text(msg.text)
-                        .font(.subheadline)
-                        .foregroundColor(isMine ? .white : KinnectTheme.textPrimary)
-                        .kinnectMultiline()
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: KinnectTheme.radiusXL, style: .continuous)
-                                .fill(isMine ? AnyShapeStyle(KinnectTheme.primaryGradient) : AnyShapeStyle(KinnectTheme.surfaceElevated))
-                        )
+
+            VStack(alignment: isMine ? .trailing : .leading, spacing: 3) {
+                ZStack(alignment: isMine ? .topLeading : .topTrailing) {
+                    VStack(alignment: isMine ? .trailing : .leading, spacing: 6) {
+                        // Image preview if present
+                        if !msg.imageUrl.isEmpty {
+                            KinnectRemoteImageView(rawURL: msg.imageUrl, cornerRadius: 16, maxHeight: 240)
+                                .clipShape(MessageBubbleShape(isMine: isMine))
+                        }
+
+                        // Attachment file bubble
+                        if !msg.attachmentName.isEmpty {
+                            ChatAttachmentBubbleView(fileName: msg.attachmentName, fileUrl: msg.attachmentUrl, isMine: isMine)
+                        }
+
+                        // Text content with iconic asymmetric bubble
+                        if !msg.text.isEmpty {
+                            Text(msg.text)
+                                .font(.system(size: 16))
+                                .foregroundColor(isMine ? .white : KinnectTheme.textPrimary)
+                                .kinnectMultiline()
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 9)
+                                .background(
+                                    MessageBubbleShape(isMine: isMine)
+                                        .fill(
+                                            isMine
+                                                ? AnyShapeStyle(
+                                                    LinearGradient(
+                                                        colors: [Color(hex: "#8E2DE2"), Color(hex: "#4A00E0")],
+                                                        startPoint: .topLeading,
+                                                        endPoint: .bottomTrailing
+                                                    )
+                                                )
+                                                : AnyShapeStyle(KinnectTheme.surfaceElevated)
+                                        )
+                                )
+                                .overlay(
+                                    MessageBubbleShape(isMine: isMine)
+                                        .stroke(
+                                            isMine ? Color.clear : KinnectTheme.borderSoft.opacity(0.7),
+                                            lineWidth: 0.8
+                                        )
+                                )
+                        }
+                    }
+
+                    // Floating Tapback reaction badge
+                    if let reacted = messageReactions[msg.id] {
+                        Text(DirectMessageItem.emoji(for: reacted))
+                            .font(.system(size: 13))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(
+                                Capsule()
+                                    .fill(KinnectTheme.surfaceElevated)
+                                    .shadow(color: Color.black.opacity(0.35), radius: 3, y: 1)
+                                    .overlay(Capsule().stroke(KinnectTheme.borderSoft, lineWidth: 0.8))
+                            )
+                            .offset(x: isMine ? -8 : 8, y: -10)
+                    }
                 }
 
-                // Bottom row: time, seen, reaction, and more (...) in a single row
-                HStack(spacing: 8) {
+                // Bottom row: time, delivery state, reaction trigger & more options
+                HStack(spacing: 6) {
                     Text(formatRelativeDate(msg.createdAt))
-                        .font(.caption2)
-                        .foregroundColor(Color(hex: "#9CA3AF"))
+                        .font(.system(size: 11))
+                        .foregroundColor(Color(UIColor.tertiaryLabel))
 
                     if isMine {
-                        HStack(spacing: 4) {
-                            KinnectIcon(
-                                glyph: .seen,
-                                size: 16,
-                                selected: msg.isSeen,
-                                tint: msg.isSeen ? KinnectTheme.accentBright : Color(hex: "#9CA3AF")
-                            )
-                            Text(msg.isSeen ? "Đã xem" : (msg.deliveredAt.isEmpty ? "Đã gửi" : "Đã nhận"))
-                                .font(.caption2.weight(.semibold))
-                                .foregroundColor(msg.isSeen ? KinnectTheme.accentBright : Color(hex: "#9CA3AF"))
+                        if msg.isSeen {
+                            HStack(spacing: 2) {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 10, weight: .bold))
+                                Text("Đã xem")
+                                    .font(.system(size: 11, weight: .medium))
+                            }
+                            .foregroundColor(KinnectTheme.accentBright)
+                        } else if !msg.deliveredAt.isEmpty {
+                            Text("· Đã nhận")
+                                .font(.system(size: 11))
+                                .foregroundColor(Color(UIColor.tertiaryLabel))
+                        } else {
+                            Text("· Đã gửi")
+                                .font(.system(size: 11))
+                                .foregroundColor(Color(UIColor.tertiaryLabel))
                         }
                     }
 
@@ -839,18 +1083,9 @@ struct DirectChatDetailView: View {
                             }
                         }
                     } label: {
-                        HStack(spacing: 3) {
-                            KinnectIcon(
-                                glyph: .reaction,
-                                size: 16,
-                                selected: messageReactions[msg.id] != nil,
-                                tint: messageReactions[msg.id] != nil ? KinnectTheme.accentBright : KinnectTheme.textSecondary
-                            )
-                            if let reacted = messageReactions[msg.id] {
-                                Text(DirectMessageItem.emoji(for: reacted)).font(.caption2)
-                            }
-                        }
-                        .padding(.vertical, 4)
+                        Image(systemName: "face.smiling")
+                            .font(.system(size: 12))
+                            .foregroundColor(messageReactions[msg.id] != nil ? KinnectTheme.accentBright : Color(UIColor.tertiaryLabel))
                     }
                     .accessibilityLabel("Thả cảm xúc tin nhắn")
 
@@ -860,10 +1095,7 @@ struct DirectChatDetailView: View {
                                 editingMessageId = msg.id
                                 editingMessageText = msg.text
                             } label: {
-                                HStack {
-                                    Text("Sửa tin nhắn")
-                                    KinnectIcon(glyph: .edit, size: 18)
-                                }
+                                Label("Sửa tin nhắn", systemImage: "pencil")
                             }
                         }
 
@@ -872,17 +1104,14 @@ struct DirectChatDetailView: View {
                             forwardImageUrl = msg.imageUrl
                             showForwardSheet = true
                         } label: {
-                            HStack {
-                                Text("Chuyển tiếp tin nhắn")
-                                KinnectIcon(glyph: .share, size: 18)
-                            }
+                            Label("Chuyển tiếp", systemImage: "arrow.turn.up.right")
                         }
 
                         if isMine {
                             Button(role: .destructive) {
                                 Task { await deleteMessage(msg) }
                             } label: {
-                                Label("Thu hồi / Xóa tin nhắn", systemImage: "trash")
+                                Label("Thu hồi tin nhắn", systemImage: "trash")
                             }
                         } else {
                             Button(role: .destructive) {
@@ -893,32 +1122,22 @@ struct DirectChatDetailView: View {
                                     targetTitle: "Tin nhắn của \(peer.name)"
                                 )
                             } label: {
-                                HStack {
-                                    Text("Báo cáo tin nhắn")
-                                    KinnectIcon(glyph: .report, size: 18, tint: KinnectTheme.danger)
-                                }
-                            }
-
-                            Button(role: .destructive) {
-                                Task { await appState.blockUser(userId: peer.id, userName: peer.name) }
-                            } label: {
-                                HStack {
-                                    Text("Chặn người dùng")
-                                    KinnectIcon(glyph: .block, size: 18, tint: KinnectTheme.danger)
-                                }
+                                Label("Báo cáo tin nhắn", systemImage: "exclamationmark.bubble")
                             }
                         }
                     } label: {
-                        KinnectIcon(glyph: .more, size: 18, tint: KinnectTheme.textSecondary)
-                            .padding(.vertical, 4)
-                            .padding(.horizontal, 4)
-                            .contentShape(Rectangle())
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 12))
+                            .foregroundColor(Color(UIColor.tertiaryLabel))
                     }
                     .accessibilityLabel("Tùy chọn tin nhắn")
                 }
+                .padding(.horizontal, 4)
             }
+
             if !isMine { Spacer(minLength: 44) }
         }
+    }
     }
 
     private func loadMessages() async {
@@ -1193,7 +1412,7 @@ struct GroupChatDetailView: View {
     private func groupMessageRow(msg: GroupMessageItem) -> some View {
         let isMine = (msg.sender.id == appState.currentUser?.id)
         HStack(alignment: .bottom, spacing: 8) {
-            if isMine { Spacer(minLength: 40) }
+            if isMine { Spacer(minLength: 44) }
             if !isMine {
                 KinnectAvatarView(
                     name: msg.sender.name,
@@ -1202,51 +1421,92 @@ struct GroupChatDetailView: View {
                     size: 30
                 )
             }
-            VStack(alignment: isMine ? .trailing : .leading, spacing: 5) {
+            VStack(alignment: isMine ? .trailing : .leading, spacing: 3) {
                 if !isMine {
                     Text(msg.sender.name)
-                        .font(.caption2.bold())
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(KinnectTheme.accentBright)
+                        .padding(.leading, 4)
                 }
-                // Image preview if present
-                if !msg.imageUrl.isEmpty {
-                    KinnectRemoteImageView(rawURL: msg.imageUrl, cornerRadius: KinnectTheme.radiusMD, maxHeight: 220)
+
+                ZStack(alignment: isMine ? .topLeading : .topTrailing) {
+                    VStack(alignment: isMine ? .trailing : .leading, spacing: 6) {
+                        // Image preview if present
+                        if !msg.imageUrl.isEmpty {
+                            KinnectRemoteImageView(rawURL: msg.imageUrl, cornerRadius: 16, maxHeight: 240)
+                                .clipShape(MessageBubbleShape(isMine: isMine))
+                        }
+                        // File attachment card if present
+                        if !msg.attachmentName.isEmpty {
+                            ChatAttachmentBubbleView(fileName: msg.attachmentName, fileUrl: msg.attachmentUrl, isMine: isMine)
+                        }
+                        // Content on top with member mention highlight
+                        if !msg.text.isEmpty {
+                            formattedBubbleText(msg.text, isMine: isMine)
+                                .kinnectMultiline()
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 9)
+                                .background(
+                                    MessageBubbleShape(isMine: isMine)
+                                        .fill(
+                                            isMine
+                                                ? AnyShapeStyle(
+                                                    LinearGradient(
+                                                        colors: [Color(hex: "#8E2DE2"), Color(hex: "#4A00E0")],
+                                                        startPoint: .topLeading,
+                                                        endPoint: .bottomTrailing
+                                                    )
+                                                )
+                                                : AnyShapeStyle(KinnectTheme.surfaceElevated)
+                                        )
+                                )
+                                .overlay(
+                                    MessageBubbleShape(isMine: isMine)
+                                        .stroke(
+                                            isMine ? Color.clear : KinnectTheme.borderSoft.opacity(0.7),
+                                            lineWidth: 0.8
+                                        )
+                                )
+                        }
+                    }
+
+                    // Floating Tapback reaction badge
+                    if let reacted = groupReactions[msg.id] {
+                        Text(DirectMessageItem.emoji(for: reacted))
+                            .font(.system(size: 13))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(
+                                Capsule()
+                                    .fill(KinnectTheme.surfaceElevated)
+                                    .shadow(color: Color.black.opacity(0.35), radius: 3, y: 1)
+                                    .overlay(Capsule().stroke(KinnectTheme.borderSoft, lineWidth: 0.8))
+                            )
+                            .offset(x: isMine ? -8 : 8, y: -10)
+                    }
                 }
-                // File attachment card if present
-                if !msg.attachmentName.isEmpty {
-                    ChatAttachmentBubbleView(fileName: msg.attachmentName, fileUrl: msg.attachmentUrl, isMine: isMine)
-                }
-                // Content on top with Zalo-style member mention highlight
-                if !msg.text.isEmpty {
-                    formattedBubbleText(msg.text, isMine: isMine)
-                        .kinnectMultiline()
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: KinnectTheme.radiusXL)
-                                .fill(isMine ? AnyShapeStyle(KinnectTheme.primaryGradient) : AnyShapeStyle(KinnectTheme.surfaceElevated))
-                        )
-                }
-                // Bottom row: time, seen, reaction, more
+
+                // Bottom row: time, seen count, reaction, more
                 groupMessageFooter(msg: msg, isMine: isMine)
             }
-            if !isMine { Spacer(minLength: 40) }
+            if !isMine { Spacer(minLength: 44) }
         }
     }
 
     @ViewBuilder
     private func groupMessageFooter(msg: GroupMessageItem, isMine: Bool) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Text(formatRelativeDate(msg.createdAt))
-                .font(.caption2)
-                .foregroundColor(Color(hex: "#9CA3AF"))
+                .font(.system(size: 11))
+                .foregroundColor(Color(UIColor.tertiaryLabel))
 
-            HStack(spacing: 4) {
-                KinnectIcon(glyph: .seen, size: 16, selected: true, tint: KinnectTheme.accentBright)
+            HStack(spacing: 2) {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 10, weight: .bold))
                 Text("\(max(msg.seenCount, 1))")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundColor(KinnectTheme.accentBright)
+                    .font(.system(size: 11, weight: .medium))
             }
+            .foregroundColor(KinnectTheme.accentBright)
 
             Menu {
                 ForEach(["👍", "❤️", "😂", "😮", "😢", "😡"], id: \.self) { emoji in
@@ -1255,17 +1515,9 @@ struct GroupChatDetailView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 3) {
-                    KinnectIcon(
-                        glyph: .reaction,
-                        size: 16,
-                        selected: groupReactions[msg.id] != nil,
-                        tint: groupReactions[msg.id] != nil ? KinnectTheme.accentBright : KinnectTheme.textSecondary
-                    )
-                    if let reacted = groupReactions[msg.id] {
-                        Text(DirectMessageItem.emoji(for: reacted)).font(.caption2)
-                    }
-                }
+                Image(systemName: "face.smiling")
+                    .font(.system(size: 12))
+                    .foregroundColor(groupReactions[msg.id] != nil ? KinnectTheme.accentBright : Color(UIColor.tertiaryLabel))
             }
             .accessibilityLabel("Thả cảm xúc tin nhắn nhóm")
 
@@ -1275,10 +1527,7 @@ struct GroupChatDetailView: View {
                     forwardImageUrl = msg.imageUrl
                     showForwardSheet = true
                 } label: {
-                    HStack {
-                        Text("Chuyển tiếp tin nhắn")
-                        KinnectIcon(glyph: .share, size: 18)
-                    }
+                    Label("Chuyển tiếp", systemImage: "arrow.turn.up.right")
                 }
 
                 if !isMine {
@@ -1290,28 +1539,22 @@ struct GroupChatDetailView: View {
                             targetTitle: "Tin nhắn nhóm của \(msg.sender.name)"
                         )
                     } label: {
-                        HStack {
-                            Text("Báo cáo tin nhắn")
-                            KinnectIcon(glyph: .report, size: 18, tint: KinnectTheme.danger)
-                        }
+                        Label("Báo cáo tin nhắn", systemImage: "exclamationmark.bubble")
                     }
                     Button(role: .destructive) {
                         Task { await appState.blockUser(userId: msg.sender.id, userName: msg.sender.name) }
                     } label: {
-                        HStack {
-                            Text("Chặn người gửi")
-                            KinnectIcon(glyph: .block, size: 18, tint: KinnectTheme.danger)
-                        }
+                        Label("Chặn người gửi", systemImage: "hand.raised.fill")
                     }
                 }
             } label: {
-                KinnectIcon(glyph: .more, size: 18, tint: KinnectTheme.textSecondary)
-                    .padding(.vertical, 4)
-                    .padding(.horizontal, 4)
-                    .contentShape(Rectangle())
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 12))
+                    .foregroundColor(Color(UIColor.tertiaryLabel))
             }
             .accessibilityLabel("Tùy chọn tin nhắn nhóm")
         }
+        .padding(.horizontal, 4)
     }
 
     @ViewBuilder
@@ -1404,13 +1647,31 @@ struct GroupChatDetailView: View {
 
     @ViewBuilder
     private var groupChatInputBar: some View {
-        HStack(spacing: 8) {
-            PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                KinnectIcon(glyph: .photo, size: 22, tint: KinnectTheme.accentBright)
-                    .frame(width: 36, height: 36)
-                    .contentShape(Rectangle())
+        HStack(alignment: .bottom, spacing: 8) {
+            Menu {
+                PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                    Label("Thư viện ảnh", systemImage: "photo.on.rectangle.angled")
+                }
+                Button {
+                    showFileImporter = true
+                } label: {
+                    Label("Tệp & Tài liệu", systemImage: "folder")
+                }
+            } label: {
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 28))
+                    .foregroundColor(Color(UIColor.tertiaryLabel))
+                    .frame(width: 34, height: 38)
             }
-            .accessibilityLabel("Chọn ảnh gửi vào nhóm")
+            .accessibilityLabel("Đính kèm tệp hoặc ảnh")
+
+            PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                Image(systemName: "camera.fill")
+                    .font(.system(size: 18))
+                    .foregroundColor(KinnectTheme.textSecondary)
+                    .frame(width: 32, height: 38)
+            }
+            .accessibilityLabel("Chọn ảnh nhanh")
             .onChange(of: selectedPhoto) { newItem in
                 guard let newItem else { return }
                 Task {
@@ -1422,17 +1683,6 @@ struct GroupChatDetailView: View {
                     }
                 }
             }
-
-            Button {
-                showFileImporter = true
-            } label: {
-                Image(systemName: "paperclip")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(KinnectTheme.accentBright)
-                    .frame(width: 36, height: 36)
-                    .contentShape(Rectangle())
-            }
-            .accessibilityLabel("Đính kèm tệp gửi vào nhóm")
 
             // Mention shortcut button (@)
             Button {
@@ -1447,60 +1697,118 @@ struct GroupChatDetailView: View {
                 Text("@")
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(KinnectTheme.accentBright)
-                    .frame(width: 36, height: 36)
-                    .background(Circle().fill(KinnectTheme.surfaceElevated))
+                    .frame(width: 32, height: 38)
             }
             .accessibilityLabel("Nhắc tên thành viên")
 
-            TextField("Nhập tin nhắn trong nhóm...", text: $text)
-                .padding(10)
-                .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
+            HStack(alignment: .bottom, spacing: 6) {
+                TextField(
+                    "",
+                    text: $text,
+                    prompt: Text("Tin nhắn nhóm…").foregroundColor(KinnectTheme.textSecondary),
+                    axis: .vertical
+                )
+                .lineLimit(1...5)
+                .font(.system(size: 16))
                 .foregroundColor(KinnectTheme.textPrimary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
 
-            KinnectIconButton(
-                glyph: .send,
-                label: "Gửi tin nhắn nhóm",
-                tint: KinnectTheme.accentBright
-            ) {
-                Task { await sendGroupMessage(text: text, imageDataURL: "") }
+                if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Button {
+                        Task { await sendGroupMessage(text: text, imageDataURL: "") }
+                    } label: {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 30))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color(hex: "#8E2DE2"), Color(hex: "#4A00E0")],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                    }
+                    .disabled(isSending)
+                    .padding(.trailing, 4)
+                    .padding(.bottom, 3)
+                    .transition(.scale.combined(with: .opacity))
+                }
             }
-            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(KinnectTheme.surfaceElevated)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .stroke(KinnectTheme.borderSoft.opacity(0.8), lineWidth: 0.8)
+                    )
+            )
+
+            if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Button {
+                    appState.showToast("Ghi âm tin nhắn thoại (Đang hoàn thiện)")
+                } label: {
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(KinnectTheme.textSecondary)
+                        .frame(width: 32, height: 38)
+                }
+                .buttonStyle(.plain)
+            }
         }
-        .padding(12)
-        .background(KinnectTheme.surface)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(KinnectTheme.surface.ignoresSafeArea(edges: .bottom))
+        .overlay(alignment: .top) {
+            Divider().background(KinnectTheme.borderSoft)
+        }
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            ScrollView {
-                LazyVStack(spacing: 10) {
-                    ForEach(messages) { msg in
-                        groupMessageRow(msg: msg)
-                    }
-                }
-                .padding(14)
-            }
-
-            mentionSuggestionBar
-
-            groupChatInputBar
-        }
-        .background(KinnectTheme.background)
-        .navigationTitle(group.name)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
+            // iOS Custom Navigation Bar for Group Chat
+            HStack(spacing: 12) {
                 Button {
                     dismiss()
                 } label: {
                     Image(systemName: "chevron.left")
-                        .font(.body.weight(.semibold))
-                        .foregroundColor(KinnectTheme.textPrimary)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(KinnectTheme.accentBright)
+                        .frame(width: 32, height: 44)
                 }
+                .buttonStyle(.plain)
                 .accessibilityLabel("Quay lại")
-            }
 
-            ToolbarItem(placement: .navigationBarTrailing) {
+                // Group Avatar + Title
+                HStack(spacing: 10) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color(hex: "#8E2DE2"), Color(hex: "#4A00E0")],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 38, height: 38)
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(group.name)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(KinnectTheme.textPrimary)
+                            .lineLimit(1)
+
+                        Text("\(max(groupMembers.count, 1)) thành viên")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(Color(UIColor.tertiaryLabel))
+                    }
+                }
+
+                Spacer()
+
                 Menu {
                     Button {
                         newGroupName = group.name
@@ -1521,19 +1829,53 @@ struct GroupChatDetailView: View {
                     Button(role: .destructive) {
                         Task { await leaveGroup() }
                     } label: {
-                        HStack {
-                            Text("Rời nhóm")
-                            KinnectIcon(glyph: .logout, size: 18, tint: KinnectTheme.danger)
-                        }
+                        Label("Rời nhóm", systemImage: "rectangle.portrait.and.arrow.right")
                     }
                 } label: {
-                    KinnectIcon(glyph: .more, size: 22, tint: KinnectTheme.textSecondary)
-                        .frame(minWidth: 44, minHeight: 44)
-                        .contentShape(Rectangle())
+                    ZStack {
+                        Circle()
+                            .fill(KinnectTheme.surfaceElevated)
+                            .frame(width: 36, height: 36)
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
                 }
                 .accessibilityLabel("Tùy chọn nhóm")
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(KinnectTheme.surface)
+            .overlay(alignment: .bottom) {
+                Divider().background(KinnectTheme.borderSoft)
+            }
+
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 10) {
+                        ForEach(messages) { msg in
+                            groupMessageRow(msg: msg)
+                                .id(msg.id)
+                        }
+                    }
+                    .padding(14)
+                }
+                .onChange(of: messages.count) { _ in
+                    if let last = messages.last {
+                        withAnimation {
+                            proxy.scrollTo(last.id, anchor: .bottom)
+                        }
+                    }
+                }
+            }
+
+            mentionSuggestionBar
+
+            groupChatInputBar
         }
+        .background(KinnectTheme.background)
+        .navigationTitle("")
+        .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showForwardSheet) {
             ForwardMessageSheet(text: forwardText, imageUrl: forwardImageUrl)
             .transition(.move(edge: .bottom).combined(with: .opacity))

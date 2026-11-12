@@ -871,10 +871,389 @@ async function renderFriendsScreen(page) {
   console.log('Saved friends screenshot to:', outPath);
 }
 
+async function renderChatScreen(page) {
+  const html = `<!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=${IPHONE_WIDTH}, initial-scale=1.0">
+    <title>Kinnect Chat iMessage</title>
+    <style>
+      ${COMMON_CSS}
+      .app-viewport {
+        width: 100%;
+        height: 100%;
+        background: #0d0a1c;
+        display: flex;
+        flex-direction: column;
+        padding-top: 54px;
+        padding-bottom: 34px;
+        overflow: hidden;
+      }
+      /* Apple Messages Nav Bar */
+      .nav-bar-chat {
+        height: 52px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 12px;
+        background: #141026;
+        border-bottom: 0.8px solid rgba(255, 255, 255, 0.08);
+      }
+      .nav-back-btn {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: #A855F7;
+        font-size: 16px;
+        font-weight: 500;
+        cursor: pointer;
+        padding-right: 6px;
+      }
+      .nav-peer-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+      }
+      .nav-peer-avatar-wrap {
+        position: relative;
+        width: 36px;
+        height: 36px;
+      }
+      .nav-peer-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        object-fit: cover;
+      }
+      .nav-peer-online {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #2E9E66;
+        border: 2px solid #141026;
+      }
+      .nav-peer-text {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .nav-peer-name {
+        font-size: 15px;
+        font-weight: 600;
+        color: #fff;
+      }
+      .nav-peer-status {
+        font-size: 11px;
+        color: #2E9E66;
+        font-weight: 500;
+      }
+      .nav-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .nav-circle-btn {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: #231c3c;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #C084FC;
+      }
+
+      /* Chat Messages Scroll */
+      .chat-messages-container {
+        flex: 1;
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        overflow-y: hidden;
+      }
+      .chat-time-header {
+        align-self: center;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.4);
+        font-weight: 500;
+        margin: 4px 0;
+      }
+
+      /* iMessage Bubbles with authentic asymmetric shapes */
+      .bubble-row {
+        display: flex;
+        position: relative;
+        width: 100%;
+      }
+      .bubble-row.incoming {
+        justify-content: flex-start;
+      }
+      .bubble-row.outgoing {
+        justify-content: flex-end;
+      }
+
+      .bubble-col {
+        display: flex;
+        flex-direction: column;
+        max-width: 76%;
+        position: relative;
+      }
+      .bubble-col.incoming {
+        align-items: flex-start;
+      }
+      .bubble-col.outgoing {
+        align-items: flex-end;
+      }
+
+      .message-bubble {
+        padding: 9px 14px;
+        font-size: 15px;
+        line-height: 1.38;
+        position: relative;
+        word-break: break-word;
+      }
+
+      /* Authentic asymmetric iMessage border radii */
+      .message-bubble.incoming {
+        background: #201a38;
+        color: #fff;
+        border: 0.8px solid rgba(255, 255, 255, 0.1);
+        border-radius: 18px 18px 18px 4px;
+      }
+      .message-bubble.outgoing {
+        background: linear-gradient(135deg, #8E2DE2 0%, #4A00E0 100%);
+        color: #fff;
+        border-radius: 18px 18px 4px 18px;
+        box-shadow: 0 2px 8px rgba(110, 20, 230, 0.35);
+      }
+
+      /* Floating Tapback reaction pill */
+      .tapback-badge {
+        position: absolute;
+        top: -10px;
+        padding: 2px 6px;
+        background: #282144;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
+        font-size: 13px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+      }
+      .tapback-badge.outgoing {
+        left: -8px;
+      }
+      .tapback-badge.incoming {
+        right: -8px;
+      }
+
+      .message-footer {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 3px;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.4);
+        padding: 0 4px;
+      }
+      .seen-status {
+        color: #A855F7;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 2px;
+      }
+
+      /* iMessage Input Bar */
+      .imessage-input-bar {
+        display: flex;
+        align-items: center;
+        padding: 8px 10px;
+        background: #141026;
+        border-top: 0.8px solid rgba(255, 255, 255, 0.08);
+        gap: 8px;
+      }
+      .plus-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.12);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        font-weight: 300;
+      }
+      .camera-btn {
+        color: rgba(255, 255, 255, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+      }
+      .input-capsule {
+        flex: 1;
+        background: #201a38;
+        border: 0.8px solid rgba(255, 255, 255, 0.12);
+        border-radius: 20px;
+        padding: 8px 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .input-placeholder {
+        font-size: 15px;
+        color: rgba(255, 255, 255, 0.4);
+      }
+      .send-circle-btn {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #8E2DE2 0%, #4A00E0 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+      }
+      .mic-btn {
+        color: rgba(255, 255, 255, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+      }
+    </style>
+  </head>
+  <body>
+    ${ICONS.statusBar("9:41")}
+    <div class="app-viewport">
+      <!-- Apple Messages Navigation Bar -->
+      <div class="nav-bar-chat">
+        <div class="nav-back-btn">
+          <svg width="10" height="18" viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 1L1 9l8 8"/></svg>
+        </div>
+        <div class="nav-peer-info">
+          <div class="nav-peer-avatar-wrap">
+            <img class="nav-peer-avatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80" />
+            <div class="nav-peer-online"></div>
+          </div>
+          <div class="nav-peer-text">
+            <div class="nav-peer-name">Hải Yến</div>
+            <div class="nav-peer-status">Đang trực tuyến</div>
+          </div>
+        </div>
+        <div class="nav-actions">
+          <div class="nav-circle-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-1.57 1.97c-2.83-1.44-5.15-3.75-6.59-6.59l1.97-1.57c.26-.26.35-.65.24-1.01A11.36 11.36 0 0 1 8.96 4.3a1 1 0 0 0-1-1H4.01a1 1 0 0 0-1 1C3.01 13.94 10.06 21 19.01 21a1 1 0 0 0 1-1v-3.62a1 1 0 0 0-1-1z"/></svg>
+          </div>
+          <div class="nav-circle-btn">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+          </div>
+          <div class="nav-circle-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Messages Stream -->
+      <div class="chat-messages-container">
+        <div class="chat-time-header">Hôm nay 09:32</div>
+
+        <!-- Incoming 1 -->
+        <div class="bubble-row incoming">
+          <div class="bubble-col incoming">
+            <div class="message-bubble incoming">
+              Chào anh! Giao diện nhắn tin Kinnect Build 122 nhìn xịn sò chuẩn Apple iMessage quá ạ! ✨
+            </div>
+            <div class="message-footer">
+              09:32 · <span style="cursor:pointer">❤️ Thích</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Outgoing 1 with Tapback reaction -->
+        <div class="bubble-row outgoing">
+          <div class="bubble-col outgoing">
+            <div class="tapback-badge outgoing">❤️</div>
+            <div class="message-bubble outgoing">
+              Chuẩn luôn em ơi! Đã làm lại đuôi bong bóng tin nhắn bất đối xứng, thanh công cụ iMessage và đồng bộ bạn bè online nhé 🚀
+            </div>
+            <div class="message-footer">
+              09:33 · <span class="seen-status">✓ Đã xem</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Incoming 2 -->
+        <div class="bubble-row incoming">
+          <div class="bubble-col incoming">
+            <div class="message-bubble incoming">
+              Dạ vâng, danh sách ngoại tuyến và trực tuyến hiển thị rất rõ ràng, icon trong tài khoản bo tròn squircle cũng tuyệt đẹp! 🎉
+            </div>
+            <div class="message-footer">
+              09:34
+            </div>
+          </div>
+        </div>
+
+        <!-- Outgoing 2 with sending animation -->
+        <div class="bubble-row outgoing">
+          <div class="bubble-col outgoing">
+            <div class="message-bubble outgoing">
+              Anh đang đẩy lên Git để GitHub Actions tự động build file IPA mới đây!
+            </div>
+            <div class="message-footer">
+              09:35 · <span class="seen-status">✓ Đã gửi</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Apple iMessage Input Bar -->
+      <div class="imessage-input-bar">
+        <div class="plus-btn">+</div>
+        <div class="camera-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c1.65 0 3-1.35 3-3s-1.35-3-3-3-3 1.35-3 3 1.35 3 3 3zm0 2c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm7-9h-3.17L14 3H10L8.17 5H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z"/></svg>
+        </div>
+        <div class="input-capsule">
+          <span class="input-placeholder">Tin nhắn…</span>
+          <div class="send-circle-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+          </div>
+        </div>
+        <div class="mic-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-2.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+        </div>
+      </div>
+    </div>
+    ${ICONS.homeIndicator}
+  </body>
+  </html>`;
+
+  await page.setContent(html);
+  await page.waitForTimeout(400);
+  const outPath = path.join(OUT_DIR, 'ios-simulator-chat.png');
+  await page.screenshot({ path: outPath });
+  const artPath = path.join(ARTIFACT_DIR, 'ios-simulator-chat.png');
+  fs.copyFileSync(outPath, artPath);
+  console.log('Saved chat screenshot to:', outPath);
+}
+
 async function renderOverviewShowcase(page) {
-  // Triple device side-by-side presentation
-  const OVERVIEW_WIDTH = 1280;
-  const OVERVIEW_HEIGHT = 920;
+  // Quad device side-by-side presentation
+  const OVERVIEW_WIDTH = 1580;
+  const OVERVIEW_HEIGHT = 880;
 
   const html = `<!DOCTYPE html>
   <html>
@@ -893,12 +1272,12 @@ async function renderOverviewShowcase(page) {
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 30px;
+        padding: 24px;
         overflow: hidden;
       }
       .title-section {
         text-align: center;
-        margin-bottom: 24px;
+        margin-bottom: 20px;
       }
       .main-title {
         font-size: 26px;
@@ -915,7 +1294,7 @@ async function renderOverviewShowcase(page) {
       }
       .devices-row {
         display: flex;
-        gap: 32px;
+        gap: 24px;
         align-items: center;
         justify-content: center;
       }
@@ -923,13 +1302,13 @@ async function renderOverviewShowcase(page) {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 12px;
+        gap: 10px;
       }
       .device-frame {
-        width: 360px;
-        height: 740px;
-        border-radius: 44px;
-        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), 0 0 0 10px #1a1924, 0 0 0 11px rgba(255, 255, 255, 0.15);
+        width: 320px;
+        height: 694px;
+        border-radius: 40px;
+        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), 0 0 0 9px #1a1924, 0 0 0 10px rgba(255, 255, 255, 0.15);
         overflow: hidden;
         position: relative;
         background: #000;
@@ -940,7 +1319,7 @@ async function renderOverviewShowcase(page) {
         object-fit: cover;
       }
       .card-caption {
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 600;
         color: rgba(255, 255, 255, 0.85);
         display: flex;
@@ -948,21 +1327,27 @@ async function renderOverviewShowcase(page) {
         gap: 6px;
       }
       .card-caption span {
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 500;
-        padding: 2px 8px;
+        padding: 2px 7px;
         background: rgba(168, 85, 247, 0.25);
         color: #C084FC;
-        border-radius: 12px;
+        border-radius: 10px;
       }
     </style>
   </head>
   <body>
     <div class="title-section">
       <div class="main-title">Kinnect iOS Native Parity — Build 122</div>
-      <div class="subtitle">Kiểm thử giao diện giả lập iPhone 16 Pro: Tài khoản Apple Settings · Cuộc gọi FaceTime PiP · Bạn bè Online/Offline</div>
+      <div class="subtitle">Kiểm thử giao diện giả lập iPhone 16 Pro: Nhắn tin Apple iMessage · Tài khoản Apple Settings · Cuộc gọi FaceTime PiP · Bạn bè Online/Offline</div>
     </div>
     <div class="devices-row">
+      <div class="device-card">
+        <div class="device-frame">
+          <img src="file:///${path.resolve(OUT_DIR, 'ios-simulator-chat.png').replace(/\\/g, '/')}" />
+        </div>
+        <div class="card-caption">Nhắn tin <span>iMessage & Tapback</span></div>
+      </div>
       <div class="device-card">
         <div class="device-frame">
           <img src="file:///${path.resolve(OUT_DIR, 'ios-simulator-account.png').replace(/\\/g, '/')}" />
@@ -973,7 +1358,7 @@ async function renderOverviewShowcase(page) {
         <div class="device-frame">
           <img src="file:///${path.resolve(OUT_DIR, 'ios-simulator-call.png').replace(/\\/g, '/')}" />
         </div>
-        <div class="card-caption">Cuộc gọi Video <span>FaceTime PiP & Floating Capsule</span></div>
+        <div class="card-caption">Cuộc gọi Video <span>FaceTime PiP & Floating</span></div>
       </div>
       <div class="device-card">
         <div class="device-frame">
@@ -1006,16 +1391,19 @@ async function main() {
   });
   const page = await context.newPage();
 
-  console.log('1. Rendering Account screen...');
+  console.log('1. Rendering Chat screen (Apple iMessage)...');
+  await renderChatScreen(page);
+
+  console.log('2. Rendering Account screen...');
   await renderAccountScreen(page);
 
-  console.log('2. Rendering Call screen...');
+  console.log('3. Rendering Call screen...');
   await renderCallScreen(page);
 
-  console.log('3. Rendering Friends screen...');
+  console.log('4. Rendering Friends screen...');
   await renderFriendsScreen(page);
 
-  console.log('4. Rendering Overview Showcase...');
+  console.log('5. Rendering Overview Showcase...');
   await renderOverviewShowcase(page);
 
   await browser.close();
