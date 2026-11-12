@@ -60,7 +60,7 @@ struct ReactionPicker: View {
 			for i in reactions.indices {
 				DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.03) {
 					withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
-						animatedIndices.insert(i)
+						_ = animatedIndices.insert(i)
 					}
 				}
 			}
@@ -162,7 +162,7 @@ struct ReactionSummary: View {
 				}
 
 				// Show "+N" if more reactions exist
-				let visibleCount = reactionOrder.prefix(maxVisible).compactMap { reactions[$0] }.count
+				let _ = reactionOrder.prefix(maxVisible).compactMap { reactions[$0] }.count
 				let totalCount = reactions.values.reduce(0, +)
 				let shownCount = reactionOrder.prefix(maxVisible).compactMap { reactions[$0] }.reduce(0, +)
 				if totalCount > shownCount {
