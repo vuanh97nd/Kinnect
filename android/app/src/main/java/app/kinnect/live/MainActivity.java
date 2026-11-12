@@ -77,9 +77,9 @@ public class MainActivity extends Activity {
     KinnectService.start(this);
     ensureCalls();
   }
-  private void ensureCalls(){if(me!=null&&!mediaCallListening){mediaCallListening=true;KinnectService.listen(mediaCallEvents);}if(KinnectService.pendingIncoming!=null){mediaCallGate.update("call-incoming",KinnectService.pendingIncoming.optString("callId"));mediaCallBlocked=mediaCallGate.blocked();pauseForCall();}if(me!=null&&calls==null){calls=new NativeCalls(this,server());setupBackground();}}
+  private void ensureCalls(){if(NativeApi.isFixtureEnabled())return;if(me!=null&&!mediaCallListening){mediaCallListening=true;KinnectService.listen(mediaCallEvents);}if(KinnectService.pendingIncoming!=null){mediaCallGate.update("call-incoming",KinnectService.pendingIncoming.optString("callId"));mediaCallBlocked=mediaCallGate.blocked();pauseForCall();}if(me!=null&&calls==null){calls=new NativeCalls(this,server());setupBackground();}}
   // Một lần: xin đủ quyền thông báo/cuộc gọi, cho phép toàn màn hình và chạy nền.
-  private void setupBackground(){if(Distribution.PLAY){if(Build.VERSION.SDK_INT>=33&&checkSelfPermission("android.permission.POST_NOTIFICATIONS")!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"},950);return;}android.content.SharedPreferences p=getSharedPreferences("native_setup",0);if(p.getBoolean("asked_v1",false)){backgroundExtras(false);return;}p.edit().putBoolean("asked_v1",true).apply();java.util.ArrayList<String> want=new java.util.ArrayList<>();if(Build.VERSION.SDK_INT>=33)want.add("android.permission.POST_NOTIFICATIONS");want.add(Manifest.permission.RECORD_AUDIO);want.add(Manifest.permission.CAMERA);if(Build.VERSION.SDK_INT>=31)want.add("android.permission.BLUETOOTH_CONNECT");java.util.ArrayList<String> missing=new java.util.ArrayList<>();for(String w:want)if(checkSelfPermission(w)!=PackageManager.PERMISSION_GRANTED)missing.add(w);if(missing.isEmpty())backgroundExtras(true);else requestPermissions(missing.toArray(new String[0]),950);}
+  private void setupBackground(){if(NativeApi.isFixtureEnabled())return;if(Distribution.PLAY){if(Build.VERSION.SDK_INT>=33&&checkSelfPermission("android.permission.POST_NOTIFICATIONS")!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"},950);return;}android.content.SharedPreferences p=getSharedPreferences("native_setup",0);if(p.getBoolean("asked_v1",false)){backgroundExtras(false);return;}p.edit().putBoolean("asked_v1",true).apply();java.util.ArrayList<String> want=new java.util.ArrayList<>();if(Build.VERSION.SDK_INT>=33)want.add("android.permission.POST_NOTIFICATIONS");want.add(Manifest.permission.RECORD_AUDIO);want.add(Manifest.permission.CAMERA);if(Build.VERSION.SDK_INT>=31)want.add("android.permission.BLUETOOTH_CONNECT");java.util.ArrayList<String> missing=new java.util.ArrayList<>();for(String w:want)if(checkSelfPermission(w)!=PackageManager.PERMISSION_GRANTED)missing.add(w);if(missing.isEmpty())backgroundExtras(true);else requestPermissions(missing.toArray(new String[0]),950);}
   private void backgroundExtras(boolean prompt){if(Distribution.PLAY)return;try{if(Build.VERSION.SDK_INT>=34&&!getSystemService(android.app.NotificationManager.class).canUseFullScreenIntent()){if(prompt)new Sheet(this).setTitle(I18n.t("Cuộc gọi toàn màn hình")).setMessage(I18n.t("Cho phép Kinnect hiện cuộc gọi đến toàn màn hình, kể cả khi khóa máy.")).setPositiveButton(I18n.t("Cho phép"),(d,w)->{try{startActivity(new Intent("android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT",android.net.Uri.parse("package:"+getPackageName())));}catch(RuntimeException ignored){}}).setNegativeButton(I18n.t("Để sau"),(d,w)->battery()).show();else battery();return;}}catch(RuntimeException ignored){}if(prompt)battery();}
   private void battery(){android.os.PowerManager pm=(android.os.PowerManager)getSystemService(POWER_SERVICE);if(pm!=null&&pm.isIgnoringBatteryOptimizations(getPackageName())){say(I18n.t("Đã cho phép chạy ngầm không giới hạn pin."));return;}try{startActivity(new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,android.net.Uri.parse("package:"+getPackageName())));}catch(RuntimeException ignored){}}
   private void openAutostartSettings(){String m=Build.MANUFACTURER.toLowerCase(java.util.Locale.ROOT);Intent i=new Intent();try{if(m.contains("xiaomi")||m.contains("redmi")||m.contains("poco")){i.setComponent(new ComponentName("com.miui.securitycenter","com.miui.permcenter.autostart.AutoStartManagementActivity"));}else if(m.contains("oppo")||m.contains("realme")){try{i.setComponent(new ComponentName("com.coloros.safecenter","com.coloros.safecenter.permission.startup.StartupAppListActivity"));}catch(Exception e){i.setComponent(new ComponentName("com.oppo.safe","com.oppo.safe.permission.startup.StartupAppListActivity"));}}else if(m.contains("vivo")){try{i.setComponent(new ComponentName("com.iqoo.secure","com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity"));}catch(Exception e){i.setComponent(new ComponentName("com.vivo.permissionmanager","com.vivo.permissionmanager.activity.BgStartUpManagerActivity"));}}else if(m.contains("huawei")||m.contains("honor")){i.setComponent(new ComponentName("com.huawei.systemmanager","com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"));}else if(m.contains("samsung")){i.setComponent(new ComponentName("com.samsung.android.lool","com.samsung.android.sm.battery.ui.BatteryActivity"));}else{i=new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:"+getPackageName()));}i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);startActivity(i);}catch(Exception fallback){try{startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:"+getPackageName())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));}catch(Exception ignored){}}}
@@ -335,14 +335,20 @@ public class MainActivity extends Activity {
     ImageView logo = new ImageView(this);
     logo.setImageResource(getResources().getIdentifier("kinnect_logo", "drawable", getPackageName()));
     logo.setElevation(dp(10));
-    c.addView(logo, new LinearLayout.LayoutParams(dp(96), dp(96)));
+    LinearLayout.LayoutParams logoLp = new LinearLayout.LayoutParams(dp(96), dp(96));
+    logoLp.gravity = Gravity.CENTER_HORIZONTAL;
+    c.addView(logo, logoLp);
     TextView name = label("Kinnect", 26, ACCENT);
     name.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
     name.setIncludeFontPadding(true);
+    name.setSingleLine(true);
+    name.setGravity(Gravity.CENTER);
     name.setPadding(dp(16), dp(18), dp(16), dp(18));
-    c.addView(name);
-    FrameLayout rings=new FrameLayout(this);for(int i=0;i<2;i++){View ring=new View(this);GradientDrawable outline=background(0x00000000,99);outline.setStroke(dp(2),i==0?ACCENT:PINK);ring.setBackground(outline);FrameLayout.LayoutParams rp=new FrameLayout.LayoutParams(dp(20),dp(20),Gravity.CENTER);rings.addView(ring,rp);ring.setTranslationX(dp(i==0?-16:16));ring.animate().translationX(dp(i==0?-5:5)).setDuration(400).start();}LinearLayout.LayoutParams space=new LinearLayout.LayoutParams(-1,dp(42));space.topMargin=dp(18);c.addView(rings,space);
-    s.addView(c, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
+    LinearLayout.LayoutParams nameLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+    nameLp.gravity = Gravity.CENTER_HORIZONTAL;
+    c.addView(name, nameLp);
+    FrameLayout rings=new FrameLayout(this);for(int i=0;i<2;i++){View ring=new View(this);GradientDrawable outline=background(0x00000000,99);outline.setStroke(dp(2),i==0?ACCENT:PINK);ring.setBackground(outline);FrameLayout.LayoutParams rp=new FrameLayout.LayoutParams(dp(20),dp(20),Gravity.CENTER);rings.addView(ring,rp);ring.setTranslationX(dp(i==0?-16:16));ring.animate().translationX(dp(i==0?-5:5)).setDuration(400).start();}LinearLayout.LayoutParams space=new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,dp(42));space.gravity=Gravity.CENTER_HORIZONTAL;space.topMargin=dp(18);c.addView(rings,space);
+    s.addView(c, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
     setContentView(s);
     getWindow().setStatusBarColor(BG);
     getWindow().setNavigationBarColor(BG);
@@ -4593,10 +4599,12 @@ public class MainActivity extends Activity {
     try{getSystemService(android.app.NotificationManager.class).cancel(KinnectService.ID_BG);}catch(RuntimeException ignored){}
     if(storeReturning&&me!=null){storeReturning=false;api.call("GET","/api/me",null,(data,error,status)->{if(error==null&&data!=null&&!isDestroyed()){JSONObject fresh=data.optJSONObject("user");boolean styleChanged=fresh!=null&&!fresh.optString("storeStyle").equals(me.optString("storeStyle"));if(fresh!=null)me=fresh;if(styleChanged)refreshPage();}});}
     KinnectService.appVisible = true;
-    notificationHandler.removeCallbacksAndMessages(null);
-    notificationHandler.post(notificationPoll);
-    ensureCalls();
-    if (calls != null) {calls.checkPending();if(root!=null)calls.attachReturn(root);}
+    if(!NativeApi.isFixtureEnabled()){
+      notificationHandler.removeCallbacksAndMessages(null);
+      notificationHandler.post(notificationPoll);
+      ensureCalls();
+      if (calls != null) {calls.checkPending();if(root!=null)calls.attachReturn(root);}
+    }
     for (VideoView video : resumeVideos) if (video.isAttachedToWindow()) if(!mediaCallBlocked)video.start();
     resumeVideos.clear();
     if (resumeStory != null) resumeStory.run();

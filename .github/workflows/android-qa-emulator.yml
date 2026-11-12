@@ -51,6 +51,9 @@ jobs:
           test -f dist/kinnect-live-debug.apk
           ls -lh dist/kinnect-live-debug.apk
 
+      - name: Install Python dependencies for UI validation
+        run: pip3 install pillow numpy
+
       - name: Run Android Emulator & Full Screen Capture
         uses: reactivecircus/android-emulator-runner@v2
         with:

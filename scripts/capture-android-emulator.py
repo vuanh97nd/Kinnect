@@ -34,6 +34,40 @@ def dismiss_system_dialogs():
     except Exception:
         pass
 
+def check_window_overlays():
+    """Check dumpsys window and UI dump for permission dialogs or ANR."""
+    try:
+        dump = adb("shell", "dumpsys", "window", "windows")
+        if "GrantPermissionsActivity" in dump or "permission_controller" in dump:
+            return "Permission dialog overlay obscuring viewport"
+        if "Application Not Responding" in dump or "is not responding" in dump:
+            return "ANR crash dialog overlay obscuring viewport"
+    except Exception:
+        pass
+    return None
+
+def validate_screen_visuals(scr_id, img_path):
+    """Validate visual sanity of captured image."""
+    try:
+        from PIL import Image
+        import numpy as np
+        img = Image.open(img_path)
+        bg = img.getpixel((0, 0))
+        arr = np.array(img)
+        diff = np.any(arr != bg, axis=-1)
+        
+        if scr_id == "SCR-01":
+            # Splash brand text in y: 1200..1350 must be wide enough for full 'Kinnect' (> 180px)
+            sub = diff[1200:1350, :]
+            cols = np.where(np.any(sub, axis=0))[0]
+            if len(cols) > 0:
+                width = cols[-1] - cols[0] + 1
+                if width < 180:
+                    return f"Brand text clipped (width={width}px < 180px, clipped to 'Kinn')"
+    except Exception as e:
+        print(f"[Warning] Visual validation helper: {e}")
+    return None
+
 def ensure_app_foreground(activity="MainActivity"):
     for _ in range(8):
         focus = adb("shell", "dumpsys", "window")
@@ -80,6 +114,18 @@ def main():
     subprocess.run(["adb", "install", "-r", apk], check=True)
     time.sleep(2)
     dismiss_system_dialogs()
+
+    print("[Permissions] Pre-granting test permissions in isolated emulator environment...")
+    for perm in [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO"
+    ]:
+        adb("shell", "pm", "grant", "app.kinnect.live", perm)
     
     if not INVENTORY_PATH.exists():
         print(f"[Error] Inventory not found at {INVENTORY_PATH}")
@@ -211,13 +257,26 @@ def main():
         sha = get_file_sha256(target_path)
         dup_of = seen_hashes.get(sha)
         
-        if dup_of:
+        overlay_err = check_window_overlays()
+        visual_err = validate_screen_visuals(scr_id, target_path)
+        
+        if overlay_err:
+            row["status"] = "blocked"
+            row["blocker_or_reason"] = overlay_err
+            print(f"[BLOCKED] {scr_id} ({img_file}): {overlay_err}")
+        elif visual_err:
+            row["status"] = "failed"
+            row["blocker_or_reason"] = visual_err
+            print(f"[FAILED] {scr_id} ({img_file}): {visual_err}")
+        elif dup_of:
             row["status"] = "duplicate_warning"
             row["blocker_or_reason"] = f"Identical SHA256 to {dup_of}"
+            print(f"[DUPLICATE] {scr_id} ({img_file}): identical to {dup_of}")
         else:
             seen_hashes[sha] = scr_id
             row["status"] = "captured"
             row["blocker_or_reason"] = "OK (ADB screencap verified)"
+            print(f"[CAPTURED] {scr_id} ({img_file}): sha={sha[:8]}... (verified clean UI)")
             
         captures.append({
             "screen_id": scr_id,
@@ -228,7 +287,6 @@ def main():
             "fontScale": font_scale,
             "status": row["status"]
         })
-        print(f"[{row['status'].upper()}] {scr_id} ({img_file}): sha={sha[:8]}...")
         
     # Reset device state
     adb("shell", "cmd", "uimode", "night", "no")
@@ -245,6 +303,7 @@ def main():
     # Write manifest
     captured_count = sum(1 for c in captures if c["status"] == "captured")
     dup_count = sum(1 for c in captures if c["status"] == "duplicate_warning")
+    failed_count = sum(1 for c in captures if c["status"] in ("failed", "blocked"))
     
     manifest = {
         "platform": "android",
@@ -260,7 +319,8 @@ def main():
         "stats": {
             "totalScreens": len(rows),
             "captured": captured_count,
-            "duplicateWarnings": dup_count
+            "duplicateWarnings": dup_count,
+            "failedOrBlocked": failed_count
         },
         "captures": captures
     }
@@ -268,7 +328,10 @@ def main():
     with open(MANIFEST_PATH, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2, ensure_ascii=False)
         
-    print(f"\n[Summary] Captured {captured_count}/{len(rows)} screens. Duplicates: {dup_count}. Manifest: {MANIFEST_PATH}")
+    print(f"\n[Summary] Captured {captured_count}/{len(rows)} screens. Duplicates: {dup_count}. Failed/Blocked: {failed_count}. Manifest: {MANIFEST_PATH}")
+    if failed_count > 0 or dup_count > 0:
+        print(f"[Error] Quality gate rejected: {failed_count} failed/blocked screens, {dup_count} duplicates.")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
