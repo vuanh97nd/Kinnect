@@ -871,6 +871,462 @@ async function renderFriendsScreen(page) {
   console.log('Saved friends screenshot to:', outPath);
 }
 
+async function renderMessagesInboxScreen(page) {
+  const html = `<!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=${IPHONE_WIDTH}, initial-scale=1.0">
+    <title>Kinnect Messages Inbox</title>
+    <style>
+      ${COMMON_CSS}
+      .app-viewport {
+        width: 100%;
+        height: 100%;
+        background: #0d0a1c;
+        display: flex;
+        flex-direction: column;
+        padding-top: 54px;
+        padding-bottom: 34px;
+        overflow: hidden;
+      }
+      /* iOS Messages Large Title Header */
+      .messages-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 16px 8px 16px;
+      }
+      .messages-large-title {
+        font-size: 30px;
+        font-weight: 800;
+        letter-spacing: -0.6px;
+        color: #fff;
+      }
+      .compose-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: #201a38;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #C084FC;
+        cursor: pointer;
+      }
+
+      /* Search Bar */
+      .search-container {
+        padding: 0 16px 8px 16px;
+      }
+      .search-box-native {
+        height: 36px;
+        background: #1c1634;
+        border-radius: 11px;
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        gap: 8px;
+        font-size: 15px;
+        color: rgba(255, 255, 255, 0.4);
+      }
+
+      /* Segmented Picker */
+      .segmented-container {
+        padding: 0 16px 8px 16px;
+      }
+      .segmented-control {
+        height: 32px;
+        background: #18122c;
+        border-radius: 9px;
+        display: flex;
+        padding: 2px;
+        gap: 2px;
+      }
+      .seg-button {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        font-weight: 500;
+        border-radius: 7px;
+        color: rgba(255, 255, 255, 0.6);
+        cursor: pointer;
+      }
+      .seg-button.active {
+        background: #2c224c;
+        color: #fff;
+        font-weight: 600;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+      }
+
+      /* Filter Capsules */
+      .filter-capsules-row {
+        display: flex;
+        gap: 8px;
+        padding: 0 16px 8px 16px;
+      }
+      .filter-pill {
+        padding: 5px 14px;
+        border-radius: 14px;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .filter-pill.active {
+        background: linear-gradient(135deg, #8E2DE2 0%, #4A00E0 100%);
+        color: #fff;
+        font-weight: 600;
+      }
+      .filter-pill.inactive {
+        background: #1e1834;
+        color: rgba(255, 255, 255, 0.6);
+        font-weight: 500;
+      }
+
+      /* Continuous Message Rows */
+      .inbox-scroll {
+        flex: 1;
+        overflow-y: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      .conv-row {
+        display: flex;
+        align-items: center;
+        padding: 10px 16px;
+        gap: 14px;
+        cursor: pointer;
+      }
+      .conv-avatar-wrap {
+        position: relative;
+        width: 52px;
+        height: 52px;
+        flex-shrink: 0;
+      }
+      .conv-avatar {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        object-fit: cover;
+      }
+      .conv-online-dot {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        background: #2E9E66;
+        border: 2.5px solid #0d0a1c;
+      }
+      .conv-details {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+      }
+      .conv-top-line {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+      }
+      .conv-sender-name {
+        font-size: 16px;
+        color: #fff;
+      }
+      .conv-sender-name.unread {
+        font-weight: 700;
+      }
+      .conv-sender-name.read {
+        font-weight: 600;
+      }
+      .conv-timestamp {
+        font-size: 13px;
+      }
+      .conv-timestamp.unread {
+        color: #C084FC;
+        font-weight: 600;
+      }
+      .conv-timestamp.read {
+        color: rgba(255, 255, 255, 0.4);
+        font-weight: 400;
+      }
+      .conv-bottom-line {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .conv-preview {
+        font-size: 14px;
+        line-height: 1.35;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+      .conv-preview.unread {
+        color: #fff;
+        font-weight: 500;
+      }
+      .conv-preview.read {
+        color: rgba(255, 255, 255, 0.55);
+        font-weight: 400;
+      }
+      .unread-badge-pill {
+        background: linear-gradient(135deg, #8E2DE2 0%, #4A00E0 100%);
+        color: #fff;
+        font-size: 12px;
+        font-weight: 700;
+        padding: 2px 7px;
+        border-radius: 10px;
+        min-width: 18px;
+        height: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        margin-top: 2px;
+      }
+      .inset-divider {
+        height: 0.8px;
+        background: rgba(255, 255, 255, 0.08);
+        margin-left: 82px;
+      }
+
+      /* Native Bottom Tab Bar */
+      .bottom-tab-bar {
+        height: 60px;
+        background: #141026;
+        border-top: 0.8px solid rgba(255, 255, 255, 0.08);
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        padding: 0 4px;
+      }
+      .tab-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 10px;
+        font-weight: 500;
+        position: relative;
+        cursor: pointer;
+      }
+      .tab-item.active {
+        color: #C084FC;
+      }
+      .tab-fab-center {
+        width: 44px;
+        height: 38px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #7B43F7 0%, #ED45AA 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        box-shadow: 0 4px 12px rgba(123, 67, 247, 0.4);
+      }
+      .tab-badge {
+        position: absolute;
+        top: -3px;
+        right: 10px;
+        background: #EF4444;
+        color: #fff;
+        font-size: 10px;
+        font-weight: 700;
+        border-radius: 8px;
+        padding: 1px 4px;
+      }
+    </style>
+  </head>
+  <body>
+    ${ICONS.statusBar("9:41")}
+    <div class="app-viewport">
+      <!-- iOS Messages Header -->
+      <div class="messages-header">
+        <div class="messages-large-title">Tin nhắn</div>
+        <div class="compose-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Search Bar -->
+      <div class="search-container">
+        <div class="search-box-native">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          Tìm cuộc trò chuyện…
+        </div>
+      </div>
+
+      <!-- Segmented Control [Trực tiếp | Nhóm] -->
+      <div class="segmented-container">
+        <div class="segmented-control">
+          <div class="seg-button active">Trực tiếp</div>
+          <div class="seg-button">Nhóm</div>
+        </div>
+      </div>
+
+      <!-- Filters: [Tất cả | Chưa đọc] -->
+      <div class="filter-capsules-row">
+        <div class="filter-pill active">Tất cả</div>
+        <div class="filter-pill inactive">Chưa đọc (2)</div>
+      </div>
+
+      <!-- Continuous Flowing List (82pt Inset Hairline Dividers) -->
+      <div class="inbox-scroll">
+        <!-- Row 1: Hương Ly (Unread 1) -->
+        <div class="conv-row">
+          <div class="conv-avatar-wrap">
+            <img class="conv-avatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80" />
+            <div class="conv-online-dot"></div>
+          </div>
+          <div class="conv-details">
+            <div class="conv-top-line">
+              <div class="conv-sender-name unread">Hương Ly</div>
+              <div class="conv-timestamp unread">09:34</div>
+            </div>
+            <div class="conv-bottom-line">
+              <div class="conv-preview unread">Chào anh! Giao diện nhắn tin Kinnect Build 122 nhìn xịn sò chuẩn Apple iMessage quá ạ! ✨</div>
+              <div class="unread-badge-pill">1</div>
+            </div>
+          </div>
+        </div>
+        <div class="inset-divider"></div>
+
+        <!-- Row 2: Minh Hoàng (Unread 2) -->
+        <div class="conv-row">
+          <div class="conv-avatar-wrap">
+            <img class="conv-avatar" src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=150&q=80" />
+            <div class="conv-online-dot"></div>
+          </div>
+          <div class="conv-details">
+            <div class="conv-top-line">
+              <div class="conv-sender-name unread">Minh Hoàng</div>
+              <div class="conv-timestamp unread">08:15</div>
+            </div>
+            <div class="conv-bottom-line">
+              <div class="conv-preview unread">Em vừa gửi bộ khung avatar phong cách Neon cho shop rồi đó anh.</div>
+              <div class="unread-badge-pill">2</div>
+            </div>
+          </div>
+        </div>
+        <div class="inset-divider"></div>
+
+        <!-- Row 3: Hải Yến (Read) -->
+        <div class="conv-row">
+          <div class="conv-avatar-wrap">
+            <img class="conv-avatar" src="https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=150&q=80" />
+            <div class="conv-online-dot"></div>
+          </div>
+          <div class="conv-details">
+            <div class="conv-top-line">
+              <div class="conv-sender-name read">Hải Yến</div>
+              <div class="conv-timestamp read">Hôm qua</div>
+            </div>
+            <div class="conv-bottom-line">
+              <div class="conv-preview read">Dạ vâng anh, danh sách trực tuyến và ngoại tuyến hiển thị siêu rõ.</div>
+            </div>
+          </div>
+        </div>
+        <div class="inset-divider"></div>
+
+        <!-- Row 4: Thu Trang (Read, Offline) -->
+        <div class="conv-row">
+          <div class="conv-avatar-wrap">
+            <img class="conv-avatar" src="https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=150&q=80" />
+          </div>
+          <div class="conv-details">
+            <div class="conv-top-line">
+              <div class="conv-sender-name read">Thu Trang</div>
+              <div class="conv-timestamp read">Th 3</div>
+            </div>
+            <div class="conv-bottom-line">
+              <div class="conv-preview read">Hẹn gặp mọi người vào buổi offline nhóm cuối tuần này nha! 👋</div>
+            </div>
+          </div>
+        </div>
+        <div class="inset-divider"></div>
+
+        <!-- Row 5: Quốc Đạt (Read, Offline) -->
+        <div class="conv-row">
+          <div class="conv-avatar-wrap">
+            <img class="conv-avatar" src="https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=150&q=80" />
+          </div>
+          <div class="conv-details">
+            <div class="conv-top-line">
+              <div class="conv-sender-name read">Quốc Đạt</div>
+              <div class="conv-timestamp read">05/11</div>
+            </div>
+            <div class="conv-bottom-line">
+              <div class="conv-preview read">Anh duyệt giúp em cấu hình âm thanh quà tặng Luxury nhé.</div>
+            </div>
+          </div>
+        </div>
+        <div class="inset-divider"></div>
+
+        <!-- Row 6: Lan Phương (Read, Online) -->
+        <div class="conv-row">
+          <div class="conv-avatar-wrap">
+            <img class="conv-avatar" src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80" />
+            <div class="conv-online-dot"></div>
+          </div>
+          <div class="conv-details">
+            <div class="conv-top-line">
+              <div class="conv-sender-name read">Lan Phương</div>
+              <div class="conv-timestamp read">01/11</div>
+            </div>
+            <div class="conv-bottom-line">
+              <div class="conv-preview read">Cảm ơn anh nhiều ạ! Em đã nhận được gói quà tặng rồi ✨</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Tab Bar -->
+      <div class="bottom-tab-bar">
+        <div class="tab-item">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+          <span>Bảng tin</span>
+        </div>
+        <div class="tab-item">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14.93V15c0-.55-.45-1-1-1s-1 .45-1 1v1.93C7.05 16.44 3.56 12.95 3.07 9H5c.55 0 1-.45 1-1s-.45-1-1-1H3.07C3.56 5.05 7.05 1.56 11 1.07V3c0 .55.45 1 1 1s1-.45 1-1V1.07c3.95.49 7.44 3.98 7.93 7.93H19c-.55 0-1 .45-1 1s.45 1 1 1h1.93c-.49 3.95-3.98 7.44-7.93 7.93z"/></svg>
+          <span>Khám phá</span>
+        </div>
+        <div class="tab-fab-center">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        </div>
+        <div class="tab-item">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8 12.5v-9l6 4.5-6 4.5z"/></svg>
+          <span>Video</span>
+        </div>
+        <div class="tab-item active">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+          <span>Tin nhắn</span>
+          <div class="tab-badge">3</div>
+        </div>
+      </div>
+    </div>
+    ${ICONS.homeIndicator}
+  </body>
+  </html>`;
+
+  await page.setContent(html);
+  await page.waitForTimeout(400);
+  const outPath = path.join(OUT_DIR, 'ios-simulator-messages-inbox.png');
+  await page.screenshot({ path: outPath });
+  const artPath = path.join(ARTIFACT_DIR, 'ios-simulator-messages-inbox.png');
+  fs.copyFileSync(outPath, artPath);
+  console.log('Saved messages inbox screenshot to:', outPath);
+}
+
 async function renderChatScreen(page) {
   const html = `<!DOCTYPE html>
   <html>
@@ -1251,8 +1707,8 @@ async function renderChatScreen(page) {
 }
 
 async function renderOverviewShowcase(page) {
-  // Quad device side-by-side presentation
-  const OVERVIEW_WIDTH = 1580;
+  // 5-device side-by-side presentation
+  const OVERVIEW_WIDTH = 1920;
   const OVERVIEW_HEIGHT = 880;
 
   const html = `<!DOCTYPE html>
@@ -1294,7 +1750,7 @@ async function renderOverviewShowcase(page) {
       }
       .devices-row {
         display: flex;
-        gap: 24px;
+        gap: 20px;
         align-items: center;
         justify-content: center;
       }
@@ -1305,8 +1761,8 @@ async function renderOverviewShowcase(page) {
         gap: 10px;
       }
       .device-frame {
-        width: 320px;
-        height: 694px;
+        width: 310px;
+        height: 672px;
         border-radius: 40px;
         box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), 0 0 0 9px #1a1924, 0 0 0 10px rgba(255, 255, 255, 0.15);
         overflow: hidden;
@@ -1339,32 +1795,38 @@ async function renderOverviewShowcase(page) {
   <body>
     <div class="title-section">
       <div class="main-title">Kinnect iOS Native Parity — Build 122</div>
-      <div class="subtitle">Kiểm thử giao diện giả lập iPhone 16 Pro: Nhắn tin Apple iMessage · Tài khoản Apple Settings · Cuộc gọi FaceTime PiP · Bạn bè Online/Offline</div>
+      <div class="subtitle">Kiểm thử giao diện giả lập iPhone 16 Pro: Danh sách Hộp thư · Nhắn tin Apple iMessage · Cài đặt Tài khoản · FaceTime PiP · Bạn bè Online/Offline</div>
     </div>
     <div class="devices-row">
       <div class="device-card">
         <div class="device-frame">
+          <img src="file:///${path.resolve(OUT_DIR, 'ios-simulator-messages-inbox.png').replace(/\\/g, '/')}" />
+        </div>
+        <div class="card-caption">Danh sách Tin nhắn <span>iOS Inset Dividers</span></div>
+      </div>
+      <div class="device-card">
+        <div class="device-frame">
           <img src="file:///${path.resolve(OUT_DIR, 'ios-simulator-chat.png').replace(/\\/g, '/')}" />
         </div>
-        <div class="card-caption">Nhắn tin <span>iMessage & Tapback</span></div>
+        <div class="card-caption">Nhắn tin Trò chuyện <span>iMessage & Tapback</span></div>
       </div>
       <div class="device-card">
         <div class="device-frame">
           <img src="file:///${path.resolve(OUT_DIR, 'ios-simulator-account.png').replace(/\\/g, '/')}" />
         </div>
-        <div class="card-caption">Mục Tài khoản <span>Apple Settings Squircle</span></div>
+        <div class="card-caption">Mục Tài khoản <span>Settings Squircles</span></div>
       </div>
       <div class="device-card">
         <div class="device-frame">
           <img src="file:///${path.resolve(OUT_DIR, 'ios-simulator-call.png').replace(/\\/g, '/')}" />
         </div>
-        <div class="card-caption">Cuộc gọi Video <span>FaceTime PiP & Floating</span></div>
+        <div class="card-caption">Cuộc gọi Video <span>FaceTime PiP</span></div>
       </div>
       <div class="device-card">
         <div class="device-frame">
           <img src="file:///${path.resolve(OUT_DIR, 'ios-simulator-friends.png').replace(/\\/g, '/')}" />
         </div>
-        <div class="card-caption">Danh sách Bạn bè <span>Trực tuyến & Ngoại tuyến</span></div>
+        <div class="card-caption">Danh sách Bạn bè <span>Online & Offline</span></div>
       </div>
     </div>
   </body>
@@ -1391,19 +1853,22 @@ async function main() {
   });
   const page = await context.newPage();
 
-  console.log('1. Rendering Chat screen (Apple iMessage)...');
+  console.log('1. Rendering Messages Inbox screen (iOS Native List)...');
+  await renderMessagesInboxScreen(page);
+
+  console.log('2. Rendering Chat screen (Apple iMessage)...');
   await renderChatScreen(page);
 
-  console.log('2. Rendering Account screen...');
+  console.log('3. Rendering Account screen...');
   await renderAccountScreen(page);
 
-  console.log('3. Rendering Call screen...');
+  console.log('4. Rendering Call screen...');
   await renderCallScreen(page);
 
-  console.log('4. Rendering Friends screen...');
+  console.log('5. Rendering Friends screen...');
   await renderFriendsScreen(page);
 
-  console.log('5. Rendering Overview Showcase...');
+  console.log('6. Rendering Overview Showcase...');
   await renderOverviewShowcase(page);
 
   await browser.close();
