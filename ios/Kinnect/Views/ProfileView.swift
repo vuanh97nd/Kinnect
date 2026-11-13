@@ -3108,7 +3108,8 @@ final class VideoThumbnailLoader: ObservableObject {
     private var task: Task<Void, Never>? = nil
 
     func load(urlString: String) {
-        guard let url = URL(string: KinnectAPIClient.shared.absoluteURL(urlString)) else { return }
+        let origin = KinnectAPIClient.shared.mediaOrigin
+        guard let url = ServerConfig.url(for: urlString, origin: origin) else { return }
         let key = "\(KinnectAPIClient.shared.currentAccountId):\(url.absoluteString)" as NSString
         if let cached = Self.cache.object(forKey: key) {
             self.image = cached
@@ -3116,9 +3117,8 @@ final class VideoThumbnailLoader: ObservableObject {
         }
 
         task?.cancel()
-        let origin = KinnectAPIClient.shared.mediaOrigin
         let cookie = KeychainStore.shared.cookieJarHeader(for: origin)
-        let headers = url.host == URL(string: origin)?.host && !cookie.isEmpty ? ["Cookie": cookie] : [:]
+        let headers = ServerConfig.matchesOrigin(url, origin: origin) && !cookie.isEmpty ? ["Cookie": cookie] : [:]
         task = Task.detached(priority: .userInitiated) {
             let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
             let generator = AVAssetImageGenerator(asset: asset)

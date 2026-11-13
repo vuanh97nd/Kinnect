@@ -868,6 +868,7 @@ struct AdminConsoleView: View {
     @State private var showEconomyEditor = false
     @State private var showMusicManager = false
     @State private var showAISettings = false
+    @State private var showAdminOperations = false
 
     private var allowed: Bool {
         #if DEBUG
@@ -983,6 +984,11 @@ struct AdminConsoleView: View {
                             }
                         }
                     }
+                    Section("Hoạt động quản trị") {
+                        Button("Tổng quan, lịch sử & khôi phục mật khẩu") {
+                            showAdminOperations = true
+                        }
+                    }
                 }
             } else {
                 Text("Chỉ quản trị viên được vào bảng quản trị.")
@@ -1022,6 +1028,9 @@ struct AdminConsoleView: View {
                     onSaved: { Task { await reload() } }
                 )
             }
+        }
+        .sheet(isPresented: $showAdminOperations) {
+            AdminOperationsView()
         }
     }
 

@@ -1,4 +1,41 @@
 import Foundation
+import CryptoKit
+
+/// URLSession may follow media redirects; never carry app credentials to another origin.
+final class KinnectRedirectPolicy: NSObject, URLSessionTaskDelegate {
+    private let allowCrossOriginMediaRedirects: Bool
+
+    init(allowCrossOriginMediaRedirects: Bool = false) {
+        self.allowCrossOriginMediaRedirects = allowCrossOriginMediaRedirects
+        super.init()
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+                    willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest,
+                    completionHandler: @escaping (URLRequest?) -> Void) {
+        guard let destination = request.url,
+              destination.scheme?.lowercased() == "https",
+              destination.user == nil, destination.password == nil else {
+            completionHandler(nil)
+            return
+        }
+        var sanitized = request
+        guard let source = response.url else { completionHandler(nil); return }
+        if !ServerConfig.matchesOrigin(destination, origin: source.absoluteString) {
+            // JSON writes can carry passwords/secrets in the body: never forward them.
+            guard allowCrossOriginMediaRedirects,
+                  ["GET", "HEAD"].contains(request.httpMethod ?? "GET") else {
+                completionHandler(nil)
+                return
+            }
+            sanitized.setValue(nil, forHTTPHeaderField: "Cookie")
+            sanitized.setValue(nil, forHTTPHeaderField: "Authorization")
+            sanitized.setValue(nil, forHTTPHeaderField: "Origin")
+        }
+        completionHandler(sanitized)
+    }
+}
 
 enum KinnectAPIError: LocalizedError {
     case invalidURL
@@ -29,6 +66,7 @@ final class KinnectAPIClient {
     static let shared = KinnectAPIClient()
 
     private let session: URLSession
+    private let mediaSession: URLSession
     private var activeOrigin: String = ServerConfig.currentOrigin
 
     private init() {
@@ -36,7 +74,9 @@ final class KinnectAPIClient {
         config.timeoutIntervalForRequest = 18
         config.timeoutIntervalForResource = 45
         config.httpShouldSetCookies = false
-        self.session = URLSession(configuration: config)
+        self.session = URLSession(configuration: config, delegate: KinnectRedirectPolicy(), delegateQueue: nil)
+        self.mediaSession = URLSession(configuration: config,
+            delegate: KinnectRedirectPolicy(allowCrossOriginMediaRedirects: true), delegateQueue: nil)
     }
 
     var currentAccountId: String {
@@ -168,7 +208,7 @@ final class KinnectAPIClient {
         body: [String: Any]?,
         allowPrivacyAutoRetry: Bool
     ) async throws -> [String: Any] {
-        guard let url = ServerConfig.url(for: path, origin: origin) else {
+        guard let url = ServerConfig.url(for: path, origin: origin), ServerConfig.matchesOrigin(url, origin: origin) else {
             throw KinnectAPIError.invalidURL
         }
 
@@ -191,6 +231,9 @@ final class KinnectAPIClient {
         let (data, response) = try await session.data(for: req)
         guard let http = response as? HTTPURLResponse else {
             throw KinnectAPIError.networkError("Phản hồi máy chủ không hợp lệ.")
+        }
+        guard let responseURL = http.url, ServerConfig.matchesOrigin(responseURL, origin: origin) else {
+            throw KinnectAPIError.invalidURL
         }
 
         KeychainStore.shared.ingestResponseHeaderFields(http.allHeaderFields, responseURL: url, origin: origin)
@@ -241,24 +284,25 @@ final class KinnectAPIClient {
             return Data(base64Encoded: b64)
         }
         let uid = currentAccountId
+        let origin = activeOrigin
         let cacheKey = "bin:\(path)"
-        if !uid.isEmpty, let cached = AccountCache.shared.load(forKey: cacheKey, maxAge: maxAge, origin: activeOrigin, accountId: uid) {
+        if !uid.isEmpty, let cached = AccountCache.shared.load(forKey: cacheKey, maxAge: maxAge, origin: origin, accountId: uid) {
             return cached
         }
-        guard let url = ServerConfig.url(for: path, origin: activeOrigin) else { return nil }
+        guard let url = ServerConfig.url(for: path, origin: origin) else { return nil }
         var req = URLRequest(url: url)
-        let cookieHeader = KeychainStore.shared.cookieJarHeader(for: activeOrigin)
-        if !cookieHeader.isEmpty {
+        let cookieHeader = KeychainStore.shared.cookieJarHeader(for: origin)
+        if !cookieHeader.isEmpty, ServerConfig.matchesOrigin(url, origin: origin) {
             req.setValue(cookieHeader, forHTTPHeaderField: "Cookie")
         }
-        guard let (data, resp) = try? await session.data(for: req),
+        guard let (data, resp) = try? await mediaSession.data(for: req),
               let http = resp as? HTTPURLResponse,
               http.statusCode == 200,
-              !data.isEmpty else {
+              !data.isEmpty, currentAccountId == uid, activeOrigin == origin else {
             return nil
         }
         if !uid.isEmpty {
-            AccountCache.shared.store(data, forKey: cacheKey, origin: activeOrigin, accountId: uid)
+            AccountCache.shared.store(data, forKey: cacheKey, origin: origin, accountId: uid)
         }
         return data
     }
@@ -267,18 +311,43 @@ final class KinnectAPIClient {
         _ = try? await request(method: "POST", path: "/api/logout", body: [:], isIdempotent: true, allowPrivacyAutoRetry: false)
         KeychainStore.shared.clearAll()
         AccountCache.shared.wipeAllCaches()
+        KinnectAuthenticatedFile.wipe()
     }
 }
 
 enum KinnectAuthenticatedFile {
+    private static var cacheDirectory: URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("kinnect_authenticated_media", isDirectory: true)
+    }
+
+    static func wipe() {
+        try? FileManager.default.removeItem(at: cacheDirectory)
+    }
+
+    static func cacheURL(
+        path: String,
+        fileExtension: String,
+        origin: String = KinnectAPIClient.shared.mediaOrigin,
+        accountId: String = KinnectAPIClient.shared.currentAccountId
+    ) throws -> URL {
+        let safeExt = fileExtension.trimmingCharacters(in: CharacterSet(charactersIn: ".")).lowercased()
+        let cleanExt = safeExt.isEmpty ? "mp4" : safeExt
+        guard cleanExt.count <= 8, cleanExt.unicodeScalars.allSatisfy({ CharacterSet.alphanumerics.contains($0) }) else {
+            throw KinnectAPIError.invalidURL
+        }
+        let identity = try JSONSerialization.data(withJSONObject: [origin, accountId, path])
+        let safeKey = SHA256.hash(data: identity).map { String(format: "%02x", $0) }.joined() + ".\(cleanExt)"
+        return cacheDirectory.appendingPathComponent(safeKey)
+    }
+
     static func fetch(path: String, fileExtension: String) async throws -> URL {
         if path.hasPrefix("file://"), let url = URL(string: path) {
             return url
         }
-        let safeExt = fileExtension.trimmingCharacters(in: CharacterSet(charactersIn: ".")).lowercased()
-        let cleanExt = safeExt.isEmpty ? "mp4" : safeExt
-        let safeKey = "media_" + path.replacingOccurrences(of: "[^a-zA-Z0-9_-]", with: "_", options: .regularExpression).prefix(64) + ".\(cleanExt)"
-        let destination = FileManager.default.temporaryDirectory.appendingPathComponent(safeKey)
+        let origin = KinnectAPIClient.shared.mediaOrigin
+        let accountId = KinnectAPIClient.shared.currentAccountId
+        let destination = try cacheURL(path: path, fileExtension: fileExtension, origin: origin, accountId: accountId)
+        try FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
 
         if FileManager.default.fileExists(atPath: destination.path),
            let attrs = try? FileManager.default.attributesOfItem(atPath: destination.path),
@@ -286,20 +355,32 @@ enum KinnectAuthenticatedFile {
             return destination
         }
 
-        let origin = KinnectAPIClient.shared.mediaOrigin
         guard let remote = ServerConfig.url(for: path, origin: origin) else {
             throw KinnectAPIError.invalidURL
         }
         var request = URLRequest(url: remote)
-        request.setValue(origin, forHTTPHeaderField: "Origin")
+        if ServerConfig.matchesOrigin(remote, origin: origin) {
+            request.setValue(origin, forHTTPHeaderField: "Origin")
+        }
         request.setValue("KinnectiOS/\(ServerConfig.appVersion) (Build \(ServerConfig.buildNumber))", forHTTPHeaderField: "User-Agent")
         let cookie = KeychainStore.shared.cookieJarHeader(for: origin)
-        if !cookie.isEmpty {
+        if !cookie.isEmpty, ServerConfig.matchesOrigin(remote, origin: origin) {
             request.setValue(cookie, forHTTPHeaderField: "Cookie")
         }
-        let (temporary, response) = try await URLSession.shared.download(for: request)
+        let config = URLSessionConfiguration.ephemeral
+        config.httpShouldSetCookies = false
+        let session = URLSession(configuration: config,
+            delegate: KinnectRedirectPolicy(allowCrossOriginMediaRedirects: true), delegateQueue: nil)
+        defer { session.finishTasksAndInvalidate() }
+        let (temporary, response) = try await session.download(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw KinnectAPIError.networkError("Không tải được media (mã \((response as? HTTPURLResponse)?.statusCode ?? 0)).")
+        }
+        // Do not install an in-flight old account's download after logout/account switching.
+        guard KinnectAPIClient.shared.currentAccountId == accountId,
+              KinnectAPIClient.shared.mediaOrigin == origin else {
+            try? FileManager.default.removeItem(at: temporary)
+            throw KinnectAPIError.networkError("Phiên đăng nhập đã thay đổi. Hãy mở lại media.")
         }
         if FileManager.default.fileExists(atPath: destination.path) {
             try? FileManager.default.removeItem(at: destination)

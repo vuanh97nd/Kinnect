@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { createApp } from "../server.js";
 
 test("native wallet/store responses, inventory, and retry-safe consumable purchases", async () => {
@@ -89,4 +90,29 @@ test("native x2/x50 gift quantities reach wallet debit and broadcast unchanged",
       time += 1300;
     }
   } finally { db.close(); }
+});
+
+test("iOS Release boundary guards UIReviewFixture, ShortsVideoView and LiveStreamView", () => {
+  const fixtureSrc = readFileSync(new URL("../ios/Kinnect/Core/UIReviewFixture.swift", import.meta.url), "utf8");
+  const shortsSrc = readFileSync(new URL("../ios/Kinnect/Views/ShortsVideoView.swift", import.meta.url), "utf8");
+  const liveSrc = readFileSync(new URL("../ios/Kinnect/Views/LiveStreamView.swift", import.meta.url), "utf8");
+  assert.match(fixtureSrc, /static var activeScreen: String\? \{\s*#if DEBUG[\s\S]*?#else\s*return nil\s*#endif\s*\}/);
+  assert.match(fixtureSrc, /static var isEnabled: Bool \{\s*#if DEBUG\s*return activeScreen != nil\s*#else\s*return false\s*#endif\s*\}/);
+  assert.match(fixtureSrc, /static var forceLightMode: Bool \{\s*#if DEBUG/);
+  assert.match(fixtureSrc, /static var forceMaxDynamicType: Bool \{\s*#if DEBUG/);
+  assert.match(fixtureSrc, /static func writeDocument\([^)]+\) \{\s*#if DEBUG\s*guard isEnabled,/);
+  assert.match(fixtureSrc, /static func samplePlayableVideoURL\(\) -> URL\? \{\s*#if DEBUG\s*guard isEnabled else \{ return nil \}/);
+  assert.match(fixtureSrc, /static func sampleSecondPlayableVideoURL\(\) -> URL\? \{\s*#if DEBUG\s*guard isEnabled else \{ return nil \}/);
+  assert.match(fixtureSrc, /private static func makeSampleVideoURL\([^)]+\) -> URL\? \{\s*#if DEBUG\s*guard isEnabled else \{ return nil \}/);
+  assert.match(shortsSrc, /guard let remoteURL = ServerConfig\.url\(for: path, origin: origin\) else \{\s*#if DEBUG\s*if UIReviewFixture\.isEnabled, let fixtureURL = UIReviewFixture\.samplePlayableVideoURL\(\)/);
+  assert.match(shortsSrc, /failed = true\s*loading = false/);
+  assert.doesNotMatch(liveSrc, /welcome-feed-demo\.mp4/);
+  assert.match(liveSrc, /else if UIReviewFixture\.isEnabled[\s\S]*?UIReviewFixture\.samplePlayableVideoURL\(\)/);
+  assert.match(liveSrc, /appState\.currentLiveRoom\?\.id == room\.id, appState\.isCurrentLiveHost, let localTrack/);
+  assert.match(liveSrc, /appState\.currentLiveRoom\?\.id == room\.id, let remoteTrack/);
+  assert.match(liveSrc, /guard let list = res\["rooms"\] as\? \[\[String: Any\]\] else/);
+  const adminOpsSrc = readFileSync(new URL("../ios/Kinnect/Views/AdminOperationsView.swift", import.meta.url), "utf8");
+  assert.match(adminOpsSrc, /canPresentTemporarySecret\(/);
+  assert.match(adminOpsSrc, /UIApplication\.shared\.applicationState == \.active/);
+  assert.match(adminOpsSrc, /guard accountId == activeAccountId, role == "admin" else/);
 });

@@ -11,6 +11,7 @@ struct LiveStreamView: View {
     @State private var selectedIndex = 0
     @State private var scrolledRoomId: String?
     @State private var isLoading = false
+    @State private var roomLoadError = ""
     @State private var chatText = ""
     @State private var likesCount = 0
     @State private var isLiked = false
@@ -26,14 +27,19 @@ struct LiveStreamView: View {
             if appState.liveRooms.isEmpty && !isLoading {
                 VStack(spacing: 16) {
                     KinnectIcon(glyph: .live, size: 54, tint: KinnectTheme.textSecondary)
-                    Text("Hiện chưa có phòng Live nào đang phát")
+                    Text(roomLoadError.isEmpty ? "Hiện chưa có phòng Live nào đang phát" : "Chưa tải được phòng Live")
                         .font(.headline)
                         .foregroundColor(.white)
-                    Text("Khi có người phát trực tiếp, luồng Live sẽ tự động xuất hiện tại đây để bạn vuốt xem.")
+                    Text(roomLoadError.isEmpty ? "Khi có người phát trực tiếp, luồng Live sẽ tự động xuất hiện tại đây để bạn vuốt xem." : roomLoadError)
                         .font(.subheadline)
                         .foregroundColor(KinnectTheme.textSecondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 32)
+
+                    if !roomLoadError.isEmpty {
+                        Button("Thử lại") { Task { await fetchLiveRooms() } }
+                            .buttonStyle(.borderedProminent)
+                    }
 
                     Button {
                         showCreateLiveSheet = true
@@ -109,6 +115,10 @@ struct LiveStreamView: View {
                     }
                 }
                 .ignoresSafeArea()
+            } else if isLoading {
+                ProgressView("Đang tải phòng Live...")
+                    .tint(.white)
+                    .foregroundColor(.white)
             }
         }
         .task {
@@ -160,16 +170,16 @@ struct LiveStreamView: View {
         ZStack(alignment: .bottomLeading) {
             // WebRTC Video Canvas with Fallback connecting state
             ZStack {
-                if appState.isCurrentLiveHost, let localTrack = webrtc.liveLocalVideoTrack {
+                if appState.currentLiveRoom?.id == room.id, appState.isCurrentLiveHost, let localTrack = webrtc.liveLocalVideoTrack {
                     WebRTCVideoRendererView(track: localTrack, mirror: webrtc.usingFrontCamera)
-                } else if let remoteTrack = webrtc.liveRemoteVideoTrack {
+                } else if appState.currentLiveRoom?.id == room.id, let remoteTrack = webrtc.liveRemoteVideoTrack {
                     WebRTCVideoRendererView(track: remoteTrack, mirror: false)
-                } else {
-                    // Playable live video fallback with vignette overlay (Parity Android 1.2.12 build 118)
+                } else if UIReviewFixture.isEnabled, UIReviewFixture.activeScreen != "live-connecting", let sample = UIReviewFixture.samplePlayableVideoURL() {
+                    // A sample video is permitted only in explicitly activated debug QA.
                     ZStack {
                         ShortClipPlayer(
-                            path: UIReviewFixture.samplePlayableVideoURL()?.absoluteString ?? "https://kinnect.io.vn/media/welcome-feed-demo.mp4",
-                            active: true
+                            path: sample.absoluteString,
+                            active: appState.currentLiveRoom?.id == room.id
                         )
                         LinearGradient(
                             colors: [
@@ -182,6 +192,23 @@ struct LiveStreamView: View {
                         )
                     }
                     .ignoresSafeArea()
+                } else {
+                    // Missing real tracks mean connecting/paused/error, never a demo broadcast.
+                    VStack(spacing: 12) {
+                        KinnectAvatarView(name: room.hostName, avatarURL: room.hostAvatarUrl,
+                            colorHex: room.hostAvatarColor, size: 92)
+                        if !room.gamePaused && webrtc.liveConnectionError == nil {
+                            ProgressView().tint(.white)
+                        }
+                        Text(room.gamePaused ? "Chủ phòng đang tạm dừng màn hình game"
+                            : (webrtc.liveConnectionError ?? "Đang kết nối luồng video Live..."))
+                            .font(.subheadline)
+                            .foregroundColor(.white.opacity(0.85))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 28)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.black)
                 }
             }
 
@@ -420,10 +447,17 @@ struct LiveStreamView: View {
 
     private func fetchLiveRooms() async {
         isLoading = true
+        roomLoadError = ""
         defer { isLoading = false }
-        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/live/rooms") {
-            let list = res["rooms"] as? [[String: Any]] ?? []
+        do {
+            let res = try await KinnectAPIClient.shared.requestJSON("/api/live/rooms")
+            guard let list = res["rooms"] as? [[String: Any]] else {
+                throw KinnectAPIError.serverMessage("Không đọc được danh sách phòng. Vui lòng thử lại.")
+            }
             appState.liveRooms = list.map(LiveRoomItem.from)
+        } catch {
+            roomLoadError = error.localizedDescription
+            appState.showToast("Chưa tải được phòng Live. Vui lòng thử lại.")
         }
     }
 }

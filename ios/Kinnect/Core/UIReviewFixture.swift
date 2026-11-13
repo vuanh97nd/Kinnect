@@ -8,24 +8,49 @@ import UIKit
 /// Isolated UI review fixture mode activated ONLY when launched with `--ui-review-screen <name>`.
 /// Clearly labeled as fixture data, never touches production servers, tokens, passwords, or real users.
 enum UIReviewFixture {
-    static var activeScreen: String? {
-        let args = CommandLine.arguments
-        if let idx = args.firstIndex(of: "--ui-review-screen"), idx + 1 < args.count {
-            return args[idx + 1]
+    static func resolveActiveScreen(arguments: [String], isDebug: Bool) -> String? {
+        guard isDebug else { return nil }
+        if let idx = arguments.firstIndex(of: "--ui-review-screen"), idx + 1 < arguments.count {
+            return arguments[idx + 1]
         }
         return nil
     }
 
+    static func resolveFixtureFlag(_ flag: String, arguments: [String], isDebug: Bool, isFixtureEnabled: Bool) -> Bool {
+        guard isDebug, isFixtureEnabled else { return false }
+        return arguments.contains(flag)
+    }
+
+    static var activeScreen: String? {
+        #if DEBUG
+        return resolveActiveScreen(arguments: CommandLine.arguments, isDebug: true)
+        #else
+        return nil
+        #endif
+    }
+
     static var forceLightMode: Bool {
-        CommandLine.arguments.contains("--ui-review-light")
+        #if DEBUG
+        return resolveFixtureFlag("--ui-review-light", arguments: CommandLine.arguments, isDebug: true, isFixtureEnabled: isEnabled)
+        #else
+        return false
+        #endif
     }
 
     static var forceMaxDynamicType: Bool {
-        CommandLine.arguments.contains("--ui-review-dynamictype-max")
+        #if DEBUG
+        return resolveFixtureFlag("--ui-review-dynamictype-max", arguments: CommandLine.arguments, isDebug: true, isFixtureEnabled: isEnabled)
+        #else
+        return false
+        #endif
     }
 
     static var isEnabled: Bool {
-        activeScreen != nil
+        #if DEBUG
+        return activeScreen != nil
+        #else
+        return false
+        #endif
     }
 
     static var adminApiCalls = 0
@@ -57,6 +82,10 @@ enum UIReviewFixture {
             if clean.hasPrefix("/api/admin") || clean == "/api/music" {
                 return "Không tải được dữ liệu quản trị."
             }
+        case "live-error":
+            if clean == "/api/live/rooms" {
+                return "Không tải được phòng Live."
+            }
         default:
             break
         }
@@ -83,13 +112,19 @@ enum UIReviewFixture {
         if activeScreen == "admin-empty" && (clean.hasPrefix("/api/admin") || clean == "/api/music") {
             return true
         }
+        if activeScreen == "live-empty" && clean == "/api/live/rooms" {
+            return true
+        }
         return false
     }
 
     static func writeDocument(_ name: String, _ payload: [String: Any]) {
-        guard let data = try? JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted]),
+        #if DEBUG
+        guard isEnabled,
+              let data = try? JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted]),
               let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
         try? data.write(to: dir.appendingPathComponent(name))
+        #endif
     }
 
     /// Camera and microphone prompts belong only to capture, live, and call screens.
@@ -933,6 +968,9 @@ enum UIReviewFixture {
             ]
 
         case "/api/live/rooms":
+            if prefersEmpty("/api/live/rooms") {
+                return ["rooms": []]
+            }
             return [
                 "rooms": [
                     [
@@ -1237,14 +1275,26 @@ enum UIReviewFixture {
 
     /// Generates a genuine playable H.264 MP4 video file on disk for local video playback verification.
     static func samplePlayableVideoURL() -> URL? {
+        #if DEBUG
+        guard isEnabled else { return nil }
         return makeSampleVideoURL(fileName: "ui_review_sample_shorts.mp4", variant: 0)
+        #else
+        return nil
+        #endif
     }
 
     static func sampleSecondPlayableVideoURL() -> URL? {
+        #if DEBUG
+        guard isEnabled else { return nil }
         return makeSampleVideoURL(fileName: "ui_review_sample_shorts_2.mp4", variant: 1)
+        #else
+        return nil
+        #endif
     }
 
     private static func makeSampleVideoURL(fileName: String, variant: Int) -> URL? {
+        #if DEBUG
+        guard isEnabled else { return nil }
         let tempDir = FileManager.default.temporaryDirectory
         let movieURL = tempDir.appendingPathComponent(fileName)
         if FileManager.default.fileExists(atPath: movieURL.path) {
@@ -1344,6 +1394,9 @@ enum UIReviewFixture {
         sema.wait()
 
         return movieURL
+        #else
+        return nil
+        #endif
     }
 
     /// Generates a valid playable PCM WAV audio file for background music muxing verification.
@@ -1477,7 +1530,7 @@ enum UIReviewFixture {
             // Exercise the real main container so header/safe-area regressions
             // are visible in simulator captures.
             return AnyView(RootMainView())
-        case "live-room":
+        case "live-room", "live-empty", "live-error", "live-connecting":
             return AnyView(
                 LiveStreamView(onOpenWallet: {})
             )
@@ -2228,6 +2281,9 @@ private struct SwiftContractsHarnessProbe: View {
         var aiSettingsMode: ResponseMode = .ok
         var aiCredentialsMode: ResponseMode = .ok
         var aiTestMode: ResponseMode = .ok
+        var opsRequestCount = 0
+        var opsResetMode: ResponseMode = .ok
+        var opsDismissMode: ResponseMode = .ok
         var storedSupport = false
         var storedModeration = false
         var storedTokenSaved = false
@@ -2362,6 +2418,75 @@ private struct SwiftContractsHarnessProbe: View {
                 case .ok:
                     let prov = (body?["provider"] as? String) ?? "cloudflare"
                     return ["ok": true, "provider": prov, "message": "Kết nối thành công."]
+                }
+            }
+            if path == "/api/admin/overview", method == "GET" {
+                opsRequestCount += 1
+                return ["users": 12, "suspended": 1, "pendingResets": 2, "openReports": 3]
+            }
+            if path == "/api/admin/password-resets", method == "GET" {
+                opsRequestCount += 1
+                return [
+                    "requests": [
+                        [
+                            "id": "11111111-1111-4111-8111-111111111111",
+                            "username": "fixture_user",
+                            "user_id": "u_fixture",
+                            "contact": "hotro@example.invalid",
+                            "note": "Quên mật khẩu",
+                            "status": "open",
+                            "created": 1763000000000.0
+                        ],
+                        [
+                            "id": "22222222-2222-4222-8222-222222222222",
+                            "username": "unknown_user",
+                            "user_id": NSNull(),
+                            "contact": "none@example.invalid",
+                            "note": "Tài khoản không tồn tại",
+                            "status": "open",
+                            "created": 1763000001000.0
+                        ]
+                    ]
+                ]
+            }
+            if path == "/api/admin/activity", method == "GET" {
+                opsRequestCount += 1
+                return [
+                    "entries": [
+                        [
+                            "id": "act_1",
+                            "action": "reset-password:admin_1",
+                            "username": "fixture_user",
+                            "actorUsername": "admin_1",
+                            "created": 1763000002000.0
+                        ]
+                    ]
+                ]
+            }
+            if path == "/api/admin/password-resets/11111111-1111-4111-8111-111111111111/reset", method == "POST" {
+                opsRequestCount += 1
+                switch opsResetMode {
+                case .missingField:
+                    return ["ok": true, "username": "wrong_user", "temporaryPassword": "Temp12345!"]
+                case .okFalse:
+                    return ["ok": false]
+                case .serverFailure(let status, let msg):
+                    throw KinnectAPIError.serverError(status: status, message: msg)
+                case .ok:
+                    return ["ok": true, "username": "fixture_user", "temporaryPassword": "Tmp#987654"]
+                }
+            }
+            if path == "/api/admin/password-resets/22222222-2222-4222-8222-222222222222/dismiss", method == "POST" {
+                opsRequestCount += 1
+                switch opsDismissMode {
+                case .missingField:
+                    return [:]
+                case .okFalse:
+                    return ["ok": false]
+                case .serverFailure(let status, let msg):
+                    throw KinnectAPIError.serverError(status: status, message: msg)
+                case .ok:
+                    return ["ok": true]
                 }
             }
             throw KinnectAPIError.serverError(status: 404, message: "Not found")
@@ -2673,6 +2798,191 @@ private struct SwiftContractsHarnessProbe: View {
         }
         transport.aiTestMode = .ok
         check("ai_test_ok_and_failures", aiTestOk && aiTestOkFalseRejected && aiTestErrorRejected)
+
+        // 5. AdminOperations overview / activity / password-resets contract coverage
+        let openKnownUpperReq = AdminResetRequest(
+            id: "11111111-1111-4111-8111-111111111111".uppercased(),
+            username: "fixture_user",
+            userId: "u_fixture",
+            contact: "hotro@example.invalid",
+            note: "Quên mật khẩu",
+            status: "open",
+            created: nil
+        )
+        let openUnknownReq = AdminResetRequest(
+            id: "22222222-2222-4222-8222-222222222222",
+            username: "unknown_user",
+            userId: nil,
+            contact: "none@example.invalid",
+            note: "Tài khoản không tồn tại",
+            status: "open",
+            created: nil
+        )
+        let staleDoneReq = AdminResetRequest(
+            id: "11111111-1111-4111-8111-111111111111",
+            username: "fixture_user",
+            userId: "u_fixture",
+            contact: "",
+            note: "",
+            status: "done",
+            created: nil
+        )
+
+        func expectThrows(_ op: () async throws -> Void) async -> Bool {
+            do {
+                try await op()
+                return false
+            } catch {
+                return true
+            }
+        }
+
+        transport.opsRequestCount = 0
+        var opsNonAdminBlocked = true
+        if !(await expectThrows { _ = try await AdminOperationsContract.overview(role: "user", transport: transport) }) { opsNonAdminBlocked = false }
+        if !(await expectThrows { _ = try await AdminOperationsContract.requests(role: "user", transport: transport) }) { opsNonAdminBlocked = false }
+        if !(await expectThrows { _ = try await AdminOperationsContract.activity(role: "user", transport: transport) }) { opsNonAdminBlocked = false }
+        if !(await expectThrows { _ = try await AdminOperationsContract.handle(openKnownUpperReq, operation: .reset, role: "user", transport: transport) }) { opsNonAdminBlocked = false }
+        if !(await expectThrows { _ = try await AdminOperationsContract.handle(openUnknownReq, operation: .dismiss, role: "user", transport: transport) }) { opsNonAdminBlocked = false }
+        check("ops_nonadmin_blocked_no_calls", opsNonAdminBlocked && transport.opsRequestCount == 0)
+
+        var opsReadOk = false
+        do {
+            let snap = try await AdminOperationsContract.overview(role: "admin", transport: transport)
+            let reqs = try await AdminOperationsContract.requests(role: "admin", transport: transport)
+            let entries = try await AdminOperationsContract.activity(role: "admin", transport: transport)
+            opsReadOk = snap.users == 12 && snap.pendingResets == 2
+                && reqs.count == 2 && reqs[0].userId == "u_fixture" && reqs[1].userId == nil
+                && entries.count == 1 && entries[0].action == "Khôi phục mật khẩu" && entries[0].actor == "admin_1"
+                && entries[0].created != nil
+        } catch {}
+        check("ops_overview_requests_activity_ok", opsReadOk)
+
+        transport.opsRequestCount = 0
+        var unknownResetBlocked = false
+        var staleResetBlocked = false
+        do {
+            _ = try await AdminOperationsContract.handle(openUnknownReq, operation: .reset, role: "admin", transport: transport)
+        } catch { unknownResetBlocked = true }
+        do {
+            _ = try await AdminOperationsContract.handle(staleDoneReq, operation: .reset, role: "admin", transport: transport)
+        } catch { staleResetBlocked = true }
+        check("ops_reset_unknown_user_and_stale_blocked", unknownResetBlocked && staleResetBlocked && transport.opsRequestCount == 0)
+
+        var resetOk = false
+        var resetMismatchRejected = false
+        var reset409Rejected = false
+        do {
+            let out = try await AdminOperationsContract.handle(openKnownUpperReq, operation: .reset, role: "admin", transport: transport)
+            resetOk = out.username == "fixture_user" && out.temporaryPassword == "Tmp#987654"
+        } catch {}
+        transport.opsResetMode = .missingField
+        do {
+            _ = try await AdminOperationsContract.handle(openKnownUpperReq, operation: .reset, role: "admin", transport: transport)
+        } catch { resetMismatchRejected = true }
+        transport.opsResetMode = .serverFailure(409, "Yêu cầu đã được xử lý.")
+        do {
+            _ = try await AdminOperationsContract.handle(openKnownUpperReq, operation: .reset, role: "admin", transport: transport)
+        } catch { reset409Rejected = true }
+        transport.opsResetMode = .ok
+        check("ops_reset_ok_and_mismatch_rejected", resetOk && resetMismatchRejected && reset409Rejected)
+
+        var dismissOk = false
+        var dismissOkFalseRejected = false
+        do {
+            let out = try await AdminOperationsContract.handle(openUnknownReq, operation: .dismiss, role: "admin", transport: transport)
+            dismissOk = out.username == nil && out.temporaryPassword == nil
+        } catch {}
+        transport.opsDismissMode = .okFalse
+        do {
+            _ = try await AdminOperationsContract.handle(openUnknownReq, operation: .dismiss, role: "admin", transport: transport)
+        } catch { dismissOkFalseRejected = true }
+        transport.opsDismissMode = .ok
+        check("ops_dismiss_ok_and_okfalse_rejected", dismissOk && dismissOkFalseRejected)
+
+        let tempSecretSameActive = AdminOperationsContract.canPresentTemporarySecret(
+            initiatedAccountId: "adm_a", currentAccountId: "adm_a", role: "admin", isAppActive: true
+        )
+        let tempSecretSwitchedAdmin = AdminOperationsContract.canPresentTemporarySecret(
+            initiatedAccountId: "adm_a", currentAccountId: "adm_b", role: "admin", isAppActive: true
+        )
+        let tempSecretInactiveApp = AdminOperationsContract.canPresentTemporarySecret(
+            initiatedAccountId: "adm_a", currentAccountId: "adm_a", role: "admin", isAppActive: false
+        )
+        let tempSecretDemoted = AdminOperationsContract.canPresentTemporarySecret(
+            initiatedAccountId: "adm_a", currentAccountId: "adm_a", role: "user", isAppActive: true
+        )
+        let tempSecretEmptyId = AdminOperationsContract.canPresentTemporarySecret(
+            initiatedAccountId: "", currentAccountId: "", role: "admin", isAppActive: true
+        )
+        check("ops_temp_secret_requires_same_account_and_active_app", tempSecretSameActive && !tempSecretSwitchedAdmin && !tempSecretInactiveApp && !tempSecretDemoted && !tempSecretEmptyId)
+
+        // 6. Origin matching, HTTPS-only URL resolution, redirect policy & scoped media cache keys
+        let baseOrigin = "https://app.kinnect.io.vn"
+        let diffPortFalse = !ServerConfig.matchesOrigin(URL(string: "https://app.kinnect.io.vn:8443/a")!, origin: baseOrigin)
+        let httpFalse = !ServerConfig.matchesOrigin(URL(string: "http://app.kinnect.io.vn/a")!, origin: baseOrigin)
+        let suffixHostFalse = !ServerConfig.matchesOrigin(URL(string: "https://app.kinnect.io.vn.evil.com/a")!, origin: baseOrigin)
+            && !ServerConfig.matchesOrigin(URL(string: "https://evilapp.kinnect.io.vn/a")!, origin: baseOrigin)
+        let sameOrigin443True = ServerConfig.matchesOrigin(URL(string: "https://app.kinnect.io.vn:443/a")!, origin: baseOrigin)
+        let httpUrlRejected = (ServerConfig.url(for: "http://cdn.example.com/a.mp4", origin: baseOrigin) == nil)
+            && (ServerConfig.normalize("http://app.kinnect.io.vn") == nil)
+        check("origin_match_rules", diffPortFalse && httpFalse && suffixHostFalse && sameOrigin443True && httpUrlRejected)
+
+        func runRedirect(_ policy: KinnectRedirectPolicy, from srcStr: String, to dstStr: String, method: String, status: Int) -> URLRequest? {
+            guard let srcURL = URL(string: srcStr),
+                  let dstURL = URL(string: dstStr),
+                  let resp = HTTPURLResponse(url: srcURL, statusCode: status, httpVersion: "HTTP/1.1", headerFields: nil) else {
+                return nil
+            }
+            var initialReq = URLRequest(url: srcURL)
+            initialReq.httpMethod = method
+            let dummyTask = stubSession.dataTask(with: initialReq)
+            var nextReq = URLRequest(url: dstURL)
+            nextReq.httpMethod = method
+            nextReq.setValue("kinnect_sid=secret", forHTTPHeaderField: "Cookie")
+            nextReq.setValue("Bearer tok", forHTTPHeaderField: "Authorization")
+            nextReq.setValue(baseOrigin, forHTTPHeaderField: "Origin")
+            var resolved: URLRequest?
+            policy.urlSession(stubSession, task: dummyTask, willPerformHTTPRedirection: resp, newRequest: nextReq) { req in
+                resolved = req
+            }
+            return resolved
+        }
+
+        let apiPolicy = KinnectRedirectPolicy(allowCrossOriginMediaRedirects: false)
+        let apiCross307Refused = runRedirect(apiPolicy, from: "\(baseOrigin)/api/login", to: "https://cdn.example.com/trap", method: "POST", status: 307) == nil
+        let apiDowngradeRefused = runRedirect(apiPolicy, from: "\(baseOrigin)/api/me", to: "http://app.kinnect.io.vn/me", method: "GET", status: 302) == nil
+        let apiSameOriginAllowed = runRedirect(apiPolicy, from: "\(baseOrigin)/api/me", to: "https://app.kinnect.io.vn:443/api/v2/me", method: "GET", status: 302)?.value(forHTTPHeaderField: "Cookie") == "kinnect_sid=secret"
+
+        let mediaPolicy = KinnectRedirectPolicy(allowCrossOriginMediaRedirects: true)
+        let mediaCrossHttps = runRedirect(mediaPolicy, from: "\(baseOrigin)/uploads/v.mp4", to: "https://cdn.example.net/v.mp4", method: "GET", status: 302)
+        let mediaCredsStripped = mediaCrossHttps != nil
+            && mediaCrossHttps?.value(forHTTPHeaderField: "Cookie") == nil
+            && mediaCrossHttps?.value(forHTTPHeaderField: "Authorization") == nil
+            && mediaCrossHttps?.value(forHTTPHeaderField: "Origin") == nil
+        let mediaDowngradeRefused = runRedirect(mediaPolicy, from: "\(baseOrigin)/uploads/v.mp4", to: "http://cdn.example.net/v.mp4", method: "GET", status: 302) == nil
+        let mediaPost307Refused = runRedirect(mediaPolicy, from: "\(baseOrigin)/uploads/v.mp4", to: "https://cdn.example.net/v.mp4", method: "POST", status: 307) == nil
+        check("redirect_policy_api_and_media", apiCross307Refused && apiDowngradeRefused && apiSameOriginAllowed && mediaCredsStripped && mediaDowngradeRefused && mediaPost307Refused)
+
+        var cacheKeysScopedDistinct = false
+        do {
+            let prefix = "/media/" + String(repeating: "very_long_segment_", count: 14)
+            let pathA = prefix + "clip_a.mp4"
+            let pathB = prefix + "clip_b.mp4"
+            let urlAcct1A = try KinnectAuthenticatedFile.cacheURL(path: pathA, fileExtension: "mp4", origin: baseOrigin, accountId: "acct_1")
+            let urlAcct2A = try KinnectAuthenticatedFile.cacheURL(path: pathA, fileExtension: "mp4", origin: baseOrigin, accountId: "acct_2")
+            let urlAcct1B = try KinnectAuthenticatedFile.cacheURL(path: pathB, fileExtension: "mp4", origin: baseOrigin, accountId: "acct_1")
+            cacheKeysScopedDistinct = (urlAcct1A != urlAcct2A) && (urlAcct1A != urlAcct1B) && (urlAcct2A != urlAcct1B)
+        } catch {}
+        check("media_cache_account_and_long_path_scoped", cacheKeysScopedDistinct)
+
+        let releaseActiveNil = UIReviewFixture.resolveActiveScreen(arguments: ["Kinnect", "--ui-review-screen", "admin"], isDebug: false) == nil
+        let releaseLightFalse = !UIReviewFixture.resolveFixtureFlag("--ui-review-light", arguments: ["Kinnect", "--ui-review-light"], isDebug: false, isFixtureEnabled: true)
+        let normalLightFalse = !UIReviewFixture.resolveFixtureFlag("--ui-review-light", arguments: ["Kinnect", "--ui-review-light"], isDebug: true, isFixtureEnabled: false)
+        let normalScreenNil = UIReviewFixture.resolveActiveScreen(arguments: ["Kinnect"], isDebug: true) == nil
+        let invalidMediaUrlRefused = ServerConfig.url(for: "http://app.kinnect.io.vn/video.mp4", origin: baseOrigin) == nil
+            && ServerConfig.url(for: "not a url :::", origin: baseOrigin) == nil
+        check("release_fixture_boundary_guards", releaseActiveNil && releaseLightFalse && normalLightFalse && normalScreenNil && invalidMediaUrlRefused)
 
         lines = results.keys.sorted().map { key in
             "\(key)=\(results[key] == true ? "pass" : "fail")"

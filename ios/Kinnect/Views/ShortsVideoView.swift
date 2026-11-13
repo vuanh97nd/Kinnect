@@ -771,7 +771,9 @@ private final class ClipPlaybackController: ObservableObject {
             return
         }
 
-        if path.hasPrefix("/api/") || path.hasPrefix("/") || path.contains("app.kinnect.io.vn") {
+        let origin = KinnectAPIClient.shared.mediaOrigin
+        if let resolved = ServerConfig.url(for: path, origin: origin),
+           ServerConfig.matchesOrigin(resolved, origin: origin) {
             if let cachedLocalURL = try? await KinnectAuthenticatedFile.fetch(path: path, fileExtension: "mp4") {
                 guard !Task.isCancelled, isMounted, currentPath == path else { return }
                 setupPlayer(with: AVPlayerItem(url: cachedLocalURL), expectedPath: path)
@@ -780,20 +782,23 @@ private final class ClipPlaybackController: ObservableObject {
             guard !Task.isCancelled, isMounted, currentPath == path else { return }
         }
 
-        let origin = KinnectAPIClient.shared.mediaOrigin
         KeychainStore.shared.syncToHTTPCookieStorage(origin: origin)
         guard let remoteURL = ServerConfig.url(for: path, origin: origin) else {
-            if let fixtureURL = UIReviewFixture.samplePlayableVideoURL() {
+            #if DEBUG
+            if UIReviewFixture.isEnabled, let fixtureURL = UIReviewFixture.samplePlayableVideoURL() {
                 setupPlayer(with: AVPlayerItem(url: fixtureURL), expectedPath: path)
                 return
             }
+            #endif
+            clearPlayerInstance(keepMounted: true)
             failed = true
+            loading = false
             return
         }
 
         let cookie = KeychainStore.shared.cookieJarHeader(for: origin)
         var options: [String: Any] = [:]
-        if !cookie.isEmpty, remoteURL.host == URL(string: origin)?.host {
+        if !cookie.isEmpty, ServerConfig.matchesOrigin(remoteURL, origin: origin) {
             options["AVURLAssetHTTPHeaderFieldsKey"] = ["Cookie": cookie]
         }
 
