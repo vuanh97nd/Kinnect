@@ -3858,12 +3858,24 @@ public class MainActivity extends Activity {
       try { startActivity(Intent.createChooser(send, I18n.t("Chia sẻ video"))); } catch (Exception ignored) {}
     }));
     // Đã chuyển Tải video và Âm thanh vào shortOptions (Tùy chọn)
-    side.addView(reelButton(shortMuted ? "volume_x" : "sound", shortMuted ? I18n.t("Bật tiếng") : I18n.t("Tắt tiếng"), WHITE, () -> {
+    final LinearLayout muteBtn = reelButton(shortMuted ? "volume_x" : "sound", shortMuted ? I18n.t("Bật tiếng") : I18n.t("Tắt tiếng"), WHITE, () -> {});
+    muteBtn.setOnClickListener(v -> {
       shortMuted = !shortMuted;
-      if (shortPlayer != null) shortPlayer.setVolume(shortMuted ? 0 : 1, shortMuted ? 0 : 1);
-      android.util.Log.i("KinnectQA", "SHORTS_EVENT: action=mute_toggle muted=" + shortMuted + " volume=" + (shortMuted ? 0 : 1));
-      showShort(shortIndex);
-    }));
+      if (shortPlayer != null) {
+        shortPlayer.setVolume(shortMuted ? 0 : 1, shortMuted ? 0 : 1);
+      }
+      int pos = shortVideo != null ? shortVideo.getCurrentPosition() : 0;
+      boolean playing = shortVideo != null && shortVideo.isPlaying();
+      android.util.Log.i("KinnectQA", "SHORTS_EVENT: action=mute_toggle muted=" + shortMuted + " volume=" + (shortMuted ? 0 : 1) + " pos=" + pos + " isPlaying=" + playing);
+      ImageView iv = (ImageView) muteBtn.getChildAt(0);
+      TextView tv = (TextView) muteBtn.getChildAt(1);
+      iv.setImageDrawable(WebIcons.load(this, shortMuted ? "volume_x" : "sound"));
+      iv.setImageTintList(android.content.res.ColorStateList.valueOf(WHITE));
+      String caption = shortMuted ? I18n.t("Bật tiếng") : I18n.t("Tắt tiếng");
+      tv.setText(caption);
+      muteBtn.setContentDescription(caption);
+    });
+    side.addView(muteBtn);
     side.addView(reelButton("more", I18n.t("Tùy chọn video"), WHITE, () -> shortOptions(item)));
     ScrollView actionRail = new ScrollView(this);
     actionRail.setVerticalScrollBarEnabled(false);
