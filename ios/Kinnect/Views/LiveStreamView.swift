@@ -172,7 +172,7 @@ struct LiveStreamView: View {
             scrolledRoomId = nil
             return
         }
-        if let currentId = scrolledRoomId, let idx = rooms.firstIndex(of: currentId) {
+        if let currentId = scrolledRoomId, let idx = rooms.firstIndex(where: { $0.id == currentId }) {
             selectedIndex = idx
             if !appState.isCurrentLiveHost && appState.currentLiveRoom?.id != currentId {
                 appState.joinLiveRoom(rooms[idx])
