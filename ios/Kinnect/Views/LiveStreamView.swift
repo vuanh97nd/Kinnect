@@ -1018,6 +1018,7 @@ struct LiveGiftDrawerSheet: View {
     var onGiftSent: ((LiveGiftCatalogItem, Int) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var selectedQuantity: Int = 1
+    @State private var selectedGiftID: String? = nil
     @State private var pendingGift: LiveGiftCatalogItem?
     @State private var pendingRequestId: String?
     @State private var pendingQuantity = 1
@@ -1029,6 +1030,14 @@ struct LiveGiftDrawerSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                HStack {
+                    Text(UIReviewFixture.isEnabled ? "Xu tặng · 1.200" : "Xu tặng")
+                        .font(KinnectTheme.bodyBold)
+                        .foregroundColor(KinnectTheme.textPrimary)
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
                 // Quantity / Combo Multiplier Pills matching Android & Web
                 ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
@@ -1040,24 +1049,17 @@ struct LiveGiftDrawerSheet: View {
                         Button {
                             selectedQuantity = qty
                         } label: {
-                            HStack(spacing: 4) {
-                                if let img = UIImage(named: "kg20261109_combo_x\(qty)") {
-                                    Image(uiImage: img)
-                                        .resizable()
-                                        .scaledToFit()
-                                        .frame(height: 18)
-                                } else {
-                                    Text("x\(qty)")
-                                        .font(.caption.bold())
-                                }
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(
-                                Capsule().fill(selectedQuantity == qty ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
-                            )
-                            .foregroundColor(selectedQuantity == qty ? .white : KinnectTheme.textSecondary)
+                            Text("x\(qty)")
+                                .font(KinnectTheme.bodyBold)
+                                .frame(minWidth: 44, minHeight: 36)
+                                .padding(.horizontal, 8)
+                                .background(
+                                    Capsule().fill(selectedQuantity == qty ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
+                                )
+                                .foregroundColor(selectedQuantity == qty ? .white : KinnectTheme.textPrimary)
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Số lượng \(qty)")
                     }
                     Spacer()
                 }
@@ -1071,9 +1073,7 @@ struct LiveGiftDrawerSheet: View {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 12)], spacing: 12) {
                         ForEach(gifts) { gift in
                             Button {
-                                let quote = GiftQuote(unitCoins: gift.coins, quantity: selectedQuantity)
-                                if quote.needsConfirmation { confirmGift = gift }
-                                else { sendGift(gift) }
+                                selectedGiftID = gift.id
                             } label: {
                                 VStack(spacing: 6) {
                                     giftIconView(gift)
@@ -1102,6 +1102,24 @@ struct LiveGiftDrawerSheet: View {
                         }
                     }
                     .padding(16)
+                }
+                if let gift = gifts.first(where: { $0.id == (selectedGiftID ?? gifts.first?.id) }) {
+                    let quote = GiftQuote(unitCoins: gift.coins, quantity: selectedQuantity)
+                    Button {
+                        if quote.needsConfirmation { confirmGift = gift }
+                        else { sendGift(gift) }
+                    } label: {
+                        Text("Tặng · \(quote.total) xu")
+                            .font(KinnectTheme.sectionTitle)
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                            .background(KinnectTheme.primaryGradient)
+                            .foregroundColor(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+                    .disabled(pendingRequestId != nil)
                 }
             }
             .background(KinnectTheme.background)
@@ -1175,6 +1193,11 @@ struct LiveGiftDrawerSheet: View {
 
     private func sendGift(_ gift: LiveGiftCatalogItem) {
         guard pendingRequestId == nil else { return }
+        let quote = GiftQuote(unitCoins: gift.coins, quantity: selectedQuantity)
+        if UIReviewFixture.isEnabled {
+            giftError = "Fixture: \(gift.label) · \(quote.total) xu. Không gửi giao dịch."
+            return
+        }
         guard NativeSocketClient.shared.isConnected else {
             giftError = "Mất kết nối phòng Live. Hãy kết nối lại trước khi tặng quà."
             return

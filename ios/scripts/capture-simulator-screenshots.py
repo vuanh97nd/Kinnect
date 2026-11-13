@@ -258,6 +258,24 @@ def isolate_permission_state(udid, bundle_id, screen_arg):
         subprocess.run(["xcrun", "simctl", "privacy", udid, "grant", "microphone", bundle_id], check=False)
 
 
+def copy_app_document(udid, bundle_id, name):
+    res = subprocess.run(
+        ["xcrun", "simctl", "get_app_container", udid, bundle_id, "data"],
+        text=True,
+        capture_output=True,
+    )
+    if res.returncode != 0:
+        print(f"Could not read app container for {name}", flush=True)
+        return
+    source = Path(res.stdout.strip()) / "Documents" / name
+    if source.exists():
+        target = OUT_DIR / name
+        target.write_bytes(source.read_bytes())
+        print(f"Copied {name}", flush=True)
+    else:
+        print(f"Missing document {source}", flush=True)
+
+
 def capture_screen(device, slug, screen_arg, bundle_id, extra_args=None, wait_sec=3.0):
     udid = device["udid"]
     subprocess.run(["xcrun", "simctl", "terminate", udid, bundle_id], check=False)
@@ -286,16 +304,35 @@ def capture_screen(device, slug, screen_arg, bundle_id, extra_args=None, wait_se
     cmd = ["xcrun", "simctl", "launch", udid, bundle_id, "-AppleLanguages", lang_arg, "--ui-review-screen", screen_arg]
     if extra_args:
         cmd.extend(extra_args)
+    record = screen_arg == "shorts-telemetry"
+    video_path = OUT_DIR / f"{slug}.mp4"
+    recorder = None
+    if record:
+        recorder = subprocess.Popen(
+            ["xcrun", "simctl", "io", udid, "recordVideo", "--codec=h264", str(video_path)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        time.sleep(1.0)
+
     run(cmd)
 
-    if screen_arg in ("auth", "auth-login-keyboard", "auth-login-password-keyboard", "auth-login-lang-sheet"):
-        actual_wait = 4.8
+    if screen_arg in ("auth", "auth-login-keyboard", "auth-login-password-keyboard", "auth-login-lang-sheet", "shorts-telemetry"):
+        actual_wait = 6.0
     else:
         actual_wait = wait_sec
     time.sleep(actual_wait)
 
     out_file = OUT_DIR / f"{slug}.png"
     run(["xcrun", "simctl", "io", udid, "screenshot", str(out_file)])
+    if recorder is not None:
+        recorder.send_signal(signal.SIGINT)
+        try:
+            recorder.wait(timeout=20)
+        except subprocess.TimeoutExpired:
+            recorder.kill()
+    if screen_arg in ("password-spy", "shorts-telemetry"):
+        copy_app_document(udid, bundle_id, "password-spy.json" if screen_arg == "password-spy" else "shorts-telemetry.json")
 
     if is_light:
         subprocess.run(["xcrun", "simctl", "ui", udid, "appearance", "dark"], check=False)
@@ -466,6 +503,10 @@ def main():
         ("13n-iphone-live-gifts-drawer", "gift-drawer", [], "Ngăn quà Live đang mở"),
         ("13o-iphone-studio-music-picker", "music-picker", [], "Danh sách chọn nhạc đang mở"),
         ("13o2-iphone-studio-music-picker-light", "music-picker", ["--ui-review-light"], "Danh sách chọn nhạc đang mở, chế độ sáng"),
+        ("19-password-spy", "password-spy", [], "Ma trận mật khẩu, không gửi mạng"),
+        ("19b-persist-write", "persist-write", [], "Ghi ngôn ngữ và thông báo vào máy"),
+        ("19c-persist-read", "persist-read", [], "Đọc lại sau khi tắt app"),
+        ("19d-shorts-telemetry", "shorts-telemetry", [], "Pause, mute, resume và swipe"),
         ("13j-iphone-support", "support", [], "Trung tâm Hỗ trợ & Trợ giúp người dùng (124)"),
         ("13l-iphone-support-chat", "support-chat", [], "Trung tâm hỗ trợ mở cuộc trò chuyện trực tiếp"),
         ("13m-iphone-admin", "admin", [], "Bảng quản trị: báo cáo và thành viên"),

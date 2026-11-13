@@ -73,9 +73,6 @@ struct ShortsVideoView: View {
                         .rotationEffect(.degrees(90))
                         .position(x: geo.size.width / 2, y: geo.size.height / 2)
                     }
-                    .onChange(of: currentIndex) { _ in
-                        userPaused = false
-                    }
                 }
             }
 
@@ -96,6 +93,9 @@ struct ShortsVideoView: View {
                 )
                 .ignoresSafeArea(edges: .top)
             )
+        }
+        .onChange(of: currentIndex) { _ in
+            userPaused = false
         }
         .task {
             await loadShorts()

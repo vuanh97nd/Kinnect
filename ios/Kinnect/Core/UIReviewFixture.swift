@@ -1586,9 +1586,141 @@ enum UIReviewFixture {
             return AnyView(ReviewGiftDrawer())
         case "music-picker":
             return AnyView(ReviewMusicPicker())
+        case "password-spy":
+            return AnyView(PasswordSpyProbe())
+        case "persist-write":
+            return AnyView(PersistenceProbe(writing: true))
+        case "persist-read":
+            return AnyView(PersistenceProbe(writing: false))
+        case "shorts-telemetry":
+            return AnyView(ShortsTelemetryProbe())
 
         default:
             return AnyView(RootMainView())
+        }
+    }
+}
+
+private struct PasswordSpyProbe: View {
+    @State private var lines: [String] = ["Đang kiểm tra..."]
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Kiểm tra mật khẩu")
+                    .font(KinnectTheme.sectionTitle)
+                ForEach(lines, id: \.self) { line in
+                    Text(line)
+                        .font(KinnectTheme.caption)
+                        .foregroundColor(KinnectTheme.textPrimary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(20)
+        }
+        .background(KinnectTheme.background)
+        .task { runMatrix() }
+    }
+
+    private func runMatrix() {
+        PasswordTransportSpy.reset()
+        let cases: [(String, String, String, String)] = [
+            ("", "abcdef", "abcdef", "current rỗng"),
+            ("current-secret", "abcde", "abcde", "next 5"),
+            ("current-secret", "abcdef", "abcdef", "next 6"),
+            ("current-secret", "abcdefg", "abcdefg", "next 7"),
+            ("current-secret", "abcdef", "", "retype rỗng"),
+            ("current-secret", "abcdef", "abcdefX", "retype lệch")
+        ]
+        var shown: [String] = []
+        var report: [[String: Any]] = []
+        for item in cases {
+            let decision = PasswordChangeValidation.evaluate(current: item.0, next: item.1, confirm: item.2)
+            if decision.sendsToServer {
+                PasswordTransportSpy.record(current: item.0, next: item.1)
+            }
+            shown.append("\(item.3): post=\(decision.sendsToServer ? "có" : "không")")
+            report.append([
+                "label": item.3,
+                "nextCount": item.1.count,
+                "sendsToServer": decision.sendsToServer,
+                "message": decision.message ?? ""
+            ])
+        }
+        shown.append("Đã ghi \(PasswordTransportSpy.attempts.count) lần, không gửi mạng.")
+        lines = shown
+        let payload: [String: Any] = [
+            "attempts": PasswordTransportSpy.attempts.count,
+            "cases": report
+        ]
+        if let data = try? JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted]),
+           let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            try? data.write(to: dir.appendingPathComponent("password-spy.json"))
+        }
+    }
+}
+
+private struct PersistenceProbe: View {
+    let writing: Bool
+    @State private var text = "Đang đọc..."
+
+    var body: some View {
+        Text(text)
+            .font(KinnectTheme.body)
+            .foregroundColor(KinnectTheme.textPrimary)
+            .padding(24)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(KinnectTheme.background)
+            .task {
+                if writing {
+                    UserDefaults.standard.set("en", forKey: AppLanguageStore.defaultsKey)
+                    KinnectNotificationPrefs.set("messages", false)
+                    text = "Đã ghi ngôn ngữ en và tắt thông báo tin nhắn trên máy."
+                } else {
+                    let lang = UserDefaults.standard.string(forKey: AppLanguageStore.defaultsKey) ?? "missing"
+                    let messages = KinnectNotificationPrefs.isOn("messages")
+                    text = "Đọc lại sau khi tắt app: ngôn ngữ \(lang). Thông báo tin nhắn \(messages ? "bật" : "tắt")."
+                }
+            }
+    }
+}
+
+private struct ShortsTelemetryProbe: View {
+    @State private var lines: [String] = []
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Shorts telemetry")
+                    .font(KinnectTheme.sectionTitle)
+                ForEach(lines, id: \.self) { line in
+                    Text(line).font(KinnectTheme.body)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(20)
+        }
+        .background(KinnectTheme.background)
+        .task { runSequence() }
+    }
+
+    private func runSequence() {
+        var state = ShortsPlaybackState(index: 0, userPaused: false, muted: false)
+        var shown: [String] = []
+        func note(_ line: String) { shown.append(line); lines = shown }
+        note("start index=\(state.index) playing=\(state.playing) muted=\(state.muted)")
+        state.togglePause()
+        note("pause index=\(state.index) playing=\(state.playing)")
+        state.toggleMute()
+        note("mute giữ pause index=\(state.index) playing=\(state.playing) muted=\(state.muted)")
+        state.togglePause()
+        note("resume index=\(state.index) playing=\(state.playing) muted=\(state.muted)")
+        state.swipe(to: 1)
+        note("swipe index=\(state.index) playing=\(state.playing) muted=\(state.muted)")
+        let payload: [String: Any] = ["lines": shown]
+        if let data = try? JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted]),
+           let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            try? data.write(to: dir.appendingPathComponent("shorts-telemetry.json"))
         }
     }
 }
