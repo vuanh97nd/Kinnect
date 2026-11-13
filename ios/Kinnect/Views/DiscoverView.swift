@@ -342,18 +342,22 @@ struct DiscoverView: View {
                 "latitude": coord.latitude,
                 "longitude": coord.longitude
             ]
-            _ = try? await KinnectAPIClient.shared.requestJSON(
-                "/api/me/location",
-                method: "PATCH",
-                body: body,
-                requestId: "loc_\(Int(Date().timeIntervalSince1970))"
-            )
-            if var me = appState.currentUser {
-                me.hasLocation = true
-                appState.currentUser = me
+            do {
+                _ = try await KinnectAPIClient.shared.requestJSON(
+                    "/api/me/location",
+                    method: "PATCH",
+                    body: body,
+                    requestId: "loc_\(Int(Date().timeIntervalSince1970))"
+                )
+                if var me = appState.currentUser {
+                    me.hasLocation = true
+                    appState.currentUser = me
+                }
+                locationStatusText = "Đang tìm kiếm quanh đây trong bán kính 50 km"
+                await loadCurrentSegment()
+            } catch {
+                locationStatusText = "Chưa lưu vị trí. \(error.localizedDescription)"
             }
-            locationStatusText = "Đang tìm kiếm quanh đây trong bán kính 50 km"
-            await loadCurrentSegment()
         } else {
             locationStatusText = "Chưa cấp quyền vị trí. Bạn có thể bật vị trí trong Cài đặt máy."
         }

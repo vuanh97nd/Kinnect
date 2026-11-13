@@ -295,7 +295,7 @@ struct AccountMenuView: View {
 
 // MARK: - Sub-screens with Pinned Header Bar (1:1 Android Parity)
 
-private struct PrivacySettingsView: View {
+struct PrivacySettingsView: View {
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var language = LocalizationManager.shared
     @Environment(\.dismiss) private var dismiss
@@ -305,6 +305,8 @@ private struct PrivacySettingsView: View {
     @State private var showDistance: Bool = true
     @State private var showActivity: Bool = true
     @State private var dmFriendsOnly: Bool = false
+    @State private var statusNote = ""
+    @State private var failedDmMode: String?
     @State private var showEditProfile = false
     @State private var showPrivateAlbum = false
     @State private var showBlockedUsers = false
@@ -321,6 +323,16 @@ private struct PrivacySettingsView: View {
             )
 
             Form {
+                if !statusNote.isEmpty {
+                    Section {
+                        Text(statusNote)
+                            .font(KinnectTheme.caption)
+                            .foregroundColor(KinnectTheme.danger)
+                        if let failedDmMode {
+                            Button("Thử lại") { updateDmMode(failedDmMode) }
+                        }
+                    }
+                }
                 Section("Ngôn ngữ") {
                     Button {
                         language.setLanguage(.vi)
@@ -451,6 +463,17 @@ private struct PrivacySettingsView: View {
                     self.dmFriendsOnly = user.dmMode == "friends"
                 }
             }
+            .task {
+                if UIReviewFixture.activeScreen == "privacy-toggle-error" {
+                    discoverable = true
+                    updatePrivacySetting("discoverable", value: false)
+                } else if UIReviewFixture.activeScreen == "dm-mode-error" {
+                    dmFriendsOnly = false
+                    updateDmMode("friends")
+                } else if UIReviewFixture.activeScreen == "location-off-error" {
+                    await turnOffLocation()
+                }
+            }
             .sheet(isPresented: $showEditProfile) {
                 EditProfileSheet(onSaved: {})
             }
@@ -476,32 +499,65 @@ private struct PrivacySettingsView: View {
         }
     }
 
-    private func updatePrivacySetting(_ key: String, value: Bool) {
-        if var user = appState.currentUser {
-            if key == "showActivity" { user.showActivity = value }
-            if key == "discoverable" { user.discoverable = value }
-            if key == "showDistance" { user.showDistance = value }
-            appState.currentUser = user
+    private func storedBool(_ key: String) -> Bool {
+        switch key {
+        case "showActivity": return showActivity
+        case "discoverable": return discoverable
+        case "showDistance": return showDistance
+        default: return false
         }
+    }
+
+    private func setStoredBool(_ key: String, _ value: Bool) {
+        switch key {
+        case "showActivity": showActivity = value
+        case "discoverable": discoverable = value
+        case "showDistance": showDistance = value
+        default: break
+        }
+    }
+
+    private func updatePrivacySetting(_ key: String, value: Bool) {
+        let previous = storedBool(key)
+        setStoredBool(key, value)
+        statusNote = "Đang lưu..."
         Task {
-            _ = try? await KinnectAPIClient.shared.requestJSON(
-                "/api/me",
-                method: "PATCH",
-                body: [key: value]
-            )
-            if key == "showActivity" && value {
-                appState.reportActiveStatus(force: true)
+            do {
+                _ = try await KinnectAPIClient.shared.requestJSON(
+                    "/api/me",
+                    method: "PATCH",
+                    body: [key: value]
+                )
+                if var user = appState.currentUser {
+                    if key == "showActivity" { user.showActivity = value }
+                    if key == "discoverable" { user.discoverable = value }
+                    if key == "showDistance" { user.showDistance = value }
+                    appState.currentUser = user
+                }
+                if key == "showActivity" && value {
+                    appState.reportActiveStatus(force: true)
+                }
+                statusNote = ""
+            } catch {
+                setStoredBool(key, previous)
+                statusNote = "Chưa lưu. \(error.localizedDescription)"
+                appState.showToast(statusNote)
+                if UIReviewFixture.activeScreen == "privacy-toggle-error" {
+                    UIReviewFixture.writeDocument("privacy-toggle-error.json", [
+                        "rolledBack": storedBool(key) == previous,
+                        "successToast": false,
+                        "note": statusNote
+                    ])
+                }
             }
         }
     }
 
     private func updateDmMode(_ mode: String) {
         let normalized = mode == "friends" ? "friends" : "everyone"
+        let previous = dmFriendsOnly
         dmFriendsOnly = normalized == "friends"
-        if var user = appState.currentUser {
-            user.dmMode = normalized
-            appState.currentUser = user
-        }
+        statusNote = "Đang lưu..."
         Task {
             do {
                 _ = try await KinnectAPIClient.shared.requestJSON(
@@ -509,23 +565,53 @@ private struct PrivacySettingsView: View {
                     method: "PATCH",
                     body: ["dmMode": normalized]
                 )
+                if var user = appState.currentUser {
+                    user.dmMode = normalized
+                    appState.currentUser = user
+                }
+                failedDmMode = nil
+                statusNote = ""
             } catch {
-                appState.showToast(error.localizedDescription)
+                dmFriendsOnly = previous
+                failedDmMode = normalized
+                statusNote = "Chưa lưu ai có thể nhắn tin. \(error.localizedDescription)"
+                appState.showToast(statusNote)
+                if UIReviewFixture.activeScreen == "dm-mode-error" {
+                    UIReviewFixture.writeDocument("dm-mode-error.json", [
+                        "rolledBack": dmFriendsOnly == previous,
+                        "retry": failedDmMode != nil,
+                        "successToast": false,
+                        "mode": normalized
+                    ])
+                }
             }
         }
     }
 
     private func turnOffLocation() async {
-        _ = try? await KinnectAPIClient.shared.requestJSON(
-            "/api/me/location",
-            method: "PATCH",
-            body: ["enabled": false]
-        )
-        if var user = appState.currentUser {
-            user.hasLocation = false
-            appState.currentUser = user
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/me/location",
+                method: "PATCH",
+                body: ["enabled": false]
+            )
+            if var user = appState.currentUser {
+                user.hasLocation = false
+                appState.currentUser = user
+            }
+            statusNote = ""
+            appState.showToast("Đã tắt tìm quanh đây")
+        } catch {
+            statusNote = "Chưa tắt tìm quanh đây. \(error.localizedDescription)"
+            appState.showToast(statusNote)
+            if UIReviewFixture.activeScreen == "location-off-error" {
+                UIReviewFixture.writeDocument("location-off-error.json", [
+                    "saved": false,
+                    "successToast": false,
+                    "note": statusNote
+                ])
+            }
         }
-        appState.showToast("Đã tắt tìm quanh đây")
     }
 }
 
@@ -951,7 +1037,13 @@ struct AdminConsoleView: View {
     }
 
     private func reload() async {
-        guard allowed else { return }
+        guard allowed else {
+            UIReviewFixture.writeDocument("admin-denied.json", [
+                "allowed": false,
+                "adminApiCalls": UIReviewFixture.adminApiCalls
+            ])
+            return
+        }
         corePhase = "loading"
         economyPhase = "loading"
         aiPhase = "loading"
@@ -1003,6 +1095,11 @@ struct AdminConsoleView: View {
             return
         }
         let config = data["config"] as? [String: Any] ?? [:]
+        if config.isEmpty {
+            aiLine = ""
+            aiPhase = "empty"
+            return
+        }
         let ready = (config["ready"] as? Bool) ?? ((config["ready"] as? NSNumber)?.boolValue ?? false)
         let queue = (config["queue"] as? NSNumber)?.intValue ?? (config["queue"] as? Int) ?? 0
         let failed = (config["failed"] as? NSNumber)?.intValue ?? (config["failed"] as? Int) ?? 0

@@ -2063,36 +2063,61 @@ struct ActiveSessionsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
     @State private var sessions: [[String: Any]] = []
+    @State private var phase = "loading"
+    @State private var errorText = ""
 
     var body: some View {
         NavigationStack {
             List {
-                ForEach(Array(sessions.enumerated()), id: \.offset) { _, s in
-                    let sid = s["id"] as? String ?? ""
-                    let label = (s["label"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Thiết bị Kinnect"
-                    let current = s["current"] as? Bool ?? false
-                    let expires = (s["expires"] as? NSNumber)?.int64Value ?? (s["expires"] as? Int64) ?? Int64((s["expires"] as? Int) ?? 0)
-                    HStack {
+                if phase == "loading" {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text("Đang tải phiên đăng nhập.")
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                } else if phase == "failed" {
+                    Text(errorText.isEmpty ? "Chưa tải được phiên đăng nhập." : errorText)
+                        .foregroundColor(KinnectTheme.danger)
+                    Button("Thử lại") { Task { await loadSessions() } }
+                } else if sessions.isEmpty {
+                    Text("Chưa có phiên đăng nhập.")
+                        .foregroundColor(KinnectTheme.textSecondary)
+                }
+                if phase == "ready" {
+                    ForEach(Array(sessions.enumerated()), id: \.offset) { _, s in
+                        let sid = s["id"] as? String ?? ""
+                        let label = (s["label"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Thiết bị Kinnect"
+                        let current = s["current"] as? Bool ?? false
+                        let expires = (s["expires"] as? NSNumber)?.int64Value ?? (s["expires"] as? Int64) ?? Int64((s["expires"] as? Int) ?? 0)
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(label)
-                                .font(.subheadline.bold())
-                                .foregroundColor(KinnectTheme.textPrimary)
-                                .kinnectMultiline()
-                            Text(current ? "Thiết bị hiện tại" : Self.sessionExpiry(expires))
-                                .font(.caption)
-                                .foregroundColor(current ? KinnectTheme.online : KinnectTheme.textSecondary)
-                        }
-                        Spacer()
-                        if !current && !sid.isEmpty {
-                            Button(role: .destructive) {
-                                Task { await revokeSession(sid) }
-                            } label: {
-                                Text("Đăng xuất")
-                                    .font(.caption.bold())
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(label)
+                                        .font(.subheadline.bold())
+                                        .foregroundColor(KinnectTheme.textPrimary)
+                                        .kinnectMultiline()
+                                    Text(current ? "Thiết bị hiện tại" : Self.sessionExpiry(expires))
+                                        .font(.caption)
+                                        .foregroundColor(current ? KinnectTheme.online : KinnectTheme.textSecondary)
+                                }
+                                Spacer()
+                                if !current && !sid.isEmpty {
+                                    Button(role: .destructive) {
+                                        Task { await revokeSession(sid) }
+                                    } label: {
+                                        Text("Đăng xuất thiết bị")
+                                            .font(.caption.bold())
+                                    }
+                                }
+                            }
+                            if current {
+                                Text("Phiên này kết thúc bằng Đăng xuất ở menu tài khoản. Máy chủ không cho thu hồi chính phiên đang dùng.")
+                                    .font(.caption)
+                                    .foregroundColor(KinnectTheme.textSecondary)
                             }
                         }
+                        .listRowBackground(KinnectTheme.surface)
                     }
-                    .listRowBackground(KinnectTheme.surface)
                 }
             }
             .listStyle(.plain)
@@ -2123,19 +2148,31 @@ struct ActiveSessionsSheet: View {
     }
 
     private func loadSessions() async {
-        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/me/sessions") {
-            self.sessions = res["sessions"] as? [[String: Any]] ?? []
+        phase = "loading"
+        errorText = ""
+        do {
+            let res = try await KinnectAPIClient.shared.requestJSON("/api/me/sessions")
+            sessions = res["sessions"] as? [[String: Any]] ?? []
+            phase = "ready"
+        } catch {
+            sessions = []
+            phase = "failed"
+            errorText = error.localizedDescription
         }
     }
 
     private func revokeSession(_ id: String) async {
-        _ = try? await KinnectAPIClient.shared.requestJSON(
-            "/api/me/sessions/\(id)",
-            method: "DELETE",
-            body: [:],
-            requestId: "revoke_\(id)"
-        )
-        await loadSessions()
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/me/sessions/\(id)",
+                method: "DELETE",
+                body: [:],
+                requestId: "revoke_\(id)"
+            )
+            await loadSessions()
+        } catch {
+            appState.showToast("Chưa đăng xuất thiết bị này. \(error.localizedDescription)")
+        }
     }
 }
 
@@ -2515,6 +2552,12 @@ struct PrivacySettingsSheet: View {
     @State private var dmFriendsOnly: Bool = false
     @State private var cloudChatSync: Bool = true
     @State private var isSaving = false
+    @State private var unsavedNote = ""
+    @State private var savedDiscoverable = true
+    @State private var savedShowDistance = true
+    @State private var savedShowActivity = true
+    @State private var savedDmFriendsOnly = false
+    @State private var savedCloudChatSync = true
 
     var body: some View {
         NavigationStack {
@@ -2637,6 +2680,14 @@ struct PrivacySettingsSheet: View {
                 }
             }
             }
+            if !unsavedNote.isEmpty {
+                Text(unsavedNote)
+                    .font(KinnectTheme.caption)
+                    .foregroundColor(KinnectTheme.danger)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+            }
             Button {
                 Task { await saveSettings() }
             } label: {
@@ -2670,37 +2721,64 @@ struct PrivacySettingsSheet: View {
             }
             .task {
                 await loadSettings()
+                if UIReviewFixture.activeScreen == "privacy-save-error" {
+                    discoverable = false
+                    await saveSettings()
+                }
             }
         }
     }
 
     private func loadSettings() async {
         if UIReviewFixture.activeScreen != nil {
-            self.discoverable = true
-            self.showDistance = true
-            self.showActivity = true
-            self.dmFriendsOnly = false
-            self.cloudChatSync = true
+            apply(discoverable: true, showDistance: true, showActivity: true, dmFriendsOnly: false, cloudChatSync: true, commitSaved: true)
             return
         }
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/me") {
             let user = (res["user"] as? [String: Any]) ?? res
-            self.discoverable = (user["discoverable"] as? Bool) ?? ((user["discoverable"] as? Int) == 1)
-            self.showDistance = (user["showDistance"] as? Bool) ?? ((user["show_distance"] as? Int) == 1)
-            self.showActivity = (user["showActivity"] as? Bool) ?? ((user["show_activity"] as? Int) == 1)
             let dm = user["dmMode"] as? String ?? user["dm_mode"] as? String ?? "everyone"
-            self.dmFriendsOnly = (dm == "friends")
-            self.cloudChatSync = (user["cloudChatSync"] as? Bool) ?? ((user["cloud_chat_sync"] as? Int) == 1)
+            apply(
+                discoverable: (user["discoverable"] as? Bool) ?? ((user["discoverable"] as? Int) == 1),
+                showDistance: (user["showDistance"] as? Bool) ?? ((user["show_distance"] as? Int) == 1),
+                showActivity: (user["showActivity"] as? Bool) ?? ((user["show_activity"] as? Int) == 1),
+                dmFriendsOnly: dm == "friends",
+                cloudChatSync: (user["cloudChatSync"] as? Bool) ?? ((user["cloud_chat_sync"] as? Int) == 1),
+                commitSaved: true
+            )
         }
     }
 
+    private func apply(discoverable: Bool, showDistance: Bool, showActivity: Bool, dmFriendsOnly: Bool, cloudChatSync: Bool, commitSaved: Bool) {
+        self.discoverable = discoverable
+        self.showDistance = showDistance
+        self.showActivity = showActivity
+        self.dmFriendsOnly = dmFriendsOnly
+        self.cloudChatSync = cloudChatSync
+        if commitSaved {
+            savedDiscoverable = discoverable
+            savedShowDistance = showDistance
+            savedShowActivity = showActivity
+            savedDmFriendsOnly = dmFriendsOnly
+            savedCloudChatSync = cloudChatSync
+        }
+    }
+
+    private func restoreSaved() {
+        discoverable = savedDiscoverable
+        showDistance = savedShowDistance
+        showActivity = savedShowActivity
+        dmFriendsOnly = savedDmFriendsOnly
+        cloudChatSync = savedCloudChatSync
+    }
+
     private func saveSettings() async {
-        if UIReviewFixture.activeScreen != nil {
+        if UIReviewFixture.activeScreen == "privacy-settings" {
             appState.showToast("Đã cập nhật quyền riêng tư.")
             dismiss()
             return
         }
         isSaving = true
+        unsavedNote = "Đang lưu..."
         defer { isSaving = false }
         do {
             _ = try await KinnectAPIClient.shared.requestJSON(
@@ -2714,20 +2792,36 @@ struct PrivacySettingsSheet: View {
                     "cloudChatSync": cloudChatSync
                 ]
             )
+            savedDiscoverable = discoverable
+            savedShowDistance = showDistance
+            savedShowActivity = showActivity
+            savedDmFriendsOnly = dmFriendsOnly
+            savedCloudChatSync = cloudChatSync
             if var user = appState.currentUser {
                 user.discoverable = discoverable
                 user.showDistance = showDistance
                 user.showActivity = showActivity
+                user.dmMode = dmFriendsOnly ? "friends" : "everyone"
                 user.cloudChatSync = cloudChatSync
                 appState.currentUser = user
             }
             if showActivity {
                 appState.reportActiveStatus(force: true)
             }
+            unsavedNote = ""
             appState.showToast("Đã cập nhật quyền riêng tư.")
             dismiss()
         } catch {
-            appState.showToast(error.localizedDescription)
+            restoreSaved()
+            unsavedNote = "Chưa lưu. \(error.localizedDescription)"
+            appState.showToast(unsavedNote)
+            if UIReviewFixture.activeScreen == "privacy-save-error" {
+                UIReviewFixture.writeDocument("privacy-save-error.json", [
+                    "rolledBack": discoverable == savedDiscoverable,
+                    "successToast": false,
+                    "note": unsavedNote
+                ])
+            }
         }
     }
 }

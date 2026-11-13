@@ -117,6 +117,14 @@ final class KinnectAPIClient {
         allowPrivacyAutoRetry: Bool = true
     ) async throws -> [String: Any] {
         if UIReviewFixture.isEnabled {
+            UIReviewFixture.noteTransport(method: method, path: path)
+            if let message = UIReviewFixture.forcedError(method: method, path: path) {
+                throw KinnectAPIError.serverMessage(message)
+            }
+            let delay = UIReviewFixture.delayNanoseconds(method: method, path: path)
+            if delay > 0 {
+                try await Task.sleep(nanoseconds: delay)
+            }
             return UIReviewFixture.mockResponse(for: path)
         }
         let safeToRetryOnFallback = isIdempotent ?? (method == "GET" || method == "HEAD" || (body?["requestId"] as? String != nil))

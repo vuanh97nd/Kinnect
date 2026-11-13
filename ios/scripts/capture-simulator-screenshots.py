@@ -318,7 +318,7 @@ def capture_screen(device, slug, screen_arg, bundle_id, extra_args=None, wait_se
     run(cmd)
 
     if screen_arg == "shorts-avplayer":
-        actual_wait = 12.0
+        actual_wait = 16.0
     elif screen_arg in ("auth", "auth-login-keyboard", "auth-login-password-keyboard", "auth-login-lang-sheet", "shorts-telemetry"):
         actual_wait = 6.0
     else:
@@ -339,6 +339,12 @@ def capture_screen(device, slug, screen_arg, bundle_id, extra_args=None, wait_se
         "shorts-avplayer": "shorts-avplayer.json",
         "persist-write": "persist-write.json",
         "persist-read": "persist-read.json",
+        "privacy-save-error": "privacy-save-error.json",
+        "privacy-toggle-error": "privacy-toggle-error.json",
+        "dm-mode-error": "dm-mode-error.json",
+        "location-off-error": "location-off-error.json",
+        "admin-denied": "admin-denied.json",
+        "gift-catalog-v1": "gift-catalog-v1.json",
     }.get(screen_arg)
     if document_name:
         copy_app_document(udid, bundle_id, document_name)
@@ -516,8 +522,18 @@ def main():
         ("19b-persist-write", "persist-write", [], "Ghi ngôn ngữ và thông báo vào máy"),
         ("19c-persist-read", "persist-read", [], "Đọc lại sau khi tắt app"),
         ("19d-shorts-telemetry", "shorts-telemetry", [], "Pause, mute, resume và swipe"),
-        ("19e-shorts-avplayer", "shorts-avplayer", [], "AVPlayer phát file mẫu, mute khi pause không tự chạy"),
+        ("19e-shorts-avplayer", "shorts-avplayer", [], "AVPlayer: đồng hồ, điểm ảnh và player thứ hai"),
+        ("19f-gift-catalog-v1", "gift-catalog-v1", [], "Adapter catalog quà phiên bản 1"),
         ("13m2-iphone-admin-denied", "admin-denied", [], "Bảng quản trị khi không phải quản trị viên"),
+        ("13m3-iphone-admin-loading", "admin-loading", [], "Bảng quản trị đang tải"),
+        ("13m4-iphone-admin-empty", "admin-empty", [], "Bảng quản trị không có dữ liệu"),
+        ("13m5-iphone-admin-error", "admin-error", [], "Bảng quản trị lỗi và nút thử lại"),
+        ("13i3-iphone-privacy-save-error", "privacy-save-error", [], "Lưu quyền riêng tư lỗi, khôi phục và không báo thành công"),
+        ("13p-dm-mode-error", "dm-mode-error", [], "dmMode lỗi thì quay lại và có thử lại"),
+        ("13q-location-off-error", "location-off-error", [], "Tắt vị trí lỗi thì không báo đã tắt"),
+        ("13r-sessions-loading", "sessions-loading", [], "Phiên đăng nhập đang tải"),
+        ("13s-sessions-error", "sessions-error", [], "Phiên đăng nhập lỗi và thử lại"),
+        ("13t-sessions-empty", "sessions-empty", [], "Phiên đăng nhập trống sau khi tải xong"),
         ("13j-iphone-support", "support", [], "Trung tâm Hỗ trợ & Trợ giúp người dùng (124)"),
         ("13l-iphone-support-chat", "support-chat", [], "Trung tâm hỗ trợ mở cuộc trò chuyện trực tiếp"),
         ("13m-iphone-admin", "admin", [], "Bảng quản trị: báo cáo và thành viên"),

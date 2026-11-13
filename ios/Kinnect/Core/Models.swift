@@ -618,11 +618,16 @@ struct LiveGiftCatalogItem: Identifiable, Equatable {
     var tier: String
 
     static func from(_ dict: [String: Any]) -> LiveGiftCatalogItem {
-        LiveGiftCatalogItem(
+        func number(_ key: String) -> Int? {
+            if let value = dict[key] as? Int { return value }
+            if let value = dict[key] as? NSNumber { return value.intValue }
+            return nil
+        }
+        return LiveGiftCatalogItem(
             id: (dict["id"] as? String) ?? (dict["reaction"] as? String) ?? UUID().uuidString,
             label: (dict["label"] as? String) ?? (dict["name"] as? String) ?? "Quà tặng",
             emoji: (dict["emoji"] as? String) ?? (dict["icon"] as? String) ?? "🎁",
-            coins: (dict["coins"] as? Int) ?? (dict["priceCoins"] as? Int) ?? (dict["price"] as? Int) ?? 10,
+            coins: number("coins") ?? number("costCoins") ?? number("priceCoins") ?? number("price") ?? 10,
             tier: (dict["tier"] as? String) ?? "standard"
         )
     }
@@ -639,6 +644,25 @@ struct LiveGiftCatalogItem: Identifiable, Equatable {
         LiveGiftCatalogItem(id: "sports_car", label: "Siêu xe", emoji: "🏎️", coins: 5000, tier: "legendary"),
         LiveGiftCatalogItem(id: "castle", label: "Lâu đài", emoji: "🏰", coins: 10000, tier: "legendary")
     ]
+}
+
+enum LiveGiftCatalogAdapter {
+    struct Parsed {
+        let version: Int
+        let items: [LiveGiftCatalogItem]
+    }
+
+    static func parse(_ payload: [String: Any]) -> Parsed {
+        let version = number(payload["version"]) ?? number(payload["priceVersion"]) ?? 0
+        let raw = (payload["items"] as? [[String: Any]]) ?? (payload["gifts"] as? [[String: Any]]) ?? []
+        return Parsed(version: version, items: raw.map(LiveGiftCatalogItem.from))
+    }
+
+    private static func number(_ value: Any?) -> Int? {
+        if let value = value as? Int { return value }
+        if let value = value as? NSNumber { return value.intValue }
+        return nil
+    }
 }
 
 struct WalletEntryItem: Identifiable, Equatable {

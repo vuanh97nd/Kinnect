@@ -27,6 +27,70 @@ enum UIReviewFixture {
         activeScreen != nil
     }
 
+    static var adminApiCalls = 0
+
+    static func noteTransport(method: String, path: String) {
+        let clean = path.components(separatedBy: "?").first ?? path
+        if clean.hasPrefix("/api/admin") || clean == "/api/music" {
+            adminApiCalls += 1
+        }
+        _ = method
+    }
+
+    static func forcedError(method: String, path: String) -> String? {
+        let clean = path.components(separatedBy: "?").first ?? path
+        switch activeScreen {
+        case "privacy-save-error", "privacy-toggle-error", "dm-mode-error":
+            if method == "PATCH" && clean == "/api/me" {
+                return "Không lưu được lên máy chủ."
+            }
+        case "location-off-error":
+            if method == "PATCH" && clean == "/api/me/location" {
+                return "Không tắt được tìm quanh đây."
+            }
+        case "sessions-error":
+            if clean == "/api/me/sessions" || clean == "/api/sessions" {
+                return "Không tải được phiên đăng nhập."
+            }
+        case "admin-error":
+            if clean.hasPrefix("/api/admin") || clean == "/api/music" {
+                return "Không tải được dữ liệu quản trị."
+            }
+        default:
+            break
+        }
+        return nil
+    }
+
+    static func delayNanoseconds(method: String, path: String) -> UInt64 {
+        let clean = path.components(separatedBy: "?").first ?? path
+        _ = method
+        if activeScreen == "admin-loading" && (clean.hasPrefix("/api/admin") || clean == "/api/music") {
+            return 8_000_000_000
+        }
+        if activeScreen == "sessions-loading" && (clean == "/api/me/sessions" || clean == "/api/sessions") {
+            return 8_000_000_000
+        }
+        return 0
+    }
+
+    static func prefersEmpty(_ path: String) -> Bool {
+        let clean = path.components(separatedBy: "?").first ?? path
+        if activeScreen == "sessions-empty" && (clean == "/api/me/sessions" || clean == "/api/sessions") {
+            return true
+        }
+        if activeScreen == "admin-empty" && (clean.hasPrefix("/api/admin") || clean == "/api/music") {
+            return true
+        }
+        return false
+    }
+
+    static func writeDocument(_ name: String, _ payload: [String: Any]) {
+        guard let data = try? JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted]),
+              let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+        try? data.write(to: dir.appendingPathComponent(name))
+    }
+
     /// Camera and microphone prompts belong only to capture, live, and call screens.
     /// Password, chat, and settings fixtures must not raise a system permission dialog.
     static var allowsCapturePrompt: Bool {
@@ -148,6 +212,24 @@ enum UIReviewFixture {
 
     static func mockResponse(for path: String) -> [String: Any] {
         let cleanPath = path.components(separatedBy: "?").first ?? path
+        if prefersEmpty(cleanPath) {
+            switch cleanPath {
+            case "/api/admin/reports":
+                return ["reports": []]
+            case "/api/admin/users":
+                return ["users": []]
+            case "/api/admin/economy":
+                return ["version": 1, "config": ["giftPrices": [String: Int]()]]
+            case "/api/admin/ai":
+                return ["config": [String: Any]()]
+            case "/api/music":
+                return ["tracks": []]
+            case "/api/sessions", "/api/me/sessions":
+                return ["sessions": []]
+            default:
+                break
+            }
+        }
 
         switch cleanPath {
         case "/api/me":
@@ -1618,8 +1700,18 @@ enum UIReviewFixture {
             return AnyView(ShortsTelemetryProbe())
         case "shorts-avplayer":
             return AnyView(ShortsAVPlayerProbe())
+        case "gift-catalog-v1":
+            return AnyView(GiftCatalogVersionProbe())
         case "admin-denied":
             return AnyView(AdminConsoleView())
+        case "admin-loading", "admin-empty", "admin-error":
+            return AnyView(AdminConsoleView())
+        case "privacy-save-error":
+            return AnyView(PrivacySettingsSheet())
+        case "privacy-toggle-error", "dm-mode-error", "location-off-error":
+            return AnyView(PrivacySettingsView())
+        case "sessions-loading", "sessions-error", "sessions-empty":
+            return AnyView(NavigationStack { ActiveSessionsSheet() })
 
         default:
             return AnyView(RootMainView())
@@ -1798,10 +1890,14 @@ private struct ShortsAVPlayerProbe: View {
 
     private func run() async {
         guard let url = UIReviewFixture.samplePlayableVideoURL() else {
-            publish(["video=missing"], ready: false, decoded: false, held: false, advanced: false, playTime: 0, pauseRate: 0, muteRate: 0)
+            publish(lines: ["video=missing"], clock: false, pixel: false, swipe: false, held: false, advanced: false, playTime: 0, pauseRate: 0, muteRate: 0, red: 0, green: 0, blue: 0)
             return
         }
         let item = AVPlayerItem(url: url)
+        let output = AVPlayerItemVideoOutput(pixelBufferAttributes: [
+            kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)
+        ])
+        item.add(output)
         let next = AVPlayer(playerItem: item)
         next.isMuted = false
         player = next
@@ -1810,6 +1906,7 @@ private struct ShortsAVPlayerProbe: View {
         try? await Task.sleep(nanoseconds: 500_000_000)
         let playTime = seconds(next.currentTime())
         let playRate = Double(next.rate)
+        let pixel = await samplePixel(output, item: item)
         next.pause()
         let pauseTime = seconds(next.currentTime())
         let pauseRate = Double(next.rate)
@@ -1823,26 +1920,80 @@ private struct ShortsAVPlayerProbe: View {
         try? await Task.sleep(nanoseconds: 400_000_000)
         let resumeTime = seconds(next.currentTime())
         let resumeRate = Double(next.rate)
-        let decoded = ready && playTime > 0.05
+        let clock = ready && playTime > 0.05
         let advanced = resumeTime > muteTime + 0.05
+        next.pause()
+        let heldAfterPause = seconds(next.currentTime())
+        let second = AVPlayerItem(url: url)
+        let secondOutput = AVPlayerItemVideoOutput(pixelBufferAttributes: [
+            kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)
+        ])
+        second.add(secondOutput)
+        let secondPlayer = AVPlayer(playerItem: second)
+        secondPlayer.isMuted = true
+        player = secondPlayer
+        let secondReady = await waitReady(second)
+        secondPlayer.play()
+        try? await Task.sleep(nanoseconds: 450_000_000)
+        let secondTime = seconds(secondPlayer.currentTime())
+        let secondPixel = await samplePixel(secondOutput, item: second)
+        let firstHeld = abs(seconds(next.currentTime()) - heldAfterPause) < 0.08 && next.rate == 0
+        let swipe = secondReady && secondTime > 0.05 && secondPixel.proof && firstHeld
         publish(
-            [
+            lines: [
                 "file=\(url.lastPathComponent)",
                 "status=\(ready ? "ready" : "not-ready")",
                 String(format: "play time=%.3f rate=%.2f", playTime, playRate),
                 String(format: "pause time=%.3f rate=%.2f", pauseTime, pauseRate),
                 String(format: "mute-while-paused time=%.3f rate=%.2f muted=%@ held=%@", muteTime, muteRate, next.isMuted ? "yes" : "no", held ? "yes" : "no"),
                 String(format: "resume time=%.3f rate=%.2f advanced=%@", resumeTime, resumeRate, advanced ? "yes" : "no"),
-                "decodedFrames=\(decoded ? "yes" : "no")"
+                "clockAdvanced=\(clock ? "yes" : "no")",
+                String(format: "pixel r=%d g=%d b=%d proof=%@", pixel.red, pixel.green, pixel.blue, pixel.proof ? "yes" : "no"),
+                String(format: "secondPlayer time=%.3f pixel=%@ firstHeld=%@ swipe=%@", secondTime, secondPixel.proof ? "yes" : "no", firstHeld ? "yes" : "no", swipe ? "yes" : "no")
             ],
-            ready: ready,
-            decoded: decoded,
+            clock: clock,
+            pixel: pixel.proof,
+            swipe: swipe,
             held: held,
             advanced: advanced,
             playTime: playTime,
             pauseRate: pauseRate,
-            muteRate: muteRate
+            muteRate: muteRate,
+            red: pixel.red,
+            green: pixel.green,
+            blue: pixel.blue
         )
+    }
+
+    private func samplePixel(_ output: AVPlayerItemVideoOutput, item: AVPlayerItem) async -> (proof: Bool, red: Int, green: Int, blue: Int) {
+        let start = Date()
+        while Date().timeIntervalSince(start) < 1.2 {
+            let time = item.currentTime()
+            if output.hasNewPixelBuffer(forItemTime: time),
+               let buffer = output.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) {
+                return readPixel(buffer)
+            }
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        return (false, 0, 0, 0)
+    }
+
+    private func readPixel(_ buffer: CVPixelBuffer) -> (proof: Bool, red: Int, green: Int, blue: Int) {
+        CVPixelBufferLockBaseAddress(buffer, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
+        let width = CVPixelBufferGetWidth(buffer)
+        let height = CVPixelBufferGetHeight(buffer)
+        guard width > 1, height > 1, let base = CVPixelBufferGetBaseAddress(buffer) else {
+            return (false, 0, 0, 0)
+        }
+        let row = CVPixelBufferGetBytesPerRow(buffer)
+        let x = min(8, width - 1)
+        let y = min(8, height - 1)
+        let pixel = base.advanced(by: y * row + x * 4).assumingMemoryBound(to: UInt8.self)
+        let blue = Int(pixel[0])
+        let green = Int(pixel[1])
+        let red = Int(pixel[2])
+        return (red + green + blue > 20, red, green, blue)
     }
 
     private func waitReady(_ item: AVPlayerItem) async -> Bool {
@@ -1861,31 +2012,103 @@ private struct ShortsAVPlayerProbe: View {
     }
 
     private func publish(
-        _ shown: [String],
-        ready: Bool,
-        decoded: Bool,
+        lines shown: [String],
+        clock: Bool,
+        pixel: Bool,
+        swipe: Bool,
         held: Bool,
         advanced: Bool,
         playTime: Double,
         pauseRate: Double,
-        muteRate: Double
+        muteRate: Double,
+        red: Int,
+        green: Int,
+        blue: Int
     ) {
         lines = shown
         let payload: [String: Any] = [
             "lines": shown,
-            "ready": ready,
-            "decodedFrames": decoded,
+            "clockAdvanced": clock,
+            "pixelProof": pixel,
+            "pixel": ["r": red, "g": green, "b": blue],
+            "swipeMeasured": swipe,
+            "swipeMethod": "second-avplayer",
             "muteHeldPause": held,
             "resumedWhileMuted": advanced,
             "playTime": playTime,
             "pauseRate": pauseRate,
             "muteRate": muteRate
         ]
-        if let data = try? JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted]),
-           let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-            try? data.write(to: dir.appendingPathComponent("shorts-avplayer.json"))
-        }
+        UIReviewFixture.writeDocument("shorts-avplayer.json", payload)
     }
+}
+
+private struct GiftCatalogVersionProbe: View {
+    @State private var lines: [String] = []
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Catalog quà phiên bản 1")
+                    .font(KinnectTheme.sectionTitle)
+                ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                    Text(line).font(KinnectTheme.caption)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(20)
+        }
+        .background(KinnectTheme.background)
+        .task { run() }
+    }
+
+    private func run() {
+        let parsed = LiveGiftCatalogAdapter.parse(Self.versionOnePayload)
+        let rose = parsed.items.first { $0.id == "rose" }?.coins ?? -1
+        let crown = parsed.items.first { $0.id == "crown" }?.coins ?? -1
+        let star = parsed.items.first { $0.id == "star" }?.coins ?? -1
+        let matched = parsed.version == 1 && parsed.items.count == 16 && rose == 50 && star == 100 && crown == 200
+        lines = [
+            "version=\(parsed.version)",
+            "count=\(parsed.items.count)",
+            "rose=\(rose)",
+            "star=\(star)",
+            "crown=\(crown)",
+            "matchesIsolatedCatalog=\(matched ? "yes" : "no")"
+        ]
+        UIReviewFixture.writeDocument("gift-catalog-v1.json", [
+            "version": parsed.version,
+            "count": parsed.items.count,
+            "rose": rose,
+            "star": star,
+            "crown": crown,
+            "matchesIsolatedCatalog": matched
+        ])
+    }
+
+    private static let versionOnePayload: [String: Any] = [
+        "enabled": true,
+        "experience": true,
+        "version": 1,
+        "items": [
+            ["id": "rose", "name": "Hoa hồng", "tier": "small", "costCoins": 50],
+            ["id": "heart", "name": "Trái tim", "tier": "small", "costCoins": 50],
+            ["id": "coffee", "name": "Cà phê", "tier": "small", "costCoins": 100],
+            ["id": "love_gun", "name": "Súng tình yêu", "tier": "medium", "costCoins": 150],
+            ["id": "fireworks", "name": "Pháo hoa", "tier": "medium", "costCoins": 200],
+            ["id": "star", "name": "Sao pha lê", "tier": "small", "costCoins": 100],
+            ["id": "crown", "name": "Vương miện", "tier": "medium", "costCoins": 200],
+            ["id": "diamond", "name": "Kim cương", "tier": "medium", "costCoins": 500],
+            ["id": "car", "name": "Siêu xe", "tier": "large", "costCoins": 800],
+            ["id": "sports_car", "name": "Siêu xe thể thao", "tier": "large", "costCoins": 1000],
+            ["id": "yacht", "name": "Du thuyền", "tier": "large", "costCoins": 1200],
+            ["id": "castle", "name": "Lâu đài", "tier": "legendary", "costCoins": 2000],
+            ["id": "aurora", "name": "Cực quang", "tier": "medium", "costCoins": 300],
+            ["id": "meteor", "name": "Sao băng", "tier": "medium", "costCoins": 400],
+            ["id": "butterfly", "name": "Bướm mộng", "tier": "small", "costCoins": 150],
+            ["id": "lotus", "name": "Sen ánh sáng", "tier": "medium", "costCoins": 250]
+        ]
+    ]
 }
 
 private struct ReviewGiftDrawer: View {
