@@ -2617,28 +2617,33 @@ struct PrivacySettingsSheet: View {
                     }
                     .padding(16)
                     .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusXL).fill(KinnectTheme.surface))
-
-                    Button {
-                        Task { await saveSettings() }
-                    } label: {
-                        HStack(spacing: 8) {
-                            if isSaving {
-                                ProgressView().tint(.white)
-                            }
-                            Text("Lưu cài đặt")
-                                .font(.headline)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 48)
-                        .background(KinnectTheme.primaryGradient)
-                        .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD))
-                    }
-                    .disabled(isSaving)
-                    .padding(.top, 4)
                 }
                 .padding(20)
+                .padding(.bottom, 8)
             }
             .background(KinnectTheme.background)
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    Task { await saveSettings() }
+                } label: {
+                    HStack(spacing: 8) {
+                        if isSaving {
+                            ProgressView().tint(.white)
+                        }
+                        Text("Lưu cài đặt")
+                            .font(.headline)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .background(KinnectTheme.primaryGradient)
+                    .foregroundColor(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD))
+                }
+                .disabled(isSaving)
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 12)
+                .background(KinnectTheme.background)
+            }
             .navigationTitle("Quyền riêng tư")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
