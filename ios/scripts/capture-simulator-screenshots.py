@@ -348,6 +348,8 @@ def capture_screen(device, slug, screen_arg, bundle_id, extra_args=None, wait_se
     }.get(screen_arg)
     if document_name:
         copy_app_document(udid, bundle_id, document_name)
+    if screen_arg == "shorts-avplayer":
+        copy_app_document(udid, bundle_id, "shorts-avplayer-frame.png")
 
     if is_light:
         subprocess.run(["xcrun", "simctl", "ui", udid, "appearance", "dark"], check=False)
@@ -522,7 +524,7 @@ def main():
         ("19b-persist-write", "persist-write", [], "Ghi ngôn ngữ và thông báo vào máy"),
         ("19c-persist-read", "persist-read", [], "Đọc lại sau khi tắt app"),
         ("19d-shorts-telemetry", "shorts-telemetry", [], "Pause, mute, resume và swipe"),
-        ("19e-shorts-avplayer", "shorts-avplayer", [], "AVPlayer: đồng hồ, điểm ảnh và player thứ hai"),
+        ("19e-shorts-avplayer", "shorts-avplayer", [], "AVPlayer: buffer, timestamp, kích thước và khung hình"),
         ("19f-gift-catalog-v1", "gift-catalog-v1", [], "Adapter catalog quà phiên bản 1"),
         ("13m2-iphone-admin-denied", "admin-denied", [], "Bảng quản trị khi không phải quản trị viên"),
         ("13m3-iphone-admin-loading", "admin-loading", [], "Bảng quản trị đang tải"),

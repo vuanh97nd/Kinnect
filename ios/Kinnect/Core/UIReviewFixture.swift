@@ -1,5 +1,6 @@
 import AVFoundation
 import AVKit
+import CoreImage
 import Foundation
 import SwiftUI
 import UIKit
@@ -1860,16 +1861,25 @@ private struct ShortsTelemetryProbe: View {
 private struct ShortsAVPlayerProbe: View {
     @State private var lines: [String] = ["Đang mở video mẫu trên máy."]
     @State private var player: AVPlayer?
+    @State private var frameImage: UIImage?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let player {
                 VideoPlayer(player: player)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 420)
+                    .frame(height: 280)
             } else {
                 ProgressView("Đang tạo video mẫu.")
-                    .frame(maxWidth: .infinity, minHeight: 420)
+                    .frame(maxWidth: .infinity, minHeight: 180)
+            }
+            if let frameImage {
+                Image(uiImage: frameImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 180)
+                    .accessibilityLabel("Khung điểm ảnh đã lấy từ video")
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 6) {
@@ -1890,7 +1900,7 @@ private struct ShortsAVPlayerProbe: View {
 
     private func run() async {
         guard let url = UIReviewFixture.samplePlayableVideoURL() else {
-            publish(lines: ["video=missing"], clock: false, pixel: false, swipe: false, held: false, advanced: false, playTime: 0, pauseRate: 0, muteRate: 0, red: 0, green: 0, blue: 0)
+            publish(lines: ["video=missing"], clock: false, buffer: false, frame: false, width: 0, height: 0, bufferTime: 0, probeSwitch: false, held: false, advanced: false, playTime: 0, pauseRate: 0, muteRate: 0, red: 0, green: 0, blue: 0)
             return
         }
         let item = AVPlayerItem(url: url)
@@ -1906,7 +1916,7 @@ private struct ShortsAVPlayerProbe: View {
         try? await Task.sleep(nanoseconds: 500_000_000)
         let playTime = seconds(next.currentTime())
         let playRate = Double(next.rate)
-        let pixel = await samplePixel(output, item: item)
+        let pixel = await sampleBuffer(output, item: item)
         next.pause()
         let pauseTime = seconds(next.currentTime())
         let pauseRate = Double(next.rate)
@@ -1936,9 +1946,10 @@ private struct ShortsAVPlayerProbe: View {
         secondPlayer.play()
         try? await Task.sleep(nanoseconds: 450_000_000)
         let secondTime = seconds(secondPlayer.currentTime())
-        let secondPixel = await samplePixel(secondOutput, item: second)
+        let secondBuffer = await sampleBuffer(secondOutput, item: second)
         let firstHeld = abs(seconds(next.currentTime()) - heldAfterPause) < 0.08 && next.rate == 0
-        let swipe = secondReady && secondTime > 0.05 && secondPixel.proof && firstHeld
+        let probeSwitch = secondReady && secondTime > 0.05 && secondBuffer.received && firstHeld
+        let pixelProof = pixel.received && pixel.width > 0 && pixel.height > 0 && pixel.time.isFinite && pixel.frameSaved
         publish(
             lines: [
                 "file=\(url.lastPathComponent)",
@@ -1948,12 +1959,18 @@ private struct ShortsAVPlayerProbe: View {
                 String(format: "mute-while-paused time=%.3f rate=%.2f muted=%@ held=%@", muteTime, muteRate, next.isMuted ? "yes" : "no", held ? "yes" : "no"),
                 String(format: "resume time=%.3f rate=%.2f advanced=%@", resumeTime, resumeRate, advanced ? "yes" : "no"),
                 "clockAdvanced=\(clock ? "yes" : "no")",
-                String(format: "pixel r=%d g=%d b=%d proof=%@", pixel.red, pixel.green, pixel.blue, pixel.proof ? "yes" : "no"),
-                String(format: "secondPlayer time=%.3f pixel=%@ firstHeld=%@ swipe=%@", secondTime, secondPixel.proof ? "yes" : "no", firstHeld ? "yes" : "no", swipe ? "yes" : "no")
+                String(format: "bufferReceived=%@ %dx%d time=%.3f", pixel.received ? "yes" : "no", pixel.width, pixel.height, pixel.time),
+                "frameSaved=\(pixel.frameSaved ? "yes" : "no")",
+                String(format: "cornerSample r=%d g=%d b=%d notProof=yes", pixel.red, pixel.green, pixel.blue),
+                String(format: "probePlayerSwitch=%@ shortsSwipeClosed=no", probeSwitch ? "yes" : "no")
             ],
             clock: clock,
-            pixel: pixel.proof,
-            swipe: swipe,
+            buffer: pixel.received,
+            frame: pixel.frameSaved,
+            width: pixel.width,
+            height: pixel.height,
+            bufferTime: pixel.time,
+            probeSwitch: probeSwitch,
             held: held,
             advanced: advanced,
             playTime: playTime,
@@ -1961,39 +1978,64 @@ private struct ShortsAVPlayerProbe: View {
             muteRate: muteRate,
             red: pixel.red,
             green: pixel.green,
-            blue: pixel.blue
+            blue: pixel.blue,
+            pixelProof: pixelProof
         )
     }
 
-    private func samplePixel(_ output: AVPlayerItemVideoOutput, item: AVPlayerItem) async -> (proof: Bool, red: Int, green: Int, blue: Int) {
+    private struct BufferSample {
+        var received = false
+        var width = 0
+        var height = 0
+        var time = 0.0
+        var red = 0
+        var green = 0
+        var blue = 0
+        var frameSaved = false
+    }
+
+    private func sampleBuffer(_ output: AVPlayerItemVideoOutput, item: AVPlayerItem) async -> BufferSample {
         let start = Date()
         while Date().timeIntervalSince(start) < 1.2 {
             let time = item.currentTime()
             if output.hasNewPixelBuffer(forItemTime: time),
                let buffer = output.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) {
-                return readPixel(buffer)
+                return readBuffer(buffer, time: seconds(time))
             }
             try? await Task.sleep(nanoseconds: 50_000_000)
         }
-        return (false, 0, 0, 0)
+        return BufferSample()
     }
 
-    private func readPixel(_ buffer: CVPixelBuffer) -> (proof: Bool, red: Int, green: Int, blue: Int) {
+    private func readBuffer(_ buffer: CVPixelBuffer, time: Double) -> BufferSample {
+        var sample = BufferSample()
+        sample.received = true
+        sample.width = CVPixelBufferGetWidth(buffer)
+        sample.height = CVPixelBufferGetHeight(buffer)
+        sample.time = time.isFinite ? time : 0
         CVPixelBufferLockBaseAddress(buffer, .readOnly)
-        defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
-        let width = CVPixelBufferGetWidth(buffer)
-        let height = CVPixelBufferGetHeight(buffer)
-        guard width > 1, height > 1, let base = CVPixelBufferGetBaseAddress(buffer) else {
-            return (false, 0, 0, 0)
+        if let base = CVPixelBufferGetBaseAddress(buffer), sample.width > 1, sample.height > 1 {
+            let row = CVPixelBufferGetBytesPerRow(buffer)
+            let x = min(8, sample.width - 1)
+            let y = min(8, sample.height - 1)
+            let corner = base.advanced(by: y * row + x * 4).assumingMemoryBound(to: UInt8.self)
+            sample.blue = Int(corner[0])
+            sample.green = Int(corner[1])
+            sample.red = Int(corner[2])
         }
-        let row = CVPixelBufferGetBytesPerRow(buffer)
-        let x = min(8, width - 1)
-        let y = min(8, height - 1)
-        let pixel = base.advanced(by: y * row + x * 4).assumingMemoryBound(to: UInt8.self)
-        let blue = Int(pixel[0])
-        let green = Int(pixel[1])
-        let red = Int(pixel[2])
-        return (red + green + blue > 20, red, green, blue)
+        CVPixelBufferUnlockBaseAddress(buffer, .readOnly)
+        let image = CIImage(cvPixelBuffer: buffer)
+        let context = CIContext()
+        if let cgImage = context.createCGImage(image, from: image.extent) {
+            let rendered = UIImage(cgImage: cgImage)
+            frameImage = rendered
+            if let data = rendered.pngData(),
+               let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+                let file = dir.appendingPathComponent("shorts-avplayer-frame.png")
+                sample.frameSaved = (try? data.write(to: file)) != nil
+            }
+        }
+        return sample
     }
 
     private func waitReady(_ item: AVPlayerItem) async -> Bool {
@@ -2014,8 +2056,12 @@ private struct ShortsAVPlayerProbe: View {
     private func publish(
         lines shown: [String],
         clock: Bool,
-        pixel: Bool,
-        swipe: Bool,
+        buffer: Bool,
+        frame: Bool,
+        width: Int,
+        height: Int,
+        bufferTime: Double,
+        probeSwitch: Bool,
         held: Bool,
         advanced: Bool,
         playTime: Double,
@@ -2023,15 +2069,22 @@ private struct ShortsAVPlayerProbe: View {
         muteRate: Double,
         red: Int,
         green: Int,
-        blue: Int
+        blue: Int,
+        pixelProof: Bool
     ) {
         lines = shown
         let payload: [String: Any] = [
             "lines": shown,
             "clockAdvanced": clock,
-            "pixelProof": pixel,
-            "pixel": ["r": red, "g": green, "b": blue],
-            "swipeMeasured": swipe,
+            "bufferReceived": buffer,
+            "bufferWidth": width,
+            "bufferHeight": height,
+            "bufferTimeSeconds": bufferTime,
+            "frameFile": frame ? "shorts-avplayer-frame.png" : "",
+            "pixelProof": pixelProof,
+            "cornerSample": ["r": red, "g": green, "b": blue, "usedAsProof": false],
+            "probePlayerSwitch": probeSwitch,
+            "shortsSwipeClosed": false,
             "swipeMethod": "second-avplayer",
             "muteHeldPause": held,
             "resumedWhileMuted": advanced,
@@ -2074,7 +2127,10 @@ private struct GiftCatalogVersionProbe: View {
             "rose=\(rose)",
             "star=\(star)",
             "crown=\(crown)",
-            "matchesIsolatedCatalog=\(matched ? "yes" : "no")"
+            "matchesIsolatedCatalog=\(matched ? "yes" : "no")",
+            "adapterScope=parse",
+            "drawerFixtureCrown=1000",
+            "drawerPriceParity=open"
         ]
         UIReviewFixture.writeDocument("gift-catalog-v1.json", [
             "version": parsed.version,
@@ -2082,7 +2138,10 @@ private struct GiftCatalogVersionProbe: View {
             "rose": rose,
             "star": star,
             "crown": crown,
-            "matchesIsolatedCatalog": matched
+            "matchesIsolatedCatalog": matched,
+            "adapterScope": "parse",
+            "drawerFixtureCrown": 1000,
+            "drawerPriceParity": "open"
         ])
     }
 
