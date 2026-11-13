@@ -617,16 +617,39 @@ struct LiveGiftCatalogItem: Identifiable, Equatable {
     var coins: Int
     var tier: String
 
+    static func defaultEmoji(for id: String) -> String {
+        switch id {
+        case "rose": return "🌹"
+        case "heart": return "💖"
+        case "coffee": return "☕"
+        case "love_gun": return "🔫"
+        case "fireworks": return "🎆"
+        case "star": return "⭐"
+        case "crown": return "👑"
+        case "diamond": return "💎"
+        case "car", "sports_car": return "🏎️"
+        case "yacht": return "🛥️"
+        case "castle": return "🏰"
+        case "aurora": return "🌌"
+        case "meteor": return "🌠"
+        case "butterfly": return "🦋"
+        case "lotus": return "🪷"
+        default: return "🎁"
+        }
+    }
+
     static func from(_ dict: [String: Any]) -> LiveGiftCatalogItem {
         func number(_ key: String) -> Int? {
             if let value = dict[key] as? Int { return value }
             if let value = dict[key] as? NSNumber { return value.intValue }
             return nil
         }
+        let id = (dict["id"] as? String) ?? (dict["reaction"] as? String) ?? UUID().uuidString
+        let rawEmoji = ((dict["emoji"] as? String) ?? (dict["icon"] as? String) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         return LiveGiftCatalogItem(
-            id: (dict["id"] as? String) ?? (dict["reaction"] as? String) ?? UUID().uuidString,
+            id: id,
             label: (dict["label"] as? String) ?? (dict["name"] as? String) ?? "Quà tặng",
-            emoji: (dict["emoji"] as? String) ?? (dict["icon"] as? String) ?? "🎁",
+            emoji: rawEmoji.isEmpty ? defaultEmoji(for: id) : rawEmoji,
             coins: number("coins") ?? number("costCoins") ?? number("priceCoins") ?? number("price") ?? 10,
             tier: (dict["tier"] as? String) ?? "standard"
         )

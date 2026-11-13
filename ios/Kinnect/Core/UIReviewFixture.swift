@@ -445,7 +445,8 @@ enum UIReviewFixture {
             ]
 
         case "/api/shorts":
-            let videoURL = samplePlayableVideoURL()?.absoluteString ?? ""
+            let videoURL1 = samplePlayableVideoURL()?.absoluteString ?? ""
+            let videoURL2 = sampleSecondPlayableVideoURL()?.absoluteString ?? ""
             return [
                 "shorts": [
                     [
@@ -453,12 +454,24 @@ enum UIReviewFixture {
                         "author": peerUserDict,
                         "title": "Dạo phố sáng cuối tuần [Fixture UI]",
                         "caption": "Video ngắn thử nghiệm bố cục Shorts trên iOS Simulator.",
-                        "videoUrl": videoURL,
+                        "videoUrl": videoURL1,
                         "durationSec": 15,
                         "likesCount": 128,
                         "commentsCount": 14,
                         "liked": true,
                         "createdAt": "2026-11-07T01:10:00.000Z"
+                    ],
+                    [
+                        "id": "fixture_short_2",
+                        "author": peerUserDict,
+                        "title": "Hoàng hôn bên sông Hàn [Fixture UI]",
+                        "caption": "Clip cục bộ thứ 2 kiểm thử vuốt Shorts trên iOS Simulator.",
+                        "videoUrl": videoURL2,
+                        "durationSec": 12,
+                        "likesCount": 256,
+                        "commentsCount": 24,
+                        "liked": false,
+                        "createdAt": "2026-11-07T02:20:00.000Z"
                     ]
                 ]
             ]
@@ -1224,8 +1237,16 @@ enum UIReviewFixture {
 
     /// Generates a genuine playable H.264 MP4 video file on disk for local video playback verification.
     static func samplePlayableVideoURL() -> URL? {
+        return makeSampleVideoURL(fileName: "ui_review_sample_shorts.mp4", variant: 0)
+    }
+
+    static func sampleSecondPlayableVideoURL() -> URL? {
+        return makeSampleVideoURL(fileName: "ui_review_sample_shorts_2.mp4", variant: 1)
+    }
+
+    private static func makeSampleVideoURL(fileName: String, variant: Int) -> URL? {
         let tempDir = FileManager.default.temporaryDirectory
-        let movieURL = tempDir.appendingPathComponent("ui_review_sample_shorts.mp4")
+        let movieURL = tempDir.appendingPathComponent(fileName)
         if FileManager.default.fileExists(atPath: movieURL.path) {
             return movieURL
         }
@@ -1289,12 +1310,21 @@ enum UIReviewFixture {
                 )
                 if let ctx = context {
                     let progress = CGFloat(idx) / CGFloat(totalFrames)
-                    ctx.setFillColor(red: 0.12 + 0.35 * progress, green: 0.08 + 0.15 * progress, blue: 0.42, alpha: 1.0)
-                    ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+                    if variant == 1 {
+                        ctx.setFillColor(red: 0.05, green: 0.36 + 0.28 * progress, blue: 0.42, alpha: 1.0)
+                        ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
 
-                    let circleY = CGFloat(height) * (0.3 + 0.4 * progress)
-                    ctx.setFillColor(red: 0.85, green: 0.35, blue: 0.95, alpha: 0.85)
-                    ctx.fillEllipse(in: CGRect(x: CGFloat(width)/2 - 60, y: circleY - 60, width: 120, height: 120))
+                        let circleY = CGFloat(height) * (0.65 - 0.35 * progress)
+                        ctx.setFillColor(red: 0.98, green: 0.80, blue: 0.20, alpha: 0.92)
+                        ctx.fill(CGRect(x: CGFloat(width)/2 - 70, y: circleY - 70, width: 140, height: 140))
+                    } else {
+                        ctx.setFillColor(red: 0.12 + 0.35 * progress, green: 0.08 + 0.15 * progress, blue: 0.42, alpha: 1.0)
+                        ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+
+                        let circleY = CGFloat(height) * (0.3 + 0.4 * progress)
+                        ctx.setFillColor(red: 0.85, green: 0.35, blue: 0.95, alpha: 0.85)
+                        ctx.fillEllipse(in: CGRect(x: CGFloat(width)/2 - 60, y: circleY - 60, width: 120, height: 120))
+                    }
                 }
             }
             CVPixelBufferUnlockBaseAddress(buffer, [])
@@ -1701,6 +1731,8 @@ enum UIReviewFixture {
             return AnyView(ShortsTelemetryProbe())
         case "shorts-avplayer":
             return AnyView(ShortsAVPlayerProbe())
+        case "shorts-real-swipe":
+            return AnyView(ShortsVideoView())
         case "gift-catalog-v1":
             return AnyView(GiftCatalogVersionProbe())
         case "admin-denied":
@@ -1985,63 +2017,12 @@ private struct ShortsAVPlayerProbe: View {
         )
     }
 
-    private struct BufferSample {
-        var received = false
-        var width = 0
-        var height = 0
-        var time = 0.0
-        var red = 0
-        var green = 0
-        var blue = 0
-        var frameSaved = false
-        var frameFile = ""
-    }
+    private typealias BufferSample = UIReviewFixture.AVBufferSample
 
     private func sampleBuffer(_ output: AVPlayerItemVideoOutput, item: AVPlayerItem, fileName: String, updatePreview: Bool) async -> BufferSample {
-        let start = Date()
-        while Date().timeIntervalSince(start) < 1.2 {
-            let time = item.currentTime()
-            if output.hasNewPixelBuffer(forItemTime: time),
-               let buffer = output.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) {
-                return readBuffer(buffer, time: seconds(time), fileName: fileName, updatePreview: updatePreview)
-            }
-            try? await Task.sleep(nanoseconds: 50_000_000)
-        }
-        return BufferSample()
-    }
-
-    private func readBuffer(_ buffer: CVPixelBuffer, time: Double, fileName: String, updatePreview: Bool) -> BufferSample {
-        var sample = BufferSample()
-        sample.received = true
-        sample.width = CVPixelBufferGetWidth(buffer)
-        sample.height = CVPixelBufferGetHeight(buffer)
-        sample.time = time.isFinite ? time : 0
-        CVPixelBufferLockBaseAddress(buffer, .readOnly)
-        if let base = CVPixelBufferGetBaseAddress(buffer), sample.width > 1, sample.height > 1 {
-            let row = CVPixelBufferGetBytesPerRow(buffer)
-            let x = min(8, sample.width - 1)
-            let y = min(8, sample.height - 1)
-            let corner = base.advanced(by: y * row + x * 4).assumingMemoryBound(to: UInt8.self)
-            sample.blue = Int(corner[0])
-            sample.green = Int(corner[1])
-            sample.red = Int(corner[2])
-        }
-        CVPixelBufferUnlockBaseAddress(buffer, .readOnly)
-        let image = CIImage(cvPixelBuffer: buffer)
-        let context = CIContext()
-        if let cgImage = context.createCGImage(image, from: image.extent) {
-            let rendered = UIImage(cgImage: cgImage)
-            if updatePreview {
-                frameImage = rendered
-            }
-            if let data = rendered.pngData(),
-               let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-                let file = dir.appendingPathComponent(fileName)
-                sample.frameSaved = (try? data.write(to: file)) != nil
-                if sample.frameSaved {
-                    sample.frameFile = fileName
-                }
-            }
+        let (sample, rendered) = await UIReviewFixture.sampleVideoFrame(output: output, item: item, fileName: fileName)
+        if updatePreview, let rendered {
+            frameImage = rendered
         }
         return sample
     }
@@ -2220,4 +2201,123 @@ private struct ReviewMusicPicker: View {
             StudioMusicPickerSheet(selectedTrack: $selectedTrack)
         }
     }
+}
+
+extension UIReviewFixture {
+    struct AVBufferSample {
+        var received = false
+        var width = 0
+        var height = 0
+        var time = 0.0
+        var red = 0
+        var green = 0
+        var blue = 0
+        var frameSaved = false
+        var frameFile = ""
+    }
+
+    static func sampleVideoFrame(output: AVPlayerItemVideoOutput, item: AVPlayerItem, fileName: String) async -> (sample: AVBufferSample, image: UIImage?) {
+        let start = Date()
+        while Date().timeIntervalSince(start) < 1.5 {
+            let time = item.currentTime()
+            if output.hasNewPixelBuffer(forItemTime: time),
+               let buffer = output.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) {
+                var sample = AVBufferSample()
+                sample.received = true
+                sample.width = CVPixelBufferGetWidth(buffer)
+                sample.height = CVPixelBufferGetHeight(buffer)
+                let sec = time.seconds
+                sample.time = sec.isFinite ? sec : 0
+                CVPixelBufferLockBaseAddress(buffer, .readOnly)
+                if let base = CVPixelBufferGetBaseAddress(buffer), sample.width > 1, sample.height > 1 {
+                    let row = CVPixelBufferGetBytesPerRow(buffer)
+                    let x = min(8, sample.width - 1)
+                    let y = min(8, sample.height - 1)
+                    let corner = base.advanced(by: y * row + x * 4).assumingMemoryBound(to: UInt8.self)
+                    sample.blue = Int(corner[0])
+                    sample.green = Int(corner[1])
+                    sample.red = Int(corner[2])
+                }
+                CVPixelBufferUnlockBaseAddress(buffer, .readOnly)
+                var renderedImage: UIImage? = nil
+                let image = CIImage(cvPixelBuffer: buffer)
+                let context = CIContext()
+                if let cgImage = context.createCGImage(image, from: image.extent) {
+                    let rendered = UIImage(cgImage: cgImage)
+                    renderedImage = rendered
+                    if let data = rendered.pngData(),
+                       let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+                        let file = dir.appendingPathComponent(fileName)
+                        sample.frameSaved = (try? data.write(to: file)) != nil
+                        if sample.frameSaved {
+                            sample.frameFile = fileName
+                        }
+                    }
+                }
+                return (sample, renderedImage)
+            }
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        return (AVBufferSample(), nil)
+    }
+
+    #if DEBUG
+    final class ShortsRealSwipeObserver {
+        struct Entry {
+            let player: AVPlayer
+            let item: AVPlayerItem
+            let output: AVPlayerItemVideoOutput
+        }
+
+        static let shared = ShortsRealSwipeObserver()
+        private let lock = NSLock()
+        private var entries: [String: Entry] = [:]
+
+        func register(path: String, player: AVPlayer, item: AVPlayerItem, output: AVPlayerItemVideoOutput) {
+            lock.lock()
+            entries[path] = Entry(player: player, item: item, output: output)
+            lock.unlock()
+        }
+
+        func unregister(path: String) {
+            lock.lock()
+            entries.removeValue(forKey: path)
+            lock.unlock()
+        }
+
+        func entry(for path: String) -> Entry? {
+            lock.lock()
+            defer { lock.unlock() }
+            return entries[path]
+        }
+    }
+
+    @MainActor
+    static func findVerticalPagingScrollView() -> UIScrollView? {
+        func search(_ view: UIView) -> UIScrollView? {
+            if let sv = view as? UIScrollView,
+               sv.isScrollEnabled,
+               sv.bounds.height > 100,
+               sv.contentSize.height > sv.bounds.height * 1.4 {
+                return sv
+            }
+            for sub in view.subviews {
+                if let match = search(sub) {
+                    return match
+                }
+            }
+            return nil
+        }
+
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        for scene in scenes {
+            for window in scene.windows where !window.isHidden {
+                if let sv = search(window) {
+                    return sv
+                }
+            }
+        }
+        return nil
+    }
+    #endif
 }

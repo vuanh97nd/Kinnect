@@ -99,6 +99,11 @@ struct ShortsVideoView: View {
         }
         .task {
             await loadShorts()
+            #if DEBUG
+            if UIReviewFixture.activeScreen == "shorts-real-swipe" {
+                await runRealSwipeProof()
+            }
+            #endif
         }
         .sheet(item: $activeCommentShort) { short in
             ShortCommentsSheet(short: short) {
@@ -427,6 +432,130 @@ struct ShortsVideoView: View {
             }
         }
     }
+
+    #if DEBUG
+    @MainActor
+    private func runRealSwipeProof() async {
+        let start = Date()
+        var e0: UIReviewFixture.ShortsRealSwipeObserver.Entry? = nil
+        while Date().timeIntervalSince(start) < 5.0 {
+            if items.count >= 2,
+               let entry = UIReviewFixture.ShortsRealSwipeObserver.shared.entry(for: items[0].videoUrl),
+               entry.item.status == .readyToPlay,
+               entry.player.rate > 0,
+               entry.player.currentTime().seconds.isFinite,
+               entry.player.currentTime().seconds > 0.20 {
+                e0 = entry
+                break
+            }
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+
+        let beforeIndex = currentIndex ?? -1
+        let beforeId = (beforeIndex >= 0 && beforeIndex < items.count) ? items[beforeIndex].id : ""
+        let item0Player = e0?.player
+        let item0RateBefore = Double(item0Player?.rate ?? 0)
+        let item0TimeBefore = item0Player?.currentTime().seconds ?? 0
+        var frame1 = UIReviewFixture.AVBufferSample()
+        if let e0 {
+            (frame1, _) = await UIReviewFixture.sampleVideoFrame(output: e0.output, item: e0.item, fileName: "shorts-real-swipe-frame-1.png")
+        }
+
+        let sv = UIReviewFixture.findVerticalPagingScrollView()
+        let scrollOffsetBefore = Double(sv?.contentOffset.y ?? -1)
+        let pageHeight = Double(sv?.bounds.height ?? 0)
+        let isPagingEnabled = sv?.isPagingEnabled ?? false
+        if let sv, pageHeight > 100 {
+            sv.setContentOffset(CGPoint(x: 0, y: pageHeight), animated: true)
+        }
+
+        try? await Task.sleep(nanoseconds: 1_600_000_000)
+
+        var e1: UIReviewFixture.ShortsRealSwipeObserver.Entry? = nil
+        let secondWaitStart = Date()
+        while Date().timeIntervalSince(secondWaitStart) < 3.0 {
+            if items.count >= 2,
+               let entry = UIReviewFixture.ShortsRealSwipeObserver.shared.entry(for: items[1].videoUrl),
+               entry.item.status == .readyToPlay,
+               entry.player.rate > 0,
+               entry.player.currentTime().seconds.isFinite,
+               entry.player.currentTime().seconds > 0.20 {
+                e1 = entry
+                break
+            }
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+
+        let scrollOffsetAfter = Double(sv?.contentOffset.y ?? -1)
+        let afterIndex = currentIndex ?? -1
+        let afterId = (afterIndex >= 0 && afterIndex < items.count) ? items[afterIndex].id : ""
+        let item0TimeCheck1 = item0Player?.currentTime().seconds ?? 0
+        try? await Task.sleep(nanoseconds: 250_000_000)
+        let item0TimeCheck2 = item0Player?.currentTime().seconds ?? 0
+        let item0RateAfter = Double(item0Player?.rate ?? -1)
+        let item0HeldPaused = item0RateAfter == 0 && abs(item0TimeCheck2 - item0TimeCheck1) < 0.08
+
+        let item1RateAfter = Double(e1?.player.rate ?? 0)
+        var frame2 = UIReviewFixture.AVBufferSample()
+        if let e1 {
+            (frame2, _) = await UIReviewFixture.sampleVideoFrame(output: e1.output, item: e1.item, fileName: "shorts-real-swipe-frame-2.png")
+        }
+
+        let distinct = frame1.received && frame2.received && (frame1.red != frame2.red || frame1.green != frame2.green || frame1.blue != frame2.blue)
+        let payload: [String: Any] = [
+            "realShortsView": true,
+            "itemCount": items.count,
+            "items": items.map { item in
+                [
+                    "id": item.id,
+                    "title": item.title,
+                    "videoFile": URL(string: item.videoUrl)?.lastPathComponent ?? item.videoUrl
+                ]
+            },
+            "swipeMethod": "uiscrollview-animated-paging",
+            "scrollViewFound": sv != nil,
+            "isPagingEnabled": isPagingEnabled,
+            "pageHeight": pageHeight,
+            "scrollOffsetYBefore": scrollOffsetBefore,
+            "scrollOffsetYAfter": scrollOffsetAfter,
+            "selectedIndexBefore": beforeIndex,
+            "selectedIndexAfter": afterIndex,
+            "selectedIdBefore": beforeId,
+            "selectedIdAfter": afterId,
+            "scrollDrivenIndexChanged": (beforeIndex == 0 && afterIndex == 1 && afterId == "fixture_short_2"),
+            "item0RateBefore": item0RateBefore,
+            "item0TimeBefore": item0TimeBefore.isFinite ? item0TimeBefore : 0,
+            "item0RateAfter": item0RateAfter,
+            "item0HeldPaused": item0HeldPaused,
+            "item1ActiveAfter": e1 != nil && item1RateAfter > 0,
+            "item1RateAfter": item1RateAfter,
+            "frame1": [
+                "received": frame1.received,
+                "width": frame1.width,
+                "height": frame1.height,
+                "timeSeconds": frame1.time,
+                "r": frame1.red,
+                "g": frame1.green,
+                "b": frame1.blue,
+                "frameSaved": frame1.frameSaved,
+                "frameFile": frame1.frameFile
+            ],
+            "frame2": [
+                "received": frame2.received,
+                "width": frame2.width,
+                "height": frame2.height,
+                "timeSeconds": frame2.time,
+                "r": frame2.red,
+                "g": frame2.green,
+                "b": frame2.blue,
+                "frameSaved": frame2.frameSaved,
+                "frameFile": frame2.frameFile
+            ],
+            "framesPixelDistinct": distinct
+        ]
+        UIReviewFixture.writeDocument("shorts-real-swipe.json", payload)
+    }
+    #endif
 }
 
 struct ShortClipPlayer: View {
@@ -542,6 +671,20 @@ struct ShortClipPlayer: View {
 
     private func setupPlayer(with item: AVPlayerItem) {
         let next = AVPlayer(playerItem: item)
+        #if DEBUG
+        if UIReviewFixture.activeScreen == "shorts-real-swipe" {
+            let output = AVPlayerItemVideoOutput(pixelBufferAttributes: [
+                kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)
+            ])
+            item.add(output)
+            UIReviewFixture.ShortsRealSwipeObserver.shared.register(
+                path: path,
+                player: next,
+                item: item,
+                output: output
+            )
+        }
+        #endif
         statusObserver = item.observe(\.status, options: [.new, .initial]) { [weak next] item, _ in
             DispatchQueue.main.async {
                 switch item.status {
@@ -582,6 +725,11 @@ struct ShortClipPlayer: View {
     }
 
     private func stop() {
+        #if DEBUG
+        if UIReviewFixture.activeScreen == "shorts-real-swipe" {
+            UIReviewFixture.ShortsRealSwipeObserver.shared.unregister(path: path)
+        }
+        #endif
         statusObserver?.invalidate()
         statusObserver = nil
         shouldPlay = false

@@ -304,7 +304,7 @@ def capture_screen(device, slug, screen_arg, bundle_id, extra_args=None, wait_se
     cmd = ["xcrun", "simctl", "launch", udid, bundle_id, "-AppleLanguages", lang_arg, "--ui-review-screen", screen_arg]
     if extra_args:
         cmd.extend(extra_args)
-    record = screen_arg in ("shorts-telemetry", "shorts-avplayer")
+    record = screen_arg in ("shorts-telemetry", "shorts-avplayer", "shorts-real-swipe")
     video_path = OUT_DIR / f"{slug}.mp4"
     recorder = None
     if record:
@@ -319,6 +319,8 @@ def capture_screen(device, slug, screen_arg, bundle_id, extra_args=None, wait_se
 
     if screen_arg == "shorts-avplayer":
         actual_wait = 16.0
+    elif screen_arg == "shorts-real-swipe":
+        actual_wait = 12.0
     elif screen_arg in ("auth", "auth-login-keyboard", "auth-login-password-keyboard", "auth-login-lang-sheet", "shorts-telemetry"):
         actual_wait = 6.0
     else:
@@ -337,6 +339,7 @@ def capture_screen(device, slug, screen_arg, bundle_id, extra_args=None, wait_se
         "password-spy": "password-spy.json",
         "shorts-telemetry": "shorts-telemetry.json",
         "shorts-avplayer": "shorts-avplayer.json",
+        "shorts-real-swipe": "shorts-real-swipe.json",
         "persist-write": "persist-write.json",
         "persist-read": "persist-read.json",
         "privacy-save-error": "privacy-save-error.json",
@@ -350,6 +353,10 @@ def capture_screen(device, slug, screen_arg, bundle_id, extra_args=None, wait_se
         copy_app_document(udid, bundle_id, document_name)
     if screen_arg == "shorts-avplayer":
         copy_app_document(udid, bundle_id, "shorts-avplayer-frame.png")
+        copy_app_document(udid, bundle_id, "shorts-avplayer-frame-second.png")
+    elif screen_arg == "shorts-real-swipe":
+        copy_app_document(udid, bundle_id, "shorts-real-swipe-frame-1.png")
+        copy_app_document(udid, bundle_id, "shorts-real-swipe-frame-2.png")
 
     if is_light:
         subprocess.run(["xcrun", "simctl", "ui", udid, "appearance", "dark"], check=False)
@@ -525,6 +532,7 @@ def main():
         ("19c-persist-read", "persist-read", [], "Đọc lại sau khi tắt app"),
         ("19d-shorts-telemetry", "shorts-telemetry", [], "Pause, mute, resume và swipe"),
         ("19e-shorts-avplayer", "shorts-avplayer", [], "AVPlayer: buffer, timestamp, kích thước và khung hình"),
+        ("19g-shorts-real-swipe", "shorts-real-swipe", [], "ShortsVideoView: 2 clip local + vuốt sang video thứ 2"),
         ("19f-gift-catalog-v1", "gift-catalog-v1", [], "Adapter catalog quà phiên bản 1"),
         ("13m2-iphone-admin-denied", "admin-denied", [], "Bảng quản trị khi không phải quản trị viên"),
         ("13m3-iphone-admin-loading", "admin-loading", [], "Bảng quản trị đang tải"),

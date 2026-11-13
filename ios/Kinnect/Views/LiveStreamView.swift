@@ -1180,8 +1180,19 @@ struct LiveGiftDrawerSheet: View {
                 .scaledToFit()
                 .frame(width: 44, height: 44)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
+        } else if gift.id == "star" {
+            ZStack {
+                Circle()
+                    .fill(RadialGradient(colors: [Color(red: 0.67, green: 0.55, blue: 1.0).opacity(0.45), .clear], center: .center, startRadius: 2, endRadius: 24))
+                Image(systemName: "star.fill")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundStyle(LinearGradient(colors: [Color(red: 1.0, green: 0.94, blue: 0.68), Color(red: 0.96, green: 0.72, blue: 0.25)], startPoint: .top, endPoint: .bottom))
+                    .shadow(color: Color(red: 0.67, green: 0.55, blue: 1.0).opacity(0.65), radius: 5)
+            }
+            .frame(width: 44, height: 44)
         } else {
-            Text(gift.emoji)
+            let symbol = gift.emoji == "🎁" ? LiveGiftCatalogItem.defaultEmoji(for: gift.id) : gift.emoji
+            Text(symbol)
                 .font(.system(size: 38))
         }
     }
