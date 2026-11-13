@@ -603,19 +603,17 @@ private struct ChangePasswordSheetView: View {
 
     private func submit() async {
         errorMessage = ""
-        if oldPassword.isEmpty {
-            errorMessage = "Vui lòng nhập mật khẩu hiện tại."
-            return
-        }
-        if newPassword.count < 6 {
-            errorMessage = "Mật khẩu mới phải có ít nhất 6 ký tự."
-            return
-        }
-        if newPassword != confirmPassword {
-            errorMessage = "Mật khẩu nhập lại không khớp."
+        let decision = PasswordChangeValidation.evaluate(
+            current: oldPassword,
+            next: newPassword,
+            confirm: confirmPassword
+        )
+        if let message = decision.message {
+            errorMessage = message
             return
         }
         if UIReviewFixture.activeScreen != nil {
+            PasswordTransportSpy.record(current: oldPassword, next: newPassword)
             AppState.shared.showToast("Đã đổi mật khẩu. Các thiết bị khác đã được đăng xuất.")
             close()
             return

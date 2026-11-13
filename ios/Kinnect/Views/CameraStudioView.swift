@@ -1595,7 +1595,7 @@ struct StudioMusicPickerSheet: View {
                 } else if !loading && tracks.isEmpty {
                     Text("Chưa có âm thanh trong thư viện.")
                 }
-                ForEach(tracks.filter { query.isEmpty || ($0.title + " " + $0.artist).localizedCaseInsensitiveContains(query) }) { track in
+                ForEach(tracks.filter { MusicPickerQuery.matches(title: $0.title, artist: $0.artist, query: query) }) { track in
                     HStack(spacing: 12) {
                         Button {
                             Task { await preview(track) }

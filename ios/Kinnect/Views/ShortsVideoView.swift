@@ -13,6 +13,7 @@ struct ShortsVideoView: View {
     @State private var activeOptionsShort: ShortItem?
     @State private var selectedAuthorProfile: KinnectUser? = nil
     @State private var isMuted: Bool = false
+    @State private var userPaused: Bool = false
     @State private var floatingHearts: [FloatingHeart] = []
     @State private var followingRequests: Set<String> = []
     private let profileItems: [ShortItem]?
@@ -71,6 +72,9 @@ struct ShortsVideoView: View {
                         .frame(width: geo.size.height, height: geo.size.width)
                         .rotationEffect(.degrees(90))
                         .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                    }
+                    .onChange(of: currentIndex) { _ in
+                        userPaused = false
                     }
                 }
             }
@@ -170,7 +174,7 @@ struct ShortsVideoView: View {
     private func shortVideoCard(_ item: ShortItem, at index: Int) -> some View {
         ZStack(alignment: .bottomLeading) {
             Rectangle().fill(Color.black)
-            ShortClipPlayer(path: item.videoUrl, active: index == currentIndex, muted: isMuted)
+            ShortClipPlayer(path: item.videoUrl, active: index == currentIndex, muted: isMuted, userPaused: userPaused && index == currentIndex)
                 .allowsHitTesting(false)
 
             // Double tap detector for floating heart
@@ -178,6 +182,9 @@ struct ShortsVideoView: View {
                 .contentShape(Rectangle())
                 .onTapGesture(count: 2, coordinateSpace: .local) { location in
                     triggerDoubleTapHeart(at: index, point: location)
+                }
+                .onTapGesture(count: 1) {
+                    userPaused.toggle()
                 }
 
             // Floating hearts animation overlay
@@ -426,6 +433,7 @@ struct ShortClipPlayer: View {
     let path: String
     let active: Bool
     var muted: Bool = false
+    var userPaused: Bool = false
     @ObservedObject private var calls = NativeWebRTCManager.shared
     @Environment(\.scenePhase) private var scenePhase
     @State private var player: AVPlayer?
@@ -474,6 +482,7 @@ struct ShortClipPlayer: View {
         .task(id: path) { await load() }
         .onChange(of: active) { _ in syncPlayback() }
         .onChange(of: muted) { player?.isMuted = $0 }
+        .onChange(of: userPaused) { _ in syncPlayback() }
         .onChange(of: scenePhase) { _ in syncPlayback() }
         .onChange(of: calls.activeCall != nil) { _ in syncPlayback() }
         .onDisappear { stop() }
@@ -562,7 +571,7 @@ struct ShortClipPlayer: View {
     }
 
     private func syncPlayback() {
-        let blocked = !active || scenePhase != .active || calls.activeCall != nil
+        let blocked = !active || scenePhase != .active || calls.activeCall != nil || userPaused
         shouldPlay = !blocked
         guard let player else { return }
         if blocked {

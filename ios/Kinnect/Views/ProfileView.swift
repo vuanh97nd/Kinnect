@@ -2273,11 +2273,17 @@ struct ChangePasswordSheet: View {
 
     private func updatePassword() async {
         errorMessage = nil
-        guard newPassword == confirmPassword else {
-            errorMessage = "Mật khẩu xác nhận không khớp."
+        let decision = PasswordChangeValidation.evaluate(
+            current: currentPassword,
+            next: newPassword,
+            confirm: confirmPassword
+        )
+        if let message = decision.message {
+            errorMessage = message
             return
         }
         if UIReviewFixture.activeScreen != nil {
+            PasswordTransportSpy.record(current: currentPassword, next: newPassword)
             appState.showToast("Đã đổi mật khẩu. Các thiết bị khác đã được đăng xuất.")
             dismiss()
             return

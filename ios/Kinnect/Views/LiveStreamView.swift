@@ -1071,7 +1071,8 @@ struct LiveGiftDrawerSheet: View {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 12)], spacing: 12) {
                         ForEach(gifts) { gift in
                             Button {
-                                if gift.coins * selectedQuantity >= 1000 { confirmGift = gift }
+                                let quote = GiftQuote(unitCoins: gift.coins, quantity: selectedQuantity)
+                                if quote.needsConfirmation { confirmGift = gift }
                                 else { sendGift(gift) }
                             } label: {
                                 VStack(spacing: 6) {
@@ -1082,7 +1083,7 @@ struct LiveGiftDrawerSheet: View {
                                         .lineLimit(1)
                                     HStack(spacing: 3) {
                                         KinnectIcon(glyph: .coin, size: 12, selected: true, tint: KinnectTheme.warning)
-                                        Text("\(gift.coins * selectedQuantity) xu")
+                                        Text("\(GiftQuote(unitCoins: gift.coins, quantity: selectedQuantity).total) xu")
                                             .font(.caption2.bold())
                                             .foregroundColor(KinnectTheme.warning)
                                     }
