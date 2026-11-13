@@ -25,8 +25,37 @@ public final class NativeApi {
   private boolean cacheable(String path){String p=path.split("\\?",2)[0];return java.util.Arrays.asList("/api/me","/api/posts","/api/discover","/api/shorts","/api/conversations","/api/groups","/api/notifications","/api/friends","/api/friend-requests","/api/friend-suggestions").contains(p)||p.matches("/api/users/[^/]+(?:/messages)?")||p.matches("/api/groups/[^/]+(?:/messages)?");}
   public JSONObject cachedGet(String path){if(diskCache==null||cookie.isEmpty()||!cacheable(path))return null;byte[] bytes=diskCache.get(cacheScope(),"json:"+path,AppCache.WEEK);try{if(bytes==null)return null;JSONObject value=new JSONObject(new String(bytes,"UTF-8"));value.put("cached",true);return value;}catch(Exception e){return null;}}
   public byte[] cachedImage(String path){return diskCache==null||cookie.isEmpty()?null:diskCache.get(cacheScope(),"image:"+path,AppCache.WEEK);}
-  public File cachedVideo(String path){return diskCache==null||cookie.isEmpty()?null:diskCache.video(cacheScope(),path);}
-  public byte[] cachedThumbnail(String path){return diskCache==null||cookie.isEmpty()?null:diskCache.get(cacheScope(),"thumb:"+path,AppCache.WEEK);}
+  public File cachedVideo(String path){
+    if(fixtureEnabled&&appContext!=null){
+      File fixtureFile=new File(appContext.getCacheDir(),"fixture_short.mp4");
+      if(!fixtureFile.exists()||fixtureFile.length()==0){
+        try(java.io.InputStream in=appContext.getAssets().open("short_sample.mp4");java.io.FileOutputStream out=new java.io.FileOutputStream(fixtureFile)){
+          byte[] buf=new byte[8192];int r;while((r=in.read(buf))!=-1)out.write(buf,0,r);
+        }catch(Exception ignored){}
+      }
+      if(fixtureFile.exists()&&fixtureFile.length()>0)return fixtureFile;
+    }
+    return diskCache==null||cookie.isEmpty()?null:diskCache.video(cacheScope(),path);
+  }
+  public byte[] cachedThumbnail(String path){
+    if(fixtureEnabled&&appContext!=null){
+      File fixtureFile=cachedVideo(path);
+      if(fixtureFile!=null&&fixtureFile.exists()){
+        android.media.MediaMetadataRetriever retriever=new android.media.MediaMetadataRetriever();
+        try{
+          retriever.setDataSource(fixtureFile.getAbsolutePath());
+          android.graphics.Bitmap frame=android.os.Build.VERSION.SDK_INT>=27?retriever.getScaledFrameAtTime(0,android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,360,640):null;
+          if(frame!=null){
+            ByteArrayOutputStream out=new ByteArrayOutputStream();
+            frame.compress(android.graphics.Bitmap.CompressFormat.JPEG,85,out);
+            frame.recycle();
+            return out.toByteArray();
+          }
+        }catch(Exception ignored){}finally{try{retriever.release();}catch(Exception ignored){}}
+      }
+    }
+    return diskCache==null||cookie.isEmpty()?null:diskCache.get(cacheScope(),"thumb:"+path,AppCache.WEEK);
+  }
   public void cacheThumbnail(String path,byte[] bytes){if(diskCache!=null&&!cookie.isEmpty())diskCache.put(cacheScope(),"thumb:"+path,bytes);}
   public void warmVideo(String path){
     if(fixtureEnabled||diskCache==null||cookie.isEmpty()||!path.matches("/api/shorts/[^/]+/video")||cachedVideo(path)!=null)return;
@@ -155,7 +184,7 @@ public final class NativeApi {
         return new FixtureResult(new JSONObject("{\"success\":true,\"myReaction\":\"love\",\"reactionsCount\":25}"), null, 200);
       }
       if ("GET".equals(method) && (cleanPath.matches("/api/posts/[^/]+/comments") || cleanPath.matches("/api/posts/[^/]+/comments/comments") || cleanPath.matches("/api/shorts/[^/]+/comments") || cleanPath.matches("/api/shorts/[^/]+/comments/comments"))) {
-        return new FixtureResult(new JSONObject("{\"comments\":[{\"id\":\"c_1\",\"body\":\"Chào mừng bạn gia nhập!\",\"content\":\"Chào mừng bạn gia nhập!\",\"author\":{\"id\":\"u2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\"},\"created\":" + (nowTime - 1800000L) + ",\"createdAt\":\"2026-11-13T00:05:00Z\",\"likes\":2,\"myReaction\":null}]}"), null, 200);
+        return new FixtureResult(new JSONObject("{\"comments\":[{\"id\":\"c_1\",\"body\":\"Chào mừng bạn gia nhập!\",\"content\":\"Chào mừng bạn gia nhập!\",\"author\":{\"id\":\"u2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\"},\"created\":" + (nowTime - 1800000L) + ",\"createdAt\":\"2026-11-13T00:05:00Z\",\"likes\":2,\"myReaction\":null},{\"id\":\"c_2\",\"parentId\":\"c_1\",\"body\":\"Cảm ơn Hoàng Nam nhé!\",\"content\":\"Cảm ơn Hoàng Nam nhé!\",\"author\":{\"id\":\"usr_qa_review\",\"name\":\"Minh Anh\",\"username\":\"minhanh\"},\"created\":" + (nowTime - 900000L) + ",\"createdAt\":\"2026-11-13T00:20:00Z\",\"likes\":1,\"myReaction\":\"love\"}]}"), null, 200);
       }
       if ("GET".equals(method) && cleanPath.matches("/api/users/[^/]+/stats")) {
         return new FixtureResult(new JSONObject("{\"posts\":12,\"followers\":128,\"following\":64}"), null, 200);
@@ -191,7 +220,7 @@ public final class NativeApi {
         return new FixtureResult(new JSONObject("{\"users\":[{\"id\":\"u1\",\"name\":\"Linh Nhi\",\"username\":\"linhnhi\",\"bio\":\"Yêu đời, thích khám phá\"},{\"id\":\"u2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\",\"bio\":\"Nhiếp ảnh & Sáng tạo nội dung\"},{\"id\":\"u3\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\",\"bio\":\"Yêu âm nhạc & Du lịch\"}]}"), null, 200);
       }
       if ("GET".equals(method) && "/api/shorts".equals(cleanPath)) {
-        return new FixtureResult(new JSONObject("{\"shorts\":[{\"id\":\"s1\",\"title\":\"Khoảnh khắc cuộc sống\",\"author\":{\"id\":\"usr_qa_review\",\"name\":\"Minh Anh\"},\"likes\":89,\"comments\":12}]}"), null, 200);
+        return new FixtureResult(new JSONObject("{\"shorts\":[{\"id\":\"s1\",\"title\":\"Khoảnh khắc cuộc sống\",\"video\":\"/api/shorts/s1/video\",\"author\":{\"id\":\"usr_qa_review\",\"name\":\"Minh Anh\",\"username\":\"minhanh\"},\"likes\":89,\"comments\":12}]}"), null, 200);
       }
       if ("GET".equals(method) && "/api/conversations".equals(cleanPath)) {
         return new FixtureResult(new JSONObject("{\"users\":[{\"id\":\"u3\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\",\"isActive\":true,\"unread\":1,\"last\":{\"body\":\"Hẹn gặp bạn cuối tuần này nhé!\",\"created\":" + (nowTime - 900000L) + ",\"mine\":false}}],\"conversations\":[{\"id\":\"c1\",\"title\":\"Bảo Ngọc\",\"lastMessage\":\"Hẹn gặp bạn cuối tuần này nhé!\",\"updatedAt\":\"2026-11-13T00:00:00Z\",\"unread\":1}]}"), null, 200);
