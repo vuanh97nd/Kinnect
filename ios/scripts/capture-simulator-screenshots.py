@@ -572,6 +572,8 @@ def main():
         ("10b-iphone-live-empty", "live-empty", [], "Phòng Live: Trạng thái chưa có phòng phát"),
         ("10c-iphone-live-error", "live-error", [], "Phòng Live: Trạng thái lỗi tải phòng và nút Thử lại"),
         ("10d-iphone-live-connecting", "live-connecting", [], "Phòng Live: Trạng thái đang kết nối thật (không video mẫu)"),
+        ("10e-iphone-create-live-chat", "create-live-chat", [], "Chuẩn bị phát Live: Chế độ Trò chuyện (Camera studio)"),
+        ("10f-iphone-create-live-game", "create-live-game", [], "Chuẩn bị phát Live: Chế độ Chơi game trực tiếp"),
         ("11-iphone-camera-studio-empty", "camera-studio", [], "Camera & Studio: Chế độ chụp ảnh"),
         ("11b-iphone-camera-studio-video", "camera-studio-video", [], "Camera & Studio: Chế độ quay video với nút bấm đỏ"),
         ("12-iphone-camera-studio-edit", "camera-studio-edit", [], "Camera & Studio Pro: Thanh công cụ Cắt/Màu/Mịn da + Lưu riêng"),

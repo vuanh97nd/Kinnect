@@ -118,4 +118,9 @@ test("iOS Release boundary guards UIReviewFixture, ShortsVideoView and LiveStrea
   const appStateSrc = readFileSync(new URL("../ios/Kinnect/Core/AppState.swift", import.meta.url), "utf8");
   assert.match(appStateSrc, /func clearSessionState\(\)[\s\S]*?AccountCache\.shared\.wipeAllCaches\(\)\s*KinnectAuthenticatedFile\.wipe\(\)/);
   assert.match(fixtureSrc, /#if DEBUG[\s\S]*?case "admin-operations-ready":[\s\S]*?adminDict\["role"\] = "admin"[\s\S]*?#endif/);
+  assert.doesNotMatch(liveSrc, /liveTopLobbyBar|categoryFilter/);
+  assert.match(liveSrc, /private func liveVerticalActionButtonLabel[\s\S]*?\.frame\(width:\s*56\)/);
+  assert.match(liveSrc, /struct CreateLiveRoomSheet:[\s\S]*?preLiveBackdrop[\s\S]*?LiveCameraPreviewView[\s\S]*?preLiveGameSetupDeck[\s\S]*?previewController\.stop\(\)[\s\S]*?startLiveHostBroadcast\(\)/);
+  assert.match(fixtureSrc, /case "create-live-chat":[\s\S]*?CreateLiveRoomSheet\(initialLiveMode:\s*"chat"\)/);
+  assert.match(fixtureSrc, /case "create-live-game":[\s\S]*?CreateLiveRoomSheet\(initialLiveMode:\s*"game"\)/);
 });

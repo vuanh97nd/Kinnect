@@ -291,10 +291,21 @@ struct CameraStudioView: View {
                 )
             }
         }
-        .sheet(isPresented: $showCreateLiveSheet) {
-            CreateLiveRoomSheet(onStarted: {
-                closeCameraView()
-            })
+        .fullScreenCover(isPresented: $showCreateLiveSheet) {
+            CreateLiveRoomSheet(
+                initialLiveMode: "chat",
+                onStarted: {
+                    closeCameraView()
+                }
+            )
+        }
+        .onChange(of: showCreateLiveSheet) { isOpen in
+            if isOpen {
+                cameraController.stop()
+            } else if !cameraController.isRecordingVideo && capturedImage == nil && recordedVideoURL == nil {
+                cameraController.configureIfAuthorized()
+                cameraController.start()
+            }
         }
     }
 
@@ -1881,7 +1892,7 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
     private var isConfigured = false
     private var currentPosition: AVCaptureDevice.Position = .back
 
-    func configureIfAuthorized() {
+    func configureIfAuthorized(initialPosition: AVCaptureDevice.Position = .back) {
         #if !targetEnvironment(simulator)
         let status = AVCaptureDevice.authorizationStatus(for: .video)
         if status == .denied || status == .restricted {
@@ -1901,9 +1912,10 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
             return
         }
         isConfigured = true
+        currentPosition = initialPosition
         session.beginConfiguration()
         session.sessionPreset = .high
-        if let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+        if let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: initialPosition),
            let input = try? AVCaptureDeviceInput(device: device), session.canAddInput(input) {
             session.addInput(input)
         }
@@ -1920,7 +1932,7 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
         }
         applyStabilization()
         session.commitConfiguration()
-        refreshLenses(position: .back)
+        refreshLenses(position: initialPosition)
         NotificationCenter.default.addObserver(self, selector: #selector(stopForInterruption), name: UIApplication.willResignActiveNotification, object: nil)
         start()
         #endif
@@ -2100,14 +2112,18 @@ struct LiveCameraPreviewView: UIViewControllerRepresentable {
     @ObservedObject var controller: CameraCaptureController
     @Binding var isFlashOn: Bool
     @Binding var isUsingFrontCamera: Bool
+    var showGrid: Bool = true
 
     func makeUIViewController(context: Context) -> CameraPreviewViewController {
         let vc = CameraPreviewViewController()
         vc.controller = controller
+        vc.showGrid = showGrid
+        vc.initialPosition = isUsingFrontCamera ? .front : .back
         return vc
     }
 
     func updateUIViewController(_ uiViewController: CameraPreviewViewController, context: Context) {
+        uiViewController.showGrid = showGrid
         uiViewController.setCamera(front: isUsingFrontCamera)
         uiViewController.setFlash(on: isFlashOn)
     }
@@ -2115,6 +2131,12 @@ struct LiveCameraPreviewView: UIViewControllerRepresentable {
 
 final class CameraPreviewViewController: UIViewController {
     var controller: CameraCaptureController?
+    var showGrid: Bool = true {
+        didSet {
+            gridLayer.isHidden = !showGrid
+        }
+    }
+    var initialPosition: AVCaptureDevice.Position = .back
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private let backdropLayer = CAGradientLayer()
     private let gridLayer = CAShapeLayer()
@@ -2132,7 +2154,7 @@ final class CameraPreviewViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         setupSessionIfAuthorized()
-        controller?.configureIfAuthorized()
+        controller?.configureIfAuthorized(initialPosition: initialPosition)
         controller?.start()
     }
 
@@ -2171,6 +2193,7 @@ final class CameraPreviewViewController: UIViewController {
         gridLayer.strokeColor = UIColor(red: 0xFD / 255.0, green: 0xD6 / 255.0, blue: 0x63 / 255.0, alpha: 0.65).cgColor
         gridLayer.lineWidth = 1.0
         gridLayer.fillColor = UIColor.clear.cgColor
+        gridLayer.isHidden = !showGrid
         view.layer.addSublayer(gridLayer)
     }
 
@@ -2226,7 +2249,8 @@ final class CameraPreviewViewController: UIViewController {
     private func attachHardwarePreview() {
         #if !targetEnvironment(simulator)
         guard let ctrl = controller else { return }
-        ctrl.configureIfAuthorized()
+        ctrl.configureIfAuthorized(initialPosition: initialPosition)
+        lastConfiguredPosition = initialPosition
         if previewLayer == nil {
             let layer = AVCaptureVideoPreviewLayer(session: ctrl.session)
             layer.videoGravity = .resizeAspectFill

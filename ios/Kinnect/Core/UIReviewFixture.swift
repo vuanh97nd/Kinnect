@@ -1579,6 +1579,14 @@ enum UIReviewFixture {
             return AnyView(
                 LiveStreamView(onOpenWallet: {})
             )
+        case "create-live-chat":
+            return AnyView(
+                CreateLiveRoomSheet(initialLiveMode: "chat")
+            )
+        case "create-live-game":
+            return AnyView(
+                CreateLiveRoomSheet(initialLiveMode: "game")
+            )
 
         // MARK: - Messages & Chats
         case "messages":
