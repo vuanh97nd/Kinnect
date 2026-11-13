@@ -16,6 +16,7 @@ public final class NativeApi {
   private static final class Snapshot{final String etag,body;Snapshot(String e,String b){etag=e;body=b;}}
   private final java.util.Map<String,Snapshot> snapshots=java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<String,Snapshot>(){protected boolean removeEldestEntry(java.util.Map.Entry<String,Snapshot> e){return size()>32;}});
   private volatile int epoch = 0;
+  public volatile int apiDispatchCount = 0;
   private SessionStore sessions;
   private AppCache diskCache;private android.content.Context appContext;
   private final ExecutorService mediaCacheExecutor=Executors.newSingleThreadExecutor();
@@ -304,6 +305,8 @@ public final class NativeApi {
     Progress progress,
     Result callback
   ) {
+    apiDispatchCount++;
+    android.util.Log.i("KinnectQA", "API_TRANSPORT_ATTEMPT: method=" + method + " path=" + path + " counter=" + apiDispatchCount);
     if (fixtureEnabled) {
       FixtureResult fr = offlineFixture(method, path, data);
       main.post(() -> callback.done(fr.data, fr.error, fr.status));

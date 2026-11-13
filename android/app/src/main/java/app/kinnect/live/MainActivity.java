@@ -5074,17 +5074,24 @@ public class MainActivity extends Activity {
       String nVal = next.getText() == null ? "" : next.getText().toString();
       String rVal = retype.getText() == null ? "" : retype.getText().toString();
       if (cVal.isEmpty()) {
-        Toast.makeText(this, I18n.t("Vui lòng nhập mật khẩu hiện tại."), Toast.LENGTH_SHORT).show();
+        String msg = I18n.t("Vui lòng nhập mật khẩu hiện tại.");
+        android.util.Log.i("KinnectQA", "PASSWORD_VALIDATION: branch=empty_current error='" + msg + "' api_dispatched=false api_dispatch_count=" + NativeApi.shared.apiDispatchCount);
+        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
         return;
       }
       if (nVal.length() < 6) {
-        Toast.makeText(this, I18n.t("Mật khẩu mới phải có ít nhất 6 ký tự."), Toast.LENGTH_SHORT).show();
+        String msg = I18n.t("Mật khẩu mới phải có ít nhất 6 ký tự.");
+        android.util.Log.i("KinnectQA", "PASSWORD_VALIDATION: branch=short_new_password error='" + msg + "' api_dispatched=false api_dispatch_count=" + NativeApi.shared.apiDispatchCount);
+        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
         return;
       }
       if (!nVal.equals(rVal)) {
-        Toast.makeText(this, I18n.t("Mật khẩu nhập lại không khớp."), Toast.LENGTH_SHORT).show();
+        String msg = I18n.t("Mật khẩu nhập lại không khớp.");
+        android.util.Log.i("KinnectQA", "PASSWORD_VALIDATION: branch=mismatch error='" + msg + "' api_dispatched=false api_dispatch_count=" + NativeApi.shared.apiDispatchCount);
+        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
         return;
       }
+      android.util.Log.i("KinnectQA", "PASSWORD_VALIDATION: branch=passed api_dispatched=true");
       api.call("POST", "/api/me/password", json("current", cVal, "next", nVal), (r, e, s) ->
         Toast.makeText(this, e != null ? e : I18n.t("Đã đổi mật khẩu. Các thiết bị khác đã được đăng xuất."), Toast.LENGTH_LONG).show());
     }).setNegativeButton(I18n.t("Hủy"), null).show();
