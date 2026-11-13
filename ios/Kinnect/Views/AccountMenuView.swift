@@ -578,10 +578,12 @@ struct PrivacySettingsView: View {
                 appState.showToast(statusNote)
                 if UIReviewFixture.activeScreen == "dm-mode-error" {
                     UIReviewFixture.writeDocument("dm-mode-error.json", [
+                        "priorMode": previous ? "friends" : "everyone",
+                        "requestedMode": normalized,
+                        "afterMode": dmFriendsOnly ? "friends" : "everyone",
                         "rolledBack": dmFriendsOnly == previous,
                         "retry": failedDmMode != nil,
-                        "successToast": false,
-                        "mode": normalized
+                        "successToast": false
                     ])
                 }
             }
@@ -845,8 +847,13 @@ struct AdminConsoleView: View {
     @State private var confirm = false
 
     private var allowed: Bool {
+        #if DEBUG
         if UIReviewFixture.activeScreen == "admin-denied" { return false }
-        return UIReviewFixture.activeScreen == "admin" || appState.currentUser?.accountRole == "admin"
+        if ["admin", "admin-loading", "admin-empty", "admin-error"].contains(UIReviewFixture.activeScreen) {
+            return true
+        }
+        #endif
+        return appState.currentUser?.accountRole == "admin"
     }
 
     var body: some View {

@@ -1912,17 +1912,17 @@ private struct ShortsAVPlayerProbe: View {
         next.isMuted = false
         player = next
         let ready = await waitReady(item)
+        await next.seek(to: .zero)
         next.play()
-        try? await Task.sleep(nanoseconds: 500_000_000)
+        try? await Task.sleep(nanoseconds: 450_000_000)
         let playTime = seconds(next.currentTime())
         let playRate = Double(next.rate)
-        let pixel = await sampleBuffer(output, item: item, fileName: "shorts-avplayer-frame.png", updatePreview: true)
         next.pause()
         let pauseTime = seconds(next.currentTime())
         let pauseRate = Double(next.rate)
-        try? await Task.sleep(nanoseconds: 200_000_000)
+        try? await Task.sleep(nanoseconds: 150_000_000)
         next.isMuted = true
-        try? await Task.sleep(nanoseconds: 200_000_000)
+        try? await Task.sleep(nanoseconds: 150_000_000)
         let muteTime = seconds(next.currentTime())
         let muteRate = Double(next.rate)
         let held = muteRate == 0 && abs(muteTime - pauseTime) < 0.08
@@ -1932,6 +1932,7 @@ private struct ShortsAVPlayerProbe: View {
         let resumeRate = Double(next.rate)
         let clock = ready && playTime > 0.05
         let advanced = resumeTime > muteTime + 0.05
+        let pixel = await sampleBuffer(output, item: item, fileName: "shorts-avplayer-frame.png", updatePreview: true)
         next.pause()
         let heldAfterPause = seconds(next.currentTime())
         let second = AVPlayerItem(url: url)
@@ -2143,9 +2144,9 @@ private struct GiftCatalogVersionProbe: View {
             "star=\(star)",
             "crown=\(crown)",
             "matchesIsolatedCatalog=\(matched ? "yes" : "no")",
-            "adapterScope=parse",
-            "drawerFixtureCrown=1000",
-            "drawerPriceParity=open"
+            "adapterScope=parse-and-drawer",
+            "drawerFixtureCrown=\(crown)",
+            "drawerPriceParity=closed-isolated-v1"
         ]
         UIReviewFixture.writeDocument("gift-catalog-v1.json", [
             "version": parsed.version,
@@ -2154,13 +2155,13 @@ private struct GiftCatalogVersionProbe: View {
             "star": star,
             "crown": crown,
             "matchesIsolatedCatalog": matched,
-            "adapterScope": "parse",
-            "drawerFixtureCrown": 1000,
-            "drawerPriceParity": "open"
+            "adapterScope": "parse-and-drawer",
+            "drawerFixtureCrown": crown,
+            "drawerPriceParity": "closed-isolated-v1"
         ])
     }
 
-    private static let versionOnePayload: [String: Any] = [
+    fileprivate static let versionOnePayload: [String: Any] = [
         "enabled": true,
         "experience": true,
         "version": 1,
@@ -2186,11 +2187,7 @@ private struct GiftCatalogVersionProbe: View {
 }
 
 private struct ReviewGiftDrawer: View {
-    private let gifts = [
-        LiveGiftCatalogItem(id: "rose", label: "Hoa hồng", emoji: "🌹", coins: 10, tier: "standard"),
-        LiveGiftCatalogItem(id: "crystal", label: "Sao pha lê", emoji: "⭐", coins: 50, tier: "standard"),
-        LiveGiftCatalogItem(id: "crown", label: "Vương miện", emoji: "👑", coins: 1000, tier: "epic")
-    ]
+    private let catalog = LiveGiftCatalogAdapter.parse(GiftCatalogVersionProbe.versionOnePayload)
 
     var body: some View {
         ZStack {
@@ -2208,7 +2205,7 @@ private struct ReviewGiftDrawer: View {
             .padding(20)
         }
         .sheet(isPresented: .constant(true)) {
-            LiveGiftDrawerSheet(roomId: "fixture_live_room", gifts: gifts, priceVersion: 1)
+            LiveGiftDrawerSheet(roomId: "fixture_live_room", gifts: catalog.items, priceVersion: catalog.version)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
