@@ -3830,6 +3830,7 @@ public class MainActivity extends Activity {
       player.setLooping(true);
       player.setVolume(shortMuted ? 0 : 1, shortMuted ? 0 : 1);
       if(!mediaCallBlocked)shortVideo.start();
+      android.util.Log.i("KinnectQA", "SHORTS_EVENT: action=playing index=" + shortIndex + " id=" + item.optString("id") + " pos=" + shortVideo.getCurrentPosition() + " muted=" + shortMuted);
     });
     shortVideo.setOnErrorListener((player, what, extra) -> {preview.setVisibility(View.VISIBLE);unavailable.setVisibility(View.VISIBLE);return true;});
     if(shortEnter!=0){int direction=shortEnter;shortEnter=0;VerticalMediaStage.enter(stage,direction);}
@@ -3840,7 +3841,7 @@ public class MainActivity extends Activity {
     pauseBadge.addView(icon("play", 28, WHITE), new FrameLayout.LayoutParams(dp(28), dp(28), Gravity.CENTER));
     pauseBadge.setVisibility(View.GONE);
     stage.addView(pauseBadge, new FrameLayout.LayoutParams(dp(64), dp(64), Gravity.CENTER));
-    stage.setOnClickListener(v->{if(shortVideo!=null){if(shortVideo.isPlaying()){shortVideo.pause();pauseBadge.setAlpha(0f);pauseBadge.setScaleX(0.85f);pauseBadge.setScaleY(0.85f);pauseBadge.setVisibility(View.VISIBLE);pauseBadge.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(150).start();}else if(!mediaCallBlocked){shortVideo.start();pauseBadge.animate().alpha(0f).setDuration(120).withEndAction(()->pauseBadge.setVisibility(View.GONE)).start();}}});
+    stage.setOnClickListener(v->{if(shortVideo!=null){if(shortVideo.isPlaying()){shortVideo.pause();android.util.Log.i("KinnectQA", "SHORTS_EVENT: action=pause pos=" + shortVideo.getCurrentPosition() + " isPlaying=false");pauseBadge.setAlpha(0f);pauseBadge.setScaleX(0.85f);pauseBadge.setScaleY(0.85f);pauseBadge.setVisibility(View.VISIBLE);pauseBadge.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(150).start();}else if(!mediaCallBlocked){shortVideo.start();android.util.Log.i("KinnectQA", "SHORTS_EVENT: action=start pos=" + shortVideo.getCurrentPosition() + " isPlaying=true");pauseBadge.animate().alpha(0f).setDuration(120).withEndAction(()->pauseBadge.setVisibility(View.GONE)).start();}}});
     // Cột nút bên phải
     LinearLayout side = column();
     side.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -3857,6 +3858,12 @@ public class MainActivity extends Activity {
       try { startActivity(Intent.createChooser(send, I18n.t("Chia sẻ video"))); } catch (Exception ignored) {}
     }));
     // Đã chuyển Tải video và Âm thanh vào shortOptions (Tùy chọn)
+    side.addView(reelButton(shortMuted ? "volume_x" : "sound", shortMuted ? I18n.t("Bật tiếng") : I18n.t("Tắt tiếng"), WHITE, () -> {
+      shortMuted = !shortMuted;
+      if (shortPlayer != null) shortPlayer.setVolume(shortMuted ? 0 : 1, shortMuted ? 0 : 1);
+      android.util.Log.i("KinnectQA", "SHORTS_EVENT: action=mute_toggle muted=" + shortMuted + " volume=" + (shortMuted ? 0 : 1));
+      showShort(shortIndex);
+    }));
     side.addView(reelButton("more", I18n.t("Tùy chọn video"), WHITE, () -> shortOptions(item)));
     ScrollView actionRail = new ScrollView(this);
     actionRail.setVerticalScrollBarEnabled(false);
