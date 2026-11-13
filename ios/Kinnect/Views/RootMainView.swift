@@ -483,7 +483,8 @@ struct RootMainView: View {
                                         .zIndex(100)
                                 }
                             }
-                            .preferredColorScheme(activeColorScheme)
+                            .preferredColorScheme((webrtc.activeCall != nil || appState.currentLiveRoom != nil || selectedTab == .create) ? .dark : activeColorScheme)
+                            .statusBarHidden(false)
                             .modifier(UIReviewDynamicTypeModifier())
                             .task {
                                 await appState.bootstrapSession()

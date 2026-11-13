@@ -46,6 +46,8 @@ final class AppState: ObservableObject {
     @Published var liveGiftCombo: Int = 0
     private var pendingLiveCreateToken: UUID?
     private var pendingLiveCreateContinuation: CheckedContinuation<Result<LiveRoomItem, LiveCreateFailure>, Never>?
+    private var announcedNotificationIds: Set<String> = []
+    private var hasSeededNotifications = false
 
     func createLiveRoomAndAwaitJoin(payload: [String: Any]) async -> Result<LiveRoomItem, LiveCreateFailure> {
         let connected = await NativeSocketClient.shared.ensureConnected()
@@ -236,7 +238,15 @@ final class AppState: ObservableObject {
         KeychainStore.shared.saveAccountId(user.id)
         NativeSocketClient.shared.connectWithKeychainSession()
         PushKitManager.shared.startRegistration()
+        requestLocalNotificationAuthorizationIfNeeded()
         startActivityHeartbeat()
+    }
+
+    private func requestLocalNotificationAuthorizationIfNeeded() {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            guard settings.authorizationStatus == .notDetermined else { return }
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { _, _ in }
+        }
     }
 
     func logout() async {
@@ -263,22 +273,72 @@ final class AppState: ObservableObject {
         blockedUserIds.removeAll()
         currentLiveRoom = nil
         isCurrentLiveHost = false
+        announcedNotificationIds.removeAll()
+        hasSeededNotifications = false
     }
 
-    func refreshGlobalBadges() async {
+    func refreshGlobalBadges(announceNew: Bool = false) async {
         guard currentUser != nil else { return }
         if let notifRes = try? await KinnectAPIClient.shared.requestJSON("/api/notifications") {
             let items = (notifRes["notifications"] as? [[String: Any]] ?? []).map(NotificationItem.from)
-            self.unreadNotificationsCount = items.filter { !$0.read }.count
+            let bellItems = items.filter {
+                let kind = $0.type.lowercased()
+                return !$0.read && kind != "message" && kind != "group_message"
+            }
+            self.unreadNotificationsCount = bellItems.count
+            if !hasSeededNotifications {
+                announcedNotificationIds.formUnion(items.map(\.id))
+                hasSeededNotifications = true
+            } else if announceNew {
+                let freshUnread = items.filter { !$0.read && !announcedNotificationIds.contains($0.id) }
+                announcedNotificationIds.formUnion(items.map(\.id))
+                for item in freshUnread.prefix(2) {
+                    presentLocalNotification(for: item)
+                }
+            }
         }
         if let convRes = try? await KinnectAPIClient.shared.requestJSON("/api/conversations") {
-            let list = convRes["conversations"] as? [[String: Any]] ?? []
+            let people = (convRes["users"] as? [[String: Any]])
+                ?? (convRes["conversations"] as? [[String: Any]])
+                ?? []
+            let groups = (convRes["groups"] as? [[String: Any]]) ?? []
             var total = 0
-            for item in list {
-                total += (item["unreadCount"] as? Int ?? 0)
+            for item in people + groups {
+                total += (item["unread"] as? Int) ?? (item["unreadCount"] as? Int) ?? 0
             }
             self.unreadMessagesCount = total
         }
+    }
+
+    private func presentLocalNotification(for item: NotificationItem) {
+        let sender = item.actor.name.isEmpty ? "Kinnect" : item.actor.name
+        let kind = item.type.lowercased()
+        let actionLine: String
+        switch kind {
+        case "message": actionLine = "đã gửi cho bạn một tin nhắn mới"
+        case "group_message": actionLine = "đã gửi tin nhắn trong nhóm"
+        case "like": actionLine = "đã thích bài viết của bạn"
+        case "comment": actionLine = "đã bình luận bài viết của bạn"
+        case "comment_reply": actionLine = "đã trả lời bình luận của bạn"
+        case "friend_request": actionLine = "đã gửi lời mời kết bạn"
+        case "friend_accept", "friend_accepted": actionLine = "đã chấp nhận lời mời kết bạn"
+        case "follow": actionLine = "đã bắt đầu theo dõi bạn"
+        case "short_like": actionLine = "đã thích video ngắn của bạn"
+        case "short_comment": actionLine = "đã bình luận video ngắn của bạn"
+        case "missed_call": actionLine = "đã gọi nhỡ cho bạn"
+        default: actionLine = "có thông báo mới dành cho bạn"
+        }
+
+        let bodyText = item.preview.isEmpty ? "\(sender) \(actionLine)" : "\(sender) \(actionLine): \(item.preview)"
+        showToast(bodyText)
+
+        let content = UNMutableNotificationContent()
+        content.title = sender
+        content.body = item.preview.isEmpty ? actionLine : "\(actionLine): \(item.preview)"
+        content.sound = .default
+        content.userInfo = ["notificationId": item.id, "kind": item.type]
+        let req = UNNotificationRequest(identifier: "kinnect_notif_\(item.id)", content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(req)
     }
 
     func refreshBlockedUsers() async {
@@ -348,6 +408,10 @@ final class AppState: ObservableObject {
         guard let type = json["type"] as? String else { return }
 
         switch type {
+        case "welcome":
+            Task { await refreshGlobalBadges(announceNew: false) }
+            NotificationCenter.default.post(name: .kinnectNotificationsChanged, object: nil)
+            NotificationCenter.default.post(name: .kinnectMessagesChanged, object: json)
         case "presence":
             if let ids = json["onlineUserIds"] as? [String] {
                 self.onlineUserIds = Set(ids)
@@ -460,14 +524,20 @@ final class AppState: ObservableObject {
                 showToast("Bạn đã rời khỏi vị trí khách mời Live.")
             }
         case "live-mode-state":
-            if var room = currentLiveRoom {
-                if let paused = json["gamePaused"] as? Bool {
-                    room.gamePaused = paused
-                }
-                if let title = json["gameTitle"] as? String {
-                    room.gameTitle = title
-                }
+            let msgRoom = (json["room"] as? String) ?? currentLiveRoom?.id ?? ""
+            let nextMode = (json["liveMode"] as? String) ?? (json["mode"] as? String)
+            let nextPaused = (json["screenPaused"] as? Bool) ?? (json["gamePaused"] as? Bool)
+            let nextTitle = json["gameTitle"] as? String
+            if var room = currentLiveRoom, msgRoom.isEmpty || room.id == msgRoom {
+                if let nextMode, !nextMode.isEmpty { room.liveMode = nextMode }
+                if let nextPaused { room.gamePaused = nextPaused }
+                if let nextTitle { room.gameTitle = nextTitle }
                 self.currentLiveRoom = room
+            }
+            if !msgRoom.isEmpty, let idx = liveRooms.firstIndex(where: { $0.id == msgRoom }) {
+                if let nextMode, !nextMode.isEmpty { liveRooms[idx].liveMode = nextMode }
+                if let nextPaused { liveRooms[idx].gamePaused = nextPaused }
+                if let nextTitle { liveRooms[idx].gameTitle = nextTitle }
             }
         case "ended", "room-ended":
             let msgRoom = json["room"] as? String
@@ -497,10 +567,11 @@ final class AppState: ObservableObject {
         case "call-ended":
             NativeWebRTCManager.shared.handleCallEndedSocket(json)
         case "notification", "notifications-changed":
-            Task { await refreshGlobalBadges() }
+            Task { await refreshGlobalBadges(announceNew: true) }
             NotificationCenter.default.post(name: .kinnectNotificationsChanged, object: nil)
+            NotificationCenter.default.post(name: .kinnectMessagesChanged, object: json)
         case "direct-message", "group-message", "conversations-changed":
-            Task { await refreshGlobalBadges() }
+            Task { await refreshGlobalBadges(announceNew: true) }
             NotificationCenter.default.post(name: .kinnectMessagesChanged, object: json)
         case "error":
             let message = (json["message"] as? String) ?? (json["error"] as? String) ?? ""

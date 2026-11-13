@@ -1480,6 +1480,8 @@ struct ProfileShortDetailSheet: View {
                 }
                 .padding(12).accessibilityLabel("Đóng video")
             }
+            .preferredColorScheme(.dark)
+            .statusBarHidden(false)
     }
 
     private func deleteShort() async {

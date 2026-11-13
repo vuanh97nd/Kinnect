@@ -299,6 +299,7 @@ struct KinnectRemoteImageView: View {
     var contentMode: ContentMode = .fit
     var cornerRadius: CGFloat = 16
     var maxHeight: CGFloat = 320
+    var fillWidthNaturalHeight: Bool = false
 
     @State private var image: UIImage?
     @State private var failed = false
@@ -307,12 +308,14 @@ struct KinnectRemoteImageView: View {
         rawURL: String,
         contentMode: ContentMode = .fit,
         cornerRadius: CGFloat = 16,
-        maxHeight: CGFloat = 320
+        maxHeight: CGFloat = 320,
+        fillWidthNaturalHeight: Bool = false
     ) {
         self.rawURL = rawURL
         self.contentMode = contentMode
         self.cornerRadius = cornerRadius
         self.maxHeight = maxHeight
+        self.fillWidthNaturalHeight = fillWidthNaturalHeight
         _image = State(initialValue: ImageMemoryCache.shared.image(forKey: rawURL))
     }
 
@@ -325,18 +328,42 @@ struct KinnectRemoteImageView: View {
     var body: some View {
         Group {
             if let img = image {
-                Image(uiImage: img)
-                    .resizable()
-                    .aspectRatio(contentMode: contentMode)
-                    .frame(maxWidth: .infinity, maxHeight: maxHeight)
-                    .clipped()
-                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                if fillWidthNaturalHeight, img.size.width > 0, img.size.height > 0 {
+                    let ratio = img.size.width / img.size.height
+                    let clampedRatio = max(ratio, 0.72)
+                    Color.clear
+                        .aspectRatio(clampedRatio, contentMode: .fit)
+                        .frame(maxWidth: .infinity)
+                        .overlay(
+                            Group {
+                                if ratio >= 0.72 {
+                                    Image(uiImage: img)
+                                        .resizable()
+                                        .scaledToFit()
+                                } else {
+                                    Image(uiImage: img)
+                                        .resizable()
+                                        .scaledToFill()
+                                }
+                            }
+                        )
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                } else {
+                    Image(uiImage: img)
+                        .resizable()
+                        .aspectRatio(contentMode: contentMode)
+                        .frame(maxWidth: .infinity, maxHeight: maxHeight)
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                }
             } else if failed {
                 EmptyView()
             } else {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(KinnectTheme.surfaceElevated)
-                    .frame(height: min(180, maxHeight))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: fillWidthNaturalHeight ? min(260, maxHeight) : min(180, maxHeight))
                     .overlay(ProgressView().tint(KinnectTheme.accentBright))
             }
         }

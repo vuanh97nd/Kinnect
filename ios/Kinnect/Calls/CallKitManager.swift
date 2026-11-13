@@ -65,6 +65,12 @@ final class CallKitManager: NSObject, CXProviderDelegate {
                     self?.callUUIDs.removeValue(forKey: callId)
                     self?.callIDs.removeValue(forKey: uuid)
                 }
+                DispatchQueue.main.async {
+                    if NativeWebRTCManager.shared.activeCall?.callId == callId,
+                       NativeWebRTCManager.shared.activeCall?.state == .ringingIncoming {
+                        CallAudioFeedback.shared.incomingRing()
+                    }
+                }
                 self?.postFallbackCallNotification(callId: callId, callerName: callerName, isVideo: isVideo)
             }
             completion?()
@@ -195,6 +201,14 @@ final class CallKitManager: NSObject, CXProviderDelegate {
         RTCAudioSession.sharedInstance().audioSessionDidActivate(audioSession)
         MediaPermissionHandler.shared.configureAudioSessionForCall(
             speaker: NativeWebRTCManager.shared.isSpeakerOn)
+        DispatchQueue.main.async {
+            if let call = NativeWebRTCManager.shared.activeCall,
+               !call.isIncoming,
+               call.state == .dialingOutgoing {
+                // Re-start outgoing ringback after CallKit activates the audio session.
+                CallAudioFeedback.shared.ringback()
+            }
+        }
     }
 
     func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {

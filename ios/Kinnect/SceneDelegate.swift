@@ -46,6 +46,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         NativeSocketClient.shared.connectWithKeychainSession()
         Task { @MainActor in
             await AppState.shared.refreshGlobalBadges()
+            NotificationCenter.default.post(name: .kinnectNotificationsChanged, object: nil)
+            NotificationCenter.default.post(name: .kinnectMessagesChanged, object: nil)
             AppState.shared.reportActiveStatus(force: true)
             AppState.shared.startActivityHeartbeat()
         }

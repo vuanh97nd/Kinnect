@@ -167,6 +167,8 @@ struct ShortsVideoView: View {
             }
             #endif
         }
+        .preferredColorScheme(.dark)
+        .statusBarHidden(false)
         .sheet(item: $activeCommentShort) { short in
             ShortCommentsSheet(short: short) {
                 Task { await loadShorts() }
@@ -928,9 +930,14 @@ private final class ClipPlaybackController: ObservableObject {
 
         if let player {
             player.isMuted = effectiveMuted
+            player.volume = effectiveMuted ? 0.0 : 1.0
             if blocked {
                 player.pause()
             } else {
+                if !effectiveMuted && !hasCall {
+                    try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+                    try? AVAudioSession.sharedInstance().setActive(true)
+                }
                 player.play()
             }
         }

@@ -1243,29 +1243,114 @@ private struct AboutKinnectSheetView: View {
             )
 
             ScrollView {
-                VStack(spacing: 8) {
-                    KinnectBrandLogo(size: 72)
-                        .padding(.top, 20)
-                    Text("Kinnect")
-                        .font(KinnectTheme.scaled(22, weight: .bold))
-                        .foregroundColor(KinnectTheme.accent)
-                    Text("Kết nối theo cách của bạn.")
-                        .font(KinnectTheme.scaled(13))
-                        .foregroundColor(KinnectTheme.textSecondary)
-                    VStack(alignment: .leading, spacing: 10) {
-                        aboutRow("Tác giả", "Vũ Ngọc Ánh")
-                        aboutRow("Đang dùng", "\(ServerConfig.appVersion) (\(ServerConfig.buildNumber))")
+                VStack(spacing: 16) {
+                    VStack(spacing: 10) {
+                        ZStack {
+                            Circle()
+                                .fill(KinnectTheme.accent.opacity(0.12))
+                                .frame(width: 98, height: 98)
+                            KinnectBrandLogo(size: 76)
+                        }
+                        .padding(.top, 10)
+
+                        Text("Kinnect")
+                            .font(KinnectTheme.scaled(24, weight: .bold))
+                            .foregroundColor(KinnectTheme.textPrimary)
+
+                        Text("Kết nối nhanh, trò chuyện mượt & phát trực tiếp thời gian thực.")
+                            .font(KinnectTheme.scaled(14))
+                            .foregroundColor(KinnectTheme.textSecondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 12)
+
+                        Text("Kinnect iOS \(ServerConfig.appVersion) • Build \(ServerConfig.buildNumber)")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(KinnectTheme.accentBright)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(KinnectTheme.accent.opacity(0.14)))
                     }
-                    .padding(16)
+                    .frame(maxWidth: .infinity)
+                    .padding(20)
+                    .background(
+                        RoundedRectangle(cornerRadius: 24, style: .continuous)
+                            .fill(KinnectTheme.surface)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                    .stroke(KinnectTheme.borderSoft, lineWidth: 1)
+                            )
+                    )
+
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Trải nghiệm trên iPhone & iPad")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundColor(KinnectTheme.textPrimary)
+
+                        aboutHighlightRow(
+                            icon: "sparkles.rectangle.stack.fill",
+                            title: "Bảng tin, Tin 24h & Video ngắn",
+                            subtitle: "Chia sẻ khoảnh khắc với nhạc nền và biểu cảm trực quan."
+                        )
+                        aboutHighlightRow(
+                            icon: "phone.and.waveform.fill",
+                            title: "Nhắn tin & Gọi HD thời gian thực",
+                            subtitle: "Nhận thông báo tức thì, gọi thoại và video ổn định."
+                        )
+                        aboutHighlightRow(
+                            icon: "dot.radiowaves.left.and.right",
+                            title: "Phát trực tiếp đa tương tác",
+                            subtitle: "Phòng trò chuyện, chơi game, mời khách và tặng quà."
+                        )
+                    }
+                    .padding(18)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: 24).fill(KinnectTheme.surface))
-                    .padding(.top, 12)
-                    Text("Kiểm tra cập nhật APK là luồng Android. iOS không có màn cập nhật đó.")
-                        .font(.caption)
-                        .foregroundColor(KinnectTheme.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .fill(KinnectTheme.surface)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                    .stroke(KinnectTheme.borderSoft, lineWidth: 1)
+                            )
+                    )
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        aboutRow("Ứng dụng", "Kinnect dành cho iOS & iPadOS")
+                        Divider().background(KinnectTheme.borderSoft)
+                        aboutRow("Phiên bản hiện tại", "\(ServerConfig.appVersion) (\(ServerConfig.buildNumber))")
+                        Divider().background(KinnectTheme.borderSoft)
+                        aboutRow("Đội ngũ phát triển", "Kinnect Team")
+                    }
+                    .padding(18)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .fill(KinnectTheme.surface)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                    .stroke(KinnectTheme.borderSoft, lineWidth: 1)
+                            )
+                    )
                 }
                 .padding(16)
+            }
+        }
+    }
+
+    private func aboutHighlightRow(icon: String, title: String, subtitle: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(KinnectTheme.accentBright)
+                .frame(width: 36, height: 36)
+                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(KinnectTheme.accent.opacity(0.14)))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(KinnectTheme.textPrimary)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundColor(KinnectTheme.textSecondary)
+                    .kinnectMultiline()
             }
         }
     }

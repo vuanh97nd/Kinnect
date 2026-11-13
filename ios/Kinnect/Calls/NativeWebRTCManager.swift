@@ -11,6 +11,7 @@ struct ActiveCallSession: Identifiable, Equatable {
     var mode: String // "video" | "audio"
     var isIncoming: Bool
     var state: CallLifecycleState
+    var connectedAt: Date? = nil
 
     enum CallLifecycleState: String, Equatable {
         case ringingIncoming
@@ -204,7 +205,8 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
                     peerUser: current.peerUser,
                     mode: current.mode,
                     isIncoming: current.isIncoming,
-                    state: current.state
+                    state: current.state,
+                    connectedAt: current.connectedAt
                 )
                 self.activeCall = updated
             }
@@ -1199,12 +1201,15 @@ extension NativeWebRTCManager: RTCPeerConnectionDelegate {
             guard self.callPeerConnection === peerConnection else { return }
             if newState == .connected || newState == .completed {
                 if var current = self.activeCall {
-                    CallAudioFeedback.shared.stop()
-                    if current.state != .connected && !current.isIncoming {
-                        CallKitManager.shared.reportCallConnected(callId: current.callId)
+                    if current.state != .connected {
+                        CallAudioFeedback.shared.connectedChime()
+                        if !current.isIncoming {
+                            CallKitManager.shared.reportCallConnected(callId: current.callId)
+                        }
+                        current.connectedAt = current.connectedAt ?? Date()
+                        current.state = .connected
+                        self.activeCall = current
                     }
-                    current.state = .connected
-                    self.activeCall = current
                 }
             } else if newState == .failed || newState == .closed {
                 self.endOrRejectCurrentCall(sendSocket: false)

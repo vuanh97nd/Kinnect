@@ -395,30 +395,41 @@ final class StudioVideoProject: ObservableObject {
         return mutableComposition
     }
 
-    /// Exports one clip. Speed other than 1x changes pitch. HEVC is used when the preset exists.
+    /// Exports one clip with optional grading/rotation/trim/speed/music muxing.
     func exportVideo() async throws -> URL {
         let source = AVURLAsset(url: sourceURL)
+        let loadedDur = CMTimeGetSeconds((try? await source.load(.duration)) ?? .zero)
+        if loadedDur.isFinite, loadedDur > 0 {
+            await MainActor.run {
+                if self.duration <= 0 {
+                    self.duration = loadedDur
+                }
+                if self.trimOut <= 0 || self.trimOut > loadedDur {
+                    self.trimOut = loadedDur
+                }
+            }
+        }
         let (exportAsset, audioMix) = try await prepareAssetAndAudioMix(from: source)
-        let composition = makeVideoComposition(for: exportAsset)
+        let needsVideoComposition = !makeGrade().isNeutral || (rotation % 360 != 0)
         let outputURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("Kinnect-Video-\(UUID().uuidString).mp4")
-        let preset = AVAssetExportPresetHighestQuality
-        guard let exportSession = AVAssetExportSession(asset: exportAsset, presetName: preset) else {
+        let preferredPreset = AVAssetExportSession.exportPresets(compatibleWith: exportAsset).contains(AVAssetExportPreset1280x720)
+            ? AVAssetExportPreset1280x720
+            : AVAssetExportPresetMediumQuality
+        guard let exportSession = AVAssetExportSession(asset: exportAsset, presetName: preferredPreset)
+                ?? AVAssetExportSession(asset: exportAsset, presetName: AVAssetExportPresetHighestQuality) else {
             throw NSError(domain: "KinnectStudio", code: -1, userInfo: [NSLocalizedDescriptionKey: "Không khởi tạo được bộ xuất video."])
         }
 
-        exportSession.videoComposition = composition
+        if needsVideoComposition {
+            exportSession.videoComposition = makeVideoComposition(for: exportAsset)
+        }
         if let audioMix {
             exportSession.audioMix = audioMix
         }
         exportSession.outputURL = outputURL
         exportSession.outputFileType = .mp4
         exportSession.shouldOptimizeForNetworkUse = true
-        if abs(playbackRate - 1) < 0.05 && musicURL == nil && trimIn <= 0.05 && (duration <= 0 || trimOut >= duration - 0.05) {
-            let startTime = CMTime(seconds: max(0, trimIn), preferredTimescale: 600)
-            let endTime = CMTime(seconds: min(duration, trimOut > trimIn ? trimOut : duration), preferredTimescale: 600)
-            exportSession.timeRange = CMTimeRange(start: startTime, end: endTime)
-        }
         activeExport = exportSession
         isExporting = true
         exportProgress = 0
@@ -448,9 +459,12 @@ final class StudioVideoProject: ObservableObject {
     }
 
     private func prepareAssetAndAudioMix(from source: AVURLAsset) async throws -> (AVAsset, AVAudioMix?) {
+        let loadedSec = CMTimeGetSeconds((try? await source.load(.duration)) ?? source.duration)
+        let effectiveTotal = (loadedSec.isFinite && loadedSec > 0) ? loadedSec : max(duration, 0)
+        let effectiveEnd = (trimOut > trimIn && trimOut <= effectiveTotal + 0.05) ? trimOut : effectiveTotal
         let hasCustomAudio = (musicURL != nil)
         let hasRateChange = abs(playbackRate - 1) >= 0.05
-        let hasTrim = trimIn > 0.05 || (duration > 0 && trimOut < duration - 0.05)
+        let hasTrim = trimIn > 0.05 || (effectiveTotal > 0 && effectiveEnd < effectiveTotal - 0.05)
 
         guard hasCustomAudio || hasRateChange || hasTrim else {
             return (source, nil)
@@ -458,9 +472,10 @@ final class StudioVideoProject: ObservableObject {
 
         let composition = AVMutableComposition()
         let start = CMTime(seconds: max(0, trimIn), preferredTimescale: 600)
-        let length = CMTime(seconds: max(0.1, (trimOut > trimIn ? trimOut : duration) - trimIn), preferredTimescale: 600)
+        let clipLen = max(0.5, effectiveEnd - trimIn)
+        let length = CMTime(seconds: clipLen, preferredTimescale: 600)
         let range = CMTimeRange(start: start, duration: length)
-        let scaled = CMTimeMultiplyByFloat64(length, multiplier: 1.0 / playbackRate)
+        let scaled = CMTimeMultiplyByFloat64(length, multiplier: 1.0 / max(playbackRate, 0.25))
 
         var inputParams: [AVMutableAudioMixInputParameters] = []
 

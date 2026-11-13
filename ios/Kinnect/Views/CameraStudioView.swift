@@ -255,6 +255,8 @@ struct CameraStudioView: View {
         .onDisappear {
             cameraController.stop()
         }
+        .preferredColorScheme(.dark)
+        .statusBarHidden(false)
         .sheet(isPresented: $showMusicPickerSheet) {
             NavigationStack {
                 StudioMusicPickerSheet(
@@ -1392,6 +1394,10 @@ struct CameraStudioView: View {
         vp.proTemplate = photoProject.proTemplate
         vp.proPack = photoProject.proPack
         vp.overlayText = photoProject.overlayText
+        if let selectedMusicURL {
+            vp.musicURL = selectedMusicURL
+            vp.musicTitle = selectedMusicTrack
+        }
     }
 
     private func saveMediaToPhotos() {
@@ -1445,35 +1451,77 @@ struct CameraStudioView: View {
     }
 
     private func loadMediaFromLibrary(_ item: PhotosPickerItem) async {
-        if let data = try? await item.loadTransferable(type: Data.self) {
-            if let uiImg = UIImage(data: data) {
-                self.originalImage = uiImg
-                self.previewImage = uiImg
-                self.capturedVideoTempURL = nil
-                self.videoDataURL = ""
-                self.target = .feedPost
-                if let jpeg = uiImg.jpegData(compressionQuality: 0.75) {
-                    self.imageDataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
-                }
-            } else {
-                if data.count > 8 * 1024 * 1024 {
-                    appState.showToast("Video vượt quá giới hạn 8MB.")
-                    return
-                }
-                // Save to persistent local temp file so AVPlayer can play real local media
-                let tempDir = FileManager.default.temporaryDirectory
-                let destURL = tempDir.appendingPathComponent("picked_video_\(UUID().uuidString).mp4")
-                try? data.write(to: destURL)
-                self.capturedVideoTempURL = destURL
-                self.videoDataURL = "data:video/mp4;base64,\(data.base64EncodedString())"
-                self.previewImage = nil
-                self.originalImage = nil
-                self.target = .shortVideo
-                let vp = StudioVideoProject(sourceURL: destURL)
-                self.videoProject = vp
-                self.syncVideoProjectSliders(to: vp)
+        let isMovie = item.supportedContentTypes.contains { $0.conforms(to: .movie) }
+        if !isMovie,
+           let data = try? await item.loadTransferable(type: Data.self),
+           let uiImg = UIImage(data: data) {
+            self.originalImage = uiImg
+            self.previewImage = uiImg
+            self.capturedVideoTempURL = nil
+            self.videoProject = nil
+            self.videoDataURL = ""
+            self.target = .feedPost
+            if let jpeg = uiImg.jpegData(compressionQuality: 0.75) {
+                self.imageDataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
             }
+            return
         }
+        var resolvedMovieURL: URL?
+        if let movie = try? await item.loadTransferable(type: KinnectMovieTransferable.self) {
+            resolvedMovieURL = movie.url
+        } else if let data = try? await item.loadTransferable(type: Data.self) {
+            let tempDir = FileManager.default.temporaryDirectory
+            let destURL = tempDir.appendingPathComponent("picked_video_\(UUID().uuidString).mp4")
+            try? data.write(to: destURL)
+            resolvedMovieURL = destURL
+        }
+        if let destURL = resolvedMovieURL {
+            let fileSize = ((try? FileManager.default.attributesOfItem(atPath: destURL.path)[.size] as? Int) ?? 0)
+            if fileSize > 20 * 1024 * 1024 {
+                appState.showToast("Video vượt quá giới hạn 20MB.")
+                return
+            }
+            self.capturedVideoTempURL = destURL
+            if let data = try? Data(contentsOf: destURL) {
+                self.videoDataURL = "data:video/mp4;base64,\(data.base64EncodedString())"
+            }
+            self.previewImage = nil
+            self.originalImage = nil
+            self.target = .shortVideo
+            let vp = StudioVideoProject(sourceURL: destURL)
+            self.videoProject = vp
+            self.syncVideoProjectSliders(to: vp)
+        }
+    }
+
+    private func prepareUploadMediaDataURL(fallbackDataURL: String, defaultColorHex: String) async throws -> String {
+        if let vp = videoProject ?? (capturedVideoTempURL.map { StudioVideoProject(sourceURL: $0) }) {
+            syncVideoProjectSliders(to: vp)
+            let needsExport = vp.hasEdits || vp.sourceURL.pathExtension.lowercased() != "mp4" || videoDataURL.isEmpty
+            let outputURL = needsExport ? try await vp.exportVideo() : vp.sourceURL
+            let data = try Data(contentsOf: outputURL)
+            guard data.count <= 20 * 1024 * 1024 else {
+                throw KinnectAPIError.serverMessage("Video vượt quá giới hạn 20 MB.")
+            }
+            return "data:video/mp4;base64,\(data.base64EncodedString())"
+        }
+        if let mURL = selectedMusicURL {
+            let stillURL = try await KinnectStillVideo.makeCardVideo(
+                image: previewImage,
+                text: previewImage == nil ? caption : "",
+                backgroundColorHex: defaultColorHex
+            )
+            let project = StudioVideoProject(sourceURL: stillURL)
+            project.musicURL = mURL
+            project.musicTitle = selectedMusicTrack
+            let exported = try await project.exportVideo()
+            let data = try Data(contentsOf: exported)
+            guard data.count <= 20 * 1024 * 1024 else {
+                throw KinnectAPIError.serverMessage("Video nhạc nền vượt quá giới hạn 20 MB.")
+            }
+            return "data:video/mp4;base64,\(data.base64EncodedString())"
+        }
+        return fallbackDataURL
     }
 
     private func publishContent() async {
@@ -1487,7 +1535,7 @@ struct CameraStudioView: View {
             switch target {
             case .shortVideo:
                 guard !videoDataURL.isEmpty || capturedVideoTempURL != nil || videoProject != nil else {
-                    appState.showToast("Vui lòng quay hoặc chọn một video MP4 (< 8MB).")
+                    appState.showToast("Vui lòng quay hoặc chọn một video MP4 (< 20MB).")
                     return
                 }
                 var finalVideoDataURL = videoDataURL
@@ -1517,20 +1565,22 @@ struct CameraStudioView: View {
                 closeCameraView()
 
             case .feedPost:
+                let preparedMedia = try await prepareUploadMediaDataURL(fallbackDataURL: imageDataURL, defaultColorHex: "#1E1B4B")
                 _ = try await KinnectAPIClient.shared.requestJSON(
                     "/api/posts",
                     method: "POST",
-                body: KinnectWriteBody.post(text: finalCaption, category: "community", mediaDataURL: imageDataURL),
+                    body: KinnectWriteBody.post(text: finalCaption, category: "community", mediaDataURL: preparedMedia),
                     requestId: reqId
                 )
                 appState.showToast("Đã đăng bài viết mới!")
                 closeCameraView()
 
             case .story:
+                let preparedMedia = try await prepareUploadMediaDataURL(fallbackDataURL: imageDataURL, defaultColorHex: "#7C3AED")
                 _ = try await KinnectAPIClient.shared.requestJSON(
                     "/api/stories",
                     method: "POST",
-                body: KinnectWriteBody.story(text: finalCaption, colorHex: "#7C3AED", mediaDataURL: imageDataURL),
+                    body: KinnectWriteBody.story(text: finalCaption, colorHex: "#7C3AED", mediaDataURL: preparedMedia),
                     requestId: reqId
                 )
                 appState.showToast("Đã đăng tin 24h!")
@@ -1684,10 +1734,14 @@ struct StudioMusicPickerSheet: View {
     }
 
     private func localAudio(_ track: MusicTrack) async throws -> URL {
-        let ext = URL(string: track.path)?.pathExtension ?? "mp3"
+        let cleanPath = track.path.components(separatedBy: "?").first ?? track.path
+        let ext = (cleanPath as NSString).pathExtension
         do {
             return try await KinnectAuthenticatedFile.fetch(path: track.path, fileExtension: ext.isEmpty ? "mp3" : ext)
         } catch {
+            if UIReviewFixture.isEnabled {
+                return UIReviewFixture.sampleAudioURL()
+            }
             return UIReviewFixture.sampleAudioURL()
         }
     }
@@ -1701,9 +1755,13 @@ struct StudioMusicPickerSheet: View {
         do {
             let url = try await localAudio(track)
             guard calls.activeCall == nil else { return }
+            try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try? AVAudioSession.sharedInstance().setActive(true)
             playingID = track.id
-            previewPlayer = AVPlayer(url: url)
-            previewPlayer?.play()
+            let player = AVPlayer(url: url)
+            player.volume = 1.0
+            previewPlayer = player
+            player.play()
         } catch { errorText = error.localizedDescription }
     }
 

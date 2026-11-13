@@ -1,3 +1,4 @@
+import AVFoundation
 import PhotosUI
 import SwiftUI
 import UIKit
@@ -596,45 +597,6 @@ struct PostCardView: View {
 
             Divider()
 
-            if showReactionDock {
-                HStack(spacing: 8) {
-                    ForEach(reactionOptions, id: \.key) { item in
-                        Button {
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            onReact(item.key)
-                            withAnimation(.spring(response: 0.25, dampingFraction: 0.6)) {
-                                showReactionDock = false
-                            }
-                        } label: {
-                            VStack(spacing: 2) {
-                                Text(item.emoji)
-                                    .font(KinnectTheme.scaled(26))
-                                Text(item.title)
-                                    .font(.system(size: 9, weight: .bold))
-                                    .foregroundColor(KinnectTheme.textPrimary)
-                            }
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 4)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule()
-                        .fill(Color(uiColor: .secondarySystemGroupedBackground))
-                        .shadow(color: Color.black.opacity(0.12), radius: 12, y: 4)
-                        .overlay(Capsule().stroke(KinnectTheme.borderSoft, lineWidth: 1))
-                )
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.8, anchor: .bottomLeading).combined(with: .opacity),
-                    removal: .scale(scale: 0.8, anchor: .bottomLeading).combined(with: .opacity)
-                ))
-                .padding(.leading, 8)
-                .zIndex(20)
-            }
-
             // Equal 3-Column Action Bar (Android parity: 33% Cảm xúc, 33% Bình luận, 33% Chia sẻ)
             HStack(spacing: 0) {
                 // Column 1: Cảm xúc (Reaction)
@@ -703,8 +665,60 @@ struct PostCardView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Chia sẻ bài viết")
             }
+            .overlay(alignment: .topLeading) {
+                if showReactionDock {
+                    HStack(spacing: 6) {
+                        ForEach(reactionOptions, id: \.key) { item in
+                            let isSelected = post.liked && post.userReaction == item.key
+                            Button {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                onReact(item.key)
+                                withAnimation(.spring(response: 0.25, dampingFraction: 0.65)) {
+                                    isBouncing = true
+                                    showReactionDock = false
+                                }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                                    isBouncing = false
+                                }
+                            } label: {
+                                VStack(spacing: 2) {
+                                    Text(item.emoji)
+                                        .font(KinnectTheme.scaled(27))
+                                        .scaleEffect(isSelected ? 1.16 : 1.0)
+                                    Text(item.title)
+                                        .font(.system(size: 8.5, weight: .bold))
+                                        .foregroundColor(isSelected ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
+                                        .lineLimit(1)
+                                }
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 4)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .fill(isSelected ? KinnectTheme.accent.opacity(0.14) : Color.clear)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(
+                        Capsule()
+                            .fill(Color(uiColor: .secondarySystemGroupedBackground))
+                            .shadow(color: Color.black.opacity(0.18), radius: 14, y: 5)
+                            .overlay(Capsule().stroke(KinnectTheme.borderSoft, lineWidth: 1))
+                    )
+                    .offset(x: 2, y: -62)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.78, anchor: .bottomLeading).combined(with: .opacity),
+                        removal: .scale(scale: 0.85, anchor: .bottomLeading).combined(with: .opacity)
+                    ))
+                    .zIndex(30)
+                }
+            }
         }
         .modifier(FeedCardStyle())
+        .zIndex(showReactionDock ? 50 : 0)
     }
 
     private var postShareURL: URL {
@@ -788,12 +802,25 @@ struct PostComposerSheet: View {
                     }
                     if let videoURL {
                         ShortClipPlayer(path: videoURL.absoluteString, active: true).frame(height: 320)
-                        Button { showMusic = true } label: {
-                            Label(musicTitle.isEmpty ? "Thêm nhạc" : musicTitle, systemImage: "music.note")
-                        }
                     }
-                    if !mediaDataURL.isEmpty || videoURL != nil {
-                        Button("Gỡ media", role: .destructive) {
+                    Button { showMusic = true } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "music.note")
+                            Text(musicTitle.isEmpty ? "Thêm nhạc" : musicTitle)
+                                .lineLimit(1)
+                            Spacer()
+                            if !musicTitle.isEmpty {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(KinnectTheme.accentBright)
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                    }
+                    .buttonStyle(.plain)
+                    if !mediaDataURL.isEmpty || videoURL != nil || musicURL != nil {
+                        Button("Gỡ media & nhạc", role: .destructive) {
                             previewImage = nil; videoURL = nil; mediaDataURL = ""
                             musicTitle = ""; musicURL = nil; photo = nil; video = nil
                         }
@@ -829,7 +856,7 @@ struct PostComposerSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(isSubmitting ? "Đang đăng…" : "Đăng") { Task { await submitPost() } }
                         .font(.subheadline.bold())
-                        .disabled(isSubmitting || loadingMedia || (text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && mediaDataURL.isEmpty && videoURL == nil))
+                        .disabled(isSubmitting || loadingMedia || (text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && mediaDataURL.isEmpty && videoURL == nil && musicURL == nil))
                 }
             }
         }
@@ -849,7 +876,14 @@ struct PostComposerSheet: View {
                 loadingMedia = true
                 defer { loadingMedia = false }
                 do {
-                    guard let data = try await item.loadTransferable(type: Data.self) else { return }
+                    if let movie = try? await item.loadTransferable(type: KinnectMovieTransferable.self) {
+                        videoURL = movie.url; previewImage = nil; mediaDataURL = ""
+                        return
+                    }
+                    guard let data = try await item.loadTransferable(type: Data.self) else {
+                        appState.showToast("Không đọc được video đã chọn.")
+                        return
+                    }
                     let url = FileManager.default.temporaryDirectory.appendingPathComponent("Kinnect-Post-\(UUID().uuidString).mov")
                     try data.write(to: url)
                     videoURL = url; previewImage = nil; mediaDataURL = ""
@@ -895,6 +929,20 @@ struct PostComposerSheet: View {
                     appState.showToast("Video vượt quá giới hạn 20 MB."); return
                 }
                 media = "data:video/mp4;base64,\(data.base64EncodedString())"
+            } else if let musicURL {
+                let stillURL = try await KinnectStillVideo.makeCardVideo(
+                    image: previewImage,
+                    text: previewImage == nil ? text : "",
+                    backgroundColorHex: "#1E1B4B"
+                )
+                let project = StudioVideoProject(sourceURL: stillURL)
+                project.musicURL = musicURL; project.musicTitle = musicTitle
+                let output = try await project.exportVideo()
+                let data = try Data(contentsOf: output)
+                guard data.count <= 20 * 1024 * 1024 else {
+                    appState.showToast("Video nhạc vượt quá giới hạn 20 MB."); return
+                }
+                media = "data:video/mp4;base64,\(data.base64EncodedString())"
             }
             _ = try await KinnectAPIClient.shared.requestJSON("/api/posts", method: "POST",
                 body: KinnectWriteBody.post(text: text.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -932,6 +980,8 @@ struct StoryComposerSheet: View {
     @State private var storyMusicURL: URL?
     @State private var storyVideoURL: URL?
     @State private var storyMediaLoading = false
+    @State private var storyMusicPlayer: AVPlayer?
+    @State private var isStoryMusicPaused = false
 
     var body: some View {
         NavigationStack {
@@ -1047,6 +1097,7 @@ struct StoryComposerSheet: View {
                                             selectedMusic = nil
                                             storyMusicTitle = ""
                                             storyMusicURL = nil
+                                            stopStoryMusicPreview()
                                         } label: {
                                             Image(systemName: "xmark.circle.fill")
                                                 .font(.caption)
@@ -1112,26 +1163,44 @@ struct StoryComposerSheet: View {
                         Task {
                             storyMediaLoading = true
                             defer { storyMediaLoading = false }
-                            if let data = try? await item.loadTransferable(type: Data.self) {
-                                if let uiImg = UIImage(data: data),
-                                   let jpeg = uiImg.jpegData(compressionQuality: 0.72) {
-                                    guard jpeg.count <= 20 * 1024 * 1024 else {
-                                        appState.showToast("Ảnh vượt quá giới hạn 20 MB."); return
-                                    }
-                                    previewImage = uiImg
-                                    selectedVideoName = nil
-                                    storyVideoURL = nil
-                                    imageDataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
-                                } else {
-                                    do {
-                                        let url = FileManager.default.temporaryDirectory.appendingPathComponent("Kinnect-Story-\(UUID().uuidString).mov")
-                                        try data.write(to: url)
-                                        storyVideoURL = url
-                                        previewImage = nil
-                                        selectedVideoName = "Đã chọn video 24h (\(data.count / 1024 / 1024) MB)"
-                                        imageDataURL = "data:video/mp4;base64,\(data.base64EncodedString())"
-                                    } catch { appState.showToast(error.localizedDescription) }
+                            let isMovie = item.supportedContentTypes.contains { $0.conforms(to: .movie) }
+                            if !isMovie,
+                               let data = try? await item.loadTransferable(type: Data.self),
+                               let uiImg = UIImage(data: data),
+                               let jpeg = uiImg.jpegData(compressionQuality: 0.72) {
+                                guard jpeg.count <= 20 * 1024 * 1024 else {
+                                    appState.showToast("Ảnh vượt quá giới hạn 20 MB."); return
                                 }
+                                previewImage = uiImg
+                                selectedVideoName = nil
+                                storyVideoURL = nil
+                                imageDataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
+                                return
+                            }
+                            var resolvedURL: URL?
+                            if let movie = try? await item.loadTransferable(type: KinnectMovieTransferable.self) {
+                                resolvedURL = movie.url
+                            } else if let data = try? await item.loadTransferable(type: Data.self) {
+                                let url = FileManager.default.temporaryDirectory.appendingPathComponent("Kinnect-Story-\(UUID().uuidString).mov")
+                                try? data.write(to: url)
+                                resolvedURL = url
+                            }
+                            if let url = resolvedURL {
+                                let sizeBytes = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
+                                guard sizeBytes <= 20 * 1024 * 1024 else {
+                                    appState.showToast("Video vượt quá giới hạn 20 MB."); return
+                                }
+                                stopStoryMusicPreview()
+                                storyVideoURL = url
+                                previewImage = nil
+                                selectedVideoName = "Đã chọn video 24h (\(max(1, sizeBytes / 1024 / 1024)) MB)"
+                                if let rawData = try? Data(contentsOf: url) {
+                                    imageDataURL = "data:video/mp4;base64,\(rawData.base64EncodedString())"
+                                } else {
+                                    imageDataURL = ""
+                                }
+                            } else {
+                                appState.showToast("Không đọc được ảnh hoặc video đã chọn.")
                             }
                         }
                     }
@@ -1154,7 +1223,7 @@ struct StoryComposerSheet: View {
                         .foregroundColor(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
-                    .disabled(isSubmitting || storyMediaLoading || (text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && imageDataURL.isEmpty))
+                    .disabled(isSubmitting || storyMediaLoading || (text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && imageDataURL.isEmpty && storyVideoURL == nil && storyMusicURL == nil))
                 }
                 .padding(16)
             }
@@ -1163,37 +1232,66 @@ struct StoryComposerSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Đóng") { dismiss() }
+                    Button("Đóng") { stopStoryMusicPreview(); dismiss() }
                 }
             }
+            .onDisappear { stopStoryMusicPreview() }
             .sheet(isPresented: $showMusicSheet) {
                 NavigationStack {
                     StudioMusicPickerSheet(selectedTrack: $storyMusicTitle) { title, url in
                         selectedMusic = title.isEmpty ? nil : StoryMusicTrack(id: url?.absoluteString ?? title, title: title, artist: "")
                         storyMusicTitle = title
                         storyMusicURL = url
+                        if let url, storyVideoURL == nil {
+                            startStoryMusicPreview(url: url)
+                        } else {
+                            stopStoryMusicPreview()
+                        }
                     }
                 }
             }
         }
     }
 
+    private func startStoryMusicPreview(url: URL) {
+        stopStoryMusicPreview()
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+        try? AVAudioSession.sharedInstance().setActive(true)
+        let player = AVPlayer(url: url)
+        player.volume = 1.0
+        storyMusicPlayer = player
+        isStoryMusicPaused = false
+        player.play()
+    }
+
+    private func stopStoryMusicPreview() {
+        storyMusicPlayer?.pause()
+        storyMusicPlayer = nil
+    }
+
     private func createStory() async {
+        stopStoryMusicPreview()
         isSubmitting = true
         defer { isSubmitting = false }
         let reqId = "story_\(UUID().uuidString)"
         do {
             var media = imageDataURL
             let source: URL?
-            if let storyVideoURL { source = storyVideoURL }
-            else if storyMusicURL != nil, let previewImage { source = try await KinnectStillVideo.make(image: previewImage) }
-            else { source = nil }
-            if storyMusicURL != nil && source == nil {
-                throw KinnectAPIError.serverMessage("Chọn ảnh hoặc video để ghép nhạc.")
+            if let storyVideoURL {
+                source = storyVideoURL
+            } else if storyMusicURL != nil {
+                source = try await KinnectStillVideo.makeCardVideo(
+                    image: previewImage,
+                    text: previewImage == nil ? text : "",
+                    backgroundColorHex: backgroundColor
+                )
+            } else {
+                source = nil
             }
             if let source {
                 let project = StudioVideoProject(sourceURL: source)
                 project.musicURL = storyMusicURL
+                project.musicTitle = storyMusicTitle
                 let output = try await project.exportVideo()
                 let data = try Data(contentsOf: output)
                 guard data.count <= 20 * 1024 * 1024 else { throw KinnectAPIError.serverMessage("Tin vượt quá giới hạn 20 MB.") }
@@ -1223,6 +1321,7 @@ struct StoryDetailSheet: View {
     @ObservedObject private var appState = AppState.shared
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var viewers: [KinnectUser] = []
+    @State private var isMuted: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -1251,7 +1350,28 @@ struct StoryDetailSheet: View {
                         .frame(maxWidth: .infinity, minHeight: 340)
 
                     if !story.imageUrl.isEmpty {
-                        KinnectMediaTile(path: story.imageUrl, kind: story.mediaKind)
+                        let isStoryVideo = story.mediaKind.lowercased() == "video"
+                            || story.imageUrl.lowercased().contains(".mp4")
+                            || story.imageUrl.lowercased().contains(".mov")
+                        if isStoryVideo {
+                            ShortClipPlayer(path: story.imageUrl, active: true, muted: isMuted)
+                                .frame(maxWidth: .infinity, minHeight: 340, maxHeight: 460)
+                                .clipShape(RoundedRectangle(cornerRadius: 22))
+                                .overlay(alignment: .topTrailing) {
+                                    Button {
+                                        isMuted.toggle()
+                                    } label: {
+                                        Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundColor(.white)
+                                            .frame(width: 38, height: 38)
+                                            .background(Circle().fill(Color.black.opacity(0.55)))
+                                    }
+                                    .padding(12)
+                                }
+                        } else {
+                            KinnectMediaTile(path: story.imageUrl, kind: story.mediaKind)
+                        }
                     }
 
                     if !story.text.isEmpty {
@@ -1297,9 +1417,11 @@ struct StoryDetailSheet: View {
                 Spacer()
             }
             .padding(16)
-            .background(KinnectTheme.background)
+            .background(Color(red: 0.06, green: 0.06, blue: 0.1).ignoresSafeArea())
             .navigationTitle("Tin 24h")
             .navigationBarTitleDisplayMode(.inline)
+            .preferredColorScheme(.dark)
+            .statusBarHidden(false)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Đóng") { dismiss() }

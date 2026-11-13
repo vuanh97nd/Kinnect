@@ -10,6 +10,7 @@ final class NativeSocketClient: NSObject, URLSessionWebSocketDelegate {
     private var pingTimer: Timer?
     private(set) var isConnected = false
     private var shouldReconnect = false
+    private var reconnectAttempt = 0
 
     var onEvent: (([String: Any]) -> Void)?
 
@@ -111,6 +112,7 @@ final class NativeSocketClient: NSObject, URLSessionWebSocketDelegate {
 
         if type == "welcome" {
             isConnected = true
+            reconnectAttempt = 0
         }
 
         DispatchQueue.main.async { [weak self] in
@@ -124,8 +126,15 @@ final class NativeSocketClient: NSObject, URLSessionWebSocketDelegate {
 
     private func startPingTimer() {
         pingTimer?.invalidate()
-        pingTimer = Timer.scheduledTimer(withTimeInterval: 25.0, repeats: true) { [weak self] _ in
-            self?.webSocketTask?.sendPing { _ in }
+        pingTimer = Timer.scheduledTimer(withTimeInterval: 18.0, repeats: true) { [weak self] _ in
+            guard let self = self, let task = self.webSocketTask else { return }
+            task.sendPing { [weak self] error in
+                if error != nil {
+                    DispatchQueue.main.async {
+                        self?.handleDisconnection()
+                    }
+                }
+            }
         }
     }
 
@@ -136,7 +145,9 @@ final class NativeSocketClient: NSObject, URLSessionWebSocketDelegate {
         webSocketTask = nil
         guard shouldReconnect,
               UIApplication.shared.applicationState == .active || NativeWebRTCManager.shared.activeCall != nil else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+        let delay = min(10.0, 2.0 * pow(1.5, Double(reconnectAttempt)))
+        reconnectAttempt = min(reconnectAttempt + 1, 5)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self = self, self.shouldReconnect, self.webSocketTask == nil else { return }
             self.connectWithKeychainSession()
         }
@@ -145,6 +156,7 @@ final class NativeSocketClient: NSObject, URLSessionWebSocketDelegate {
     func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didOpenWithProtocol protocol: String?) {
         guard self.webSocketTask === webSocketTask else { return }
         isConnected = true
+        reconnectAttempt = 0
     }
 
     func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didCloseWith closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {

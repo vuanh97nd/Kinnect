@@ -16,6 +16,8 @@ struct FriendsView: View {
     @State private var incoming: [KinnectUser] = []
     @State private var outgoing: [KinnectUser] = []
     @State private var suggestions: [KinnectUser] = []
+    @State private var discoverResults: [KinnectUser] = []
+    @State private var isSearchingServer = false
     @State private var isLoading = false
     @State private var selectedProfileUser: KinnectUser? = nil
     @State private var activeChatPeer: KinnectUser? = nil
@@ -34,10 +36,22 @@ struct FriendsView: View {
         return friends.filter { $0.name.lowercased().contains(q) || $0.handle.lowercased().contains(q) }
     }
 
+    private var trimmedSearchQuery: String {
+        let clean = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        return clean.hasPrefix("@") ? String(clean.dropFirst()) : clean
+    }
+
+    private var filteredDiscoverResults: [KinnectUser] {
+        guard !trimmedSearchQuery.isEmpty else { return [] }
+        let friendIds = Set(filteredFriends.map(\.id))
+        return discoverResults.filter { !friendIds.contains($0.id) }
+    }
+
     // Suggestions filtered by search, max 6 - matches Android discover integration
     private var filteredSuggestions: [KinnectUser] {
         let clean = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        var filtered = suggestions
+        let discoverIds = Set(filteredDiscoverResults.map(\.id))
+        var filtered = suggestions.filter { !discoverIds.contains($0.id) }
         if !clean.isEmpty {
             let q = clean.hasPrefix("@") ? String(clean.dropFirst()) : clean
             filtered = filtered.filter { $0.name.lowercased().contains(q) || $0.handle.lowercased().contains(q) }
@@ -88,8 +102,8 @@ struct FriendsView: View {
                 LazyVStack(spacing: 14) {
                     switch tab {
                     case .friends:
-                        if filteredFriends.isEmpty && !isLoading && filteredSuggestions.isEmpty {
-                            emptyPlaceholder(searchQuery.isEmpty ? "Chưa có bạn bè nào trong danh sách" : "Không tìm thấy bạn bè phù hợp")
+                        if filteredFriends.isEmpty && filteredDiscoverResults.isEmpty && !isLoading && !isSearchingServer && filteredSuggestions.isEmpty {
+                            emptyPlaceholder(searchQuery.isEmpty ? "Chưa có bạn bè nào trong danh sách" : "Không tìm thấy người dùng phù hợp")
                         } else {
                             let online = filteredFriends.filter { ($0.isActive && $0.showActivity) || appState.onlineUserIds.contains($0.id) }
                             let offline = filteredFriends.filter { !(($0.isActive && $0.showActivity) || appState.onlineUserIds.contains($0.id)) }
@@ -118,6 +132,30 @@ struct FriendsView: View {
                                     }
                                 }
                                 .background(groupedCardBackground)
+                            }
+
+                            if !trimmedSearchQuery.isEmpty {
+                                if isSearchingServer && filteredDiscoverResults.isEmpty {
+                                    HStack(spacing: 8) {
+                                        ProgressView().tint(KinnectTheme.accentBright)
+                                        Text("Đang tìm trên toàn bộ Kinnect…")
+                                            .font(.caption)
+                                            .foregroundColor(KinnectTheme.textSecondary)
+                                        Spacer()
+                                    }
+                                    .padding(.vertical, 8)
+                                } else if !filteredDiscoverResults.isEmpty {
+                                    sectionHeader("Kết quả tìm kiếm trên Kinnect", count: filteredDiscoverResults.count, color: KinnectTheme.accentBright)
+                                    VStack(spacing: 0) {
+                                        ForEach(filteredDiscoverResults) { user in
+                                            suggestionRow(user: user)
+                                            if user.id != filteredDiscoverResults.last?.id {
+                                                Divider().background(KinnectTheme.borderSoft).padding(.leading, 64)
+                                            }
+                                        }
+                                    }
+                                    .background(groupedCardBackground)
+                                }
                             }
 
                             // Suggestions integrated at bottom of friends tab (max 6, search-filtered) - matches Android
@@ -178,6 +216,9 @@ struct FriendsView: View {
         .toolbar(.hidden, for: .navigationBar)
         .task {
             await loadAll()
+        }
+        .task(id: searchQuery) {
+            await searchDiscover(query: searchQuery, immediate: false)
         }
         .onAppear {
             if UIReviewFixture.activeScreen == "friends-requests" {
@@ -536,6 +577,34 @@ struct FriendsView: View {
         if let sRes = try? await sTask {
             let list = (sRes["users"] as? [[String: Any]]) ?? (sRes["suggestions"] as? [[String: Any]]) ?? []
             self.suggestions = list.map(KinnectUser.from)
+        }
+        if !trimmedSearchQuery.isEmpty {
+            await searchDiscover(query: searchQuery, immediate: true)
+        }
+    }
+
+    private func searchDiscover(query: String, immediate: Bool) async {
+        let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = clean.hasPrefix("@") ? String(clean.dropFirst()) : clean
+        guard !normalized.isEmpty else {
+            discoverResults = []
+            isSearchingServer = false
+            return
+        }
+        if !immediate {
+            try? await Task.sleep(nanoseconds: 220_000_000)
+            if Task.isCancelled { return }
+        }
+        isSearchingServer = true
+        defer { isSearchingServer = false }
+        var components = URLComponents()
+        components.path = "/api/discover"
+        components.queryItems = [URLQueryItem(name: "q", value: normalized)]
+        let path = components.string ?? "/api/discover?q=\(normalized)"
+        if let res = try? await KinnectAPIClient.shared.requestJSON(path),
+           !Task.isCancelled {
+            let list = (res["users"] as? [[String: Any]]) ?? []
+            discoverResults = list.map(KinnectUser.from)
         }
     }
 

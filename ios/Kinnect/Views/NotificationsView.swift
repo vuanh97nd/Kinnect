@@ -14,7 +14,6 @@ struct NotificationsView: View {
     }
 
     @State private var filter: NotificationFilter = .all
-    @State private var searchQuery: String = ""
     @State private var notifications: [NotificationItem] = []
     @State private var isLoading = false
 
@@ -42,28 +41,6 @@ struct NotificationsView: View {
             )
 
             VStack(spacing: 10) {
-                // Search Bar (Parity with Android searchField)
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(KinnectTheme.textSecondary)
-                    TextField("Tìm kiếm thông báo…", text: $searchQuery)
-                        .font(.subheadline)
-                        .foregroundColor(KinnectTheme.textPrimary)
-                    if !searchQuery.isEmpty {
-                        Button {
-                            searchQuery = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(KinnectTheme.textSecondary)
-                        }
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 9)
-                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                .padding(.horizontal, 14)
-                .padding(.top, 10)
-
                 // Filter Tabs (Tất cả · Chưa đọc)
                 Picker("Bộ lọc thông báo", selection: $filter) {
                     ForEach(NotificationFilter.allCases, id: \.self) { item in
@@ -72,6 +49,7 @@ struct NotificationsView: View {
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal, 14)
+                .padding(.top, 10)
 
                 // Notifications List
                 ScrollView {
@@ -108,6 +86,9 @@ struct NotificationsView: View {
         .toolbar(.hidden, for: .navigationBar)
         .task {
             await loadNotifications()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .kinnectNotificationsChanged)) { _ in
+            Task { await loadNotifications() }
         }
         .fullScreenCover(item: $selectedPost) { post in
             NotificationPostDetailView(post: post)
@@ -184,7 +165,6 @@ struct NotificationsView: View {
     // MARK: - Filtered Notifications
 
     private var filteredNotifications: [NotificationItem] {
-        let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return notifications.filter { item in
             let t = item.type.lowercased()
             if t == "message" || t == "group_message" {
@@ -192,12 +172,6 @@ struct NotificationsView: View {
             }
             if filter == .unread && item.read {
                 return false
-            }
-            if !q.isEmpty {
-                let text = "\(item.actor.name) \(actionText(for: item.type)) \(item.preview)".lowercased()
-                if !text.contains(q) {
-                    return false
-                }
             }
             return true
         }
@@ -270,7 +244,7 @@ struct NotificationsView: View {
             Text(
                 filter == .unread
                     ? "Không có thông báo chưa đọc."
-                    : (searchQuery.isEmpty ? "Chưa có thông báo mới." : "Không tìm thấy thông báo.")
+                    : "Chưa có thông báo mới."
             )
             .font(.subheadline)
             .foregroundColor(KinnectTheme.textSecondary)
