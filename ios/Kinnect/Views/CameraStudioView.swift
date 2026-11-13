@@ -302,7 +302,7 @@ struct CameraStudioView: View {
         .onChange(of: showCreateLiveSheet) { isOpen in
             if isOpen {
                 cameraController.stop()
-            } else if !cameraController.isRecordingVideo && capturedImage == nil && recordedVideoURL == nil {
+            } else if !cameraController.isRecordingVideo && previewImage == nil && videoDataURL.isEmpty {
                 cameraController.configureIfAuthorized()
                 cameraController.start()
             }
