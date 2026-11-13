@@ -1,4 +1,5 @@
 import AVFoundation
+import AVKit
 import Foundation
 import SwiftUI
 import UIKit
@@ -940,6 +941,27 @@ enum UIReviewFixture {
         case "/api/admin/moderate":
             return ["ok": true]
 
+        case "/api/admin/economy":
+            return [
+                "version": 1,
+                "config": [
+                    "giftPrices": [
+                        "rose": 50,
+                        "star": 100,
+                        "crown": 200
+                    ]
+                ]
+            ]
+
+        case "/api/admin/ai":
+            return [
+                "config": [
+                    "ready": false,
+                    "queue": 0,
+                    "failed": 0
+                ]
+            ]
+
         default:
             if cleanPath.hasSuffix("/private") {
                 return [
@@ -1594,6 +1616,10 @@ enum UIReviewFixture {
             return AnyView(PersistenceProbe(writing: false))
         case "shorts-telemetry":
             return AnyView(ShortsTelemetryProbe())
+        case "shorts-avplayer":
+            return AnyView(ShortsAVPlayerProbe())
+        case "admin-denied":
+            return AnyView(AdminConsoleView())
 
         default:
             return AnyView(RootMainView())
@@ -1681,6 +1707,20 @@ private struct PersistenceProbe: View {
                     let messages = KinnectNotificationPrefs.isOn("messages")
                     text = "Đọc lại sau khi tắt app: ngôn ngữ \(lang). Thông báo tin nhắn \(messages ? "bật" : "tắt")."
                 }
+                let lang = UserDefaults.standard.string(forKey: AppLanguageStore.defaultsKey) ?? "missing"
+                let messages = KinnectNotificationPrefs.isOn("messages")
+                let payload: [String: Any] = [
+                    "writing": writing,
+                    "language": lang,
+                    "messages": messages,
+                    "languageKey": AppLanguageStore.defaultsKey,
+                    "messagesKey": "kinnect_notifications.messages"
+                ]
+                if let data = try? JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted]),
+                   let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+                    let name = writing ? "persist-write.json" : "persist-read.json"
+                    try? data.write(to: dir.appendingPathComponent(name))
+                }
             }
     }
 }
@@ -1721,6 +1761,129 @@ private struct ShortsTelemetryProbe: View {
         if let data = try? JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted]),
            let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
             try? data.write(to: dir.appendingPathComponent("shorts-telemetry.json"))
+        }
+    }
+}
+
+private struct ShortsAVPlayerProbe: View {
+    @State private var lines: [String] = ["Đang mở video mẫu trên máy."]
+    @State private var player: AVPlayer?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let player {
+                VideoPlayer(player: player)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 420)
+            } else {
+                ProgressView("Đang tạo video mẫu.")
+                    .frame(maxWidth: .infinity, minHeight: 420)
+            }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                        Text(line)
+                            .font(KinnectTheme.caption)
+                            .foregroundColor(KinnectTheme.textPrimary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(KinnectTheme.background)
+        .task { await run() }
+    }
+
+    private func run() async {
+        guard let url = UIReviewFixture.samplePlayableVideoURL() else {
+            publish(["video=missing"], ready: false, decoded: false, held: false, advanced: false, playTime: 0, pauseRate: 0, muteRate: 0)
+            return
+        }
+        let item = AVPlayerItem(url: url)
+        let next = AVPlayer(playerItem: item)
+        next.isMuted = false
+        player = next
+        let ready = await waitReady(item)
+        next.play()
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        let playTime = seconds(next.currentTime())
+        let playRate = Double(next.rate)
+        next.pause()
+        let pauseTime = seconds(next.currentTime())
+        let pauseRate = Double(next.rate)
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        next.isMuted = true
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        let muteTime = seconds(next.currentTime())
+        let muteRate = Double(next.rate)
+        let held = muteRate == 0 && abs(muteTime - pauseTime) < 0.08
+        next.play()
+        try? await Task.sleep(nanoseconds: 400_000_000)
+        let resumeTime = seconds(next.currentTime())
+        let resumeRate = Double(next.rate)
+        let decoded = ready && playTime > 0.05
+        let advanced = resumeTime > muteTime + 0.05
+        publish(
+            [
+                "file=\(url.lastPathComponent)",
+                "status=\(ready ? "ready" : "not-ready")",
+                String(format: "play time=%.3f rate=%.2f", playTime, playRate),
+                String(format: "pause time=%.3f rate=%.2f", pauseTime, pauseRate),
+                String(format: "mute-while-paused time=%.3f rate=%.2f muted=%@ held=%@", muteTime, muteRate, next.isMuted ? "yes" : "no", held ? "yes" : "no"),
+                String(format: "resume time=%.3f rate=%.2f advanced=%@", resumeTime, resumeRate, advanced ? "yes" : "no"),
+                "decodedFrames=\(decoded ? "yes" : "no")"
+            ],
+            ready: ready,
+            decoded: decoded,
+            held: held,
+            advanced: advanced,
+            playTime: playTime,
+            pauseRate: pauseRate,
+            muteRate: muteRate
+        )
+    }
+
+    private func waitReady(_ item: AVPlayerItem) async -> Bool {
+        let start = Date()
+        while Date().timeIntervalSince(start) < 4 {
+            if item.status == .readyToPlay { return true }
+            if item.status == .failed { return false }
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+        return item.status == .readyToPlay
+    }
+
+    private func seconds(_ time: CMTime) -> Double {
+        let value = time.seconds
+        return value.isFinite ? value : 0
+    }
+
+    private func publish(
+        _ shown: [String],
+        ready: Bool,
+        decoded: Bool,
+        held: Bool,
+        advanced: Bool,
+        playTime: Double,
+        pauseRate: Double,
+        muteRate: Double
+    ) {
+        lines = shown
+        let payload: [String: Any] = [
+            "lines": shown,
+            "ready": ready,
+            "decodedFrames": decoded,
+            "muteHeldPause": held,
+            "resumedWhileMuted": advanced,
+            "playTime": playTime,
+            "pauseRate": pauseRate,
+            "muteRate": muteRate
+        ]
+        if let data = try? JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted]),
+           let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            try? data.write(to: dir.appendingPathComponent("shorts-avplayer.json"))
         }
     }
 }

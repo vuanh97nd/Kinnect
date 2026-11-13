@@ -747,12 +747,20 @@ struct AdminConsoleView: View {
     @ObservedObject private var appState = AppState.shared
     @State private var reports: [[String: Any]] = []
     @State private var users: [[String: Any]] = []
+    @State private var economyLines: [String] = []
+    @State private var aiLine = ""
+    @State private var musicLines: [String] = []
     @State private var status = ""
+    @State private var corePhase = "loading"
+    @State private var economyPhase = "loading"
+    @State private var aiPhase = "loading"
+    @State private var musicPhase = "loading"
     @State private var pending: AdminModeration?
     @State private var confirm = false
 
     private var allowed: Bool {
-        UIReviewFixture.activeScreen == "admin" || appState.currentUser?.accountRole == "admin"
+        if UIReviewFixture.activeScreen == "admin-denied" { return false }
+        return UIReviewFixture.activeScreen == "admin" || appState.currentUser?.accountRole == "admin"
     }
 
     var body: some View {
@@ -764,13 +772,27 @@ struct AdminConsoleView: View {
             )
             if allowed {
                 List {
+                    if corePhase == "loading" {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text("Đang tải bảng quản trị.")
+                                .font(.footnote)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        }
+                    }
                     if !status.isEmpty {
                         Text(status)
                             .font(.footnote)
                             .foregroundColor(KinnectTheme.textSecondary)
                     }
+                    if corePhase == "failed" || economyPhase == "failed" || aiPhase == "failed" || musicPhase == "failed" {
+                        Button("Thử lại") { Task { await reload() } }
+                    }
                     Section("Báo cáo") {
-                        if reports.isEmpty {
+                        if corePhase == "loading" {
+                            Text("Đang tải báo cáo.")
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        } else if reports.isEmpty {
                             Text("Chưa có báo cáo.")
                                 .foregroundColor(KinnectTheme.textSecondary)
                         }
@@ -779,13 +801,59 @@ struct AdminConsoleView: View {
                         }
                     }
                     Section("Thành viên gần đây") {
+                        if corePhase == "loading" {
+                            Text("Đang tải thành viên.")
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        } else if users.isEmpty {
+                            Text("Chưa có thành viên.")
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        }
                         ForEach(Array(users.enumerated()), id: \.offset) { _, user in
                             userRow(user)
                         }
                     }
-                    Text("Kinh tế, trợ lý AI và thư viện nhạc chưa có trên màn này.")
-                        .font(.caption)
-                        .foregroundColor(KinnectTheme.textSecondary)
+                    Section("Kinh tế") {
+                        panelStatus(
+                            economyPhase,
+                            loading: "Đang tải giá quà.",
+                            empty: "Chưa có giá quà.",
+                            failed: "Chưa tải được giá quà."
+                        )
+                        ForEach(Array(economyLines.enumerated()), id: \.offset) { _, line in
+                            Text(line).font(KinnectTheme.caption)
+                        }
+                        Text("Chỉ đọc. Chưa lưu cấu hình kinh tế trên iOS.")
+                            .font(KinnectTheme.caption)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                    Section("Trợ lý AI") {
+                        panelStatus(
+                            aiPhase,
+                            loading: "Đang tải trạng thái AI.",
+                            empty: "Chưa có trạng thái AI.",
+                            failed: "Chưa tải được trạng thái AI."
+                        )
+                        if aiPhase == "ready" {
+                            Text(aiLine).font(KinnectTheme.caption)
+                        }
+                        Text("Không hiện khóa. Chưa lưu hoặc kiểm tra kết nối AI trên iOS.")
+                            .font(KinnectTheme.caption)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                    Section("Thư viện nhạc") {
+                        panelStatus(
+                            musicPhase,
+                            loading: "Đang tải danh sách nhạc.",
+                            empty: "Chưa có bài nhạc.",
+                            failed: "Chưa tải được danh sách nhạc."
+                        )
+                        ForEach(Array(musicLines.enumerated()), id: \.offset) { _, line in
+                            Text(line).font(KinnectTheme.caption)
+                        }
+                        Text("Chỉ đọc. Chưa thêm hoặc xóa bài trên iOS.")
+                            .font(KinnectTheme.caption)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
                 }
             } else {
                 Text("Chỉ quản trị viên được vào bảng quản trị.")
@@ -871,17 +939,89 @@ struct AdminConsoleView: View {
         return false
     }
 
+    @ViewBuilder
+    private func panelStatus(_ phase: String, loading: String, empty: String, failed: String) -> some View {
+        if phase == "loading" {
+            Text(loading).foregroundColor(KinnectTheme.textSecondary)
+        } else if phase == "empty" {
+            Text(empty).foregroundColor(KinnectTheme.textSecondary)
+        } else if phase == "failed" {
+            Text(failed).foregroundColor(KinnectTheme.textSecondary)
+        }
+    }
+
     private func reload() async {
         guard allowed else { return }
+        corePhase = "loading"
+        economyPhase = "loading"
+        aiPhase = "loading"
+        musicPhase = "loading"
         do {
             let reportData = try await KinnectAPIClient.shared.requestJSON("/api/admin/reports")
             let userData = try await KinnectAPIClient.shared.requestJSON("/api/admin/users")
             reports = reportData["reports"] as? [[String: Any]] ?? []
             users = userData["users"] as? [[String: Any]] ?? []
+            corePhase = "ready"
             status = ""
         } catch {
+            reports = []
+            users = []
+            economyLines = []
+            musicLines = []
+            aiLine = ""
+            corePhase = "failed"
+            economyPhase = "failed"
+            aiPhase = "failed"
+            musicPhase = "failed"
             status = "Chưa tải được dữ liệu quản trị."
+            return
         }
+        await loadEconomy()
+        await loadAIStatus()
+        await loadMusicLibrary()
+    }
+
+    private func loadEconomy() async {
+        guard let data = try? await KinnectAPIClient.shared.requestJSON("/api/admin/economy") else {
+            economyLines = []
+            economyPhase = "failed"
+            return
+        }
+        let config = data["config"] as? [String: Any] ?? [:]
+        let prices = config["giftPrices"] as? [String: Any] ?? [:]
+        economyLines = prices.keys.sorted().map { key in
+            let value = (prices[key] as? NSNumber)?.intValue ?? (prices[key] as? Int) ?? 0
+            return "\(key): \(value) xu"
+        }
+        economyPhase = economyLines.isEmpty ? "empty" : "ready"
+    }
+
+    private func loadAIStatus() async {
+        guard let data = try? await KinnectAPIClient.shared.requestJSON("/api/admin/ai") else {
+            aiLine = ""
+            aiPhase = "failed"
+            return
+        }
+        let config = data["config"] as? [String: Any] ?? [:]
+        let ready = (config["ready"] as? Bool) ?? ((config["ready"] as? NSNumber)?.boolValue ?? false)
+        let queue = (config["queue"] as? NSNumber)?.intValue ?? (config["queue"] as? Int) ?? 0
+        let failed = (config["failed"] as? NSNumber)?.intValue ?? (config["failed"] as? Int) ?? 0
+        aiLine = "Sẵn sàng: \(ready ? "có" : "không"). Hàng chờ \(queue). Lỗi \(failed)."
+        aiPhase = "ready"
+    }
+
+    private func loadMusicLibrary() async {
+        guard let data = try? await KinnectAPIClient.shared.requestJSON("/api/music") else {
+            musicLines = []
+            musicPhase = "failed"
+            return
+        }
+        let tracks = data["tracks"] as? [[String: Any]] ?? []
+        musicLines = tracks.compactMap { track in
+            let title = track["title"] as? String ?? ""
+            return title.isEmpty ? nil : title
+        }
+        musicPhase = musicLines.isEmpty ? "empty" : "ready"
     }
 
     private func moderate(_ action: String, _ target: String) async {

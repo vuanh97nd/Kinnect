@@ -304,7 +304,7 @@ def capture_screen(device, slug, screen_arg, bundle_id, extra_args=None, wait_se
     cmd = ["xcrun", "simctl", "launch", udid, bundle_id, "-AppleLanguages", lang_arg, "--ui-review-screen", screen_arg]
     if extra_args:
         cmd.extend(extra_args)
-    record = screen_arg == "shorts-telemetry"
+    record = screen_arg in ("shorts-telemetry", "shorts-avplayer")
     video_path = OUT_DIR / f"{slug}.mp4"
     recorder = None
     if record:
@@ -317,7 +317,9 @@ def capture_screen(device, slug, screen_arg, bundle_id, extra_args=None, wait_se
 
     run(cmd)
 
-    if screen_arg in ("auth", "auth-login-keyboard", "auth-login-password-keyboard", "auth-login-lang-sheet", "shorts-telemetry"):
+    if screen_arg == "shorts-avplayer":
+        actual_wait = 12.0
+    elif screen_arg in ("auth", "auth-login-keyboard", "auth-login-password-keyboard", "auth-login-lang-sheet", "shorts-telemetry"):
         actual_wait = 6.0
     else:
         actual_wait = wait_sec
@@ -331,8 +333,15 @@ def capture_screen(device, slug, screen_arg, bundle_id, extra_args=None, wait_se
             recorder.wait(timeout=20)
         except subprocess.TimeoutExpired:
             recorder.kill()
-    if screen_arg in ("password-spy", "shorts-telemetry"):
-        copy_app_document(udid, bundle_id, "password-spy.json" if screen_arg == "password-spy" else "shorts-telemetry.json")
+    document_name = {
+        "password-spy": "password-spy.json",
+        "shorts-telemetry": "shorts-telemetry.json",
+        "shorts-avplayer": "shorts-avplayer.json",
+        "persist-write": "persist-write.json",
+        "persist-read": "persist-read.json",
+    }.get(screen_arg)
+    if document_name:
+        copy_app_document(udid, bundle_id, document_name)
 
     if is_light:
         subprocess.run(["xcrun", "simctl", "ui", udid, "appearance", "dark"], check=False)
@@ -507,6 +516,8 @@ def main():
         ("19b-persist-write", "persist-write", [], "Ghi ngôn ngữ và thông báo vào máy"),
         ("19c-persist-read", "persist-read", [], "Đọc lại sau khi tắt app"),
         ("19d-shorts-telemetry", "shorts-telemetry", [], "Pause, mute, resume và swipe"),
+        ("19e-shorts-avplayer", "shorts-avplayer", [], "AVPlayer phát file mẫu, mute khi pause không tự chạy"),
+        ("13m2-iphone-admin-denied", "admin-denied", [], "Bảng quản trị khi không phải quản trị viên"),
         ("13j-iphone-support", "support", [], "Trung tâm Hỗ trợ & Trợ giúp người dùng (124)"),
         ("13l-iphone-support-chat", "support-chat", [], "Trung tâm hỗ trợ mở cuộc trò chuyện trực tiếp"),
         ("13m-iphone-admin", "admin", [], "Bảng quản trị: báo cáo và thành viên"),

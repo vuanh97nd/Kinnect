@@ -2288,6 +2288,7 @@ struct StudioVideoPlayerView: View {
     @State private var isMuted: Bool = false
     @State private var timeObserverToken: Any?
     @State private var endObserverToken: (any NSObjectProtocol)? = nil
+    @State private var playbackObserver: NSKeyValueObservation?
     @State private var metadataTask: Task<Void, Never>? = nil
     @State private var videoResolution: String = ""
 
@@ -2486,13 +2487,19 @@ struct StudioVideoPlayerView: View {
             self.isPlaying = true
         }
 
+        playbackObserver?.invalidate()
+        playbackObserver = p.observe(\.timeControlStatus, options: [.initial, .new]) { observed, _ in
+            let playing = observed.timeControlStatus == .playing
+            DispatchQueue.main.async { self.isPlaying = playing }
+        }
         p.play()
-        isPlaying = true
     }
 
     private func teardownPlayer() {
         metadataTask?.cancel()
         metadataTask = nil
+        playbackObserver?.invalidate()
+        playbackObserver = nil
 
         if let token = endObserverToken {
             NotificationCenter.default.removeObserver(token)
@@ -2508,12 +2515,10 @@ struct StudioVideoPlayerView: View {
 
     private func togglePlayPause() {
         guard let p = player else { return }
-        if isPlaying {
-            p.pause()
-            isPlaying = false
-        } else {
+        if p.timeControlStatus == .paused {
             p.play()
-            isPlaying = true
+        } else {
+            p.pause()
         }
     }
 
