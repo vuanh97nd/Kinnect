@@ -307,6 +307,9 @@ struct PrivacySettingsView: View {
     @State private var dmFriendsOnly: Bool = false
     @State private var statusNote = ""
     @State private var failedDmMode: String?
+    @State private var failedPrivacyKey: String?
+    @State private var failedPrivacyValue: Bool?
+    @State private var failedLocationOff = false
     @State private var showEditProfile = false
     @State private var showPrivateAlbum = false
     @State private var showBlockedUsers = false
@@ -330,6 +333,10 @@ struct PrivacySettingsView: View {
                             .foregroundColor(KinnectTheme.danger)
                         if let failedDmMode {
                             Button("Thử lại") { updateDmMode(failedDmMode) }
+                        } else if let failedPrivacyKey, let failedPrivacyValue {
+                            Button("Thử lại") { updatePrivacySetting(failedPrivacyKey, value: failedPrivacyValue) }
+                        } else if failedLocationOff {
+                            Button("Thử lại") { Task { await turnOffLocation() } }
                         }
                     }
                 }
@@ -537,14 +544,19 @@ struct PrivacySettingsView: View {
                 if key == "showActivity" && value {
                     appState.reportActiveStatus(force: true)
                 }
+                failedPrivacyKey = nil
+                failedPrivacyValue = nil
                 statusNote = ""
             } catch {
                 setStoredBool(key, previous)
+                failedPrivacyKey = key
+                failedPrivacyValue = value
                 statusNote = "Chưa lưu. \(error.localizedDescription)"
                 appState.showToast(statusNote)
                 if UIReviewFixture.activeScreen == "privacy-toggle-error" {
                     UIReviewFixture.writeDocument("privacy-toggle-error.json", [
                         "rolledBack": storedBool(key) == previous,
+                        "retry": failedPrivacyKey != nil,
                         "successToast": false,
                         "note": statusNote
                     ])
@@ -601,14 +613,17 @@ struct PrivacySettingsView: View {
                 user.hasLocation = false
                 appState.currentUser = user
             }
+            failedLocationOff = false
             statusNote = ""
             appState.showToast("Đã tắt tìm quanh đây")
         } catch {
+            failedLocationOff = true
             statusNote = "Chưa tắt tìm quanh đây. \(error.localizedDescription)"
             appState.showToast(statusNote)
             if UIReviewFixture.activeScreen == "location-off-error" {
                 UIReviewFixture.writeDocument("location-off-error.json", [
                     "saved": false,
+                    "retry": failedLocationOff,
                     "successToast": false,
                     "note": statusNote
                 ])
@@ -845,6 +860,14 @@ struct AdminConsoleView: View {
     @State private var musicPhase = "loading"
     @State private var pending: AdminModeration?
     @State private var confirm = false
+    @State private var economyDraft: AdminEconomyDraft?
+    @State private var aiSummary: AdminAICredentialSummary?
+    @State private var aiSupportEnabled = false
+    @State private var aiModerationEnabled = false
+    @State private var musicItems: [AdminMusicItem] = []
+    @State private var showEconomyEditor = false
+    @State private var showMusicManager = false
+    @State private var showAISettings = false
 
     private var allowed: Bool {
         #if DEBUG
@@ -915,9 +938,15 @@ struct AdminConsoleView: View {
                         ForEach(Array(economyLines.enumerated()), id: \.offset) { _, line in
                             Text(line).font(KinnectTheme.caption)
                         }
-                        Text("Chỉ đọc. Chưa lưu cấu hình kinh tế trên iOS.")
-                            .font(KinnectTheme.caption)
-                            .foregroundColor(KinnectTheme.textSecondary)
+                        if economyPhase == "ready", economyDraft != nil {
+                            Button("Chỉnh sửa & lưu cấu hình kinh tế") {
+                                showEconomyEditor = true
+                            }
+                        } else {
+                            Text("Khóa phiên bản lạc quan (PATCH /api/admin/economy).")
+                                .font(KinnectTheme.caption)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        }
                     }
                     Section("Trợ lý AI") {
                         panelStatus(
@@ -928,8 +957,13 @@ struct AdminConsoleView: View {
                         )
                         if aiPhase == "ready" {
                             Text(aiLine).font(KinnectTheme.caption)
+                            if aiSummary != nil {
+                                Button("Xem cấu hình & bảo mật AI") {
+                                    showAISettings = true
+                                }
+                            }
                         }
-                        Text("Không hiện khóa. Chưa lưu hoặc kiểm tra kết nối AI trên iOS.")
+                        Text("Không hiện khóa. Cập nhật khóa AI yêu cầu xác thực mật khẩu quản trị.")
                             .font(KinnectTheme.caption)
                             .foregroundColor(KinnectTheme.textSecondary)
                     }
@@ -943,9 +977,11 @@ struct AdminConsoleView: View {
                         ForEach(Array(musicLines.enumerated()), id: \.offset) { _, line in
                             Text(line).font(KinnectTheme.caption)
                         }
-                        Text("Chỉ đọc. Chưa thêm hoặc xóa bài trên iOS.")
-                            .font(KinnectTheme.caption)
-                            .foregroundColor(KinnectTheme.textSecondary)
+                        if musicPhase == "ready" || musicPhase == "empty" {
+                            Button("Quản lý / thêm bài nhạc") {
+                                showMusicManager = true
+                            }
+                        }
                     }
                 }
             } else {
@@ -964,6 +1000,27 @@ struct AdminConsoleView: View {
                 }
             }
             Button("Hủy", role: .cancel) { pending = nil }
+        }
+        .sheet(isPresented: $showEconomyEditor) {
+            if let economyDraft {
+                AdminEconomyEditorSheet(initialDraft: economyDraft) {
+                    Task { await reload() }
+                }
+            }
+        }
+        .sheet(isPresented: $showMusicManager) {
+            AdminMusicManagerSheet(tracks: musicItems) {
+                Task { await reload() }
+            }
+        }
+        .sheet(isPresented: $showAISettings) {
+            if let aiSummary {
+                AdminAISettingsSheet(
+                    summary: aiSummary,
+                    supportEnabled: aiSupportEnabled,
+                    moderationEnabled: aiModerationEnabled
+                )
+            }
         }
     }
 
@@ -1083,9 +1140,11 @@ struct AdminConsoleView: View {
     private func loadEconomy() async {
         guard let data = try? await KinnectAPIClient.shared.requestJSON("/api/admin/economy") else {
             economyLines = []
+            economyDraft = nil
             economyPhase = "failed"
             return
         }
+        economyDraft = AdminEconomyDraft.parse(from: data)
         let config = data["config"] as? [String: Any] ?? [:]
         let prices = config["giftPrices"] as? [String: Any] ?? [:]
         economyLines = prices.keys.sorted().map { key in
@@ -1098,15 +1157,20 @@ struct AdminConsoleView: View {
     private func loadAIStatus() async {
         guard let data = try? await KinnectAPIClient.shared.requestJSON("/api/admin/ai") else {
             aiLine = ""
+            aiSummary = nil
             aiPhase = "failed"
             return
         }
         let config = data["config"] as? [String: Any] ?? [:]
         if config.isEmpty {
             aiLine = ""
+            aiSummary = nil
             aiPhase = "empty"
             return
         }
+        aiSummary = AdminAICredentialSummary.parse(from: data)
+        aiSupportEnabled = AdminActionsContract.flag(config["support"])
+        aiModerationEnabled = AdminActionsContract.flag(config["moderation"])
         let ready = (config["ready"] as? Bool) ?? ((config["ready"] as? NSNumber)?.boolValue ?? false)
         let queue = (config["queue"] as? NSNumber)?.intValue ?? (config["queue"] as? Int) ?? 0
         let failed = (config["failed"] as? NSNumber)?.intValue ?? (config["failed"] as? Int) ?? 0
@@ -1117,10 +1181,22 @@ struct AdminConsoleView: View {
     private func loadMusicLibrary() async {
         guard let data = try? await KinnectAPIClient.shared.requestJSON("/api/music") else {
             musicLines = []
+            musicItems = []
             musicPhase = "failed"
             return
         }
         let tracks = data["tracks"] as? [[String: Any]] ?? []
+        musicItems = tracks.compactMap { track in
+            let file = track["file"] as? String ?? ""
+            let title = track["title"] as? String ?? ""
+            guard !file.isEmpty, !title.isEmpty else { return nil }
+            return AdminMusicItem(
+                file: file,
+                title: title,
+                artist: track["artist"] as? String ?? "",
+                license: track["license"] as? String ?? ""
+            )
+        }
         musicLines = tracks.compactMap { track in
             let title = track["title"] as? String ?? ""
             return title.isEmpty ? nil : title

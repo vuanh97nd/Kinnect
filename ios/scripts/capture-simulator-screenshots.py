@@ -321,6 +321,8 @@ def capture_screen(device, slug, screen_arg, bundle_id, extra_args=None, wait_se
         actual_wait = 16.0
     elif screen_arg == "shorts-real-swipe":
         actual_wait = 12.0
+    elif screen_arg == "swift-contracts-harness":
+        actual_wait = 4.5
     elif screen_arg in ("auth", "auth-login-keyboard", "auth-login-password-keyboard", "auth-login-lang-sheet", "shorts-telemetry"):
         actual_wait = 6.0
     else:
@@ -348,6 +350,7 @@ def capture_screen(device, slug, screen_arg, bundle_id, extra_args=None, wait_se
         "location-off-error": "location-off-error.json",
         "admin-denied": "admin-denied.json",
         "gift-catalog-v1": "gift-catalog-v1.json",
+        "swift-contracts-harness": "swift-contracts-harness.json",
     }.get(screen_arg)
     if document_name:
         copy_app_document(udid, bundle_id, document_name)
@@ -525,6 +528,7 @@ def main():
         ("13i-iphone-privacy-settings", "privacy-settings", [], "Cài đặt: Quyền riêng tư & Định vị chuẩn PATCH /api/me (118)"),
         ("13i2-iphone-privacy-settings-light", "privacy-settings", ["--ui-review-light"], "Quyền riêng tư sáng: nút Lưu cách home indicator"),
         ("13n-iphone-live-gifts-drawer", "gift-drawer", [], "Ngăn quà Live đang mở"),
+        ("13n2-iphone-live-gifts-drawer-light", "gift-drawer", ["--ui-review-light"], "Ngăn quà Live chế độ sáng (cùng theme Android)"),
         ("13o-iphone-studio-music-picker", "music-picker", [], "Danh sách chọn nhạc đang mở"),
         ("13o2-iphone-studio-music-picker-light", "music-picker", ["--ui-review-light"], "Danh sách chọn nhạc đang mở, chế độ sáng"),
         ("19-password-spy", "password-spy", [], "Ma trận mật khẩu, không gửi mạng"),
@@ -534,6 +538,7 @@ def main():
         ("19e-shorts-avplayer", "shorts-avplayer", [], "AVPlayer: buffer, timestamp, kích thước và khung hình"),
         ("19g-shorts-real-swipe", "shorts-real-swipe", [], "ShortsVideoView: 2 clip local + vuốt sang video thứ 2"),
         ("19f-gift-catalog-v1", "gift-catalog-v1", [], "Adapter catalog quà phiên bản 1"),
+        ("19h-swift-contracts-harness", "swift-contracts-harness", [], "Kiểm thử Swift URLProtocol và Admin contracts"),
         ("13m2-iphone-admin-denied", "admin-denied", [], "Bảng quản trị khi không phải quản trị viên"),
         ("13m3-iphone-admin-loading", "admin-loading", [], "Bảng quản trị đang tải"),
         ("13m4-iphone-admin-empty", "admin-empty", [], "Bảng quản trị không có dữ liệu"),

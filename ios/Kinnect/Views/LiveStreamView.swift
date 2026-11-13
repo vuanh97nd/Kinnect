@@ -1030,11 +1030,16 @@ struct LiveGiftDrawerSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                HStack {
-                    Text(UIReviewFixture.isEnabled ? "Xu tặng · 1.200" : "Xu tặng")
-                        .font(KinnectTheme.bodyBold)
-                        .foregroundColor(KinnectTheme.textPrimary)
-                    Spacer()
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(UIReviewFixture.isEnabled ? "Xu tặng · 1.200" : "Xu tặng")
+                            .font(KinnectTheme.bodyBold)
+                            .foregroundColor(KinnectTheme.textPrimary)
+                        Spacer()
+                    }
+                    Text("Quà từ xu tặng không tạo tiền rút")
+                        .font(.caption)
+                        .foregroundColor(KinnectTheme.textSecondary)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
@@ -1071,7 +1076,9 @@ struct LiveGiftDrawerSheet: View {
 
                 ScrollView {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 12)], spacing: 12) {
+                        let activeId = selectedGiftID ?? gifts.first?.id
                         ForEach(gifts) { gift in
+                            let isSelected = activeId == gift.id
                             Button {
                                 selectedGiftID = gift.id
                             } label: {
@@ -1092,10 +1099,13 @@ struct LiveGiftDrawerSheet: View {
                                 .padding(12)
                                 .background(
                                     RoundedRectangle(cornerRadius: 16)
-                                        .fill(KinnectTheme.surfaceElevated)
+                                        .fill(isSelected ? KinnectTheme.accentBright.opacity(0.14) : KinnectTheme.surfaceElevated)
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 16)
-                                                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+                                                .strokeBorder(
+                                                    isSelected ? KinnectTheme.accentBright : Color.white.opacity(0.08),
+                                                    lineWidth: isSelected ? 2 : 1
+                                                )
                                         )
                                 )
                             }
@@ -1190,10 +1200,34 @@ struct LiveGiftDrawerSheet: View {
                     .shadow(color: Color(red: 0.67, green: 0.55, blue: 1.0).opacity(0.65), radius: 5)
             }
             .frame(width: 44, height: 44)
+        } else if let vectorSpec = Self.vectorSymbol(for: gift.id) {
+            ZStack {
+                Circle()
+                    .fill(RadialGradient(colors: [vectorSpec.primary.opacity(0.28), .clear], center: .center, startRadius: 2, endRadius: 24))
+                Image(systemName: vectorSpec.systemName)
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundStyle(LinearGradient(colors: [vectorSpec.primary, vectorSpec.secondary], startPoint: .topLeading, endPoint: .bottomTrailing))
+            }
+            .frame(width: 44, height: 44)
         } else {
             let symbol = gift.emoji == "🎁" ? LiveGiftCatalogItem.defaultEmoji(for: gift.id) : gift.emoji
             Text(symbol)
                 .font(.system(size: 38))
+        }
+    }
+
+    private static func vectorSymbol(for id: String) -> (systemName: String, primary: Color, secondary: Color)? {
+        switch id {
+        case "butterfly":
+            return ("sparkles", Color(red: 0.25, green: 0.85, blue: 0.82), Color(red: 0.56, green: 0.42, blue: 0.98))
+        case "aurora":
+            return ("sparkles", Color(red: 0.22, green: 0.82, blue: 0.92), Color(red: 0.48, green: 0.36, blue: 0.96))
+        case "meteor":
+            return ("sparkle", Color(red: 1.0, green: 0.85, blue: 0.35), Color(red: 0.98, green: 0.50, blue: 0.28))
+        case "lotus":
+            return ("leaf.fill", Color(red: 0.98, green: 0.48, blue: 0.72), Color(red: 0.65, green: 0.33, blue: 0.97))
+        default:
+            return nil
         }
     }
 

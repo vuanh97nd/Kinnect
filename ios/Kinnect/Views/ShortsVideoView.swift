@@ -46,23 +46,46 @@ struct ShortsVideoView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if !items.isEmpty {
                 GeometryReader { geo in
+                    let bottomSafeInset = geo.safeAreaInsets.bottom
                     if #available(iOS 17.0, *) {
                         ScrollView(.vertical, showsIndicators: false) {
                             LazyVStack(spacing: 0) {
                                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                                    shortVideoCard(item, at: index)
+                                    shortVideoCard(item, at: index, bottomSafeInset: bottomSafeInset)
                                         .frame(width: geo.size.width, height: geo.size.height)
                                         .id(index)
                                 }
                             }
                             .scrollTargetLayout()
+                            .background(
+                                GeometryReader { contentGeo in
+                                    Color.clear.preference(
+                                        key: ShortsScrollOffsetKey.self,
+                                        value: contentGeo.frame(in: .named("shortsScrollArea")).minY
+                                    )
+                                }
+                            )
                         }
+                        .coordinateSpace(name: "shortsScrollArea")
+                        .contentMargins(0, for: .scrollContent)
                         .scrollTargetBehavior(.paging)
                         .scrollPosition(id: $currentIndex)
+                        .ignoresSafeArea()
+                        .onPreferenceChange(ShortsScrollOffsetKey.self) { minY in
+                            guard geo.size.height > 100 else { return }
+                            let progress = Double(-minY / geo.size.height)
+                            let nearest = Int(progress.rounded())
+                            if nearest >= 0,
+                               nearest < items.count,
+                               abs(progress - Double(nearest)) < 0.08,
+                               currentIndex != nearest {
+                                currentIndex = nearest
+                            }
+                        }
                     } else {
                         TabView(selection: $currentIndex) {
                             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                                shortVideoCard(item, at: index)
+                                shortVideoCard(item, at: index, bottomSafeInset: bottomSafeInset)
                                     .frame(width: geo.size.width, height: geo.size.height)
                                     .rotationEffect(.degrees(-90))
                                     .tag(Optional(index))
@@ -72,8 +95,10 @@ struct ShortsVideoView: View {
                         .frame(width: geo.size.height, height: geo.size.width)
                         .rotationEffect(.degrees(90))
                         .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                        .ignoresSafeArea()
                     }
                 }
+                .ignoresSafeArea()
             }
 
             // Top transparent floating bar (Đề xuất · Đang theo dõi) - Parity with Android 1.2.12
@@ -176,7 +201,7 @@ struct ShortsVideoView: View {
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 
-    private func shortVideoCard(_ item: ShortItem, at index: Int) -> some View {
+    private func shortVideoCard(_ item: ShortItem, at index: Int, bottomSafeInset: CGFloat = 0) -> some View {
         ZStack(alignment: .bottomLeading) {
             Rectangle().fill(Color.black)
             ShortClipPlayer(path: item.videoUrl, active: index == currentIndex, muted: isMuted, userPaused: userPaused && index == currentIndex)
@@ -240,7 +265,7 @@ struct ShortsVideoView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.bottom, 24)
+                .padding(.bottom, max(24, bottomSafeInset + 12))
 
                 Spacer()
 
@@ -336,7 +361,7 @@ struct ShortsVideoView: View {
                     .accessibilityLabel("Tùy chọn video")
                 }
                 .padding(.trailing, 12)
-                .padding(.bottom, 28)
+                .padding(.bottom, max(28, bottomSafeInset + 16))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -466,7 +491,8 @@ struct ShortsVideoView: View {
         let pageHeight = Double(sv?.bounds.height ?? 0)
         let isPagingEnabled = sv?.isPagingEnabled ?? false
         if let sv, pageHeight > 100 {
-            sv.setContentOffset(CGPoint(x: 0, y: pageHeight), animated: true)
+            let targetY = CGFloat(pageHeight) - sv.adjustedContentInset.top
+            sv.setContentOffset(CGPoint(x: 0, y: targetY), animated: true)
         }
 
         try? await Task.sleep(nanoseconds: 1_600_000_000)
@@ -564,7 +590,7 @@ struct ShortClipPlayer: View {
     var muted: Bool = false
     var userPaused: Bool = false
     @ObservedObject private var calls = NativeWebRTCManager.shared
-    @Environment(\.scenePhase) private var scenePhase
+    @State private var isAppActive: Bool = UIApplication.shared.applicationState != .background
     @State private var player: AVPlayer?
     @State private var failed = false
     @State private var loading = false
@@ -609,10 +635,25 @@ struct ShortClipPlayer: View {
             }
         }
         .task(id: path) { await load() }
+        .onAppear {
+            isAppActive = UIApplication.shared.applicationState != .background
+            syncPlayback()
+        }
         .onChange(of: active) { _ in syncPlayback() }
         .onChange(of: muted) { player?.isMuted = $0 }
         .onChange(of: userPaused) { _ in syncPlayback() }
-        .onChange(of: scenePhase) { _ in syncPlayback() }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            isAppActive = true
+            syncPlayback()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            isAppActive = false
+            syncPlayback()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+            isAppActive = false
+            syncPlayback()
+        }
         .onChange(of: calls.activeCall != nil) { _ in syncPlayback() }
         .onDisappear { stop() }
     }
@@ -714,7 +755,7 @@ struct ShortClipPlayer: View {
     }
 
     private func syncPlayback() {
-        let blocked = !active || scenePhase != .active || calls.activeCall != nil || userPaused
+        let blocked = !active || !isAppActive || calls.activeCall != nil || userPaused
         shouldPlay = !blocked
         guard let player else { return }
         if blocked {
@@ -1115,5 +1156,12 @@ struct HeartEffectView: View {
                     scale = 1.45
                 }
             }
+    }
+}
+
+private struct ShortsScrollOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }

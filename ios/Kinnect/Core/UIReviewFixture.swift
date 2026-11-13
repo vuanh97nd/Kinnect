@@ -1735,6 +1735,10 @@ enum UIReviewFixture {
             return AnyView(ShortsVideoView())
         case "gift-catalog-v1":
             return AnyView(GiftCatalogVersionProbe())
+        #if DEBUG
+        case "swift-contracts-harness":
+            return AnyView(SwiftContractsHarnessProbe())
+        #endif
         case "admin-denied":
             return AnyView(AdminConsoleView())
         case "admin-loading", "admin-empty", "admin-error":
@@ -2202,6 +2206,170 @@ private struct ReviewMusicPicker: View {
         }
     }
 }
+
+#if DEBUG
+private struct SwiftContractsHarnessProbe: View {
+    @State private var lines: [String] = ["Đang chạy kiểm thử Swift URLProtocol & Admin..."]
+
+    private final class MockAdminTransport: AdminTransportProtocol {
+        var serverVersion = 1
+        var uploadedFiles: [String] = []
+
+        func requestJSON(_ path: String, method: String, body: [String: Any]?) async throws -> [String: Any] {
+            if path == "/api/admin/economy", method == "PATCH" {
+                let reqVersion = (body?["version"] as? Int) ?? 0
+                if reqVersion != serverVersion {
+                    throw KinnectAPIError.serverError(status: 409, message: "Cấu hình đã đổi. Hãy tải lại trước khi lưu.")
+                }
+                serverVersion += 1
+                var updated = (body?["config"] as? [String: Any]) ?? [:]
+                if updated["vndPerCoin"] == nil { updated["vndPerCoin"] = 100 }
+                return ["version": serverVersion, "config": updated]
+            }
+            if path == "/api/music", method == "POST" {
+                let file = "fixture_track_\(uploadedFiles.count + 1).mp3"
+                uploadedFiles.append(file)
+                return ["ok": true, "file": file]
+            }
+            if path == "/api/music", method == "DELETE" {
+                let file = (body?["file"] as? String) ?? ""
+                uploadedFiles.removeAll { $0 == file }
+                return ["ok": true]
+            }
+            throw KinnectAPIError.serverError(status: 404, message: "Not found")
+        }
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Swift Contracts & URLProtocol Harness")
+                    .font(KinnectTheme.sectionTitle)
+                ForEach(lines, id: \.self) { line in
+                    Text(line)
+                        .font(KinnectTheme.caption)
+                        .foregroundColor(KinnectTheme.textPrimary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(20)
+        }
+        .background(KinnectTheme.background)
+        .task { await run() }
+    }
+
+    private func run() async {
+        var passed = 0
+        var failed = 0
+        var results: [String: Bool] = [:]
+
+        func check(_ name: String, _ condition: Bool) {
+            results[name] = condition
+            if condition { passed += 1 } else { failed += 1 }
+        }
+
+        // 1. URLProtocol stubbed URLSession checks for password, dmMode, sessions
+        let origin = "https://127.0.0.1"
+        var capturedPaths: [String] = []
+        let stubSession = LocalTransportHarness.makeStubbedSession { request in
+            capturedPaths.append("\(request.httpMethod ?? "GET") \(request.url?.path ?? "")")
+            let url = request.url ?? URL(string: origin)!
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!
+            let data = Data("{\"ok\":true}".utf8)
+            return (response, data)
+        }
+        defer { KinnectLocalStubURLProtocol.handler = nil }
+
+        do {
+            let pwReq = try LocalTransportHarness.makePasswordRequest(origin: origin, current: "oldpass123", next: "newpass123")
+            let (_, pwResp) = try await stubSession.data(for: pwReq)
+            let dmReq = try LocalTransportHarness.makeDmModeRequest(origin: origin, dmMode: "friends")
+            let (_, dmResp) = try await stubSession.data(for: dmReq)
+            let sessReq = try LocalTransportHarness.makeRevokeSessionRequest(origin: origin, sessionId: "0123456789abcdef0123456789abcdef")
+            let (_, sessResp) = try await stubSession.data(for: sessReq)
+            let codesOK = [pwResp, dmResp, sessResp].allSatisfy { ($0 as? HTTPURLResponse)?.statusCode == 200 }
+            check("urlprotocol_roundtrip", codesOK && capturedPaths == [
+                "POST /api/me/password",
+                "PATCH /api/me",
+                "DELETE /api/me/sessions/0123456789abcdef0123456789abcdef"
+            ])
+        } catch {
+            check("urlprotocol_roundtrip", false)
+        }
+
+        // 2. AdminEconomyDraft role gate, v1->v2 save, and 409 conflict rejection
+        let transport = MockAdminTransport()
+        var prices: [String: Int] = [:]
+        for key in AdminEconomyDraft.requiredGiftIds { prices[key] = 50 }
+        let draft = AdminEconomyDraft(
+            version: 1,
+            vndPerCoin: 100,
+            signupBonusCoins: 2000,
+            signupBonusEnabled: true,
+            trialPackagePurchases: true,
+            trialGiftsEnabled: true,
+            showCoinPacks: true,
+            giftPrices: prices,
+            coinPacks: [100, 500, 1000]
+        )
+        do {
+            _ = try await AdminActionsContract.saveEconomy(draft: draft, role: "member", transport: transport)
+            check("economy_role_gate_403", false)
+        } catch let KinnectAPIError.serverError(status, _) {
+            check("economy_role_gate_403", status == 403)
+        } catch {
+            check("economy_role_gate_403", false)
+        }
+
+        do {
+            let saved = try await AdminActionsContract.saveEconomy(draft: draft, role: "admin", transport: transport)
+            check("economy_save_v2", saved.version == 2)
+        } catch {
+            check("economy_save_v2", false)
+        }
+
+        do {
+            _ = try await AdminActionsContract.saveEconomy(draft: draft, role: "admin", transport: transport)
+            check("economy_conflict_409", false)
+        } catch let KinnectAPIError.serverError(status, _) {
+            check("economy_conflict_409", status == 409)
+        } catch {
+            check("economy_conflict_409", false)
+        }
+
+        // 3. Music upload & delete contract validation + role gate
+        var badMusic = AdminMusicUploadDraft(title: "T", artist: "A", license: "CC0", source: "", rightsConfirmed: false, mimeType: "audio/mpeg", audioData: Data("ID3".utf8))
+        check("music_rights_validation", badMusic.validate() != nil)
+        badMusic.rightsConfirmed = true
+        do {
+            let file = try await AdminActionsContract.uploadMusic(draft: badMusic, role: "admin", transport: transport)
+            check("music_upload_ok", file == "fixture_track_1.mp3")
+            try await AdminActionsContract.deleteMusic(file: file, role: "admin", transport: transport)
+            check("music_delete_ok", transport.uploadedFiles.isEmpty)
+        } catch {
+            check("music_upload_ok", false)
+            check("music_delete_ok", false)
+        }
+        check("music_traversal_rejected", !AdminMusicItem.isValidFilename("../evil.mp3"))
+
+        // 4. AI credentials allowlist & non-secret validation
+        let badAIUrl = AdminAICredentialsPatch(password: "pw123", workerUrl: "https://evil.example.com", token: nil, nvidiaKey: nil, nvidiaModel: nil, nvidiaVisionModel: nil, fallbackEnabled: nil)
+        let goodAI = AdminAICredentialsPatch(password: "pw123", workerUrl: "https://kinnect-ai.vuanh97nd.workers.dev", token: String(repeating: "a", count: 32), nvidiaKey: nil, nvidiaModel: nil, nvidiaVisionModel: nil, fallbackEnabled: false)
+        check("ai_credentials_validation", badAIUrl.validate() != nil && goodAI.validate() == nil)
+
+        lines = results.keys.sorted().map { key in
+            "\(key)=\(results[key] == true ? "pass" : "fail")"
+        } + ["passed=\(passed)", "failed=\(failed)"]
+
+        UIReviewFixture.writeDocument("swift-contracts-harness.json", [
+            "passed": passed,
+            "failed": failed,
+            "allPassed": failed == 0,
+            "checks": results
+        ])
+    }
+}
+#endif
 
 extension UIReviewFixture {
     struct AVBufferSample {

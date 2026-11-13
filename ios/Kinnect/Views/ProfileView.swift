@@ -2681,12 +2681,19 @@ struct PrivacySettingsSheet: View {
             }
             }
             if !unsavedNote.isEmpty {
-                Text(unsavedNote)
-                    .font(KinnectTheme.caption)
-                    .foregroundColor(KinnectTheme.danger)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
+                HStack(spacing: 12) {
+                    Text(unsavedNote)
+                        .font(KinnectTheme.caption)
+                        .foregroundColor(KinnectTheme.danger)
+                    Spacer()
+                    Button("Thử lại") {
+                        Task { await saveSettings() }
+                    }
+                    .font(KinnectTheme.captionBold)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
             }
             Button {
                 Task { await saveSettings() }
