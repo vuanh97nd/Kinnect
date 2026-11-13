@@ -220,7 +220,8 @@ public final class NativeApi {
         return new FixtureResult(new JSONObject("{\"users\":[{\"id\":\"u1\",\"name\":\"Linh Nhi\",\"username\":\"linhnhi\",\"bio\":\"Yêu đời, thích khám phá\"},{\"id\":\"u2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\",\"bio\":\"Nhiếp ảnh & Sáng tạo nội dung\"},{\"id\":\"u3\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\",\"bio\":\"Yêu âm nhạc & Du lịch\"}]}"), null, 200);
       }
       if ("GET".equals(method) && "/api/shorts".equals(cleanPath)) {
-        return new FixtureResult(new JSONObject("{\"shorts\":[{\"id\":\"s1\",\"title\":\"Khoảnh khắc cuộc sống\",\"video\":\"/api/shorts/s1/video\",\"author\":{\"id\":\"usr_qa_review\",\"name\":\"Minh Anh\",\"username\":\"minhanh\"},\"likes\":89,\"comments\":12}]}"), null, 200);
+        return new FixtureResult(new JSONObject("{\"shorts\":[{\"id\":\"s1\",\"title\":\"Khoảnh khắc cuộc sống\",\"video\":\"/api/shorts/s1/video\",\"author\":{\"id\":\"usr_qa_review\",\"name\":\"Minh Anh\",\"username\":\"minhanh\"},\"likes\":89,\"comments\":12},{\"id\":\"s2\",\"title\":\"Giai điệu kết nối\",\"video\":\"/api/shorts/s2/video\",\"author\":{\"id\":\"u2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\"},\"likes\":142,\"comments\":25}]}"), null, 200);
+      },\"likes\":89,\"comments\":12}]}"), null, 200);
       }
       if ("GET".equals(method) && "/api/conversations".equals(cleanPath)) {
         return new FixtureResult(new JSONObject("{\"users\":[{\"id\":\"u3\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\",\"isActive\":true,\"unread\":1,\"last\":{\"body\":\"Hẹn gặp bạn cuối tuần này nhé!\",\"created\":" + (nowTime - 900000L) + ",\"mine\":false}}],\"conversations\":[{\"id\":\"c1\",\"title\":\"Bảo Ngọc\",\"lastMessage\":\"Hẹn gặp bạn cuối tuần này nhé!\",\"updatedAt\":\"2026-11-13T00:00:00Z\",\"unread\":1}]}"), null, 200);
