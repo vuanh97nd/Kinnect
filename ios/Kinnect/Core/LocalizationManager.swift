@@ -2,6 +2,12 @@ import Foundation
 import SwiftUI
 
 // MARK: - Supported App Languages
+enum AppLanguagePreference: String {
+    case vi
+    case en
+    case system
+}
+
 enum AppLanguage: String, CaseIterable, Identifiable {
     case vi = "vi"
     case en = "en"
@@ -33,31 +39,46 @@ final class LocalizationManager: ObservableObject {
 
     private let userDefaultsKey = "kinnect_app_language"
 
-    @Published var currentLanguage: AppLanguage {
-        didSet {
-            UserDefaults.standard.set(currentLanguage.rawValue, forKey: userDefaultsKey)
-        }
-    }
+    @Published var preference: AppLanguagePreference
+    @Published var currentLanguage: AppLanguage
 
     private init() {
         if UIReviewFixture.isEnabled {
-            self.currentLanguage = (UIReviewFixture.activeScreen?.hasSuffix("-en") == true) ? .en : .vi
-        } else if let saved = UserDefaults.standard.string(forKey: userDefaultsKey),
-           let lang = AppLanguage(rawValue: saved) {
-            self.currentLanguage = lang
+            let english = UIReviewFixture.activeScreen?.hasSuffix("-en") == true
+            self.preference = english ? .en : .vi
+            self.currentLanguage = english ? .en : .vi
+        } else if let saved = UserDefaults.standard.string(forKey: userDefaultsKey) {
+            let preference = AppLanguagePreference(rawValue: saved) ?? .system
+            self.preference = preference
+            self.currentLanguage = Self.resolved(preference)
         } else {
-            let preferred = Locale.preferredLanguages.first?.lowercased() ?? "vi"
-            if preferred.starts(with: "en") {
-                self.currentLanguage = .en
-            } else {
-                self.currentLanguage = .vi
-            }
+            self.preference = .system
+            self.currentLanguage = Self.resolved(.system)
         }
     }
 
     func setLanguage(_ lang: AppLanguage) {
+        setPreference(lang == .en ? .en : .vi)
+    }
+
+    func setPreference(_ value: AppLanguagePreference) {
+        let resolved = Self.resolved(value)
+        UserDefaults.standard.set(value.rawValue, forKey: userDefaultsKey)
         withAnimation(.easeInOut(duration: 0.2)) {
-            self.currentLanguage = lang
+            preference = value
+            currentLanguage = resolved
+        }
+    }
+
+    private static func resolved(_ preference: AppLanguagePreference) -> AppLanguage {
+        switch preference {
+        case .vi:
+            return .vi
+        case .en:
+            return .en
+        case .system:
+            let device = Locale.preferredLanguages.first?.lowercased() ?? "vi"
+            return device.hasPrefix("vi") ? .vi : .en
         }
     }
 
@@ -165,6 +186,10 @@ final class LocalizationManager: ObservableObject {
         "Tiếng Việt / English": [
             .vi: "Tiếng Việt / English",
             .en: "Tiếng Việt / English"
+        ],
+        "Theo hệ thống": [
+            .vi: "Theo hệ thống",
+            .en: "System"
         ],
         "hoặc tiếp tục với mật khẩu": [
             .vi: "hoặc tiếp tục với mật khẩu",

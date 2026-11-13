@@ -901,6 +901,41 @@ enum UIReviewFixture {
                 ]
             ]
 
+        case "/api/support":
+            return [
+                "user": peerUserDict,
+                "contact": "anhvn53@wru.vn",
+                "operator": "Mr Ánh"
+            ]
+
+        case "/api/admin/reports":
+            return [
+                "reports": [[
+                    "id": "fixture_report_1",
+                    "target_type": "post",
+                    "target_id": "fixture_post_1",
+                    "status": "open",
+                    "reason": "Nội dung không phù hợp",
+                    "subject": [
+                        "username": "hoangnam",
+                        "body": "Bài viết mẫu",
+                        "userId": "fixture_user_peer",
+                        "hidden": false
+                    ]
+                ]]
+            ]
+
+        case "/api/admin/users":
+            return [
+                "users": [
+                    ["id": "fixture_user_peer", "username": "hoangnam", "role": "member", "suspended": 0],
+                    ["id": "fixture_user_me", "username": "minhanh", "role": "admin", "suspended": 0]
+                ]
+            ]
+
+        case "/api/admin/moderate":
+            return ["ok": true]
+
         default:
             if cleanPath.hasSuffix("/private") {
                 return [
@@ -1539,6 +1574,10 @@ enum UIReviewFixture {
             return AnyView(PrivacySettingsSheet())
         case "support":
             return AnyView(SupportContactSheet())
+        case "support-chat":
+            return AnyView(DirectChatDetailView(peer: KinnectUser.from(peerUserDict)))
+        case "admin":
+            return AnyView(AdminConsoleView())
 
         default:
             return AnyView(RootMainView())

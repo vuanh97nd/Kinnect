@@ -463,6 +463,8 @@ def main():
         ("13h-iphone-blocked-users", "blocked-users", [], "Cài đặt & Quyền riêng tư: Danh sách người dùng đã chặn"),
         ("13i-iphone-privacy-settings", "privacy-settings", [], "Cài đặt: Quyền riêng tư & Định vị chuẩn PATCH /api/me (118)"),
         ("13j-iphone-support", "support", [], "Trung tâm Hỗ trợ & Trợ giúp người dùng (124)"),
+        ("13l-iphone-support-chat", "support-chat", [], "Trung tâm hỗ trợ mở cuộc trò chuyện trực tiếp"),
+        ("13m-iphone-admin", "admin", [], "Bảng quản trị: báo cáo và thành viên"),
         ("13k-iphone-change-password-light", "change-password", ["--ui-review-light"], "Cài đặt: Đổi mật khẩu tài khoản (Light)")
     ]
     iphone_screens = login_iphone_screens if only_login else (login_iphone_screens + other_iphone_screens)

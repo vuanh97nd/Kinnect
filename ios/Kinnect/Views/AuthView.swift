@@ -847,13 +847,32 @@ struct AuthView: View {
                             .font(.system(size: 17))
                             .foregroundColor(LoginChrome.ink)
                         Spacer()
-                        if loc.currentLanguage == language {
+                        if loc.preference.rawValue == language.rawValue {
                             Image(systemName: "checkmark")
                                 .foregroundColor(LoginChrome.purple)
                         }
                     }
                     .padding(.vertical, 8)
                 }
+            }
+
+            Button {
+                loc.setPreference(.system)
+                showLoginLanguageSheet = false
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "gearshape")
+                        .foregroundColor(LoginChrome.purple)
+                    Text(L10n.tr("Theo hệ thống"))
+                        .font(.system(size: 17))
+                        .foregroundColor(LoginChrome.ink)
+                    Spacer()
+                    if loc.preference == .system {
+                        Image(systemName: "checkmark")
+                            .foregroundColor(LoginChrome.purple)
+                    }
+                }
+                .padding(.vertical, 8)
             }
 
             Button {

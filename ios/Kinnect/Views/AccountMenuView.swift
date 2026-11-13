@@ -42,6 +42,7 @@ struct AccountMenuView: View {
         case password
         case appearance
         case support
+        case admin
         case about
         case notifications
     }
@@ -66,6 +67,8 @@ struct AccountMenuView: View {
                     AppearanceSettingsSheetView(onBack: { withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = nil } })
                 case .support:
                     HelpSupportSheetView(onBack: { withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = nil } })
+                case .admin:
+                    AdminConsoleView(onBack: { withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = nil } })
                 case .about:
                     AboutKinnectSheetView(onBack: { withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = nil } })
                 case .notifications:
@@ -82,6 +85,7 @@ struct AccountMenuView: View {
                 ScrollView {
                     VStack(spacing: 16) {
                         headerProfileCard
+                        adminMenuGroup
                         mainMenuGroup
                         endMenuGroup
                         footerLabel
@@ -164,6 +168,18 @@ struct AccountMenuView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Trang cá nhân")
+    }
+
+    @ViewBuilder
+    private var adminMenuGroup: some View {
+        if appState.currentUser?.accountRole == "admin" {
+            VStack(spacing: 0) {
+                menuRow(systemName: "checkmark.shield", title: "Bảng quản trị") {
+                    withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = .admin }
+                }
+            }
+            .background(settingsGroupBackground)
+        }
     }
 
     private var mainMenuGroup: some View {
@@ -309,12 +325,17 @@ private struct PrivacySettingsView: View {
                     Button {
                         language.setLanguage(.vi)
                     } label: {
-                        languageRow("Tiếng Việt", selected: language.currentLanguage == .vi)
+                        languageRow("Tiếng Việt", selected: language.preference == .vi)
                     }
                     Button {
                         language.setLanguage(.en)
                     } label: {
-                        languageRow("English", selected: language.currentLanguage == .en)
+                        languageRow("English", selected: language.preference == .en)
+                    }
+                    Button {
+                        language.setPreference(.system)
+                    } label: {
+                        languageRow("Theo hệ thống", selected: language.preference == .system)
                     }
                 }
 
@@ -689,24 +710,194 @@ private struct HelpSupportSheetView: View {
         .sheet(isPresented: $showReport) {
             AppReportSheet()
         }
+        .sheet(item: $supportPeer) { peer in
+            DirectChatDetailView(peer: peer)
+        }
+        .alert("Hỗ trợ Kinnect", isPresented: $showSupportFallback) {
+            Button("Đóng", role: .cancel) {}
+        } message: {
+            Text("Liên hệ riêng Mr Ánh: anhvn53@wru.vn. Không gửi mật khẩu hoặc OTP.")
+        }
     }
 
     @State private var showReport = false
+    @State private var supportPeer: KinnectUser?
+    @State private var showSupportFallback = false
 
     private func openSupport() async {
-        if UIReviewFixture.isEnabled {
-            AppState.shared.showToast("Liên hệ riêng Mr Ánh: anhvn53@wru.vn. Không gửi mật khẩu hoặc OTP.")
-            return
-        }
         do {
             let data = try await KinnectAPIClient.shared.requestJSON("/api/support")
-            if data["user"] is [String: Any] {
-                AppState.shared.showToast("Đã tìm thấy tài khoản hỗ trợ. Mở Tin nhắn để nhắn Mr Ánh.")
-            } else {
-                AppState.shared.showToast("Liên hệ riêng Mr Ánh: anhvn53@wru.vn. Không gửi mật khẩu hoặc OTP.")
+            if let user = data["user"] as? [String: Any],
+               let id = user["id"] as? String, !id.isEmpty {
+                supportPeer = KinnectUser.from(user)
+                return
             }
+        } catch {}
+        showSupportFallback = true
+    }
+}
+
+private struct AdminModeration: Identifiable {
+    let id = UUID()
+    let action: String
+    let target: String
+}
+
+struct AdminConsoleView: View {
+    var onBack: (() -> Void)? = nil
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
+    @State private var reports: [[String: Any]] = []
+    @State private var users: [[String: Any]] = []
+    @State private var status = ""
+    @State private var pending: AdminModeration?
+    @State private var confirm = false
+
+    private var allowed: Bool {
+        UIReviewFixture.activeScreen == "admin" || appState.currentUser?.accountRole == "admin"
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            PinnedHeaderBar(
+                title: "Bảng quản trị",
+                onBack: onBack ?? { dismiss() },
+                trailingActions: []
+            )
+            if allowed {
+                List {
+                    if !status.isEmpty {
+                        Text(status)
+                            .font(.footnote)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                    Section("Báo cáo") {
+                        if reports.isEmpty {
+                            Text("Chưa có báo cáo.")
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        }
+                        ForEach(Array(reports.enumerated()), id: \.offset) { _, report in
+                            reportRow(report)
+                        }
+                    }
+                    Section("Thành viên gần đây") {
+                        ForEach(Array(users.enumerated()), id: \.offset) { _, user in
+                            userRow(user)
+                        }
+                    }
+                    Text("Kinh tế, trợ lý AI và thư viện nhạc chưa có trên màn này.")
+                        .font(.caption)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                }
+            } else {
+                Text("Chỉ quản trị viên được vào bảng quản trị.")
+                    .font(.subheadline)
+                    .foregroundColor(KinnectTheme.textSecondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .background(KinnectTheme.background)
+        .task { await reload() }
+        .confirmationDialog("Xác nhận thao tác quản trị?", isPresented: $confirm, titleVisibility: .visible) {
+            Button("Xác nhận", role: .destructive) {
+                if let pending {
+                    Task { await moderate(pending.action, pending.target) }
+                }
+            }
+            Button("Hủy", role: .cancel) { pending = nil }
+        }
+    }
+
+    @ViewBuilder
+    private func reportRow(_ report: [String: Any]) -> some View {
+        let subject = report["subject"] as? [String: Any]
+        let kind = report["target_type"] as? String ?? ""
+        let target = report["target_id"] as? String ?? ""
+        VStack(alignment: .leading, spacing: 8) {
+            Text("\(kind) · \(report["status"] as? String ?? "")")
+                .font(.subheadline.bold())
+                .foregroundColor(KinnectTheme.accentBright)
+            Text(report["reason"] as? String ?? "")
+                .font(.subheadline)
+                .foregroundColor(KinnectTheme.textPrimary)
+            if let subject {
+                Text((subject["body"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? (subject["username"] as? String ?? ""))
+                    .font(.caption)
+                    .foregroundColor(KinnectTheme.textSecondary)
+                if kind == "short" || kind == "post" {
+                    let hidden = Self.flag(subject["hidden"])
+                    Button(hidden ? (kind == "short" ? "Hiện video" : "Hiện bài") : (kind == "short" ? "Ẩn video" : "Ẩn bài")) {
+                        ask(hidden ? "show-\(kind)" : "hide-\(kind)", target)
+                    }
+                }
+                if kind == "message" || kind == "group_message" {
+                    Button("Gỡ nội dung tin nhắn") { ask("hide-\(kind)", target) }
+                }
+                if let userId = subject["userId"] as? String, !userId.isEmpty {
+                    Button("Đình chỉ tài khoản") { ask("suspend-user", userId) }
+                }
+            }
+            if (report["status"] as? String) == "open", let id = report["id"] as? String {
+                Button("Đóng báo cáo") { ask("close-report", id) }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private func userRow(_ user: [String: Any]) -> some View {
+        let role = user["role"] as? String ?? ""
+        VStack(alignment: .leading, spacing: 8) {
+            Text("\(user["username"] as? String ?? "") · \(role)")
+                .font(.subheadline.bold())
+                .foregroundColor(KinnectTheme.textPrimary)
+            if role != "admin", let id = user["id"] as? String, !id.isEmpty {
+                let suspended = Self.flag(user["suspended"])
+                Button(suspended ? "Khôi phục" : "Đình chỉ") {
+                    ask(suspended ? "restore-user" : "suspend-user", id)
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func ask(_ action: String, _ target: String) {
+        guard !target.isEmpty else { return }
+        pending = AdminModeration(action: action, target: target)
+        confirm = true
+    }
+
+    private static func flag(_ value: Any?) -> Bool {
+        if let value = value as? Bool { return value }
+        if let value = value as? NSNumber { return value.intValue == 1 }
+        return false
+    }
+
+    private func reload() async {
+        guard allowed else { return }
+        do {
+            let reportData = try await KinnectAPIClient.shared.requestJSON("/api/admin/reports")
+            let userData = try await KinnectAPIClient.shared.requestJSON("/api/admin/users")
+            reports = reportData["reports"] as? [[String: Any]] ?? []
+            users = userData["users"] as? [[String: Any]] ?? []
+            status = ""
         } catch {
-            AppState.shared.showToast("Liên hệ riêng Mr Ánh: anhvn53@wru.vn. Không gửi mật khẩu hoặc OTP.")
+            status = "Chưa tải được dữ liệu quản trị."
+        }
+    }
+
+    private func moderate(_ action: String, _ target: String) async {
+        defer { pending = nil }
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/admin/moderate",
+                method: "POST",
+                body: ["action": action, "target": target]
+            )
+            appState.showToast("Đã gửi thao tác quản trị.")
+            await reload()
+        } catch {
+            appState.showToast(error.localizedDescription)
         }
     }
 }

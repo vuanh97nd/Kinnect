@@ -63,6 +63,7 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
     var discoverable: Bool
     var hasLocation: Bool
     var dmMode: String
+    var accountRole: String
 
     var avatarURL: String? { avatarUrl.isEmpty ? nil : avatarUrl }
 
@@ -108,7 +109,8 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         showDistance: Bool = true,
         discoverable: Bool = true,
         hasLocation: Bool = false,
-        dmMode: String = "everyone"
+        dmMode: String = "everyone",
+        accountRole: String = ""
     ) {
         self.id = id
         self.name = name
@@ -152,6 +154,7 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         self.discoverable = discoverable
         self.hasLocation = hasLocation
         self.dmMode = dmMode
+        self.accountRole = accountRole
     }
 
     init(json: [String: Any]) {
@@ -237,7 +240,8 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
             dmMode: {
                 let raw = (dict["dmMode"] as? String) ?? (dict["dm_mode"] as? String) ?? "everyone"
                 return raw == "friends" ? "friends" : "everyone"
-            }()
+            }(),
+            accountRole: (dict["role"] as? String) ?? ""
         )
     }
 }
