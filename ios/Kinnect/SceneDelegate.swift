@@ -18,6 +18,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             let fixtureView = UIReviewFixture.makeView(for: screenName)
                 .environmentObject(AppState.shared)
                 .preferredColorScheme(UIReviewFixture.forceLightMode ? .light : nil)
+                .dynamicTypeSize(UIReviewFixture.forceMaxDynamicType ? .accessibility5 : .large)
             let hostingController = UIHostingController(rootView: fixtureView)
             hostingController.view.backgroundColor = UIColor { trait in
                 trait.userInterfaceStyle == .light

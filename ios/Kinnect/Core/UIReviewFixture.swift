@@ -1583,22 +1583,42 @@ enum UIReviewFixture {
         case "admin":
             return AnyView(AdminConsoleView())
         case "gift-drawer":
-            return AnyView(
-                LiveGiftDrawerSheet(
-                    roomId: "fixture_live_room",
-                    gifts: [
-                        LiveGiftCatalogItem(id: "rose", label: "Hoa hồng", emoji: "🌹", coins: 10, tier: "standard"),
-                        LiveGiftCatalogItem(id: "crystal", label: "Sao pha lê", emoji: "⭐", coins: 50, tier: "standard"),
-                        LiveGiftCatalogItem(id: "crown", label: "Vương miện", emoji: "👑", coins: 1000, tier: "epic")
-                    ],
-                    priceVersion: 1
-                )
-            )
+            return AnyView(ReviewGiftDrawer())
         case "music-picker":
             return AnyView(ReviewMusicPicker())
 
         default:
             return AnyView(RootMainView())
+        }
+    }
+}
+
+private struct ReviewGiftDrawer: View {
+    private let gifts = [
+        LiveGiftCatalogItem(id: "rose", label: "Hoa hồng", emoji: "🌹", coins: 10, tier: "standard"),
+        LiveGiftCatalogItem(id: "crystal", label: "Sao pha lê", emoji: "⭐", coins: 50, tier: "standard"),
+        LiveGiftCatalogItem(id: "crown", label: "Vương miện", emoji: "👑", coins: 1000, tier: "epic")
+    ]
+
+    var body: some View {
+        ZStack {
+            LinearGradient(colors: [Color(red: 0.08, green: 0.07, blue: 0.12), Color.black], startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Trực tiếp")
+                    .font(KinnectTheme.sectionTitle)
+                    .foregroundColor(.white)
+                Text("Giao lưu âm nhạc cuối tuần")
+                    .font(KinnectTheme.body)
+                    .foregroundColor(.white.opacity(0.85))
+                Spacer()
+            }
+            .padding(20)
+        }
+        .sheet(isPresented: .constant(true)) {
+            LiveGiftDrawerSheet(roomId: "fixture_live_room", gifts: gifts, priceVersion: 1)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
     }
 }
