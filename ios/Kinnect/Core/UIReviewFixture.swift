@@ -1578,9 +1578,29 @@ enum UIReviewFixture {
             return AnyView(DirectChatDetailView(peer: KinnectUser.from(peerUserDict)))
         case "admin":
             return AnyView(AdminConsoleView())
+        case "gift-drawer":
+            return AnyView(
+                LiveGiftDrawerSheet(
+                    roomId: "fixture_live_room",
+                    gifts: LiveGiftCatalogItem.defaultCatalog,
+                    priceVersion: 1
+                )
+            )
+        case "music-picker":
+            return AnyView(ReviewMusicPicker())
 
         default:
             return AnyView(RootMainView())
+        }
+    }
+}
+
+private struct ReviewMusicPicker: View {
+    @State private var selectedTrack = ""
+
+    var body: some View {
+        NavigationStack {
+            StudioMusicPickerSheet(selectedTrack: $selectedTrack)
         }
     }
 }

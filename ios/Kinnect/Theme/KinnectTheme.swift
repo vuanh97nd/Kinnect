@@ -78,10 +78,15 @@ enum KinnectTheme {
     }
 
     // MARK: - Typography Fonts
+    // Android roles at the default scale are 22 / 16 / 15 / 14 / 13.
+    // These use text styles so Dynamic Type can grow them.
+    static let screenTitle: Font = .title2.weight(.bold)
+    static let sectionTitle: Font = .headline
     static let body: Font = .system(size: 15)
     static let bodyBold: Font = .system(size: 15, weight: .bold)
-    static let caption: Font = .system(size: 12)
-    static let captionBold: Font = .system(size: 12, weight: .bold)
+    static let secondary: Font = .subheadline
+    static let caption: Font = .footnote
+    static let captionBold: Font = .footnote.weight(.semibold)
 
     /// Time and small icons under chat bubbles. Dark mode stays light so it
     /// remains readable on the purple-black background. Light mode stays dark.

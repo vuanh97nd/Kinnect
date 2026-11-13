@@ -2516,10 +2516,10 @@ struct PrivacySettingsSheet: View {
                 VStack(spacing: 20) {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Giao diện & Chế độ sáng/tối")
-                            .font(.headline)
+                            .font(KinnectTheme.sectionTitle)
                             .foregroundColor(KinnectTheme.textPrimary)
                         Text("Tùy chỉnh giao diện theo sở thích của bạn: Sáng, Tối hoặc tự động theo cài đặt iOS.")
-                            .font(.footnote)
+                            .font(KinnectTheme.secondary)
                             .foregroundColor(KinnectTheme.textSecondary)
                             .kinnectMultiline()
 
@@ -2537,10 +2537,10 @@ struct PrivacySettingsSheet: View {
 
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Quyền riêng tư & Định vị")
-                            .font(.headline)
+                            .font(KinnectTheme.sectionTitle)
                             .foregroundColor(KinnectTheme.textPrimary)
                         Text("Quản lý thông tin hiển thị với người dùng khác và mức độ khám phá tài khoản của bạn trên Kinnect.")
-                            .font(.footnote)
+                            .font(KinnectTheme.secondary)
                             .foregroundColor(KinnectTheme.textSecondary)
                             .kinnectMultiline()
                     }
@@ -2550,10 +2550,10 @@ struct PrivacySettingsSheet: View {
                         Toggle(isOn: $discoverable) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Cho phép tìm thấy tôi")
-                                    .font(.subheadline.bold())
+                                    .font(KinnectTheme.bodyBold)
                                     .foregroundColor(KinnectTheme.textPrimary)
                                 Text("Xuất hiện trong Khám phá và danh sách người dùng Quanh đây.")
-                                    .font(.caption)
+                                    .font(KinnectTheme.caption)
                                     .foregroundColor(KinnectTheme.textSecondary)
                             }
                         }
@@ -2564,10 +2564,10 @@ struct PrivacySettingsSheet: View {
                         Toggle(isOn: $showDistance) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Hiển thị khoảng cách")
-                                    .font(.subheadline.bold())
+                                    .font(KinnectTheme.bodyBold)
                                     .foregroundColor(KinnectTheme.textPrimary)
                                 Text("Chỉ hiển thị khoảng cách gần đúng để bảo vệ vị trí chính xác của bạn.")
-                                    .font(.caption)
+                                    .font(KinnectTheme.caption)
                                     .foregroundColor(KinnectTheme.textSecondary)
                             }
                         }
@@ -2578,10 +2578,10 @@ struct PrivacySettingsSheet: View {
                         Toggle(isOn: $showActivity) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Trạng thái hoạt động")
-                                    .font(.subheadline.bold())
+                                    .font(KinnectTheme.bodyBold)
                                     .foregroundColor(KinnectTheme.textPrimary)
                                 Text("Hiển thị chấm xanh khi bạn đang trực tuyến trên Kinnect.")
-                                    .font(.caption)
+                                    .font(KinnectTheme.caption)
                                     .foregroundColor(KinnectTheme.textSecondary)
                             }
                         }
@@ -2592,10 +2592,10 @@ struct PrivacySettingsSheet: View {
                         Toggle(isOn: $dmFriendsOnly) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Chỉ nhận tin nhắn từ bạn bè")
-                                    .font(.subheadline.bold())
+                                    .font(KinnectTheme.bodyBold)
                                     .foregroundColor(KinnectTheme.textPrimary)
                                 Text("Người lạ cần gửi lời mời kết bạn trước khi nhắn tin trực tiếp.")
-                                    .font(.caption)
+                                    .font(KinnectTheme.caption)
                                     .foregroundColor(KinnectTheme.textSecondary)
                             }
                         }
@@ -2606,10 +2606,10 @@ struct PrivacySettingsSheet: View {
                         Toggle(isOn: $cloudChatSync) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Đồng bộ tin nhắn đám mây")
-                                    .font(.subheadline.bold())
+                                    .font(KinnectTheme.bodyBold)
                                     .foregroundColor(KinnectTheme.textPrimary)
                                 Text("Lưu trữ và đồng bộ lịch sử hội thoại an toàn qua máy chủ Kinnect.")
-                                    .font(.caption)
+                                    .font(KinnectTheme.caption)
                                     .foregroundColor(KinnectTheme.textSecondary)
                             }
                         }
@@ -2641,7 +2641,7 @@ struct PrivacySettingsSheet: View {
                 .disabled(isSaving)
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
-                .padding(.bottom, 12)
+                .padding(.bottom, 36)
                 .background(KinnectTheme.background)
             }
             .navigationTitle("Quyền riêng tư")

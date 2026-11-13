@@ -462,6 +462,10 @@ def main():
         ("13g-iphone-change-password", "change-password", [], "Cài đặt: Đổi mật khẩu tài khoản"),
         ("13h-iphone-blocked-users", "blocked-users", [], "Cài đặt & Quyền riêng tư: Danh sách người dùng đã chặn"),
         ("13i-iphone-privacy-settings", "privacy-settings", [], "Cài đặt: Quyền riêng tư & Định vị chuẩn PATCH /api/me (118)"),
+        ("13i2-iphone-privacy-settings-light", "privacy-settings", ["--ui-review-light"], "Quyền riêng tư sáng: nút Lưu cách home indicator"),
+        ("13n-iphone-live-gifts-drawer", "gift-drawer", [], "Ngăn quà Live đang mở"),
+        ("13o-iphone-studio-music-picker", "music-picker", [], "Danh sách chọn nhạc đang mở"),
+        ("13o2-iphone-studio-music-picker-light", "music-picker", ["--ui-review-light"], "Danh sách chọn nhạc đang mở, chế độ sáng"),
         ("13j-iphone-support", "support", [], "Trung tâm Hỗ trợ & Trợ giúp người dùng (124)"),
         ("13l-iphone-support-chat", "support-chat", [], "Trung tâm hỗ trợ mở cuộc trò chuyện trực tiếp"),
         ("13m-iphone-admin", "admin", [], "Bảng quản trị: báo cáo và thành viên"),
@@ -669,7 +673,9 @@ def main():
             ("14-compact-iphone-feed", "feed", [], "Màn hình nhỏ: Bảng tin & Tab bar 5 tab 26pt"),
             ("15-compact-iphone-chat-detail", "chat-detail", [], "Màn hình nhỏ: Chi tiết Chat & hàng trạng thái dưới"),
             ("16-compact-iphone-wallet", "wallet", [], "Màn hình nhỏ: Ví & Cửa hàng không cắt số dư / Nạp xu"),
-            ("16b-compact-iphone-dynamictype-max", "feed", ["--ui-review-dynamictype-max"], "Màn hình nhỏ: Dynamic Type kích thước tối đa Accessibility 5")
+            ("16b-compact-iphone-dynamictype-max", "feed", ["--ui-review-dynamictype-max"], "Màn hình nhỏ: Dynamic Type kích thước tối đa Accessibility 5"),
+            ("16c-compact-iphone-privacy-settings", "privacy-settings", [], "Màn hình nhỏ: Quyền riêng tư, nút Lưu cách home indicator"),
+            ("16d-compact-iphone-privacy-dynamictype", "privacy-settings", ["--ui-review-dynamictype-max"], "Màn hình nhỏ: Quyền riêng tư với Dynamic Type tối đa")
         ]
         compact_screens = compact_login_screens if only_login else (compact_login_screens + compact_other_screens)
         for slug, screen_arg, extra, desc in compact_screens:
