@@ -69,7 +69,12 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
     // Live stream WebRTC state
     @Published var liveLocalVideoTrack: RTCVideoTrack?
     @Published var liveRemoteVideoTrack: RTCVideoTrack?
+    @Published var liveRemoteVideoTracksByPeer: [String: RTCVideoTrack] = [:]
     @Published var liveConnectionError: String?
+    @Published private(set) var liveRole: String = "viewer"
+    @Published private(set) var liveTransport: String = "mesh"
+    @Published private(set) var liveStageRevision: Int = 0
+    @Published private(set) var liveRoomId: String = ""
 
     private let factory: RTCPeerConnectionFactory
     private var callPeerConnection: RTCPeerConnection?
@@ -81,9 +86,14 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
     ]
     private var pendingIceCandidates: [RTCIceCandidate] = []
 
-    // Live broadcast peer connections (host -> viewers, or viewer -> host)
-    private var liveViewerConnections: [String: PeerConnectionBox] = [:]
-    private var liveHostConnection: PeerConnectionBox?
+    // Live broadcast & SFU/mesh stage peer connections
+    private var livePeerConnections: [String: PeerConnectionBox] = [:]
+    private var livePeerPublishesMap: [String: Bool] = [:]
+    private var pendingLiveIceCandidates: [String: [RTCIceCandidate]] = [:]
+    private var liveSelfId: String = ""
+    private var liveHostPeerId: String = ""
+    private var liveStageMode: String = "video"
+    private var liveEpoch: Int = 0
     private var liveAudioTrack: RTCAudioTrack?
     private var liveCapturer: RTCCameraVideoCapturer?
     private var liveVideoSource: RTCVideoSource?
@@ -575,20 +585,86 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         MediaPermissionHandler.shared.configureAudioSessionForMedia()
     }
 
-    // MARK: - Live Stream WebRTC (Host & Viewer)
+    // MARK: - Live Stream WebRTC (Host, Guest & Viewer SFU/Mesh)
+
+    @MainActor
+    func prepareLiveRoomSession(roomId: String, role: String) {
+        guard !roomId.isEmpty else { return }
+        if liveRoomId == roomId {
+            liveRole = role
+            liveConnectionError = nil
+            return
+        }
+        resetLivePeerConnections()
+        liveRoomId = roomId
+        liveStageRevision = 0
+        liveTransport = "mesh"
+        liveSelfId = ""
+        liveHostPeerId = ""
+        liveStageMode = "video"
+        liveRole = role
+        liveConnectionError = nil
+        if role != "host" && role != "guest" {
+            stopLiveLocalMedia()
+            MediaPermissionHandler.shared.configureAudioSessionForMedia()
+        }
+    }
 
     @MainActor
     func startLiveHostBroadcast() async -> Bool {
+        stopLiveLocalMedia()
         let mic = await MediaPermissionHandler.shared.requestMicrophoneAccess()
         let camera = await MediaPermissionHandler.shared.requestCameraAccess()
         guard mic && camera else { return false }
         liveConnectionError = nil
         await refreshIceServers()
+        startLocalBroadcastCapture(withVideo: true)
+        return true
+    }
 
+    @MainActor
+    private func ensureLivePublisherMedia(withVideo: Bool) async -> Bool {
+        let mic = await MediaPermissionHandler.shared.requestMicrophoneAccess()
+        guard mic else { return false }
+        if withVideo {
+            let camera = await MediaPermissionHandler.shared.requestCameraAccess()
+            guard camera else { return false }
+        }
+        await refreshIceServers()
+        MediaPermissionHandler.shared.configureAudioSessionForCall()
+        if liveAudioTrack == nil {
+            let aSource = factory.audioSource(with: nil)
+            self.liveAudioTrack = factory.audioTrack(with: aSource, trackId: "live_audio0")
+            self.liveAudioTrack?.isEnabled = !isMicMuted
+        }
+        if withVideo {
+            if liveLocalVideoTrack == nil {
+                startLocalBroadcastVideoOnly()
+            }
+        } else {
+            stopLiveLocalVideoOnly()
+        }
+        return true
+    }
+
+    @MainActor
+    private func startLocalBroadcastCapture(withVideo: Bool) {
         MediaPermissionHandler.shared.configureAudioSessionForCall()
         let aSource = factory.audioSource(with: nil)
         let aTrack = factory.audioTrack(with: aSource, trackId: "live_audio0")
+        aTrack.isEnabled = !isMicMuted
         self.liveAudioTrack = aTrack
+        if withVideo {
+            startLocalBroadcastVideoOnly()
+        }
+    }
+
+    @MainActor
+    private func startLocalBroadcastVideoOnly() {
+        liveCapturer?.stopCapture()
+        liveCapturer = nil
+        liveVideoSource = nil
+        liveProcessor = nil
 
         let vSource = factory.videoSource()
         let processor = LiveVideoProcessor(source: vSource)
@@ -600,171 +676,489 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         self.liveCapturer = capturer
         self.liveLocalVideoTrack = vTrack
         startCapture(on: capturer, front: usingFrontCamera)
-        return true
+    }
+
+    @MainActor
+    private func stopLiveLocalVideoOnly() {
+        liveCapturer?.stopCapture()
+        liveCapturer = nil
+        liveVideoSource = nil
+        liveProcessor = nil
+        liveLocalVideoTrack = nil
+    }
+
+    @MainActor
+    private func stopLiveLocalMedia() {
+        stopLiveLocalVideoOnly()
+        liveAudioTrack = nil
+    }
+
+    @MainActor
+    func applyLiveStage(
+        roomId: String,
+        transport: String,
+        revision: Int,
+        selfId: String,
+        role: String,
+        mode: String,
+        peers rawPeers: [[String: Any]],
+        participants: [[String: Any]]
+    ) {
+        guard !roomId.isEmpty, revision > 0 else { return }
+        if roomId == liveRoomId && liveStageRevision > 0 && revision < liveStageRevision {
+            return
+        }
+
+        let normalizedTransport = LiveStageSignalingContract.normalizeTransport(transport)
+        let normalizedRole = LiveStageSignalingContract.normalizeRole(role)
+        let normalizedMode = LiveStageSignalingContract.normalizeMode(mode)
+        liveHostPeerId = LiveStageSignalingContract.resolveHostPeerId(participants: participants)
+
+        if LiveStageSignalingContract.isLayoutOnlyStageUpdate(
+            currentRoomId: liveRoomId,
+            incomingRoomId: roomId,
+            currentTransport: liveTransport,
+            incomingTransport: normalizedTransport,
+            currentRevision: liveStageRevision,
+            incomingRevision: revision,
+            currentRole: liveRole,
+            incomingRole: normalizedRole,
+            currentMode: liveStageMode,
+            incomingMode: normalizedMode
+        ) {
+            return
+        }
+
+        let previousRole = liveRole
+        liveRoomId = roomId
+        liveTransport = normalizedTransport
+        liveStageRevision = revision
+        liveSelfId = selfId
+        liveRole = normalizedRole
+        liveStageMode = normalizedMode
+        liveConnectionError = nil
+
+        resetLivePeerConnections()
+
+        let parsedPeers = LiveStageSignalingContract.parsePeers(rawPeers)
+        for peer in parsedPeers {
+            livePeerPublishesMap[peer.id] = peer.publishes
+        }
+
+        let targetEpoch = liveEpoch
+        if normalizedRole == "viewer" {
+            if previousRole == "host" || previousRole == "guest" || liveCapturer != nil || liveAudioTrack != nil || liveLocalVideoTrack != nil {
+                stopLiveLocalMedia()
+            }
+            MediaPermissionHandler.shared.configureAudioSessionForMedia()
+            for peer in parsedPeers where peer.offer {
+                initiateLiveOffer(to: peer.id, peerPublishes: peer.publishes, expectedEpoch: targetEpoch, expectedRevision: revision)
+            }
+            return
+        }
+
+        let needsVideo = (normalizedMode != "audio")
+        let mediaReady = (liveAudioTrack != nil) && (!needsVideo || liveLocalVideoTrack != nil)
+        if mediaReady {
+            if !needsVideo {
+                stopLiveLocalVideoOnly()
+            }
+            MediaPermissionHandler.shared.configureAudioSessionForCall()
+            for peer in parsedPeers where peer.offer {
+                initiateLiveOffer(to: peer.id, peerPublishes: peer.publishes, expectedEpoch: targetEpoch, expectedRevision: revision)
+            }
+            return
+        }
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let ok = await self.ensureLivePublisherMedia(withVideo: needsVideo)
+            guard self.liveEpoch == targetEpoch,
+                  self.liveRoomId == roomId,
+                  self.liveStageRevision == revision,
+                  (self.liveRole == "host" || self.liveRole == "guest") else { return }
+            guard ok else {
+                self.liveConnectionError = "Cần quyền camera và micro để lên sân khấu Live."
+                if normalizedRole == "guest" {
+                    NativeSocketClient.shared.sendJSON([
+                        "type": "live-guest-leave",
+                        "room": roomId
+                    ])
+                }
+                return
+            }
+            for peer in parsedPeers where peer.offer {
+                self.initiateLiveOffer(to: peer.id, peerPublishes: peer.publishes, expectedEpoch: targetEpoch, expectedRevision: revision)
+            }
+        }
     }
 
     @MainActor
     func handleLiveViewerJoined(peerId: String) {
-        guard !peerId.isEmpty else { return }
-        if let stale = liveViewerConnections.removeValue(forKey: peerId) {
-            stale.pc.close()
-        }
-        let box = createLivePeerBox(peerId: peerId, isHost: true)
-        liveViewerConnections[peerId] = box
+        guard liveStageRevision == 0, !peerId.isEmpty else { return }
+        let expectedEpoch = liveEpoch
+        initiateLiveOffer(to: peerId, peerPublishes: false, expectedEpoch: expectedEpoch, expectedRevision: 0)
+    }
 
-        let constraints = RTCMediaConstraints(
-            mandatoryConstraints: ["OfferToReceiveAudio": "false", "OfferToReceiveVideo": "false"],
-            optionalConstraints: nil
-        )
-        box.pc.offer(for: constraints) { sdp, err in
+    @MainActor
+    private func initiateLiveOffer(to peerId: String, peerPublishes: Bool, expectedEpoch: Int, expectedRevision: Int) {
+        guard !peerId.isEmpty,
+              liveEpoch == expectedEpoch,
+              liveStageRevision == expectedRevision else { return }
+        removeLivePeerConnection(peerId: peerId)
+        livePeerPublishesMap[peerId] = peerPublishes
+        let box = createLivePeerBox(peerId: peerId, roomId: liveRoomId, epoch: expectedEpoch, revision: expectedRevision)
+        livePeerConnections[peerId] = box
+
+        let constraints = offerConstraints(for: peerId, peerPublishes: peerPublishes)
+        box.pc.offer(for: constraints) { [weak self, weak box] sdp, err in
             guard let sdp = sdp, err == nil else { return }
-            box.pc.setLocalDescription(sdp) { setErr in
-                guard setErr == nil else { return }
-                let descPayload: [String: Any] = [
-                    "type": Self.sdpTypeString(sdp.type),
-                    "sdp": sdp.sdp
-                ]
-                NativeSocketClient.shared.sendJSON([
-                    "type": "signal",
-                    "to": peerId,
-                    "description": descPayload,
-                    "signal": ["description": descPayload]
-                ])
+            DispatchQueue.main.async { [weak self, weak box] in
+                guard let self = self,
+                      let box = box,
+                      self.liveEpoch == expectedEpoch,
+                      self.liveStageRevision == expectedRevision,
+                      self.livePeerConnections[peerId] === box else { return }
+                box.pc.setLocalDescription(sdp) { [weak self, weak box] setErr in
+                    guard setErr == nil else { return }
+                    DispatchQueue.main.async { [weak self, weak box] in
+                        guard let self = self,
+                              let box = box,
+                              self.liveEpoch == expectedEpoch,
+                              self.liveStageRevision == expectedRevision,
+                              self.livePeerConnections[peerId] === box else { return }
+                        let descPayload: [String: Any] = [
+                            "type": Self.sdpTypeString(sdp.type),
+                            "sdp": sdp.sdp
+                        ]
+                        self.sendLiveSignal(
+                            to: peerId,
+                            revision: expectedRevision,
+                            key: "description",
+                            payload: descPayload
+                        )
+                    }
+                }
             }
         }
     }
 
     @MainActor
-    func handleLiveSignal(from peerId: String, signal: [String: Any], isHost: Bool) {
-        let box: PeerConnectionBox
-        if isHost {
-            if let existing = liveViewerConnections[peerId] {
-                box = existing
-            } else {
-                let created = createLivePeerBox(peerId: peerId, isHost: true)
-                liveViewerConnections[peerId] = created
-                box = created
-            }
-        } else {
-            if let existing = liveHostConnection {
-                box = existing
-            } else {
-                liveConnectionError = nil
-                let created = createLivePeerBox(peerId: peerId, isHost: false)
-                liveHostConnection = created
-                box = created
-            }
+    func handleLiveSignal(
+        from peerId: String,
+        roomId: String? = nil,
+        revision: Int = 0,
+        signal: [String: Any],
+        isHost: Bool
+    ) {
+        guard !peerId.isEmpty else { return }
+        let usesStage = (liveStageRevision > 0)
+        guard LiveStageSignalingContract.isValidInboundSignal(
+            msgRoom: roomId,
+            msgRevision: revision,
+            currentRoomId: liveRoomId,
+            currentRevision: liveStageRevision,
+            usesStage: usesStage
+        ) else { return }
+
+        if !usesStage && liveRole == "viewer" && isHost {
+            liveRole = "host"
         }
+
+        let box: PeerConnectionBox
+        if let existing = livePeerConnections[peerId] {
+            box = existing
+        } else {
+            if !usesStage && !isHost {
+                liveConnectionError = nil
+            } else if usesStage && liveRole == "viewer" {
+                liveConnectionError = nil
+            }
+            let created = createLivePeerBox(
+                peerId: peerId,
+                roomId: liveRoomId,
+                epoch: liveEpoch,
+                revision: liveStageRevision
+            )
+            livePeerConnections[peerId] = created
+            box = created
+        }
+
+        let capturedEpoch = box.epoch
+        let capturedRevision = box.revision
 
         if let desc = signal["description"] as? [String: Any],
            let typeStr = desc["type"] as? String,
            let sdpText = desc["sdp"] as? String {
-            let sdpType: RTCSdpType = (typeStr == "offer") ? .offer : .answer
+            let normalizedType = typeStr.lowercased()
+            guard normalizedType == "offer" || normalizedType == "answer" else { return }
+            let sdpType: RTCSdpType = (normalizedType == "offer") ? .offer : .answer
             let remoteSDP = RTCSessionDescription(type: sdpType, sdp: sdpText)
-            box.pc.setRemoteDescription(remoteSDP) { err in
+            box.pc.setRemoteDescription(remoteSDP) { [weak self, weak box] err in
                 guard err == nil else { return }
-                if sdpType == .offer {
-                    let constraints = RTCMediaConstraints(
-                        mandatoryConstraints: ["OfferToReceiveAudio": "true", "OfferToReceiveVideo": "true"],
-                        optionalConstraints: nil
-                    )
-                    box.pc.answer(for: constraints) { answer, ansErr in
+                DispatchQueue.main.async { [weak self, weak box] in
+                    guard let self = self,
+                          let box = box,
+                          self.liveEpoch == capturedEpoch,
+                          self.liveStageRevision == capturedRevision,
+                          self.livePeerConnections[peerId] === box else { return }
+                    self.drainPendingLiveCandidates(for: peerId, on: box)
+                    guard sdpType == .offer else { return }
+                    let constraints = self.answerConstraints(for: peerId)
+                    box.pc.answer(for: constraints) { [weak self, weak box] answer, ansErr in
                         guard let answer = answer, ansErr == nil else { return }
-                        box.pc.setLocalDescription(answer) { setErr in
-                            guard setErr == nil else { return }
-                            let descPayload: [String: Any] = [
-                                "type": Self.sdpTypeString(answer.type),
-                                "sdp": answer.sdp
-                            ]
-                            NativeSocketClient.shared.sendJSON([
-                                "type": "signal",
-                                "to": peerId,
-                                "description": descPayload,
-                                "signal": ["description": descPayload]
-                            ])
+                        DispatchQueue.main.async { [weak self, weak box] in
+                            guard let self = self,
+                                  let box = box,
+                                  self.liveEpoch == capturedEpoch,
+                                  self.liveStageRevision == capturedRevision,
+                                  self.livePeerConnections[peerId] === box else { return }
+                            box.pc.setLocalDescription(answer) { [weak self, weak box] setErr in
+                                guard setErr == nil else { return }
+                                DispatchQueue.main.async { [weak self, weak box] in
+                                    guard let self = self,
+                                          let box = box,
+                                          self.liveEpoch == capturedEpoch,
+                                          self.liveStageRevision == capturedRevision,
+                                          self.livePeerConnections[peerId] === box else { return }
+                                    let descPayload: [String: Any] = [
+                                        "type": Self.sdpTypeString(answer.type),
+                                        "sdp": answer.sdp
+                                    ]
+                                    self.sendLiveSignal(
+                                        to: peerId,
+                                        revision: capturedRevision,
+                                        key: "description",
+                                        payload: descPayload
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
         } else if let cand = signal["candidate"] as? [String: Any],
                   let sdp = cand["candidate"] as? String {
+            guard !sdp.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
             let sdpMid = cand["sdpMid"] as? String
             let sdpMLineIndex: Int32 = (cand["sdpMLineIndex"] as? NSNumber)?.int32Value
                 ?? (cand["sdpMLineIndex"] as? Int).map(Int32.init)
                 ?? (cand["sdpMLineIndex"] as? String).flatMap(Int32.init)
                 ?? 0
             let ice = RTCIceCandidate(sdp: sdp, sdpMLineIndex: sdpMLineIndex, sdpMid: sdpMid)
-            box.pc.add(ice) { _ in }
+            if box.pc.remoteDescription != nil {
+                box.pc.add(ice) { _ in }
+            } else {
+                var queued = pendingLiveIceCandidates[peerId] ?? []
+                if queued.count < 100 {
+                    queued.append(ice)
+                    pendingLiveIceCandidates[peerId] = queued
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func handleLivePeerLeft(peerId: String) {
+        guard !peerId.isEmpty else { return }
+        removeLivePeerConnection(peerId: peerId)
+        livePeerPublishesMap.removeValue(forKey: peerId)
+        if liveRemoteVideoTracksByPeer.removeValue(forKey: peerId) != nil {
+            refreshPrimaryLiveRemoteVideoTrack()
         }
     }
 
     @MainActor
     func stopLiveSession() {
-        liveCapturer?.stopCapture()
-        liveCapturer = nil
-        liveVideoSource = nil
-        liveProcessor = nil
-        liveAudioTrack = nil
-        liveLocalVideoTrack = nil
-        liveRemoteVideoTrack = nil
+        liveEpoch += 1
+        stopLiveLocalMedia()
+        liveRoomId = ""
+        liveStageRevision = 0
+        liveTransport = "mesh"
+        liveSelfId = ""
+        liveHostPeerId = ""
+        liveStageMode = "video"
+        liveRole = "viewer"
         liveConnectionError = nil
-        for (_, box) in liveViewerConnections {
+        for (_, box) in livePeerConnections {
             box.pc.close()
         }
-        liveViewerConnections.removeAll()
-        liveHostConnection?.pc.close()
-        liveHostConnection = nil
+        livePeerConnections.removeAll()
+        livePeerPublishesMap.removeAll()
+        pendingLiveIceCandidates.removeAll()
+        liveRemoteVideoTracksByPeer.removeAll()
+        liveRemoteVideoTrack = nil
         MediaPermissionHandler.shared.configureAudioSessionForMedia()
     }
 
-    private func createLivePeerBox(peerId: String, isHost: Bool) -> PeerConnectionBox {
+    @MainActor
+    private func resetLivePeerConnections() {
+        liveEpoch += 1
+        for (_, box) in livePeerConnections {
+            box.pc.close()
+        }
+        livePeerConnections.removeAll()
+        livePeerPublishesMap.removeAll()
+        pendingLiveIceCandidates.removeAll()
+        liveRemoteVideoTracksByPeer.removeAll()
+        liveRemoteVideoTrack = nil
+    }
+
+    @MainActor
+    private func removeLivePeerConnection(peerId: String) {
+        pendingLiveIceCandidates.removeValue(forKey: peerId)
+        if let stale = livePeerConnections.removeValue(forKey: peerId) {
+            stale.pc.close()
+        }
+    }
+
+    @MainActor
+    private func drainPendingLiveCandidates(for peerId: String, on box: PeerConnectionBox) {
+        guard let queued = pendingLiveIceCandidates.removeValue(forKey: peerId),
+              !queued.isEmpty else { return }
+        for ice in queued {
+            box.pc.add(ice) { _ in }
+        }
+    }
+
+    @MainActor
+    private func refreshPrimaryLiveRemoteVideoTrack() {
+        if !liveHostPeerId.isEmpty, let hostTrack = liveRemoteVideoTracksByPeer[liveHostPeerId] {
+            liveRemoteVideoTrack = hostTrack
+            return
+        }
+        if let current = liveRemoteVideoTrack,
+           liveRemoteVideoTracksByPeer.values.contains(where: { $0 === current }) {
+            return
+        }
+        liveRemoteVideoTrack = liveRemoteVideoTracksByPeer.values.first
+    }
+
+    @MainActor
+    private func sendLiveSignal(to peerId: String, revision: Int, key: String, payload: [String: Any]) {
+        let envelope = LiveStageSignalingContract.signalEnvelope(
+            to: peerId,
+            revision: revision,
+            key: key,
+            payload: payload
+        )
+        NativeSocketClient.shared.sendJSON(envelope)
+    }
+
+    private func shouldAttachLocalMedia(for peerId: String) -> Bool {
+        let isPublisherRole = (liveRole == "host" || liveRole == "guest")
+        guard isPublisherRole else { return false }
+        if liveTransport == "sfu" {
+            return peerId == "@sfu"
+        }
+        return true
+    }
+
+    private func offerConstraints(for peerId: String, peerPublishes: Bool) -> RTCMediaConstraints {
+        if liveTransport == "sfu" && peerId == "@sfu" {
+            return RTCMediaConstraints(
+                mandatoryConstraints: ["OfferToReceiveAudio": "false", "OfferToReceiveVideo": "false"],
+                optionalConstraints: nil
+            )
+        }
+        let receive = peerPublishes ? "true" : "false"
+        return RTCMediaConstraints(
+            mandatoryConstraints: ["OfferToReceiveAudio": receive, "OfferToReceiveVideo": receive],
+            optionalConstraints: nil
+        )
+    }
+
+    private func answerConstraints(for peerId: String) -> RTCMediaConstraints {
+        if liveTransport == "sfu" {
+            return RTCMediaConstraints(
+                mandatoryConstraints: ["OfferToReceiveAudio": "true", "OfferToReceiveVideo": "true"],
+                optionalConstraints: nil
+            )
+        }
+        let expectsRemoteMedia = livePeerPublishesMap[peerId] ?? (liveRole == "viewer")
+        let receive = expectsRemoteMedia ? "true" : "false"
+        return RTCMediaConstraints(
+            mandatoryConstraints: ["OfferToReceiveAudio": receive, "OfferToReceiveVideo": receive],
+            optionalConstraints: nil
+        )
+    }
+
+    private func createLivePeerBox(peerId: String, roomId: String, epoch: Int, revision: Int) -> PeerConnectionBox {
         let config = RTCConfiguration()
         config.iceServers = cachedIceServers
         config.sdpSemantics = .unifiedPlan
         let constraints = RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: ["DtlsSrtpKeyAgreement": "true"])
-        weak var weakBox: PeerConnectionBox?
         let box = PeerConnectionBox(
             peerId: peerId,
-            onRemoteVideo: { [weak self] videoTrack in
-                DispatchQueue.main.async {
-                    self?.liveConnectionError = nil
-                    self?.liveRemoteVideoTrack = videoTrack
+            roomId: roomId,
+            epoch: epoch,
+            revision: revision,
+            onRemoteVideo: { [weak self] remotePeerId, boxEpoch, videoTrack in
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self,
+                          self.liveEpoch == boxEpoch,
+                          remotePeerId != "@sfu" else { return }
+                    self.liveConnectionError = nil
+                    self.liveRemoteVideoTracksByPeer[remotePeerId] = videoTrack
+                    self.refreshPrimaryLiveRemoteVideoTrack()
                 }
             },
-            onIceStateChange: { [weak self] pc, newState in
-                DispatchQueue.main.async {
-                    guard let self, let box = weakBox, box.pc === pc else { return }
+            onIceCandidate: { [weak self] sourceBox, candidate in
+                DispatchQueue.main.async { [weak self, weak sourceBox] in
+                    guard let self = self,
+                          let sourceBox = sourceBox,
+                          !self.liveRoomId.isEmpty,
+                          self.liveRoomId == sourceBox.roomId,
+                          self.liveEpoch == sourceBox.epoch,
+                          self.liveStageRevision == sourceBox.revision,
+                          self.livePeerConnections[sourceBox.peerId] === sourceBox else { return }
+                    let candPayload: [String: Any] = [
+                        "candidate": candidate.sdp,
+                        "sdpMid": candidate.sdpMid ?? "0",
+                        "sdpMLineIndex": candidate.sdpMLineIndex
+                    ]
+                    self.sendLiveSignal(
+                        to: sourceBox.peerId,
+                        revision: sourceBox.revision,
+                        key: "candidate",
+                        payload: candPayload
+                    )
+                }
+            },
+            onIceStateChange: { [weak self] sourceBox, pc, newState in
+                DispatchQueue.main.async { [weak self, weak sourceBox] in
+                    guard let self = self,
+                          let sourceBox = sourceBox,
+                          self.liveEpoch == sourceBox.epoch,
+                          self.livePeerConnections[sourceBox.peerId] === sourceBox,
+                          sourceBox.pc === pc else { return }
                     if newState == .connected || newState == .completed {
-                        if !isHost {
+                        if self.liveRole == "viewer" || sourceBox.peerId == "@sfu" || sourceBox.peerId == self.liveHostPeerId {
                             self.liveConnectionError = nil
                         }
                         return
                     }
                     guard newState == .failed || newState == .closed else { return }
-                    if isHost {
-                        guard self.liveViewerConnections[peerId] === box else { return }
-                        self.liveViewerConnections.removeValue(forKey: peerId)
-                        box.pc.close()
-                    } else {
-                        guard self.liveHostConnection === box else { return }
-                        self.liveHostConnection = nil
-                        self.liveRemoteVideoTrack = nil
-                        box.pc.close()
-                        if newState == .failed {
-                            self.liveConnectionError = "Mất kết nối luồng video Live (ICE failed)."
-                        }
+                    self.livePeerConnections.removeValue(forKey: sourceBox.peerId)
+                    self.pendingLiveIceCandidates.removeValue(forKey: sourceBox.peerId)
+                    sourceBox.pc.close()
+                    if self.liveRemoteVideoTracksByPeer.removeValue(forKey: sourceBox.peerId) != nil {
+                        self.refreshPrimaryLiveRemoteVideoTrack()
+                    }
+                    if newState == .failed,
+                       (sourceBox.peerId == "@sfu" || self.liveRole == "viewer" || sourceBox.peerId == self.liveHostPeerId) {
+                        self.liveConnectionError = "Mất kết nối luồng video Live (ICE failed)."
                     }
                 }
             }
         )
-        weakBox = box
         let pc = factory.peerConnection(with: config, constraints: constraints, delegate: box)!
         box.pc = pc
-        if isHost {
+        if shouldAttachLocalMedia(for: peerId) {
             if let aTrack = liveAudioTrack {
                 pc.add(aTrack, streamIds: ["kinnect_live"])
             }
-            if let vTrack = liveLocalVideoTrack {
+            if liveStageMode != "audio", let vTrack = liveLocalVideoTrack {
                 pc.add(vTrack, streamIds: ["kinnect_live"])
             }
         }
@@ -862,54 +1256,157 @@ extension NativeWebRTCManager: RTCPeerConnectionDelegate {
     }
 }
 
-// MARK: - Live PeerConnection Box
+// MARK: - Live Stage Protocol Contract & PeerConnection Box
+
+struct LiveStagePeerDescriptor: Equatable {
+    let id: String
+    let publishes: Bool
+    let offer: Bool
+}
+
+enum LiveStageSignalingContract {
+    static func normalizeTransport(_ value: String?) -> String {
+        let clean = (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return clean == "sfu" ? "sfu" : "mesh"
+    }
+
+    static func normalizeRole(_ value: String?) -> String {
+        let clean = (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        switch clean {
+        case "host", "guest", "viewer":
+            return clean
+        default:
+            return "viewer"
+        }
+    }
+
+    static func normalizeMode(_ value: String?) -> String {
+        let clean = (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return clean == "audio" ? "audio" : "video"
+    }
+
+    static func parsePeers(_ rawPeers: [[String: Any]]) -> [LiveStagePeerDescriptor] {
+        var result: [LiveStagePeerDescriptor] = []
+        var seen = Set<String>()
+        for entry in rawPeers {
+            guard let id = entry["id"] as? String, !id.isEmpty, seen.insert(id).inserted else { continue }
+            let publishes = (entry["publishes"] as? Bool) ?? false
+            let offer = (entry["offer"] as? Bool) ?? false
+            result.append(LiveStagePeerDescriptor(id: id, publishes: publishes, offer: offer))
+        }
+        return result
+    }
+
+    static func resolveHostPeerId(participants: [[String: Any]]) -> String {
+        for item in participants {
+            if (item["role"] as? String) == "host", let id = item["id"] as? String, !id.isEmpty {
+                return id
+            }
+        }
+        return ""
+    }
+
+    static func isLayoutOnlyStageUpdate(
+        currentRoomId: String,
+        incomingRoomId: String,
+        currentTransport: String,
+        incomingTransport: String,
+        currentRevision: Int,
+        incomingRevision: Int,
+        currentRole: String,
+        incomingRole: String,
+        currentMode: String,
+        incomingMode: String
+    ) -> Bool {
+        currentRevision > 0
+            && incomingRevision == currentRevision
+            && incomingRoomId == currentRoomId
+            && incomingTransport == currentTransport
+            && incomingRole == currentRole
+            && incomingMode == currentMode
+    }
+
+    static func isValidInboundSignal(
+        msgRoom: String?,
+        msgRevision: Int,
+        currentRoomId: String,
+        currentRevision: Int,
+        usesStage: Bool
+    ) -> Bool {
+        if let msgRoom, !msgRoom.isEmpty, !currentRoomId.isEmpty, msgRoom != currentRoomId {
+            return false
+        }
+        if usesStage {
+            guard !currentRoomId.isEmpty, currentRevision > 0 else { return false }
+            return msgRevision == currentRevision
+        }
+        return msgRevision == 0 || msgRevision == currentRevision
+    }
+
+    static func signalEnvelope(to peerId: String, revision: Int, key: String, payload: [String: Any]) -> [String: Any] {
+        var body: [String: Any] = [
+            "type": "signal",
+            "to": peerId,
+            key: payload,
+            "signal": [key: payload]
+        ]
+        if revision > 0 {
+            body["revision"] = revision
+        }
+        return body
+    }
+}
 
 private final class PeerConnectionBox: NSObject, RTCPeerConnectionDelegate {
     let peerId: String
+    let roomId: String
+    let epoch: Int
+    let revision: Int
     var pc: RTCPeerConnection!
-    let onRemoteVideo: (RTCVideoTrack) -> Void
-    let onIceStateChange: (RTCPeerConnection, RTCIceConnectionState) -> Void
+    let onRemoteVideo: (String, Int, RTCVideoTrack) -> Void
+    let onIceCandidate: (PeerConnectionBox, RTCIceCandidate) -> Void
+    let onIceStateChange: (PeerConnectionBox, RTCPeerConnection, RTCIceConnectionState) -> Void
 
     init(
         peerId: String,
-        onRemoteVideo: @escaping (RTCVideoTrack) -> Void,
-        onIceStateChange: @escaping (RTCPeerConnection, RTCIceConnectionState) -> Void
+        roomId: String,
+        epoch: Int,
+        revision: Int,
+        onRemoteVideo: @escaping (String, Int, RTCVideoTrack) -> Void,
+        onIceCandidate: @escaping (PeerConnectionBox, RTCIceCandidate) -> Void,
+        onIceStateChange: @escaping (PeerConnectionBox, RTCPeerConnection, RTCIceConnectionState) -> Void
     ) {
         self.peerId = peerId
+        self.roomId = roomId
+        self.epoch = epoch
+        self.revision = revision
         self.onRemoteVideo = onRemoteVideo
+        self.onIceCandidate = onIceCandidate
         self.onIceStateChange = onIceStateChange
     }
 
     func peerConnection(_ peerConnection: RTCPeerConnection, didChange stateChanged: RTCSignalingState) {}
     func peerConnection(_ peerConnection: RTCPeerConnection, didAdd stream: RTCMediaStream) {
         if let v = stream.videoTracks.first {
-            onRemoteVideo(v)
+            onRemoteVideo(peerId, epoch, v)
         }
     }
     func peerConnection(_ peerConnection: RTCPeerConnection, didRemove stream: RTCMediaStream) {}
     func peerConnectionShouldNegotiate(_ peerConnection: RTCPeerConnection) {}
     func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCIceConnectionState) {
-        onIceStateChange(peerConnection, newState)
+        onIceStateChange(self, peerConnection, newState)
     }
     func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCIceGatheringState) {}
     func peerConnection(_ peerConnection: RTCPeerConnection, didGenerate candidate: RTCIceCandidate) {
-        let candPayload: [String: Any] = [
-            "candidate": candidate.sdp,
-            "sdpMid": candidate.sdpMid ?? "0",
-            "sdpMLineIndex": candidate.sdpMLineIndex
-        ]
-        NativeSocketClient.shared.sendJSON([
-            "type": "signal",
-            "to": peerId,
-            "candidate": candPayload,
-            "signal": ["candidate": candPayload]
-        ])
+        onIceCandidate(self, candidate)
     }
     func peerConnection(_ peerConnection: RTCPeerConnection, didRemove candidates: [RTCIceCandidate]) {}
     func peerConnection(_ peerConnection: RTCPeerConnection, didOpen dataChannel: RTCDataChannel) {}
     func peerConnection(_ peerConnection: RTCPeerConnection, didAdd rtpReceiver: RTCRtpReceiver, streams mediaStreams: [RTCMediaStream]) {
         if let v = rtpReceiver.track as? RTCVideoTrack {
-            onRemoteVideo(v)
+            onRemoteVideo(peerId, epoch, v)
+        } else if let v = mediaStreams.first?.videoTracks.first {
+            onRemoteVideo(peerId, epoch, v)
         }
     }
 }

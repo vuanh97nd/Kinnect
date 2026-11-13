@@ -16,6 +16,11 @@ struct PrivacyConsentRequest: Identifiable {
     let notice: String
 }
 
+struct LiveCreateFailure: LocalizedError {
+    let message: String
+    var errorDescription: String? { message }
+}
+
 @MainActor
 final class AppState: ObservableObject {
     static let shared = AppState()
@@ -39,6 +44,50 @@ final class AppState: ObservableObject {
     @Published var navigationTargetRef: String = ""
     @Published var liveLastReactionBanner: String?
     @Published var liveGiftCombo: Int = 0
+    private var pendingLiveCreateToken: UUID?
+    private var pendingLiveCreateContinuation: CheckedContinuation<Result<LiveRoomItem, LiveCreateFailure>, Never>?
+
+    func createLiveRoomAndAwaitJoin(payload: [String: Any]) async -> Result<LiveRoomItem, LiveCreateFailure> {
+        let connected = await NativeSocketClient.shared.ensureConnected()
+        guard connected else {
+            return .failure(LiveCreateFailure(message: "Không thể kết nối máy chủ Live. Vui lòng thử lại."))
+        }
+
+        resolvePendingLiveCreate(with: .failure(LiveCreateFailure(message: "Đã hủy yêu cầu tạo phòng Live trước đó.")))
+
+        let token = UUID()
+        self.pendingLiveCreateToken = token
+
+        var createPayload = payload
+        createPayload["type"] = "create"
+        createPayload["multiGuest"] = true
+        createPayload["liveModes"] = true
+
+        return await withCheckedContinuation { (continuation: CheckedContinuation<Result<LiveRoomItem, LiveCreateFailure>, Never>) in
+            self.pendingLiveCreateContinuation = continuation
+            NativeSocketClient.shared.sendJSON(createPayload)
+
+            Task { @MainActor [weak self] in
+                for _ in 0..<40 {
+                    try? await Task.sleep(nanoseconds: 250_000_000)
+                    guard let self, self.pendingLiveCreateToken == token else { return }
+                    if !NativeSocketClient.shared.isConnected {
+                        self.resolvePendingLiveCreate(with: .failure(LiveCreateFailure(message: "Mất kết nối máy chủ Live khi tạo phòng.")))
+                        return
+                    }
+                }
+                guard let self, self.pendingLiveCreateToken == token else { return }
+                self.resolvePendingLiveCreate(with: .failure(LiveCreateFailure(message: "Không nhận được phản hồi từ máy chủ Live. Vui lòng thử lại.")))
+            }
+        }
+    }
+
+    private func resolvePendingLiveCreate(with result: Result<LiveRoomItem, LiveCreateFailure>) {
+        pendingLiveCreateToken = nil
+        guard let continuation = pendingLiveCreateContinuation else { return }
+        pendingLiveCreateContinuation = nil
+        continuation.resume(returning: result)
+    }
 
     func joinLiveRoom(_ room: LiveRoomItem) {
         if currentLiveRoom?.id == room.id {
@@ -57,13 +106,23 @@ final class AppState: ObservableObject {
         liveGiftCombo = 0
 
         if !UIReviewFixture.isEnabled && !isHost {
-            Task {
+            let targetRoomId = room.id
+            let targetLiveMode = room.liveMode
+            Task { @MainActor [weak self] in
                 await NativeWebRTCManager.shared.refreshIceServers()
+                guard let self, self.currentLiveRoom?.id == targetRoomId else { return }
+                let connected = await NativeSocketClient.shared.ensureConnected()
+                guard self.currentLiveRoom?.id == targetRoomId else { return }
+                guard connected else {
+                    NativeWebRTCManager.shared.liveConnectionError = "Không thể kết nối máy chủ Live."
+                    self.showToast("Không thể kết nối máy chủ Live.")
+                    return
+                }
                 NativeSocketClient.shared.sendJSON([
                     "type": "join",
-                    "room": room.id,
-                    "liveMode": room.liveMode,
-                    "multiGuest": false,
+                    "room": targetRoomId,
+                    "liveMode": targetLiveMode,
+                    "multiGuest": true,
                     "liveModes": true
                 ])
             }
@@ -71,6 +130,7 @@ final class AppState: ObservableObject {
     }
 
     func leaveCurrentLiveRoom() {
+        resolvePendingLiveCreate(with: .failure(LiveCreateFailure(message: "Đã rời phòng Live.")))
         if currentLiveRoom != nil && !UIReviewFixture.isEnabled {
             NativeSocketClient.shared.sendJSON(["type": "leave"])
         }
@@ -194,6 +254,7 @@ final class AppState: ObservableObject {
         KeychainStore.shared.clearAll()
         AccountCache.shared.wipeAllCaches()
         KinnectAuthenticatedFile.wipe()
+        resolvePendingLiveCreate(with: .failure(LiveCreateFailure(message: "Phiên đăng nhập đã kết thúc.")))
         currentUser = nil
         unreadNotificationsCount = 0
         unreadMessagesCount = 0
@@ -201,6 +262,7 @@ final class AppState: ObservableObject {
         liveRooms.removeAll()
         blockedUserIds.removeAll()
         currentLiveRoom = nil
+        isCurrentLiveHost = false
     }
 
     func refreshGlobalBadges() async {
@@ -307,15 +369,55 @@ final class AppState: ObservableObject {
                 let historyRaw = (json["history"] as? [[String: Any]]) ?? (roomDict["chatHistory"] as? [[String: Any]]) ?? []
                 self.liveChatMessages = historyRaw.map(LiveChatMessage.from)
                 self.liveGiftRanking = (json["giftRanking"] as? [[String: Any]]) ?? (roomDict["giftRanking"] as? [[String: Any]]) ?? []
+                NativeWebRTCManager.shared.prepareLiveRoomSession(roomId: room.id, role: role)
+                if role == "host" || pendingLiveCreateContinuation != nil {
+                    resolvePendingLiveCreate(with: .success(room))
+                }
             }
+        case "live-stage":
+            guard let roomId = json["room"] as? String, !roomId.isEmpty,
+                  currentLiveRoom?.id == roomId else { return }
+            let revision = (json["revision"] as? Int) ?? (json["revision"] as? NSNumber)?.intValue ?? 0
+            guard revision > 0 else { return }
+            let transport = (json["transport"] as? String) ?? "mesh"
+            let selfId = (json["selfId"] as? String) ?? ""
+            let role = (json["role"] as? String) ?? (isCurrentLiveHost ? "host" : "viewer")
+            let mode = (json["mode"] as? String) ?? "video"
+            let peers = json["peers"] as? [[String: Any]] ?? []
+            let participants = json["participants"] as? [[String: Any]] ?? []
+            self.isCurrentLiveHost = (role == "host")
+            NativeWebRTCManager.shared.applyLiveStage(
+                roomId: roomId,
+                transport: transport,
+                revision: revision,
+                selfId: selfId,
+                role: role,
+                mode: mode,
+                peers: peers,
+                participants: participants
+            )
         case "peer":
-            if isCurrentLiveHost, let peerId = (json["id"] as? String) ?? (json["peerId"] as? String) {
+            if isCurrentLiveHost,
+               NativeWebRTCManager.shared.liveStageRevision == 0,
+               let peerId = (json["id"] as? String) ?? (json["peerId"] as? String) {
                 NativeWebRTCManager.shared.handleLiveViewerJoined(peerId: peerId)
+            }
+        case "peer-left":
+            if let peerId = (json["id"] as? String) ?? (json["peerId"] as? String) {
+                NativeWebRTCManager.shared.handleLivePeerLeft(peerId: peerId)
             }
         case "signal":
             if let fromPeer = json["from"] as? String {
                 let signalPayload = (json["signal"] as? [String: Any]) ?? json
-                NativeWebRTCManager.shared.handleLiveSignal(from: fromPeer, signal: signalPayload, isHost: isCurrentLiveHost)
+                let msgRoom = json["room"] as? String
+                let msgRevision = (json["revision"] as? Int) ?? (json["revision"] as? NSNumber)?.intValue ?? 0
+                NativeWebRTCManager.shared.handleLiveSignal(
+                    from: fromPeer,
+                    roomId: msgRoom,
+                    revision: msgRevision,
+                    signal: signalPayload,
+                    isHost: isCurrentLiveHost
+                )
             }
         case "chat":
             let msg = LiveChatMessage.from(json)
@@ -341,10 +443,21 @@ final class AppState: ObservableObject {
         case "live-gift-receipt":
             NotificationCenter.default.post(name: Notification.Name("kinnectLiveGiftResult"), object: nil, userInfo: json)
             Task { await refreshGlobalBadges() }
-        case "live-mode-error", "live-gift-error":
+        case "live-mode-error", "live-gift-error", "live-guest-error":
             NotificationCenter.default.post(name: Notification.Name("kinnectLiveGiftResult"), object: nil, userInfo: json)
-            if let message = json["message"] as? String {
+            if let message = json["message"] as? String, !message.isEmpty {
+                if type == "live-mode-error" {
+                    let msgRoom = json["room"] as? String
+                    if msgRoom == nil || msgRoom == currentLiveRoom?.id {
+                        NativeWebRTCManager.shared.liveConnectionError = message
+                    }
+                }
                 showToast(message)
+            }
+        case "live-guest-removed":
+            let msgRoom = json["room"] as? String
+            if msgRoom == nil || msgRoom == currentLiveRoom?.id {
+                showToast("Bạn đã rời khỏi vị trí khách mời Live.")
             }
         case "live-mode-state":
             if var room = currentLiveRoom {
@@ -356,11 +469,22 @@ final class AppState: ObservableObject {
                 }
                 self.currentLiveRoom = room
             }
-        case "room-ended":
-            if currentLiveRoom != nil {
+        case "ended", "room-ended":
+            let msgRoom = json["room"] as? String
+            resolvePendingLiveCreate(with: .failure(LiveCreateFailure(message: "Phiên phát trực tiếp đã kết thúc.")))
+            if let activeRoom = currentLiveRoom, (msgRoom == nil || msgRoom == activeRoom.id) {
                 NativeWebRTCManager.shared.stopLiveSession()
                 currentLiveRoom = nil
-                showToast("Phiên phát trực tiếp đã kết thúc.")
+                isCurrentLiveHost = false
+                liveChatMessages = []
+                liveGiftRanking = []
+                liveLastReactionBanner = nil
+                liveGiftCombo = 0
+                liveRooms.removeAll { $0.id == activeRoom.id }
+                let notice = (json["message"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Phiên phát trực tiếp đã kết thúc."
+                showToast(notice)
+            } else if let msgRoom, !msgRoom.isEmpty {
+                liveRooms.removeAll { $0.id == msgRoom }
             }
         case "call-incoming":
             NativeWebRTCManager.shared.handleIncomingCallSocket(json)
@@ -380,6 +504,8 @@ final class AppState: ObservableObject {
             NotificationCenter.default.post(name: .kinnectMessagesChanged, object: json)
         case "error":
             let message = (json["message"] as? String) ?? (json["error"] as? String) ?? ""
+            let effectiveMessage = message.isEmpty ? "Không thể thực hiện thao tác Live." : message
+            resolvePendingLiveCreate(with: .failure(LiveCreateFailure(message: effectiveMessage)))
             // server.js:626 rejects WS live "create"/"chat" without current consent; route to the explicit consent sheet.
             if message.localizedCaseInsensitiveContains("đồng ý thông báo dữ liệu") {
                 presentPrivacyConsent(version: "", notice: message)

@@ -132,10 +132,31 @@ struct LiveStreamView: View {
             }
         }
         .onChange(of: selectedIndex) { newIndex in
-            guard newIndex < appState.liveRooms.count else { return }
+            guard newIndex >= 0 && newIndex < appState.liveRooms.count else { return }
             let room = appState.liveRooms[newIndex]
             appState.joinLiveRoom(room)
             likesCount = room.likesCount
+        }
+        .onChange(of: appState.liveRooms.map(\.id)) { ids in
+            if ids.isEmpty {
+                selectedIndex = 0
+                scrolledRoomId = nil
+                return
+            }
+            if selectedIndex >= ids.count {
+                selectedIndex = ids.count - 1
+            }
+            if let currentId = scrolledRoomId, let idx = ids.firstIndex(of: currentId) {
+                if selectedIndex != idx {
+                    selectedIndex = idx
+                }
+            } else if selectedIndex < appState.liveRooms.count {
+                let fallback = appState.liveRooms[selectedIndex]
+                scrolledRoomId = fallback.id
+                if !appState.isCurrentLiveHost && appState.currentLiveRoom?.id != fallback.id {
+                    appState.joinLiveRoom(fallback)
+                }
+            }
         }
         .onDisappear {
             appState.leaveCurrentLiveRoom()
@@ -475,6 +496,7 @@ struct CreateLiveRoomSheet: View {
     @State private var gameSound = true
     @State private var gameComments = true
     @State private var isStarting = false
+    @State private var createErrorMessage: String? = nil
     @State private var showPreviewEffects = false
     @State private var previewSticker = "none"
     @State private var previewFilter = "none"
@@ -502,6 +524,13 @@ struct CreateLiveRoomSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                if let createErrorMessage, !createErrorMessage.isEmpty {
+                    Section {
+                        Label(createErrorMessage, systemImage: "exclamationmark.triangle.fill")
+                            .font(.footnote)
+                            .foregroundColor(KinnectTheme.danger)
+                    }
+                }
                 liveModeSection
                 if liveMode == "game" {
                     gameConfigSection
@@ -516,9 +545,10 @@ struct CreateLiveRoomSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Hủy") { dismiss() }
+                        .disabled(isStarting)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Bắt đầu Live") {
+                    Button(isStarting ? "Đang tạo..." : "Bắt đầu Live") {
                         Task { await startHostLive() }
                     }
                     .disabled(isStarting)
@@ -644,14 +674,22 @@ struct CreateLiveRoomSheet: View {
 
     private func startHostLive() async {
         isStarting = true
+        createErrorMessage = nil
         defer { isStarting = false }
+
+        if appState.currentLiveRoom != nil {
+            appState.leaveCurrentLiveRoom()
+        }
+
         let manager = NativeWebRTCManager.shared
         manager.updateLiveEffects(LiveVideoSettings(
             filter: previewFilter, sticker: previewSticker, beauty: previewBeautyOn,
             smooth: previewSmooth, whiten: previewWhiten, slim: previewSlim, eyes: previewEyes,
             lips: previewLips, blemish: previewBlemish, blush: previewBlush))
         guard await manager.startLiveHostBroadcast() else {
-            appState.showToast("Cần quyền camera và micro để bắt đầu Live.")
+            let msg = "Cần quyền camera và micro để bắt đầu Live."
+            createErrorMessage = msg
+            appState.showToast(msg)
             return
         }
         manager.setMicrophoneMuted(!previewMicEnabled)
@@ -664,8 +702,7 @@ struct CreateLiveRoomSheet: View {
             ? (liveMode == "game" ? "Live Game: \(selectedGame)" : "Phòng Live của \(appState.currentUser?.name ?? "Kinnect")")
             : title.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        NativeSocketClient.shared.sendJSON([
-            "type": "create",
+        let createResult = await appState.createLiveRoomAndAwaitJoin(payload: [
             "title": roomTitle,
             "topic": topic,
             "liveMode": liveMode,
@@ -674,8 +711,16 @@ struct CreateLiveRoomSheet: View {
             "liveModes": true,
             "comments": gameComments
         ])
-        dismiss()
-        onStarted?()
+        switch createResult {
+        case .success:
+            dismiss()
+            onStarted?()
+        case .failure(let failure):
+            manager.stopLiveSession()
+            let msg = failure.errorDescription ?? "Không thể bắt đầu phát Live."
+            createErrorMessage = msg
+            appState.showToast(msg)
+        }
     }
 }
 
@@ -1029,9 +1074,7 @@ struct LiveRoomFullScreenView: View {
     }
 
     private func leaveLiveRoom() {
-        NativeSocketClient.shared.sendJSON(["type": "leave"])
-        webrtc.stopLiveSession()
-        appState.currentLiveRoom = nil
+        appState.leaveCurrentLiveRoom()
     }
 
     private func loadGiftCatalog() async {
