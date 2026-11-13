@@ -115,4 +115,7 @@ test("iOS Release boundary guards UIReviewFixture, ShortsVideoView and LiveStrea
   assert.match(adminOpsSrc, /canPresentTemporarySecret\(/);
   assert.match(adminOpsSrc, /UIApplication\.shared\.applicationState == \.active/);
   assert.match(adminOpsSrc, /guard accountId == activeAccountId, role == "admin" else/);
+  const appStateSrc = readFileSync(new URL("../ios/Kinnect/Core/AppState.swift", import.meta.url), "utf8");
+  assert.match(appStateSrc, /func clearSessionState\(\)[\s\S]*?AccountCache\.shared\.wipeAllCaches\(\)\s*KinnectAuthenticatedFile\.wipe\(\)/);
+  assert.match(fixtureSrc, /#if DEBUG[\s\S]*?case "admin-operations-ready":[\s\S]*?adminDict\["role"\] = "admin"[\s\S]*?#endif/);
 });

@@ -1096,6 +1096,51 @@ enum UIReviewFixture {
                 ]
             ]
 
+        case "/api/admin/overview":
+            return [
+                "users": 12,
+                "suspended": 1,
+                "pendingResets": 2,
+                "openReports": 3
+            ]
+
+        case "/api/admin/password-resets":
+            return [
+                "requests": [
+                    [
+                        "id": "11111111-1111-4111-8111-111111111111",
+                        "username": "hoangnam_fixture",
+                        "user_id": "fixture_user_peer",
+                        "contact": "hotro@example.invalid",
+                        "note": "[Fixture UI] Yêu cầu hỗ trợ đặt lại mật khẩu",
+                        "status": "open",
+                        "created": 1763000000000.0
+                    ],
+                    [
+                        "id": "22222222-2222-4222-8222-222222222222",
+                        "username": "unknown_fixture",
+                        "user_id": NSNull(),
+                        "contact": "none@example.invalid",
+                        "note": "[Fixture UI] Tài khoản chưa khớp hồ sơ",
+                        "status": "open",
+                        "created": 1763000001000.0
+                    ]
+                ]
+            ]
+
+        case "/api/admin/activity":
+            return [
+                "entries": [
+                    [
+                        "id": "fixture_act_1",
+                        "action": "dismiss-password-request:fixture_user_me",
+                        "username": "old_fixture",
+                        "actorUsername": "minhanh",
+                        "created": 1763000002000.0
+                    ]
+                ]
+            ]
+
         default:
             if cleanPath.hasSuffix("/private") {
                 return [
@@ -1791,6 +1836,11 @@ enum UIReviewFixture {
         #if DEBUG
         case "swift-contracts-harness":
             return AnyView(SwiftContractsHarnessProbe())
+        case "admin-operations-ready":
+            var adminDict = currentUserDict
+            adminDict["role"] = "admin"
+            AppState.shared.currentUser = KinnectUser.from(adminDict)
+            return AnyView(AdminOperationsView())
         #endif
         case "admin-denied":
             return AnyView(AdminConsoleView())
@@ -2981,8 +3031,32 @@ private struct SwiftContractsHarnessProbe: View {
         let normalLightFalse = !UIReviewFixture.resolveFixtureFlag("--ui-review-light", arguments: ["Kinnect", "--ui-review-light"], isDebug: true, isFixtureEnabled: false)
         let normalScreenNil = UIReviewFixture.resolveActiveScreen(arguments: ["Kinnect"], isDebug: true) == nil
         let invalidMediaUrlRefused = ServerConfig.url(for: "http://app.kinnect.io.vn/video.mp4", origin: baseOrigin) == nil
-            && ServerConfig.url(for: "not a url :::", origin: baseOrigin) == nil
+            && ServerConfig.url(for: "ftp://files.example/video.mp4", origin: baseOrigin) == nil
+            && ServerConfig.url(for: "https://user:pass@app.kinnect.io.vn/video.mp4", origin: baseOrigin) == nil
         check("release_fixture_boundary_guards", releaseActiveNil && releaseLightFalse && normalLightFalse && normalScreenNil && invalidMediaUrlRefused)
+
+        var logoutWipedMedia = false
+        do {
+            let sentinelURL = try KinnectAuthenticatedFile.cacheURL(
+                path: "/media/logout_sentinel.mp4",
+                fileExtension: "mp4",
+                origin: baseOrigin,
+                accountId: "acct_logout_sentinel"
+            )
+            try FileManager.default.createDirectory(at: sentinelURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data("sentinel".utf8).write(to: sentinelURL)
+            let existedBefore = FileManager.default.fileExists(atPath: sentinelURL.path)
+            let userCleared = await MainActor.run {
+                let savedUser = AppState.shared.currentUser
+                AppState.shared.clearSessionState()
+                let cleared = (AppState.shared.currentUser == nil)
+                AppState.shared.currentUser = savedUser
+                return cleared
+            }
+            let goneAfter = !FileManager.default.fileExists(atPath: sentinelURL.path)
+            logoutWipedMedia = existedBefore && goneAfter && userCleared
+        } catch {}
+        check("logout_wipes_authenticated_media", logoutWipedMedia)
 
         lines = results.keys.sorted().map { key in
             "\(key)=\(results[key] == true ? "pass" : "fail")"

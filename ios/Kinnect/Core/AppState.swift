@@ -193,6 +193,7 @@ final class AppState: ObservableObject {
         NativeSocketClient.shared.disconnect()
         KeychainStore.shared.clearAll()
         AccountCache.shared.wipeAllCaches()
+        KinnectAuthenticatedFile.wipe()
         currentUser = nil
         unreadNotificationsCount = 0
         unreadMessagesCount = 0

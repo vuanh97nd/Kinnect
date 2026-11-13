@@ -413,9 +413,68 @@ def build_contact_sheet(records):
     return OUT_DIR / "contact-sheet.png" if (OUT_DIR / "contact-sheet.png").exists() else None
 
 
+SECURITY_FOCUS_STANDARD_SLUGS = (
+    "01b-iphone-auth-login-dark",
+    "10b-iphone-live-empty",
+    "10c-iphone-live-error",
+    "10d-iphone-live-connecting",
+    "19e-shorts-avplayer",
+    "19g-shorts-real-swipe",
+    "19h-swift-contracts-harness",
+    "13m-iphone-admin",
+    "13m2-iphone-admin-denied",
+    "13m3-iphone-admin-loading",
+    "13m4-iphone-admin-empty",
+    "13m5-iphone-admin-error",
+    "13u-iphone-admin-operations-ready",
+    "13i3-iphone-privacy-save-error",
+    "13p-dm-mode-error",
+    "13q-location-off-error",
+)
+SECURITY_FOCUS_COMPACT_SLUGS = (
+    "16e-compact-iphone-friends",
+)
+
+
+def resolve_capture_scope(focus_value=None, only_login=False):
+    raw = os.environ.get("UI_REVIEW_FOCUS", "") if focus_value is None else focus_value
+    normalized = str(raw).strip().lower()
+    if normalized in ("", "full"):
+        scope = "full"
+    elif normalized == "security":
+        scope = "security"
+    else:
+        raise ValueError(
+            f"Unsupported UI_REVIEW_FOCUS={raw!r}; expected '', 'full', or 'security'."
+        )
+    if only_login and scope != "full":
+        raise ValueError("Cannot combine UI_REVIEW_ONLY_LOGIN=1 with UI_REVIEW_FOCUS=security.")
+    return scope
+
+
+def select_screens_for_scope(all_screens, selected_slugs, scope, only_login=False, login_screens=None):
+    if scope == "security":
+        wanted = set(selected_slugs)
+        selected = [entry for entry in all_screens if entry[0] in wanted]
+        missing = [slug for slug in selected_slugs if slug not in {entry[0] for entry in selected}]
+        if missing:
+            raise RuntimeError(f"Missing security focus slugs from screen inventory: {missing}")
+        return selected
+    if only_login:
+        return list(login_screens or ())
+    return list(all_screens)
+
+
 def main():
+    only_login = os.environ.get("UI_REVIEW_ONLY_LOGIN") == "1"
+    capture_scope = resolve_capture_scope(only_login=only_login)
+    print(f"UI review captureScope={capture_scope} (only_login={only_login})", flush=True)
     marketing_version, build_number = resolve_app_versions()
-    provenance = write_provenance_manifest(marketing_version, build_number)
+    provenance = write_provenance_manifest(
+        marketing_version,
+        build_number,
+        extra={"captureScope": capture_scope},
+    )
 
     devices = ensure_xcode_with_simulator_runtime()
     xcode_ver = run(["xcodebuild", "-version"]).stdout.strip().replace("\n", " | ")
@@ -459,8 +518,6 @@ def main():
         raise RuntimeError("No iPhone simulator device available.")
 
     records = []
-
-    only_login = os.environ.get("UI_REVIEW_ONLY_LOGIN") == "1"
 
     # 1. Standard iPhone screenshots
     boot_and_install(standard_iphone, app_path, bundle_id)
@@ -555,9 +612,17 @@ def main():
         ("13j-iphone-support", "support", [], "Trung tâm Hỗ trợ & Trợ giúp người dùng (124)"),
         ("13l-iphone-support-chat", "support-chat", [], "Trung tâm hỗ trợ mở cuộc trò chuyện trực tiếp"),
         ("13m-iphone-admin", "admin", [], "Bảng quản trị: báo cáo và thành viên"),
+        ("13u-iphone-admin-operations-ready", "admin-operations-ready", [], "Hoạt động quản trị: Tổng quan, Khôi phục mật khẩu, Lịch sử [Fixture UI]"),
         ("13k-iphone-change-password-light", "change-password", ["--ui-review-light"], "Cài đặt: Đổi mật khẩu tài khoản (Light)")
     ]
-    iphone_screens = login_iphone_screens if only_login else (login_iphone_screens + other_iphone_screens)
+    all_iphone_screens = login_iphone_screens + other_iphone_screens
+    iphone_screens = select_screens_for_scope(
+        all_iphone_screens,
+        SECURITY_FOCUS_STANDARD_SLUGS,
+        capture_scope,
+        only_login=only_login,
+        login_screens=login_iphone_screens,
+    )
 
     for slug, screen_arg, extra, desc in iphone_screens:
         f = capture_screen(standard_iphone, slug, screen_arg, bundle_id, extra, wait_sec=3.0)
@@ -570,172 +635,175 @@ def main():
             "file": str(f)
         })
 
-    # Record >=12s auto-cycle video demo (1.5s per cycle, starting AFTER welcome screen is mounted on Tab 0)
-    try:
-        std_udid = standard_iphone["udid"]
-        subprocess.run(["xcrun", "simctl", "terminate", std_udid, bundle_id], check=False)
-        time.sleep(0.5)
-        subprocess.run(["xcrun", "simctl", "ui", std_udid, "appearance", "dark"], check=False)
-        subprocess.run([
-            "xcrun", "simctl", "status_bar", std_udid, "override",
-            "--time", "09:41",
-            "--batteryState", "charged",
-            "--batteryLevel", "100"
-        ], check=False)
-
-        # Launch app into auth-welcome with autocycle starting at Tab 0 (Feed)
-        print("Launching app into auth-welcome with --ui-review-welcome-autocycle and --ui-review-welcome-tab 0...", flush=True)
-        run([
-            "xcrun", "simctl", "launch", std_udid, bundle_id,
-            "-AppleLanguages", "(vi)",
-            "--ui-review-screen", "auth-welcome",
-            "--ui-review-welcome-autocycle",
-            "--ui-review-welcome-tab", "0"
-        ])
-
-        # Wait 3.0s until welcome screen is fully visible and settled on Tab 0 (no splash or black frames)
-        time.sleep(3.0)
-
-        clip_path = OUT_DIR / "welcome-autocycle-demo.mp4"
-        print(f"Starting simulator video recording to {clip_path} (recording for 14.0s to capture >=2 full 4-tab cycles)...", flush=True)
-        rec_p = subprocess.Popen(["xcrun", "simctl", "io", std_udid, "recordVideo", "--codec=h264", "--force", str(clip_path)])
-        time.sleep(14.0)
-
-        rec_p.send_signal(signal.SIGINT)
+    if capture_scope == "security":
+        print("Skipping simulator video recordings in security captureScope.", flush=True)
+    else:
+        # Record >=12s auto-cycle video demo (1.5s per cycle, starting AFTER welcome screen is mounted on Tab 0)
         try:
-            rec_p.wait(timeout=10)
-        except Exception:
-            rec_p.kill()
-
-        if clip_path.exists() and clip_path.stat().st_size > 0:
-            clip_size = clip_path.stat().st_size
-            print(f"Recorded simulator auto-cycle clip: {clip_path} ({clip_size} bytes)", flush=True)
-            meta_path = OUT_DIR / "welcome-autocycle-meta.json"
-            meta = {
-                "file": "welcome-autocycle-demo.mp4",
-                "sizeBytes": clip_size,
-                "recordedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                "device": standard_iphone["name"],
-                "runtime": standard_iphone["runtime"],
-                "targetIntervalSec": 1.5,
-                "recordDurationSec": 14.0,
-                "cycleSequence": [
-                    {"time": "0.0s", "tab": 0, "name": "Bảng tin (Feed)"},
-                    {"time": "1.5s", "tab": 1, "name": "Khám phá (Discover)"},
-                    {"time": "3.0s", "tab": 2, "name": "Video Shorts"},
-                    {"time": "4.5s", "tab": 3, "name": "Trực tiếp Live"},
-                    {"time": "6.0s", "tab": 0, "name": "Bảng tin (Feed)"},
-                    {"time": "7.5s", "tab": 1, "name": "Khám phá (Discover)"},
-                    {"time": "9.0s", "tab": 2, "name": "Video Shorts"},
-                    {"time": "10.5s", "tab": 3, "name": "Trực tiếp Live"},
-                    {"time": "12.0s", "tab": 0, "name": "Bảng tin (Feed)"},
-                    {"time": "13.5s", "tab": 1, "name": "Khám phá (Discover)"}
-                ],
-                "settlingWaitSecBeforeRecord": 3.0,
-                "noSplashOrBlackFramesVerified": True
-            }
-            meta_path.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
-            print(f"Saved recording metadata: {meta_path}", flush=True)
-
-            records.append({
-                "slug": "welcome-autocycle-demo",
-                "screen": "auth-welcome-autocycle",
-                "description": "Video thực tế luân phiên 4 màn hình chào mừng (1.5s/chu kỳ, >=2 chu kỳ đầy đủ) trên iPhone 16 Pro",
-                "device": standard_iphone["name"],
-                "runtime": standard_iphone["runtime"],
-                "file": str(clip_path)
-            })
-    except Exception as e:
-        print(f"Auto-cycle video recording skipped/unavailable: {e}", flush=True)
-
-    # 1b. Record comprehensive end-to-end features test video requested by user
-    try:
-        std_udid = standard_iphone["udid"]
-        features_video_path = OUT_DIR / "kinnect-comprehensive-features-test.mp4"
-        print(f"Starting comprehensive feature walkthrough video recording to {features_video_path}...", flush=True)
-
-        rec_test = subprocess.Popen(["xcrun", "simctl", "io", std_udid, "recordVideo", "--codec=h264", "--force", str(features_video_path)])
-        time.sleep(1.0)
-
-        feature_steps = [
-            ("feed", [], "1. Bảng tin (Feed) - Tạo bài viết không chuyên mục, lướt tin"),
-            ("profile", [], "2. Hồ sơ cá nhân (Profile) - Ví Kinnect, Cửa hàng Kinnect, Bạn bè"),
-            ("friends", [], "3. Bạn bè & Kết bạn (Friends) - Danh sách bạn bè, lời mời, xem trang cá nhân"),
-            ("notifications", [], "4. Thông báo (Notifications) - Chuẩn Android: Tìm kiếm, tab Tất cả/Chưa đọc, Đánh dấu tất cả đã đọc"),
-            ("chat-detail", [], "5. Tin nhắn & Hội thoại (Messages) - Thẻ đồng bộ Cloud Sync, chi tiết chat"),
-            ("shorts", [], "6. Video Shorts - Phát mượt mà, double-tap thả tim bay, mở bình luận"),
-            ("live", [], "7. Trực tiếp Live - Quà tặng Live (10 loại quà phong phú), combo quà tặng, hiệu ứng"),
-            ("camera-studio-video", [], "8. Camera Studio - Thanh sáng tạo Bộ lọc, Làm đẹp, Sticker AR"),
-            ("camera-studio-edit", [], "9. Studio Pro - Biên tập video/ảnh kiểu CapCut"),
-            ("wallet", [], "10. Ví Kinnect & Cửa hàng Kinnect - Thiết kế riêng từng gói trang trí, số dư xu")
-        ]
-
-        step_log = []
-        start_time = time.time()
-
-        for screen_key, extra_args, desc in feature_steps:
-            elapsed = round(time.time() - start_time, 1)
-            print(f"[{elapsed}s] Testing feature: {desc}...", flush=True)
+            std_udid = standard_iphone["udid"]
             subprocess.run(["xcrun", "simctl", "terminate", std_udid, bundle_id], check=False)
-            time.sleep(0.3)
-            run_args = [
+            time.sleep(0.5)
+            subprocess.run(["xcrun", "simctl", "ui", std_udid, "appearance", "dark"], check=False)
+            subprocess.run([
+                "xcrun", "simctl", "status_bar", std_udid, "override",
+                "--time", "09:41",
+                "--batteryState", "charged",
+                "--batteryLevel", "100"
+            ], check=False)
+
+            # Launch app into auth-welcome with autocycle starting at Tab 0 (Feed)
+            print("Launching app into auth-welcome with --ui-review-welcome-autocycle and --ui-review-welcome-tab 0...", flush=True)
+            run([
                 "xcrun", "simctl", "launch", std_udid, bundle_id,
                 "-AppleLanguages", "(vi)",
-                "--ui-review-screen", screen_key
-            ] + extra_args
-            run(run_args, check=False)
-            step_log.append({
-                "timeSec": elapsed,
-                "screen": screen_key,
-                "description": desc
-            })
-            time.sleep(2.8)
+                "--ui-review-screen", "auth-welcome",
+                "--ui-review-welcome-autocycle",
+                "--ui-review-welcome-tab", "0"
+            ])
 
-        # Terminate app and stop recording
-        subprocess.run(["xcrun", "simctl", "terminate", std_udid, bundle_id], check=False)
-        time.sleep(0.5)
+            # Wait 3.0s until welcome screen is fully visible and settled on Tab 0 (no splash or black frames)
+            time.sleep(3.0)
 
-        rec_test.send_signal(signal.SIGINT)
+            clip_path = OUT_DIR / "welcome-autocycle-demo.mp4"
+            print(f"Starting simulator video recording to {clip_path} (recording for 14.0s to capture >=2 full 4-tab cycles)...", flush=True)
+            rec_p = subprocess.Popen(["xcrun", "simctl", "io", std_udid, "recordVideo", "--codec=h264", "--force", str(clip_path)])
+            time.sleep(14.0)
+
+            rec_p.send_signal(signal.SIGINT)
+            try:
+                rec_p.wait(timeout=10)
+            except Exception:
+                rec_p.kill()
+
+            if clip_path.exists() and clip_path.stat().st_size > 0:
+                clip_size = clip_path.stat().st_size
+                print(f"Recorded simulator auto-cycle clip: {clip_path} ({clip_size} bytes)", flush=True)
+                meta_path = OUT_DIR / "welcome-autocycle-meta.json"
+                meta = {
+                    "file": "welcome-autocycle-demo.mp4",
+                    "sizeBytes": clip_size,
+                    "recordedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "device": standard_iphone["name"],
+                    "runtime": standard_iphone["runtime"],
+                    "targetIntervalSec": 1.5,
+                    "recordDurationSec": 14.0,
+                    "cycleSequence": [
+                        {"time": "0.0s", "tab": 0, "name": "Bảng tin (Feed)"},
+                        {"time": "1.5s", "tab": 1, "name": "Khám phá (Discover)"},
+                        {"time": "3.0s", "tab": 2, "name": "Video Shorts"},
+                        {"time": "4.5s", "tab": 3, "name": "Trực tiếp Live"},
+                        {"time": "6.0s", "tab": 0, "name": "Bảng tin (Feed)"},
+                        {"time": "7.5s", "tab": 1, "name": "Khám phá (Discover)"},
+                        {"time": "9.0s", "tab": 2, "name": "Video Shorts"},
+                        {"time": "10.5s", "tab": 3, "name": "Trực tiếp Live"},
+                        {"time": "12.0s", "tab": 0, "name": "Bảng tin (Feed)"},
+                        {"time": "13.5s", "tab": 1, "name": "Khám phá (Discover)"}
+                    ],
+                    "settlingWaitSecBeforeRecord": 3.0,
+                    "noSplashOrBlackFramesVerified": True
+                }
+                meta_path.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
+                print(f"Saved recording metadata: {meta_path}", flush=True)
+
+                records.append({
+                    "slug": "welcome-autocycle-demo",
+                    "screen": "auth-welcome-autocycle",
+                    "description": "Video thực tế luân phiên 4 màn hình chào mừng (1.5s/chu kỳ, >=2 chu kỳ đầy đủ) trên iPhone 16 Pro",
+                    "device": standard_iphone["name"],
+                    "runtime": standard_iphone["runtime"],
+                    "file": str(clip_path)
+                })
+        except Exception as e:
+            print(f"Auto-cycle video recording skipped/unavailable: {e}", flush=True)
+
+        # 1b. Record comprehensive end-to-end features test video requested by user
         try:
-            rec_test.wait(timeout=10)
-        except Exception:
-            rec_test.kill()
+            std_udid = standard_iphone["udid"]
+            features_video_path = OUT_DIR / "kinnect-comprehensive-features-test.mp4"
+            print(f"Starting comprehensive feature walkthrough video recording to {features_video_path}...", flush=True)
 
-        if features_video_path.exists() and features_video_path.stat().st_size > 0:
-            test_size = features_video_path.stat().st_size
-            print(f"Recorded comprehensive test video: {features_video_path} ({test_size} bytes)", flush=True)
-            test_meta_path = OUT_DIR / "kinnect-comprehensive-features-test-meta.json"
-            test_meta = {
-                "file": "kinnect-comprehensive-features-test.mp4",
-                "sizeBytes": test_size,
-                "recordedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                "device": standard_iphone["name"],
-                "runtime": standard_iphone["runtime"],
-                "totalDurationSec": round(time.time() - start_time, 1),
-                "steps": step_log,
-                "verifiedItems": [
-                    "Bảng tin tạo bài viết không chuyên mục",
-                    "Hồ sơ người dùng & xem hồ sơ bạn bè",
-                    "Thông báo chuẩn Android (Tất cả / Chưa đọc / Đánh dấu đọc)",
-                    "Tin nhắn có thẻ đồng bộ Cloud Sync bật mặc định",
-                    "Video Shorts phát mượt mà, double tap tim bay, bình luận",
-                    "Live Stream có đầy đủ quà tặng, combo, camera thoát sạch",
-                    "Camera Studio có thanh sáng tạo Bộ lọc, Làm đẹp, Sticker AR",
-                    "Studio Pro biên tập chuyên nghiệp",
-                    "Ví Kinnect và Cửa hàng Kinnect thiết kế riêng từng gói theo web"
-                ]
-            }
-            test_meta_path.write_text(json.dumps(test_meta, indent=2, ensure_ascii=False), encoding="utf-8")
-            records.append({
-                "slug": "kinnect-comprehensive-features-test",
-                "screen": "all-features-walkthrough",
-                "description": "Video thực tế kiểm thử toàn bộ 10 chức năng trên iPhone 16 Pro theo yêu cầu",
-                "device": standard_iphone["name"],
-                "runtime": standard_iphone["runtime"],
-                "file": str(features_video_path)
-            })
-    except Exception as e:
-        print(f"Comprehensive test video recording failed: {e}", flush=True)
+            rec_test = subprocess.Popen(["xcrun", "simctl", "io", std_udid, "recordVideo", "--codec=h264", "--force", str(features_video_path)])
+            time.sleep(1.0)
+
+            feature_steps = [
+                ("feed", [], "1. Bảng tin (Feed) - Tạo bài viết không chuyên mục, lướt tin"),
+                ("profile", [], "2. Hồ sơ cá nhân (Profile) - Ví Kinnect, Cửa hàng Kinnect, Bạn bè"),
+                ("friends", [], "3. Bạn bè & Kết bạn (Friends) - Danh sách bạn bè, lời mời, xem trang cá nhân"),
+                ("notifications", [], "4. Thông báo (Notifications) - Chuẩn Android: Tìm kiếm, tab Tất cả/Chưa đọc, Đánh dấu tất cả đã đọc"),
+                ("chat-detail", [], "5. Tin nhắn & Hội thoại (Messages) - Thẻ đồng bộ Cloud Sync, chi tiết chat"),
+                ("shorts", [], "6. Video Shorts - Phát mượt mà, double-tap thả tim bay, mở bình luận"),
+                ("live", [], "7. Trực tiếp Live - Quà tặng Live (10 loại quà phong phú), combo quà tặng, hiệu ứng"),
+                ("camera-studio-video", [], "8. Camera Studio - Thanh sáng tạo Bộ lọc, Làm đẹp, Sticker AR"),
+                ("camera-studio-edit", [], "9. Studio Pro - Biên tập video/ảnh kiểu CapCut"),
+                ("wallet", [], "10. Ví Kinnect & Cửa hàng Kinnect - Thiết kế riêng từng gói trang trí, số dư xu")
+            ]
+
+            step_log = []
+            start_time = time.time()
+
+            for screen_key, extra_args, desc in feature_steps:
+                elapsed = round(time.time() - start_time, 1)
+                print(f"[{elapsed}s] Testing feature: {desc}...", flush=True)
+                subprocess.run(["xcrun", "simctl", "terminate", std_udid, bundle_id], check=False)
+                time.sleep(0.3)
+                run_args = [
+                    "xcrun", "simctl", "launch", std_udid, bundle_id,
+                    "-AppleLanguages", "(vi)",
+                    "--ui-review-screen", screen_key
+                ] + extra_args
+                run(run_args, check=False)
+                step_log.append({
+                    "timeSec": elapsed,
+                    "screen": screen_key,
+                    "description": desc
+                })
+                time.sleep(2.8)
+
+            # Terminate app and stop recording
+            subprocess.run(["xcrun", "simctl", "terminate", std_udid, bundle_id], check=False)
+            time.sleep(0.5)
+
+            rec_test.send_signal(signal.SIGINT)
+            try:
+                rec_test.wait(timeout=10)
+            except Exception:
+                rec_test.kill()
+
+            if features_video_path.exists() and features_video_path.stat().st_size > 0:
+                test_size = features_video_path.stat().st_size
+                print(f"Recorded comprehensive test video: {features_video_path} ({test_size} bytes)", flush=True)
+                test_meta_path = OUT_DIR / "kinnect-comprehensive-features-test-meta.json"
+                test_meta = {
+                    "file": "kinnect-comprehensive-features-test.mp4",
+                    "sizeBytes": test_size,
+                    "recordedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "device": standard_iphone["name"],
+                    "runtime": standard_iphone["runtime"],
+                    "totalDurationSec": round(time.time() - start_time, 1),
+                    "steps": step_log,
+                    "verifiedItems": [
+                        "Bảng tin tạo bài viết không chuyên mục",
+                        "Hồ sơ người dùng & xem hồ sơ bạn bè",
+                        "Thông báo chuẩn Android (Tất cả / Chưa đọc / Đánh dấu đọc)",
+                        "Tin nhắn có thẻ đồng bộ Cloud Sync bật mặc định",
+                        "Video Shorts phát mượt mà, double tap tim bay, bình luận",
+                        "Live Stream có đầy đủ quà tặng, combo, camera thoát sạch",
+                        "Camera Studio có thanh sáng tạo Bộ lọc, Làm đẹp, Sticker AR",
+                        "Studio Pro biên tập chuyên nghiệp",
+                        "Ví Kinnect và Cửa hàng Kinnect thiết kế riêng từng gói theo web"
+                    ]
+                }
+                test_meta_path.write_text(json.dumps(test_meta, indent=2, ensure_ascii=False), encoding="utf-8")
+                records.append({
+                    "slug": "kinnect-comprehensive-features-test",
+                    "screen": "all-features-walkthrough",
+                    "description": "Video thực tế kiểm thử toàn bộ 10 chức năng trên iPhone 16 Pro theo yêu cầu",
+                    "device": standard_iphone["name"],
+                    "runtime": standard_iphone["runtime"],
+                    "file": str(features_video_path)
+                })
+        except Exception as e:
+            print(f"Comprehensive test video recording failed: {e}", flush=True)
 
     # 2. Compact / second iPhone screenshots
     if compact_iphone:
@@ -764,7 +832,14 @@ def main():
             ("16d-compact-iphone-privacy-dynamictype", "privacy-settings", ["--ui-review-dynamictype-max"], "Màn hình nhỏ: Quyền riêng tư với Dynamic Type tối đa"),
             ("16e-compact-iphone-friends", "friends", [], "Màn hình nhỏ: Bạn bè không cắt tên dài với nút tác vụ hàng dưới")
         ]
-        compact_screens = compact_login_screens if only_login else (compact_login_screens + compact_other_screens)
+        all_compact_screens = compact_login_screens + compact_other_screens
+        compact_screens = select_screens_for_scope(
+            all_compact_screens,
+            SECURITY_FOCUS_COMPACT_SLUGS,
+            capture_scope,
+            only_login=only_login,
+            login_screens=compact_login_screens,
+        )
         for slug, screen_arg, extra, desc in compact_screens:
             f = capture_screen(compact_iphone, slug, screen_arg, bundle_id, extra_args=extra, wait_sec=3.0)
             records.append({
@@ -777,7 +852,7 @@ def main():
             })
 
     # 3. iPad screenshots
-    if ipad and not only_login:
+    if ipad and not only_login and capture_scope != "security":
         active_to_shutdown = compact_iphone if (compact_iphone and compact_iphone["udid"] != standard_iphone["udid"]) else standard_iphone
         if active_to_shutdown and active_to_shutdown["udid"] != ipad["udid"]:
             print(f"Shutting down previous simulator {active_to_shutdown['name']} to free resources...", flush=True)
@@ -802,12 +877,18 @@ def main():
 
     contact_sheet = build_contact_sheet(records)
 
+    selected_inventory = [
+        {"slug": r["slug"], "screen": r["screen"], "device": r["device"]}
+        for r in records
+    ]
     built_marketing = read_plist_value(app_path / "Info.plist", "CFBundleShortVersionString") or marketing_version
     built_build = read_plist_value(app_path / "Info.plist", "CFBundleVersion") or build_number
     provenance = write_provenance_manifest(
         marketing_version,
         build_number,
         extra={
+            "captureScope": capture_scope,
+            "selectedInventory": selected_inventory,
             "xcodeVersion": xcode_ver,
             "simulatorRuntimes": runtimes_txt.strip().splitlines() if runtimes_txt else [],
             "builtAppPath": str(app_path).replace("\\", "/"),
@@ -816,11 +897,13 @@ def main():
             "screenshotCount": len(records),
             "standardIphone": standard_iphone["name"] if standard_iphone else None,
             "compactIphone": compact_iphone["name"] if compact_iphone else None,
-            "ipad": ipad["name"] if ipad else None,
+            "ipad": ipad["name"] if (ipad and not only_login and capture_scope != "security") else None,
         },
     )
 
     manifest = {
+        "captureScope": capture_scope,
+        "selectedInventory": selected_inventory,
         "xcodeVersion": xcode_ver,
         "gitSha": provenance["gitSha"],
         "marketingVersion": marketing_version,
@@ -828,40 +911,61 @@ def main():
         "provenance": provenance,
         "standardIphone": standard_iphone,
         "compactIphone": compact_iphone,
-        "ipad": ipad,
+        "ipad": ipad if (ipad and not only_login and capture_scope != "security") else None,
         "screenshots": records,
         "contactSheet": str(contact_sheet) if contact_sheet else None,
     }
     (OUT_DIR / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
 
+    ipad_label = (
+        f"{ipad['name']} (bỏ qua trong chế độ security)"
+        if (ipad and capture_scope == "security")
+        else (ipad["name"] if ipad else "N/A")
+    )
     report_lines = [
         "# Báo cáo Chụp thử Giao diện Thực tế Kinnect iOS Native (`dist/ios-ui-review`)",
         "",
+        f"- **Capture Scope**: `{capture_scope}`",
         f"- **Git SHA**: `{provenance['gitSha']}`",
         f"- **Version / Build**: `{marketing_version}` / `{build_number}`",
         f"- **Xcode & SDK**: `{xcode_ver}`",
         f"- **Thiết bị iPhone chuẩn**: `{standard_iphone['name']}` (`{standard_iphone['runtime']}`)",
         f"- **Thiết bị iPhone kiểm tra màn hình nhỏ**: `{compact_iphone['name'] if compact_iphone else 'N/A'}`",
-        f"- **Thiết bị iPad**: `{ipad['name'] if ipad else 'N/A'}`",
+        f"- **Thiết bị iPad**: `{ipad_label}`",
         "- **Chế độ dữ liệu**: `--ui-review-screen` (`UIReviewFixture` tách biệt hoàn toàn, gắn nhãn `[Fixture UI]`, không chạm dữ liệu production, không lộ token/mật khẩu, không gọi người thật/phát live thật/mua hàng thật).",
+    ]
+    if capture_scope == "security":
+        report_lines.append(
+            f"- **PHẠM VI GIỚI HẠN (`UI_REVIEW_FOCUS=security`)**: Phiên chụp này chỉ chạy tập màn hình trọng tâm bảo mật/AdminOps/Live-state/Shorts-swipe ({len(records)} mục), bỏ qua quay video và iPad để xác minh nhanh. **KHÔNG** thay thế phiên chụp toàn diện 100+ màn hình trước đó."
+        )
+    report_lines.extend([
         "",
         "## Danh sách ảnh chụp PNG thực tế từ `xcrun simctl io screenshot`",
         ""
-    ]
+    ])
     for r in records:
         report_lines.append(f"- `{Path(r['file']).name}` — **{r['description']}** (`{r['device']}`)")
-    report_lines.extend([
-        "",
-        "## Rà soát Giao diện & Giới hạn",
-        "- **Bộ 40 icon vector (`KinnectIcons.swift`)**: Hiển thị sắc nét bằng SwiftUI `Path` native ở kích thước 24pt (26pt trên thanh tab), nét `2.05` khi chọn và `1.65` khi thường.",
-        "- **Nút gọi thoại / gọi video / menu (`...`)**: Nền trong suốt hoàn toàn, vùng chạm 44×44pt.",
-        "- **Màn hình Chat (`05-iphone-chat-detail-dark.png`)**: Nội dung tin nhắn nằm trên; giờ, icon `seen`, `reaction`, và `more` (`...`) nằm chung một hàng bên dưới.",
-        "- **Màn hình Camera & Studio (`11` & `12`)**: Khi chưa có media (`11`), ẩn toàn bộ trường chỉnh sửa Studio; chỉ sau khi có ảnh/video (`12`) mới hiện bảng Studio và nút `Lưu` tách thành cụm riêng không đè nút chính.",
-        "- **Màn hình Phòng Live (`10`)**: Luồng cuộn thống nhất, không có thanh lọc `Tất cả / Trò chuyện / Chơi game` ở đầu trang.",
-        "- **Màn hình Ví & Cửa hàng (`09` & `16`)**: Dùng chung icon `coin` có chữ `K` bên trong, phân biệt bằng nhãn chữ và có `.minimumScaleFactor(0.75)` chống cắt số.",
-        "- **Lưu ý Light Mode (`13-iphone-feed-light.png`)**: Ứng dụng Kinnect sử dụng bảng màu tối đặc trưng (`KinnectTheme.background = #0E0B18`, `surface = #181326`) nên ngay cả khi hệ thống chuyển sang Light Mode, nền và chữ vẫn giữ độ tương phản chuẩn của chủ đề tím đêm Kinnect.",
-        "- **Giới hạn Simulator**: Camera vật lý, PushKit APNs VoIP token thật và cuộc gọi WebRTC P2P với người thật không kích hoạt trong phiên chụp tự động trên Simulator để đảm bảo an toàn production."
-    ])
+    if capture_scope == "security":
+        report_lines.extend([
+            "",
+            "## Rà soát Phạm vi Trọng tâm & Giới hạn",
+            "- **Tập trung xác minh**: `19h-swift-contracts-harness`, `19g-shorts-real-swipe`, `19e-shorts-avplayer`, `10b/10c/10d-iphone-live-*`, `13m/13m2..13m5-iphone-admin-*`, `13u-iphone-admin-operations-ready`, `13i3`/`13p`/`13q`, `01b-iphone-auth-login-dark`, và `16e-compact-iphone-friends`.",
+            "- **Không bao gồm**: Không chụp lại toàn bộ Feed/Chat/Wallet/Camera/iPad hoặc video `.mp4`; vui lòng đối chiếu `captureScope: \"full\"` cho phạm vi đầy đủ.",
+            "- **Giới hạn Simulator**: Harness chạy `URLProtocol` cô lập + fixture local; không gọi mạng thật hay chạm dữ liệu production."
+        ])
+    else:
+        report_lines.extend([
+            "",
+            "## Rà soát Giao diện & Giới hạn",
+            "- **Bộ 40 icon vector (`KinnectIcons.swift`)**: Hiển thị sắc nét bằng SwiftUI `Path` native ở kích thước 24pt (26pt trên thanh tab), nét `2.05` khi chọn và `1.65` khi thường.",
+            "- **Nút gọi thoại / gọi video / menu (`...`)**: Nền trong suốt hoàn toàn, vùng chạm 44×44pt.",
+            "- **Màn hình Chat (`05-iphone-chat-detail-dark.png`)**: Nội dung tin nhắn nằm trên; giờ, icon `seen`, `reaction`, và `more` (`...`) nằm chung một hàng bên dưới.",
+            "- **Màn hình Camera & Studio (`11` & `12`)**: Khi chưa có media (`11`), ẩn toàn bộ trường chỉnh sửa Studio; chỉ sau khi có ảnh/video (`12`) mới hiện bảng Studio và nút `Lưu` tách thành cụm riêng không đè nút chính.",
+            "- **Màn hình Phòng Live (`10`)**: Luồng cuộn thống nhất, không có thanh lọc `Tất cả / Trò chuyện / Chơi game` ở đầu trang.",
+            "- **Màn hình Ví & Cửa hàng (`09` & `16`)**: Dùng chung icon `coin` có chữ `K` bên trong, phân biệt bằng nhãn chữ và có `.minimumScaleFactor(0.75)` chống cắt số.",
+            "- **Lưu ý Light Mode (`13-iphone-feed-light.png`)**: Ứng dụng Kinnect sử dụng bảng màu tối đặc trưng (`KinnectTheme.background = #0E0B18`, `surface = #181326`) nên ngay cả khi hệ thống chuyển sang Light Mode, nền và chữ vẫn giữ độ tương phản chuẩn của chủ đề tím đêm Kinnect.",
+            "- **Giới hạn Simulator**: Camera vật lý, PushKit APNs VoIP token thật và cuộc gọi WebRTC P2P với người thật không kích hoạt trong phiên chụp tự động trên Simulator để đảm bảo an toàn production."
+        ])
     (OUT_DIR / "ui-review-report.md").write_text("\n".join(report_lines), encoding="utf-8")
     print("Completed UI review screenshot capture:", len(records), "screenshots.", flush=True)
 
