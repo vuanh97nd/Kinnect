@@ -2214,8 +2214,30 @@ private struct SwiftContractsHarnessProbe: View {
     private final class MockAdminTransport: AdminTransportProtocol {
         var serverVersion = 1
         var uploadedFiles: [String] = []
+        var malformedEconomyReloadOnce = true
 
         func requestJSON(_ path: String, method: String, body: [String: Any]?) async throws -> [String: Any] {
+            if path == "/api/admin/economy", method == "GET" {
+                if malformedEconomyReloadOnce {
+                    malformedEconomyReloadOnce = false
+                    return ["ok": true]
+                }
+                var prices: [String: Int] = [:]
+                for key in AdminEconomyDraft.requiredGiftIds { prices[key] = 50 }
+                return [
+                    "version": serverVersion,
+                    "config": [
+                        "vndPerCoin": 100,
+                        "signupBonusCoins": 2000,
+                        "signupBonusEnabled": true,
+                        "trialPackagePurchases": true,
+                        "trialGiftsEnabled": true,
+                        "showCoinPacks": true,
+                        "giftPrices": prices,
+                        "coinPacks": [100, 500, 1000]
+                    ]
+                ]
+            }
             if path == "/api/admin/economy", method == "PATCH" {
                 let reqVersion = (body?["version"] as? Int) ?? 0
                 if reqVersion != serverVersion {
@@ -2337,6 +2359,20 @@ private struct SwiftContractsHarnessProbe: View {
             check("economy_conflict_409", false)
         }
 
+        do {
+            _ = try await AdminActionsContract.reloadEconomy(transport: transport)
+            check("economy_reload_malformed_throws", false)
+        } catch {
+            check("economy_reload_malformed_throws", true)
+        }
+
+        do {
+            let reloaded = try await AdminActionsContract.reloadEconomy(transport: transport)
+            check("economy_reload_v2_recovers", reloaded.version == 2)
+        } catch {
+            check("economy_reload_v2_recovers", false)
+        }
+
         // 3. Music upload & delete contract validation + role gate
         var badMusic = AdminMusicUploadDraft(title: "T", artist: "A", license: "CC0", source: "", rightsConfirmed: false, mimeType: "audio/mpeg", audioData: Data("ID3".utf8))
         check("music_rights_validation", badMusic.validate() != nil)
@@ -2351,6 +2387,61 @@ private struct SwiftContractsHarnessProbe: View {
             check("music_delete_ok", false)
         }
         check("music_traversal_rejected", !AdminMusicItem.isValidFilename("../evil.mp3"))
+        do {
+            let tmpDir = FileManager.default.temporaryDirectory
+            let validUrl = tmpDir.appendingPathComponent("kinnect_valid_a.mp3")
+            let oversizeUrl = tmpDir.appendingPathComponent("kinnect_oversize_test.mp3")
+            let badExtUrl = tmpDir.appendingPathComponent("kinnect_bad_ext.txt")
+            defer {
+                try? FileManager.default.removeItem(at: validUrl)
+                try? FileManager.default.removeItem(at: oversizeUrl)
+                try? FileManager.default.removeItem(at: badExtUrl)
+            }
+            try Data("ID3".utf8).write(to: validUrl)
+            FileManager.default.createFile(atPath: oversizeUrl.path, contents: nil)
+            let handle = try FileHandle(forWritingTo: oversizeUrl)
+            try handle.truncate(atOffset: UInt64(AdminMusicUploadDraft.maxDecodedBytes + 64))
+            try handle.close()
+            try Data("ID3".utf8).write(to: badExtUrl)
+            var rejectedOversize = false
+            do {
+                _ = try AdminActionsContract.readValidatedAudioFile(from: oversizeUrl)
+            } catch {
+                rejectedOversize = true
+            }
+            var rejectedBadExt = false
+            do {
+                _ = try AdminActionsContract.readValidatedAudioFile(from: badExtUrl)
+            } catch {
+                rejectedBadExt = true
+            }
+            check("music_oversize_and_ext_rejected", rejectedOversize && rejectedBadExt)
+
+            var selectionDraft = AdminMusicUploadDraft(
+                title: "Track A",
+                artist: "Artist A",
+                license: "CC0",
+                source: "",
+                rightsConfirmed: true
+            )
+            var pickedName = ""
+            let pickedA = try AdminActionsContract.readValidatedAudioFile(from: validUrl)
+            selectionDraft.mimeType = pickedA.mimeType
+            selectionDraft.audioData = pickedA.data
+            pickedName = validUrl.lastPathComponent
+            let validABeforeInvalidB = (selectionDraft.validate() == nil && !pickedName.isEmpty)
+
+            selectionDraft.clearAudioSelection()
+            pickedName = ""
+            do {
+                _ = try AdminActionsContract.readValidatedAudioFile(from: oversizeUrl)
+            } catch {}
+            let clearedAfterInvalidB = (selectionDraft.audioData.isEmpty && pickedName.isEmpty && selectionDraft.validate() != nil)
+            check("music_validA_then_invalidB_resets_state", validABeforeInvalidB && clearedAfterInvalidB)
+        } catch {
+            check("music_oversize_and_ext_rejected", false)
+            check("music_validA_then_invalidB_resets_state", false)
+        }
 
         // 4. AI credentials allowlist & non-secret validation
         let badAIUrl = AdminAICredentialsPatch(password: "pw123", workerUrl: "https://evil.example.com", token: nil, nvidiaKey: nil, nvidiaModel: nil, nvidiaVisionModel: nil, fallbackEnabled: nil)

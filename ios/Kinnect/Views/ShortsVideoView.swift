@@ -50,10 +50,9 @@ struct ShortsVideoView: View {
                     if #available(iOS 17.0, *) {
                         ScrollView(.vertical, showsIndicators: false) {
                             LazyVStack(spacing: 0) {
-                                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
                                     shortVideoCard(item, at: index, bottomSafeInset: bottomSafeInset)
                                         .frame(width: geo.size.width, height: geo.size.height)
-                                        .id(index)
                                 }
                             }
                             .scrollTargetLayout()
@@ -64,6 +63,17 @@ struct ShortsVideoView: View {
                                         value: contentGeo.frame(in: .named("shortsScrollArea")).minY
                                     )
                                 }
+                            )
+                            .background(
+                                ShortsScrollObserver(
+                                    pageHeight: geo.size.height,
+                                    itemCount: items.count,
+                                    onPageSettled: { nearest in
+                                        if currentIndex != nearest {
+                                            currentIndex = nearest
+                                        }
+                                    }
+                                )
                             )
                         }
                         .coordinateSpace(name: "shortsScrollArea")
@@ -1163,5 +1173,97 @@ private struct ShortsScrollOffsetKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
+    }
+}
+
+private struct ShortsScrollObserver: UIViewRepresentable {
+    let pageHeight: CGFloat
+    let itemCount: Int
+    let onPageSettled: (Int) -> Void
+
+    final class Coordinator {
+        var observation: NSKeyValueObservation?
+        var pageHeight: CGFloat = 0
+        var itemCount: Int = 0
+        var onPageSettled: (Int) -> Void
+        weak var scrollView: UIScrollView?
+
+        init(onPageSettled: @escaping (Int) -> Void) {
+            self.onPageSettled = onPageSettled
+        }
+
+        deinit {
+            observation?.invalidate()
+        }
+
+        func attach(to view: UIView) {
+            DispatchQueue.main.async { [weak self, weak view] in
+                guard let self, let view else { return }
+                var ancestor = view.superview
+                while let current = ancestor {
+                    if let sv = current as? UIScrollView {
+                        if self.scrollView !== sv {
+                            self.observation?.invalidate()
+                            self.scrollView = sv
+                            self.observation = sv.observe(\.contentOffset, options: [.initial, .new]) { [weak self] sv, _ in
+                                guard let self else { return }
+                                let h = self.pageHeight > 100 ? self.pageHeight : sv.bounds.height
+                                guard h > 100, self.itemCount > 0 else { return }
+                                let effectiveY = sv.contentOffset.y + sv.adjustedContentInset.top
+                                let progress = Double(effectiveY / h)
+                                let nearest = Int(progress.rounded())
+                                if nearest >= 0, nearest < self.itemCount, abs(progress - Double(nearest)) < 0.08 {
+                                    DispatchQueue.main.async { [weak self] in
+                                        self?.onPageSettled(nearest)
+                                    }
+                                }
+                            }
+                        }
+                        break
+                    }
+                    ancestor = current.superview
+                }
+            }
+        }
+    }
+
+    private final class ObserverHostView: UIView {
+        var onAttach: (() -> Void)?
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            onAttach?()
+        }
+
+        override func didMoveToSuperview() {
+            super.didMoveToSuperview()
+            onAttach?()
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onPageSettled: onPageSettled)
+    }
+
+    func makeUIView(context: Context) -> UIView {
+        let view = ObserverHostView(frame: .zero)
+        view.isUserInteractionEnabled = false
+        view.backgroundColor = .clear
+        context.coordinator.pageHeight = pageHeight
+        context.coordinator.itemCount = itemCount
+        context.coordinator.onPageSettled = onPageSettled
+        view.onAttach = { [weak coordinator = context.coordinator, weak view] in
+            guard let coordinator, let view else { return }
+            coordinator.attach(to: view)
+        }
+        context.coordinator.attach(to: view)
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.pageHeight = pageHeight
+        context.coordinator.itemCount = itemCount
+        context.coordinator.onPageSettled = onPageSettled
+        context.coordinator.attach(to: uiView)
     }
 }

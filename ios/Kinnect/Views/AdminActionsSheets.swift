@@ -102,6 +102,11 @@ struct AdminMusicUploadDraft: Equatable {
     var mimeType: String = "audio/mpeg"
     var audioData: Data = Data()
 
+    mutating func clearAudioSelection() {
+        audioData = Data()
+        mimeType = "audio/mpeg"
+    }
+
     static let allowedMimeTypes: Set<String> = [
         "audio/mpeg", "audio/mp3", "audio/mp4", "audio/x-m4a", "audio/aac"
     ]
@@ -286,6 +291,48 @@ enum AdminActionsContract {
         return updated
     }
 
+    static func reloadEconomy(
+        transport: AdminTransportProtocol = LiveAdminTransport()
+    ) async throws -> AdminEconomyDraft {
+        let response = try await transport.requestJSON("/api/admin/economy", method: "GET", body: nil)
+        guard let latest = AdminEconomyDraft.parse(from: response) else {
+            throw KinnectAPIError.serverMessage("Không đọc được cấu hình mới. Vui lòng thử tải lại.")
+        }
+        return latest
+    }
+
+    static func readValidatedAudioFile(from url: URL) throws -> (mimeType: String, data: Data) {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        let limit = AdminMusicUploadDraft.maxDecodedBytes
+        let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize
+        if let size, size > limit {
+            throw KinnectAPIError.serverMessage("File nhạc vượt quá 15 MB.")
+        }
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        // Also bound the read when size metadata is absent or changes.
+        var bytes = Data()
+        while bytes.count <= limit {
+            let chunk = try handle.read(upToCount: min(64 * 1024, limit + 1 - bytes.count)) ?? Data()
+            if chunk.isEmpty { break }
+            bytes.append(chunk)
+        }
+        guard !bytes.isEmpty, bytes.count <= limit else {
+            throw KinnectAPIError.serverMessage("File nhạc trống hoặc vượt quá 15 MB.")
+        }
+        let mime: String
+        switch url.pathExtension.lowercased() {
+        case "mp3": mime = "audio/mpeg"
+        case "m4a": mime = "audio/x-m4a"
+        case "aac": mime = "audio/aac"
+        case "mp4": mime = "audio/mp4"
+        default:
+            throw KinnectAPIError.serverMessage("Chỉ hỗ trợ MP3, M4A hoặc AAC.")
+        }
+        return (mime, bytes)
+    }
+
     static func uploadMusic(
         draft: AdminMusicUploadDraft,
         role: String,
@@ -410,7 +457,7 @@ struct AdminEconomyEditorSheet: View {
                     Button(saving ? "Đang lưu..." : "Lưu") {
                         confirmSave = true
                     }
-                    .disabled(saving)
+                    .disabled(saving || conflictReloadRequired)
                 }
             }
             .confirmationDialog(
@@ -429,11 +476,8 @@ struct AdminEconomyEditorSheet: View {
     private func reloadFromServer() async {
         errorMessage = ""
         do {
-            let res = try await LiveAdminTransport().requestJSON("/api/admin/economy")
-            if let latest = AdminEconomyDraft.parse(from: res) {
-                draft = latest
-                conflictReloadRequired = false
-            }
+            draft = try await AdminActionsContract.reloadEconomy()
+            conflictReloadRequired = false
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -471,6 +515,7 @@ struct AdminMusicManagerSheet: View {
     @State private var confirmUpload = false
     @State private var showAudioImporter = false
     @State private var pickedFileName = ""
+    @State private var loadingAudio = false
     @State private var uploadDraft = AdminMusicUploadDraft()
     @State private var uploading = false
     @State private var errorMessage = ""
@@ -490,13 +535,14 @@ struct AdminMusicManagerSheet: View {
                     TextField("Giấy phép (VD: CC BY / Royalty-Free)", text: $uploadDraft.license)
                     TextField("Nguồn (không bắt buộc)", text: $uploadDraft.source)
                     Toggle("Xác nhận tôi có quyền chia sẻ bài này", isOn: $uploadDraft.rightsConfirmed)
-                    Button(pickedFileName.isEmpty ? "Chọn file MP3 / M4A / AAC" : "Đã chọn: \(pickedFileName)") {
+                    Button(loadingAudio ? "Đang đọc file..." : (pickedFileName.isEmpty ? "Chọn file MP3 / M4A / AAC" : "Đã chọn: \(pickedFileName)")) {
                         showAudioImporter = true
                     }
+                    .disabled(uploading || loadingAudio)
                     Button(uploading ? "Đang tải lên..." : "Tải nhạc lên") {
                         confirmUpload = true
                     }
-                    .disabled(uploading || uploadDraft.validate() != nil)
+                    .disabled(uploading || loadingAudio || uploadDraft.validate() != nil)
                 }
 
                 Section("Danh sách nhạc hiện có") {
@@ -559,36 +605,28 @@ struct AdminMusicManagerSheet: View {
     }
 
     private func loadPickedAudio(_ result: Result<URL, Error>) {
+        // Invalidate the previous selection before any new selection can fail.
+        uploadDraft.clearAudioSelection()
+        pickedFileName = ""
+        confirmUpload = false
         errorMessage = ""
         guard case let .success(url) = result else {
-            errorMessage = "Không thể mở file âm thanh."
+            errorMessage = "Không thể mở file âm thanh. Vui lòng chọn lại."
             return
         }
-        let scoped = url.startAccessingSecurityScopedResource()
-        defer {
-            if scoped { url.stopAccessingSecurityScopedResource() }
-        }
-        do {
-            let data = try Data(contentsOf: url)
-            guard !data.isEmpty, data.count <= AdminMusicUploadDraft.maxDecodedBytes else {
-                errorMessage = "File nhạc trống hoặc vượt quá 15 MB."
-                return
+        loadingAudio = true
+        Task { @MainActor in
+            defer { loadingAudio = false }
+            do {
+                let picked = try await Task.detached(priority: .userInitiated) {
+                    try AdminActionsContract.readValidatedAudioFile(from: url)
+                }.value
+                uploadDraft.mimeType = picked.mimeType
+                uploadDraft.audioData = picked.data
+                pickedFileName = url.lastPathComponent
+            } catch {
+                errorMessage = error.localizedDescription
             }
-            let ext = url.pathExtension.lowercased()
-            switch ext {
-            case "m4a":
-                uploadDraft.mimeType = "audio/x-m4a"
-            case "aac":
-                uploadDraft.mimeType = "audio/aac"
-            case "mp4":
-                uploadDraft.mimeType = "audio/mp4"
-            default:
-                uploadDraft.mimeType = "audio/mpeg"
-            }
-            uploadDraft.audioData = data
-            pickedFileName = url.lastPathComponent
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 

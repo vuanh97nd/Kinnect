@@ -688,7 +688,7 @@ struct LiveRoomFullScreenView: View {
                             colorHex: room.hostAvatarColor,
                             size: 92
                         )
-                        Text(room.gamePaused ? "Chủ phòng đang tạm dừng màn hình game" : "Đang kết nối luồng video Live...")
+                        Text(room.gamePaused ? "Chủ phòng đang tạm dừng màn hình game" : (webrtc.liveConnectionError ?? "Đang kết nối luồng video Live..."))
                             .font(.subheadline)
                             .foregroundColor(KinnectTheme.textSecondary)
                             .kinnectMultiline()

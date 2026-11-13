@@ -438,9 +438,10 @@ private struct DiscoverSquareUserTile: View {
                                     name: person.name,
                                     avatarURL: "",
                                     colorHex: person.avatarColor,
-                                    size: min(geo.size.width * 0.5, 48),
+                                    size: min(geo.size.width * 0.44, 46),
                                     isOnline: isOnline
                                 )
+                                .padding(.bottom, 28)
                             )
                     }
 
