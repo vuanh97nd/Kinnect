@@ -1900,7 +1900,7 @@ private struct ShortsAVPlayerProbe: View {
 
     private func run() async {
         guard let url = UIReviewFixture.samplePlayableVideoURL() else {
-            publish(lines: ["video=missing"], clock: false, buffer: false, frame: false, width: 0, height: 0, bufferTime: 0, probeSwitch: false, held: false, advanced: false, playTime: 0, pauseRate: 0, muteRate: 0, red: 0, green: 0, blue: 0)
+            publish(lines: ["video=missing"], clock: false, buffer: false, frame: false, width: 0, height: 0, bufferTime: 0, probeSwitch: false, held: false, advanced: false, playTime: 0, pauseRate: 0, muteRate: 0, red: 0, green: 0, blue: 0, pixelProof: false, secondBuffer: BufferSample())
             return
         }
         let item = AVPlayerItem(url: url)
@@ -1916,7 +1916,7 @@ private struct ShortsAVPlayerProbe: View {
         try? await Task.sleep(nanoseconds: 500_000_000)
         let playTime = seconds(next.currentTime())
         let playRate = Double(next.rate)
-        let pixel = await sampleBuffer(output, item: item)
+        let pixel = await sampleBuffer(output, item: item, fileName: "shorts-avplayer-frame.png", updatePreview: true)
         next.pause()
         let pauseTime = seconds(next.currentTime())
         let pauseRate = Double(next.rate)
@@ -1946,7 +1946,7 @@ private struct ShortsAVPlayerProbe: View {
         secondPlayer.play()
         try? await Task.sleep(nanoseconds: 450_000_000)
         let secondTime = seconds(secondPlayer.currentTime())
-        let secondBuffer = await sampleBuffer(secondOutput, item: second)
+        let secondBuffer = await sampleBuffer(secondOutput, item: second, fileName: "shorts-avplayer-frame-second.png", updatePreview: false)
         let firstHeld = abs(seconds(next.currentTime()) - heldAfterPause) < 0.08 && next.rate == 0
         let probeSwitch = secondReady && secondTime > 0.05 && secondBuffer.received && firstHeld
         let pixelProof = pixel.received && pixel.width > 0 && pixel.height > 0 && pixel.time.isFinite && pixel.frameSaved
@@ -1979,7 +1979,8 @@ private struct ShortsAVPlayerProbe: View {
             red: pixel.red,
             green: pixel.green,
             blue: pixel.blue,
-            pixelProof: pixelProof
+            pixelProof: pixelProof,
+            secondBuffer: secondBuffer
         )
     }
 
@@ -1992,22 +1993,23 @@ private struct ShortsAVPlayerProbe: View {
         var green = 0
         var blue = 0
         var frameSaved = false
+        var frameFile = ""
     }
 
-    private func sampleBuffer(_ output: AVPlayerItemVideoOutput, item: AVPlayerItem) async -> BufferSample {
+    private func sampleBuffer(_ output: AVPlayerItemVideoOutput, item: AVPlayerItem, fileName: String, updatePreview: Bool) async -> BufferSample {
         let start = Date()
         while Date().timeIntervalSince(start) < 1.2 {
             let time = item.currentTime()
             if output.hasNewPixelBuffer(forItemTime: time),
                let buffer = output.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) {
-                return readBuffer(buffer, time: seconds(time))
+                return readBuffer(buffer, time: seconds(time), fileName: fileName, updatePreview: updatePreview)
             }
             try? await Task.sleep(nanoseconds: 50_000_000)
         }
         return BufferSample()
     }
 
-    private func readBuffer(_ buffer: CVPixelBuffer, time: Double) -> BufferSample {
+    private func readBuffer(_ buffer: CVPixelBuffer, time: Double, fileName: String, updatePreview: Bool) -> BufferSample {
         var sample = BufferSample()
         sample.received = true
         sample.width = CVPixelBufferGetWidth(buffer)
@@ -2028,11 +2030,16 @@ private struct ShortsAVPlayerProbe: View {
         let context = CIContext()
         if let cgImage = context.createCGImage(image, from: image.extent) {
             let rendered = UIImage(cgImage: cgImage)
-            frameImage = rendered
+            if updatePreview {
+                frameImage = rendered
+            }
             if let data = rendered.pngData(),
                let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-                let file = dir.appendingPathComponent("shorts-avplayer-frame.png")
+                let file = dir.appendingPathComponent(fileName)
                 sample.frameSaved = (try? data.write(to: file)) != nil
+                if sample.frameSaved {
+                    sample.frameFile = fileName
+                }
             }
         }
         return sample
@@ -2070,7 +2077,8 @@ private struct ShortsAVPlayerProbe: View {
         red: Int,
         green: Int,
         blue: Int,
-        pixelProof: Bool
+        pixelProof: Bool,
+        secondBuffer: BufferSample
     ) {
         lines = shown
         let payload: [String: Any] = [
@@ -2083,9 +2091,16 @@ private struct ShortsAVPlayerProbe: View {
             "frameFile": frame ? "shorts-avplayer-frame.png" : "",
             "pixelProof": pixelProof,
             "cornerSample": ["r": red, "g": green, "b": blue, "usedAsProof": false],
+            "secondPlayerBuffer": [
+                "received": secondBuffer.received,
+                "width": secondBuffer.width,
+                "height": secondBuffer.height,
+                "timeSeconds": secondBuffer.time,
+                "frameFile": secondBuffer.frameFile
+            ],
             "probePlayerSwitch": probeSwitch,
             "shortsSwipeClosed": false,
-            "swipeMethod": "second-avplayer",
+            "swipeMethod": "second-avplayer-probe-only",
             "muteHeldPause": held,
             "resumedWhileMuted": advanced,
             "playTime": playTime,
