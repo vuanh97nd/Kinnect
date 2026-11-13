@@ -51,7 +51,7 @@ struct CallOverlayView: View {
                             size: 104
                         )
                         Text(call.peerUser.name)
-                            .font(.system(size: 26, weight: .bold))
+                            .font(KinnectTheme.scaled(26, weight: .bold))
                             .foregroundColor(.white)
                         Text(call.state == .connected ? "Đang chờ video từ đối phương..." : status(call))
                             .font(.subheadline)
@@ -79,7 +79,7 @@ struct CallOverlayView: View {
                             webrtc.endOrRejectCurrentCall()
                         } label: {
                             Image(systemName: "chevron.down")
-                                .font(.system(size: 18, weight: .bold))
+                                .font(KinnectTheme.scaled(18, weight: .bold))
                                 .foregroundColor(.white)
                                 .frame(width: 44, height: 44)
                                 .background(Circle().fill(Color.black.opacity(0.45)))
@@ -91,7 +91,7 @@ struct CallOverlayView: View {
 
                         VStack(spacing: 3) {
                             Text(call.peerUser.name)
-                                .font(.system(size: 18, weight: .bold))
+                                .font(KinnectTheme.scaled(18, weight: .bold))
                                 .foregroundColor(.white)
                                 .shadow(color: .black.opacity(0.6), radius: 4)
                             if call.state == .connected, let connectedAt {
@@ -113,7 +113,7 @@ struct CallOverlayView: View {
                             webrtc.switchCamera()
                         } label: {
                             Image(systemName: "camera.rotate.fill")
-                                .font(.system(size: 18, weight: .bold))
+                                .font(KinnectTheme.scaled(18, weight: .bold))
                                 .foregroundColor(.white)
                                 .frame(width: 44, height: 44)
                                 .background(Circle().fill(Color.black.opacity(0.45)))
@@ -157,7 +157,7 @@ struct CallOverlayView: View {
                                 .fill(Color(red: 0.12, green: 0.13, blue: 0.18))
                             VStack(spacing: 4) {
                                 Image(systemName: "video.slash.fill")
-                                    .font(.system(size: 22))
+                                    .font(KinnectTheme.scaled(22))
                                     .foregroundColor(.white.opacity(0.7))
                                 Text("Camera tắt")
                                     .font(.system(size: 10, weight: .medium))
@@ -212,7 +212,7 @@ struct CallOverlayView: View {
                         } label: {
                             VStack(spacing: 6) {
                                 Image(systemName: "phone.down.fill")
-                                    .font(.system(size: 22, weight: .bold))
+                                    .font(KinnectTheme.scaled(22, weight: .bold))
                                     .foregroundColor(.white)
                                     .frame(width: 56, height: 56)
                                     .background(Color.red, in: Circle())
@@ -302,13 +302,13 @@ struct CallOverlayView: View {
                     } label: {
                         VStack(spacing: 8) {
                             Image(systemName: "phone.down.fill")
-                                .font(.system(size: 28, weight: .bold))
+                                .font(KinnectTheme.scaled(28, weight: .bold))
                                 .foregroundColor(.white)
                                 .frame(width: 72, height: 72)
                                 .background(Color.red, in: Circle())
                                 .shadow(color: .red.opacity(0.5), radius: 8)
                             Text("Từ chối")
-                                .font(.system(size: 13, weight: .medium))
+                                .font(KinnectTheme.scaled(13, weight: .medium))
                                 .foregroundColor(.white)
                         }
                     }
@@ -327,14 +327,14 @@ struct CallOverlayView: View {
                                     .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: haloPulsing)
 
                                 Image(systemName: call.mode == "video" ? "video.fill" : "phone.fill")
-                                    .font(.system(size: 28, weight: .bold))
+                                    .font(KinnectTheme.scaled(28, weight: .bold))
                                     .foregroundColor(.white)
                                     .frame(width: 72, height: 72)
                                     .background(Color.green, in: Circle())
                                     .shadow(color: .green.opacity(0.5), radius: 8)
                             }
                             Text("Trả lời")
-                                .font(.system(size: 13, weight: .medium))
+                                .font(KinnectTheme.scaled(13, weight: .medium))
                                 .foregroundColor(.white)
                         }
                     }
@@ -388,7 +388,7 @@ struct CallOverlayView: View {
 
                 VStack(spacing: 8) {
                     Text(call.peerUser.name)
-                        .font(.system(size: 28, weight: .bold))
+                        .font(KinnectTheme.scaled(28, weight: .bold))
                         .foregroundColor(.white)
                     if call.state == .connected, let connectedAt {
                         Text(connectedAt, style: .timer)
@@ -426,7 +426,7 @@ struct CallOverlayView: View {
                     } label: {
                         VStack(spacing: 6) {
                             Image(systemName: "phone.down.fill")
-                                .font(.system(size: 24, weight: .bold))
+                                .font(KinnectTheme.scaled(24, weight: .bold))
                                 .foregroundColor(.white)
                                 .frame(width: 60, height: 60)
                                 .background(Color.red, in: Circle())
@@ -471,7 +471,7 @@ struct CallOverlayView: View {
         Button(action: action) {
             VStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 22, weight: .medium))
+                    .font(KinnectTheme.scaled(22, weight: .medium))
                     .foregroundColor(isActive ? .white : .white.opacity(0.4))
                     .frame(width: 54, height: 54)
                     .background(

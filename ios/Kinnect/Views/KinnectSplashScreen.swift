@@ -18,7 +18,7 @@ struct KinnectSplashScreen: View {
 
                 // App Brand Title
                 Text("Kinnect")
-                    .font(.system(size: 28, weight: .bold))
+                    .font(KinnectTheme.scaled(28, weight: .bold))
                     .foregroundColor(KinnectTheme.accentBright)
 
                 // Animated dual rings (matching Android rings: ACCENT & PINK translation)

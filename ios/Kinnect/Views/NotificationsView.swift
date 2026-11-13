@@ -133,7 +133,7 @@ struct NotificationsView: View {
                     onBack()
                 } label: {
                     Image(systemName: "arrow.left")
-                        .font(.system(size: 19, weight: .semibold))
+                        .font(KinnectTheme.scaled(19, weight: .semibold))
                         .foregroundColor(KinnectTheme.textPrimary)
                         .frame(width: 44, height: 44)
                 }
@@ -143,7 +143,7 @@ struct NotificationsView: View {
 
             HStack(spacing: 8) {
                 Text("Thông báo")
-                    .font(.system(size: 18, weight: .bold))
+                    .font(KinnectTheme.scaled(18, weight: .bold))
                     .foregroundColor(KinnectTheme.textPrimary)
 
                 if appState.unreadNotificationsCount > 0 {
@@ -163,9 +163,9 @@ struct NotificationsView: View {
             } label: {
                 HStack(spacing: 5) {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 13))
+                        .font(KinnectTheme.scaled(13))
                     Text("Đã đọc")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(KinnectTheme.scaled(12, weight: .semibold))
                 }
                 .foregroundColor(KinnectTheme.accentBright)
                 .padding(.horizontal, 10)
@@ -430,7 +430,7 @@ private struct NotificationPostDetailView: View {
                     dismiss()
                 } label: {
                     Image(systemName: "arrow.left")
-                        .font(.system(size: 19, weight: .semibold))
+                        .font(KinnectTheme.scaled(19, weight: .semibold))
                         .foregroundColor(KinnectTheme.textPrimary)
                         .frame(width: 44, height: 44)
                 }
@@ -438,7 +438,7 @@ private struct NotificationPostDetailView: View {
                 .accessibilityLabel("Quay lại")
 
                 Text("Chi tiết bài viết")
-                    .font(.system(size: 18, weight: .bold))
+                    .font(KinnectTheme.scaled(18, weight: .bold))
                     .foregroundColor(KinnectTheme.textPrimary)
 
                 Spacer()
@@ -570,7 +570,7 @@ private struct NotificationPostDetailView: View {
                     Task { await submitComment() }
                 } label: {
                     Image(systemName: "paperplane.fill")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(KinnectTheme.scaled(16, weight: .bold))
                         .foregroundColor(.white)
                         .frame(width: 40, height: 40)
                         .background(Circle().fill(commentText.trimmingCharacters(in: .whitespaces).isEmpty ? KinnectTheme.surfaceElevated : KinnectTheme.accentBright))

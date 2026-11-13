@@ -82,11 +82,45 @@ enum KinnectTheme {
     // These use text styles so Dynamic Type can grow them.
     static let screenTitle: Font = .title2.weight(.bold)
     static let sectionTitle: Font = .headline
-    static let body: Font = .system(size: 15)
-    static let bodyBold: Font = .system(size: 15, weight: .bold)
+    static var body: Font { scaled(15) }
+    static var bodyBold: Font { scaled(15, weight: .bold) }
     static let secondary: Font = .subheadline
     static let caption: Font = .footnote
     static let captionBold: Font = .footnote.weight(.semibold)
+
+    /// Keeps the Android role size at the default text scale and grows it
+    /// when the user raises Dynamic Type. Sizes 22, 16–17, 15, 14 and 13
+    /// map to title, headline, subheadline, footnote and caption.
+    static func scaled(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        let style: UIFont.TextStyle
+        if size >= 22 {
+            style = .title2
+        } else if size >= 17 {
+            style = .headline
+        } else if size >= 15 {
+            style = .subheadline
+        } else if size >= 13 {
+            style = .footnote
+        } else {
+            style = .caption1
+        }
+        let uiWeight: UIFont.Weight
+        if weight == .bold {
+            uiWeight = .bold
+        } else if weight == .semibold {
+            uiWeight = .semibold
+        } else if weight == .medium {
+            uiWeight = .medium
+        } else if weight == .light {
+            uiWeight = .light
+        } else if weight == .heavy {
+            uiWeight = .heavy
+        } else {
+            uiWeight = .regular
+        }
+        let font = UIFont.systemFont(ofSize: size, weight: uiWeight)
+        return Font(UIFontMetrics(forTextStyle: style).scaledFont(for: font))
+    }
 
     /// Time and small icons under chat bubbles. Dark mode stays light so it
     /// remains readable on the purple-black background. Light mode stays dark.

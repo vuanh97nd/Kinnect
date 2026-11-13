@@ -34,7 +34,7 @@ struct PinnedHeaderBar: View {
 			if let onBack = onBack {
 				Button(action: onBack) {
 					Image(systemName: "arrow.left")
-						.font(.system(size: 19, weight: .semibold))
+						.font(KinnectTheme.scaled(19, weight: .semibold))
 						.foregroundColor(KinnectTheme.textPrimary)
 						.frame(width: 44, height: 44)
 						.contentShape(Rectangle())
@@ -48,7 +48,7 @@ struct PinnedHeaderBar: View {
 
 			// Title
 			Text(title)
-				.font(.system(size: 18, weight: .bold))
+				.font(KinnectTheme.scaled(18, weight: .bold))
 				.foregroundColor(KinnectTheme.textPrimary)
 				.lineLimit(1)
 
@@ -60,7 +60,7 @@ struct PinnedHeaderBar: View {
 					Button(action: action.action) {
 						ZStack {
 							Image(systemName: action.systemImage)
-								.font(.system(size: 18, weight: .semibold))
+								.font(KinnectTheme.scaled(18, weight: .semibold))
 								.foregroundColor(KinnectTheme.textPrimary)
 								.frame(width: 38, height: 38)
 								.background(Circle().fill(KinnectTheme.surfaceElevated))

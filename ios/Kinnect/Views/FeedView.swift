@@ -608,7 +608,7 @@ struct PostCardView: View {
                         } label: {
                             VStack(spacing: 2) {
                                 Text(item.emoji)
-                                    .font(.system(size: 26))
+                                    .font(KinnectTheme.scaled(26))
                                 Text(item.title)
                                     .font(.system(size: 9, weight: .bold))
                                     .foregroundColor(KinnectTheme.textPrimary)
@@ -780,7 +780,7 @@ struct PostComposerSheet: View {
                         Spacer()
                     }
                     TextField("Bạn đang nghĩ gì?", text: $text, axis: .vertical)
-                        .font(.system(size: 18)).lineLimit(6...16)
+                        .font(KinnectTheme.scaled(18)).lineLimit(6...16)
                         .onChange(of: text) { value in if value.count > 2000 { text = String(value.prefix(2000)) } }
                     if loadingMedia { ProgressView("Đang chuẩn bị media…") }
                     if let previewImage {
@@ -946,7 +946,7 @@ struct StoryComposerSheet: View {
                                         .fill(Color.white.opacity(0.2))
                                         .frame(width: 44, height: 44)
                                     Image(systemName: "video.fill")
-                                        .font(.system(size: 20))
+                                        .font(KinnectTheme.scaled(20))
                                         .foregroundColor(.white)
                                 }
                                 Text("Quay tin")
@@ -974,7 +974,7 @@ struct StoryComposerSheet: View {
                                         .fill(Color.white.opacity(0.2))
                                         .frame(width: 44, height: 44)
                                     Image(systemName: "photo.fill")
-                                        .font(.system(size: 20))
+                                        .font(KinnectTheme.scaled(20))
                                         .foregroundColor(.white)
                                 }
                                 Text("Ảnh kèm nhạc")

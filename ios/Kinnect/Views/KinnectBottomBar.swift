@@ -54,7 +54,7 @@ struct KinnectBottomBar: View {
                         .shadow(color: Color(red: 0x7B / 255.0, green: 0x43 / 255.0, blue: 0xF7 / 255.0).opacity(0.35), radius: 4, y: 2)
 
                     Image(systemName: "plus")
-                        .font(.system(size: 20, weight: .bold))
+                        .font(KinnectTheme.scaled(20, weight: .bold))
                         .foregroundColor(.white)
                 }
                 .frame(maxWidth: .infinity, minHeight: 64)

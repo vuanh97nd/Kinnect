@@ -146,7 +146,7 @@ struct AccountMenuView: View {
                         .foregroundColor(KinnectTheme.textPrimary)
 
                     Text("@\(appState.currentUser?.handle ?? "kinnect")")
-                        .font(.system(size: 14))
+                        .font(KinnectTheme.scaled(14))
                         .foregroundColor(KinnectTheme.textSecondary)
                 }
 
@@ -266,12 +266,12 @@ struct AccountMenuView: View {
                         .fill(isDestructive ? KinnectTheme.danger.opacity(0.12) : KinnectTheme.accentSoft)
                         .frame(width: 40, height: 40)
                     Image(systemName: systemName)
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(KinnectTheme.scaled(18, weight: .semibold))
                         .foregroundColor(tint)
                 }
 
                 Text(title)
-                    .font(.system(size: 15, weight: .medium))
+                    .font(KinnectTheme.scaled(15, weight: .medium))
                     .foregroundColor(isDestructive ? tint : KinnectTheme.textPrimary)
                     .lineLimit(2)
                     .minimumScaleFactor(0.85)
@@ -280,7 +280,7 @@ struct AccountMenuView: View {
 
                 if !isDestructive {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(KinnectTheme.scaled(14, weight: .semibold))
                         .foregroundColor(KinnectTheme.textSecondary)
                 }
             }
@@ -919,10 +919,10 @@ private struct AboutKinnectSheetView: View {
                     KinnectBrandLogo(size: 72)
                         .padding(.top, 20)
                     Text("Kinnect")
-                        .font(.system(size: 22, weight: .bold))
+                        .font(KinnectTheme.scaled(22, weight: .bold))
                         .foregroundColor(KinnectTheme.accent)
                     Text("Kết nối theo cách của bạn.")
-                        .font(.system(size: 13))
+                        .font(KinnectTheme.scaled(13))
                         .foregroundColor(KinnectTheme.textSecondary)
                     VStack(alignment: .leading, spacing: 10) {
                         aboutRow("Tác giả", "Vũ Ngọc Ánh")
@@ -948,7 +948,7 @@ private struct AboutKinnectSheetView: View {
                 .font(.caption)
                 .foregroundColor(KinnectTheme.textSecondary)
             Text(value)
-                .font(.system(size: 15, weight: .medium))
+                .font(KinnectTheme.scaled(15, weight: .medium))
                 .foregroundColor(KinnectTheme.textPrimary)
                 .textSelection(.enabled)
         }

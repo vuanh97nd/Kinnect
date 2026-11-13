@@ -79,7 +79,7 @@ struct DiscoverView: View {
                     activeFilterType = .full
                 } label: {
                     Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(KinnectTheme.scaled(18, weight: .semibold))
                         .foregroundColor(isFilterActive ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
                         .frame(width: 44, height: 44)
                         .background(
@@ -505,7 +505,7 @@ private struct DiscoverSquareUserTile: View {
                             }
                         }
                         Text(person.name)
-                            .font(.system(size: 12, weight: .bold))
+                            .font(KinnectTheme.scaled(12, weight: .bold))
                             .foregroundColor(.white)
                             .lineLimit(2)
                             .minimumScaleFactor(0.85)

@@ -549,7 +549,7 @@ struct CameraStudioView: View {
         } label: {
             VStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(KinnectTheme.scaled(20, weight: .semibold))
                     .foregroundColor(isSelected ? KinnectTheme.accentBright : .white)
                     .frame(width: 44, height: 44)
                     .background(
@@ -1100,7 +1100,7 @@ struct CameraStudioView: View {
                                     .fill(KinnectTheme.accentBright.opacity(0.2))
                                     .frame(width: 44, height: 44)
                                 Image(systemName: vp.musicURL != nil || !selectedMusicTrack.isEmpty ? "music.note.list" : "music.note")
-                                    .font(.system(size: 20))
+                                    .font(KinnectTheme.scaled(20))
                                     .foregroundColor(KinnectTheme.accentBright)
                             }
 
@@ -1652,6 +1652,17 @@ struct StudioMusicPickerSheet: View {
     }
 
     private func loadCatalog() async {
+        if UIReviewFixture.isEnabled {
+            tracks = [
+                MusicTrack(id: "fixture-track-1", title: "Giai điệu kết nối", artist: "Kinnect Audio · 3:05", path: "/music/fixture-1.mp3"),
+                MusicTrack(id: "fixture-track-2", title: "Nắng sớm thành phố", artist: "Minh Anh feat. Nam · 3:30", path: "/music/fixture-2.mp3"),
+                MusicTrack(id: "fixture-track-3", title: "Khoảnh khắc thanh xuân", artist: "Kinnect Vibes · 3:15", path: "/music/fixture-3.mp3"),
+                MusicTrack(id: "fixture-track-4", title: "Nhịp đập cuộc sống", artist: "Bảo Ngọc · 4:00", path: "/music/fixture-4.mp3")
+            ]
+            loading = false
+            errorText = ""
+            return
+        }
         loading = true
         errorText = ""
         defer { loading = false }
@@ -2320,7 +2331,7 @@ struct StudioVideoPlayerView: View {
                         player?.isMuted = isMuted
                     } label: {
                         Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                            .font(.system(size: 12))
+                            .font(KinnectTheme.scaled(12))
                             .foregroundColor(.white)
                             .padding(6)
                             .background(Circle().fill(Color.black.opacity(0.65)))

@@ -40,7 +40,7 @@ struct LiveStreamView: View {
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "video.badge.plus")
-                                .font(.system(size: 16, weight: .bold))
+                                .font(KinnectTheme.scaled(16, weight: .bold))
                             Text("Bắt đầu phát Live ngay")
                                 .font(.subheadline.bold())
                         }
@@ -1024,7 +1024,7 @@ struct LiveGiftDrawerSheet: View {
     @State private var confirmGift: LiveGiftCatalogItem?
     @State private var giftError: String?
 
-    private let quantities = [1, 2, 5, 10, 50]
+    private let quantities = [1, 5, 10, 99]
 
     var body: some View {
         NavigationStack {
@@ -1678,7 +1678,7 @@ struct LiveEffectsSheet: View {
                                         Circle().stroke(activeSticker == s.id ? KinnectTheme.accentBright : Color.clear, lineWidth: 2)
                                     )
                                 Text(s.emoji)
-                                    .font(.system(size: 26))
+                                    .font(KinnectTheme.scaled(26))
                             }
                             Text(s.name)
                                 .font(.caption2)
@@ -1738,7 +1738,7 @@ struct LiveEffectsSheet: View {
         Button(action: action) {
             VStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.system(size: 20))
+                    .font(KinnectTheme.scaled(20))
                     .foregroundColor(KinnectTheme.accentBright)
                     .frame(width: 44, height: 44)
                     .background(KinnectTheme.surfaceElevated)

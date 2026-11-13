@@ -275,7 +275,7 @@ struct ProfileView: View {
                 if isSelf {
                     PhotosPicker(selection: $selectedCoverItem, matching: .images) {
                         Image(systemName: "camera.fill")
-                            .font(.system(size: 14, weight: .bold))
+                            .font(KinnectTheme.scaled(14, weight: .bold))
                             .foregroundColor(.white)
                             .frame(width: 36, height: 36)
                             .background(Circle().fill(Color.black.opacity(0.45)))
@@ -303,12 +303,12 @@ struct ProfileView: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(user.name)
-                        .font(.system(size: 20, weight: .bold))
+                        .font(KinnectTheme.scaled(20, weight: .bold))
                         .foregroundColor(KinnectTheme.textPrimary)
                         .lineLimit(1)
 
                     Text("@\(user.handle.isEmpty ? user.name : user.handle)")
-                        .font(.system(size: 13))
+                        .font(KinnectTheme.scaled(13))
                         .foregroundColor(KinnectTheme.textSecondary)
                         .lineLimit(1)
                 }
@@ -346,7 +346,7 @@ struct ProfileView: View {
             // Bio in Profile Card (Android parity lines 2272-2276: 13sp MUTED, lineSpacing 1.6f)
             if !user.bio.isEmpty {
                 Text(user.bio)
-                    .font(.system(size: 13))
+                    .font(KinnectTheme.scaled(13))
                     .foregroundColor(KinnectTheme.textSecondary)
                     .lineSpacing(4)
                     .padding(.horizontal, 14)
@@ -474,10 +474,10 @@ struct ProfileView: View {
                 if isFieldVisible(key: "bio", user: user) && !user.bio.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Tiểu sử")
-                            .font(.system(size: 12))
+                            .font(KinnectTheme.scaled(12))
                             .foregroundColor(KinnectTheme.textSecondary)
                         Text(user.bio)
-                            .font(.system(size: 14))
+                            .font(KinnectTheme.scaled(14))
                             .foregroundColor(KinnectTheme.textPrimary)
                             .kinnectMultiline()
                     }
@@ -564,12 +564,12 @@ struct ProfileView: View {
                 if isFieldVisible(key: "interests", user: user) && !user.interests.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Sở thích")
-                            .font(.system(size: 12))
+                            .font(KinnectTheme.scaled(12))
                             .foregroundColor(KinnectTheme.textSecondary)
                         WrappingHStack(horizontalSpacing: 6, verticalSpacing: 6) {
                             ForEach(user.interests, id: \.self) { item in
                                 Text(item)
-                                    .font(.system(size: 13, weight: .medium))
+                                    .font(KinnectTheme.scaled(13, weight: .medium))
                                     .foregroundColor(KinnectTheme.accentBright)
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 5)
@@ -591,7 +591,7 @@ struct ProfileView: View {
                 // Tham gia Kinnect từ MM/yyyy (Android parity line 2344)
                 if user.joinedAt > 0 {
                     Text(formattedJoinedDate(user.joinedAt))
-                        .font(.system(size: 12))
+                        .font(KinnectTheme.scaled(12))
                         .foregroundColor(KinnectTheme.textSecondary)
                         .padding(.top, 16)
                         .padding(.bottom, 6)
@@ -770,7 +770,7 @@ struct ProfileView: View {
         } label: {
             VStack(spacing: 2) {
                 Text("\(count)")
-                    .font(.system(size: 18, weight: .bold))
+                    .font(KinnectTheme.scaled(18, weight: .bold))
                     .foregroundColor(KinnectTheme.textPrimary)
                 Text(label)
                     .font(.system(size: 11))
@@ -846,10 +846,10 @@ struct ProfileView: View {
     private func profileDetailRow(label: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(label)
-                .font(.system(size: 12))
+                .font(KinnectTheme.scaled(12))
                 .foregroundColor(KinnectTheme.textSecondary)
             Text(value)
-                .font(.system(size: 14))
+                .font(KinnectTheme.scaled(14))
                 .foregroundColor(KinnectTheme.textPrimary)
         }
         .padding(.vertical, 8)
@@ -2935,7 +2935,7 @@ struct UserConnectionsSheet: View {
                                         .foregroundColor(KinnectTheme.textPrimary)
                                     if !u.handle.isEmpty {
                                         Text("@\(u.handle)")
-                                            .font(.system(size: 13))
+                                            .font(KinnectTheme.scaled(13))
                                             .foregroundColor(KinnectTheme.textSecondary)
                                     }
                                 }
@@ -2944,7 +2944,7 @@ struct UserConnectionsSheet: View {
 
                                 if !u.city.isEmpty {
                                     Text(u.city)
-                                        .font(.system(size: 12))
+                                        .font(KinnectTheme.scaled(12))
                                         .foregroundColor(KinnectTheme.textTertiary)
                                 }
                             }
@@ -3050,7 +3050,7 @@ struct ShortThumbnailView: View {
             }
 
             Image(systemName: "play.fill")
-                .font(.system(size: 22))
+                .font(KinnectTheme.scaled(22))
                 .foregroundColor(.white)
                 .shadow(color: .black.opacity(0.4), radius: 4, x: 0, y: 1)
 
@@ -3148,7 +3148,7 @@ struct ProfilePostCard: View {
                         }
                     } label: {
                         Image(systemName: "ellipsis")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(KinnectTheme.scaled(16, weight: .semibold))
                             .foregroundColor(KinnectTheme.textSecondary)
                             .frame(width: 32, height: 32)
                             .contentShape(Rectangle())
@@ -3206,11 +3206,11 @@ struct ProfilePostCard: View {
                 Button(action: toggleLike) {
                     HStack(spacing: 6) {
                         Image(systemName: isLiked ? "heart.fill" : "heart")
-                            .font(.system(size: 16))
+                            .font(KinnectTheme.scaled(16))
                             .foregroundColor(isLiked ? KinnectTheme.rose : KinnectTheme.textSecondary)
 
                         Text("\(likesCount)")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(KinnectTheme.scaled(13, weight: .medium))
                             .foregroundColor(isLiked ? KinnectTheme.rose : KinnectTheme.textSecondary)
                     }
                 }
@@ -3219,11 +3219,11 @@ struct ProfilePostCard: View {
                 Button(action: onOpenComments) {
                     HStack(spacing: 6) {
                         Image(systemName: "bubble.left")
-                            .font(.system(size: 16))
+                            .font(KinnectTheme.scaled(16))
                             .foregroundColor(KinnectTheme.textSecondary)
 
                         Text("\(commentsCount)")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(KinnectTheme.scaled(13, weight: .medium))
                             .foregroundColor(KinnectTheme.textSecondary)
                     }
                 }

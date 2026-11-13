@@ -97,7 +97,7 @@ struct WalletStoreView: View {
                         showWalletInfoAlert = true
                     } label: {
                         Image(systemName: "info.circle")
-                            .font(.system(size: 16))
+                            .font(KinnectTheme.scaled(16))
                             .foregroundColor(KinnectTheme.accentBright)
                     }
                     .accessibilityLabel("Thông tin ví")
@@ -108,7 +108,7 @@ struct WalletStoreView: View {
                         showStoreMenuDialog = true
                     } label: {
                         Image(systemName: "ellipsis")
-                            .font(.system(size: 16))
+                            .font(KinnectTheme.scaled(16))
                             .foregroundColor(KinnectTheme.accentBright)
                     }
                     .accessibilityLabel("Tùy chọn cửa hàng")
@@ -166,7 +166,7 @@ struct WalletStoreView: View {
                     HStack(spacing: 6) {
                         KinnectIcon(glyph: .wallet, size: 16, selected: true, tint: .white)
                         Text("VÍ KINNECT")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(KinnectTheme.scaled(13, weight: .bold))
                             .tracking(1.2)
                             .foregroundColor(.white.opacity(0.95))
                     }
@@ -175,7 +175,7 @@ struct WalletStoreView: View {
                         isBalanceHidden.toggle()
                     } label: {
                         Image(systemName: isBalanceHidden ? "eye.slash" : "eye")
-                            .font(.system(size: 16, weight: .medium))
+                            .font(KinnectTheme.scaled(16, weight: .medium))
                             .foregroundColor(.white)
                             .frame(minWidth: 44, minHeight: 44)
                     }
@@ -393,7 +393,7 @@ struct WalletStoreView: View {
                 }
 
                 Text("Thêm sắc màu.\nThêm chất riêng.")
-                    .font(.system(size: 22, weight: .bold))
+                    .font(KinnectTheme.scaled(22, weight: .bold))
                     .foregroundColor(.white)
                     .lineSpacing(4)
             }
@@ -601,7 +601,7 @@ struct WalletStoreView: View {
         switch cat {
         case .style:
             Image(systemName: "paintpalette.fill")
-                .font(.system(size: 13, weight: .semibold))
+                .font(KinnectTheme.scaled(13, weight: .semibold))
                 .foregroundColor(tint)
         case .live:
             KinnectIcon(glyph: .live, size: 14, selected: isSelected, tint: tint)
@@ -609,13 +609,13 @@ struct WalletStoreView: View {
             KinnectIcon(glyph: .gift, size: 14, selected: isSelected, tint: tint)
         case .member:
             Image(systemName: "crown.fill")
-                .font(.system(size: 13, weight: .semibold))
+                .font(KinnectTheme.scaled(13, weight: .semibold))
                 .foregroundColor(tint)
         case .studio:
             KinnectIcon(glyph: .studio, size: 14, selected: isSelected, tint: tint)
         case .owned:
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 13, weight: .semibold))
+                .font(KinnectTheme.scaled(13, weight: .semibold))
                 .foregroundColor(tint)
         }
     }
@@ -630,13 +630,13 @@ struct WalletStoreView: View {
             KinnectIcon(glyph: .gift, size: 20, selected: true, tint: accent)
         case "member":
             Image(systemName: "crown.fill")
-                .font(.system(size: 18, weight: .bold))
+                .font(KinnectTheme.scaled(18, weight: .bold))
                 .foregroundColor(accent)
         case "studio":
             KinnectIcon(glyph: .studio, size: 20, selected: true, tint: accent)
         default:
             Image(systemName: "paintpalette.fill")
-                .font(.system(size: 18, weight: .bold))
+                .font(KinnectTheme.scaled(18, weight: .bold))
                 .foregroundColor(accent)
         }
     }
@@ -1022,7 +1022,7 @@ private struct StorePackageArtworkView: View {
                         .background(Circle().fill(Color(hex: pkg.accentColor)))
                         .overlay(
                             Image(systemName: pkg.iconName)
-                                .font(.system(size: 26, weight: .bold))
+                                .font(KinnectTheme.scaled(26, weight: .bold))
                                 .foregroundColor(.white)
                         )
                         .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)

@@ -237,7 +237,7 @@ struct AuthView: View {
                     .frame(width: 34, height: 34)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                 Text("Kinnect")
-                    .font(.system(size: 19, weight: .bold))
+                    .font(KinnectTheme.scaled(19, weight: .bold))
                     .foregroundColor(LoginChrome.purple)
                     .lineLimit(1)
                 Spacer(minLength: 4)
@@ -245,7 +245,7 @@ struct AuthView: View {
                     showLoginLanguageSheet = true
                 } label: {
                     Text("VI / EN")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(KinnectTheme.scaled(12, weight: .bold))
                         .foregroundColor(LoginChrome.ink)
                         .frame(minWidth: 56, minHeight: 44)
                 }
@@ -256,7 +256,7 @@ struct AuthView: View {
                     withAnimation(.easeInOut(duration: 0.2)) { stage = .login }
                 } label: {
                     Text(L10n.tr("Đăng nhập"))
-                        .font(.system(size: 14, weight: .bold))
+                        .font(KinnectTheme.scaled(14, weight: .bold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 12)
                         .frame(height: 44)
@@ -266,7 +266,7 @@ struct AuthView: View {
             .frame(height: 48)
 
             Text(L10n.tr("Kết nối đúng gu.\nSống đúng mình."))
-                .font(.system(size: 28, weight: .bold))
+                .font(KinnectTheme.scaled(28, weight: .bold))
                 .foregroundColor(LoginChrome.ink)
                 .multilineTextAlignment(.center)
                 .minimumScaleFactor(0.75)
@@ -285,7 +285,7 @@ struct AuthView: View {
                 withAnimation(.easeInOut(duration: 0.2)) { stage = .register }
             } label: {
                 Text(L10n.tr("Bắt đầu kết nối"))
-                    .font(.system(size: 16, weight: .bold))
+                    .font(KinnectTheme.scaled(16, weight: .bold))
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 52)
@@ -366,7 +366,7 @@ struct AuthView: View {
             HStack(spacing: 5) {
                 Image("KinnectLogo").resizable().frame(width: 19, height: 19)
                     .clipShape(RoundedRectangle(cornerRadius: 4))
-                Text("Kinnect").font(.system(size: 14, weight: .bold))
+                Text("Kinnect").font(KinnectTheme.scaled(14, weight: .bold))
                     .foregroundColor(LoginChrome.purple)
                 Spacer()
                 Image(systemName: "bell").font(.system(size: 11))
@@ -390,7 +390,7 @@ struct AuthView: View {
             HStack(spacing: 0) {
                 welcomeMiniTab("house", title: "Bảng tin", index: 0)
                 welcomeMiniTab("safari", title: "Khám phá", index: 1)
-                Image(systemName: "plus").font(.system(size: 20))
+                Image(systemName: "plus").font(KinnectTheme.scaled(20))
                     .frame(width: 27, height: 27)
                     .foregroundColor(.white)
                     .background(RoundedRectangle(cornerRadius: 9).fill(LoginChrome.purple))
@@ -409,7 +409,7 @@ struct AuthView: View {
             withAnimation(.easeInOut(duration: 0.25)) { welcomePreview = index }
         } label: {
             VStack(spacing: 3) {
-                Image(systemName: icon).font(.system(size: 12))
+                Image(systemName: icon).font(KinnectTheme.scaled(12))
                 Text(L10n.tr(title)).font(.system(size: 6)).lineLimit(1)
             }
             .foregroundColor(welcomePreview == index ? LoginChrome.purple : LoginChrome.muted)
@@ -603,11 +603,11 @@ struct AuthView: View {
                     .frame(width: 28, height: 28)
                     .clipShape(RoundedRectangle(cornerRadius: 7))
                 Text("Kinnect")
-                    .font(.system(size: 20, weight: .bold))
+                    .font(KinnectTheme.scaled(20, weight: .bold))
                     .foregroundColor(LoginChrome.purple)
                 Spacer(minLength: 8)
                 Text(L10n.tr("Sống đúng mình."))
-                    .font(.system(size: 13))
+                    .font(KinnectTheme.scaled(13))
                     .foregroundColor(LoginChrome.muted)
                     .lineLimit(1)
             }
@@ -623,7 +623,7 @@ struct AuthView: View {
                     Image(systemName: "chevron.left")
                     Text(L10n.tr("Trang chủ"))
                 }
-                .font(.system(size: 15, weight: .medium))
+                .font(KinnectTheme.scaled(15, weight: .medium))
                 .foregroundColor(LoginChrome.ink)
             }
             .padding(.top, 4)
@@ -632,7 +632,7 @@ struct AuthView: View {
                 showLoginLanguageSheet = true
             } label: {
                 Text(L10n.tr("Tiếng Việt / English"))
-                    .font(.system(size: 15, weight: .medium))
+                    .font(KinnectTheme.scaled(15, weight: .medium))
                     .foregroundColor(LoginChrome.ink)
                     .frame(maxWidth: .infinity)
                     .frame(height: 42)
@@ -641,10 +641,10 @@ struct AuthView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(L10n.tr("Chào bạn trở lại!"))
-                    .font(.system(size: 28, weight: .bold))
+                    .font(KinnectTheme.scaled(28, weight: .bold))
                     .foregroundColor(LoginChrome.ink)
                 Text(L10n.tr("Đăng nhập để tiếp tục những kết nối của bạn."))
-                    .font(.system(size: 14))
+                    .font(KinnectTheme.scaled(14))
                     .foregroundColor(LoginChrome.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -735,7 +735,7 @@ struct AuthView: View {
                         Image(systemName: rememberLogin ? "checkmark.square.fill" : "square")
                             .foregroundColor(rememberLogin ? LoginChrome.purple : LoginChrome.muted)
                         Text(L10n.tr("Ghi nhớ"))
-                            .font(.system(size: 14))
+                            .font(KinnectTheme.scaled(14))
                             .foregroundColor(LoginChrome.ink)
                     }
                 }
@@ -748,7 +748,7 @@ struct AuthView: View {
                     }
                 } label: {
                     Text(L10n.tr("Quên mật khẩu?"))
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(KinnectTheme.scaled(14, weight: .semibold))
                         .foregroundColor(LoginChrome.purple)
                 }
             }
@@ -769,7 +769,7 @@ struct AuthView: View {
                         Image(systemName: "arrow.right")
                     }
                     Text(L10n.tr("Đăng nhập"))
-                        .font(.system(size: 16, weight: .bold))
+                        .font(KinnectTheme.scaled(16, weight: .bold))
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
@@ -792,7 +792,7 @@ struct AuthView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "person.badge.plus")
                     Text(L10n.tr("Tạo tài khoản mới"))
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(KinnectTheme.scaled(16, weight: .semibold))
                 }
                 .foregroundColor(LoginChrome.ink)
                 .frame(maxWidth: .infinity)
@@ -808,7 +808,7 @@ struct AuthView: View {
             }
 
             Text(L10n.tr("Tiếp tục nghĩa là bạn đồng ý quy tắc cộng đồng."))
-                .font(.system(size: 12))
+                .font(KinnectTheme.scaled(12))
                 .foregroundColor(LoginChrome.muted)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
@@ -832,7 +832,7 @@ struct AuthView: View {
                 .padding(.top, 8)
 
             Text(L10n.tr("Ngôn ngữ ứng dụng"))
-                .font(.system(size: 22, weight: .bold))
+                .font(KinnectTheme.scaled(22, weight: .bold))
                 .foregroundColor(LoginChrome.ink)
 
             ForEach(AppLanguage.allCases) { language in
@@ -844,7 +844,7 @@ struct AuthView: View {
                         Image(systemName: "globe")
                             .foregroundColor(LoginChrome.purple)
                         Text(language.displayName)
-                            .font(.system(size: 17))
+                            .font(KinnectTheme.scaled(17))
                             .foregroundColor(LoginChrome.ink)
                         Spacer()
                         if loc.preference.rawValue == language.rawValue {
@@ -864,7 +864,7 @@ struct AuthView: View {
                     Image(systemName: "gearshape")
                         .foregroundColor(LoginChrome.purple)
                     Text(L10n.tr("Theo hệ thống"))
-                        .font(.system(size: 17))
+                        .font(KinnectTheme.scaled(17))
                         .foregroundColor(LoginChrome.ink)
                     Spacer()
                     if loc.preference == .system {
@@ -879,7 +879,7 @@ struct AuthView: View {
                 showLoginLanguageSheet = false
             } label: {
                 Text(L10n.tr("Đóng"))
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(KinnectTheme.scaled(16, weight: .semibold))
                     .foregroundColor(LoginChrome.ink)
                     .frame(maxWidth: .infinity)
                     .frame(height: 46)
@@ -902,7 +902,7 @@ struct AuthView: View {
         HStack(spacing: 10) {
             Rectangle().fill(LoginChrome.line).frame(height: 1)
             Text(title)
-                .font(.system(size: 13))
+                .font(KinnectTheme.scaled(13))
                 .foregroundColor(LoginChrome.muted)
                 .fixedSize()
             Rectangle().fill(LoginChrome.line).frame(height: 1)
@@ -917,7 +917,7 @@ struct AuthView: View {
                     .scaledToFit()
                     .frame(width: 18, height: 18)
                 Text(title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(KinnectTheme.scaled(15, weight: .semibold))
                     .foregroundColor(LoginChrome.ink)
             }
             .frame(maxWidth: .infinity)
@@ -944,7 +944,7 @@ struct AuthView: View {
         let focused = focusedLoginField == field
         return HStack(spacing: 10) {
             Image(systemName: systemImage)
-                .font(.system(size: 14))
+                .font(KinnectTheme.scaled(14))
                 .foregroundColor(focused ? LoginChrome.purple : LoginChrome.muted)
             Group {
                 if secure {

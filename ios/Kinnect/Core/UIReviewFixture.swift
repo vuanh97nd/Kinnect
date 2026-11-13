@@ -884,6 +884,8 @@ enum UIReviewFixture {
                 "sessions": [
                     [
                         "id": "fixture_sess_1",
+                        "label": "iPhone 16 Pro",
+                        "expires": 1794528000000,
                         "userAgent": "iPhone 16 Pro • iOS 18.2 (Thiết bị hiện tại)",
                         "deviceName": "iPhone 16 Pro (Thiết bị này)",
                         "ip": "127.0.0.1",
@@ -892,6 +894,8 @@ enum UIReviewFixture {
                     ],
                     [
                         "id": "fixture_sess_2",
+                        "label": "iPad Pro 11-inch",
+                        "expires": 1791936000000,
                         "userAgent": "iPad Pro 11-inch • iPadOS 18.2",
                         "deviceName": "iPad Pro 11-inch",
                         "ip": "192.168.1.15",
@@ -1582,7 +1586,11 @@ enum UIReviewFixture {
             return AnyView(
                 LiveGiftDrawerSheet(
                     roomId: "fixture_live_room",
-                    gifts: LiveGiftCatalogItem.defaultCatalog,
+                    gifts: [
+                        LiveGiftCatalogItem(id: "rose", label: "Hoa hồng", emoji: "🌹", coins: 10, tier: "standard"),
+                        LiveGiftCatalogItem(id: "crystal", label: "Sao pha lê", emoji: "⭐", coins: 50, tier: "standard"),
+                        LiveGiftCatalogItem(id: "crown", label: "Vương miện", emoji: "👑", coins: 1000, tier: "epic")
+                    ],
                     priceVersion: 1
                 )
             )

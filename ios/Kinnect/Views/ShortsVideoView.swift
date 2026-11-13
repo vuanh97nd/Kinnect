@@ -149,7 +149,7 @@ struct ShortsVideoView: View {
         } label: {
             VStack(spacing: 4) {
                 Text(title)
-                    .font(.system(size: 16, weight: isSelected ? .bold : .medium))
+                    .font(KinnectTheme.scaled(16, weight: isSelected ? .bold : .medium))
                     .foregroundColor(isSelected ? .white : .white.opacity(0.65))
                 if isSelected {
                     Capsule()
@@ -243,7 +243,7 @@ struct ShortsVideoView: View {
                         if item.author.id != appState.currentUser?.id {
                             Button { Task { await toggleFollow(item.author) } } label: {
                                 Image(systemName: item.author.isFollowed ? "checkmark" : "plus")
-                                    .font(.system(size: 13, weight: .bold))
+                                    .font(KinnectTheme.scaled(13, weight: .bold))
                                     .foregroundColor(.white)
                                     .frame(width: 26, height: 26)
                                     .background(Circle().fill(item.author.isFollowed ? KinnectTheme.accentBright : KinnectTheme.danger))
@@ -914,7 +914,7 @@ struct ShortOptionsSheet: View {
                         .fill(isDestructive ? KinnectTheme.danger.opacity(0.18) : KinnectTheme.surfaceElevated)
                         .frame(width: 56, height: 56)
                     Image(systemName: icon)
-                        .font(.system(size: 24))
+                        .font(KinnectTheme.scaled(24))
                         .foregroundColor(isDestructive ? KinnectTheme.danger : KinnectTheme.accentBright)
                 }
                 Text(label)

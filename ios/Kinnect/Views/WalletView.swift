@@ -131,7 +131,7 @@ struct WalletView: View {
                 }
             } label: {
                 Image(systemName: "arrow.left")
-                    .font(.system(size: 19, weight: .semibold))
+                    .font(KinnectTheme.scaled(19, weight: .semibold))
                     .foregroundColor(KinnectTheme.textPrimary)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -142,7 +142,7 @@ struct WalletView: View {
             HStack(spacing: 8) {
                 KinnectIcon(glyph: .wallet, size: 20, selected: true, tint: KinnectTheme.warning)
                 Text("Ví Kinnect")
-                    .font(.system(size: 18, weight: .bold))
+                    .font(KinnectTheme.scaled(18, weight: .bold))
                     .foregroundColor(KinnectTheme.textPrimary)
             }
 
@@ -152,7 +152,7 @@ struct WalletView: View {
                 showWalletInfoAlert = true
             } label: {
                 Image(systemName: "info.circle")
-                    .font(.system(size: 19, weight: .semibold))
+                    .font(KinnectTheme.scaled(19, weight: .semibold))
                     .foregroundColor(KinnectTheme.textPrimary)
                     .frame(width: 38, height: 38)
                     .background(Circle().fill(KinnectTheme.surfaceElevated))
@@ -164,7 +164,7 @@ struct WalletView: View {
                 Task { await loadWalletData() }
             } label: {
                 Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(KinnectTheme.scaled(18, weight: .semibold))
                     .foregroundColor(KinnectTheme.textPrimary)
                     .frame(width: 38, height: 38)
                     .background(Circle().fill(KinnectTheme.surfaceElevated))
@@ -185,7 +185,7 @@ struct WalletView: View {
                 HStack(spacing: 6) {
                     KinnectIcon(glyph: .wallet, size: 16, selected: true, tint: .white)
                     Text("VÍ KINNECT")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(KinnectTheme.scaled(13, weight: .bold))
                         .tracking(1.2)
                         .foregroundColor(.white.opacity(0.95))
                 }
@@ -194,7 +194,7 @@ struct WalletView: View {
                     isBalanceHidden.toggle()
                 } label: {
                     Image(systemName: isBalanceHidden ? "eye.slash" : "eye")
-                        .font(.system(size: 16, weight: .medium))
+                        .font(KinnectTheme.scaled(16, weight: .medium))
                         .foregroundColor(.white)
                         .frame(minWidth: 44, minHeight: 44)
                 }
@@ -290,7 +290,7 @@ struct WalletView: View {
                         .frame(width: 46, height: 46)
                         .overlay(
                             Image(systemName: "plus")
-                                .font(.system(size: 20, weight: .bold))
+                                .font(KinnectTheme.scaled(20, weight: .bold))
                                 .foregroundColor(KinnectTheme.warning)
                         )
                     Text("Nạp xu")
@@ -316,7 +316,7 @@ struct WalletView: View {
                         .frame(width: 46, height: 46)
                         .overlay(
                             Image(systemName: "arrow.up.right")
-                                .font(.system(size: 20, weight: .bold))
+                                .font(KinnectTheme.scaled(20, weight: .bold))
                                 .foregroundColor(KinnectTheme.online)
                         )
                     Text("Rút tiền")
@@ -419,7 +419,7 @@ struct WalletView: View {
                     ForEach(giftInventory) { gift in
                         VStack(spacing: 6) {
                             Text(giftIconEmoji(gift.giftId))
-                                .font(.system(size: 28))
+                                .font(KinnectTheme.scaled(28))
                             Text(gift.name)
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(KinnectTheme.textPrimary)
@@ -572,7 +572,7 @@ struct WalletView: View {
                     }
                 } label: {
                     Image(systemName: "arrow.left")
-                        .font(.system(size: 19, weight: .semibold))
+                        .font(KinnectTheme.scaled(19, weight: .semibold))
                         .foregroundColor(KinnectTheme.textPrimary)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
@@ -581,13 +581,13 @@ struct WalletView: View {
                 .accessibilityLabel("Quay lại Ví")
 
                 Text("Nạp xu Kinnect")
-                    .font(.system(size: 18, weight: .bold))
+                    .font(KinnectTheme.scaled(18, weight: .bold))
                     .foregroundColor(KinnectTheme.textPrimary)
 
                 Spacer()
 
                 Text("1 xu = 100đ")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(KinnectTheme.scaled(12, weight: .bold))
                     .foregroundColor(KinnectTheme.accentBright)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
@@ -715,7 +715,7 @@ struct WalletView: View {
                     }
                 } label: {
                     Image(systemName: "arrow.left")
-                        .font(.system(size: 19, weight: .semibold))
+                        .font(KinnectTheme.scaled(19, weight: .semibold))
                         .foregroundColor(KinnectTheme.textPrimary)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
@@ -724,7 +724,7 @@ struct WalletView: View {
                 .accessibilityLabel("Quay lại Ví")
 
                 Text("Chi tiết giao dịch")
-                    .font(.system(size: 18, weight: .bold))
+                    .font(KinnectTheme.scaled(18, weight: .bold))
                     .foregroundColor(KinnectTheme.textPrimary)
 
                 Spacer()

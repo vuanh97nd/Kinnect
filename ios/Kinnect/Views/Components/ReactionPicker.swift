@@ -85,7 +85,7 @@ private struct ReactionButton: View {
 			VStack(spacing: 2) {
 				// Emoji with spring scale animation
 				Text(reaction.emoji)
-					.font(.system(size: 24))
+					.font(KinnectTheme.scaled(24))
 					.scaleEffect(isPressed ? 1.35 : (hasAppeared ? 1.0 : 0.85))
 					.animation(
 						.spring(response: 0.35, dampingFraction: 0.55)
@@ -141,7 +141,7 @@ struct ReactionSummary: View {
 					if let count = reactions[key], count > 0 {
 						HStack(spacing: 2) {
 							Text(DirectMessageItem.emoji(for: key))
-								.font(.system(size: 12))
+								.font(KinnectTheme.scaled(12))
 							if count > 1 {
 								Text("\(count)")
 									.font(.system(size: 10, weight: .semibold))
@@ -189,7 +189,7 @@ struct FloatingReactionBadge: View {
 
 	var body: some View {
 		Text(DirectMessageItem.emoji(for: reaction))
-			.font(.system(size: 13))
+			.font(KinnectTheme.scaled(13))
 			.padding(.horizontal, 6)
 			.padding(.vertical, 3)
 			.background(

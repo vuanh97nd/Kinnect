@@ -67,7 +67,7 @@ struct MessagesView: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(KinnectTheme.messageMeta)
                 TextField("Tìm cuộc trò chuyện…", text: $searchQuery)
-                    .font(.system(size: 15))
+                    .font(KinnectTheme.scaled(15))
                     .foregroundColor(KinnectTheme.textPrimary)
                 if !searchQuery.isEmpty {
                     Button { searchQuery = "" } label: {
@@ -322,7 +322,7 @@ struct MessagesView: View {
 
                     if unread > 0 {
                         Text("\(unread)")
-                            .font(.system(size: 12, weight: .bold))
+                            .font(KinnectTheme.scaled(12, weight: .bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)
@@ -361,7 +361,7 @@ struct MessagesView: View {
                             .foregroundColor(KinnectTheme.textPrimary)
                             .lineLimit(1)
                         Text("(\(group.membersCount))")
-                            .font(.system(size: 13))
+                            .font(KinnectTheme.scaled(13))
                             .foregroundColor(KinnectTheme.messageMeta)
                     }
 
@@ -385,7 +385,7 @@ struct MessagesView: View {
 
                     if group.unreadCount > 0 {
                         Text("\(group.unreadCount)")
-                            .font(.system(size: 12, weight: .bold))
+                            .font(KinnectTheme.scaled(12, weight: .bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)
@@ -511,7 +511,7 @@ struct ChatAttachmentBubbleView: View {
                         .fill(isMine ? Color.white.opacity(0.2) : fileIconColor.opacity(0.15))
                         .frame(width: 40, height: 40)
                     Image(systemName: fileIconName)
-                        .font(.system(size: 20))
+                        .font(KinnectTheme.scaled(20))
                         .foregroundColor(isMine ? .white : fileIconColor)
                 }
 
@@ -529,7 +529,7 @@ struct ChatAttachmentBubbleView: View {
                 Spacer(minLength: 4)
 
                 Image(systemName: "arrow.down.circle.fill")
-                    .font(.system(size: 20))
+                    .font(KinnectTheme.scaled(20))
                     .foregroundColor(isMine ? Color.white.opacity(0.9) : KinnectTheme.accentBright)
             }
             .padding(.horizontal, 12)
@@ -609,7 +609,7 @@ struct DirectChatDetailView: View {
                     dismiss()
                 } label: {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(KinnectTheme.scaled(18, weight: .semibold))
                         .foregroundColor(KinnectTheme.accentBright)
                         .frame(width: 36, height: 44)
                         .contentShape(Rectangle())
@@ -631,7 +631,7 @@ struct DirectChatDetailView: View {
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text(peer.name)
-                                .font(.system(size: 16, weight: .semibold))
+                                .font(KinnectTheme.scaled(16, weight: .semibold))
                                 .foregroundColor(KinnectTheme.textPrimary)
                                 .lineLimit(1)
 
@@ -649,7 +649,7 @@ struct DirectChatDetailView: View {
                                         ? "Đang trực tuyến"
                                         : "Ngoại tuyến"
                                 )
-                                .font(.system(size: 12))
+                                .font(KinnectTheme.scaled(12))
                                 .foregroundColor(Color(UIColor.secondaryLabel))
                             }
                         }
@@ -669,7 +669,7 @@ struct DirectChatDetailView: View {
                                 .fill(Color(hex: "#2E9E66").opacity(0.18))
                                 .frame(width: 36, height: 36)
                             Image(systemName: "phone.fill")
-                                .font(.system(size: 15))
+                                .font(KinnectTheme.scaled(15))
                                 .foregroundColor(Color(hex: "#2E9E66"))
                         }
                     }
@@ -684,7 +684,7 @@ struct DirectChatDetailView: View {
                                 .fill(KinnectTheme.accentBright.opacity(0.18))
                                 .frame(width: 36, height: 36)
                             Image(systemName: "video.fill")
-                                .font(.system(size: 15))
+                                .font(KinnectTheme.scaled(15))
                                 .foregroundColor(KinnectTheme.accentBright)
                         }
                     }
@@ -749,7 +749,7 @@ struct DirectChatDetailView: View {
                                 .fill(KinnectTheme.surfaceElevated)
                                 .frame(width: 36, height: 36)
                             Image(systemName: "ellipsis")
-                                .font(.system(size: 15, weight: .bold))
+                                .font(KinnectTheme.scaled(15, weight: .bold))
                                 .foregroundColor(KinnectTheme.textSecondary)
                         }
                     }
@@ -786,7 +786,7 @@ struct DirectChatDetailView: View {
             if let editId = editingMessageId {
                 HStack(spacing: 8) {
                     Image(systemName: "pencil.circle.fill")
-                        .font(.system(size: 16))
+                        .font(KinnectTheme.scaled(16))
                         .foregroundColor(KinnectTheme.accentBright)
                     Text("Đang sửa tin nhắn")
                         .font(.caption.bold())
@@ -825,7 +825,7 @@ struct DirectChatDetailView: View {
                     }
                 } label: {
                     Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 28))
+                        .font(KinnectTheme.scaled(28))
                         .foregroundColor(KinnectTheme.messageMeta)
                         .frame(width: 34, height: 38)
                 }
@@ -833,7 +833,7 @@ struct DirectChatDetailView: View {
 
                 PhotosPicker(selection: $selectedPhoto, matching: .images) {
                     Image(systemName: "camera.fill")
-                        .font(.system(size: 18))
+                        .font(KinnectTheme.scaled(18))
                         .foregroundColor(KinnectTheme.textSecondary)
                         .frame(width: 32, height: 38)
                 }
@@ -856,7 +856,7 @@ struct DirectChatDetailView: View {
                         text: $editingMessageText,
                         prompt: Text("Nội dung tin nhắn mới...").foregroundColor(KinnectTheme.textSecondary)
                     )
-                    .font(.system(size: 16))
+                    .font(KinnectTheme.scaled(16))
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
                     .background(
@@ -874,7 +874,7 @@ struct DirectChatDetailView: View {
                             axis: .vertical
                         )
                         .lineLimit(1...5)
-                        .font(.system(size: 16))
+                        .font(KinnectTheme.scaled(16))
                         .foregroundColor(KinnectTheme.textPrimary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
@@ -913,7 +913,7 @@ struct DirectChatDetailView: View {
                             appState.showToast("Ghi âm tin nhắn thoại (Đang hoàn thiện)")
                         } label: {
                             Image(systemName: "mic.fill")
-                                .font(.system(size: 18))
+                                .font(KinnectTheme.scaled(18))
                                 .foregroundColor(KinnectTheme.textSecondary)
                                 .frame(width: 32, height: 38)
                         }
@@ -1001,7 +1001,7 @@ struct DirectChatDetailView: View {
                         // Text content with iconic asymmetric bubble
                         if !msg.text.isEmpty {
                             Text(msg.text)
-                                .font(.system(size: 16))
+                                .font(KinnectTheme.scaled(16))
                                 .foregroundColor(isMine ? .white : KinnectTheme.textPrimary)
                                 .kinnectMultiline()
                                 .padding(.horizontal, 14)
@@ -1075,7 +1075,7 @@ struct DirectChatDetailView: View {
                         Task { await reactToMessage(msgId: msg.id, emoji: "❤️") }
                     } label: {
                         Image(systemName: "face.smiling")
-                            .font(.system(size: 12))
+                            .font(KinnectTheme.scaled(12))
                             .foregroundColor(messageReactions[msg.id] != nil ? KinnectTheme.accentBright : KinnectTheme.messageMeta)
                             .frame(width: 32, height: 32)
                             .contentShape(Rectangle())
@@ -1127,7 +1127,7 @@ struct DirectChatDetailView: View {
                         }
                     } label: {
                         Image(systemName: "ellipsis")
-                            .font(.system(size: 12))
+                            .font(KinnectTheme.scaled(12))
                             .foregroundColor(KinnectTheme.messageMeta)
                             .frame(width: 32, height: 32)
                             .contentShape(Rectangle())
@@ -1477,7 +1477,7 @@ struct GroupChatDetailView: View {
             VStack(alignment: isMine ? .trailing : .leading, spacing: 3) {
                 if !isMine {
                     Text(msg.sender.name)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(KinnectTheme.scaled(12, weight: .semibold))
                         .foregroundColor(KinnectTheme.accentBright)
                         .padding(.leading, 4)
                 }
@@ -1584,7 +1584,7 @@ struct GroupChatDetailView: View {
                     Task { await reactToGroupMessage(msgId: msg.id, emoji: "❤️") }
                 } label: {
                     Image(systemName: "face.smiling")
-                        .font(.system(size: 12))
+                        .font(KinnectTheme.scaled(12))
                         .foregroundColor(groupReactions[msg.id] != nil ? KinnectTheme.accentBright : KinnectTheme.messageMeta)
                         .frame(width: 32, height: 32)
                         .contentShape(Rectangle())
@@ -1626,7 +1626,7 @@ struct GroupChatDetailView: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis")
-                        .font(.system(size: 12))
+                        .font(KinnectTheme.scaled(12))
                         .foregroundColor(KinnectTheme.messageMeta)
                         .frame(width: 32, height: 32)
                         .contentShape(Rectangle())
@@ -1669,7 +1669,7 @@ struct GroupChatDetailView: View {
                                         .fill(KinnectTheme.accentBright.opacity(0.2))
                                         .frame(width: 28, height: 28)
                                     Image(systemName: "person.3.fill")
-                                        .font(.system(size: 12))
+                                        .font(KinnectTheme.scaled(12))
                                         .foregroundColor(KinnectTheme.accentBright)
                                 }
                                 VStack(alignment: .leading, spacing: 1) {
@@ -1739,7 +1739,7 @@ struct GroupChatDetailView: View {
                 }
             } label: {
                 Image(systemName: "plus.circle.fill")
-                    .font(.system(size: 28))
+                    .font(KinnectTheme.scaled(28))
                     .foregroundColor(KinnectTheme.messageMeta)
                     .frame(width: 34, height: 38)
             }
@@ -1747,7 +1747,7 @@ struct GroupChatDetailView: View {
 
             PhotosPicker(selection: $selectedPhoto, matching: .images) {
                 Image(systemName: "camera.fill")
-                    .font(.system(size: 18))
+                    .font(KinnectTheme.scaled(18))
                     .foregroundColor(KinnectTheme.textSecondary)
                     .frame(width: 32, height: 38)
             }
@@ -1775,7 +1775,7 @@ struct GroupChatDetailView: View {
                 }
             } label: {
                 Text("@")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(KinnectTheme.scaled(16, weight: .bold))
                     .foregroundColor(KinnectTheme.accentBright)
                     .frame(width: 32, height: 38)
             }
@@ -1789,7 +1789,7 @@ struct GroupChatDetailView: View {
                     axis: .vertical
                 )
                 .lineLimit(1...5)
-                .font(.system(size: 16))
+                .font(KinnectTheme.scaled(16))
                 .foregroundColor(KinnectTheme.textPrimary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -1828,7 +1828,7 @@ struct GroupChatDetailView: View {
                     appState.showToast("Ghi âm tin nhắn thoại (Đang hoàn thiện)")
                 } label: {
                     Image(systemName: "mic.fill")
-                        .font(.system(size: 18))
+                        .font(KinnectTheme.scaled(18))
                         .foregroundColor(KinnectTheme.textSecondary)
                         .frame(width: 32, height: 38)
                 }
@@ -1851,7 +1851,7 @@ struct GroupChatDetailView: View {
                     dismiss()
                 } label: {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(KinnectTheme.scaled(18, weight: .semibold))
                         .foregroundColor(KinnectTheme.accentBright)
                         .frame(width: 32, height: 44)
                 }
@@ -1871,13 +1871,13 @@ struct GroupChatDetailView: View {
                             )
                             .frame(width: 38, height: 38)
                         Image(systemName: "person.2.fill")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(KinnectTheme.scaled(16, weight: .semibold))
                             .foregroundColor(.white)
                     }
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(group.name)
-                            .font(.system(size: 16, weight: .bold))
+                            .font(KinnectTheme.scaled(16, weight: .bold))
                             .foregroundColor(KinnectTheme.textPrimary)
                             .lineLimit(1)
 
@@ -1917,7 +1917,7 @@ struct GroupChatDetailView: View {
                             .fill(KinnectTheme.surfaceElevated)
                             .frame(width: 36, height: 36)
                         Image(systemName: "ellipsis")
-                            .font(.system(size: 15, weight: .bold))
+                            .font(KinnectTheme.scaled(15, weight: .bold))
                             .foregroundColor(KinnectTheme.textSecondary)
                     }
                 }

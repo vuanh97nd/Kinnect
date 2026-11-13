@@ -162,7 +162,7 @@ struct StoreView: View {
                 }
             } label: {
                 Image(systemName: "arrow.left")
-                    .font(.system(size: 19, weight: .semibold))
+                    .font(KinnectTheme.scaled(19, weight: .semibold))
                     .foregroundColor(KinnectTheme.textPrimary)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -173,7 +173,7 @@ struct StoreView: View {
             HStack(spacing: 8) {
                 KinnectIcon(glyph: .store, size: 20, selected: true, tint: KinnectTheme.accentBright)
                 Text("Cửa hàng")
-                    .font(.system(size: 18, weight: .bold))
+                    .font(KinnectTheme.scaled(18, weight: .bold))
                     .foregroundColor(KinnectTheme.textPrimary)
             }
 
@@ -185,9 +185,9 @@ struct StoreView: View {
             } label: {
                 HStack(spacing: 5) {
                     Text("🪙")
-                        .font(.system(size: 13))
+                        .font(KinnectTheme.scaled(13))
                     Text("\(storeBalance) xu")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(KinnectTheme.scaled(13, weight: .bold))
                         .foregroundColor(KinnectTheme.warning)
                 }
                 .padding(.horizontal, 10)
@@ -202,7 +202,7 @@ struct StoreView: View {
                 showStoreMenuDialog = true
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(KinnectTheme.scaled(18, weight: .semibold))
                     .foregroundColor(KinnectTheme.textPrimary)
                     .frame(width: 38, height: 38)
                     .background(Circle().fill(KinnectTheme.surfaceElevated))
@@ -241,7 +241,7 @@ struct StoreView: View {
             }
 
             Text("Thêm sắc màu.\nThêm chất riêng.")
-                .font(.system(size: 22, weight: .bold))
+                .font(KinnectTheme.scaled(22, weight: .bold))
                 .foregroundColor(.white)
                 .lineSpacing(4)
         }
@@ -310,7 +310,7 @@ struct StoreView: View {
                     .fill(Color(hex: "#23183D"))
                     .frame(width: 68, height: 68)
                 Text("K")
-                    .font(.system(size: 26, weight: .bold))
+                    .font(KinnectTheme.scaled(26, weight: .bold))
                     .foregroundColor(.white)
                 if let frame = packageFrameImage(preview) {
                     Image(uiImage: frame)
@@ -609,17 +609,17 @@ struct StoreView: View {
         let tint = isSelected ? Color.white : KinnectTheme.textSecondary
         switch cat {
         case .style:
-            return AnyView(Image(systemName: "paintpalette.fill").font(.system(size: 13)).foregroundColor(tint))
+            return AnyView(Image(systemName: "paintpalette.fill").font(KinnectTheme.scaled(13)).foregroundColor(tint))
         case .studio:
-            return AnyView(Image(systemName: "film.fill").font(.system(size: 13)).foregroundColor(tint))
+            return AnyView(Image(systemName: "film.fill").font(KinnectTheme.scaled(13)).foregroundColor(tint))
         case .live:
-            return AnyView(Image(systemName: "antenna.radiowaves.left.and.right").font(.system(size: 13)).foregroundColor(tint))
+            return AnyView(Image(systemName: "antenna.radiowaves.left.and.right").font(KinnectTheme.scaled(13)).foregroundColor(tint))
         case .gifts:
-            return AnyView(Image(systemName: "gift.fill").font(.system(size: 13)).foregroundColor(tint))
+            return AnyView(Image(systemName: "gift.fill").font(KinnectTheme.scaled(13)).foregroundColor(tint))
         case .member:
-            return AnyView(Image(systemName: "crown.fill").font(.system(size: 13)).foregroundColor(tint))
+            return AnyView(Image(systemName: "crown.fill").font(KinnectTheme.scaled(13)).foregroundColor(tint))
         case .owned:
-            return AnyView(Image(systemName: "checkmark.circle.fill").font(.system(size: 13)).foregroundColor(tint))
+            return AnyView(Image(systemName: "checkmark.circle.fill").font(KinnectTheme.scaled(13)).foregroundColor(tint))
         }
     }
 
