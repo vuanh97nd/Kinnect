@@ -415,6 +415,7 @@ def build_contact_sheet(records):
 
 SECURITY_FOCUS_STANDARD_SLUGS = (
     "01b-iphone-auth-login-dark",
+    "07-iphone-friends-dark",
     "10b-iphone-live-empty",
     "10c-iphone-live-error",
     "10d-iphone-live-connecting",
