@@ -101,6 +101,9 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     getWindow().setStatusBarColor(0xff000000);
     getWindow().setNavigationBarColor(0xff000000);
+    if (getIntent() != null && getIntent().getBooleanExtra("ui_review_fixture", false)) {
+      NativeApi.enableFixture(this, true);
+    }
     story = getIntent().getBooleanExtra(EXTRA_STORY, false);
     String startMode = getIntent().getStringExtra(EXTRA_MODE);
     if (startMode != null) mode = startMode;
@@ -1373,11 +1376,13 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     query.setHint(I18n.t("Tìm bài hát hoặc nghệ sĩ"));
     query.setHintTextColor(muted);
     query.setTextColor(ink);
-    query.setTextSize(15);
+    query.setTextSize(14);
     query.setBackground(null);
     query.setSingleLine(true);
-    search.addView(query, new LinearLayout.LayoutParams(0, -2, 1));
-    LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, dp(42));
+    query.setGravity(Gravity.CENTER_VERTICAL);
+    query.setPadding(dp(8), dp(4), dp(8), dp(4));
+    search.addView(query, new LinearLayout.LayoutParams(0, -1, 1));
+    LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, dp(46));
     sp.setMargins(dp(14), dp(6), dp(14), dp(4));
     sheet.addView(search, sp);
     final LinearLayout tabs = new LinearLayout(this);

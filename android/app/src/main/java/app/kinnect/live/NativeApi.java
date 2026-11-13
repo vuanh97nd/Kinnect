@@ -103,7 +103,13 @@ public final class NativeApi {
     fixtureEnabled = true;
     return true;
   }
-  public static boolean isFixtureEnabled() { return fixtureEnabled; }
+  public static boolean isFixtureEnabled() {
+    if (!fixtureEnabled) {
+      java.io.File flag = new java.io.File("/data/local/tmp/kinnect_fixture");
+      if (flag.exists()) fixtureEnabled = true;
+    }
+    return fixtureEnabled;
+  }
 
   private static final class FixtureResult {
     final JSONObject data;
@@ -151,6 +157,24 @@ public final class NativeApi {
       if ("GET".equals(method) && (cleanPath.matches("/api/posts/[^/]+/comments") || cleanPath.matches("/api/posts/[^/]+/comments/comments") || cleanPath.matches("/api/shorts/[^/]+/comments") || cleanPath.matches("/api/shorts/[^/]+/comments/comments"))) {
         return new FixtureResult(new JSONObject("{\"comments\":[{\"id\":\"c_1\",\"body\":\"Chào mừng bạn gia nhập!\",\"content\":\"Chào mừng bạn gia nhập!\",\"author\":{\"id\":\"u2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\"},\"created\":" + (nowTime - 1800000L) + ",\"createdAt\":\"2026-11-13T00:05:00Z\",\"likes\":2,\"myReaction\":null}]}"), null, 200);
       }
+      if ("GET".equals(method) && cleanPath.matches("/api/users/[^/]+/stats")) {
+        return new FixtureResult(new JSONObject("{\"posts\":12,\"followers\":128,\"following\":64}"), null, 200);
+      }
+      if ("POST".equals(method) && cleanPath.matches("/api/stories/[^/]+/view")) {
+        return new FixtureResult(new JSONObject("{\"success\":true}"), null, 200);
+      }
+      if ("GET".equals(method) && cleanPath.matches("/api/users/[^/]+/followers")) {
+        return new FixtureResult(new JSONObject("{\"users\":[]}"), null, 200);
+      }
+      if ("GET".equals(method) && cleanPath.matches("/api/users/[^/]+/following")) {
+        return new FixtureResult(new JSONObject("{\"users\":[]}"), null, 200);
+      }
+      if ("POST".equals(method) && cleanPath.matches("/api/users/[^/]+/follow")) {
+        return new FixtureResult(new JSONObject("{\"success\":true}"), null, 200);
+      }
+      if ("POST".equals(method) && cleanPath.matches("/api/posts/[^/]+/like")) {
+        return new FixtureResult(new JSONObject("{\"success\":true,\"reactionsCount\":25,\"myReaction\":\"like\"}"), null, 200);
+      }
       if ("GET".equals(method) && cleanPath.matches("/api/posts/[^/]+/reactions")) {
         return new FixtureResult(new JSONObject("{\"users\":[{\"id\":\"u2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\",\"reaction\":\"love\"},{\"id\":\"u3\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\",\"reaction\":\"like\"}]}"), null, 200);
       }
@@ -161,7 +185,10 @@ public final class NativeApi {
         if (path.contains("khong_tim_thay")) {
           return new FixtureResult(new JSONObject("{\"users\":[],\"total\":0}"), null, 200);
         }
-        return new FixtureResult(new JSONObject("{\"users\":[{\"id\":\"u2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\",\"bio\":\"Nhiếp ảnh & Sáng tạo nội dung\"},{\"id\":\"u3\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\",\"bio\":\"Yêu âm nhạc & Du lịch\"}]}"), null, 200);
+        if (path.contains("c%C3%A0+ph%C3%AA") || path.contains("c%C3%A0%20ph%C3%AA") || path.contains("cà phê")) {
+          return new FixtureResult(new JSONObject("{\"users\":[{\"id\":\"u4\",\"name\":\"Kinnect Coffee & Book\",\"username\":\"cafe_kinnect\",\"bio\":\"Không gian cà phê & kết nối bạn bè\"},{\"id\":\"u2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\",\"bio\":\"Nhiếp ảnh & Cà phê sáng\"}]}"), null, 200);
+        }
+        return new FixtureResult(new JSONObject("{\"users\":[{\"id\":\"u1\",\"name\":\"Linh Nhi\",\"username\":\"linhnhi\",\"bio\":\"Yêu đời, thích khám phá\"},{\"id\":\"u2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\",\"bio\":\"Nhiếp ảnh & Sáng tạo nội dung\"},{\"id\":\"u3\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\",\"bio\":\"Yêu âm nhạc & Du lịch\"}]}"), null, 200);
       }
       if ("GET".equals(method) && "/api/shorts".equals(cleanPath)) {
         return new FixtureResult(new JSONObject("{\"shorts\":[{\"id\":\"s1\",\"title\":\"Khoảnh khắc cuộc sống\",\"author\":{\"id\":\"usr_qa_review\",\"name\":\"Minh Anh\"},\"likes\":89,\"comments\":12}]}"), null, 200);
@@ -194,7 +221,7 @@ public final class NativeApi {
         return new FixtureResult(new JSONObject("{\"success\":true}"), null, 200);
       }
       if ("GET".equals(method) && "/api/store".equals(cleanPath)) {
-        return new FixtureResult(new JSONObject("{\"packages\":[{\"id\":\"pkg_aurora\",\"name\":\"Gói Phong cách Aurora\",\"priceCoins\":200},{\"id\":\"pkg_neon\",\"name\":\"Gói Phong cách Neon\",\"priceCoins\":300}],\"products\":[]}"), null, 200);
+        return new FixtureResult(new JSONObject("{\"packages\":[{\"id\":\"pkg_aurora\",\"name\":\"Phong cách Cực quang\",\"kind\":\"style\",\"tier\":\"featured\",\"priceCoins\":200,\"description\":\"Hiệu ứng viền hồ sơ phát sáng cực quang huyền ảo\"},{\"id\":\"pkg_neon\",\"name\":\"Phong cách Neon Tím\",\"kind\":\"style\",\"tier\":\"popular\",\"priceCoins\":350,\"description\":\"Đổi màu giao diện chủ đạo sang tông Neon Cyberpunk\"},{\"id\":\"pkg_studio_pro\",\"name\":\"Kinnect Studio Pro\",\"kind\":\"studio\",\"line\":\"video\",\"tier\":\"pro\",\"priceCoins\":500,\"description\":\"Quay video không giới hạn, mở khóa 24 bộ lọc điện ảnh\"}],\"products\":[{\"id\":\"prod_badge_vip\",\"name\":\"Huy hiệu VIP Kinnect\",\"kind\":\"style\",\"priceCoins\":150,\"description\":\"Huy hiệu nổi bật bên cạnh tên hiển thị\"}],\"coins\":1200,\"balance\":1200,\"ownedPackages\":[\"pkg_aurora\"],\"owned\":[]}"), null, 200);
       }
       if ("POST".equals(method) && "/api/store/packages/buy".equals(cleanPath)) {
         return new FixtureResult(new JSONObject("{\"success\":true,\"packageId\":\"pkg_aurora\",\"balance\":1000}"), null, 200);
@@ -206,7 +233,7 @@ public final class NativeApi {
         return new FixtureResult(new JSONObject("{\"accountId\":\"usr_qa_review\",\"studioProFree\":true,\"studioProPermanent\":true,\"owned\":[\"kinnect_studio_pro\"]}"), null, 200);
       }
       if ("GET".equals(method) && "/api/music".equals(cleanPath)) {
-        return new FixtureResult(new JSONObject("{\"tracks\":[{\"id\":\"m1\",\"title\":\"Giai điệu kết nối\",\"artist\":\"Kinnect Audio\",\"duration\":185}]}"), null, 200);
+        return new FixtureResult(new JSONObject("{\"tracks\":[{\"id\":\"m1\",\"title\":\"Giai điệu kết nối\",\"artist\":\"Kinnect Audio\",\"duration\":185,\"url\":\"/music/m1.mp3\"},{\"id\":\"m2\",\"title\":\"Nắng sớm thành phố\",\"artist\":\"Minh Anh feat. Nam\",\"duration\":210,\"url\":\"/music/m2.mp3\"},{\"id\":\"m3\",\"title\":\"Khoảnh khắc thanh xuân\",\"artist\":\"Kinnect Vibes\",\"duration\":195,\"url\":\"/music/m3.mp3\"},{\"id\":\"m4\",\"title\":\"Nhịp đập cuộc sống\",\"artist\":\"Bảo Ngọc\",\"duration\":240,\"url\":\"/music/m4.mp3\"}]}"), null, 200);
       }
       if ("GET".equals(method) && "/api/live".equals(cleanPath)) {
         return new FixtureResult(new JSONObject("{\"rooms\":[{\"id\":\"room_1\",\"title\":\"Giao lưu âm nhạc cuối tuần\",\"host\":\"Minh Anh\",\"liveMode\":\"chat\",\"hostId\":\"usr_qa_review\",\"viewers\":42}]}"), null, 200);

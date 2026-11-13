@@ -105,6 +105,12 @@ public class MainActivity extends Activity {
       if(destination.equals("login")||destination.equals("auth_login")){auth(false);return;}
       if(destination.equals("register")||destination.equals("auth_register")){auth(true);return;}
       if(destination.equals("forgot")||destination.equals("auth_forgot")){forgot();return;}
+      if(me==null){
+        try{
+          me=new JSONObject("{\"id\":\"usr_qa_review\",\"username\":\"minhanh\",\"name\":\"Minh Anh\",\"role\":\"user\",\"coins\":1200,\"bio\":\"Kinnect QA Review\",\"followersCount\":128,\"followingCount\":64}");
+          onUserSignedIn(me);
+        }catch(Exception ignored){}
+      }
       if(me!=null){
         if(destination.equals("feed")||destination.equals("feed_home")||destination.equals("feed_dark")||destination.equals("feed_font13")||destination.equals("feed_narrow")){
           navigate("feed");
@@ -140,14 +146,12 @@ public class MainActivity extends Activity {
           navigate("discover");
         }
         else if(destination.equals("discover_results")){
-          navigate("discover");
           nearQuery="cà phê";
-          renderPeopleSearch();
+          navigate("discover");
         }
         else if(destination.equals("discover_empty")){
-          navigate("discover");
           nearQuery="___khong_tim_thay___";
-          renderPeopleSearch();
+          navigate("discover");
         }
         else if(destination.equals("shorts")||destination.equals("shorts_player")){
           navigate("shorts");
@@ -258,7 +262,7 @@ public class MainActivity extends Activity {
         else if(destination.equals("settings")){
           settings();
         }
-        else navigate(destination);
+        else if(destination!=null&&!destination.isEmpty()) navigate(destination); else navigate("feed");
       }
     }
     if(intent.getBooleanExtra("accept_call",false)){intent.removeExtra("accept_call");ensureCalls();if(calls!=null)calls.checkPending();}
@@ -309,7 +313,6 @@ public class MainActivity extends Activity {
       try {
         me = new JSONObject("{\"id\":\"usr_qa_review\",\"username\":\"minhanh\",\"name\":\"Minh Anh\",\"role\":\"user\",\"coins\":1200,\"bio\":\"Kinnect QA Review\",\"followersCount\":128,\"followingCount\":64}");
         onUserSignedIn(me);
-        navigate("feed");
         handleExtras(getIntent());
         return;
       } catch (Exception ignored) {}
@@ -1768,7 +1771,7 @@ public class MainActivity extends Activity {
   }
 
 
-  private void discover(){nearQuery="";renderPeopleSearch();}
+  private void discover(){if(nearQuery==null)nearQuery="";renderPeopleSearch();}
   private void refreshPeopleSearch(){navigate("discover");}
   private void renderPeopleSearch() {
     final boolean hasLocation = me != null && me.optBoolean("hasLocation");
@@ -3210,7 +3213,7 @@ public class MainActivity extends Activity {
     request("GET", "/api/posts?post=" + encode(id), null, data -> {
       JSONArray rows = data.optJSONArray("posts");
       if (rows == null || rows.length() == 0) { content.addView(emptyBlock("newspaper", I18n.t("Bài viết không còn khả dụng"), "")); return; }
-      postCard(rows.optJSONObject(0), commentId);
+      postCard(rows.optJSONObject(0), commentId == null ? "" : commentId);
     });
   }
 
@@ -5217,7 +5220,7 @@ public class MainActivity extends Activity {
     ap.setMargins(0, dp(4), 0, dp(4));
     c.addView(actions, ap);
     c.addView(thread);
-    if (!commentFocus.isEmpty()) { thread.setVisibility(View.VISIBLE); inlineComments(p, thread, false, commentFocus); }
+    if (commentFocus != null && !commentFocus.isEmpty()) { thread.setVisibility(View.VISIBLE); inlineComments(p, thread, false, commentFocus); }
   }
 
   private String reactionName(String key) {

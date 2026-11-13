@@ -137,7 +137,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     boolean dark = WebTheme.isDark(this);
     setTheme(getResources().getIdentifier(dark?"Kinnect.App.Dark":"Kinnect.App.Light","style",getPackageName()));
     super.onCreate(state);
-    CrashLog.install(this);
+    CrashLog.install(this);if(getIntent()!=null&&getIntent().getBooleanExtra("ui_review_fixture",false))NativeApi.enableFixture(this,true);
     int variant = dark ? 1 : 0;
     BG = WebDesign.BG[variant]; CARD = WebDesign.CARD[variant]; TEXT = WebDesign.INK[variant];
     MUTED = WebDesign.MUTED[variant]; ACCENT = WebDesign.PURPLE[variant]; SOFT = WebDesign.WASH[variant]; LINE = WebDesign.LINE[variant];
