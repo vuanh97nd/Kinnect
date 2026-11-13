@@ -150,7 +150,18 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     setContentView(root);giftExperience=new LiveGiftExperience(this,this::sendGift);
     if(getIntent().getBooleanExtra("show_gifts",false))root.postDelayed(this::gifts,600);
     cameraSetup=getIntent().getBooleanExtra("cameraSetup",false);if(cameraSetup){liveMode="game".equals(getIntent().getStringExtra("liveMode"))?"game":"chat";gameTitle=getIntent().getStringExtra("gameTitle");if(gameTitle==null)gameTitle="";topicText=getIntent().getStringExtra("title");if(topicText==null)topicText="";pendingHostMic=getIntent().getBooleanExtra("mic",true);gameSound=getIntent().getBooleanExtra("sound",true);gameComments=getIntent().getBooleanExtra("comments",false);}
-    creationEntry=getIntent().getBooleanExtra(EXTRA_HOST,false);if(creationEntry)preparationWaiting();else lobby();
+    creationEntry=getIntent().getBooleanExtra(EXTRA_HOST,false);
+    if(creationEntry)preparationWaiting();
+    else {
+      lobby();
+      if(NativeApi.isFixtureEnabled()){
+        ready=true;
+        try{
+          lastRooms=new JSONArray("[{\"id\":\"room_1\",\"title\":\"Giao lưu âm nhạc cuối tuần\",\"host\":\"Minh Anh\",\"liveMode\":\"chat\",\"hostId\":\"usr_qa_review\",\"viewers\":42}]");
+          renderRooms();
+        }catch(Exception ignored){}
+      }
+    }
     String origin = ServerConfig.DEFAULT_ORIGIN;
     NativeApi.shared.call("GET", "/api/call-config", null, (data, error, code) -> {
       if (isFinishing() || isDestroyed()) return;

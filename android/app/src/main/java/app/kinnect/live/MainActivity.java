@@ -136,7 +136,8 @@ public class MainActivity extends Activity {
           postDetail("post_1",null);
         }
         else if(destination.equals("feed_comments")||destination.equals("comments_narrow")){
-          comments("/api/posts/post_1/comments",()->{},()->navigate("feed"),"Bảng tin");
+          accountHeader(I18n.t("Bình luận"), () -> navigate("feed"));
+          comments("/api/posts/post_1", () -> {}, () -> navigate("feed"), "Bảng tin");
         }
         else if(destination.equals("feed_reactions")){
           postDetail("post_1",null);
