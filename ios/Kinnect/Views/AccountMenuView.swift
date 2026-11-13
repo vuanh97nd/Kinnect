@@ -1018,7 +1018,8 @@ struct AdminConsoleView: View {
                 AdminAISettingsSheet(
                     summary: aiSummary,
                     supportEnabled: aiSupportEnabled,
-                    moderationEnabled: aiModerationEnabled
+                    moderationEnabled: aiModerationEnabled,
+                    onSaved: { Task { await reload() } }
                 )
             }
         }

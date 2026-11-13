@@ -305,7 +305,7 @@ struct FriendsView: View {
     }
 
     private func friendRow(user: KinnectUser) -> some View {
-        HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 10) {
             Button {
                 selectedProfileUser = user
             } label: {
@@ -321,8 +321,8 @@ struct FriendsView: View {
                         Text(user.name)
                             .font(.subheadline.bold())
                             .foregroundColor(KinnectTheme.textPrimary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
                         let active = (user.isActive && user.showActivity) || appState.onlineUserIds.contains(user.id)
                         Text("@\(user.handle.isEmpty ? user.name : user.handle) • \(active ? "Đang hoạt động" : "Ngoại tuyến")")
                             .font(.caption2)
@@ -333,10 +333,9 @@ struct FriendsView: View {
                 }
             }
             .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            Spacer(minLength: 8)
-
-            // Friends action icons (Tin nhắn, Gọi thoại, Gọi video, Thêm) - matches Android roundAction layout
+            // Keep actions on a separate row so long names retain the card width.
             HStack(spacing: 6) {
                 Button {
                     activeChatPeer = user
@@ -392,6 +391,7 @@ struct FriendsView: View {
                 }
                 .accessibilityLabel("Tùy chọn bạn bè")
             }
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .kinnectCard()
     }

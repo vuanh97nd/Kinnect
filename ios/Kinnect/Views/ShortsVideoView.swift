@@ -1,10 +1,19 @@
 import AVFoundation
 import AVKit
+import Combine
 import SwiftUI
 import UIKit
 
+@MainActor
+final class ShortsFeedPlaybackState: ObservableObject {
+    @Published var activeIndex: Int? = 0
+    @Published var isMuted: Bool = false
+    @Published var userPaused: Bool = false
+}
+
 struct ShortsVideoView: View {
     @ObservedObject private var appState = AppState.shared
+    @StateObject private var playbackState = ShortsFeedPlaybackState()
     @State private var shortsTab: String = "for" // "for" (Đề xuất) | "following" (Đang theo dõi)
     @State private var items: [ShortItem] = []
     @State private var currentIndex: Int? = 0
@@ -72,6 +81,9 @@ struct ShortsVideoView: View {
                                         if currentIndex != nearest {
                                             currentIndex = nearest
                                         }
+                                        if playbackState.activeIndex != nearest {
+                                            playbackState.activeIndex = nearest
+                                        }
                                     }
                                 )
                             )
@@ -87,9 +99,13 @@ struct ShortsVideoView: View {
                             let nearest = Int(progress.rounded())
                             if nearest >= 0,
                                nearest < items.count,
-                               abs(progress - Double(nearest)) < 0.08,
-                               currentIndex != nearest {
-                                currentIndex = nearest
+                               abs(progress - Double(nearest)) < 0.08 {
+                                if currentIndex != nearest {
+                                    currentIndex = nearest
+                                }
+                                if playbackState.activeIndex != nearest {
+                                    playbackState.activeIndex = nearest
+                                }
                             }
                         }
                     } else {
@@ -129,10 +145,21 @@ struct ShortsVideoView: View {
                 .ignoresSafeArea(edges: .top)
             )
         }
-        .onChange(of: currentIndex) { _ in
+        .onChange(of: currentIndex) { next in
             userPaused = false
+            playbackState.userPaused = false
+            playbackState.activeIndex = next ?? 0
+        }
+        .onChange(of: isMuted) { next in
+            playbackState.isMuted = next
+        }
+        .onChange(of: userPaused) { next in
+            playbackState.userPaused = next
         }
         .task {
+            playbackState.activeIndex = currentIndex ?? 0
+            playbackState.isMuted = isMuted
+            playbackState.userPaused = userPaused
             await loadShorts()
             #if DEBUG
             if UIReviewFixture.activeScreen == "shorts-real-swipe" {
@@ -189,6 +216,9 @@ struct ShortsVideoView: View {
         return Button {
             shortsTab = id
             currentIndex = 0
+            playbackState.activeIndex = 0
+            userPaused = false
+            playbackState.userPaused = false
             Task { await loadShorts() }
         } label: {
             VStack(spacing: 4) {
@@ -214,8 +244,15 @@ struct ShortsVideoView: View {
     private func shortVideoCard(_ item: ShortItem, at index: Int, bottomSafeInset: CGFloat = 0) -> some View {
         ZStack(alignment: .bottomLeading) {
             Rectangle().fill(Color.black)
-            ShortClipPlayer(path: item.videoUrl, active: index == currentIndex, muted: isMuted, userPaused: userPaused && index == currentIndex)
-                .allowsHitTesting(false)
+            ShortClipPlayer(
+                path: item.videoUrl,
+                active: index == currentIndex,
+                muted: isMuted,
+                userPaused: userPaused && index == currentIndex,
+                feedIndex: index,
+                feedState: playbackState
+            )
+            .allowsHitTesting(false)
 
             // Double tap detector for floating heart
             Color.clear
@@ -522,6 +559,7 @@ struct ShortsVideoView: View {
             try? await Task.sleep(nanoseconds: 100_000_000)
         }
 
+        let latestE1 = e1 ?? UIReviewFixture.ShortsRealSwipeObserver.shared.entry(for: items[1].videoUrl)
         let scrollOffsetAfter = Double(sv?.contentOffset.y ?? -1)
         let afterIndex = currentIndex ?? -1
         let afterId = (afterIndex >= 0 && afterIndex < items.count) ? items[afterIndex].id : ""
@@ -531,12 +569,14 @@ struct ShortsVideoView: View {
         let item0RateAfter = Double(item0Player?.rate ?? -1)
         let item0HeldPaused = item0RateAfter == 0 && abs(item0TimeCheck2 - item0TimeCheck1) < 0.08
 
-        let item1RateAfter = Double(e1?.player.rate ?? 0)
+        let item1RateAfter = Double(latestE1?.player.rate ?? 0)
         var frame2 = UIReviewFixture.AVBufferSample()
-        if let e1 {
-            (frame2, _) = await UIReviewFixture.sampleVideoFrame(output: e1.output, item: e1.item, fileName: "shorts-real-swipe-frame-2.png")
+        if let sampleTarget = latestE1 {
+            (frame2, _) = await UIReviewFixture.sampleVideoFrame(output: sampleTarget.output, item: sampleTarget.item, fileName: "shorts-real-swipe-frame-2.png")
         }
 
+        let item0Lifecycle = UIReviewFixture.ShortsRealSwipeObserver.shared.lifecycleDictionary(for: items[0].videoUrl)
+        let item1Lifecycle = items.count >= 2 ? UIReviewFixture.ShortsRealSwipeObserver.shared.lifecycleDictionary(for: items[1].videoUrl) : [:]
         let distinct = frame1.received && frame2.received && (frame1.red != frame2.red || frame1.green != frame2.green || frame1.blue != frame2.blue)
         let payload: [String: Any] = [
             "realShortsView": true,
@@ -549,6 +589,7 @@ struct ShortsVideoView: View {
                 ]
             },
             "swipeMethod": "uiscrollview-animated-paging",
+            "gestureType": "programmatic-setContentOffset-animated",
             "scrollViewFound": sv != nil,
             "isPagingEnabled": isPagingEnabled,
             "pageHeight": pageHeight,
@@ -563,8 +604,11 @@ struct ShortsVideoView: View {
             "item0TimeBefore": item0TimeBefore.isFinite ? item0TimeBefore : 0,
             "item0RateAfter": item0RateAfter,
             "item0HeldPaused": item0HeldPaused,
+            "item1PresentAfter": latestE1 != nil,
             "item1ActiveAfter": e1 != nil && item1RateAfter > 0,
             "item1RateAfter": item1RateAfter,
+            "item0Lifecycle": item0Lifecycle,
+            "item1Lifecycle": item1Lifecycle,
             "frame1": [
                 "received": frame1.received,
                 "width": frame1.width,
@@ -594,82 +638,121 @@ struct ShortsVideoView: View {
     #endif
 }
 
-struct ShortClipPlayer: View {
-    let path: String
-    let active: Bool
-    var muted: Bool = false
-    var userPaused: Bool = false
-    @ObservedObject private var calls = NativeWebRTCManager.shared
-    @State private var isAppActive: Bool = UIApplication.shared.applicationState != .background
-    @State private var player: AVPlayer?
-    @State private var failed = false
-    @State private var loading = false
-    @State private var loopObserver: NSObjectProtocol?
-    @State private var shouldPlay = false
-    @State private var statusObserver: NSKeyValueObservation?
+@MainActor
+private final class ClipPlaybackController: ObservableObject {
+    @Published private(set) var player: AVPlayer?
+    @Published var failed = false
+    @Published var loading = false
 
-    var body: some View {
-        ZStack {
-            // Elegant cinematic gradient background so video is never a black void
-            LinearGradient(
-                colors: [
-                    Color(red: 0.16, green: 0.08, blue: 0.32),
-                    Color(red: 0.05, green: 0.03, blue: 0.14)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+    private var isMounted = false
+    private var isAppActive: Bool = UIApplication.shared.applicationState != .background
+    private var shouldPlay = false
+    private var currentToken = UUID()
+    private var currentPlayerId = ""
+    private var currentPath = ""
+    private var directActive = false
+    private var directMuted = false
+    private var directUserPaused = false
+    private var feedIndex: Int?
+    private weak var feedState: ShortsFeedPlaybackState?
+    private weak var observedFeedState: ShortsFeedPlaybackState?
+    private var statusObserver: NSKeyValueObservation?
+    private var globalCancellables: Set<AnyCancellable> = []
+    private var feedCancellables: Set<AnyCancellable> = []
+    private var playerCancellables: Set<AnyCancellable> = []
 
-            if failed {
-                VStack(spacing: 12) {
-                    Text("Không thể phát video.").foregroundColor(.white)
-                    Button("Thử lại") { Task { await load() } }.tint(.white)
+    func bind(
+        path: String,
+        active: Bool,
+        muted: Bool,
+        userPaused: Bool,
+        feedIndex: Int?,
+        feedState: ShortsFeedPlaybackState?,
+        trigger: String
+    ) {
+        let activeChanged = (directActive != active)
+        currentPath = path
+        directActive = active
+        directMuted = muted
+        directUserPaused = userPaused
+        self.feedIndex = feedIndex
+        self.feedState = feedState
+        isMounted = true
+        isAppActive = UIApplication.shared.applicationState != .background
+
+        if globalCancellables.isEmpty {
+            NativeWebRTCManager.shared.$activeCall
+                .sink { [weak self] nextCall in
+                    self?.syncPlayback(trigger: "callState", overrideHasCall: nextCall != nil)
                 }
-            } else if let player {
-                VideoPlayer(player: player)
-                    .allowsHitTesting(false)
-                    .ignoresSafeArea()
-            } else if loading {
-                ProgressView().tint(.white)
-            } else {
-                VStack(spacing: 12) {
-                    KinnectIcon(glyph: .video, size: 54, tint: KinnectTheme.accentBright.opacity(0.85))
-                    Text("Kinnect Video HD")
-                        .font(.headline.bold())
-                        .foregroundColor(.white)
-                    Text("Chưa có nguồn video khả dụng.")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.75))
+                .store(in: &globalCancellables)
+            NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
+                .sink { [weak self] _ in
+                    self?.isAppActive = true
+                    self?.syncPlayback(trigger: "didBecomeActive")
                 }
+                .store(in: &globalCancellables)
+            NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)
+                .sink { [weak self] _ in
+                    self?.isAppActive = false
+                    self?.syncPlayback(trigger: "willResignActive")
+                }
+                .store(in: &globalCancellables)
+            NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)
+                .sink { [weak self] _ in
+                    self?.isAppActive = false
+                    self?.syncPlayback(trigger: "didEnterBackground")
+                }
+                .store(in: &globalCancellables)
+        }
+
+        if observedFeedState !== feedState {
+            feedCancellables.removeAll()
+            observedFeedState = feedState
+            if let feedState {
+                feedState.$activeIndex
+                    .sink { [weak self] nextIdx in
+                        self?.syncPlayback(trigger: "feedActiveIndex", overrideActiveIndex: .some(nextIdx))
+                    }
+                    .store(in: &feedCancellables)
+                feedState.$userPaused
+                    .sink { [weak self] nextPaused in
+                        self?.syncPlayback(trigger: "feedUserPaused", overrideUserPaused: nextPaused)
+                    }
+                    .store(in: &feedCancellables)
+                feedState.$isMuted
+                    .sink { [weak self] nextMuted in
+                        self?.syncPlayback(trigger: "feedMuted", overrideMuted: nextMuted)
+                    }
+                    .store(in: &feedCancellables)
             }
         }
-        .task(id: path) { await load() }
-        .onAppear {
-            isAppActive = UIApplication.shared.applicationState != .background
-            syncPlayback()
+
+        if activeChanged && trigger == "onChangeActive" {
+            syncPlayback(trigger: "onChangeActive")
+        } else {
+            syncPlayback(trigger: trigger)
         }
-        .onChange(of: active) { _ in syncPlayback() }
-        .onChange(of: muted) { player?.isMuted = $0 }
-        .onChange(of: userPaused) { _ in syncPlayback() }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            isAppActive = true
-            syncPlayback()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
-            isAppActive = false
-            syncPlayback()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
-            isAppActive = false
-            syncPlayback()
-        }
-        .onChange(of: calls.activeCall != nil) { _ in syncPlayback() }
-        .onDisappear { stop() }
     }
 
-    private func load() async {
-        stop()
+    func load(
+        path: String,
+        active: Bool,
+        muted: Bool,
+        userPaused: Bool,
+        feedIndex: Int?,
+        feedState: ShortsFeedPlaybackState?
+    ) async {
+        bind(
+            path: path,
+            active: active,
+            muted: muted,
+            userPaused: userPaused,
+            feedIndex: feedIndex,
+            feedState: feedState,
+            trigger: "loadStart"
+        )
+        prepareForReload()
         guard !path.isEmpty else {
             failed = false
             return
@@ -678,31 +761,30 @@ struct ShortClipPlayer: View {
         loading = true
         defer { loading = false }
 
-        // Configure audio session for smooth video audio playback
-        if calls.activeCall == nil {
+        if NativeWebRTCManager.shared.activeCall == nil {
             try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
             try? AVAudioSession.sharedInstance().setActive(true)
         }
 
         if path.hasPrefix("file://"), let localURL = URL(string: path) {
-            setupPlayer(with: AVPlayerItem(url: localURL))
+            setupPlayer(with: AVPlayerItem(url: localURL), expectedPath: path)
             return
         }
 
-        // 1. Try playing from authenticated media cache (fast, reliable, no AVURLAsset cookie dropping on iOS)
         if path.hasPrefix("/api/") || path.hasPrefix("/") || path.contains("app.kinnect.io.vn") {
             if let cachedLocalURL = try? await KinnectAuthenticatedFile.fetch(path: path, fileExtension: "mp4") {
-                setupPlayer(with: AVPlayerItem(url: cachedLocalURL))
+                guard !Task.isCancelled, isMounted, currentPath == path else { return }
+                setupPlayer(with: AVPlayerItem(url: cachedLocalURL), expectedPath: path)
                 return
             }
+            guard !Task.isCancelled, isMounted, currentPath == path else { return }
         }
 
-        // 2. Direct streaming fallback with cookie jar
         let origin = KinnectAPIClient.shared.mediaOrigin
         KeychainStore.shared.syncToHTTPCookieStorage(origin: origin)
         guard let remoteURL = ServerConfig.url(for: path, origin: origin) else {
             if let fixtureURL = UIReviewFixture.samplePlayableVideoURL() {
-                setupPlayer(with: AVPlayerItem(url: fixtureURL))
+                setupPlayer(with: AVPlayerItem(url: fixtureURL), expectedPath: path)
                 return
             }
             failed = true
@@ -717,10 +799,18 @@ struct ShortClipPlayer: View {
 
         let asset = AVURLAsset(url: remoteURL, options: options)
         let item = AVPlayerItem(asset: asset)
-        setupPlayer(with: item)
+        setupPlayer(with: item, expectedPath: path)
     }
 
-    private func setupPlayer(with item: AVPlayerItem) {
+    private func setupPlayer(with item: AVPlayerItem, expectedPath: String) {
+        guard isMounted, currentPath == expectedPath else { return }
+        clearPlayerInstance(keepMounted: true)
+
+        let token = UUID()
+        let pid = String(token.uuidString.prefix(8))
+        currentToken = token
+        currentPlayerId = pid
+
         let next = AVPlayer(playerItem: item)
         #if DEBUG
         if UIReviewFixture.activeScreen == "shorts-real-swipe" {
@@ -729,67 +819,288 @@ struct ShortClipPlayer: View {
             ])
             item.add(output)
             UIReviewFixture.ShortsRealSwipeObserver.shared.register(
-                path: path,
+                path: expectedPath,
+                playerId: pid,
                 player: next,
                 item: item,
                 output: output
             )
         }
         #endif
-        statusObserver = item.observe(\.status, options: [.new, .initial]) { [weak next] item, _ in
-            DispatchQueue.main.async {
-                switch item.status {
+
+        statusObserver = item.observe(\.status, options: [.new, .initial]) { [weak self, weak next] observedItem, _ in
+            Task { @MainActor [weak self, weak next] in
+                guard let self,
+                      let next,
+                      self.isMounted,
+                      self.currentToken == token,
+                      self.player === next else {
+                    next?.pause()
+                    #if DEBUG
+                    if UIReviewFixture.activeScreen == "shorts-real-swipe" {
+                        UIReviewFixture.ShortsRealSwipeObserver.shared.recordEvent(
+                            path: expectedPath,
+                            event: "obsoleteRestartBlocked",
+                            playerId: pid,
+                            rate: next.map { Double($0.rate) } ?? 0
+                        )
+                    }
+                    #endif
+                    return
+                }
+                switch observedItem.status {
                 case .readyToPlay:
-                    failed = false
-                    loading = false
-                    if shouldPlay { next?.play() }
+                    self.failed = false
+                    self.loading = false
+                    self.syncPlayback(trigger: "readyToPlay")
                 case .failed:
-                    failed = true
-                    loading = false
+                    self.failed = true
+                    self.loading = false
                 default:
                     break
                 }
             }
         }
-        next.isMuted = muted
-        loopObserver = NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemDidPlayToEndTime,
-            object: item,
-            queue: .main
-        ) { _ in
-            next.seek(to: .zero)
-            if shouldPlay { next.play() }
-        }
+
+        NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime, object: item)
+            .receive(on: RunLoop.main)
+            .sink { [weak self, weak next] _ in
+                guard let self,
+                      let next,
+                      self.isMounted,
+                      self.currentToken == token,
+                      self.player === next else {
+                    next?.pause()
+                    #if DEBUG
+                    if UIReviewFixture.activeScreen == "shorts-real-swipe" {
+                        UIReviewFixture.ShortsRealSwipeObserver.shared.recordEvent(
+                            path: expectedPath,
+                            event: "obsoleteRestartBlocked",
+                            playerId: pid,
+                            rate: next.map { Double($0.rate) } ?? 0
+                        )
+                    }
+                    #endif
+                    return
+                }
+                next.seek(to: .zero)
+                self.syncPlayback(trigger: "didPlayToEnd")
+            }
+            .store(in: &playerCancellables)
+
         player = next
-        syncPlayback()
+        syncPlayback(trigger: "setupPlayer")
     }
 
-    private func syncPlayback() {
-        let blocked = !active || !isAppActive || calls.activeCall != nil || userPaused
-        shouldPlay = !blocked
-        guard let player else { return }
-        if blocked {
-            player.pause()
+    func syncPlayback(
+        trigger: String,
+        overrideActiveIndex: Int?? = nil,
+        overrideUserPaused: Bool? = nil,
+        overrideMuted: Bool? = nil,
+        overrideHasCall: Bool? = nil
+    ) {
+        let effectiveActive: Bool
+        if let feedState, let feedIndex {
+            let idx = overrideActiveIndex ?? feedState.activeIndex
+            effectiveActive = (idx == feedIndex)
         } else {
-            player.play()
+            effectiveActive = directActive
         }
-    }
 
-    private func stop() {
+        let effectiveUserPaused: Bool
+        if let feedState, let feedIndex {
+            let idx = overrideActiveIndex ?? feedState.activeIndex
+            let paused = overrideUserPaused ?? feedState.userPaused
+            effectiveUserPaused = paused && (idx == feedIndex)
+        } else {
+            effectiveUserPaused = directUserPaused
+        }
+
+        let effectiveMuted = overrideMuted ?? (feedState?.isMuted ?? directMuted)
+        let hasCall = overrideHasCall ?? (NativeWebRTCManager.shared.activeCall != nil)
+        let blocked = !isMounted || !effectiveActive || !isAppActive || hasCall || effectiveUserPaused
+        shouldPlay = !blocked
+
+        if let player {
+            player.isMuted = effectiveMuted
+            if blocked {
+                player.pause()
+            } else {
+                player.play()
+            }
+        }
+
         #if DEBUG
-        if UIReviewFixture.activeScreen == "shorts-real-swipe" {
-            UIReviewFixture.ShortsRealSwipeObserver.shared.unregister(path: path)
+        if UIReviewFixture.activeScreen == "shorts-real-swipe", !currentPath.isEmpty {
+            UIReviewFixture.ShortsRealSwipeObserver.shared.recordEvent(
+                path: currentPath,
+                event: trigger,
+                playerId: currentPlayerId,
+                active: effectiveActive,
+                userPaused: effectiveUserPaused,
+                isAppActive: isAppActive,
+                shouldPlay: shouldPlay,
+                rate: player.map { Double($0.rate) }
+            )
         }
         #endif
+    }
+
+    func prepareForReload() {
+        clearPlayerInstance(keepMounted: true)
+    }
+
+    func teardown() {
+        #if DEBUG
+        if UIReviewFixture.activeScreen == "shorts-real-swipe", !currentPath.isEmpty {
+            UIReviewFixture.ShortsRealSwipeObserver.shared.recordEvent(
+                path: currentPath,
+                event: "onDisappear",
+                playerId: currentPlayerId,
+                active: false,
+                shouldPlay: false,
+                rate: 0
+            )
+        }
+        #endif
+        clearPlayerInstance(keepMounted: false)
+        feedCancellables.removeAll()
+        observedFeedState = nil
+        globalCancellables.removeAll()
+    }
+
+    private func clearPlayerInstance(keepMounted: Bool) {
+        let deadPath = currentPath
+        let deadPid = currentPlayerId
+        currentToken = UUID()
+        isMounted = keepMounted
+        shouldPlay = false
         statusObserver?.invalidate()
         statusObserver = nil
-        shouldPlay = false
+        playerCancellables.removeAll()
         player?.pause()
         player = nil
-        if let loopObserver {
-            NotificationCenter.default.removeObserver(loopObserver)
-            self.loopObserver = nil
+        currentPlayerId = ""
+        #if DEBUG
+        if UIReviewFixture.activeScreen == "shorts-real-swipe", !deadPath.isEmpty, !deadPid.isEmpty {
+            UIReviewFixture.ShortsRealSwipeObserver.shared.unregister(path: deadPath, playerId: deadPid)
         }
+        #endif
+    }
+}
+
+struct ShortClipPlayer: View {
+    let path: String
+    let active: Bool
+    var muted: Bool = false
+    var userPaused: Bool = false
+    var feedIndex: Int? = nil
+    var feedState: ShortsFeedPlaybackState? = nil
+    @StateObject private var controller = ClipPlaybackController()
+
+    var body: some View {
+        ZStack {
+            // Elegant cinematic gradient background so video is never a black void
+            LinearGradient(
+                colors: [
+                    Color(red: 0.16, green: 0.08, blue: 0.32),
+                    Color(red: 0.05, green: 0.03, blue: 0.14)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+
+            if controller.failed {
+                VStack(spacing: 12) {
+                    Text("Không thể phát video.").foregroundColor(.white)
+                    Button("Thử lại") {
+                        Task {
+                            await controller.load(
+                                path: path,
+                                active: active,
+                                muted: muted,
+                                userPaused: userPaused,
+                                feedIndex: feedIndex,
+                                feedState: feedState
+                            )
+                        }
+                    }
+                    .tint(.white)
+                }
+            } else if let player = controller.player {
+                VideoPlayer(player: player)
+                    .allowsHitTesting(false)
+                    .ignoresSafeArea()
+            } else if controller.loading {
+                ProgressView().tint(.white)
+            } else {
+                VStack(spacing: 12) {
+                    KinnectIcon(glyph: .video, size: 54, tint: KinnectTheme.accentBright.opacity(0.85))
+                    Text("Kinnect Video HD")
+                        .font(.headline.bold())
+                        .foregroundColor(.white)
+                    Text("Chưa có nguồn video khả dụng.")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.75))
+                }
+            }
+        }
+        .task(id: path) {
+            await controller.load(
+                path: path,
+                active: active,
+                muted: muted,
+                userPaused: userPaused,
+                feedIndex: feedIndex,
+                feedState: feedState
+            )
+        }
+        .onAppear {
+            controller.bind(
+                path: path,
+                active: active,
+                muted: muted,
+                userPaused: userPaused,
+                feedIndex: feedIndex,
+                feedState: feedState,
+                trigger: "onAppear"
+            )
+        }
+        .onChange(of: active) { nextActive in
+            controller.bind(
+                path: path,
+                active: nextActive,
+                muted: muted,
+                userPaused: userPaused,
+                feedIndex: feedIndex,
+                feedState: feedState,
+                trigger: "onChangeActive"
+            )
+        }
+        .onChange(of: muted) { nextMuted in
+            controller.bind(
+                path: path,
+                active: active,
+                muted: nextMuted,
+                userPaused: userPaused,
+                feedIndex: feedIndex,
+                feedState: feedState,
+                trigger: "onChangeMuted"
+            )
+        }
+        .onChange(of: userPaused) { nextPaused in
+            controller.bind(
+                path: path,
+                active: active,
+                muted: muted,
+                userPaused: nextPaused,
+                feedIndex: feedIndex,
+                feedState: feedState,
+                trigger: "onChangeUserPaused"
+            )
+        }
+        .onDisappear { controller.teardown() }
     }
 }
 

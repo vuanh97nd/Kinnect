@@ -349,7 +349,12 @@ enum AdminActionsContract {
             method: "POST",
             body: draft.requestBody()
         )
-        return response["file"] as? String ?? ""
+        guard flag(response["ok"]),
+              let file = response["file"] as? String,
+              AdminMusicItem.isValidFilename(file) else {
+            throw KinnectAPIError.serverMessage("Máy chủ chưa xác nhận tải nhạc thành công. Hãy tải lại danh sách trước khi thử lại.")
+        }
+        return file
     }
 
     static func deleteMusic(
@@ -363,11 +368,14 @@ enum AdminActionsContract {
         guard AdminMusicItem.isValidFilename(file) else {
             throw KinnectAPIError.serverError(status: 400, message: "Tên file không hợp lệ.")
         }
-        _ = try await transport.requestJSON(
+        let response = try await transport.requestJSON(
             "/api/music",
             method: "DELETE",
             body: ["file": file]
         )
+        guard flag(response["ok"]) else {
+            throw KinnectAPIError.serverMessage("Máy chủ chưa xác nhận xóa bài nhạc. Hãy tải lại danh sách trước khi thử lại.")
+        }
     }
 
     static func updateAISettings(
@@ -384,6 +392,35 @@ enum AdminActionsContract {
             body: patch.requestBody()
         )
     }
+    static func saveAICredentials(
+        patch: AdminAICredentialsPatch, role: String,
+        transport: AdminTransportProtocol = LiveAdminTransport()
+    ) async throws -> AdminAICredentialSummary {
+        guard role == "admin" else {
+            throw KinnectAPIError.serverError(status: 403, message: "Chỉ quản trị viên có quyền thực hiện.")
+        }
+        if let error = patch.validate() { throw KinnectAPIError.serverMessage(error) }
+        let response = try await transport.requestJSON("/api/admin/ai/credentials", method: "PATCH", body: patch.requestBody())
+        guard let summary = AdminAICredentialSummary.parse(from: response) else {
+            throw KinnectAPIError.serverMessage("Chưa xác nhận được cấu hình kết nối. Hãy tải lại trạng thái.")
+        }
+        return summary
+    }
+
+    static func testAIConnection(
+        provider: AdminAITestProvider, role: String,
+        transport: AdminTransportProtocol = LiveAdminTransport()
+    ) async throws -> String {
+        guard role == "admin" else {
+            throw KinnectAPIError.serverError(status: 403, message: "Chỉ quản trị viên có quyền thực hiện.")
+        }
+        let response = try await transport.requestJSON("/api/admin/ai/test", method: "POST", body: ["provider": provider.rawValue])
+        guard flag(response["ok"]) else {
+            throw KinnectAPIError.serverMessage("Chưa xác nhận được kết nối AI.")
+        }
+        return response["message"] as? String ?? "Kết nối thành công."
+    }
+
 }
 
 struct AdminEconomyEditorSheet: View {
@@ -661,40 +698,146 @@ struct AdminMusicManagerSheet: View {
 
 struct AdminAISettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
-    let summary: AdminAICredentialSummary
-    let supportEnabled: Bool
-    let moderationEnabled: Bool
+    @ObservedObject private var appState = AppState.shared
+    let onSaved: () -> Void
+    @State private var summary: AdminAICredentialSummary
+    @State private var supportDraft: Bool
+    @State private var moderationDraft: Bool
+    @State private var workerUrl: String
+    @State private var model: String
+    @State private var fallbackEnabled: Bool
+    @State private var password = ""
+    @State private var token = ""
+    @State private var nvidiaKey = ""
+    @State private var provider = AdminAITestProvider.cloudflare
+    @State private var busy = false
+    @State private var confirmSettings = false
+    @State private var confirmCredentials = false
+    @State private var confirmTest = false
+    @State private var errorMessage = ""
+    @State private var savedMessage = ""
+
+    init(summary: AdminAICredentialSummary, supportEnabled: Bool, moderationEnabled: Bool, onSaved: @escaping () -> Void = {}) {
+        self.onSaved = onSaved
+        _summary = State(initialValue: summary)
+        _supportDraft = State(initialValue: supportEnabled)
+        _moderationDraft = State(initialValue: moderationEnabled)
+        _workerUrl = State(initialValue: summary.workerUrl)
+        _model = State(initialValue: summary.nvidiaModel)
+        _fallbackEnabled = State(initialValue: summary.fallbackEnabled)
+    }
+
+    private var role: String { appState.currentUser?.accountRole ?? "" }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Trạng thái kết nối (không hiển thị khóa)") {
-                    LabeledContent("Worker URL", value: summary.workerUrl)
+                Section("Trạng thái kết nối") {
                     LabeledContent("Token Cloudflare", value: summary.tokenSaved ? "Đã lưu" : "Chưa có")
                     LabeledContent("Khóa NVIDIA", value: summary.nvidiaKeySaved ? "Đã lưu" : "Chưa có")
-                    LabeledContent("Model NVIDIA", value: summary.nvidiaModel.isEmpty ? "Chưa đặt" : summary.nvidiaModel)
-                    LabeledContent("Fallback", value: summary.fallbackEnabled ? "Đang bật" : "Đang tắt")
+                    LabeledContent("Fallback", value: summary.fallbackReady ? "Sẵn sàng" : "Chưa sẵn sàng")
                 }
-
                 Section("Tính năng AI") {
-                    LabeledContent("Hỗ trợ tự động", value: supportEnabled ? "Bật" : "Tắt")
-                    LabeledContent("Kiểm duyệt nội dung", value: moderationEnabled ? "Bật" : "Tắt")
+                    Toggle("Hỗ trợ tự động", isOn: $supportDraft)
+                    Toggle("Kiểm duyệt nội dung", isOn: $moderationDraft)
+                    Button("Lưu tính năng AI") { confirmSettings = true }
                 }
-
-                Section {
-                    Text("Cập nhật khóa API (`PATCH /api/admin/ai/credentials`) yêu cầu nhập lại mật khẩu quản trị và không lưu khóa trên thiết bị.")
-                        .font(.caption)
-                        .foregroundColor(KinnectTheme.textSecondary)
+                Section("Cấu hình kết nối") {
+                    TextField("Worker URL HTTPS", text: $workerUrl)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    TextField("Model NVIDIA", text: $model)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    Toggle("Bật fallback NVIDIA", isOn: $fallbackEnabled)
+                    SecureField("Token Cloudflare mới (bỏ trống để giữ nguyên)", text: $token)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    SecureField("Khóa NVIDIA mới (bỏ trống để giữ nguyên)", text: $nvidiaKey)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    SecureField("Mật khẩu quản trị hiện tại", text: $password)
+                        .textContentType(.password)
+                    Text("Khóa chỉ được gửi khi bạn xác nhận lưu; không lưu trên thiết bị. Bỏ trống khóa để giữ cấu hình đã lưu.")
+                        .font(.caption).foregroundColor(KinnectTheme.textSecondary)
+                    Button("Lưu cấu hình kết nối") { confirmCredentials = true }
+                        .disabled(password.isEmpty)
                 }
+                Section("Kiểm tra kết nối") {
+                    Picker("Dịch vụ", selection: $provider) {
+                        Text("Cloudflare").tag(AdminAITestProvider.cloudflare)
+                        Text("NVIDIA").tag(AdminAITestProvider.nvidia)
+                        Text("Fallback").tag(AdminAITestProvider.fallback)
+                    }
+                    Text("Gửi một yêu cầu thử bằng cấu hình đã lưu trên máy chủ; có thể sử dụng hạn mức dịch vụ.")
+                        .font(.caption).foregroundColor(KinnectTheme.textSecondary)
+                    Button("Kiểm tra kết nối") { confirmTest = true }
+                }
+                if busy { ProgressView("Đang xử lý...") }
+                if !errorMessage.isEmpty { Text(errorMessage).foregroundColor(KinnectTheme.danger) }
+                if !savedMessage.isEmpty { Text(savedMessage).foregroundColor(KinnectTheme.textSecondary) }
             }
-            .navigationTitle("Trạng thái & Bảo mật AI")
+            .disabled(busy || role != "admin")
+            .navigationTitle("Cấu hình AI")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Đóng") { dismiss() }
-                }
+                ToolbarItem(placement: .cancellationAction) { Button("Đóng") { clearSecrets(); dismiss() }.disabled(busy) }
             }
+            .confirmationDialog("Lưu thay đổi tính năng AI?", isPresented: $confirmSettings, titleVisibility: .visible) {
+                Button("Xác nhận lưu") { Task { await saveSettings() } }
+                Button("Hủy", role: .cancel) {}
+            }
+            .confirmationDialog("Cập nhật cấu hình kết nối AI trên máy chủ?", isPresented: $confirmCredentials, titleVisibility: .visible) {
+                Button("Xác nhận lưu") { Task { await saveCredentials() } }
+                Button("Hủy", role: .cancel) {}
+            }
+            .confirmationDialog("Gửi yêu cầu kiểm tra AI?", isPresented: $confirmTest, titleVisibility: .visible) {
+                Button("Gửi yêu cầu thử") { Task { await testConnection() } }
+                Button("Hủy", role: .cancel) {}
+            }
+            .onDisappear { clearSecrets() }
         }
     }
-}
 
+    private func clearSecrets() { password = ""; token = ""; nvidiaKey = "" }
+
+    @MainActor
+    private func saveSettings() async {
+        guard !busy else { return }
+        busy = true; errorMessage = ""; savedMessage = ""
+        defer { busy = false }
+        do {
+            let result = try await AdminActionsContract.updateAISettings(
+                patch: AdminAIConfigPatch(support: supportDraft, moderation: moderationDraft), role: role)
+            guard let config = result["config"] as? [String: Any],
+                  config["support"] is NSNumber, config["moderation"] is NSNumber else {
+                throw KinnectAPIError.serverMessage("Máy chủ chưa xác nhận cấu hình AI. Hãy tải lại trước khi thử lại.")
+            }
+            supportDraft = AdminActionsContract.flag(config["support"])
+            moderationDraft = AdminActionsContract.flag(config["moderation"])
+            savedMessage = "Đã lưu cấu hình AI."
+            onSaved()
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    @MainActor
+    private func saveCredentials() async {
+        guard !busy else { return }
+        busy = true; errorMessage = ""; savedMessage = ""
+        defer { busy = false; clearSecrets() }
+        do {
+            let patch = AdminAICredentialsPatch(password: password, workerUrl: workerUrl,
+                token: token.isEmpty ? nil : token, nvidiaKey: nvidiaKey.isEmpty ? nil : nvidiaKey,
+                nvidiaModel: model, fallbackEnabled: fallbackEnabled)
+            summary = try await AdminActionsContract.saveAICredentials(patch: patch, role: role)
+            workerUrl = summary.workerUrl; model = summary.nvidiaModel; fallbackEnabled = summary.fallbackEnabled
+            savedMessage = "Đã lưu cấu hình kết nối AI."
+            onSaved()
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    @MainActor
+    private func testConnection() async {
+        guard !busy else { return }
+        busy = true; errorMessage = ""; savedMessage = ""
+        defer { busy = false }
+        do { savedMessage = try await AdminActionsContract.testAIConnection(provider: provider, role: role) }
+        catch { errorMessage = error.localizedDescription }
+    }
+}

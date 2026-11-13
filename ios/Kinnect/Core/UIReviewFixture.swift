@@ -2212,9 +2212,26 @@ private struct SwiftContractsHarnessProbe: View {
     @State private var lines: [String] = ["Đang chạy kiểm thử Swift URLProtocol & Admin..."]
 
     private final class MockAdminTransport: AdminTransportProtocol {
+        enum ResponseMode {
+            case ok
+            case missingField
+            case okFalse
+            case serverFailure(Int, String)
+        }
+
         var serverVersion = 1
         var uploadedFiles: [String] = []
         var malformedEconomyReloadOnce = true
+        var musicUploadMode: ResponseMode = .ok
+        var musicDeleteMode: ResponseMode = .ok
+        var aiRequestCount = 0
+        var aiSettingsMode: ResponseMode = .ok
+        var aiCredentialsMode: ResponseMode = .ok
+        var aiTestMode: ResponseMode = .ok
+        var storedSupport = false
+        var storedModeration = false
+        var storedTokenSaved = false
+        var storedWorkerUrl = "https://kinnect-ai.vuanh97nd.workers.dev"
 
         func requestJSON(_ path: String, method: String, body: [String: Any]?) async throws -> [String: Any] {
             if path == "/api/admin/economy", method == "GET" {
@@ -2249,14 +2266,103 @@ private struct SwiftContractsHarnessProbe: View {
                 return ["version": serverVersion, "config": updated]
             }
             if path == "/api/music", method == "POST" {
-                let file = "fixture_track_\(uploadedFiles.count + 1).mp3"
-                uploadedFiles.append(file)
-                return ["ok": true, "file": file]
+                switch musicUploadMode {
+                case .missingField:
+                    return ["ok": true]
+                case .okFalse:
+                    return ["ok": false, "file": "fixture_bad.mp3"]
+                case .serverFailure(let status, let msg):
+                    throw KinnectAPIError.serverError(status: status, message: msg)
+                case .ok:
+                    let file = "fixture_track_\(uploadedFiles.count + 1).mp3"
+                    uploadedFiles.append(file)
+                    return ["ok": true, "file": file]
+                }
             }
             if path == "/api/music", method == "DELETE" {
-                let file = (body?["file"] as? String) ?? ""
-                uploadedFiles.removeAll { $0 == file }
-                return ["ok": true]
+                switch musicDeleteMode {
+                case .missingField:
+                    return [:]
+                case .okFalse:
+                    return ["ok": false]
+                case .serverFailure(let status, let msg):
+                    throw KinnectAPIError.serverError(status: status, message: msg)
+                case .ok:
+                    let file = (body?["file"] as? String) ?? ""
+                    uploadedFiles.removeAll { $0 == file }
+                    return ["ok": true]
+                }
+            }
+            if path == "/api/admin/ai", method == "GET" {
+                aiRequestCount += 1
+                return [
+                    "config": ["support": storedSupport ? 1 : 0, "moderation": storedModeration ? 1 : 0],
+                    "credentials": [
+                        "workerUrl": storedWorkerUrl,
+                        "tokenSaved": storedTokenSaved,
+                        "nvidiaKeySaved": false,
+                        "nvidiaModel": "",
+                        "nvidiaVisionModel": "",
+                        "fallbackEnabled": false,
+                        "primaryProvider": "cloudflare",
+                        "fallbackReady": false
+                    ]
+                ]
+            }
+            if path == "/api/admin/ai", method == "PATCH" {
+                aiRequestCount += 1
+                switch aiSettingsMode {
+                case .missingField:
+                    return ["ok": true]
+                case .okFalse:
+                    return ["ok": false]
+                case .serverFailure(let status, let msg):
+                    throw KinnectAPIError.serverError(status: status, message: msg)
+                case .ok:
+                    if let sup = body?["support"] as? Bool { storedSupport = sup }
+                    if let mod = body?["moderation"] as? Bool { storedModeration = mod }
+                    return ["config": ["support": storedSupport ? 1 : 0, "moderation": storedModeration ? 1 : 0]]
+                }
+            }
+            if path == "/api/admin/ai/credentials", method == "PATCH" {
+                aiRequestCount += 1
+                switch aiCredentialsMode {
+                case .missingField:
+                    return ["credentials": ["tokenSaved": true]]
+                case .okFalse:
+                    return ["ok": false]
+                case .serverFailure(let status, let msg):
+                    throw KinnectAPIError.serverError(status: status, message: msg)
+                case .ok:
+                    if let url = body?["workerUrl"] as? String { storedWorkerUrl = url }
+                    if let tok = body?["token"] as? String, !tok.isEmpty { storedTokenSaved = true }
+                    return [
+                        "credentials": [
+                            "workerUrl": storedWorkerUrl,
+                            "tokenSaved": storedTokenSaved,
+                            "nvidiaKeySaved": false,
+                            "nvidiaModel": (body?["nvidiaModel"] as? String) ?? "",
+                            "nvidiaVisionModel": "",
+                            "fallbackEnabled": (body?["fallbackEnabled"] as? Bool) ?? false,
+                            "primaryProvider": "cloudflare",
+                            "fallbackReady": false
+                        ]
+                    ]
+                }
+            }
+            if path == "/api/admin/ai/test", method == "POST" {
+                aiRequestCount += 1
+                switch aiTestMode {
+                case .missingField:
+                    return [:]
+                case .okFalse:
+                    return ["ok": false]
+                case .serverFailure(let status, let msg):
+                    throw KinnectAPIError.serverError(status: status, message: msg)
+                case .ok:
+                    let prov = (body?["provider"] as? String) ?? "cloudflare"
+                    return ["ok": true, "provider": prov, "message": "Kết nối thành công."]
+                }
             }
             throw KinnectAPIError.serverError(status: 404, message: "Not found")
         }
@@ -2443,10 +2549,130 @@ private struct SwiftContractsHarnessProbe: View {
             check("music_validA_then_invalidB_resets_state", false)
         }
 
-        // 4. AI credentials allowlist & non-secret validation
+        transport.musicUploadMode = .missingField
+        var uploadMissingRejected = false
+        do {
+            _ = try await AdminActionsContract.uploadMusic(draft: badMusic, role: "admin", transport: transport)
+        } catch {
+            uploadMissingRejected = true
+        }
+        transport.musicUploadMode = .okFalse
+        var uploadOkFalseRejected = false
+        do {
+            _ = try await AdminActionsContract.uploadMusic(draft: badMusic, role: "admin", transport: transport)
+        } catch {
+            uploadOkFalseRejected = true
+        }
+        transport.musicUploadMode = .ok
+        check("music_upload_malformed_and_okfalse_rejected", uploadMissingRejected && uploadOkFalseRejected)
+
+        transport.musicDeleteMode = .okFalse
+        var deleteOkFalseRejected = false
+        do {
+            try await AdminActionsContract.deleteMusic(file: "fixture_track_1.mp3", role: "admin", transport: transport)
+        } catch {
+            deleteOkFalseRejected = true
+        }
+        transport.musicDeleteMode = .ok
+        check("music_delete_okfalse_rejected", deleteOkFalseRejected)
+
+        // 4. AI credentials allowlist, non-admin gate & mock transport contract coverage
         let badAIUrl = AdminAICredentialsPatch(password: "pw123", workerUrl: "https://evil.example.com", token: nil, nvidiaKey: nil, nvidiaModel: nil, nvidiaVisionModel: nil, fallbackEnabled: nil)
-        let goodAI = AdminAICredentialsPatch(password: "pw123", workerUrl: "https://kinnect-ai.vuanh97nd.workers.dev", token: String(repeating: "a", count: 32), nvidiaKey: nil, nvidiaModel: nil, nvidiaVisionModel: nil, fallbackEnabled: false)
-        check("ai_credentials_validation", badAIUrl.validate() != nil && goodAI.validate() == nil)
+        let emptyAIPass = AdminAICredentialsPatch(password: "", workerUrl: "https://kinnect-ai.vuanh97nd.workers.dev", token: nil, nvidiaKey: nil, nvidiaModel: nil, nvidiaVisionModel: nil, fallbackEnabled: nil)
+        let goodAI = AdminAICredentialsPatch(password: "pw123", workerUrl: "https://kinnect-ai.vuanh97nd.workers.dev", token: String(repeating: "a", count: 32), nvidiaKey: nil, nvidiaModel: "meta/llama-3.1-8b-instruct", nvidiaVisionModel: nil, fallbackEnabled: false)
+
+        transport.aiRequestCount = 0
+        var badUrlCallRejected = false
+        do {
+            _ = try await AdminActionsContract.saveAICredentials(patch: badAIUrl, role: "admin", transport: transport)
+        } catch {
+            badUrlCallRejected = true
+        }
+        var emptyPassCallRejected = false
+        do {
+            _ = try await AdminActionsContract.saveAICredentials(patch: emptyAIPass, role: "admin", transport: transport)
+        } catch {
+            emptyPassCallRejected = true
+        }
+        check("ai_credentials_validation", badAIUrl.validate() != nil && goodAI.validate() == nil && badUrlCallRejected && emptyPassCallRejected && transport.aiRequestCount == 0)
+
+        var nonAdminSettingsDenied = false
+        do {
+            _ = try await AdminActionsContract.updateAISettings(patch: AdminAIConfigPatch(support: true, moderation: false, adminId: nil), role: "user", transport: transport)
+        } catch {
+            nonAdminSettingsDenied = true
+        }
+        var nonAdminCredsDenied = false
+        do {
+            _ = try await AdminActionsContract.saveAICredentials(patch: goodAI, role: "user", transport: transport)
+        } catch {
+            nonAdminCredsDenied = true
+        }
+        var nonAdminTestDenied = false
+        do {
+            _ = try await AdminActionsContract.testAIConnection(provider: .cloudflare, role: "user", transport: transport)
+        } catch {
+            nonAdminTestDenied = true
+        }
+        check("ai_nonadmin_blocked_no_calls", nonAdminSettingsDenied && nonAdminCredsDenied && nonAdminTestDenied && transport.aiRequestCount == 0)
+
+        var credSaveOk = false
+        var credMalformedRejected = false
+        var credErrorRejected = false
+        do {
+            let summary = try await AdminActionsContract.saveAICredentials(patch: goodAI, role: "admin", transport: transport)
+            credSaveOk = summary.tokenSaved && summary.workerUrl == "https://kinnect-ai.vuanh97nd.workers.dev" && summary.nvidiaModel == "meta/llama-3.1-8b-instruct"
+        } catch {}
+        transport.aiCredentialsMode = .missingField
+        do {
+            _ = try await AdminActionsContract.saveAICredentials(patch: goodAI, role: "admin", transport: transport)
+        } catch {
+            credMalformedRejected = true
+        }
+        transport.aiCredentialsMode = .serverFailure(401, "Mật khẩu quản trị không đúng.")
+        do {
+            _ = try await AdminActionsContract.saveAICredentials(patch: goodAI, role: "admin", transport: transport)
+        } catch {
+            credErrorRejected = true
+        }
+        transport.aiCredentialsMode = .ok
+        check("ai_credentials_save_ok_and_errors", credSaveOk && credMalformedRejected && credErrorRejected)
+
+        var aiSettingsUpdated = false
+        do {
+            let updated = try await AdminActionsContract.updateAISettings(patch: AdminAIConfigPatch(support: true, moderation: false, adminId: nil), role: "admin", transport: transport)
+            let cfgUpdated = updated["config"] as? [String: Any]
+            let reloaded = try await transport.requestJSON("/api/admin/ai", method: "GET", body: nil)
+            let cfgReloaded = reloaded["config"] as? [String: Any]
+            let reloadedSummary = AdminAICredentialSummary.parse(from: reloaded)
+            aiSettingsUpdated = AdminActionsContract.flag(cfgUpdated?["support"])
+                && !AdminActionsContract.flag(cfgUpdated?["moderation"])
+                && AdminActionsContract.flag(cfgReloaded?["support"])
+                && reloadedSummary?.tokenSaved == true
+        } catch {}
+        check("ai_settings_update_and_reload", aiSettingsUpdated)
+
+        var aiTestOk = false
+        var aiTestOkFalseRejected = false
+        var aiTestErrorRejected = false
+        do {
+            let msg = try await AdminActionsContract.testAIConnection(provider: .cloudflare, role: "admin", transport: transport)
+            aiTestOk = !msg.isEmpty
+        } catch {}
+        transport.aiTestMode = .okFalse
+        do {
+            _ = try await AdminActionsContract.testAIConnection(provider: .nvidia, role: "admin", transport: transport)
+        } catch {
+            aiTestOkFalseRejected = true
+        }
+        transport.aiTestMode = .serverFailure(503, "Không kết nối được AI đã chọn.")
+        do {
+            _ = try await AdminActionsContract.testAIConnection(provider: .fallback, role: "admin", transport: transport)
+        } catch {
+            aiTestErrorRejected = true
+        }
+        transport.aiTestMode = .ok
+        check("ai_test_ok_and_failures", aiTestOk && aiTestOkFalseRejected && aiTestErrorRejected)
 
         lines = results.keys.sorted().map { key in
             "\(key)=\(results[key] == true ? "pass" : "fail")"
@@ -2523,24 +2749,87 @@ extension UIReviewFixture {
     #if DEBUG
     final class ShortsRealSwipeObserver {
         struct Entry {
+            let playerId: String
             let player: AVPlayer
             let item: AVPlayerItem
             let output: AVPlayerItemVideoOutput
         }
 
+        struct LifecycleSnapshot {
+            var playerId: String = ""
+            var createdCount: Int = 0
+            var onAppearCount: Int = 0
+            var onDisappearCount: Int = 0
+            var onChangeActiveCount: Int = 0
+            var obsoleteRestartBlocked: Int = 0
+            var lastActive: Bool = false
+            var lastUserPaused: Bool = false
+            var lastAppActive: Bool = true
+            var lastShouldPlay: Bool = false
+            var lastTrigger: String = ""
+            var recentEvents: [String] = []
+        }
+
         static let shared = ShortsRealSwipeObserver()
         private let lock = NSLock()
         private var entries: [String: Entry] = [:]
+        private var lifecycles: [String: LifecycleSnapshot] = [:]
 
-        func register(path: String, player: AVPlayer, item: AVPlayerItem, output: AVPlayerItemVideoOutput) {
+        private static func keyLabel(for path: String) -> String {
+            URL(string: path)?.lastPathComponent ?? (path as NSString).lastPathComponent
+        }
+
+        func register(path: String, playerId: String, player: AVPlayer, item: AVPlayerItem, output: AVPlayerItemVideoOutput) {
             lock.lock()
-            entries[path] = Entry(player: player, item: item, output: output)
+            entries[path] = Entry(playerId: playerId, player: player, item: item, output: output)
+            var snap = lifecycles[path] ?? LifecycleSnapshot()
+            snap.playerId = playerId
+            snap.createdCount += 1
+            snap.recentEvents.append("setup[\(playerId)]")
+            if snap.recentEvents.count > 24 { snap.recentEvents.removeFirst() }
+            lifecycles[path] = snap
             lock.unlock()
         }
 
-        func unregister(path: String) {
+        func unregister(path: String, playerId: String? = nil) {
             lock.lock()
-            entries.removeValue(forKey: path)
+            if let existing = entries[path], playerId == nil || existing.playerId == playerId {
+                entries.removeValue(forKey: path)
+            }
+            lock.unlock()
+        }
+
+        func recordEvent(
+            path: String,
+            event: String,
+            playerId: String = "",
+            active: Bool? = nil,
+            userPaused: Bool? = nil,
+            isAppActive: Bool? = nil,
+            shouldPlay: Bool? = nil,
+            rate: Double? = nil
+        ) {
+            guard !path.isEmpty else { return }
+            lock.lock()
+            var snap = lifecycles[path] ?? LifecycleSnapshot()
+            if !playerId.isEmpty { snap.playerId = playerId }
+            switch event {
+            case "onAppear": snap.onAppearCount += 1
+            case "onDisappear": snap.onDisappearCount += 1
+            case "onChangeActive": snap.onChangeActiveCount += 1
+            case "obsoleteRestartBlocked": snap.obsoleteRestartBlocked += 1
+            default: break
+            }
+            if let active { snap.lastActive = active }
+            if let userPaused { snap.lastUserPaused = userPaused }
+            if let isAppActive { snap.lastAppActive = isAppActive }
+            if let shouldPlay { snap.lastShouldPlay = shouldPlay }
+            snap.lastTrigger = event
+            let rateTag = rate.map { String(format: "%.1f", $0) } ?? "-"
+            let summary = "\(event)(file=\(Self.keyLabel(for: path)),pid=\(snap.playerId),act=\(snap.lastActive),sp=\(snap.lastShouldPlay),r=\(rateTag))"
+            snap.recentEvents.append(summary)
+            if snap.recentEvents.count > 24 { snap.recentEvents.removeFirst() }
+            lifecycles[path] = snap
             lock.unlock()
         }
 
@@ -2548,6 +2837,37 @@ extension UIReviewFixture {
             lock.lock()
             defer { lock.unlock() }
             return entries[path]
+        }
+
+        func lifecycleDictionary(for path: String) -> [String: Any] {
+            lock.lock()
+            let snap = lifecycles[path] ?? LifecycleSnapshot()
+            let entry = entries[path]
+            lock.unlock()
+            return [
+                "file": Self.keyLabel(for: path),
+                "present": entry != nil,
+                "playerId": entry?.playerId ?? snap.playerId,
+                "itemStatus": entry.map {
+                    switch $0.item.status {
+                    case .readyToPlay: return "readyToPlay"
+                    case .failed: return "failed"
+                    default: return "unknown"
+                    }
+                } ?? "absent",
+                "rate": entry.map { Double($0.player.rate) } ?? 0,
+                "createdCount": snap.createdCount,
+                "onAppearCount": snap.onAppearCount,
+                "onDisappearCount": snap.onDisappearCount,
+                "onChangeActiveCount": snap.onChangeActiveCount,
+                "obsoleteRestartBlocked": snap.obsoleteRestartBlocked,
+                "lastActive": snap.lastActive,
+                "lastUserPaused": snap.lastUserPaused,
+                "lastAppActive": snap.lastAppActive,
+                "lastShouldPlay": snap.lastShouldPlay,
+                "lastTrigger": snap.lastTrigger,
+                "recentEvents": snap.recentEvents
+            ]
         }
     }
 

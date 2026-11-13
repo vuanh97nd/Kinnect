@@ -758,7 +758,8 @@ def main():
             ("16-compact-iphone-wallet", "wallet", [], "Màn hình nhỏ: Ví & Cửa hàng không cắt số dư / Nạp xu"),
             ("16b-compact-iphone-dynamictype-max", "feed", ["--ui-review-dynamictype-max"], "Màn hình nhỏ: Dynamic Type kích thước tối đa Accessibility 5"),
             ("16c-compact-iphone-privacy-settings", "privacy-settings", [], "Màn hình nhỏ: Quyền riêng tư, nút Lưu cách home indicator"),
-            ("16d-compact-iphone-privacy-dynamictype", "privacy-settings", ["--ui-review-dynamictype-max"], "Màn hình nhỏ: Quyền riêng tư với Dynamic Type tối đa")
+            ("16d-compact-iphone-privacy-dynamictype", "privacy-settings", ["--ui-review-dynamictype-max"], "Màn hình nhỏ: Quyền riêng tư với Dynamic Type tối đa"),
+            ("16e-compact-iphone-friends", "friends", [], "Màn hình nhỏ: Bạn bè không cắt tên dài với nút tác vụ hàng dưới")
         ]
         compact_screens = compact_login_screens if only_login else (compact_login_screens + compact_other_screens)
         for slug, screen_arg, extra, desc in compact_screens:
