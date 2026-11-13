@@ -43,6 +43,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   private FocusRingView focusRing;
   private View flipButton;
   private GridOverlay gridOverlay;
+  private android.app.Dialog musicDialog;
   private CameraDevice device;
   private CameraCaptureSession session;
   private CaptureRequest.Builder previewRequest;
@@ -721,7 +722,8 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   @Override
   protected void onResume() {
     super.onResume();
-    if(mode.equals("live")&&liveSetup==null)root.post(this::showLiveSetup);
+    if(mode.equals("live")&&liveSetup==null)root.postDelayed(this::showLiveSetup, 400);
+    if(getIntent().getBooleanExtra("open_music", false)&&(musicDialog==null||!musicDialog.isShowing()))root.postDelayed(this::chooseMusic, 600);
     Choreographer.getInstance().postFrameCallback(this);
     if (camera.isAvailable()&&reviewedVideo==null) openCamera();if(reviewVideo!=null)reviewVideo.start();
   }
@@ -1325,8 +1327,10 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
   private MediaPlayer previewPlayer;
 
   private void chooseMusic() {
-    if (recording) return;
+    if (recording || (musicDialog != null && musicDialog.isShowing())) return;
     final android.app.Dialog dialog = new android.app.Dialog(this);
+    musicDialog = dialog;
+    dialog.setCanceledOnTouchOutside(false);
     dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
     final boolean dark = WebTheme.isDark(this);
     final int variant = dark ? 1 : 0;

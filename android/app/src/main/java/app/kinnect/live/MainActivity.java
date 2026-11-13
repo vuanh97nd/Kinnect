@@ -112,8 +112,18 @@ public class MainActivity extends Activity {
         else if(destination.equals("feed_story")){
           navigate("feed");
           try{
-            JSONArray arr=new JSONArray("[{\"id\":\"st_1\",\"mediaUrl\":\"/story.jpg\",\"user\":{\"id\":\"usr_story\",\"name\":\"Linh Nhi\",\"username\":\"linhnhi\"}}]");
-            story(arr,0);
+            JSONObject s = new JSONObject();
+            s.put("id", "st_1");
+            s.put("body", "Chào ngày mới đầy năng lượng cùng Kinnect! ✨");
+            s.put("created", System.currentTimeMillis() - 3600000L);
+            JSONObject a = new JSONObject();
+            a.put("id", "usr_story");
+            a.put("name", "Linh Nhi");
+            a.put("username", "linhnhi");
+            s.put("author", a);
+            JSONArray arr = new JSONArray();
+            arr.put(s);
+            story(arr, 0);
           }catch(Exception ignored){}
         }
         else if(destination.equals("feed_post_detail")){
@@ -225,7 +235,7 @@ public class MainActivity extends Activity {
           live();
         }
         else if(destination.equals("live_setup_sheet")){
-          startActivity(new Intent(this,LiveActivity.class).putExtra(LiveActivity.EXTRA_HOST,true));
+          startActivity(new Intent(this,StudioActivity.class).putExtra(StudioActivity.EXTRA_MODE,"live"));
         }
         else if(destination.equals("live_gifts_drawer")){
           startActivity(new Intent(this,LiveActivity.class).putExtra("show_gifts",true));

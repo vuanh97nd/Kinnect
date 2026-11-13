@@ -658,7 +658,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
   }
 
   protected void onStop() { super.onStop();if(gameSession){gameControllerVisible=false;syncGameVisibility();}if(giftExperience!=null)giftExperience.stopVisuals();if(gameSession&&gameService!=null&&gameComments)gameService.overlayVisible(true); if ((joined || previewing) && !gameSession&&gameConnection==null&&!projectionPrompt&&!externalPicker&&!isChangingConfigurations()) finish(); }
-  @Override protected void onResume(){super.onResume();gameControllerVisible=true;syncGameVisibility();externalPicker=false;if(gameService!=null)gameService.overlayVisible(false);}
+  @Override protected void onResume(){super.onResume();gameControllerVisible=true;syncGameVisibility();externalPicker=false;if(gameService!=null)gameService.overlayVisible(false);if(getIntent().getBooleanExtra("show_gifts",false))root.postDelayed(this::gifts,800);}
   @Override public void onBackPressed(){if(joined){confirmLeave();return;}super.onBackPressed();}
 
   protected void onDestroy() {

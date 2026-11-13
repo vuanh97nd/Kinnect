@@ -256,7 +256,33 @@ def main():
             "-e", "app_language", row.get("language", "vi"))
         time.sleep(2.5)
         
-        ensure_app_foreground(act_name)
+        is_fg = ensure_app_foreground(act_name)
+        if not is_fg:
+            focus = adb("shell", "dumpsys", "window")
+            row["status"] = "failed"
+            row["blocker_or_reason"] = f"App crashed or fell back to launcher (focus: {focus[:60]})"
+            print(f"[FAILED] {scr_id} ({img_file}): {row['blocker_or_reason']}")
+            subprocess.run(["adb", "exec-out", "screencap", "-p"], stdout=open(target_path, "wb"), check=True)
+            sha = get_file_sha256(target_path)
+            captures.append({
+                "screen_id": scr_id,
+                "screen_name": row["screen_name"],
+                "file": f"screenshots/{img_file}",
+                "sha256": sha,
+                "theme": theme,
+                "fontScale": font_scale,
+                "status": row["status"]
+            })
+            continue
+
+        if scr_id in ("SCR-25", "SCR-45", "SCR-47"):
+            # Scroll down to reveal bottom danger action (Logout red row)
+            time.sleep(0.5)
+            adb("shell", "input", "swipe", "540", "1800", "540", "600", "300")
+            time.sleep(1)
+        elif scr_id in ("SCR-39", "SCR-40", "SCR-43"):
+            # Extra settling time for bottom sheets and dialogs
+            time.sleep(1.2)
         
         # Screencap
         subprocess.run(["adb", "exec-out", "screencap", "-p"], stdout=open(target_path, "wb"), check=True)

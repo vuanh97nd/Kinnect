@@ -118,12 +118,17 @@ public final class NativeApi {
 
   private FixtureResult offlineFixture(String method, String path, JSONObject data) {
     String cleanPath = path.split("\\?", 2)[0];
+    long nowTime = System.currentTimeMillis();
+    long postTime = nowTime - 3600000L;
     try {
       if ("GET".equals(method) && "/api/me".equals(cleanPath)) {
         return new FixtureResult(new JSONObject("{\"user\":{\"id\":\"usr_qa_review\",\"username\":\"minhanh\",\"name\":\"Minh Anh\",\"role\":\"user\",\"coins\":1200,\"bio\":\"Kinnect QA Review\",\"followersCount\":128,\"followingCount\":64,\"showActivity\":true}}"), null, 200);
       }
       if ("POST".equals(method) && "/api/me/password".equals(cleanPath)) {
         return new FixtureResult(new JSONObject("{\"message\":\"Đã đổi mật khẩu thành công\"}"), null, 200);
+      }
+      if ("GET".equals(method) && "/api/me/privacy-consent".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"accepted\":true}"), null, 200);
       }
       if ("POST".equals(method) && "/api/me/privacy-consent".equals(cleanPath)) {
         return new FixtureResult(new JSONObject("{\"success\":true}"), null, 200);
@@ -135,23 +140,22 @@ public final class NativeApi {
         return new FixtureResult(new JSONObject("{\"sessions\":[{\"id\":\"sess_1\",\"label\":\"Pixel 6 · Android 14\",\"current\":true,\"expires\":\"2026-12-01T00:00:00Z\"}]}"), null, 200);
       }
       if ("GET".equals(method) && "/api/stories".equals(cleanPath)) {
-        return new FixtureResult(new JSONObject("{\"stories\":[{\"id\":\"st_1\",\"mediaUrl\":\"/story.jpg\",\"author\":{\"id\":\"usr_story\",\"name\":\"Linh Nhi\",\"username\":\"linhnhi\"}}]}"), null, 200);
+        return new FixtureResult(new JSONObject("{\"stories\":[{\"id\":\"st_1\",\"body\":\"Khoảnh khắc cuối tuần cùng Kinnect!\",\"created\":" + postTime + ",\"mediaUrl\":\"/story.jpg\",\"user\":{\"id\":\"usr_story\",\"name\":\"Linh Nhi\",\"username\":\"linhnhi\"},\"author\":{\"id\":\"usr_story\",\"name\":\"Linh Nhi\",\"username\":\"linhnhi\"}}]}"), null, 200);
       }
-      if ("GET".equals(method) && "/api/posts".equals(cleanPath)) {
-        long postTime = System.currentTimeMillis() - 3600000L;
+      if ("GET".equals(method) && ("/api/posts".equals(cleanPath) || cleanPath.startsWith("/api/posts?"))) {
         return new FixtureResult(new JSONObject("{\"posts\":[{\"id\":\"post_1\",\"body\":\"Chào mừng bạn đến với Kinnect! Trải nghiệm kết nối sống đúng mình.\",\"content\":\"Chào mừng bạn đến với Kinnect! Trải nghiệm kết nối sống đúng mình.\",\"created\":" + postTime + ",\"createdAt\":\"2026-11-13T00:00:00Z\",\"user_id\":\"usr_qa_review\",\"visibility\":\"public\",\"author\":{\"id\":\"usr_qa_review\",\"name\":\"Minh Anh\",\"username\":\"minhanh\"},\"likes\":15,\"comments\":4,\"reactionsCount\":24,\"myReaction\":\"love\"}]}"), null, 200);
       }
       if ("POST".equals(method) && cleanPath.matches("/api/posts/[^/]+/reaction")) {
         return new FixtureResult(new JSONObject("{\"success\":true,\"myReaction\":\"love\",\"reactionsCount\":25}"), null, 200);
       }
-      if ("GET".equals(method) && cleanPath.matches("/api/posts/[^/]+/comments")) {
-        return new FixtureResult(new JSONObject("{\"comments\":[{\"id\":\"c_1\",\"content\":\"Chào mừng bạn gia nhập!\",\"author\":{\"id\":\"u2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\"},\"createdAt\":\"2026-11-13T00:05:00Z\",\"likes\":2,\"myReaction\":null}]}"), null, 200);
+      if ("GET".equals(method) && (cleanPath.matches("/api/posts/[^/]+/comments") || cleanPath.matches("/api/posts/[^/]+/comments/comments") || cleanPath.matches("/api/shorts/[^/]+/comments") || cleanPath.matches("/api/shorts/[^/]+/comments/comments"))) {
+        return new FixtureResult(new JSONObject("{\"comments\":[{\"id\":\"c_1\",\"body\":\"Chào mừng bạn gia nhập!\",\"content\":\"Chào mừng bạn gia nhập!\",\"author\":{\"id\":\"u2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\"},\"created\":" + (nowTime - 1800000L) + ",\"createdAt\":\"2026-11-13T00:05:00Z\",\"likes\":2,\"myReaction\":null}]}"), null, 200);
       }
       if ("GET".equals(method) && cleanPath.matches("/api/posts/[^/]+/reactions")) {
         return new FixtureResult(new JSONObject("{\"users\":[{\"id\":\"u2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\",\"reaction\":\"love\"},{\"id\":\"u3\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\",\"reaction\":\"like\"}]}"), null, 200);
       }
-      if ("POST".equals(method) && cleanPath.matches("/api/posts/[^/]+/comments")) {
-        return new FixtureResult(new JSONObject("{\"comment\":{\"id\":\"c_new\",\"content\":\"Cảm ơn mọi người!\",\"author\":{\"id\":\"usr_qa_review\",\"name\":\"Minh Anh\",\"username\":\"minhanh\"},\"createdAt\":\"2026-11-13T00:10:00Z\"}}"), null, 200);
+      if ("POST".equals(method) && (cleanPath.matches("/api/posts/[^/]+/comments") || cleanPath.matches("/api/posts/[^/]+/comments/comments") || cleanPath.matches("/api/shorts/[^/]+/comments") || cleanPath.matches("/api/shorts/[^/]+/comments/comments"))) {
+        return new FixtureResult(new JSONObject("{\"comment\":{\"id\":\"c_new\",\"body\":\"Cảm ơn mọi người!\",\"content\":\"Cảm ơn mọi người!\",\"author\":{\"id\":\"usr_qa_review\",\"name\":\"Minh Anh\",\"username\":\"minhanh\"},\"created\":" + nowTime + ",\"createdAt\":\"2026-11-13T00:10:00Z\"}}"), null, 200);
       }
       if ("GET".equals(method) && "/api/discover".equals(cleanPath)) {
         if (path.contains("khong_tim_thay")) {
@@ -163,25 +167,34 @@ public final class NativeApi {
         return new FixtureResult(new JSONObject("{\"shorts\":[{\"id\":\"s1\",\"title\":\"Khoảnh khắc cuộc sống\",\"author\":{\"id\":\"usr_qa_review\",\"name\":\"Minh Anh\"},\"likes\":89,\"comments\":12}]}"), null, 200);
       }
       if ("GET".equals(method) && "/api/conversations".equals(cleanPath)) {
-        return new FixtureResult(new JSONObject("{\"conversations\":[{\"id\":\"c1\",\"title\":\"Bảo Ngọc\",\"lastMessage\":\"Hẹn gặp bạn cuối tuần này nhé!\",\"updatedAt\":\"2026-11-13T00:00:00Z\",\"unread\":1}]}"), null, 200);
+        return new FixtureResult(new JSONObject("{\"users\":[{\"id\":\"u3\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\",\"isActive\":true,\"unread\":1,\"last\":{\"body\":\"Hẹn gặp bạn cuối tuần này nhé!\",\"created\":" + (nowTime - 900000L) + ",\"mine\":false}}],\"conversations\":[{\"id\":\"c1\",\"title\":\"Bảo Ngọc\",\"lastMessage\":\"Hẹn gặp bạn cuối tuần này nhé!\",\"updatedAt\":\"2026-11-13T00:00:00Z\",\"unread\":1}]}"), null, 200);
+      }
+      if ("GET".equals(method) && "/api/groups".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"groups\":[{\"id\":\"g1\",\"name\":\"Cộng đồng Nhiếp ảnh Kinnect\",\"members\":[{\"id\":\"usr_qa_review\"},{\"id\":\"u2\"},{\"id\":\"u3\"}],\"unread\":0,\"last\":{\"body\":\"Chào mừng mọi người đến nhóm âm nhạc!\",\"created\":" + (nowTime - 1800000L) + ",\"name\":\"Hoàng Nam\",\"mine\":false}}]}"), null, 200);
       }
       if ("GET".equals(method) && cleanPath.matches("/api/users/[^/]+/messages")) {
-        return new FixtureResult(new JSONObject("{\"messages\":[{\"id\":\"m_1\",\"sender\":\"u3\",\"body\":\"Chào bạn, rất vui được làm quen!\",\"createdAt\":\"2026-11-13T00:00:00Z\"},{\"id\":\"m_2\",\"sender\":\"usr_qa_review\",\"body\":\"Chào Bảo Ngọc nhé!\",\"createdAt\":\"2026-11-13T00:01:00Z\"}]}"), null, 200);
+        return new FixtureResult(new JSONObject("{\"messages\":[{\"id\":\"m_1\",\"sender\":\"u3\",\"body\":\"Chào bạn, rất vui được làm quen!\",\"created\":" + (nowTime - 3600000L) + ",\"createdAt\":\"2026-11-13T00:00:00Z\"},{\"id\":\"m_2\",\"sender\":\"usr_qa_review\",\"body\":\"Chào Bảo Ngọc nhé!\",\"created\":" + (nowTime - 3540000L) + ",\"createdAt\":\"2026-11-13T00:01:00Z\"}]}"), null, 200);
       }
       if ("GET".equals(method) && cleanPath.matches("/api/groups/[^/]+/messages")) {
-        return new FixtureResult(new JSONObject("{\"messages\":[{\"id\":\"gm_1\",\"sender\":\"u2\",\"body\":\"Chào mừng mọi người đến nhóm âm nhạc!\",\"createdAt\":\"2026-11-13T00:00:00Z\"}]}"), null, 200);
+        return new FixtureResult(new JSONObject("{\"messages\":[{\"id\":\"gm_1\",\"sender\":\"u2\",\"body\":\"Chào mừng mọi người đến nhóm âm nhạc!\",\"created\":" + (nowTime - 3600000L) + ",\"createdAt\":\"2026-11-13T00:00:00Z\"}]}"), null, 200);
       }
       if ("GET".equals(method) && "/api/friends".equals(cleanPath)) {
-        return new FixtureResult(new JSONObject("{\"friends\":[{\"id\":\"f1\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\"},{\"id\":\"f2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\"}]}"), null, 200);
+        return new FixtureResult(new JSONObject("{\"users\":[{\"id\":\"f1\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\",\"bio\":\"Yêu âm nhạc & Du lịch\"},{\"id\":\"f2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\",\"bio\":\"Nhiếp ảnh & Sáng tạo nội dung\"}],\"friends\":[{\"id\":\"f1\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\"},{\"id\":\"f2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\"}]}"), null, 200);
+      }
+      if ("GET".equals(method) && "/api/friend-suggestions".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"users\":[{\"id\":\"u4\",\"name\":\"Khánh Linh\",\"username\":\"linh_k\",\"bio\":\"Nhà thiết kế trải nghiệm\"}]}"), null, 200);
       }
       if ("GET".equals(method) && "/api/friend-requests".equals(cleanPath)) {
         return new FixtureResult(new JSONObject("{\"requests\":[{\"id\":\"fr_1\",\"user\":{\"id\":\"u4\",\"name\":\"Khánh Linh\",\"username\":\"linh_k\"},\"createdAt\":\"2026-11-13T00:00:00Z\"}]}"), null, 200);
       }
       if ("GET".equals(method) && "/api/notifications".equals(cleanPath)) {
-        return new FixtureResult(new JSONObject("{\"notifications\":[{\"id\":\"n1\",\"title\":\"Chào mừng thành viên mới\",\"body\":\"Cảm ơn bạn đã tham gia cộng đồng Kinnect!\",\"createdAt\":\"2026-11-13T00:00:00Z\"}]}"), null, 200);
+        return new FixtureResult(new JSONObject("{\"notifications\":[{\"id\":\"n1\",\"kind\":\"like\",\"created\":" + (nowTime - 7200000L) + ",\"createdAt\":\"2026-11-13T00:00:00Z\",\"seen\":0,\"actor\":{\"id\":\"u2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\"}}]}"), null, 200);
+      }
+      if ("POST".equals(method) && "/api/notifications".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"success\":true}"), null, 200);
       }
       if ("GET".equals(method) && "/api/store".equals(cleanPath)) {
-        return new FixtureResult(new JSONObject("{\"packages\":[{\"id\":\"pkg_aurora\",\"name\":\"Gói Phong cách Aurora\",\"priceCoins\":200},{\"id\":\"pkg_neon\",\"name\":\"Gói Phong cách Neon\",\"priceCoins\":300}]}"), null, 200);
+        return new FixtureResult(new JSONObject("{\"packages\":[{\"id\":\"pkg_aurora\",\"name\":\"Gói Phong cách Aurora\",\"priceCoins\":200},{\"id\":\"pkg_neon\",\"name\":\"Gói Phong cách Neon\",\"priceCoins\":300}],\"products\":[]}"), null, 200);
       }
       if ("POST".equals(method) && "/api/store/packages/buy".equals(cleanPath)) {
         return new FixtureResult(new JSONObject("{\"success\":true,\"packageId\":\"pkg_aurora\",\"balance\":1000}"), null, 200);
@@ -196,7 +209,10 @@ public final class NativeApi {
         return new FixtureResult(new JSONObject("{\"tracks\":[{\"id\":\"m1\",\"title\":\"Giai điệu kết nối\",\"artist\":\"Kinnect Audio\",\"duration\":185}]}"), null, 200);
       }
       if ("GET".equals(method) && "/api/live".equals(cleanPath)) {
-        return new FixtureResult(new JSONObject("{\"rooms\":[{\"id\":\"room_1\",\"title\":\"Giao lưu âm nhạc cuối tuần\",\"host\":{\"name\":\"Minh Anh\",\"username\":\"minhanh\"},\"viewers\":42}]}"), null, 200);
+        return new FixtureResult(new JSONObject("{\"rooms\":[{\"id\":\"room_1\",\"title\":\"Giao lưu âm nhạc cuối tuần\",\"host\":\"Minh Anh\",\"liveMode\":\"chat\",\"hostId\":\"usr_qa_review\",\"viewers\":42}]}"), null, 200);
+      }
+      if ("GET".equals(method) && "/api/live/gifts".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"enabled\":true,\"experience\":true,\"balance\":1200,\"version\":1,\"inventory\":[],\"items\":[{\"id\":\"rose\",\"costCoins\":10,\"tier\":\"small\",\"comboable\":true},{\"id\":\"star\",\"costCoins\":50,\"tier\":\"small\",\"comboable\":true},{\"id\":\"crown\",\"costCoins\":500,\"tier\":\"medium\",\"comboable\":true},{\"id\":\"castle\",\"costCoins\":2000,\"tier\":\"legendary\",\"comboable\":false}]}"), null, 200);
       }
       if ("GET".equals(method) && "/api/wallet".equals(cleanPath)) {
         return new FixtureResult(new JSONObject("{\"balance\":1200,\"diamonds\":450,\"currency\":\"VND\",\"records\":[{\"id\":\"w_1\",\"title\":\"Nạp xu\",\"amount\":500,\"created\":\"2026-11-12T10:00:00Z\",\"type\":\"topup\",\"category\":\"topup\"}]}"), null, 200);
