@@ -1,25 +1,26 @@
 {
   "platform": "android",
   "provenance": {
-    "sourceCommit": "61a698a8a7ace6e1d1590c24d0f2f21484ea4415",
+    "sourceCommit": "f325d756d2d127832cb4186f56a05aac6340dcec",
     "targetSdk": 35,
     "minSdk": 26,
     "apkPackage": "app.kinnect.live",
     "deviceProfile": "Pixel 6 (Google APIs x86_64)",
     "apiLevel": 34,
-    "capturedAt": "2026-11-12T22:30:43Z"
+    "capturedAt": "2026-11-12T23:59:16Z"
   },
   "stats": {
     "totalScreens": 49,
     "captured": 49,
-    "duplicateWarnings": 0
+    "duplicateWarnings": 0,
+    "failedOrBlocked": 0
   },
   "captures": [
     {
       "screen_id": "SCR-01",
       "screen_name": "Splash / Intro",
       "file": "screenshots/01_splash_intro.png",
-      "sha256": "9b66872d6089d8518701899205d64ef18b9a48b98345f5165f1f27a950745896",
+      "sha256": "36f5342b877ed749dcdeca818f629719f1f6760ec9d493b5f25a21dcbbdae55f",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -28,7 +29,7 @@
       "screen_id": "SCR-02",
       "screen_name": "Welcome & Login Options",
       "file": "screenshots/02_auth_welcome.png",
-      "sha256": "18df81fe466a9bf1f1657782d14ab0d7d02936d71b294af36c101cb2ef66f174",
+      "sha256": "2402dd038b81bd452d67bb7d49368fa3eb880649ec0d54b52dbc085132b05f64",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -37,7 +38,7 @@
       "screen_id": "SCR-03",
       "screen_name": "Login Form",
       "file": "screenshots/03_auth_login.png",
-      "sha256": "cc30a1048a587f7d7b8e7976f02154e2318c804538dd43a544c1f44f33dc1081",
+      "sha256": "5417b3d31a3b6bb0931abb44df6b1b8a53fcbb417833e34d709c7f57d4573e70",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -46,7 +47,7 @@
       "screen_id": "SCR-04",
       "screen_name": "Register Form",
       "file": "screenshots/04_auth_register.png",
-      "sha256": "a8f8d62e51c241a496da07a1048d15266991827c9650b80029d9dd27ff192cea",
+      "sha256": "f5487293fcea674cd26781f23c5bf8ca58a22b72dd832fb157446e4488ddf6c8",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -55,7 +56,7 @@
       "screen_id": "SCR-05",
       "screen_name": "Forgot Password",
       "file": "screenshots/05_auth_forgot_password.png",
-      "sha256": "62cf0583cb5c314abea1cf2d2aeba5c504714514c2fa5cf784659d02fccc51a9",
+      "sha256": "652c0392f7c2f5714223cbc9d2684a90ed7b80fe07be0a5103b52d617e9b5668",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -64,7 +65,7 @@
       "screen_id": "SCR-06",
       "screen_name": "News Feed Main",
       "file": "screenshots/06_feed_home.png",
-      "sha256": "39d5769d5145a54759c6bb2b06af3adedcd14e9a209f331c55ae13750306390a",
+      "sha256": "cef2535448a02ffefd12a125ca98fcfdcd21ef08fc7cefe2ba247b054c964720",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -73,7 +74,7 @@
       "screen_id": "SCR-07",
       "screen_name": "Story 24h Bar & Viewer",
       "file": "screenshots/07_feed_story.png",
-      "sha256": "4a0a61968e2ab7cfc4607849eb34486a233fc08027abaf1db5d653552353d2bf",
+      "sha256": "f5bfa79054cb22be4b2897cc2a000a22acf1b407157da3c63b4b45556a41a2b4",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -82,7 +83,7 @@
       "screen_id": "SCR-08",
       "screen_name": "Post Detail",
       "file": "screenshots/08_feed_post_detail.png",
-      "sha256": "b31a04b5650bd0ef9b8cc43101417ec1dcfaa58b1385782e37eb2df221538315",
+      "sha256": "3f34bda2c065ed3b7e469ca4141d2a4fd7f8a267dcefd7733e72524dd051a43d",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -91,7 +92,7 @@
       "screen_id": "SCR-09",
       "screen_name": "Comments Sheet",
       "file": "screenshots/09_feed_comments.png",
-      "sha256": "bdd0fed6da10a2d8d41ebd714f8dce915bcdd9f64da2ecd012b8c0558d85fc57",
+      "sha256": "59dd5ea63204bbe324481a11712fb41cc28b87cfd78417b7d47d3c285e40d2de",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -100,7 +101,7 @@
       "screen_id": "SCR-10",
       "screen_name": "Reaction Picker (6 reactions)",
       "file": "screenshots/10_feed_reactions.png",
-      "sha256": "e0979f09723a5574ca75ba1ecb8fabe0660c9f15239a68a5e55bd0488f5727d8",
+      "sha256": "9bf11667eb3bd7ac3886b607284803fc38ac699fe02f1db57ee8336c9f71dd36",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -109,7 +110,7 @@
       "screen_id": "SCR-11",
       "screen_name": "Discover & Search",
       "file": "screenshots/11_discover_search.png",
-      "sha256": "f2b62e37319c6a86e82ad70a76b1690e805f4ba0bf1be0ab4b907e8adf21c7fa",
+      "sha256": "6c5671203134e534ce4bce923220bb6a796fa8b6e106e1cfd715f43ac68d2852",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -118,7 +119,7 @@
       "screen_id": "SCR-12",
       "screen_name": "Discover Suggestions",
       "file": "screenshots/12_discover_results.png",
-      "sha256": "2f8a9919797d7d0cf04a79602d614869839e6a03ea04c4c1bce503a679dcaac1",
+      "sha256": "9870d60c32565718966b9a45028dda0cbc5b196bf7e6fc87959ad0665f45e1cc",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -127,7 +128,7 @@
       "screen_id": "SCR-13",
       "screen_name": "Discover Empty Search",
       "file": "screenshots/13_discover_empty.png",
-      "sha256": "ad575d1f711f3506d059867280efda5413a0f23762bd45758ec4a7751b0afaae",
+      "sha256": "14946d78f897cd63a1c366de35588dfc9635f73a4d414f2b3f26512551fb145a",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -136,7 +137,7 @@
       "screen_id": "SCR-14",
       "screen_name": "Shorts Fullscreen Player",
       "file": "screenshots/14_shorts_player.png",
-      "sha256": "e71f3cbedb2af3dc1c6cc668fcf4bd48861082899b3a29f6a9d72094cb34686c",
+      "sha256": "9d24f900c979d98f9c99c7f758f768f695cbbf6d1344f2f5af534c88a2d3bf34",
       "theme": "dark",
       "fontScale": "1.0",
       "status": "captured"
@@ -145,7 +146,7 @@
       "screen_id": "SCR-15",
       "screen_name": "Shorts Comments Drawer",
       "file": "screenshots/15_shorts_comments.png",
-      "sha256": "e2810cb1e837e81b6969b700be972763a1b9fd9f2679547414aeb35d716cffd1",
+      "sha256": "7de67f19f4da6aad98558593cb21cedb1f464e05789edc4f53ab09d96111ec49",
       "theme": "dark",
       "fontScale": "1.0",
       "status": "captured"
@@ -154,7 +155,7 @@
       "screen_id": "SCR-16",
       "screen_name": "Messages Inbox",
       "file": "screenshots/16_inbox_list.png",
-      "sha256": "989383839b398d34ed0b8e7438a7c50b383db04aa70fdb95b0eb79c9941a4299",
+      "sha256": "4c4459e13d979769abfbbb012dcb8bc261f64ebffb1b7abc56eb6a4c03c49f68",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -163,7 +164,7 @@
       "screen_id": "SCR-17",
       "screen_name": "Direct Chat Conversation",
       "file": "screenshots/17_chat_direct.png",
-      "sha256": "707e403fec938066a36f147dee88d29c631c569fc316747605bd328e1b2e3614",
+      "sha256": "fa516f99be5b52b7207a83a124210ef3ec1a86aac3b16d823b910b6aef662d08",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -172,7 +173,7 @@
       "screen_id": "SCR-18",
       "screen_name": "Group Chat Conversation",
       "file": "screenshots/18_chat_group.png",
-      "sha256": "37c299fdc74f934b8db501fc7b346b25dbb78893bae43b0494fa31c2bd016515",
+      "sha256": "c30e03936619746b1653221bfeffaa6e99bcb53806b0aa26bce8ddc5c5d4c48e",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -181,7 +182,7 @@
       "screen_id": "SCR-19",
       "screen_name": "Chat Conversation Menu",
       "file": "screenshots/19_chat_menu.png",
-      "sha256": "35319f6f89ba0ef3069375a4ab64c8810df71b2db24c5a32ebd4ed9bbb46fd0e",
+      "sha256": "dba62976b4396223c936240a8202a04741d9f3e46df3072d8631c3478027f4e5",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -190,7 +191,7 @@
       "screen_id": "SCR-20",
       "screen_name": "Friends List",
       "file": "screenshots/20_friends_list.png",
-      "sha256": "c5c217975b436521052a8965a058696e1903fb8d105c43d36df90db4b784ad84",
+      "sha256": "6046c7416db3576988a97d5159a3763b09ed81960163fee7a4aa72c207685214",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -199,7 +200,7 @@
       "screen_id": "SCR-21",
       "screen_name": "Friend Requests",
       "file": "screenshots/21_friends_requests.png",
-      "sha256": "02119011617eae56fe762b4413b7712d5cdc7ed94a8ad57defb34ecacbeebbb8",
+      "sha256": "adf15dc3e86623bb819e6cae84d9ee7b0d0a56a2d7420b1e67e998a51abe6482",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -208,7 +209,7 @@
       "screen_id": "SCR-22",
       "screen_name": "Profile Main View",
       "file": "screenshots/22_profile_main.png",
-      "sha256": "c456fdc98b04c416fb0432fd86a7b74d8fe999f399028f554207c5a789e4161d",
+      "sha256": "7c03e853bca0af3a6291c2fb72a5a97cc8e1d50cc1aa7230c39930b11886b414",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -217,7 +218,7 @@
       "screen_id": "SCR-23",
       "screen_name": "Edit Profile Sheet",
       "file": "screenshots/23_profile_edit.png",
-      "sha256": "a7cc647238ab2951f5e47a07ada53c4e0ec062353fab31b0470f562f9e0652f3",
+      "sha256": "f890d66e48e080e0a59d9bed541cf855058420acfe29d7f971051c0486d32b96",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -226,7 +227,7 @@
       "screen_id": "SCR-24",
       "screen_name": "Profile Albums & Privacy",
       "file": "screenshots/24_profile_albums.png",
-      "sha256": "b2fd80c771042a0d8a24a44feea8fab18b7e0c3e2c0a8d38fc819d4a7c033579",
+      "sha256": "3f5fa4e2d93f31c607eba8d8a2ba8b3825b073d87744fb355d115595d3c80757",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -235,7 +236,7 @@
       "screen_id": "SCR-25",
       "screen_name": "Account Menu",
       "file": "screenshots/25_account_menu.png",
-      "sha256": "6292baf8889a60b50fc0815c2f21ad00e9cbbf45a20f049ad15635a0f1af0076",
+      "sha256": "37351edb8094a3883681d4ed6ffa748a3cf7fa2a45a179268089ce9015928ed1",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -244,7 +245,7 @@
       "screen_id": "SCR-26",
       "screen_name": "Appearance Settings (Theme)",
       "file": "screenshots/26_appearance_settings.png",
-      "sha256": "890b5c18d3b85a27772bf4d2aedbf84b8c5706e4d39d2adf8d566de77032412d",
+      "sha256": "fe40308f7dcb8890c22e39b3e08bceca4615b9027c576b04377d6c439b675295",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -253,7 +254,7 @@
       "screen_id": "SCR-27",
       "screen_name": "Change Password Sheet",
       "file": "screenshots/27_security_password.png",
-      "sha256": "1cd0d4b21ec8095fe2c8dfc0e43c382d72a2cfa2552b0609b957fa5b9d033f5f",
+      "sha256": "6616db9258741ea6b89bde9b71511efc7651120d7405efbd582c50848e02b684",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -262,7 +263,7 @@
       "screen_id": "SCR-28",
       "screen_name": "Active Login Sessions",
       "file": "screenshots/28_sessions_devices.png",
-      "sha256": "db664791d04d53bd6347f4dacd0b89941ba53621aeaa63726d5df120b9056da3",
+      "sha256": "f07802bb4b9dcd1ea1046ddad2624a5d372850a5a335e68eef6c84e9f5843470",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -271,7 +272,7 @@
       "screen_id": "SCR-29",
       "screen_name": "Notifications Screen",
       "file": "screenshots/29_notifications_screen.png",
-      "sha256": "73f6aaf76648f915ded31180628e8b5b58e0ccb7c02e2e56aa29bfa0162e3644",
+      "sha256": "9b43b240c2152b60dcfcb821e6298bdb3bfcb43c39fa5695cbe199c866192e7a",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -280,7 +281,7 @@
       "screen_id": "SCR-30",
       "screen_name": "Notification Preferences",
       "file": "screenshots/30_notifications_settings.png",
-      "sha256": "1400048a90b2726f87cd7f6b380d553580f3dbb5e33f90e4a394cbfc65881fce",
+      "sha256": "1c5027aaad6193612b1e54ea2f7d2da31830ecf3d579f773c20396393c11cb43",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -289,7 +290,7 @@
       "screen_id": "SCR-31",
       "screen_name": "Privacy Settings",
       "file": "screenshots/31_privacy_settings.png",
-      "sha256": "f93820bcad846776615e93ffad96da379d74511ff33de943bc4f874ad449183d",
+      "sha256": "1a53484f75e2b3fc24862f42c1fa47283176ef472c99f232dc1ce3b0a829bfaf",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -298,7 +299,7 @@
       "screen_id": "SCR-32",
       "screen_name": "Language Settings",
       "file": "screenshots/32_language_settings.png",
-      "sha256": "b83eba7bac139c4b2843eef7f777e67f3f27532721d12d4ec8cefc3a8e41fceb",
+      "sha256": "cd9e1eae82dbe1b0ee7ea519079ddaf222ffde8a43a52b49d8c0b7636096038b",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -307,7 +308,7 @@
       "screen_id": "SCR-33",
       "screen_name": "Help & Support",
       "file": "screenshots/33_help_support.png",
-      "sha256": "a4be705559d65852f4380975a74b6c15ab9e66a215ff3b469f96870cca174172",
+      "sha256": "329d955113fa0e35b02ec10c779e268782a2d8c97635b215cf948a9f3b2f4769",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -316,7 +317,7 @@
       "screen_id": "SCR-34",
       "screen_name": "About App",
       "file": "screenshots/34_about_screen.png",
-      "sha256": "899cb47e64ad42e0206ff40b54c7f3be30a963c13982fa88a151bf2a4f26ecdb",
+      "sha256": "46b8681b0eba10e1fba5a9ad18d6c56a2b4601ab998f5b8923b104033e248160",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -325,7 +326,7 @@
       "screen_id": "SCR-35",
       "screen_name": "Delete Account Confirmation",
       "file": "screenshots/35_delete_account_confirm.png",
-      "sha256": "0264754e89c2046a39fa59ac5c6d2897969af7c7cc96ebe423776162651a3b3e",
+      "sha256": "994172cd1db3ad3f0cc2bc8ec0fea31a58b9673b4fcecf8e0d86cf5a8d457639",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -334,7 +335,7 @@
       "screen_id": "SCR-36",
       "screen_name": "Wallet Balance & Coin",
       "file": "screenshots/36_wallet_main.png",
-      "sha256": "86545c8348a1c7f244127918a52d5cb19e50f9e864694f58cbe69d163e9c73eb",
+      "sha256": "62b0df3a9202ef4d7d1816e1ad298f15269f62138e305f583fd6b6af4cc9ce02",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -343,7 +344,7 @@
       "screen_id": "SCR-37",
       "screen_name": "Store Packages",
       "file": "screenshots/37_store_packages.png",
-      "sha256": "5a9ca006c1b283d2fa8ade1e644d034afb9657a5b4b152e7baa6eaa356e7f8f6",
+      "sha256": "126d7cdd420176652eab2de18a9846c1bfa4ada2f558b6a30dec2d7ec0699118",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -352,7 +353,7 @@
       "screen_id": "SCR-38",
       "screen_name": "Live Streaming Rooms List",
       "file": "screenshots/38_live_list.png",
-      "sha256": "e0d66525e1f21388d9bdd2ec8363eb6ed3d5d689fb213ba054fcfe261fb538e5",
+      "sha256": "b8f2382f3e9fa32b27d5ad4d143314c4e799ca66d79a8fc448a747225cdecd17",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -361,7 +362,7 @@
       "screen_id": "SCR-39",
       "screen_name": "Live Setup Sheet (Chat/Game)",
       "file": "screenshots/39_live_setup_sheet.png",
-      "sha256": "a99dc46c758bfdd738c5d18bd5a0fb3d1173aabb6fe43cc290c2d1e9fa6ec5e9",
+      "sha256": "cdc5f67512ff54531e44208b61c5ddf2d2bf2f60ea1b367515167a776901cb31",
       "theme": "dark",
       "fontScale": "1.0",
       "status": "captured"
@@ -370,7 +371,7 @@
       "screen_id": "SCR-40",
       "screen_name": "Live Gifts Drawer & Combos",
       "file": "screenshots/40_live_gifts_drawer.png",
-      "sha256": "3d4a720ac3458f37519e14d7ca223ea22a2a2028c17c76b263be07cd7aab1f06",
+      "sha256": "337725112d96e128c8a3b8feeb639bf72385dd1c312e6087228e776f2047d34d",
       "theme": "dark",
       "fontScale": "1.0",
       "status": "captured"
@@ -388,7 +389,7 @@
       "screen_id": "SCR-42",
       "screen_name": "Camera Studio Mode",
       "file": "screenshots/42_studio_camera.png",
-      "sha256": "6169e6d7996b97369195baacbe847e99fc81a10fd5e16c3ef339489f48061340",
+      "sha256": "70f4a213b4498b424cba964db8841a059128981bf156897a6eace6c6e55a8547",
       "theme": "dark",
       "fontScale": "1.0",
       "status": "captured"
@@ -397,7 +398,7 @@
       "screen_id": "SCR-43",
       "screen_name": "Studio Music Picker Sheet",
       "file": "screenshots/43_studio_music_picker.png",
-      "sha256": "14e2698bd9d251a8bb0063d4af8d1f4954e17001c1a0b16309484ce8811391d1",
+      "sha256": "ffc715dbf8815077080c220ec9ccf0643997b9ce2be6a54c1b08f99124d9801d",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -406,7 +407,7 @@
       "screen_id": "SCR-44",
       "screen_name": "News Feed (Dark Theme)",
       "file": "screenshots/44_feed_dark.png",
-      "sha256": "50a9e88abf6ef31e7a8acff04fa06f286c59978eeae2ce99a30c7623d54e4d80",
+      "sha256": "df0d9f237c041405201d72010eb946fcfc9169778537edb90c0910a9782f16b8",
       "theme": "dark",
       "fontScale": "1.0",
       "status": "captured"
@@ -415,7 +416,7 @@
       "screen_id": "SCR-45",
       "screen_name": "Account Menu (Dark Theme)",
       "file": "screenshots/45_account_dark.png",
-      "sha256": "aaa58688680e73dea21b29cbb05e1f3e01e64e1183cef99ed7934ec36d1c3593",
+      "sha256": "5f2de2194f4d2883cf3aceb560c73fcd2545506d24c3f923be0b9ac4c8d06b53",
       "theme": "dark",
       "fontScale": "1.0",
       "status": "captured"
@@ -424,7 +425,7 @@
       "screen_id": "SCR-46",
       "screen_name": "News Feed (Large Text fontScale=1.3)",
       "file": "screenshots/46_feed_font13.png",
-      "sha256": "17568de0165af210d7d8e24a98a6fb1517663cb91db2c01c3d95103d43a6fd66",
+      "sha256": "a790833a2ba1eb22d5935b6b0dbb77da8a4343d32cc3805c4975bbe7a75dcf48",
       "theme": "light",
       "fontScale": "1.3",
       "status": "captured"
@@ -433,7 +434,7 @@
       "screen_id": "SCR-47",
       "screen_name": "Account Menu (Large Text fontScale=1.3)",
       "file": "screenshots/47_account_font13.png",
-      "sha256": "184bdade316e86adff5728602ccb354570f99d3764e9baef298cc08865bcc125",
+      "sha256": "99caf65fb9bcc6af9917ba553db52f9eabffb6bb64b35e5304c1fb427414a9e7",
       "theme": "light",
       "fontScale": "1.3",
       "status": "captured"
@@ -442,7 +443,7 @@
       "screen_id": "SCR-48",
       "screen_name": "News Feed (Narrow Screen 720x1520)",
       "file": "screenshots/48_feed_narrow.png",
-      "sha256": "6e93e5f1e59b4fc0e9219caf7262a033f486ac0b798d9cbaa84a940deb495c74",
+      "sha256": "bdc41a5a6abbaaa4c8bac4e32595d12730b413f976e91aaa189d1b1ec1c6b1ff",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
@@ -451,7 +452,7 @@
       "screen_id": "SCR-49",
       "screen_name": "Comments Sheet (Narrow Screen 720x1520)",
       "file": "screenshots/49_comments_narrow.png",
-      "sha256": "26628c6fef8b2e635b691905e36946e5557f6bd9e6b82fe9832df37c6f98dae2",
+      "sha256": "2c2fbc77ea4f3f6c6468d4b54affac72e08b3b80b10c62949f5e9b71ed0c2e8d",
       "theme": "light",
       "fontScale": "1.0",
       "status": "captured"
