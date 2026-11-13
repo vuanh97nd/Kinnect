@@ -65,14 +65,14 @@ struct MessagesView: View {
             // Search Bar
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
-                    .foregroundColor(Color(UIColor.tertiaryLabel))
+                    .foregroundColor(KinnectTheme.messageMeta)
                 TextField("Tìm cuộc trò chuyện…", text: $searchQuery)
                     .font(.system(size: 15))
                     .foregroundColor(KinnectTheme.textPrimary)
                 if !searchQuery.isEmpty {
                     Button { searchQuery = "" } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(Color(UIColor.tertiaryLabel))
+                            .foregroundColor(KinnectTheme.messageMeta)
                     }
                 }
             }
@@ -237,7 +237,7 @@ struct MessagesView: View {
         VStack(spacing: 12) {
             Image(systemName: unreadOnly ? "tray" : "bubble.left.and.bubble.right")
                 .font(.system(size: 40))
-                .foregroundColor(Color(UIColor.tertiaryLabel))
+                .foregroundColor(KinnectTheme.messageMeta)
             Text(unreadOnly ? "Không có tin nhắn chưa đọc." : "Chưa có cuộc trò chuyện riêng nào")
                 .font(.subheadline)
                 .foregroundColor(KinnectTheme.textSecondary)
@@ -257,7 +257,7 @@ struct MessagesView: View {
         VStack(spacing: 12) {
             Image(systemName: "person.3")
                 .font(.system(size: 40))
-                .foregroundColor(Color(UIColor.tertiaryLabel))
+                .foregroundColor(KinnectTheme.messageMeta)
             Text("Bạn chưa tham gia nhóm trò chuyện nào")
                 .font(.subheadline)
                 .foregroundColor(KinnectTheme.textSecondary)
@@ -307,7 +307,7 @@ struct MessagesView: View {
                     if !rawTime.isEmpty {
                         Text(formatRelativeDate(rawTime))
                             .font(.system(size: 13, weight: unread > 0 ? .semibold : .regular))
-                            .foregroundColor(unread > 0 ? KinnectTheme.accentBright : Color(UIColor.tertiaryLabel))
+                            .foregroundColor(unread > 0 ? KinnectTheme.accentBright : KinnectTheme.messageMeta)
                     }
                 }
 
@@ -362,7 +362,7 @@ struct MessagesView: View {
                             .lineLimit(1)
                         Text("(\(group.membersCount))")
                             .font(.system(size: 13))
-                            .foregroundColor(Color(UIColor.tertiaryLabel))
+                            .foregroundColor(KinnectTheme.messageMeta)
                     }
 
                     Spacer(minLength: 8)
@@ -370,7 +370,7 @@ struct MessagesView: View {
                     if !group.updatedAt.isEmpty {
                         Text(formatRelativeDate(group.updatedAt))
                             .font(.system(size: 13, weight: group.unreadCount > 0 ? .semibold : .regular))
-                            .foregroundColor(group.unreadCount > 0 ? KinnectTheme.accentBright : Color(UIColor.tertiaryLabel))
+                            .foregroundColor(group.unreadCount > 0 ? KinnectTheme.accentBright : KinnectTheme.messageMeta)
                     }
                 }
 
@@ -640,7 +640,7 @@ struct DirectChatDetailView: View {
                                     .fill(
                                         (appState.onlineUserIds.contains(peer.id) || (peer.isActive && peer.showActivity))
                                             ? Color(hex: "#2E9E66")
-                                            : Color(UIColor.tertiaryLabel)
+                                            : KinnectTheme.messageMeta
                                     )
                                     .frame(width: 7, height: 7)
 
@@ -826,7 +826,7 @@ struct DirectChatDetailView: View {
                 } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(.system(size: 28))
-                        .foregroundColor(Color(UIColor.tertiaryLabel))
+                        .foregroundColor(KinnectTheme.messageMeta)
                         .frame(width: 34, height: 38)
                 }
                 .accessibilityLabel("Đính kèm tệp hoặc ảnh")
@@ -1047,7 +1047,7 @@ struct DirectChatDetailView: View {
                 HStack(spacing: 6) {
                     Text(formatRelativeDate(msg.createdAt))
                         .font(.system(size: 11))
-                        .foregroundColor(Color(UIColor.tertiaryLabel))
+                        .foregroundColor(KinnectTheme.messageMeta)
 
                     if isMine {
                         if msg.isSeen {
@@ -1061,11 +1061,11 @@ struct DirectChatDetailView: View {
                         } else if !msg.deliveredAt.isEmpty {
                             Text("· Đã nhận")
                                 .font(.system(size: 11))
-                                .foregroundColor(Color(UIColor.tertiaryLabel))
+                                .foregroundColor(KinnectTheme.messageMeta)
                         } else {
                             Text("· Đã gửi")
                                 .font(.system(size: 11))
-                                .foregroundColor(Color(UIColor.tertiaryLabel))
+                                .foregroundColor(KinnectTheme.messageMeta)
                         }
                     }
 
@@ -1076,7 +1076,7 @@ struct DirectChatDetailView: View {
                     } label: {
                         Image(systemName: "face.smiling")
                             .font(.system(size: 12))
-                            .foregroundColor(messageReactions[msg.id] != nil ? KinnectTheme.accentBright : Color(UIColor.tertiaryLabel))
+                            .foregroundColor(messageReactions[msg.id] != nil ? KinnectTheme.accentBright : KinnectTheme.messageMeta)
                             .frame(width: 32, height: 32)
                             .contentShape(Rectangle())
                     }
@@ -1128,7 +1128,7 @@ struct DirectChatDetailView: View {
                     } label: {
                         Image(systemName: "ellipsis")
                             .font(.system(size: 12))
-                            .foregroundColor(Color(UIColor.tertiaryLabel))
+                            .foregroundColor(KinnectTheme.messageMeta)
                             .frame(width: 32, height: 32)
                             .contentShape(Rectangle())
                     }
@@ -1568,7 +1568,7 @@ struct GroupChatDetailView: View {
             HStack(spacing: 6) {
                 Text(formatRelativeDate(msg.createdAt))
                     .font(.system(size: 11))
-                    .foregroundColor(Color(UIColor.tertiaryLabel))
+                    .foregroundColor(KinnectTheme.messageMeta)
 
                 HStack(spacing: 2) {
                     Image(systemName: "checkmark")
@@ -1585,7 +1585,7 @@ struct GroupChatDetailView: View {
                 } label: {
                     Image(systemName: "face.smiling")
                         .font(.system(size: 12))
-                        .foregroundColor(groupReactions[msg.id] != nil ? KinnectTheme.accentBright : Color(UIColor.tertiaryLabel))
+                        .foregroundColor(groupReactions[msg.id] != nil ? KinnectTheme.accentBright : KinnectTheme.messageMeta)
                         .frame(width: 32, height: 32)
                         .contentShape(Rectangle())
                 }
@@ -1627,7 +1627,7 @@ struct GroupChatDetailView: View {
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 12))
-                        .foregroundColor(Color(UIColor.tertiaryLabel))
+                        .foregroundColor(KinnectTheme.messageMeta)
                         .frame(width: 32, height: 32)
                         .contentShape(Rectangle())
                 }
@@ -1740,7 +1740,7 @@ struct GroupChatDetailView: View {
             } label: {
                 Image(systemName: "plus.circle.fill")
                     .font(.system(size: 28))
-                    .foregroundColor(Color(UIColor.tertiaryLabel))
+                    .foregroundColor(KinnectTheme.messageMeta)
                     .frame(width: 34, height: 38)
             }
             .accessibilityLabel("Đính kèm tệp hoặc ảnh")
@@ -1883,7 +1883,7 @@ struct GroupChatDetailView: View {
 
                         Text("\(max(groupMembers.count, 1)) thành viên")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(Color(UIColor.tertiaryLabel))
+                            .foregroundColor(KinnectTheme.messageMeta)
                     }
                 }
 

@@ -26,6 +26,16 @@ enum UIReviewFixture {
         activeScreen != nil
     }
 
+    /// Camera and microphone prompts belong only to capture, live, and call screens.
+    /// Password, chat, and settings fixtures must not raise a system permission dialog.
+    static var allowsCapturePrompt: Bool {
+        guard isEnabled else { return true }
+        let screen = activeScreen ?? ""
+        if screen.hasPrefix("camera") || screen.hasPrefix("studio") { return true }
+        if screen.hasPrefix("live") || screen.contains("call") { return true }
+        return false
+    }
+
     static let currentUserDict: [String: Any] = [
         "id": "fixture_user_me",
         "name": "Nguyễn Minh Anh",

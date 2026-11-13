@@ -237,10 +237,32 @@ def boot_and_install(device, app_path, bundle_id):
     time.sleep(1.0)
 
 
+def screen_needs_capture_permission(screen_arg):
+    return (
+        screen_arg.startswith("camera")
+        or screen_arg.startswith("studio")
+        or screen_arg.startswith("live")
+        or "call" in screen_arg
+    )
+
+
+def isolate_permission_state(udid, bundle_id, screen_arg):
+    """Reset TCC for this app, then grant camera/mic only for screens that use them.
+
+    A camera prompt raised by an earlier screen stays above later screens unless
+    the process is killed and the permission state is separated.
+    """
+    subprocess.run(["xcrun", "simctl", "privacy", udid, "reset", "all", bundle_id], check=False)
+    if screen_needs_capture_permission(screen_arg):
+        subprocess.run(["xcrun", "simctl", "privacy", udid, "grant", "camera", bundle_id], check=False)
+        subprocess.run(["xcrun", "simctl", "privacy", udid, "grant", "microphone", bundle_id], check=False)
+
+
 def capture_screen(device, slug, screen_arg, bundle_id, extra_args=None, wait_sec=3.0):
     udid = device["udid"]
     subprocess.run(["xcrun", "simctl", "terminate", udid, bundle_id], check=False)
-    time.sleep(0.5)
+    time.sleep(1.0)
+    isolate_permission_state(udid, bundle_id, screen_arg)
 
     is_light = extra_args and "--ui-review-light" in extra_args
     if is_light:
