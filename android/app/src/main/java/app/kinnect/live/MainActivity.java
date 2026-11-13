@@ -666,7 +666,7 @@ public class MainActivity extends Activity {
     scroll.setRefreshListener(new PullRefreshScrollView.Listener(){public boolean enabled(){return feedRefresh!=null||peopleRefresh!=null;}public void refresh(Runnable complete){if(peopleRefresh!=null)peopleRefresh.run(complete);else if(feedRefresh!=null)feedRefresh.run(complete);else complete.run();}});
     scroll.setFillViewport(true);
     content = column();
-    content.setPadding(dp(16), dp(14), dp(16), dp(24));
+    content.setPadding(dp(16), dp(14), dp(16), dp(64));
     scroll.addView(content);
     LinearLayout.LayoutParams viewport = new LinearLayout.LayoutParams(Math.min(getResources().getDisplayMetrics().widthPixels, dp(720)), 0, 1);
     viewport.gravity = Gravity.CENTER_HORIZONTAL;
@@ -991,12 +991,12 @@ public class MainActivity extends Activity {
     remember("account", () -> meMenu());
     shell(I18n.t("Tài khoản"), true);
     LinearLayout profile = row();
-    profile.setPadding(dp(16), dp(16), dp(16), dp(16));
+    profile.setPadding(dp(14), dp(12), dp(14), dp(12));
     GradientDrawable pg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { PRIMARY_SOFT, CARD });
     pg.setCornerRadius(dp(24));
     pg.setStroke(dp(1), LINE);
     profile.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf((ACCENT & 0x00ffffff) | 0x22000000), pg, null));
-    avatar(me, profile, 64);
+    avatar(me, profile, 56);
     LinearLayout text = column();
     text.setPadding(dp(16), 0, 0, 0);
     TextView n = label(me.optString("name"), 20, TEXT);
@@ -1008,7 +1008,7 @@ public class MainActivity extends Activity {
     profile.setContentDescription(I18n.t("Trang cá nhân"));
     profile.setOnClickListener(v -> navigate("profile"));
     LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(-1, -2);
-    pp.bottomMargin = dp(16);
+    pp.bottomMargin = dp(10);
     content.addView(profile, pp);
 
     if (me.optString("role").equals("admin")) {
@@ -1101,7 +1101,7 @@ public class MainActivity extends Activity {
     g.setBackground(bg);
     g.setElevation(dp(2)); // Bóng nhẹ cho Group theo M3
     LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
-    p.bottomMargin = dp(16);
+    p.bottomMargin = dp(10);
     content.addView(g, p);
     return g;
   }
@@ -1132,7 +1132,8 @@ public class MainActivity extends Activity {
     }
     int tint = danger ? WebDesign.DANGER[WebTheme.isDark(this) ? 1 : 0] : ACCENT;
     LinearLayout r = row();
-    r.setPadding(dp(16), dp(12), dp(16), dp(12)); // Tăng padding
+    r.setMinimumHeight(dp(48));
+    r.setPadding(dp(14), dp(8), dp(14), dp(8));
     r.setBackground(pressable(CARD, 24)); // Góc bo 24 theo M3
     r.addView(settingsIcon(iconName,tint),new LinearLayout.LayoutParams(dp(40),dp(40))); // Icon to hơn
     TextView t = label(title, 15, danger ? tint : TEXT); // Chữ to hơn
@@ -4736,6 +4737,7 @@ public class MainActivity extends Activity {
   }
 
   private String ago(long time) {
+    if (time <= 0) return "v\u1eeba xong";
     long s = Math.max(0, (System.currentTimeMillis() - time) / 1000);
     if (s < 60) return "vừa xong";
     if (s < 3600) return (s / 60) + " phút";

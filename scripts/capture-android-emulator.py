@@ -64,6 +64,13 @@ def validate_screen_visuals(scr_id, img_path):
                 width = cols[-1] - cols[0] + 1
                 if width < 180:
                     return f"Brand text clipped (width={width}px < 180px, clipped to 'Kinn')"
+        elif scr_id in ("SCR-25", "SCR-45", "SCR-47"):
+            # Account menu screens must display the bottom danger action (Logout red button)
+            # Red accent color (WebDesign.DANGER) pixels in lower viewport (y > 500)
+            red_mask = (arr[500:, :, 0] > 180) & (arr[500:, :, 1] < 120) & (arr[500:, :, 2] < 120)
+            red_count = int(np.sum(red_mask))
+            if red_count < 200:
+                return f"Account menu bottom action clipped or off-screen (red_count={red_count} < 200)"
     except Exception as e:
         print(f"[Warning] Visual validation helper: {e}")
     return None

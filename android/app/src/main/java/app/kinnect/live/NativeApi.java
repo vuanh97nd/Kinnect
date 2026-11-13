@@ -134,8 +134,12 @@ public final class NativeApi {
       if ("GET".equals(method) && "/api/me/sessions".equals(cleanPath)) {
         return new FixtureResult(new JSONObject("{\"sessions\":[{\"id\":\"sess_1\",\"label\":\"Pixel 6 · Android 14\",\"current\":true,\"expires\":\"2026-12-01T00:00:00Z\"}]}"), null, 200);
       }
+      if ("GET".equals(method) && "/api/stories".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"stories\":[{\"id\":\"st_1\",\"mediaUrl\":\"/story.jpg\",\"author\":{\"id\":\"usr_story\",\"name\":\"Linh Nhi\",\"username\":\"linhnhi\"}}]}"), null, 200);
+      }
       if ("GET".equals(method) && "/api/posts".equals(cleanPath)) {
-        return new FixtureResult(new JSONObject("{\"posts\":[{\"id\":\"post_1\",\"content\":\"Chào mừng bạn đến với Kinnect! Trải nghiệm kết nối sống đúng mình.\",\"author\":{\"id\":\"usr_qa_review\",\"name\":\"Minh Anh\",\"username\":\"minhanh\"},\"createdAt\":\"2026-11-13T00:00:00Z\",\"likes\":15,\"comments\":4,\"reactionsCount\":24,\"myReaction\":\"love\"}]}"), null, 200);
+        long postTime = System.currentTimeMillis() - 3600000L;
+        return new FixtureResult(new JSONObject("{\"posts\":[{\"id\":\"post_1\",\"body\":\"Chào mừng bạn đến với Kinnect! Trải nghiệm kết nối sống đúng mình.\",\"content\":\"Chào mừng bạn đến với Kinnect! Trải nghiệm kết nối sống đúng mình.\",\"created\":" + postTime + ",\"createdAt\":\"2026-11-13T00:00:00Z\",\"user_id\":\"usr_qa_review\",\"visibility\":\"public\",\"author\":{\"id\":\"usr_qa_review\",\"name\":\"Minh Anh\",\"username\":\"minhanh\"},\"likes\":15,\"comments\":4,\"reactionsCount\":24,\"myReaction\":\"love\"}]}"), null, 200);
       }
       if ("POST".equals(method) && cleanPath.matches("/api/posts/[^/]+/reaction")) {
         return new FixtureResult(new JSONObject("{\"success\":true,\"myReaction\":\"love\",\"reactionsCount\":25}"), null, 200);
