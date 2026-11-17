@@ -71,15 +71,10 @@ struct MessagesView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 8)
 
-            // Scope Segmented Control
-            Picker("Loại tin nhắn", selection: $scope) {
-                ForEach(ChatScope.allCases, id: \.self) { s in
-                    Text(s.rawValue).tag(s)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 8)
+            // Scope Segmented Control — dùng bản branded thay cho Picker hệ thống
+            KSegmented(options: ChatScope.allCases, title: { $0.rawValue }, selection: $scope)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
 
             // Filters: [Tất cả | Chưa đọc]
             if scope == .direct {

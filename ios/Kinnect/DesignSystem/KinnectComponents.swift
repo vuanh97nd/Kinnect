@@ -254,6 +254,41 @@ struct KSkeleton: View {
     }
 }
 
+// MARK: - Segmented control
+// Bản branded thay cho Picker(.segmented) của hệ thống: iOS vẽ tab đang chọn bằng
+// xám nên trông như bị vô hiệu, và trái hẳn ngôn ngữ "chip tím" của phần còn lại.
+
+struct KSegmented<T: Hashable>: View {
+    let options: [T]
+    let title: (T) -> String
+    @Binding var selection: T
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(options, id: \.self) { option in
+                let isSelected = option == selection
+                Button {
+                    selection = option
+                } label: {
+                    Text(title(option))
+                        .font(KTType.label)
+                        .fontWeight(isSelected ? .semibold : .regular)
+                        .foregroundColor(isSelected ? KTColor.accent : KTColor.textSecondary)
+                        .frame(maxWidth: .infinity, minHeight: 34)
+                        .background(isSelected ? KTColor.accentSoft : Color.clear)
+                        .clipShape(RoundedRectangle(cornerRadius: KTRadius.xs))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+            }
+        }
+        .padding(4)
+        .background(KTColor.surfaceElevated)
+        .clipShape(RoundedRectangle(cornerRadius: KTRadius.sm))
+    }
+}
+
 // MARK: - Section header
 
 struct KSectionHeader: View {
