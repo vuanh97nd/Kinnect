@@ -1,0 +1,63 @@
+{
+  "file": "welcome-autocycle-demo.mp4",
+  "sizeBytes": 10607337,
+  "recordedAt": "2026-11-17T23:46:19Z",
+  "device": "iPhone 16 Pro",
+  "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+  "targetIntervalSec": 1.5,
+  "recordDurationSec": 14.0,
+  "cycleSequence": [
+    {
+      "time": "0.0s",
+      "tab": 0,
+      "name": "Bảng tin (Feed)"
+    },
+    {
+      "time": "1.5s",
+      "tab": 1,
+      "name": "Khám phá (Discover)"
+    },
+    {
+      "time": "3.0s",
+      "tab": 2,
+      "name": "Video Shorts"
+    },
+    {
+      "time": "4.5s",
+      "tab": 3,
+      "name": "Trực tiếp Live"
+    },
+    {
+      "time": "6.0s",
+      "tab": 0,
+      "name": "Bảng tin (Feed)"
+    },
+    {
+      "time": "7.5s",
+      "tab": 1,
+      "name": "Khám phá (Discover)"
+    },
+    {
+      "time": "9.0s",
+      "tab": 2,
+      "name": "Video Shorts"
+    },
+    {
+      "time": "10.5s",
+      "tab": 3,
+      "name": "Trực tiếp Live"
+    },
+    {
+      "time": "12.0s",
+      "tab": 0,
+      "name": "Bảng tin (Feed)"
+    },
+    {
+      "time": "13.5s",
+      "tab": 1,
+      "name": "Khám phá (Discover)"
+    }
+  ],
+  "settlingWaitSecBeforeRecord": 3.0,
+  "noSplashOrBlackFramesVerified": true
+}
