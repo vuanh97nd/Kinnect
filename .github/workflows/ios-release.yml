@@ -98,6 +98,28 @@ jobs:
           grep -E "(error:|fatal error:)" build.log | head -n 50 >> $GITHUB_STEP_SUMMARY || true
           echo '```' >> $GITHUB_STEP_SUMMARY
 
+      # Log build fail cần đăng nhập GitHub mới xem được. Commit phần lỗi vào repo
+      # để bất kỳ ai (kể cả agent không có token) đọc được nguyên nhân.
+      - name: Publish build errors to repo
+        if: failure()
+        run: |
+          set -e
+          DEST="outputs/ci-logs/run-${{ github.run_number }}.txt"
+          mkdir -p outputs/ci-logs
+          {
+            echo "run: ${{ github.run_number }}  sha: ${{ github.sha }}"
+            echo "workflow: ios-release / build-ios"
+            echo "---- compiler errors ----"
+            grep -E "(error:|fatal error:|note: )" build.log | head -n 80 || echo "(không thấy dòng error: trong build.log)"
+            echo "---- last 40 lines ----"
+            tail -n 40 build.log || true
+          } > "$DEST"
+          git config user.name  "kinnect-ci"
+          git config user.email "ci@kinnect.local"
+          git add "$DEST"
+          git commit -m "chore(ci): publish build errors for run ${{ github.run_number }} [skip ci]" || exit 0
+          git push origin "HEAD:${{ github.ref_name }}" || echo "push failed (branch protection?)"
+
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
