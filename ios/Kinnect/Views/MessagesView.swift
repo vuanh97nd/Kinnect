@@ -55,7 +55,9 @@ struct MessagesView: View {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(KinnectTheme.messageMeta)
-                TextField("Tìm cuộc trò chuyện…", text: $searchQuery)
+                // Placeholder mặc định của hệ thống quá nhạt trên nền lavender ở light mode
+                // (khoảng 2:1). Đặt prompt với màu textTertiary để đạt ngưỡng đọc được.
+                TextField("", text: $searchQuery, prompt: Text("Tìm cuộc trò chuyện…").foregroundColor(KTColor.textTertiary))
                     .font(KinnectTheme.scaled(15))
                     .foregroundColor(KinnectTheme.textPrimary)
                 if !searchQuery.isEmpty {
