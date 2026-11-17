@@ -442,18 +442,41 @@ def resolve_capture_scope(focus_value=None, only_login=False):
     normalized = str(raw).strip().lower()
     if normalized in ("", "full"):
         scope = "full"
+    elif normalized == "core":
+        scope = "core"
     elif normalized == "security":
         scope = "security"
     else:
         raise ValueError(
-            f"Unsupported UI_REVIEW_FOCUS={raw!r}; expected '', 'full', or 'security'."
+            f"Unsupported UI_REVIEW_FOCUS={raw!r}; expected '', 'full', 'core', or 'security'."
         )
     if only_login and scope != "full":
-        raise ValueError("Cannot combine UI_REVIEW_ONLY_LOGIN=1 with UI_REVIEW_FOCUS=security.")
+        raise ValueError("Cannot combine UI_REVIEW_ONLY_LOGIN=1 with UI_REVIEW_FOCUS=security/core.")
     return scope
 
 
+# Scope "core": 8 màn đại diện cho toàn bộ luồng chính, chạy ~4 phút thay vì ~25 phút.
+# Dùng khi cần vòng phản hồi thị giác nhanh sau mỗi thay đổi giao diện.
+CORE_SLUGS = [
+    "01-iphone-auth-welcome-dark",
+    "01b-iphone-auth-login-dark",
+    "13-iphone-feed-light",
+    "04-iphone-messages-list-dark",
+    "05-iphone-chat-detail-dark",
+    "09-iphone-wallet-store-dark",
+    "10-iphone-live-stream-dark",
+    "06-iphone-profile-dark",
+]
+
+
 def select_screens_for_scope(all_screens, selected_slugs, scope, only_login=False, login_screens=None):
+    if scope == "core":
+        wanted = set(CORE_SLUGS)
+        selected = [entry for entry in all_screens if entry[0] in wanted]
+        missing = [slug for slug in CORE_SLUGS if slug not in {entry[0] for entry in selected}]
+        if missing:
+            raise RuntimeError(f"Missing core slugs from screen inventory: {missing}")
+        return selected
     if scope == "security":
         wanted = set(selected_slugs)
         selected = [entry for entry in all_screens if entry[0] in wanted]
@@ -810,7 +833,8 @@ def main():
             print(f"Comprehensive test video recording failed: {e}", flush=True)
 
     # 2. Compact / second iPhone screenshots
-    if compact_iphone:
+    #    Scope "core" chỉ chụp iPhone chuẩn: bỏ hẳn nhánh compact + iPad để job xong trong vài phút.
+    if compact_iphone and capture_scope != "core":
         if compact_iphone["udid"] != standard_iphone["udid"]:
             print(f"Shutting down previous standard simulator {standard_iphone['name']} to free resources...", flush=True)
             subprocess.run(["xcrun", "simctl", "shutdown", standard_iphone["udid"]], check=False)
@@ -856,7 +880,7 @@ def main():
             })
 
     # 3. iPad screenshots
-    if ipad and not only_login and capture_scope != "security":
+    if ipad and not only_login and capture_scope not in ("security", "core"):
         active_to_shutdown = compact_iphone if (compact_iphone and compact_iphone["udid"] != standard_iphone["udid"]) else standard_iphone
         if active_to_shutdown and active_to_shutdown["udid"] != ipad["udid"]:
             print(f"Shutting down previous simulator {active_to_shutdown['name']} to free resources...", flush=True)
@@ -901,7 +925,7 @@ def main():
             "screenshotCount": len(records),
             "standardIphone": standard_iphone["name"] if standard_iphone else None,
             "compactIphone": compact_iphone["name"] if compact_iphone else None,
-            "ipad": ipad["name"] if (ipad and not only_login and capture_scope != "security") else None,
+            "ipad": ipad["name"] if (ipad and not only_login and capture_scope not in ("security", "core")) else None,
         },
     )
 
@@ -915,7 +939,7 @@ def main():
         "provenance": provenance,
         "standardIphone": standard_iphone,
         "compactIphone": compact_iphone,
-        "ipad": ipad if (ipad and not only_login and capture_scope != "security") else None,
+        "ipad": ipad if (ipad and not only_login and capture_scope not in ("security", "core")) else None,
         "screenshots": records,
         "contactSheet": str(contact_sheet) if contact_sheet else None,
     }
