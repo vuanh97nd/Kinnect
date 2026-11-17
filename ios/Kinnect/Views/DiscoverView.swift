@@ -455,19 +455,23 @@ private struct DiscoverSquareUserTile: View {
 
     var body: some View {
         Button(action: onTap) {
-            GeometryReader { geo in
-                ZStack(alignment: .bottomLeading) {
-                    // Full Square Image / Avatar Background
-                    if !person.avatarUrl.isEmpty {
-                        KinnectRemoteImageView(
-                            rawURL: person.avatarUrl,
-                            contentMode: .fill,
-                            cornerRadius: 14,
-                            maxHeight: geo.size.width
-                        )
-                        .frame(width: geo.size.width, height: geo.size.width)
-                        .clipped()
-                    } else {
+            // Color.clear + aspectRatio quyết định kích thước ô TRƯỚC, rồi overlay vẽ nội dung.
+            // Trước đây GeometryReader nằm ngoài cùng nên mỗi ô tự lấy chiều cao theo nội dung,
+            // khiến lưới so le khi tên dài 1 dòng vs 2 dòng.
+            Color.clear
+                .aspectRatio(1, contentMode: .fit)
+                .overlay {
+                    ZStack(alignment: .bottomLeading) {
+                        // Full Square Image / Avatar Background
+                        if !person.avatarUrl.isEmpty {
+                            KinnectRemoteImageView(
+                                rawURL: person.avatarUrl,
+                                contentMode: .fill,
+                                cornerRadius: 14,
+                                maxHeight: 240
+                            )
+                            .clipped()
+                        } else {
                         RoundedRectangle(cornerRadius: 14)
                             .fill(KinnectTheme.surfaceElevated)
                             .overlay(
@@ -475,7 +479,7 @@ private struct DiscoverSquareUserTile: View {
                                     name: person.name,
                                     avatarURL: "",
                                     colorHex: person.avatarColor,
-                                    size: min(geo.size.width * 0.44, 46),
+                                    size: 46,
                                     isOnline: isOnline
                                 )
                                 .padding(.bottom, 28)
@@ -555,10 +559,8 @@ private struct DiscoverSquareUserTile: View {
                     .padding(.horizontal, 8)
                     .padding(.bottom, 6)
                 }
-                .frame(width: geo.size.width, height: geo.size.width)
+                }
                 .clipShape(RoundedRectangle(cornerRadius: 14))
-            }
-            .aspectRatio(1, contentMode: .fit)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Thành viên \(person.name)")
