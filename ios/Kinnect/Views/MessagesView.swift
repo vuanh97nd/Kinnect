@@ -260,16 +260,23 @@ struct MessagesView: View {
         .buttonStyle(.plain)
     }
 
+    @ViewBuilder
     private var emptyDirectView: some View {
-        KEmptyState(
-            systemImage: unreadOnly ? "tray" : "bubble.left.and.bubble.right",
-            title: unreadOnly ? "Không có tin nhắn chưa đọc" : "Chưa có cuộc trò chuyện nào",
-            message: unreadOnly
-                ? "Bạn đã xem hết tin nhắn. Chuyển sang tab Tất cả để xem lại."
-                : "Kết nối với người bạn quan tâm để bắt đầu trò chuyện.",
-            actionTitle: unreadOnly ? nil : "Mở danh sách bạn bè",
-            action: unreadOnly ? nil : onOpenFriends
-        )
+        if unreadOnly {
+            KEmptyState(
+                systemImage: "tray",
+                title: "Không có tin nhắn chưa đọc",
+                message: "Bạn đã xem hết tin nhắn. Chuyển sang tab Tất cả để xem lại."
+            )
+        } else {
+            KEmptyState(
+                systemImage: "bubble.left.and.bubble.right",
+                title: "Chưa có cuộc trò chuyện nào",
+                message: "Kết nối với người bạn quan tâm để bắt đầu trò chuyện.",
+                actionTitle: "Mở danh sách bạn bè",
+                action: { onOpenFriends() }
+            )
+        }
     }
 
     private var emptyGroupsView: some View {
