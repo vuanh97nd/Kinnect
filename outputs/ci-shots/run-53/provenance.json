@@ -1,0 +1,622 @@
+{
+  "gitSha": "b7fdcd6ba0af29300a46cc23db40e612f43d9192",
+  "marketingVersion": "1.2.12",
+  "buildNumber": "124",
+  "CFBundleShortVersionString": "1.2.12",
+  "CFBundleVersion": "124",
+  "MARKETING_VERSION": "1.2.12",
+  "CURRENT_PROJECT_VERSION": "124",
+  "sourceInfoPlist": "ios/Kinnect/Resources/Info.plist",
+  "capturedAt": "2026-11-17T18:12:49Z",
+  "githubRunId": "44137395387",
+  "githubRunAttempt": "1",
+  "githubRef": "refs/heads/codex/ios-qa-20261113",
+  "githubRepository": "vuanh97nd/Kinnect",
+  "workflow": "iOS QA Simulator Screenshots",
+  "actor": "vuanh97nd",
+  "captureScope": "full",
+  "selectedInventory": [
+    {
+      "slug": "01-iphone-auth-welcome-dark",
+      "screen": "auth-welcome",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "01-iphone-auth-welcome-tab0-feed-dark",
+      "screen": "auth-welcome",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "01-iphone-auth-welcome-tab2-video-dark",
+      "screen": "auth-welcome",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "01-iphone-auth-welcome-tab3-live-dark",
+      "screen": "auth-welcome",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "01a-iphone-auth-welcome-en-dark",
+      "screen": "auth-welcome-en",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "01a0-iphone-auth-welcome-tab0-feed-en-dark",
+      "screen": "auth-welcome-en",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "01a2-iphone-auth-welcome-tab2-video-en-dark",
+      "screen": "auth-welcome-en",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "01a3-iphone-auth-welcome-tab3-live-en-dark",
+      "screen": "auth-welcome-en",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "01b-iphone-auth-login-dark",
+      "screen": "auth-login",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "01b2-iphone-auth-login-populated-dark",
+      "screen": "auth-login-populated",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "01b3-iphone-auth-login-error-dark",
+      "screen": "auth-login-error",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "01b4-iphone-auth-login-en-dark",
+      "screen": "auth-login-en",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "01b5-iphone-auth-login-keyboard-dark",
+      "screen": "auth-login-keyboard",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "01b6-iphone-auth-login-lang-sheet-dark",
+      "screen": "auth-login-lang-sheet",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "01c-iphone-auth-register-dark",
+      "screen": "auth-register",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "01d-iphone-auth-forgot-dark",
+      "screen": "auth-reset",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "01e-iphone-auth-welcome-light",
+      "screen": "auth-welcome",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "02-iphone-feed-dark",
+      "screen": "feed",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "02b-iphone-feed-comments",
+      "screen": "feed-comments",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "02c-iphone-feed-error",
+      "screen": "feed-error",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "03-iphone-discover-dark",
+      "screen": "discover",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "03b-iphone-shorts-video-dark",
+      "screen": "shorts",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "03c-iphone-shorts-comments",
+      "screen": "shorts-comments",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "04-iphone-messages-list-dark",
+      "screen": "messages",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "05-iphone-chat-detail-dark",
+      "screen": "chat-detail",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "05b-iphone-chat-menu-dark",
+      "screen": "chat-menu",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "05c-iphone-message-menu-dark",
+      "screen": "message-menu",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "05d-iphone-group-chat-dark",
+      "screen": "group-chat-detail",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "05f-iphone-call-incoming",
+      "screen": "call-incoming",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "06-iphone-profile-dark",
+      "screen": "profile",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "06b-iphone-profile-posts",
+      "screen": "profile-posts",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "06c-iphone-profile-albums",
+      "screen": "profile-albums",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "06d-iphone-profile-videos",
+      "screen": "profile-videos",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "06e-iphone-profile-edit",
+      "screen": "profile-edit",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "06f-iphone-profile-private-album",
+      "screen": "profile-private-album",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "06g-iphone-profile-sessions",
+      "screen": "profile-sessions",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "06h-iphone-profile-public-album",
+      "screen": "profile-public-album",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "07-iphone-friends-dark",
+      "screen": "friends",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "07b-iphone-friends-requests",
+      "screen": "friends-requests",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "07c-iphone-friends-suggestions",
+      "screen": "friends-suggestions",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "08-iphone-notifications-dark",
+      "screen": "notifications",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "09-iphone-wallet-store-dark",
+      "screen": "wallet",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "09b-iphone-wallet-topup",
+      "screen": "wallet-topup",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "09c-iphone-store-packages",
+      "screen": "wallet-packages",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "10-iphone-live-stream-dark",
+      "screen": "live",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "10b-iphone-live-empty",
+      "screen": "live-empty",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "10c-iphone-live-error",
+      "screen": "live-error",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "10d-iphone-live-connecting",
+      "screen": "live-connecting",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "10e-iphone-create-live-chat",
+      "screen": "create-live-chat",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "10f-iphone-create-live-game",
+      "screen": "create-live-game",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "11-iphone-camera-studio-empty",
+      "screen": "camera-studio",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "11b-iphone-camera-studio-video",
+      "screen": "camera-studio-video",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "12-iphone-camera-studio-edit",
+      "screen": "camera-studio-edit",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "12b-iphone-studio-pro-sheet",
+      "screen": "studio-pro-sheet",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "12c-iphone-camera-studio-video-preview",
+      "screen": "camera-studio-video-edit",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13-iphone-feed-light",
+      "screen": "feed",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13b-iphone-privacy-consent-dark",
+      "screen": "privacy-consent",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13c-iphone-privacy-consent-light",
+      "screen": "privacy-consent",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13d-iphone-delete-account-dark",
+      "screen": "delete-account",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13e-iphone-delete-account-light",
+      "screen": "delete-account",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13f-iphone-ugc-report-sheet",
+      "screen": "ugc-report",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "05e-iphone-forward-message",
+      "screen": "forward-message",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13g-iphone-change-password",
+      "screen": "change-password",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13h-iphone-blocked-users",
+      "screen": "blocked-users",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13i-iphone-privacy-settings",
+      "screen": "privacy-settings",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13i2-iphone-privacy-settings-light",
+      "screen": "privacy-settings",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13n-iphone-live-gifts-drawer",
+      "screen": "gift-drawer",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13n2-iphone-live-gifts-drawer-light",
+      "screen": "gift-drawer",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13o-iphone-studio-music-picker",
+      "screen": "music-picker",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13o2-iphone-studio-music-picker-light",
+      "screen": "music-picker",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "19-password-spy",
+      "screen": "password-spy",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "19b-persist-write",
+      "screen": "persist-write",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "19c-persist-read",
+      "screen": "persist-read",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "19d-shorts-telemetry",
+      "screen": "shorts-telemetry",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "19e-shorts-avplayer",
+      "screen": "shorts-avplayer",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "19g-shorts-real-swipe",
+      "screen": "shorts-real-swipe",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "19f-gift-catalog-v1",
+      "screen": "gift-catalog-v1",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "19h-swift-contracts-harness",
+      "screen": "swift-contracts-harness",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13m2-iphone-admin-denied",
+      "screen": "admin-denied",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13m3-iphone-admin-loading",
+      "screen": "admin-loading",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13m4-iphone-admin-empty",
+      "screen": "admin-empty",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13m5-iphone-admin-error",
+      "screen": "admin-error",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13i3-iphone-privacy-save-error",
+      "screen": "privacy-save-error",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13p-dm-mode-error",
+      "screen": "dm-mode-error",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13q-location-off-error",
+      "screen": "location-off-error",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13r-sessions-loading",
+      "screen": "sessions-loading",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13s-sessions-error",
+      "screen": "sessions-error",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13t-sessions-empty",
+      "screen": "sessions-empty",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13j-iphone-support",
+      "screen": "support",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13l-iphone-support-chat",
+      "screen": "support-chat",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13m-iphone-admin",
+      "screen": "admin",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13u-iphone-admin-operations-ready",
+      "screen": "admin-operations-ready",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13k-iphone-change-password-light",
+      "screen": "change-password",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "welcome-autocycle-demo",
+      "screen": "auth-welcome-autocycle",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "kinnect-comprehensive-features-test",
+      "screen": "all-features-walkthrough",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "14-compact-iphone-auth-welcome-dark",
+      "screen": "auth-welcome",
+      "device": "iPhone 16e"
+    },
+    {
+      "slug": "14-compact-iphone-auth-welcome-tab0-feed-dark",
+      "screen": "auth-welcome",
+      "device": "iPhone 16e"
+    },
+    {
+      "slug": "14-compact-iphone-auth-welcome-tab2-video-dark",
+      "screen": "auth-welcome",
+      "device": "iPhone 16e"
+    },
+    {
+      "slug": "14-compact-iphone-auth-welcome-tab3-live-dark",
+      "screen": "auth-welcome",
+      "device": "iPhone 16e"
+    },
+    {
+      "slug": "14en-compact-iphone-auth-welcome-en-dark",
+      "screen": "auth-welcome-en",
+      "device": "iPhone 16e"
+    },
+    {
+      "slug": "14en0-compact-iphone-auth-welcome-tab0-feed-en-dark",
+      "screen": "auth-welcome-en",
+      "device": "iPhone 16e"
+    },
+    {
+      "slug": "14a-compact-iphone-auth-login-dark",
+      "screen": "auth-login",
+      "device": "iPhone 16e"
+    },
+    {
+      "slug": "14b-compact-iphone-auth-login-keyboard-dark",
+      "screen": "auth-login-keyboard",
+      "device": "iPhone 16e"
+    },
+    {
+      "slug": "14b2-compact-iphone-auth-login-password-keyboard-dark",
+      "screen": "auth-login-password-keyboard",
+      "device": "iPhone 16e"
+    },
+    {
+      "slug": "14c-compact-iphone-auth-login-lang-sheet-dark",
+      "screen": "auth-login-lang-sheet",
+      "device": "iPhone 16e"
+    },
+    {
+      "slug": "14-compact-iphone-feed",
+      "screen": "feed",
+      "device": "iPhone 16e"
+    },
+    {
+      "slug": "15-compact-iphone-chat-detail",
+      "screen": "chat-detail",
+      "device": "iPhone 16e"
+    },
+    {
+      "slug": "16-compact-iphone-wallet",
+      "screen": "wallet",
+      "device": "iPhone 16e"
+    },
+    {
+      "slug": "16b-compact-iphone-dynamictype-max",
+      "screen": "feed",
+      "device": "iPhone 16e"
+    },
+    {
+      "slug": "16c-compact-iphone-privacy-settings",
+      "screen": "privacy-settings",
+      "device": "iPhone 16e"
+    },
+    {
+      "slug": "16d-compact-iphone-privacy-dynamictype",
+      "screen": "privacy-settings",
+      "device": "iPhone 16e"
+    },
+    {
+      "slug": "16e-compact-iphone-friends",
+      "screen": "friends",
+      "device": "iPhone 16e"
+    },
+    {
+      "slug": "17-ipad-feed-splitview",
+      "screen": "feed",
+      "device": "iPad Pro 11-inch (M4)"
+    },
+    {
+      "slug": "18-ipad-chat-detail",
+      "screen": "chat-detail",
+      "device": "iPad Pro 11-inch (M4)"
+    },
+    {
+      "slug": "18b-ipad-dynamictype-max",
+      "screen": "feed",
+      "device": "iPad Pro 11-inch (M4)"
+    }
+  ],
+  "xcodeVersion": "Xcode 16.4 | Build version 16F6",
+  "simulatorRuntimes": [
+    "== Runtimes ==",
+    "iOS 18.5 (18.5 - 22F77) - com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+    "iOS 18.6 (18.6 - 22G86) - com.apple.CoreSimulator.SimRuntime.iOS-18-6",
+    "iOS 26.0 (26.0.1 - 23A8464) - com.apple.CoreSimulator.SimRuntime.iOS-26-0",
+    "iOS 26.1 (26.1 - 23B86) - com.apple.CoreSimulator.SimRuntime.iOS-26-1",
+    "iOS 26.2 (26.2 - 23C54) - com.apple.CoreSimulator.SimRuntime.iOS-26-2",
+    "tvOS 18.5 (18.5 - 22L572) - com.apple.CoreSimulator.SimRuntime.tvOS-18-5",
+    "tvOS 26.1 (26.1 - 23J579) - com.apple.CoreSimulator.SimRuntime.tvOS-26-1",
+    "tvOS 26.2 (26.2 - 23K51) - com.apple.CoreSimulator.SimRuntime.tvOS-26-2",
+    "watchOS 11.5 (11.5 - 22T572) - com.apple.CoreSimulator.SimRuntime.watchOS-11-5",
+    "watchOS 26.1 (26.1 - 23S36) - com.apple.CoreSimulator.SimRuntime.watchOS-26-1",
+    "watchOS 26.2 (26.2 - 23S303) - com.apple.CoreSimulator.SimRuntime.watchOS-26-2",
+    "visionOS 2.3 (2.3 - 22N895) - com.apple.CoreSimulator.SimRuntime.xrOS-2-3",
+    "visionOS 2.4 (2.4 - 22O237) - com.apple.CoreSimulator.SimRuntime.xrOS-2-4",
+    "visionOS 2.5 (2.5 - 22O473) - com.apple.CoreSimulator.SimRuntime.xrOS-2-5",
+    "visionOS 26.1 (26.1 - 23N47) - com.apple.CoreSimulator.SimRuntime.xrOS-26-1",
+    "visionOS 26.2 (26.2 - 23N301) - com.apple.CoreSimulator.SimRuntime.xrOS-26-2"
+  ],
+  "builtAppPath": "build/SimDerivedData/Build/Products/Debug-iphonesimulator/Kinnect.app",
+  "builtCFBundleShortVersionString": "1.2.12",
+  "builtCFBundleVersion": "124",
+  "screenshotCount": 115,
+  "standardIphone": "iPhone 16 Pro",
+  "compactIphone": "iPhone 16e",
+  "ipad": "iPad Pro 11-inch (M4)"
+}

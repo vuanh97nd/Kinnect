@@ -1,0 +1,7 @@
+{
+  "languageKey" : "kinnect_app_language",
+  "language" : "en",
+  "messagesKey" : "kinnect_notifications.messages",
+  "writing" : true,
+  "messages" : false
+}
