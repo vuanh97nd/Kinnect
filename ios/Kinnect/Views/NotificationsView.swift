@@ -42,13 +42,13 @@ struct NotificationsView: View {
             )
 
             VStack(spacing: 10) {
-                // Filter Tabs (Tất cả · Chưa đọc)
-                Picker("Bộ lọc thông báo", selection: $filter) {
-                    ForEach(NotificationFilter.allCases, id: \.self) { item in
-                        Text(item.rawValue).tag(item)
-                    }
-                }
-                .pickerStyle(.segmented)
+                // Filter Tabs — KSegmented thay Picker hệ thống: pill xám của iOS
+                // đọc như trạng thái vô hiệu, trái với chip tím ở các màn khác.
+                KSegmented(
+                    options: NotificationFilter.allCases,
+                    title: { $0.rawValue },
+                    selection: $filter
+                )
                 .padding(.horizontal, 16)
                 .padding(.top, 10)
 
