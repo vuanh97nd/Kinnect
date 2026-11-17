@@ -1,0 +1,298 @@
+{
+  "captureScope": "core",
+  "selectedInventory": [
+    {
+      "slug": "01-iphone-auth-welcome-dark",
+      "screen": "auth-welcome",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "01b-iphone-auth-login-dark",
+      "screen": "auth-login",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "03-iphone-discover-dark",
+      "screen": "discover",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "04-iphone-messages-list-dark",
+      "screen": "messages",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "05-iphone-chat-detail-dark",
+      "screen": "chat-detail",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "06-iphone-profile-dark",
+      "screen": "profile",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "08-iphone-notifications-dark",
+      "screen": "notifications",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "09-iphone-wallet-store-dark",
+      "screen": "wallet",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "10-iphone-live-stream-dark",
+      "screen": "live",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "13-iphone-feed-light",
+      "screen": "feed",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "welcome-autocycle-demo",
+      "screen": "auth-welcome-autocycle",
+      "device": "iPhone 16 Pro"
+    },
+    {
+      "slug": "kinnect-comprehensive-features-test",
+      "screen": "all-features-walkthrough",
+      "device": "iPhone 16 Pro"
+    }
+  ],
+  "xcodeVersion": "Xcode 16.4 | Build version 16F6",
+  "gitSha": "7713c408009a275e9ba5b3481f531d46b966ed62",
+  "marketingVersion": "1.2.12",
+  "buildNumber": "124",
+  "provenance": {
+    "gitSha": "7713c408009a275e9ba5b3481f531d46b966ed62",
+    "marketingVersion": "1.2.12",
+    "buildNumber": "124",
+    "CFBundleShortVersionString": "1.2.12",
+    "CFBundleVersion": "124",
+    "MARKETING_VERSION": "1.2.12",
+    "CURRENT_PROJECT_VERSION": "124",
+    "sourceInfoPlist": "ios/Kinnect/Resources/Info.plist",
+    "capturedAt": "2026-11-17T19:07:14Z",
+    "githubRunId": "44148951550",
+    "githubRunAttempt": "1",
+    "githubRef": "refs/heads/codex/ios-qa-20261113",
+    "githubRepository": "vuanh97nd/Kinnect",
+    "workflow": "iOS QA Simulator Screenshots",
+    "actor": "vuanh97nd",
+    "captureScope": "core",
+    "selectedInventory": [
+      {
+        "slug": "01-iphone-auth-welcome-dark",
+        "screen": "auth-welcome",
+        "device": "iPhone 16 Pro"
+      },
+      {
+        "slug": "01b-iphone-auth-login-dark",
+        "screen": "auth-login",
+        "device": "iPhone 16 Pro"
+      },
+      {
+        "slug": "03-iphone-discover-dark",
+        "screen": "discover",
+        "device": "iPhone 16 Pro"
+      },
+      {
+        "slug": "04-iphone-messages-list-dark",
+        "screen": "messages",
+        "device": "iPhone 16 Pro"
+      },
+      {
+        "slug": "05-iphone-chat-detail-dark",
+        "screen": "chat-detail",
+        "device": "iPhone 16 Pro"
+      },
+      {
+        "slug": "06-iphone-profile-dark",
+        "screen": "profile",
+        "device": "iPhone 16 Pro"
+      },
+      {
+        "slug": "08-iphone-notifications-dark",
+        "screen": "notifications",
+        "device": "iPhone 16 Pro"
+      },
+      {
+        "slug": "09-iphone-wallet-store-dark",
+        "screen": "wallet",
+        "device": "iPhone 16 Pro"
+      },
+      {
+        "slug": "10-iphone-live-stream-dark",
+        "screen": "live",
+        "device": "iPhone 16 Pro"
+      },
+      {
+        "slug": "13-iphone-feed-light",
+        "screen": "feed",
+        "device": "iPhone 16 Pro"
+      },
+      {
+        "slug": "welcome-autocycle-demo",
+        "screen": "auth-welcome-autocycle",
+        "device": "iPhone 16 Pro"
+      },
+      {
+        "slug": "kinnect-comprehensive-features-test",
+        "screen": "all-features-walkthrough",
+        "device": "iPhone 16 Pro"
+      }
+    ],
+    "xcodeVersion": "Xcode 16.4 | Build version 16F6",
+    "simulatorRuntimes": [
+      "== Runtimes ==",
+      "iOS 18.5 (18.5 - 22F77) - com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+      "iOS 18.6 (18.6 - 22G86) - com.apple.CoreSimulator.SimRuntime.iOS-18-6",
+      "iOS 26.0 (26.0.1 - 23A8464) - com.apple.CoreSimulator.SimRuntime.iOS-26-0",
+      "iOS 26.1 (26.1 - 23B86) - com.apple.CoreSimulator.SimRuntime.iOS-26-1",
+      "iOS 26.2 (26.2 - 23C54) - com.apple.CoreSimulator.SimRuntime.iOS-26-2",
+      "tvOS 18.5 (18.5 - 22L572) - com.apple.CoreSimulator.SimRuntime.tvOS-18-5",
+      "tvOS 26.1 (26.1 - 23J579) - com.apple.CoreSimulator.SimRuntime.tvOS-26-1",
+      "tvOS 26.2 (26.2 - 23K51) - com.apple.CoreSimulator.SimRuntime.tvOS-26-2",
+      "watchOS 11.5 (11.5 - 22T572) - com.apple.CoreSimulator.SimRuntime.watchOS-11-5",
+      "watchOS 26.1 (26.1 - 23S36) - com.apple.CoreSimulator.SimRuntime.watchOS-26-1",
+      "watchOS 26.2 (26.2 - 23S303) - com.apple.CoreSimulator.SimRuntime.watchOS-26-2",
+      "visionOS 2.3 (2.3 - 22N895) - com.apple.CoreSimulator.SimRuntime.xrOS-2-3",
+      "visionOS 2.4 (2.4 - 22O237) - com.apple.CoreSimulator.SimRuntime.xrOS-2-4",
+      "visionOS 2.5 (2.5 - 22O473) - com.apple.CoreSimulator.SimRuntime.xrOS-2-5",
+      "visionOS 26.1 (26.1 - 23N47) - com.apple.CoreSimulator.SimRuntime.xrOS-26-1",
+      "visionOS 26.2 (26.2 - 23N301) - com.apple.CoreSimulator.SimRuntime.xrOS-26-2"
+    ],
+    "builtAppPath": "build/SimDerivedData/Build/Products/Debug-iphonesimulator/Kinnect.app",
+    "builtCFBundleShortVersionString": "1.2.12",
+    "builtCFBundleVersion": "124",
+    "screenshotCount": 12,
+    "standardIphone": "iPhone 16 Pro",
+    "compactIphone": "iPhone 16e",
+    "ipad": null
+  },
+  "standardIphone": {
+    "dataPath": "/Users/runner/Library/Developer/CoreSimulator/Devices/C1B4F8AF-9BCC-444D-A13D-4044D04E28DD/data",
+    "dataPathSize": 18337792,
+    "logPath": "/Users/runner/Library/Logs/CoreSimulator/C1B4F8AF-9BCC-444D-A13D-4044D04E28DD",
+    "udid": "C1B4F8AF-9BCC-444D-A13D-4044D04E28DD",
+    "isAvailable": true,
+    "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro",
+    "state": "Shutdown",
+    "name": "iPhone 16 Pro",
+    "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5"
+  },
+  "compactIphone": {
+    "dataPath": "/Users/runner/Library/Developer/CoreSimulator/Devices/D6637289-2B84-4D8C-BD11-E3EE0187A9C2/data",
+    "dataPathSize": 18337792,
+    "logPath": "/Users/runner/Library/Logs/CoreSimulator/D6637289-2B84-4D8C-BD11-E3EE0187A9C2",
+    "udid": "D6637289-2B84-4D8C-BD11-E3EE0187A9C2",
+    "isAvailable": true,
+    "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16e",
+    "state": "Shutdown",
+    "name": "iPhone 16e",
+    "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5"
+  },
+  "ipad": null,
+  "screenshots": [
+    {
+      "slug": "01-iphone-auth-welcome-dark",
+      "screen": "auth-welcome",
+      "description": "Chào mừng Tab 1: Khám phá (Discover VI) — Standard iPhone",
+      "device": "iPhone 16 Pro",
+      "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+      "file": "dist/ios-ui-review/01-iphone-auth-welcome-dark.png"
+    },
+    {
+      "slug": "01b-iphone-auth-login-dark",
+      "screen": "auth-login",
+      "description": "Đăng nhập chính tiếng Việt trống (Dark)",
+      "device": "iPhone 16 Pro",
+      "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+      "file": "dist/ios-ui-review/01b-iphone-auth-login-dark.png"
+    },
+    {
+      "slug": "03-iphone-discover-dark",
+      "screen": "discover",
+      "description": "Khám phá (Dark)",
+      "device": "iPhone 16 Pro",
+      "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+      "file": "dist/ios-ui-review/03-iphone-discover-dark.png"
+    },
+    {
+      "slug": "04-iphone-messages-list-dark",
+      "screen": "messages",
+      "description": "Danh sách Tin nhắn & Nhóm (Dark)",
+      "device": "iPhone 16 Pro",
+      "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+      "file": "dist/ios-ui-review/04-iphone-messages-list-dark.png"
+    },
+    {
+      "slug": "05-iphone-chat-detail-dark",
+      "screen": "chat-detail",
+      "description": "Chi tiết Chat: nội dung trên, giờ+seen+reaction+more dưới",
+      "device": "iPhone 16 Pro",
+      "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+      "file": "dist/ios-ui-review/05-iphone-chat-detail-dark.png"
+    },
+    {
+      "slug": "06-iphone-profile-dark",
+      "screen": "profile",
+      "description": "Hồ sơ cá nhân & Chẩn đoán PushKit (Dark)",
+      "device": "iPhone 16 Pro",
+      "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+      "file": "dist/ios-ui-review/06-iphone-profile-dark.png"
+    },
+    {
+      "slug": "08-iphone-notifications-dark",
+      "screen": "notifications",
+      "description": "Thông báo",
+      "device": "iPhone 16 Pro",
+      "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+      "file": "dist/ios-ui-review/08-iphone-notifications-dark.png"
+    },
+    {
+      "slug": "09-iphone-wallet-store-dark",
+      "screen": "wallet",
+      "description": "Ví & Cửa hàng: Tách Xu mua & Xu tặng, Số dư và Lịch sử",
+      "device": "iPhone 16 Pro",
+      "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+      "file": "dist/ios-ui-review/09-iphone-wallet-store-dark.png"
+    },
+    {
+      "slug": "10-iphone-live-stream-dark",
+      "screen": "live",
+      "description": "Phòng Live: Luồng vuốt xem trực tiếp",
+      "device": "iPhone 16 Pro",
+      "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+      "file": "dist/ios-ui-review/10-iphone-live-stream-dark.png"
+    },
+    {
+      "slug": "13-iphone-feed-light",
+      "screen": "feed",
+      "description": "Bảng tin chế độ Light mode",
+      "device": "iPhone 16 Pro",
+      "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+      "file": "dist/ios-ui-review/13-iphone-feed-light.png"
+    },
+    {
+      "slug": "welcome-autocycle-demo",
+      "screen": "auth-welcome-autocycle",
+      "description": "Video thực tế luân phiên 4 màn hình chào mừng (1.5s/chu kỳ, >=2 chu kỳ đầy đủ) trên iPhone 16 Pro",
+      "device": "iPhone 16 Pro",
+      "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+      "file": "dist/ios-ui-review/welcome-autocycle-demo.mp4"
+    },
+    {
+      "slug": "kinnect-comprehensive-features-test",
+      "screen": "all-features-walkthrough",
+      "description": "Video thực tế kiểm thử toàn bộ 10 chức năng trên iPhone 16 Pro theo yêu cầu",
+      "device": "iPhone 16 Pro",
+      "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+      "file": "dist/ios-ui-review/kinnect-comprehensive-features-test.mp4"
+    }
+  ],
+  "contactSheet": "dist/ios-ui-review/contact-sheet.png"
+}
