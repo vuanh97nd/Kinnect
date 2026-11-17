@@ -5,3 +5,19 @@ test('existing sessions respect cloud demotion, suspension, password changes and
 test('remote member dossiers never expose credential fields or unrelated team cases',async t=>{const a=await setup(t);a.db.prepare("INSERT INTO console_tickets(id,subject,description,priority,team,member,status,version,created_by,created,updated) VALUES('private-case','Private support','Private','normal','support','remote_member','open',1,'someone',1,1)").run();a.db.prepare("INSERT INTO console_ticket_teams VALUES('private-case','support')").run();const login=await a.call('login','finance',{username:'sandbox_finance',password:a.password});let r=await a.call('member-360/remote_member','finance',null,login.cookie);assert.equal(r.status,200);for(const key of ['password','salt','token','credential'])assert.equal(Object.hasOwn(r.body.user,key),false,key);assert.equal(r.body.tickets.length,0);a.db.prepare("INSERT INTO console_ticket_teams VALUES('private-case','finance')").run();r=await a.call('member-360/remote_member','finance',null,login.cookie);assert.equal(r.body.tickets.length,1);});
 test('finance fails explicitly during authoritative ledger outage rather than showing stale SQLite balances',async t=>{const a=await setup(t);const login=await a.call('login','finance',{username:'sandbox_finance',password:a.password});const r=await a.call('finance','finance',null,login.cookie);assert.equal(r.status,503);assert.equal(r.body.entries,undefined);});
 test('restart without a configured controller returns failure instead of false success',async t=>{const a=await setup(t);const login=await a.call('login','admin',{username:a.root.username,password:a.password});const r=await a.call('operations/action','admin',{action:'restart-server'},login.cookie);assert.equal(r.status,503);assert.equal(r.body.ok,undefined);});
+
+test('malformed authority credential rejects login instead of falling back or throwing 500', async t=>{
+ const a=await setup(t);
+ a.setCurrent({password:null});
+ const result=await a.call('login','admin',{username:a.root.username,password:a.password});
+ assert.equal(result.status,401);
+ assert.equal(result.cookie,undefined);
+});
+
+test('malformed authority credential invalidates an existing admin session', async t=>{
+ const a=await setup(t);
+ const login=await a.call('login','admin',{username:a.root.username,password:a.password});
+ assert.equal(login.status,200);
+ a.setCurrent({password:null});
+ assert.equal((await a.call('me','admin',null,login.cookie)).status,401);
+});

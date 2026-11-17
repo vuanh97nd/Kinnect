@@ -23,7 +23,8 @@ public class MainActivity extends Activity {
   private final NativeApi api = NativeApi.shared;
   private final Handler handler = new Handler(Looper.getMainLooper());
   private final Handler startupHandler = new Handler(Looper.getMainLooper());
-  private android.animation.ObjectAnimator splashAnimator;
+  private android.animation.AnimatorSet splashAnimator;
+  private int introTabOverride = -1;
   private final List<VideoView> mediaVideos = new ArrayList<>(), resumeVideos = new ArrayList<>();
   private LinearLayout root, content, toolbar, bottom;
   private TextView notice;
@@ -71,14 +72,210 @@ public class MainActivity extends Activity {
     resumeVideos.clear();
   }
   private NativeCalls calls;
-  private void onUserSignedIn(JSONObject user){me=user;KinnectService.start(this);ensureCalls();}
-  private void ensureCalls(){if(me!=null&&!mediaCallListening){mediaCallListening=true;KinnectService.listen(mediaCallEvents);}if(KinnectService.pendingIncoming!=null){mediaCallGate.update("call-incoming",KinnectService.pendingIncoming.optString("callId"));mediaCallBlocked=mediaCallGate.blocked();pauseForCall();}if(me!=null&&calls==null){calls=new NativeCalls(this,server());setupBackground();}}
+  private void onUserSignedIn(JSONObject user){
+    me=user;
+    if(NativeApi.isFixtureEnabled())return;
+    KinnectService.start(this);
+    ensureCalls();
+  }
+  private void ensureCalls(){if(NativeApi.isFixtureEnabled())return;if(me!=null&&!mediaCallListening){mediaCallListening=true;KinnectService.listen(mediaCallEvents);}if(KinnectService.pendingIncoming!=null){mediaCallGate.update("call-incoming",KinnectService.pendingIncoming.optString("callId"));mediaCallBlocked=mediaCallGate.blocked();pauseForCall();}if(me!=null&&calls==null){calls=new NativeCalls(this,server());setupBackground();}}
   // Một lần: xin đủ quyền thông báo/cuộc gọi, cho phép toàn màn hình và chạy nền.
-  private void setupBackground(){if(Distribution.PLAY){if(Build.VERSION.SDK_INT>=33&&checkSelfPermission("android.permission.POST_NOTIFICATIONS")!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"},950);return;}android.content.SharedPreferences p=getSharedPreferences("native_setup",0);if(p.getBoolean("asked_v1",false)){backgroundExtras(false);return;}p.edit().putBoolean("asked_v1",true).apply();java.util.ArrayList<String> want=new java.util.ArrayList<>();if(Build.VERSION.SDK_INT>=33)want.add("android.permission.POST_NOTIFICATIONS");want.add(Manifest.permission.RECORD_AUDIO);want.add(Manifest.permission.CAMERA);if(Build.VERSION.SDK_INT>=31)want.add("android.permission.BLUETOOTH_CONNECT");java.util.ArrayList<String> missing=new java.util.ArrayList<>();for(String w:want)if(checkSelfPermission(w)!=PackageManager.PERMISSION_GRANTED)missing.add(w);if(missing.isEmpty())backgroundExtras(true);else requestPermissions(missing.toArray(new String[0]),950);}
+  private void setupBackground(){if(NativeApi.isFixtureEnabled())return;if(Distribution.PLAY){if(Build.VERSION.SDK_INT>=33&&checkSelfPermission("android.permission.POST_NOTIFICATIONS")!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"},950);return;}android.content.SharedPreferences p=getSharedPreferences("native_setup",0);if(p.getBoolean("asked_v1",false)){backgroundExtras(false);return;}p.edit().putBoolean("asked_v1",true).apply();java.util.ArrayList<String> want=new java.util.ArrayList<>();if(Build.VERSION.SDK_INT>=33)want.add("android.permission.POST_NOTIFICATIONS");want.add(Manifest.permission.RECORD_AUDIO);want.add(Manifest.permission.CAMERA);if(Build.VERSION.SDK_INT>=31)want.add("android.permission.BLUETOOTH_CONNECT");java.util.ArrayList<String> missing=new java.util.ArrayList<>();for(String w:want)if(checkSelfPermission(w)!=PackageManager.PERMISSION_GRANTED)missing.add(w);if(missing.isEmpty())backgroundExtras(true);else requestPermissions(missing.toArray(new String[0]),950);}
   private void backgroundExtras(boolean prompt){if(Distribution.PLAY)return;try{if(Build.VERSION.SDK_INT>=34&&!getSystemService(android.app.NotificationManager.class).canUseFullScreenIntent()){if(prompt)new Sheet(this).setTitle(I18n.t("Cuộc gọi toàn màn hình")).setMessage(I18n.t("Cho phép Kinnect hiện cuộc gọi đến toàn màn hình, kể cả khi khóa máy.")).setPositiveButton(I18n.t("Cho phép"),(d,w)->{try{startActivity(new Intent("android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT",android.net.Uri.parse("package:"+getPackageName())));}catch(RuntimeException ignored){}}).setNegativeButton(I18n.t("Để sau"),(d,w)->battery()).show();else battery();return;}}catch(RuntimeException ignored){}if(prompt)battery();}
   private void battery(){android.os.PowerManager pm=(android.os.PowerManager)getSystemService(POWER_SERVICE);if(pm!=null&&pm.isIgnoringBatteryOptimizations(getPackageName())){say(I18n.t("Đã cho phép chạy ngầm không giới hạn pin."));return;}try{startActivity(new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,android.net.Uri.parse("package:"+getPackageName())));}catch(RuntimeException ignored){}}
   private void openAutostartSettings(){String m=Build.MANUFACTURER.toLowerCase(java.util.Locale.ROOT);Intent i=new Intent();try{if(m.contains("xiaomi")||m.contains("redmi")||m.contains("poco")){i.setComponent(new ComponentName("com.miui.securitycenter","com.miui.permcenter.autostart.AutoStartManagementActivity"));}else if(m.contains("oppo")||m.contains("realme")){try{i.setComponent(new ComponentName("com.coloros.safecenter","com.coloros.safecenter.permission.startup.StartupAppListActivity"));}catch(Exception e){i.setComponent(new ComponentName("com.oppo.safe","com.oppo.safe.permission.startup.StartupAppListActivity"));}}else if(m.contains("vivo")){try{i.setComponent(new ComponentName("com.iqoo.secure","com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity"));}catch(Exception e){i.setComponent(new ComponentName("com.vivo.permissionmanager","com.vivo.permissionmanager.activity.BgStartUpManagerActivity"));}}else if(m.contains("huawei")||m.contains("honor")){i.setComponent(new ComponentName("com.huawei.systemmanager","com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"));}else if(m.contains("samsung")){i.setComponent(new ComponentName("com.samsung.android.lool","com.samsung.android.sm.battery.ui.BatteryActivity"));}else{i=new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:"+getPackageName()));}i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);startActivity(i);}catch(Exception fallback){try{startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:"+getPackageName())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));}catch(Exception ignored){}}}
-  private void handleExtras(Intent intent){if(intent==null||me==null)return;String destination=intent.getStringExtra("commerce_destination");if(destination!=null){intent.removeExtra("commerce_destination");if(destination.equals("account"))meMenu();else if(destination.equals("notifications"))notifications();else if(destination.equals("friends"))friendsScreen("friends");else if(destination.equals("create"))openCreateMenu();else navigate(destination);}if(intent.getBooleanExtra("accept_call",false)){intent.removeExtra("accept_call");ensureCalls();if(calls!=null)calls.checkPending();}String n=intent.getStringExtra("notification");if(n!=null){intent.removeExtra("notification");try{openNotification(new JSONObject(n));}catch(JSONException ignored){}}}
+  private void handleExtras(Intent intent){
+    if(intent==null)return;
+    boolean isDebug = (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+    if(intent.hasExtra("app_language")){
+      String lang=intent.getStringExtra("app_language");
+      if("vi".equals(lang)||"en".equals(lang))try{I18n.select(this,lang);}catch(Exception ignored){}
+    }
+    if(isDebug && intent.getBooleanExtra("ui_review_fixture",false)){
+      if(intent.getBooleanExtra("reset_fixture_state",false)) NativeApi.resetFixtureState(this);
+      NativeApi.enableFixture(this, true);
+      if(me==null)try{
+        me=NativeApi.shared.fixtureUser(this);
+        onUserSignedIn(me);
+      }catch(Exception ignored){}
+    }
+    String destination=intent.getStringExtra("commerce_destination");
+    if(destination!=null){
+      intent.removeExtra("commerce_destination");
+      if(destination.equals("splash")){splash();return;}
+      if(destination.equals("intro")||destination.equals("welcome")){
+        introTabOverride = (isDebug && NativeApi.isFixtureEnabled()) ? intent.getIntExtra("welcome_tab", -1) : -1;
+        intro();
+        return;
+      }
+      if(destination.equals("login")||destination.equals("auth_login")){auth(false);return;}
+      if(destination.equals("register")||destination.equals("auth_register")){auth(true);return;}
+      if(destination.equals("forgot")||destination.equals("auth_forgot")){forgot();return;}
+      if(me==null){
+        try{
+          me=new JSONObject("{\"id\":\"usr_qa_review\",\"username\":\"minhanh\",\"name\":\"Minh Anh\",\"role\":\"user\",\"coins\":1200,\"bio\":\"Kinnect QA Review\",\"followersCount\":128,\"followingCount\":64}");
+          onUserSignedIn(me);
+        }catch(Exception ignored){}
+      }
+      if(me!=null){
+        if(destination.equals("feed")||destination.equals("feed_home")||destination.equals("feed_dark")||destination.equals("feed_font13")||destination.equals("feed_narrow")){
+          navigate("feed");
+        }
+        else if(destination.equals("feed_story")){
+          navigate("feed");
+          try{
+            JSONObject s = new JSONObject();
+            s.put("id", "st_1");
+            s.put("body", "Chào ngày mới đầy năng lượng cùng Kinnect! ✨");
+            s.put("created", System.currentTimeMillis() - 3600000L);
+            JSONObject a = new JSONObject();
+            a.put("id", "usr_story");
+            a.put("name", "Linh Nhi");
+            a.put("username", "linhnhi");
+            s.put("author", a);
+            JSONArray arr = new JSONArray();
+            arr.put(s);
+            story(arr, 0);
+          }catch(Exception ignored){}
+        }
+        else if(destination.equals("feed_post_detail")){
+          postDetail("post_1",null);
+        }
+        else if(destination.equals("feed_comments")||destination.equals("comments_narrow")){
+          accountHeader(I18n.t("Bình luận"), () -> navigate("feed"));
+          comments("/api/posts/post_1", () -> {}, () -> navigate("feed"), "Bảng tin");
+        }
+        else if(destination.equals("feed_reactions")){
+          postDetail("post_1",null);
+          reactorsSheet("post_1");
+        }
+        else if(destination.equals("discover")||destination.equals("discover_search")){
+          navigate("discover");
+        }
+        else if(destination.equals("discover_results")){
+          nearQuery="cà phê";
+          navigate("discover");
+        }
+        else if(destination.equals("discover_empty")){
+          nearQuery="___khong_tim_thay___";
+          navigate("discover");
+        }
+        else if(destination.equals("shorts")||destination.equals("shorts_player")){
+          navigate("shorts");
+        }
+        else if(destination.equals("shorts_comments")){
+          navigate("shorts");
+          try{
+            shortComments(new JSONObject("{\"id\":\"s1\",\"title\":\"Khoảnh khắc cuộc sống\",\"author\":{\"id\":\"usr_qa_review\",\"name\":\"Minh Anh\"},\"comments\":12}"));
+          }catch(Exception ignored){}
+        }
+        else if(destination.equals("inbox")||destination.equals("inbox_list")){
+          navigate("inbox");
+        }
+        else if(destination.equals("chat_direct")){
+          try{chat(new JSONObject("{\"id\":\"usr_chat_mock\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\",\"isActive\":true}"));}catch(Exception ignored){}
+        }
+        else if(destination.equals("chat_group")){
+          try{groupChat(new JSONObject("{\"id\":\"grp_mock\",\"name\":\"Nhóm Âm Nhạc\",\"members\":[{},{},{}]}"));}catch(Exception ignored){}
+        }
+        else if(destination.equals("chat_menu")){
+          try{
+            JSONObject mockUser=new JSONObject("{\"id\":\"usr_chat_mock\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\"}");
+            chat(mockUser);
+            directChatMenu(mockUser);
+          }catch(Exception ignored){}
+        }
+        else if(destination.equals("friends")||destination.equals("friends_list")){
+          headerActive = "";
+          friendsScreen("friends");
+        }
+        else if(destination.equals("friend_requests")||destination.equals("friends_requests")){
+          headerActive = "";
+          friendsScreen("incoming");
+        }
+        else if(destination.equals("profile")||destination.equals("profile_main")){
+          navigate("profile");
+        }
+        else if(destination.equals("profile_edit")){
+          editProfile();
+        }
+        else if(destination.equals("profile_albums")){
+          privateAlbum(me);
+        }
+        else if(destination.equals("account")||destination.equals("account_menu")||destination.equals("account_dark")||destination.equals("account_font13")){
+          headerActive = "";
+          meMenu();
+        }
+        else if(destination.equals("appearance_settings")){
+          appearanceScreen();
+        }
+        else if(destination.equals("password")||destination.equals("security_password")){
+          changePassword();
+        }
+        else if(destination.equals("sessions_devices")){
+          sessionsScreen();
+        }
+        else if(destination.equals("notifications")||destination.equals("notifications_screen")){
+          notifications();
+        }
+        else if(destination.equals("notifications_settings")){
+          nativeNotificationSettings();
+        }
+        else if(destination.equals("privacy_settings")){
+          nativeDocument("privacy",this::settings);
+        }
+        else if(destination.equals("language")||destination.equals("language_settings")){
+          languageMenu();
+        }
+        else if(destination.equals("help_support")){
+          helpScreen();
+        }
+        else if(destination.equals("about_screen")){
+          aboutScreen();
+        }
+        else if(destination.equals("delete_account_confirm")){
+          deleteAccountScreen();
+        }
+        else if(destination.equals("wallet_main")){
+          startActivity(new Intent(this,WalletActivity.class));
+        }
+        else if(destination.equals("store")||destination.equals("store_packages")){
+          startActivity(new Intent(this,StoreActivity.class));
+        }
+        else if(destination.equals("live")||destination.equals("live_list")){
+          live();
+        }
+        else if(destination.equals("live_setup_sheet")){
+          startActivity(new Intent(this,StudioActivity.class).putExtra(StudioActivity.EXTRA_MODE,"live"));
+        }
+        else if(destination.equals("live_gifts_drawer")){
+          startActivity(new Intent(this,LiveActivity.class).putExtra("show_gifts",true));
+        }
+        else if(destination.equals("call_incoming")){
+          try{
+            KinnectService.pendingIncoming=new JSONObject("{\"callId\":\"call_qa_01\",\"from\":{\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\"},\"mode\":\"video\"}");
+            startActivity(new Intent(this,IncomingCallActivity.class));
+          }catch(Exception ignored){}
+        }
+        else if(destination.equals("studio_camera")){
+          startActivity(new Intent(this,StudioActivity.class));
+        }
+        else if(destination.equals("studio_music_picker")){
+          startActivity(new Intent(this,StudioActivity.class).putExtra("open_music",true));
+        }
+        else if(destination.equals("create")){
+          openCreateMenu();
+        }
+        else if(destination.equals("settings")){
+          settings();
+        }
+        else if(destination!=null&&!destination.isEmpty()) navigate(destination); else navigate("feed");
+      }
+    }
+    if(intent.getBooleanExtra("accept_call",false)){intent.removeExtra("accept_call");ensureCalls();if(calls!=null)calls.checkPending();}
+    String n=intent.getStringExtra("notification");
+    if(n!=null){intent.removeExtra("notification");try{openNotification(new JSONObject(n));}catch(JSONException ignored){}}
+  }
   private LocationListener locationListener;
   // Màu lấy từ public/theme.css để app và web mobile trông giống nhau; tự theo chế độ sáng/tối của máy.
   private int BG, CARD, TEXT, MUTED, ACCENT, SOFT, LINE, PRIMARY_SOFT;
@@ -111,16 +308,35 @@ public class MainActivity extends Activity {
     CrashLog.install(this);
     if (Build.VERSION.SDK_INT >= 33) getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::handleBack);
     palette();
+    boolean isDebug = (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+    if (isDebug && getIntent() != null && getIntent().hasExtra("qa_local_loopback_origin")) {
+      api.pinDebugLoopback(this, getIntent().getStringExtra("qa_local_loopback_origin"), getIntent().getStringExtra("qa_local_loopback_cert_sha256"));
+    }
     api.initialize(this,server());
+    if (isDebug && getIntent() != null && getIntent().getBooleanExtra("qa_local_loopback_wipe", false) && api.pinnedDebugLoopbackOrigin() != null) {
+      clearClientSessionCaches();
+    }
     getWindow().setStatusBarColor(CARD);
     getWindow().setNavigationBarColor(CARD);
     if (!WebTheme.isDark(this))
       getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
     splash();
+    if (isDebug && getIntent() != null && getIntent().getBooleanExtra("ui_review_fixture", false)) {
+      if (getIntent().getBooleanExtra("reset_fixture_state", false)) {
+        NativeApi.resetFixtureState(this);
+      }
+      NativeApi.enableFixture(this, true);
+      try {
+        me = NativeApi.shared.fixtureUser(this);
+        onUserSignedIn(me);
+        handleExtras(getIntent());
+        return;
+      } catch (Exception ignored) {}
+    }
     final long shownAt = System.currentTimeMillis();
     final boolean hasSession = !api.cookieFor(server()).isEmpty();
     if (hasSession) {
-      KinnectService.start(this);
+      if (api.pinnedDebugLoopbackOrigin() == null) KinnectService.start(this);
       api.call("GET", "/api/me", null, (data, error, status) -> {
         if (isDestroyed()) return;
         long wait = Math.max(0, 450 - (System.currentTimeMillis() - shownAt));
@@ -133,31 +349,115 @@ public class MainActivity extends Activity {
         }, wait);
       });
     }
-    else startupHandler.postDelayed(() -> { if (!isDestroyed() && !isFinishing()) { intro(); handleLink(getIntent()); } }, 700);
+    else {
+      if (getIntent() != null && getIntent().hasExtra("commerce_destination")) {
+        handleExtras(getIntent());
+      } else {
+        startupHandler.postDelayed(() -> { if (!isDestroyed() && !isFinishing()) { intro(); handleLink(getIntent()); } }, 700);
+      }
+    }
   }
 
   private void splash() {
+    if (splashAnimator != null) {
+      splashAnimator.cancel();
+      splashAnimator = null;
+    }
+    float density = getResources().getDisplayMetrics().density;
+    int logoPx = Math.round(96f * density);
+    final float logoRadius = 22f * density;
+    int gapPx = Math.round(18f * density);
+    int ringPx = Math.round(22f * density);
+    int ringStroke = Math.max(2, Math.round(2.5f * density));
+    int ringsWidth = Math.round(96f * density);
+    int ringsHeight = Math.round(36f * density);
+    float spread = 16f * density;
+    float overlap = 5f * density;
+
     FrameLayout s = new FrameLayout(this);
+    s.setClipChildren(false);
+    s.setClipToPadding(false);
     s.setBackgroundColor(BG);
+
     LinearLayout c = column();
     c.setGravity(Gravity.CENTER_HORIZONTAL);
+    c.setClipChildren(false);
+    c.setClipToPadding(false);
+
     ImageView logo = new ImageView(this);
     logo.setImageResource(getResources().getIdentifier("kinnect_logo", "drawable", getPackageName()));
-    logo.setElevation(dp(10));
-    c.addView(logo, new LinearLayout.LayoutParams(dp(96), dp(96)));
+    logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+    logo.setElevation(Math.round(12f * density));
+    logo.setOutlineProvider(new android.view.ViewOutlineProvider() {
+      @Override public void getOutline(View view, android.graphics.Outline outline) {
+        outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), logoRadius);
+      }
+    });
+    LinearLayout.LayoutParams logoLp = new LinearLayout.LayoutParams(logoPx, logoPx);
+    logoLp.gravity = Gravity.CENTER_HORIZONTAL;
+    c.addView(logo, logoLp);
+
     TextView name = label("Kinnect", 26, ACCENT);
+    name.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 30f);
     name.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
-    name.setPadding(0, dp(18), 0, dp(18));
-    c.addView(name);
-    FrameLayout rings=new FrameLayout(this);for(int i=0;i<2;i++){View ring=new View(this);GradientDrawable outline=background(0x00000000,99);outline.setStroke(dp(2),i==0?ACCENT:PINK);ring.setBackground(outline);FrameLayout.LayoutParams rp=new FrameLayout.LayoutParams(dp(20),dp(20),Gravity.CENTER);rings.addView(ring,rp);ring.setTranslationX(dp(i==0?-16:16));ring.animate().translationX(dp(i==0?-5:5)).setDuration(400).start();}LinearLayout.LayoutParams space=new LinearLayout.LayoutParams(-1,dp(42));space.topMargin=dp(18);c.addView(rings,space);
-    s.addView(c, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
+    name.setIncludeFontPadding(false);
+    name.setSingleLine(true);
+    name.setGravity(Gravity.CENTER);
+    LinearLayout.LayoutParams nameLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+    nameLp.gravity = Gravity.CENTER_HORIZONTAL;
+    nameLp.topMargin = gapPx;
+    c.addView(name, nameLp);
+
+    FrameLayout rings = new FrameLayout(this);
+    rings.setClipChildren(false);
+    rings.setClipToPadding(false);
+    View[] ringViews = new View[2];
+    int[] ringColors = { ACCENT, 0xffed45aa };
+    boolean animate = android.animation.ValueAnimator.areAnimatorsEnabled();
+    for (int i = 0; i < 2; i++) {
+      View ring = new View(this);
+      GradientDrawable outline = new GradientDrawable();
+      outline.setShape(GradientDrawable.OVAL);
+      outline.setColor(0x00000000);
+      outline.setStroke(ringStroke, ringColors[i]);
+      ring.setBackground(outline);
+      float initialOffset = animate ? (i == 0 ? -spread : spread) : (i == 0 ? -overlap : overlap);
+      ring.setTranslationX(initialOffset);
+      FrameLayout.LayoutParams rp = new FrameLayout.LayoutParams(ringPx, ringPx, Gravity.CENTER);
+      rings.addView(ring, rp);
+      ringViews[i] = ring;
+    }
+    LinearLayout.LayoutParams space = new LinearLayout.LayoutParams(ringsWidth, ringsHeight);
+    space.gravity = Gravity.CENTER_HORIZONTAL;
+    space.topMargin = gapPx;
+    c.addView(rings, space);
+
+    s.addView(c, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
     setContentView(s);
     getWindow().setStatusBarColor(BG);
     getWindow().setNavigationBarColor(BG);
+
+    if (animate) {
+      android.view.animation.Interpolator ease = new android.view.animation.AccelerateDecelerateInterpolator();
+      android.animation.ObjectAnimator pulseX = android.animation.ObjectAnimator.ofFloat(logo, View.SCALE_X, 1f, 1.05f);
+      android.animation.ObjectAnimator pulseY = android.animation.ObjectAnimator.ofFloat(logo, View.SCALE_Y, 1f, 1.05f);
+      android.animation.ObjectAnimator move0 = android.animation.ObjectAnimator.ofFloat(ringViews[0], View.TRANSLATION_X, -spread, -overlap);
+      android.animation.ObjectAnimator move1 = android.animation.ObjectAnimator.ofFloat(ringViews[1], View.TRANSLATION_X, spread, overlap);
+      for (android.animation.ObjectAnimator anim : new android.animation.ObjectAnimator[] { pulseX, pulseY, move0, move1 }) {
+        anim.setDuration(600);
+        anim.setInterpolator(ease);
+        anim.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+        anim.setRepeatMode(android.animation.ValueAnimator.REVERSE);
+      }
+      splashAnimator = new android.animation.AnimatorSet();
+      splashAnimator.playTogether(pulseX, pulseY, move0, move1);
+      splashAnimator.start();
+    }
   }
 
   private String server() {
-    return ServerConfig.DEFAULT_ORIGIN;
+    String pinned = api.pinnedDebugLoopbackOrigin();
+    return pinned != null ? pinned : ServerConfig.DEFAULT_ORIGIN;
   }
 
   private int dp(int n) {
@@ -343,6 +643,7 @@ public class MainActivity extends Activity {
   }
 
   private boolean onTabRoot = false;
+  private boolean inAccountSubPage = false;
   private LinearLayout headActions;
   private TextView inboxBadge, bellBadge, friendsBadge;
   private int friendsCount;
@@ -371,6 +672,7 @@ public class MainActivity extends Activity {
     }
     feedRefresh=null;peopleRefresh=null;shortRefreshing=false;reelViewport=null;
     onTabRoot = false;
+    inAccountSubPage = false;
     if (splashAnimator != null) { splashAnimator.cancel(); splashAnimator = null; }
     for (VideoView video : mediaVideos) { try { if(retainedFeedVideos.contains(video))video.pause();else video.stopPlayback(); } catch (RuntimeException ignored) {} }
     mediaVideos.clear(); resumeVideos.clear();
@@ -384,6 +686,7 @@ public class MainActivity extends Activity {
     chatUser = null;
     chatReload = null;
     profileEditorAvatar = null;
+    toolbarAvatar = null;
     if (!"store".equals(headerActive)) closeStoreUi();
     root = column();
     bottom = null;
@@ -425,14 +728,20 @@ public class MainActivity extends Activity {
         }
       }, "inbox"));
       FrameLayout meHolder = new FrameLayout(this);
+      boolean meActive = "account".equals(headerActive);
+      meHolder.setBackground(pressable(meActive ? PRIMARY_SOFT : CARD, 99));
       ImageView meButton = new ImageView(this);
       meButton.setScaleType(ImageView.ScaleType.CENTER_CROP);
       GradientDrawable round = new GradientDrawable();
       round.setShape(GradientDrawable.OVAL);
       round.setColor(PRIMARY_SOFT);
+      if (meActive) {
+        round.setStroke(dp(2), ACCENT);
+      }
       meButton.setBackground(round);
       meButton.setClipToOutline(true);
       meButton.setImageBitmap(initials(me, dp(40)));
+      toolbarAvatar = meButton;
       loadAvatarInto(me, meButton);
       meHolder.addView(meButton, new FrameLayout.LayoutParams(dp(26), dp(26), Gravity.CENTER));
       meHolder.setContentDescription(I18n.t("Tài khoản"));
@@ -461,7 +770,7 @@ public class MainActivity extends Activity {
     scroll.setRefreshListener(new PullRefreshScrollView.Listener(){public boolean enabled(){return feedRefresh!=null||peopleRefresh!=null;}public void refresh(Runnable complete){if(peopleRefresh!=null)peopleRefresh.run(complete);else if(feedRefresh!=null)feedRefresh.run(complete);else complete.run();}});
     scroll.setFillViewport(true);
     content = column();
-    content.setPadding(dp(16), dp(14), dp(16), dp(24));
+    content.setPadding(dp(16), dp(14), dp(16), dp(64));
     scroll.addView(content);
     LinearLayout.LayoutParams viewport = new LinearLayout.LayoutParams(Math.min(getResources().getDisplayMetrics().widthPixels, dp(720)), 0, 1);
     viewport.gravity = Gravity.CENTER_HORIZONTAL;
@@ -503,7 +812,7 @@ public class MainActivity extends Activity {
           bottom.addView(holder, new LinearLayout.LayoutParams(0, dp(64), 1));
           continue;
         }
-        boolean active = tab.equals(it[0]);
+        boolean active = headerActive.isEmpty() && tab.equals(it[0]);
         LinearLayout b = column();
         b.setGravity(Gravity.CENTER);
         FrameLayout pill = new FrameLayout(this);
@@ -650,23 +959,92 @@ public class MainActivity extends Activity {
   };
   private int avatarRevision;
   private final java.util.WeakHashMap<ImageView,String> avatarViews=new java.util.WeakHashMap<>();
+  private ImageView toolbarAvatar;
+  private void clearClientSessionCaches() {
+    api.clear();
+    avatarCache.evictAll();
+    MediaImageLoader.clear();
+    clearRetainedFeed();
+    feedRows = null;
+  }
+
+  private Bitmap decodeAvatarBitmap(byte[] bytes) {
+    return MediaImageLoader.decodeSampledBitmap(bytes, 256);
+  }
+  private String resolvedAvatarPath(JSONObject u) {
+    if (u == null) return "";
+    String uid = u.optString("id");
+    if (me != null && !uid.isEmpty() && uid.equals(me.optString("id"))) {
+      String myAvatar = me.optString("avatar", "");
+      if (!myAvatar.isEmpty() && !"null".equals(myAvatar)) return myAvatar;
+    }
+    String path = u.optString("avatar", "");
+    return "null".equals(path) ? "" : path;
+  }
+  private void applyUpdatedAvatar(JSONObject updated, byte[] uploadedBytes) {
+    if (updated == null) return;
+    me = updated;
+    avatarRevision++;
+    avatarCache.evictAll();
+    MediaImageLoader.clear();
+    api.clearSnapshots();
+    clearRetainedFeed();
+    feedRows = null;
+    String newPath = updated.optString("avatar", "");
+    if ("null".equals(newPath)) newPath = "";
+    Bitmap decoded = uploadedBytes != null ? decodeAvatarBitmap(uploadedBytes) : null;
+    if (decoded != null && !newPath.isEmpty()) {
+      avatarCache.put(api.origin() + ":" + newPath, decoded);
+      api.cacheImageBytes(newPath, uploadedBytes);
+    }
+    String myId = me.optString("id");
+    java.util.Set<ImageView> refreshed = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+    for (java.util.Map.Entry<ImageView, String> binding : new java.util.ArrayList<>(avatarViews.entrySet())) {
+      ImageView view = binding.getKey();
+      if (view == null || !myId.equals(binding.getValue())) continue;
+      if (view.isAttachedToWindow() || view == toolbarAvatar || view == profileEditorAvatar) {
+        refreshed.add(view);
+        if (decoded != null) view.setImageBitmap(decoded);
+        else loadAvatarInto(me, view);
+      }
+    }
+    if (toolbarAvatar != null && !refreshed.contains(toolbarAvatar)) {
+      if (decoded != null) { avatarViews.put(toolbarAvatar, myId); toolbarAvatar.setImageBitmap(decoded); }
+      else loadAvatarInto(me, toolbarAvatar);
+    }
+    if (profileEditorAvatar != null && profileEditorAvatar.isAttachedToWindow() && !refreshed.contains(profileEditorAvatar)) {
+      if (decoded != null) { avatarViews.put(profileEditorAvatar, myId); profileEditorAvatar.setImageBitmap(decoded); }
+      else loadAvatarInto(me, profileEditorAvatar);
+    }
+  }
+  private static final int TAG_AVATAR_KEY = 0x7f0f0041;
   private void loadAvatarInto(JSONObject u, final ImageView image) {
     if(u!=null)avatarViews.put(image,u.optString("id"));
-    String path = u == null ? "" : u.optString("avatar", "");
-    if (path.isEmpty() || path.equals("null")) return;
+    String path = resolvedAvatarPath(u);
+    if (path.isEmpty()) return;
     final String cacheKey=api.origin()+":"+path;
     final int revision=avatarRevision;
+    image.setTag(TAG_AVATAR_KEY, cacheKey);
     Bitmap cached=avatarCache.get(cacheKey);
     if(cached!=null){image.setImageBitmap(cached);return;}
-    byte[] saved=api.cachedImage(path);if(saved!=null){Bitmap b=BitmapFactory.decodeByteArray(saved,0,saved.length);if(b!=null)image.setImageBitmap(b);}
-    if(path.startsWith("data:image/")){try{byte[] bytes=android.util.Base64.decode(path.substring(path.indexOf(',')+1),android.util.Base64.DEFAULT);image.setImageBitmap(BitmapFactory.decodeByteArray(bytes,0,bytes.length));}catch(Exception ignored){}return;}
+    byte[] saved=api.cachedImage(path);
+    if(saved!=null){
+      MediaImageLoader.decodeAsync(saved, 256, b -> {
+        if (b != null && !isDestroyed() && revision == avatarRevision) {
+          avatarCache.put(cacheKey, b);
+          if (cacheKey.equals(image.getTag(TAG_AVATAR_KEY))) image.setImageBitmap(b);
+        }
+      });
+    }
+    if(path.startsWith("data:image/")){try{byte[] bytes=android.util.Base64.decode(path.substring(path.indexOf(',')+1),android.util.Base64.DEFAULT);MediaImageLoader.decodeAsync(bytes, 256, b -> { if (b != null && !isDestroyed() && cacheKey.equals(image.getTag(TAG_AVATAR_KEY))) image.setImageBitmap(b); });}catch(Exception ignored){}return;}
     api.image(path, bytes -> {
       if (bytes == null || isDestroyed() || revision!=avatarRevision) return;
-      BitmapFactory.Options options=new BitmapFactory.Options();options.inJustDecodeBounds=true;
-      BitmapFactory.decodeByteArray(bytes,0,bytes.length,options);
-      options.inSampleSize=Math.max(1,Math.max(options.outWidth,options.outHeight)/256);options.inJustDecodeBounds=false;
-      Bitmap b = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
-      if (b != null) {avatarCache.put(cacheKey,b);image.setImageBitmap(b);}
+      MediaImageLoader.decodeAsync(bytes, 256, b -> {
+        if (b != null && !isDestroyed() && revision == avatarRevision) {
+          avatarCache.put(cacheKey, b);
+          if (cacheKey.equals(image.getTag(TAG_AVATAR_KEY))) image.setImageBitmap(b);
+        }
+      });
     });
   }
 
@@ -707,6 +1085,12 @@ public class MainActivity extends Activity {
     return v;
   }
 
+
+  private void accountPage(String title, Runnable back) {
+    shell(title, true);
+    inAccountSubPage = true;
+    subBack = back;
+  }
 
   private void accountHeader(String title, Runnable back) {
     shell("", true);
@@ -777,15 +1161,25 @@ public class MainActivity extends Activity {
   }
   private void openStore() { storeScreen(); }
   private void meMenu() {
-    remember("account", () -> meMenu());
+    if ("account".equals(headerActive) && !inAccountSubPage) {
+      headerActive = "";
+      navigate(tab.isEmpty() ? "feed" : tab);
+      return;
+    }
+    openMeMenu();
+  }
+
+  private void openMeMenu() {
+    headerActive = "account";
+    remember("account", this::openMeMenu);
     shell(I18n.t("Tài khoản"), true);
     LinearLayout profile = row();
-    profile.setPadding(dp(16), dp(16), dp(16), dp(16));
+    profile.setPadding(dp(14), dp(12), dp(14), dp(12));
     GradientDrawable pg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { PRIMARY_SOFT, CARD });
     pg.setCornerRadius(dp(24));
     pg.setStroke(dp(1), LINE);
     profile.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf((ACCENT & 0x00ffffff) | 0x22000000), pg, null));
-    avatar(me, profile, 64);
+    avatar(me, profile, 56);
     LinearLayout text = column();
     text.setPadding(dp(16), 0, 0, 0);
     TextView n = label(me.optString("name"), 20, TEXT);
@@ -797,7 +1191,7 @@ public class MainActivity extends Activity {
     profile.setContentDescription(I18n.t("Trang cá nhân"));
     profile.setOnClickListener(v -> navigate("profile"));
     LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(-1, -2);
-    pp.bottomMargin = dp(16);
+    pp.bottomMargin = dp(10);
     content.addView(profile, pp);
 
     if (me.optString("role").equals("admin")) {
@@ -818,7 +1212,7 @@ public class MainActivity extends Activity {
     groupRow(end, "log_out", I18n.t("Đăng xuất"), true, () -> confirm(I18n.t("Đăng xuất khỏi Kinnect?"), () -> request("POST", "/api/logout", json(), data -> {
       if (calls != null) { calls.close(); calls = null; }
       KinnectService.stop(this);
-      api.clear(); mediaCallGate.clear();mediaCallBlocked=false;me = null; intro();
+      clearClientSessionCaches(); mediaCallGate.clear();mediaCallBlocked=false;me = null; intro();
     })));
     TextView foot = label(I18n.t("Kinnect · Kết nối theo cách của bạn."), 12, MUTED);
     foot.setGravity(Gravity.CENTER);
@@ -828,7 +1222,7 @@ public class MainActivity extends Activity {
 
   private void gamesScreen() {
     remember("games", () -> gamesScreen());
-    accountHeader(I18n.t("Trò chơi"), () -> meMenu());
+    accountPage(I18n.t("Trò chơi"), this::openMeMenu);
     LinearLayout hero = column();
     hero.setPadding(dp(20), dp(18), dp(20), dp(18));
     hero.setBackground(brandGradient(24));
@@ -838,19 +1232,9 @@ public class MainActivity extends Activity {
     TextView heroSub = label(I18n.t("Ghép cặp, chơi nhanh và nhận xu may mắn"), 13, 0xd9ffffff);
     heroSub.setPadding(0, dp(4), 0, dp(12));
     hero.addView(heroSub);
-    TextView heroTag = label(I18n.t("Nông trại đã mở"), 10, ACCENT);
-    heroTag.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
-    heroTag.setPadding(dp(10), dp(5), dp(10), dp(5));
-    heroTag.setBackground(background(WHITE, 99));
-    hero.addView(heroTag, new LinearLayout.LayoutParams(-2, -2));
     LinearLayout.LayoutParams heroLp = new LinearLayout.LayoutParams(-1, -2);
     heroLp.bottomMargin = dp(8);
     content.addView(hero, heroLp);
-
-    groupTitle("sun", I18n.t("Nông trại"));
-    LinearLayout farm = settingsGroup();
-    boolean farmInstalled = FarmGameModule.installed(this);
-    farm.addView(accountRow("sun", I18n.t("Nông trại"), I18n.t(farmInstalled ? "Đã cài · Chơi ngay" : "Module riêng · Tải về để chơi"), () -> FarmGameModule.open(this)), new LinearLayout.LayoutParams(-1, -2));
 
     groupTitle("gamepad", I18n.t("Chơi nhanh 1-1"));
     LinearLayout quick = settingsGroup();
@@ -890,7 +1274,7 @@ public class MainActivity extends Activity {
     g.setBackground(bg);
     g.setElevation(dp(2)); // Bóng nhẹ cho Group theo M3
     LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
-    p.bottomMargin = dp(16);
+    p.bottomMargin = dp(10);
     content.addView(g, p);
     return g;
   }
@@ -921,7 +1305,8 @@ public class MainActivity extends Activity {
     }
     int tint = danger ? WebDesign.DANGER[WebTheme.isDark(this) ? 1 : 0] : ACCENT;
     LinearLayout r = row();
-    r.setPadding(dp(16), dp(12), dp(16), dp(12)); // Tăng padding
+    r.setMinimumHeight(dp(48));
+    r.setPadding(dp(14), dp(8), dp(14), dp(8));
     r.setBackground(pressable(CARD, 24)); // Góc bo 24 theo M3
     r.addView(settingsIcon(iconName,tint),new LinearLayout.LayoutParams(dp(40),dp(40))); // Icon to hơn
     TextView t = label(title, 15, danger ? tint : TEXT); // Chữ to hơn
@@ -938,7 +1323,7 @@ public class MainActivity extends Activity {
   }
 
   private void appearanceScreen() {
-    accountHeader(I18n.t("Giao diện"), () -> meMenu());
+    accountPage(I18n.t("Giao diện"), this::openMeMenu);
     String selected = getSharedPreferences("kinnect_settings", 0).getString("theme", "auto");
     String[][] choices = { { "auto", "monitor", "Theo hệ thống" }, { "light", "sun", "Sáng" }, { "dark", "moon", "Tối" } };
     LinearLayout list = settingsGroup();
@@ -950,7 +1335,7 @@ public class MainActivity extends Activity {
 
 
   private void securityScreen() {
-    accountHeader(I18n.t("Bảo mật và đăng nhập"), () -> meMenu());
+    accountPage(I18n.t("Bảo mật và đăng nhập"), this::openMeMenu);
     LinearLayout panel = settingsGroup();
     groupRow(panel, "key_round", I18n.t("Đổi mật khẩu"), false, () -> changePassword());
     groupRow(panel, "mail", I18n.t("Email khôi phục"), false, () -> recoveryEmailScreen());
@@ -960,9 +1345,23 @@ public class MainActivity extends Activity {
 
 
   private void sessionsScreen() {
-    accountHeader(I18n.t("Thiết bị đăng nhập"), () -> securityScreen());
+    accountPage(I18n.t("Thiết bị đăng nhập"), () -> securityScreen());
     content.addView(label(I18n.t("Thu hồi phiên để đăng xuất thiết bị khác và huỷ đăng nhập nhanh của thiết bị đó."), 14, MUTED));
-    request("GET", "/api/me/sessions", null, data -> {
+    final int generation = screen;
+    final TextView loadingView = label(I18n.t("Đang tải thiết bị đăng nhập..."), 13, MUTED);
+    content.addView(loadingView);
+    api.call("GET", "/api/me/sessions", null, (data, error, status) -> {
+      if (isFinishing() || isDestroyed() || generation != screen) return;
+      content.removeView(loadingView);
+      if (error != null || data == null) {
+        if (status == 401 && me != null) { me = null; clearClientSessionCaches(); auth(false); return; }
+        String msg = error != null && !error.isEmpty() ? error : I18n.t("Chưa tải được danh sách thiết bị.");
+        say(msg);
+        LinearLayout errCard = card();
+        errCard.addView(label(msg, 14, TEXT));
+        errCard.addView(button(I18n.t("Thử lại"), () -> sessionsScreen()));
+        return;
+      }
       JSONArray sessions = data.optJSONArray("sessions");
       for (int i = 0; sessions != null && i < sessions.length(); i++) {
         JSONObject session = sessions.optJSONObject(i);
@@ -975,7 +1374,7 @@ public class MainActivity extends Activity {
   }
 
   private void recoveryEmailScreen() {
-    accountHeader(I18n.t("Email khôi phục"), () -> securityScreen());
+    accountPage(I18n.t("Email khôi phục"), () -> securityScreen());
     request("GET", "/api/recovery/email", null, data -> {
       LinearLayout panel = card();
       panel.addView(label(data.isNull("email") ? I18n.t("Chưa xác minh email khôi phục.") : I18n.t("Email đã xác minh: ") + data.optString("email"), 14, MUTED));
@@ -996,7 +1395,7 @@ public class MainActivity extends Activity {
   }
 
   private void nativeNotificationSettings() {
-    accountHeader(I18n.t("Cài đặt thông báo"), () -> meMenu());
+    accountPage(I18n.t("Cài đặt thông báo"), this::openMeMenu);
     LinearLayout panel = settingsGroup();
     for (final String[] choice : new String[][] { { "enabled", "Hiện thông báo", "bell_ring" }, { "messages", "Tin nhắn", "message_square" }, { "friends", "Lời mời kết bạn", "user_plus" }, { "posts", "Bài viết và tương tác", "post_heart" } }) {
       if (panel.getChildCount() > 0) {
@@ -1047,25 +1446,14 @@ public class MainActivity extends Activity {
     row.addView(labels,1,new LinearLayout.LayoutParams(0,-2,1));row.setMinimumHeight(dp(68));row.setContentDescription(title+". "+subtitle);
   }
 
-  private void aboutInfoRow(LinearLayout group,String glyph,String title,String value){
-    if(group.getChildCount()>0){View line=new View(this);line.setBackgroundColor(LINE);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,1);lp.setMargins(dp(60),0,dp(12),0);group.addView(line,lp);}
-    LinearLayout r=row();r.setPadding(dp(10),dp(10),dp(12),dp(10));r.setMinimumHeight(dp(68));
-    r.addView(settingsIcon(glyph,ACCENT),new LinearLayout.LayoutParams(dp(38),dp(38)));
-    LinearLayout labels=column();labels.setPadding(dp(12),0,0,0);labels.addView(label(title,12,MUTED));
-    TextView data=label(value,15,TEXT);data.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));data.setTextIsSelectable(true);labels.addView(data);
-    r.addView(labels,new LinearLayout.LayoutParams(0,-2,1));group.addView(r,new LinearLayout.LayoutParams(-1,-2));
-  }
-
   private void aboutScreen(){
-    accountHeader(I18n.t("Giới thiệu Kinnect"),this::meMenu);
+    accountPage(I18n.t("Giới thiệu Kinnect"),this::openMeMenu);
     LinearLayout brand=column();brand.setGravity(Gravity.CENTER_HORIZONTAL);brand.setPadding(dp(16),dp(20),dp(16),dp(24));
     ImageView logo=new ImageView(this);logo.setImageDrawable(getApplicationInfo().loadIcon(getPackageManager()));logo.setContentDescription("Logo Kinnect");
     brand.addView(logo,new LinearLayout.LayoutParams(dp(72),dp(72)));
     TextView name=label("Kinnect",22,ACCENT);name.setGravity(Gravity.CENTER);name.setTypeface(null,Typeface.BOLD);name.setPadding(0,dp(12),0,dp(6));brand.addView(name,new LinearLayout.LayoutParams(-1,-2));
     TextView slogan=label(I18n.t("Kết nối theo cách của bạn."),13,MUTED);slogan.setGravity(Gravity.CENTER);brand.addView(slogan);
     content.addView(brand,new LinearLayout.LayoutParams(-1,-2));
-    LinearLayout details=settingsGroup();
-    aboutInfoRow(details,"user_round",I18n.t("Tác giả"),I18n.t("Vũ Ngọc Ánh"));
     LinearLayout links=settingsGroup();
     groupRow(links,"globe",I18n.t("Về Kinnect"),false,()->nativeDocument("index"));
     settingsDetailRow(links,"download",I18n.t("Kiểm tra cập nhật"),I18n.t("Đang dùng ")+installedVersion(),()->ApkUpdates.check(this));
@@ -1073,41 +1461,9 @@ public class MainActivity extends Activity {
 
   private void nativeDocument(String page){nativeDocument(page,this::aboutScreen);}
   private void nativeDocument(String page,Runnable back){
-    String title="Thông tin Kinnect";String[][] rows=new String[0][];
-    if(page.equals("index")){title="Về Kinnect";rows=new String[][]{
-      {"h1","Kết nối đúng gu. Sống đúng mình."},
-      {"p","Một lời chào, một người cùng tần số, một nơi để bạn thoải mái là chính mình. Kinnect là không gian kết bạn, trò chuyện và chia sẻ dành cho cộng đồng LGBT."},
-      {"p","Android 8+ · iPhone qua Safari · Máy tính qua trình duyệt"},
-      {"p","Tính năng"},
-      {"h2","Ít ngại ngùng. Nhiều đồng điệu."},
-      {"h3","Gặp người cùng gu"},
-      {"p","Khám phá hồ sơ, sở thích và người quanh đây để tìm điểm chung bắt đầu câu chuyện."},
-      {"h3","Trò chuyện thật gần"},
-      {"p","Nhắn tin riêng, tạo nhóm, gọi thoại và video, xem ai đã đọc tin nhắn của bạn."},
-      {"h3","Chia sẻ khoảnh khắc"},
-      {"p","Bài viết, tin 24 giờ, video ngắn và livestream để cộng đồng hiểu bạn hơn."},
-      {"p","Cộng đồng"},
-      {"h2","Mọi sắc màu đều có chỗ riêng."},
-      {"p","Không cần một phiên bản hoàn hảo để bắt đầu. Chỉ cần bạn, những điều bạn thích và một chút tò mò về người ở phía bên kia."},
-      {"h3","Kết nối theo cách của bạn"},
-      {"p","Chọn sở thích, viết giới thiệu và tự quyết định có xuất hiện trong Khám phá hay không."},
-      {"h3","Ranh giới được tôn trọng"},
-      {"p","Tùy chọn nhận tin nhắn, ảnh riêng tư cần cấp quyền, chặn và báo cáo dễ dàng."},
-      {"h3","Bắt đầu từ sự tử tế"},
-      {"p","Tôn trọng danh tính, quyền riêng tư và sự đồng thuận của nhau."},
-      {"p","Hỏi đáp"},
-      {"h2","Những điều cần biết trước lời chào đầu tiên."},
-      {"p","Kinnect hướng đến người từ 18 tuổi thuộc cộng đồng LGBT và những người tôn trọng sự đa dạng. Mọi kết nối cần sự đồng thuận và tôn trọng lẫn nhau."},
-      {"p","Kinnect đang ở giai đoạn thử nghiệm. Bạn có thể dùng bản web trên máy tính và iPhone, hoặc cài bản Android qua trang phát hành GitHub khi có bản sẵn sàng. Ứng dụng chưa phát hành chính thức trên Google Play. Xem trang Hỗ trợ để biết cách cài và cập nhật."},
-      {"p","Hồ sơ, bài viết và tin nhắn riêng được lưu tại máy chủ Kinnect do chủ dự án vận hành. Hiện chưa có mã hóa đầu cuối. Bạn có thể điều chỉnh quyền xuất hiện trong Khám phá và quyền nhận tin nhắn trong Hồ sơ."},
-      {"p","Có. Bạn có thể chặn hoặc báo cáo từ hồ sơ, mục Khám phá và các nội dung được hỗ trợ. Báo cáo được xử lý thủ công; bản thử nghiệm chưa có đội kiểm duyệt liên tục 24/7."},
-      {"p","Chưa. Phòng live và chat đã có trong bản thử nghiệm, nhưng video giữa các mạng khác nhau vẫn cần bổ sung hạ tầng chuyển tiếp và kiểm thử trên thiết bị thật."},
-      {"h2","Lời chào tiếp theo bắt đầu từ đây."},
-      {"p","Mang theo sự tò mò. Còn lời chào, để mình bắt đầu."},
-      {"p","Bản thử nghiệm · Android, iPhone và máy tính · Dành cho người từ 18 tuổi"}
-    };}
-    if(page.equals("privacy")||page.equals("community")||page.equals("child-safety")){title=PolicyText.title(page);rows=PolicyText.rows(page);}
-    accountHeader(I18n.t(title),back);
+    String title=PolicyText.title(page);
+    String[][] rows=PolicyText.rows(page);
+    accountPage(I18n.t(title),back);
     LinearLayout panel=null;
     for(String[] part:rows){
       boolean heading=part[0].startsWith("h");
@@ -1120,7 +1476,7 @@ public class MainActivity extends Activity {
   }
 
   private void helpScreen() {
-    accountHeader(I18n.t("Trợ giúp và hỗ trợ"), () -> meMenu());
+    accountPage(I18n.t("Trợ giúp và hỗ trợ"), this::openMeMenu);
     LinearLayout panel = settingsGroup();
     groupRow(panel, "flag", I18n.t("Báo sự cố"), false, () -> report("app", me.optString("id")));
     groupRow(panel, "message_square", I18n.t("Trung tâm hỗ trợ"), false, () -> request("GET","/api/support",null,data->{JSONObject contact=data.optJSONObject("user");if(contact!=null)chat(contact);else new Sheet(this).setTitle(I18n.t("Hỗ trợ Kinnect")).setMessage(I18n.t("Liên hệ riêng Mr Ánh: anhvn53@wru.vn. Không gửi mật khẩu hoặc OTP.")).setPositiveButton(I18n.t("Đóng"),null).show();}));
@@ -1132,7 +1488,7 @@ public class MainActivity extends Activity {
   }
 
 
-  private void showSoftwareLicenses(){accountHeader(I18n.t("Giấy phép phần mềm"),()->helpScreen());LinearLayout panel=card();try{java.io.InputStream stream=getAssets().open("THIRD_PARTY_NOTICES.txt");String licenses=new String(NativeApi.read(stream,300000),"UTF-8");stream.close();TextView content=label(licenses,12,TEXT);content.setTextIsSelectable(true);panel.addView(content);}catch(Exception error){panel.addView(label("Xem https://app.kinnect.io.vn/third-party-notices.txt",14,TEXT));}}
+  private void showSoftwareLicenses(){accountPage(I18n.t("Giấy phép phần mềm"),()->helpScreen());LinearLayout panel=card();try{java.io.InputStream stream=getAssets().open("THIRD_PARTY_NOTICES.txt");String licenses=new String(NativeApi.read(stream,300000),"UTF-8");stream.close();TextView content=label(licenses,12,TEXT);content.setTextIsSelectable(true);panel.addView(content);}catch(Exception error){panel.addView(label("Xem https://app.kinnect.io.vn/third-party-notices.txt",14,TEXT));}}
 
   // Thông báo ngắn dạng "toast" nổi giống web (không chiếm chỗ trên màn).
   private void say(String text) {
@@ -1140,6 +1496,9 @@ public class MainActivity extends Activity {
     text=I18n.t(text);
     if (notice != null) notice.setText(text);
     if (text == null || text.trim().isEmpty()) return;
+    if ((getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
+      android.util.Log.i("KinnectQA", "UI_SAY: " + text.replace('\n', ' '));
+    }
     long toastNow=android.os.SystemClock.elapsedRealtime();
     if(text.equals(lastToastMessage)&&toastNow-lastToastAt<6000)return;
     lastToastMessage=text;lastToastAt=toastNow;
@@ -1224,7 +1583,7 @@ public class MainActivity extends Activity {
           }
           if (status == 401 && me != null) {
             me = null;
-            api.clear();
+            clearClientSessionCaches();
             auth(false);
           }
           say(error);
@@ -1479,8 +1838,10 @@ public class MainActivity extends Activity {
     subBack = null;
     currentPage = () -> navigate(next);
     currentKey = "tab:" + next;
-    ensureCalls();
-    activity();
+    if(!NativeApi.isFixtureEnabled()){
+      ensureCalls();
+      activity();
+    }
     tab = next;
     shell(
       next.equals("inbox")
@@ -1544,7 +1905,7 @@ public class MainActivity extends Activity {
   }
 
 
-  private void discover(){nearQuery="";renderPeopleSearch();}
+  private void discover(){if(nearQuery==null)nearQuery="";renderPeopleSearch();}
   private void refreshPeopleSearch(){navigate("discover");}
   private void renderPeopleSearch() {
     final boolean hasLocation = me != null && me.optBoolean("hasLocation");
@@ -1609,9 +1970,13 @@ public class MainActivity extends Activity {
         list.addView(discoveryEmptyState(), new LinearLayout.LayoutParams(-1, -2));
         return;
       }
+      WindowedListBinder.clearPending(list);
       AdaptivePeopleGrid grid=new AdaptivePeopleGrid();
       list.addView(grid,new LinearLayout.LayoutParams(-1,-2));
-      for(int i=0;i<users.length();i++)grid.addView(nearTile(users.optJSONObject(i)));
+      WindowedListBinder.bind(this, list, users, 18, dp(800), () -> people == list && discoverSort.equals(requestedTab), (start, end) -> {
+        MediaImageLoader.prefetchUsers(api, users, start, Math.min(9, users.length() - start), 256);
+        for (int i = start; i < end; i++) grid.addView(nearTile(users.optJSONObject(i)));
+      });
       list.post(()->{if(people==list&&content.getParent() instanceof ScrollView)((ScrollView)content.getParent()).scrollTo(0,nearScrollY);});
     };
     if(refreshing)request("GET",path,null,render,complete);else cachedRequest(path,render,complete);
@@ -1900,7 +2265,7 @@ public class MainActivity extends Activity {
     if(feedRows==null){JSONObject saved=api.cachedGet("/api/posts");if(saved!=null)feedRows=saved.optJSONArray("posts");}
     if(feedRows!=null){LinearLayout saved=content;content=list;try{posts(feedRows,"Chưa có bài viết.");}finally{content=saved;}final ScrollView scroll=(ScrollView)content.getParent();scroll.post(()->scroll.scrollTo(0,feedScrollY));}
     final String[] signature={feedRows==null?"":feedRows.toString()};final boolean[] fetching={false};
-    feedRefresh=complete->{if(fetching[0]){complete.run();return;}fetching[0]=true;request("GET","/api/posts",null,data->{JSONArray posts=data.optJSONArray("posts");if(posts==null||posts.toString().equals(signature[0]))return;signature[0]=posts.toString();feedRows=posts;LinearLayout next=column();java.util.Set<String> existing=new java.util.HashSet<>();for(int i=0;i<list.getChildCount();i++)if(list.getChildAt(i).getTag()instanceof String)existing.add((String)list.getChildAt(i).getTag());LinearLayout saved=content;content=next;try{if(posts.length()==0)posts(posts,"Chưa có bài viết.");for(int i=0;i<posts.length();i++){JSONObject post=posts.optJSONObject(i);String key="post:"+post.optString("id")+":"+post.toString();if(existing.contains(key)){View placeholder=new View(this);placeholder.setTag(key);next.addView(placeholder);}else postCard(post);}}finally{content=saved;}reconcileChatRows(list,next);},()->{fetching[0]=false;complete.run();});};
+    feedRefresh=complete->{if(fetching[0]){complete.run();return;}fetching[0]=true;request("GET","/api/posts",null,data->{JSONArray posts=data.optJSONArray("posts");if(posts==null||posts.toString().equals(signature[0]))return;signature[0]=posts.toString();feedRows=posts;WindowedListBinder.clearPending(list);MediaImageLoader.prefetchPosts(api,posts,0,Math.min(8,posts.length()),1280);LinearLayout next=column();java.util.Set<String> existing=new java.util.HashSet<>();for(int i=0;i<list.getChildCount();i++)if(list.getChildAt(i).getTag()instanceof String)existing.add((String)list.getChildAt(i).getTag());LinearLayout saved=content;content=next;try{if(posts.length()==0)posts(posts,"Chưa có bài viết.");for(int i=0;i<posts.length();i++){JSONObject post=posts.optJSONObject(i);String key="post:"+post.optString("id")+":"+post.toString();if(existing.contains(key)){View placeholder=new View(this);placeholder.setTag(key);next.addView(placeholder);}else postCard(post);}}finally{content=saved;}reconcileChatRows(list,next);},()->{fetching[0]=false;complete.run();});};
     if(!memoryFeed)feedRefresh.run(()->{});
   }
 
@@ -2393,8 +2758,11 @@ public class MainActivity extends Activity {
     final LinearLayout page=content;
     final View loading=loadingState(I18n.t("Đang tải hồ sơ…"));page.addView(loading);
     request("GET", "/api/me", null, data -> {
-      me = data.optJSONObject("user");
-      if(me==null)return;
+      JSONObject fresh = data.optJSONObject("user");
+      if(fresh==null)return;
+      String prevAvatar = me == null ? "" : me.optString("avatar", "");
+      if (!prevAvatar.equals(fresh.optString("avatar", ""))) applyUpdatedAvatar(fresh, null);
+      else me = fresh;
       page.removeView(loading);
       profileCard(me, true);
       profileSections(me);
@@ -2478,14 +2846,7 @@ public class MainActivity extends Activity {
 
   private void loadImage(String path, ImageView target) {
     final int generation = screen;
-    api.image(path, bytes -> {
-      if (bytes == null || isDestroyed() || screen != generation) return;
-      BitmapFactory.Options options = new BitmapFactory.Options(); options.inJustDecodeBounds = true;
-      BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
-      options.inSampleSize = Math.max(1, Math.max(options.outWidth, options.outHeight) / 1280); options.inJustDecodeBounds = false;
-      Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
-      if (bitmap != null) target.setImageBitmap(bitmap);
-    });
+    MediaImageLoader.displayImage(this, api, path, target, 1280, () -> screen == generation);
   }
 
   private void followProfile(JSONObject user) {
@@ -2669,8 +3030,9 @@ public class MainActivity extends Activity {
   }
 
   private void privateAlbum(final JSONObject owner) {
-    accountHeader(I18n.t("Ảnh riêng tư"), () -> person(owner));
     final boolean mine = owner.optString("id").equals(me.optString("id"));
+    if (mine) accountPage(I18n.t("Ảnh riêng tư"), () -> person(owner));
+    else accountHeader(I18n.t("Ảnh riêng tư"), () -> person(owner));
     request("GET", "/api/users/" + owner.optString("id") + "/private", null, data -> {
       String status = data.optString("status");
       content.addView(label(I18n.t("Chỉ người được cấp quyền"), 13, MUTED));
@@ -2705,9 +3067,14 @@ public class MainActivity extends Activity {
 
   private void editProfile() {
     remember("edit-profile", () -> editProfile());
-    accountHeader(I18n.t("Chỉnh sửa hồ sơ"), () -> navigate("profile"));
+    accountPage(I18n.t("Chỉnh sửa hồ sơ"), () -> navigate("profile"));
     request("GET", "/api/me", null, data -> {
-      me = data.optJSONObject("user");
+      JSONObject fresh = data.optJSONObject("user");
+      if (fresh != null) {
+        String prevAvatar = me == null ? "" : me.optString("avatar", "");
+        if (!prevAvatar.equals(fresh.optString("avatar", ""))) applyUpdatedAvatar(fresh, null);
+        else me = fresh;
+      }
       final JSONObject visibility = json();
       JSONObject current = me.optJSONObject("profileVisibility");
       for (String key : new String[] { "bio", "age", "gender", "orientation", "communityRole", "pronouns", "relationshipRole", "lookingFor", "city", "interests", "height", "weight", "occupation", "school" }) {
@@ -2915,45 +3282,50 @@ public class MainActivity extends Activity {
     shell(I18n.t("Thông báo"), true);
     if (headActions != null) headActions.addView(roundAction("check", I18n.t("Đánh dấu tất cả đã đọc"), false, () -> request("POST", "/api/notifications", json("scope","social"), d -> { bellCount = 0; badgesAt = 0; notificationsScreen(); })));
     final LinearLayout notices=column();content.addView(notices);
+    final int expectedScreen = screen;
     cachedRequest("/api/notifications", data -> {
+      WindowedListBinder.clearPending(notices);
       notices.removeAllViews();
-      JSONArray rows = data.optJSONArray("notifications");
-      for (int i = 0; rows != null && i < rows.length(); i++) {
-        final JSONObject n = rows.optJSONObject(i), u = n.optJSONObject("actor");
-        if(n.optString("kind").equals("message")||n.optString("kind").equals("group_message"))continue;
-        LinearLayout r = row();
-        r.setPadding(dp(12), dp(10), dp(12), dp(10));
-        r.setBackground(background(n.optInt("seen") == 0 ? PRIMARY_SOFT : CARD, 14));
-        avatar(u, r, 46);
-        LinearLayout t = column();
-        t.setPadding(dp(12), 0, dp(8), 0);
-        TextView line = new KinnectText(this);
-        android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder(u.optString("name"));
-        sb.setSpan(new android.text.style.StyleSpan(Typeface.BOLD), 0, sb.length(), 0);
-        sb.append(noticeText(n.optString("kind")));
-        line.setText(sb);
-        line.setTextColor(TEXT);
-        line.setTextSize(15);
-        t.addView(line);
-        t.addView(label(ago(n.optLong("created")), 12, n.optInt("seen") == 0 ? ACCENT : MUTED));
-        r.addView(t, new LinearLayout.LayoutParams(0, -2, 1));
-        if (n.optInt("seen") == 0) {
-          View dot = new View(this);
-          dot.setBackground(background(ACCENT, 99));
-          r.addView(dot, new LinearLayout.LayoutParams(dp(10), dp(10)));
-        }
-        r.setOnClickListener(v -> {
-          if (n.optInt("seen") == 0) try { api.call("POST", "/api/notifications", new JSONObject().put("ids", new JSONArray().put(n.optString("id"))), (d, e, s) -> {}); } catch (JSONException ignored) {}
-          badgesAt = 0;
-          openNotification(n);
-        });
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
-        p.setMargins(0, dp(4), 0, dp(4));
-        notices.addView(r, p);
-      }
+      final JSONArray rows = data.optJSONArray("notifications");
       if (rows == null || rows.length() == 0) {
         notices.addView(emptyBlock("bell",I18n.t("Chưa có thông báo mới"),I18n.t("Thông báo mới sẽ hiển thị tại đây.")));
+        return;
       }
+      WindowedListBinder.bind(this, notices, rows, 16, dp(800), () -> screen == expectedScreen, (start, end) -> {
+        for (int i = start; i < end; i++) {
+          final JSONObject n = rows.optJSONObject(i), u = n == null ? null : n.optJSONObject("actor");
+          if (n == null || n.optString("kind").equals("message") || n.optString("kind").equals("group_message")) continue;
+          LinearLayout r = row();
+          r.setPadding(dp(12), dp(10), dp(12), dp(10));
+          r.setBackground(background(n.optInt("seen") == 0 ? PRIMARY_SOFT : CARD, 14));
+          avatar(u, r, 46);
+          LinearLayout t = column();
+          t.setPadding(dp(12), 0, dp(8), 0);
+          TextView line = new KinnectText(this);
+          android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder(u == null ? "" : u.optString("name"));
+          sb.setSpan(new android.text.style.StyleSpan(Typeface.BOLD), 0, sb.length(), 0);
+          sb.append(noticeText(n.optString("kind")));
+          line.setText(sb);
+          line.setTextColor(TEXT);
+          line.setTextSize(15);
+          t.addView(line);
+          t.addView(label(ago(n.optLong("created")), 12, n.optInt("seen") == 0 ? ACCENT : MUTED));
+          r.addView(t, new LinearLayout.LayoutParams(0, -2, 1));
+          if (n.optInt("seen") == 0) {
+            View dot = new View(this);
+            dot.setBackground(background(ACCENT, 99));
+            r.addView(dot, new LinearLayout.LayoutParams(dp(10), dp(10)));
+          }
+          r.setOnClickListener(v -> {
+            if (n.optInt("seen") == 0) try { api.call("POST", "/api/notifications", new JSONObject().put("ids", new JSONArray().put(n.optString("id"))), (d, e, s) -> {}); } catch (JSONException ignored) {}
+            badgesAt = 0;
+            openNotification(n);
+          });
+          LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
+          p.setMargins(0, dp(4), 0, dp(4));
+          notices.addView(r, p);
+        }
+      });
     },()->{});
   }
 
@@ -2986,13 +3358,13 @@ public class MainActivity extends Activity {
     request("GET", "/api/posts?post=" + encode(id), null, data -> {
       JSONArray rows = data.optJSONArray("posts");
       if (rows == null || rows.length() == 0) { content.addView(emptyBlock("newspaper", I18n.t("Bài viết không còn khả dụng"), "")); return; }
-      postCard(rows.optJSONObject(0), commentId);
+      postCard(rows.optJSONObject(0), commentId == null ? "" : commentId);
     });
   }
 
   private EditText aiField(LinearLayout into,String title,String value,boolean secret){into.addView(label(title,13,TEXT));EditText field=input(into,title,value,false);field.setSaveEnabled(false);if(secret){field.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);if(android.os.Build.VERSION.SDK_INT>=26)field.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);}return field;}
   private void adminAI(){
-    accountHeader(I18n.t("Trợ lý AI và kiểm duyệt"),()->admin());if(me==null||!me.optString("role").equals("admin")){content.addView(label(I18n.t("Chỉ quản trị viên được cấu hình AI."),14,MUTED));return;}
+    accountPage(I18n.t("Trợ lý AI và kiểm duyệt"),()->admin());if(me==null||!me.optString("role").equals("admin")){content.addView(label(I18n.t("Chỉ quản trị viên được cấu hình AI."),14,MUTED));return;}
     final LinearLayout page=content;final TextView state=label(I18n.t("Đang tải cấu hình AI…"),14,MUTED);page.addView(state);final boolean[] loaded={false};request("GET","/api/admin/ai",null,data->{JSONObject config=data.optJSONObject("config"),credentials=data.optJSONObject("credentials");if(config==null||credentials==null)return;loaded[0]=true;state.setText(config.optBoolean("ready")?I18n.t("Cloudflare · Đã có cấu hình"):I18n.t("Cloudflare · Chưa có cấu hình"));
       page.addView(label(I18n.t("Cloudflare chính · NVIDIA dự phòng"),18,TEXT));page.addView(label(I18n.t("Khóa chỉ lưu tại máy chủ Kinnect. Để trống để giữ khóa đã lưu."),13,MUTED));
       LinearLayout form=card();page.addView(form);final EditText url=aiField(form,"URL Worker Cloudflare",credentials.optString("workerUrl"),false),token=aiField(form,credentials.optBoolean("tokenSaved")?"Khóa Worker · Đã lưu":"Khóa kết nối Worker","",true),key=aiField(form,credentials.optBoolean("nvidiaKeySaved")?"Khóa NVIDIA · Đã lưu":"Khóa NVIDIA API","",true),model=aiField(form,"Model NVIDIA văn bản",credentials.optString("nvidiaModel"),false),vision=aiField(form,"Model NVIDIA ảnh (tùy chọn)",credentials.optString("nvidiaVisionModel"),false);
@@ -3114,7 +3486,7 @@ public class MainActivity extends Activity {
 
   private void settings() {
     if (me == null) { auth(false); return; }
-    accountHeader(I18n.t("Cài đặt & riêng tư"), () -> meMenu());
+    accountPage(I18n.t("Cài đặt & riêng tư"), this::openMeMenu);
     groupTitle("globe", I18n.t("Ngôn ngữ"));
     groupRow(settingsGroup(),"globe",I18n.current().equals("en")?"English":I18n.t("Tiếng Việt"),false,()->languageMenu());
     groupTitle("user_round", I18n.t("Thông tin cá nhân"));
@@ -3146,10 +3518,10 @@ public class MainActivity extends Activity {
   }
 
   private void deleteAccountScreen(){
-    accountHeader(I18n.t("Xóa tài khoản"),()->settings());LinearLayout panel=card();panel.addView(label(I18n.t("Xóa vĩnh viễn"),20,TEXT));panel.addView(label(I18n.t("Hồ sơ, ảnh, bài viết, video, tin nhắn và dữ liệu gắn với tài khoản sẽ bị xóa khỏi hệ thống đang hoạt động. Tất cả phiên đăng nhập bị thu hồi. Nội dung của bạn trong nhóm cũng bị xóa; nhóm có thành viên khác được chuyển chủ sở hữu. Không thể khôi phục sau khi hoàn tất."),14,MUTED));
+    accountPage(I18n.t("Xóa tài khoản"),()->settings());LinearLayout panel=card();panel.addView(label(I18n.t("Xóa vĩnh viễn"),20,TEXT));panel.addView(label(I18n.t("Hồ sơ, ảnh, bài viết, video, tin nhắn và dữ liệu gắn với tài khoản sẽ bị xóa khỏi hệ thống đang hoạt động. Tất cả phiên đăng nhập bị thu hồi. Nội dung của bạn trong nhóm cũng bị xóa; nhóm có thành viên khác được chuyển chủ sở hữu. Không thể khôi phục sau khi hoàn tất."),14,MUTED));
     panel.addView(label(I18n.t("Nhập lại tên đăng nhập: @")+me.optString("username"),13,TEXT));EditText username=new KinnectInput(this);username.setSingleLine(true);username.setTextSize(16);panel.addView(username,new LinearLayout.LayoutParams(-1,dp(52)));
     panel.addView(label(I18n.t("Mật khẩu (nếu phiên đăng nhập đã cũ)"),13,TEXT));EditText password=new KinnectInput(this);password.setSingleLine(true);password.setTextSize(16);password.setInputType(129);panel.addView(password,new LinearLayout.LayoutParams(-1,dp(52)));
-    Button remove=primary(I18n.t("Xóa vĩnh viễn tài khoản và dữ liệu"),()->{if(!username.getText().toString().equals(me.optString("username"))){say(I18n.t("Nhập đúng tên đăng nhập để xác nhận."));return;}confirm(I18n.t("Bạn chắc chắn xóa vĩnh viễn? Không thể khôi phục dữ liệu."),()->request("DELETE","/api/me/account-deletion",json("confirmUsername",username.getText().toString(),"password",password.getText().toString(),"confirmDelete",true),result->{KinnectService.stop(this);if(calls!=null){calls=null;}api.clear();me=null;auth(false);say(I18n.t("Đã xóa tài khoản và dữ liệu."));}));});panel.addView(remove);
+    Button remove=primary(I18n.t("Xóa vĩnh viễn tài khoản và dữ liệu"),()->{if(!username.getText().toString().equals(me.optString("username"))){say(I18n.t("Nhập đúng tên đăng nhập để xác nhận."));return;}confirm(I18n.t("Bạn chắc chắn xóa vĩnh viễn? Không thể khôi phục dữ liệu."),()->request("DELETE","/api/me/account-deletion",json("confirmUsername",username.getText().toString(),"password",password.getText().toString(),"confirmDelete",true),result->{KinnectService.stop(this);if(calls!=null){calls=null;}clearClientSessionCaches();me=null;auth(false);say(I18n.t("Đã xóa tài khoản và dữ liệu."));}));});panel.addView(remove);
     panel.addView(label(I18n.t("Hỗ trợ riêng tư: anhvn53@wru.vn · Không gửi mật khẩu hoặc OTP."),12,MUTED));
   }
 
@@ -3602,6 +3974,7 @@ public class MainActivity extends Activity {
       player.setLooping(true);
       player.setVolume(shortMuted ? 0 : 1, shortMuted ? 0 : 1);
       if(!mediaCallBlocked)shortVideo.start();
+      android.util.Log.i("KinnectQA", "SHORTS_EVENT: action=playing index=" + shortIndex + " id=" + item.optString("id") + " pos=" + shortVideo.getCurrentPosition() + " muted=" + shortMuted);
     });
     shortVideo.setOnErrorListener((player, what, extra) -> {preview.setVisibility(View.VISIBLE);unavailable.setVisibility(View.VISIBLE);return true;});
     if(shortEnter!=0){int direction=shortEnter;shortEnter=0;VerticalMediaStage.enter(stage,direction);}
@@ -3612,7 +3985,7 @@ public class MainActivity extends Activity {
     pauseBadge.addView(icon("play", 28, WHITE), new FrameLayout.LayoutParams(dp(28), dp(28), Gravity.CENTER));
     pauseBadge.setVisibility(View.GONE);
     stage.addView(pauseBadge, new FrameLayout.LayoutParams(dp(64), dp(64), Gravity.CENTER));
-    stage.setOnClickListener(v->{if(shortVideo!=null){if(shortVideo.isPlaying()){shortVideo.pause();pauseBadge.setAlpha(0f);pauseBadge.setScaleX(0.85f);pauseBadge.setScaleY(0.85f);pauseBadge.setVisibility(View.VISIBLE);pauseBadge.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(150).start();}else if(!mediaCallBlocked){shortVideo.start();pauseBadge.animate().alpha(0f).setDuration(120).withEndAction(()->pauseBadge.setVisibility(View.GONE)).start();}}});
+    stage.setOnClickListener(v->{if(shortVideo!=null){if(shortVideo.isPlaying()){shortVideo.pause();android.util.Log.i("KinnectQA", "SHORTS_EVENT: action=pause pos=" + shortVideo.getCurrentPosition() + " isPlaying=false");pauseBadge.setAlpha(0f);pauseBadge.setScaleX(0.85f);pauseBadge.setScaleY(0.85f);pauseBadge.setVisibility(View.VISIBLE);pauseBadge.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(150).start();}else if(!mediaCallBlocked){shortVideo.start();android.util.Log.i("KinnectQA", "SHORTS_EVENT: action=start pos=" + shortVideo.getCurrentPosition() + " isPlaying=true");pauseBadge.animate().alpha(0f).setDuration(120).withEndAction(()->pauseBadge.setVisibility(View.GONE)).start();}}});
     // Cột nút bên phải
     LinearLayout side = column();
     side.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -3629,6 +4002,24 @@ public class MainActivity extends Activity {
       try { startActivity(Intent.createChooser(send, I18n.t("Chia sẻ video"))); } catch (Exception ignored) {}
     }));
     // Đã chuyển Tải video và Âm thanh vào shortOptions (Tùy chọn)
+    final LinearLayout muteBtn = reelButton(shortMuted ? "volume_x" : "sound", shortMuted ? I18n.t("Bật tiếng") : I18n.t("Tắt tiếng"), WHITE, () -> {});
+    muteBtn.setOnClickListener(v -> {
+      shortMuted = !shortMuted;
+      if (shortPlayer != null) {
+        shortPlayer.setVolume(shortMuted ? 0 : 1, shortMuted ? 0 : 1);
+      }
+      int pos = shortVideo != null ? shortVideo.getCurrentPosition() : 0;
+      boolean playing = shortVideo != null && shortVideo.isPlaying();
+      android.util.Log.i("KinnectQA", "SHORTS_EVENT: action=mute_toggle muted=" + shortMuted + " volume=" + (shortMuted ? 0 : 1) + " pos=" + pos + " isPlaying=" + playing);
+      ImageView iv = (ImageView) muteBtn.getChildAt(0);
+      TextView tv = (TextView) muteBtn.getChildAt(1);
+      iv.setImageDrawable(WebIcons.load(this, shortMuted ? "volume_x" : "sound"));
+      iv.setImageTintList(android.content.res.ColorStateList.valueOf(WHITE));
+      String caption = shortMuted ? I18n.t("Bật tiếng") : I18n.t("Tắt tiếng");
+      tv.setText(caption);
+      muteBtn.setContentDescription(caption);
+    });
+    side.addView(muteBtn);
     side.addView(reelButton("more", I18n.t("Tùy chọn video"), WHITE, () -> shortOptions(item)));
     ScrollView actionRail = new ScrollView(this);
     actionRail.setVerticalScrollBarEnabled(false);
@@ -4197,6 +4588,7 @@ public class MainActivity extends Activity {
           say(I18n.t("Chọn ảnh PNG/JPEG/WebP."));
           return;
         }
+        avatarUploadInFlight = true;
         request(
           "POST",
           "/api/me/avatar",
@@ -4212,13 +4604,12 @@ public class MainActivity extends Activity {
           ),
           d -> {
             JSONObject updated=d.optJSONObject("user");if(updated==null){say(I18n.t("Không tải được hồ sơ mới. Vui lòng thử lại."));return;}
-            me=updated;avatarRevision++;avatarCache.evictAll();clearRetainedFeed();feedRows=null;
-            for(java.util.Map.Entry<ImageView,String> binding:new java.util.ArrayList<>(avatarViews.entrySet())){
-              ImageView view=binding.getKey();if(view!=null&&view.isAttachedToWindow()&&me.optString("id").equals(binding.getValue()))loadAvatarInto(me,view);
-            }
+            lastAvatarMutationAt = System.currentTimeMillis();
+            applyUpdatedAvatar(updated, image);
             if(profileEditorAvatar==null||!profileEditorAvatar.isAttachedToWindow())navigate("profile");
             say(I18n.t("Đã đổi ảnh đại diện"));
-          }
+          },
+          () -> avatarUploadInFlight = false
         );
       } catch (Exception e) {
         say(I18n.t("Chọn ảnh nhỏ hơn 1 MB."));
@@ -4360,9 +4751,13 @@ public class MainActivity extends Activity {
 
   @Override protected void onUserLeaveHint(){super.onUserLeaveHint();if(calls!=null)calls.enterPip();}
   @Override public void onPictureInPictureModeChanged(boolean pip,android.content.res.Configuration config){super.onPictureInPictureModeChanged(pip,config);if(!pip&&calls!=null)calls.restorePip();}
+  private boolean leftForeground = false;
+  private boolean avatarUploadInFlight = false;
+  private long lastAvatarMutationAt = 0;
   @Override
   protected void onStop() {
     super.onStop();
+    leftForeground = true;
     KinnectService.appVisible=false;
 
     if (shortVideo != null) shortVideo.pause();
@@ -4386,12 +4781,16 @@ public class MainActivity extends Activity {
     super.onResume();
     stopped = false;
     try{getSystemService(android.app.NotificationManager.class).cancel(KinnectService.ID_BG);}catch(RuntimeException ignored){}
-    if(storeReturning&&me!=null){storeReturning=false;api.call("GET","/api/me",null,(data,error,status)->{if(error==null&&data!=null&&!isDestroyed()){JSONObject fresh=data.optJSONObject("user");boolean styleChanged=fresh!=null&&!fresh.optString("storeStyle").equals(me.optString("storeStyle"));if(fresh!=null)me=fresh;if(styleChanged)refreshPage();}});}
+    boolean shouldSyncMe = (storeReturning || leftForeground) && me != null && !NativeApi.isFixtureEnabled();
+    leftForeground = false;
+    if(shouldSyncMe){storeReturning=false;final long resumeEpoch=avatarRevision;api.call("GET","/api/me",null,(data,error,status)->{if(error==null&&data!=null&&!isDestroyed()&&me!=null){if(avatarUploadInFlight||resumeEpoch!=avatarRevision||System.currentTimeMillis()-lastAvatarMutationAt<5000)return;JSONObject fresh=data.optJSONObject("user");boolean styleChanged=fresh!=null&&!fresh.optString("storeStyle").equals(me.optString("storeStyle"));boolean avatarChanged=fresh!=null&&!fresh.optString("avatar","").equals(me.optString("avatar",""));if(avatarChanged)applyUpdatedAvatar(fresh,null);else if(fresh!=null)me=fresh;if(styleChanged)refreshPage();}});}
     KinnectService.appVisible = true;
-    notificationHandler.removeCallbacksAndMessages(null);
-    notificationHandler.post(notificationPoll);
-    ensureCalls();
-    if (calls != null) {calls.checkPending();if(root!=null)calls.attachReturn(root);}
+    if(!NativeApi.isFixtureEnabled()){
+      notificationHandler.removeCallbacksAndMessages(null);
+      notificationHandler.post(notificationPoll);
+      ensureCalls();
+      if (calls != null) {calls.checkPending();if(root!=null)calls.attachReturn(root);}
+    }
     for (VideoView video : resumeVideos) if (video.isAttachedToWindow()) if(!mediaCallBlocked)video.start();
     resumeVideos.clear();
     if (resumeStory != null) resumeStory.run();
@@ -4521,6 +4920,7 @@ public class MainActivity extends Activity {
   }
 
   private String ago(long time) {
+    if (time <= 0) return "v\u1eeba xong";
     long s = Math.max(0, (System.currentTimeMillis() - time) / 1000);
     if (s < 60) return "vừa xong";
     if (s < 3600) return (s / 60) + " phút";
@@ -4552,48 +4952,364 @@ public class MainActivity extends Activity {
 
 
   private TextView welcomeText(String text,int size,int color,boolean bold){TextView v=label(text,size,color);v.setPadding(0,0,0,0);v.setLineSpacing(dp(3),1f);if(bold)v.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));return v;}
-  private LinearLayout welcomeBrand(){LinearLayout brand=row();brand.setBaselineAligned(false);ImageView logo=new ImageView(this);logo.setImageResource(getResources().getIdentifier("kinnect_logo","drawable",getPackageName()));logo.setScaleType(ImageView.ScaleType.FIT_CENTER);brand.addView(logo,new LinearLayout.LayoutParams(dp(34),dp(34)));TextView name=welcomeText("Kinnect",19,ACCENT,true);name.setPadding(dp(9),0,0,0);name.setSingleLine(true);brand.addView(name,new LinearLayout.LayoutParams(-2,-2));brand.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));return brand;}
+  private LinearLayout welcomeBrand(){
+    LinearLayout brand=row();
+    brand.setBaselineAligned(false);
+    brand.setGravity(Gravity.CENTER_VERTICAL);
+    ImageView logo=new ImageView(this);
+    logo.setImageResource(getResources().getIdentifier("kinnect_logo","drawable",getPackageName()));
+    logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+    final float iconRadius=dp(8);
+    logo.setOutlineProvider(new android.view.ViewOutlineProvider(){
+      @Override public void getOutline(View view,android.graphics.Outline outline){
+        outline.setRoundRect(0,0,view.getWidth(),view.getHeight(),iconRadius);
+      }
+    });
+    logo.setClipToOutline(true);
+    brand.addView(logo,new LinearLayout.LayoutParams(dp(34),dp(34)));
+    TextView name=welcomeText("Kinnect",20,ACCENT,true);
+    name.setPadding(dp(9),0,0,0);
+    name.setSingleLine(true);
+    brand.addView(name,new LinearLayout.LayoutParams(-2,-2));
+    brand.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));
+    return brand;
+  }
   private void welcomeFeature(String glyph,String title,String description,int color){
     LinearLayout panel=column();panel.setPadding(dp(18),dp(19),dp(18),dp(19));panel.setBackground(outlined(CARD,20));LinearLayout line=row();FrameLayout bubble=new FrameLayout(this);bubble.setBackground(background((color&0x00ffffff)|0x18000000,14));bubble.addView(icon(glyph,23,color),new FrameLayout.LayoutParams(dp(23),dp(23),Gravity.CENTER));line.addView(bubble,new LinearLayout.LayoutParams(dp(46),dp(46)));LinearLayout words=column();words.setPadding(dp(13),0,0,0);words.addView(welcomeText(title,17,TEXT,true));TextView detail=welcomeText(description,14,MUTED,false);detail.setPadding(0,dp(6),0,0);words.addView(detail);line.addView(words,new LinearLayout.LayoutParams(0,-2,1));panel.addView(line);LinearLayout.LayoutParams space=new LinearLayout.LayoutParams(-1,-2);space.topMargin=dp(10);content.addView(panel,space);
   }
+  private String installedVersionBuild(){
+    try{
+      android.content.pm.PackageInfo info=getPackageManager().getPackageInfo(getPackageName(),0);
+      long code=Build.VERSION.SDK_INT>=28?info.getLongVersionCode():info.versionCode;
+      return "Kinnect Android v"+info.versionName+" (Build "+code+")";
+    }catch(android.content.pm.PackageManager.NameNotFoundException error){
+      return "Kinnect Android";
+    }
+  }
 
   private void intro() {
-    shell("",false);root.removeAllViews();root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{PRIMARY_SOFT,BG,BG}));getWindow().setStatusBarColor(PRIMARY_SOFT);getWindow().setNavigationBarColor(BG);content=column();content.setPadding(dp(22),dp(10),dp(22),dp(12));root.addView(content,new LinearLayout.LayoutParams(-1,-1));
-    LinearLayout brand=welcomeBrand();TextView language=welcomeText("VI / EN",12,TEXT,true);language.setPadding(dp(8),0,dp(8),0);language.setGravity(Gravity.CENTER);language.setSingleLine(true);language.setIncludeFontPadding(false);language.setMinWidth(dp(56));language.setContentDescription(I18n.t("Ngôn ngữ ứng dụng"));language.setOnClickListener(v->languageMenu());brand.addView(language,new LinearLayout.LayoutParams(-2,dp(44)));TextView login=welcomeText(I18n.t("Đăng nhập"),14,WHITE,true);login.setGravity(Gravity.CENTER);login.setPadding(dp(12),0,dp(12),0);login.setBackground(pressable(ACCENT,12));login.setOnClickListener(v->auth(false));brand.addView(login,new LinearLayout.LayoutParams(-2,dp(44)));content.addView(brand,new LinearLayout.LayoutParams(-1,dp(48)));
-    TextView headline=welcomeText(I18n.t("Kết nối đúng gu.\nSống đúng mình."),29,TEXT,true);headline.setGravity(Gravity.CENTER);headline.setPadding(0,dp(13),0,dp(4));headline.setMaxLines(2);headline.setAutoSizeTextTypeUniformWithConfiguration(22,29,1,android.util.TypedValue.COMPLEX_UNIT_SP);content.addView(headline,new LinearLayout.LayoutParams(-1,dp(92)));
-    View showcase=new PhoneFeatureShowcase();showcase.setContentDescription(I18n.t("Điện thoại minh họa luân phiên các tính năng Bảng tin, Khám phá, Video và Live. Chạm để chuyển tính năng."));content.addView(showcase,new LinearLayout.LayoutParams(-1,0,1));
-    LinearLayout start=authButton(null,I18n.t("Bắt đầu kết nối"),true);start.setOnClickListener(v->auth(true));content.addView(start,new LinearLayout.LayoutParams(-1,dp(52)));TextView note=welcomeText(I18n.t("Dành cho người từ 18 tuổi · Minh họa tính năng"),11,MUTED,false);note.setGravity(Gravity.CENTER);note.setPadding(0,dp(10),0,0);content.addView(note,new LinearLayout.LayoutParams(-1,dp(30)));
+    shell("",false);
+    root.removeAllViews();
+    root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{SOFT,BG,BG}));
+    getWindow().setStatusBarColor(SOFT);
+    getWindow().setNavigationBarColor(BG);
+    content=column();
+    content.setPadding(dp(22),dp(12),dp(22),dp(10));
+    root.addView(content,new LinearLayout.LayoutParams(-1,-1));
+
+    LinearLayout brand=welcomeBrand();
+    TextView language=welcomeText("VI / EN",13,TEXT,true);
+    language.setPadding(dp(10),0,dp(10),0);
+    language.setGravity(Gravity.CENTER);
+    language.setSingleLine(true);
+    language.setIncludeFontPadding(false);
+    language.setMinWidth(dp(56));
+    language.setBackground(pressable(0x00000000,10));
+    language.setContentDescription(I18n.t("Ngôn ngữ ứng dụng"));
+    language.setOnClickListener(v->languageMenu());
+    brand.addView(language,new LinearLayout.LayoutParams(-2,dp(40)));
+
+    View spacer=new View(this);
+    brand.addView(spacer,new LinearLayout.LayoutParams(dp(6),1));
+
+    TextView login=welcomeText(I18n.t("Đăng nhập"),14,WHITE,true);
+    login.setGravity(Gravity.CENTER);
+    login.setPadding(dp(16),0,dp(16),0);
+    login.setSingleLine(true);
+    login.setIncludeFontPadding(false);
+    login.setBackground(pressable(ACCENT,12));
+    login.setOnClickListener(v->auth(false));
+    brand.addView(login,new LinearLayout.LayoutParams(-2,dp(40)));
+    content.addView(brand,new LinearLayout.LayoutParams(-1,dp(44)));
+
+    TextView headline=welcomeText(I18n.t("Kết nối đúng gu.\nSống đúng mình."),28,TEXT,true);
+    headline.setGravity(Gravity.CENTER);
+    headline.setPadding(0,dp(14),0,dp(6));
+    headline.setLineSpacing(dp(2),1f);
+    headline.setMaxLines(2);
+    headline.setAutoSizeTextTypeUniformWithConfiguration(22,28,1,android.util.TypedValue.COMPLEX_UNIT_SP);
+    content.addView(headline,new LinearLayout.LayoutParams(-1,-2));
+
+    View showcase=new PhoneFeatureShowcase();
+    showcase.setContentDescription(I18n.t("Điện thoại minh họa luân phiên các tính năng Bảng tin, Khám phá, Video và Live. Chạm để chuyển tính năng."));
+    content.addView(showcase,new LinearLayout.LayoutParams(-1,0,1));
+
+    LinearLayout start=authButton(null,I18n.t("Bắt đầu kết nối"),true);
+    if(start.getChildCount()>0&&start.getChildAt(0) instanceof TextView){
+      TextView startLabel=(TextView)start.getChildAt(0);
+      startLabel.setTextSize(16);
+      startLabel.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));
+    }
+    start.setOnClickListener(v->auth(true));
+    LinearLayout.LayoutParams startLp=new LinearLayout.LayoutParams(-1,dp(52));
+    startLp.topMargin=dp(6);
+    content.addView(start,startLp);
+
+    TextView note=welcomeText(I18n.t("Dành cho người từ 18 tuổi · Minh họa tính năng"),12,MUTED,false);
+    note.setGravity(Gravity.CENTER);
+    note.setPadding(0,dp(8),0,0);
+    content.addView(note,new LinearLayout.LayoutParams(-1,-2));
+
+    TextView version=welcomeText(installedVersionBuild(),11,(MUTED&0x00ffffff)|0xcc000000,false);
+    version.setGravity(Gravity.CENTER);
+    version.setPadding(0,dp(2),0,0);
+    content.addView(version,new LinearLayout.LayoutParams(-1,-2));
   }
   private final class PhoneFeatureShowcase extends WelcomeScene {
-    final android.graphics.drawable.Drawable[] glyphs={WebIcons.load(MainActivity.this,"newspaper"),WebIcons.load(MainActivity.this,"compass"),WebIcons.load(MainActivity.this,"clapperboard"),WebIcons.load(MainActivity.this,"radio")};
     final android.graphics.drawable.Drawable miniLogo=getResources().getDrawable(getResources().getIdentifier("kinnect_logo","drawable",getPackageName()));
-    final String[] tabs={"Bảng tin","Khám phá","Video","Live"};long clock=android.os.SystemClock.uptimeMillis();int manual=0;
-    PhoneFeatureShowcase(){super();setClickable(true);setContentDescription(I18n.t("Xem trước Bảng tin, Khám phá, Tạo nội dung, Video và Live"));}
-    void selectPreview(int index){manual=index;clock=android.os.SystemClock.uptimeMillis();invalidate();}
-    void previewCreate(){openCreateMenu();}
-    @Override public boolean onTouchEvent(android.view.MotionEvent event){if(event.getAction()==android.view.MotionEvent.ACTION_DOWN)return true;if(event.getAction()!=android.view.MotionEvent.ACTION_UP)return true;performClick();float scale=Math.min(getWidth()/330f,getHeight()/450f);if(scale<=0)return true;float x=(event.getX()-(getWidth()-380*scale)/2)/scale,y=(event.getY()-(getHeight()-450*scale)/2)/scale;if(y>=378&&y<=415&&x>=100&&x<280){int tab=(int)((x-100)/36);if(tab==2)previewCreate();else selectPreview(tab<2?tab:tab-1);return true;}if(x<100||x>280)return true;int active=(manual+(android.animation.ValueAnimator.areAnimatorsEnabled()?(int)((android.os.SystemClock.uptimeMillis()-clock)/1500):0))%4;if(active==0&&y>=140&&y<=172||active==2&&y>200&&x>244||active==3&&y>=127&&y<=154)auth(false);return true;}
+    final String[] tabs={"Bảng tin","Khám phá","Video","Live"};
+    long clock=android.os.SystemClock.uptimeMillis();
+    int manual=1;
+    PhoneFeatureShowcase(){
+      super();
+      setClickable(true);
+      setContentDescription(I18n.t("Xem trước Bảng tin, Khám phá, Tạo nội dung, Video và Live"));
+    }
+    int currentActive(){
+      if(introTabOverride>=0&&introTabOverride<4)return introTabOverride;
+      boolean animate=android.animation.ValueAnimator.areAnimatorsEnabled();
+      return (manual+(animate?(int)((android.os.SystemClock.uptimeMillis()-clock)/1500):0))%4;
+    }
+    void selectPreview(int index){
+      introTabOverride=-1;
+      manual=index;
+      clock=android.os.SystemClock.uptimeMillis();
+      invalidate();
+    }
+    @Override public boolean onTouchEvent(android.view.MotionEvent event){
+      if(event.getAction()==android.view.MotionEvent.ACTION_DOWN)return true;
+      if(event.getAction()!=android.view.MotionEvent.ACTION_UP)return true;
+      performClick();
+      float scale=Math.min(getWidth()/330f,getHeight()/450f);
+      if(scale<=0)return true;
+      float x=(event.getX()-(getWidth()-380*scale)/2)/scale,y=(event.getY()-(getHeight()-450*scale)/2)/scale;
+      if(y>=374&&y<=416&&x>=96&&x<=284){
+        int tab=Math.max(0,Math.min(4,(int)((x-100)/36)));
+        if(tab==2)selectPreview((currentActive()+1)%4);
+        else selectPreview(tab<2?tab:tab-1);
+        return true;
+      }
+      if(x>=96&&x<=284&&y>=19&&y<374){
+        selectPreview((currentActive()+1)%4);
+      }
+      return true;
+    }
     @Override public boolean performClick(){super.performClick();return true;}
-    void iphoneStatus(){for(int i=0;i<4;i++)box(234+i*3.3f,37-(i+1)*1.8f,2.4f,(i+1)*1.8f,.7f,TEXT);pen.setColor(TEXT);pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth(1.4f);canvas.drawArc(new RectF(249,29,260,40),222,96,false,pen);canvas.drawArc(new RectF(251.5f,31.5f,257.5f,37.5f),222,96,false,pen);pen.setStyle(Paint.Style.FILL);circle(254.5f,36.3f,.9f,TEXT);pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth(.8f);canvas.drawRoundRect(new RectF(263,29,276,36),1.6f,1.6f,pen);pen.setStyle(Paint.Style.FILL);box(264.4f,30.4f,9.9f,4.2f,.7f,TEXT);box(277,31.2f,1.1f,2.8f,.4f,TEXT);}
+    void iphoneStatus(){
+      for(int i=0;i<4;i++)box(236+i*3.2f,35.5f-(i+1)*1.7f,2.2f,(i+1)*1.7f,.6f,TEXT);
+      pen.setColor(TEXT);pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth(1.3f);
+      canvas.drawArc(new RectF(250,28.5f,260,38.5f),222,96,false,pen);
+      canvas.drawArc(new RectF(252.3f,30.8f,257.7f,36.2f),222,96,false,pen);
+      pen.setStyle(Paint.Style.FILL);circle(255f,35.3f,.85f,TEXT);
+      pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth(.85f);
+      canvas.drawRoundRect(new RectF(263,28.8f,275.5f,35.2f),1.6f,1.6f,pen);
+      pen.setStyle(Paint.Style.FILL);
+      box(264.3f,30.1f,9.6f,3.8f,.6f,TEXT);
+      box(276.4f,30.9f,1.1f,2.3f,.4f,TEXT);
+    }
 
     @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused)invalidate();}
     @Override protected void onAttachedToWindow(){super.onAttachedToWindow();invalidate();}
-    void glyph(android.graphics.drawable.Drawable icon,float x,float y,int size,int color){if(icon!=miniLogo)icon.setTint(color);icon.setBounds((int)x,(int)y,(int)x+size,(int)y+size);icon.draw(canvas);}
-    void centered(String text,float y,float size,int color,boolean bold){pen.setTextSize(size);pen.setTypeface(ApprovedTypography.font(MainActivity.this,bold?Typeface.BOLD:Typeface.NORMAL));word(text,(380-pen.measureText(text))/2,y,size,color,bold);}
-    android.graphics.Bitmap demoPhoto;
-    void photo(float x,float y,float w,float h,float radius){if(demoPhoto==null){try(java.io.InputStream stream=getAssets().open("welcome-profile.png")){demoPhoto=android.graphics.BitmapFactory.decodeStream(stream);}catch(Exception ignored){return;}}if(demoPhoto==null)return;int saved=canvas.save();Path clip=new Path();clip.addRoundRect(new RectF(x,y,x+w,y+h),radius,radius,Path.Direction.CW);canvas.clipPath(clip);box(x,y,w,h,radius,SOFT);float ratio=w>100?Math.min(w/demoPhoto.getWidth(),h/demoPhoto.getHeight()):Math.max(w/demoPhoto.getWidth(),h/demoPhoto.getHeight());float rw=demoPhoto.getWidth()*ratio,rh=demoPhoto.getHeight()*ratio;float offset=w<=100?0:(h-rh)/2;canvas.drawBitmap(demoPhoto,null,new RectF(x+(w-rw)/2,y+offset,x+(w+rw)/2,y+offset+rh),pen);canvas.restoreToCount(saved);}
-    final android.graphics.Bitmap[] demoPeople=new android.graphics.Bitmap[4];
-    void personPhoto(int index,float x,float y,float w,float h){if(demoPeople[index]==null){try(java.io.InputStream stream=getAssets().open(index==0?"welcome-profile.png":"welcome-profile-"+index+".png")){demoPeople[index]=android.graphics.BitmapFactory.decodeStream(stream);}catch(Exception ignored){return;}}android.graphics.Bitmap previous=demoPhoto;demoPhoto=demoPeople[index];photo(x,y,w,h,8);demoPhoto=previous;}
-    void screen(int index){
-      box(95,18,190,409,27,CARD);word("9:41",108,39,8,TEXT,true);iphoneStatus();glyph(miniLogo,103,54,19,WHITE);word("Kinnect",128,69,14,ACCENT,true);glyph(WebIcons.load(MainActivity.this,"bell"),237,56,13,MUTED);photo(258,54,17,17,8);word(tabs[index]+" · Hồ sơ mẫu",108,86,8,MUTED,false);
-      if(index==0){circle(122,108,14,PRIMARY_SOFT);glyph(WebIcons.load(MainActivity.this,"plus"),115,101,14,ACCENT);word("Tạo tin",110,130,7,MUTED,false);photo(145,94,28,28,14);word("Minh Anh",143,130,7,MUTED,false);box(103,140,174,32,10,SOFT);photo(108,145,21,21,10);word("Bạn đang nghĩ gì?",137,158,8,MUTED,false);photo(107,184,21,21,10);word("Minh Anh · 27",134,193,9,TEXT,true);word("Hồ sơ minh họa",134,204,7,MUTED,false);word("Tập luyện mỗi ngày",107,220,9,TEXT,false);photo(103,229,174,119,9);glyph(WebIcons.load(MainActivity.this,"heart"),108,359,13,PINK);glyph(WebIcons.load(MainActivity.this,"message_circle"),139,359,13,MUTED);glyph(WebIcons.load(MainActivity.this,"share_2"),170,359,13,MUTED);}
-      else if(index==1){box(102,95,176,24,8,SOFT);word("Dành cho bạn",107,110,7,ACCENT,true);word("Đang theo dõi",198,110,7,MUTED,false);box(102,126,176,24,8,SOFT);glyph(WebIcons.load(MainActivity.this,"search"),108,133,10,MUTED);word("Tên hoặc @username",124,142,8,MUTED,false);String[] filters={"Tuổi","Cân nặng","Chiều cao","Giới tính"};for(int i=0;i<4;i++){box(102+i*37,157,35,21,6,SOFT);word(filters[i],105+i*37,170,6,TEXT,false);}glyph(WebIcons.load(MainActivity.this,"sliders_horizontal"),257,162,13,MUTED);String[] people={"Minh Anh, 27","Gia Huy, 28","Hoàng Nam, 30","Quang Minh, 26"};for(int i=0;i<4;i++){float px=103+(i%2)*89,py=187+(i/2)*96;box(px,py,85,91,8,SOFT);personPhoto(i,px,py,85,71);pen.setTextSize(7);pen.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));float labelX=px+(85-pen.measureText(people[i]))/2;word(people[i],labelX,py+84,7,TEXT,true);}}
-      else if(index==2){box(100,94,180,282,12,0xff111116);photo(100,94,180,282,12);box(103,98,174,24,8,0xaa111116);word("Đề xuất",143,114,9,WHITE,true);word("Đang theo dõi",194,114,8,WHITE,false);photo(253,218,18,18,9);circle(262,240,6,ACCENT);word("+",259,244,9,WHITE,true);glyph(WebIcons.load(MainActivity.this,"heart"),255,260,14,WHITE);glyph(WebIcons.load(MainActivity.this,"message_circle"),255,291,14,WHITE);glyph(WebIcons.load(MainActivity.this,"share_2"),255,322,14,WHITE);box(103,331,141,40,8,0xaa111116);word("@minhanh_demo",111,346,9,WHITE,true);word("Video minh họa",111,362,8,WHITE,false);}
-      else{box(101,96,178,280,12,0xff17151e);photo(101,96,178,280,12);box(108,103,40,17,6,PINK);word("LIVE",117,115,8,WHITE,true);box(151,103,68,17,6,0xaa17151e);word("Minh họa",163,115,8,WHITE,false);box(107,309,166,60,10,0xbb17151e);word("Minh Anh đang trực tiếp",114,328,10,WHITE,true);word("Chào mừng đến với Kinnect",114,345,8,WHITE,false);glyph(WebIcons.load(MainActivity.this,"heart"),251,349,14,PINK);}
+    void glyph(android.graphics.drawable.Drawable icon,float x,float y,int size,int color){
+      if(icon!=miniLogo)icon.setTint(color);
+      icon.setBounds((int)x,(int)y,(int)x+size,(int)y+size);
+      icon.draw(canvas);
     }
-    void previewNavigation(int index){String[] names={"Bảng tin","Khám phá","","Video","Live"};String[] icons={"house","compass","plus","clapperboard","radio"};for(int i=0;i<5;i++){float center=118+i*36;boolean selected=i==(index<2?index:index+1);if(i==2){box(center-13,381,26,26,8,ACCENT);glyph(WebIcons.load(MainActivity.this,"plus"),center-7,387,14,WHITE);}else{glyph(WebIcons.load(MainActivity.this,icons[i]),center-7,387,14,selected?ACCENT:MUTED);pen.setTextSize(7);pen.setTypeface(Typeface.create("sans-serif",Typeface.NORMAL));float left=center-pen.measureText(names[i])/2;word(names[i],left,411,7,selected?ACCENT:MUTED,false);}}}
-    void ripple(long elapsed,boolean animate){if(!animate){circle(190,220,145,PRIMARY_SOFT);return;}for(int i=0;i<3;i++){float phase=((elapsed+i*500)%1500)/1500f;float radius=48+phase*142;int alpha=(int)(65*(1-phase));pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth(1.3f);pen.setColor((alpha<<24)|(ACCENT&0xffffff));canvas.drawCircle(190,220,radius,pen);}pen.setStyle(Paint.Style.FILL);}
-    @Override protected void onDraw(Canvas c){canvas=c;float scale=Math.min(getWidth()/330f,getHeight()/450f);if(scale<=0)return;int save=c.save();c.translate((getWidth()-380*scale)/2,(getHeight()-450*scale)/2);c.scale(scale,scale);long elapsed=android.os.SystemClock.uptimeMillis()-clock;boolean animate=android.animation.ValueAnimator.areAnimatorsEnabled();int index=(manual+(animate?(int)(elapsed/1500):0))%4;float phase=animate?(elapsed%1500)/1500f:0;
-      ripple(elapsed,animate);c.save();pen.setShadowLayer(16,0,8,0x30271b43);box(89,12,202,423,34,0xffa5a7ae);pen.clearShadowLayer();box(91,14,198,419,32,0xff111116);box(86,91,3,18,1,0xff8b8e98);box(86,124,3,32,1,0xff8b8e98);box(86,166,3,32,1,0xff8b8e98);box(291,134,3,48,1,0xff8b8e98);screen(index);if(phase>.84f){int layer=c.saveLayerAlpha(95,18,285,427,(int)((phase-.84f)/.16f*255));screen((index+1)%4);c.restoreToCount(layer);}previewNavigation(index);box(172,27,36,11,6,0xff111116);circle(201,32,2,0xff26354b);box(165,418,50,3,2,0xff383840);c.restore();c.restoreToCount(save);if(animate&&isShown()&&hasWindowFocus())postInvalidateDelayed(33);
+    android.graphics.Bitmap demoPhoto;
+    android.graphics.Bitmap decodeAssetThumbnail(String assetName){
+      try(java.io.InputStream stream=getAssets().open(assetName)){
+        byte[] bytes=NativeApi.read(stream,8*1024*1024);
+        return MediaImageLoader.decodeSampledBitmap(bytes,320);
+      }catch(Exception ignored){return null;}
+    }
+    void photo(float x,float y,float w,float h,float topRadius,float bottomRadius){
+      if(demoPhoto==null)demoPhoto=decodeAssetThumbnail("welcome-profile.png");
+      if(demoPhoto==null)return;
+      int saved=canvas.save();
+      Path clip=new Path();
+      float[] radii={topRadius,topRadius,topRadius,topRadius,bottomRadius,bottomRadius,bottomRadius,bottomRadius};
+      clip.addRoundRect(new RectF(x,y,x+w,y+h),radii,Path.Direction.CW);
+      canvas.clipPath(clip);
+      box(x,y,w,h,0,SOFT);
+      float ratio=Math.max(w/demoPhoto.getWidth(),h/demoPhoto.getHeight());
+      float rw=demoPhoto.getWidth()*ratio,rh=demoPhoto.getHeight()*ratio;
+      pen.setFilterBitmap(true);
+      canvas.drawBitmap(demoPhoto,null,new RectF(x+(w-rw)/2f,y,x+(w+rw)/2f,y+rh),pen);
+      canvas.restoreToCount(saved);
+    }
+    void photo(float x,float y,float w,float h,float radius){photo(x,y,w,h,radius,radius);}
+    final android.graphics.Bitmap[] demoPeople=new android.graphics.Bitmap[4];
+    void personPhoto(int index,float x,float y,float w,float h,float topRadius,float bottomRadius){
+      if(demoPeople[index]==null)demoPeople[index]=decodeAssetThumbnail(index==0?"welcome-profile.png":"welcome-profile-"+index+".png");
+      android.graphics.Bitmap previous=demoPhoto;
+      demoPhoto=demoPeople[index];
+      photo(x,y,w,h,topRadius,bottomRadius);
+      demoPhoto=previous;
+    }
+    void filledHeart(float x,float y,float s,int color){
+      Path p=new Path();
+      float cx=x+s/2f;
+      p.moveTo(cx,y+s*0.88f);
+      p.cubicTo(x+s*0.12f,y+s*0.62f,x+s*0.03f,y+s*0.42f,x+s*0.03f,y+s*0.28f);
+      p.cubicTo(x+s*0.03f,y+s*0.11f,x+s*0.17f,y+s*0.02f,x+s*0.31f,y+s*0.02f);
+      p.cubicTo(x+s*0.41f,y+s*0.02f,x+s*0.48f,y+s*0.08f,cx,y+s*0.15f);
+      p.cubicTo(x+s*0.52f,y+s*0.08f,x+s*0.59f,y+s*0.02f,x+s*0.69f,y+s*0.02f);
+      p.cubicTo(x+s*0.83f,y+s*0.02f,x+s*0.97f,y+s*0.11f,x+s*0.97f,y+s*0.28f);
+      p.cubicTo(x+s*0.97f,y+s*0.42f,x+s*0.88f,y+s*0.62f,cx,y+s*0.88f);
+      p.close();
+      pen.setStyle(Paint.Style.FILL);pen.setShader(null);pen.setColor(color);
+      canvas.drawPath(p,pen);
+    }
+    void filledBubble(float x,float y,float s,int color){
+      pen.setStyle(Paint.Style.FILL);pen.setShader(null);pen.setColor(color);
+      canvas.drawOval(new RectF(x,y+s*0.06f,x+s*0.96f,y+s*0.82f),pen);
+      Path tail=new Path();
+      tail.moveTo(x+s*0.18f,y+s*0.68f);tail.lineTo(x+s*0.06f,y+s*0.94f);tail.lineTo(x+s*0.42f,y+s*0.76f);tail.close();
+      canvas.drawPath(tail,pen);
+    }
+    void playRectangleGlyph(float cx,float cy,int color){
+      pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth(1.35f);pen.setShader(null);pen.setColor(color);
+      canvas.drawRoundRect(new RectF(cx-7.5f,cy-5.3f,cx+7.5f,cy+5.3f),2.3f,2.3f,pen);
+      pen.setStyle(Paint.Style.FILL);
+      Path tri=new Path();
+      tri.moveTo(cx-2.1f,cy-2.6f);tri.lineTo(cx-2.1f,cy+2.6f);tri.lineTo(cx+2.8f,cy);tri.close();
+      canvas.drawPath(tri,pen);
+    }
+    void screen(int index){
+      box(96,19,188,409,27,CARD);
+      word("9:41",109,34.5f,8.2f,TEXT,true);
+      iphoneStatus();
+      glyph(miniLogo,104,48,18,WHITE);
+      word("Kinnect",126,61.5f,13.5f,ACCENT,true);
+      glyph(WebIcons.load(MainActivity.this,"bell"),239,50,12,TEXT);
+      photo(258,48,16,16,8);
+      word(I18n.t(tabs[index]),105,79,8.2f,MUTED,false);
+      if(index==0){
+        circle(120,104,13.5f,SOFT);
+        glyph(WebIcons.load(MainActivity.this,"plus"),113,97,14,ACCENT);
+        String storyCta=I18n.t("Tạo tin");
+        pen.setTextSize(6.8f);pen.setTypeface(ApprovedTypography.font(MainActivity.this,Typeface.NORMAL));
+        word(storyCta,120-pen.measureText(storyCta)/2f,126,6.8f,MUTED,false);
+        pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth(1.5f);pen.setColor(ACCENT);
+        canvas.drawCircle(156,104,15f,pen);
+        pen.setStyle(Paint.Style.FILL);
+        personPhoto(0,143,91,26,26,13,13);
+        String authorShort="Minh Anh";
+        pen.setTextSize(6.8f);
+        word(authorShort,156-pen.measureText(authorShort)/2f,126,6.8f,MUTED,false);
+        box(104,135,172,25,8,SOFT);
+        personPhoto(0,109,138.5f,18,18,9,9);
+        word(I18n.t("Bạn đang nghĩ gì?"),133,150.5f,7.8f,MUTED,false);
+        box(104,167,172,199,10,SOFT);
+        personPhoto(0,111,174,20,20,10,10);
+        word("Minh Anh · 27",136,182.5f,8.2f,TEXT,true);
+        word(I18n.t("Hồ sơ minh họa"),136,192.5f,6.8f,MUTED,false);
+        word(I18n.t("Tập luyện mỗi ngày"),111,206.5f,8f,TEXT,false);
+        personPhoto(0,111,213,158,125,7,7);
+        filledHeart(113,346,12,0xffec4899);
+        filledBubble(136,346,12,MUTED);
+        glyph(WebIcons.load(MainActivity.this,"forward"),159,345,13,MUTED);
+      }else if(index==1){
+        box(104,89,172,22,7,SOFT);
+        word(I18n.t("Dành cho bạn"),112,102.5f,7.5f,ACCENT,true);
+        String followTab=I18n.t("Đang theo dõi");
+        pen.setTextSize(7.5f);pen.setTypeface(ApprovedTypography.font(MainActivity.this,Typeface.BOLD));
+        word(followTab,268-pen.measureText(followTab),102.5f,7.5f,TEXT,true);
+        box(104,117,172,22,7,SOFT);
+        glyph(WebIcons.load(MainActivity.this,"search"),110,123,10,MUTED);
+        word(I18n.t("Tên đăng nhập"),124,131,7.8f,MUTED,false);
+        String[] people={"Minh Anh, 27","Gia Huy, 28","Hoàng Nam, 30","Quang Minh, 26"};
+        for(int i=0;i<4;i++){
+          float px=104+(i%2)*90,py=147+(i/2)*112;
+          box(px,py,82,104,8,SOFT);
+          personPhoto(i,px,py,82,83,8,0);
+          pen.setTextSize(7.4f);pen.setTypeface(ApprovedTypography.font(MainActivity.this,Typeface.BOLD));
+          float labelX=px+(82-pen.measureText(people[i]))/2f;
+          word(people[i],labelX,py+96,7.4f,TEXT,true);
+        }
+      }else if(index==2){
+        personPhoto(1,104,89,172,279,10,10);
+        int scrim=canvas.save();
+        Path clip=new Path();
+        clip.addRoundRect(new RectF(104,89,276,368),10,10,Path.Direction.CW);
+        canvas.clipPath(clip);
+        pen.setStyle(Paint.Style.FILL);
+        pen.setShader(new android.graphics.LinearGradient(0,318,0,368,0x00000000,0x78000000,android.graphics.Shader.TileMode.CLAMP));
+        canvas.drawRect(104,318,276,368,pen);
+        pen.setShader(null);
+        canvas.restoreToCount(scrim);
+        word("@minhanh_demo",112,358,8.5f,WHITE,true);
+      }else{
+        personPhoto(2,104,89,172,279,10,10);
+        box(111,97,34,16,8,0xffdb2777);
+        pen.setTextSize(7.2f);pen.setTypeface(ApprovedTypography.font(MainActivity.this,Typeface.BOLD));
+        float liveW=pen.measureText("LIVE");
+        word("LIVE",111+(34-liveW)/2f,107.8f,7.2f,WHITE,true);
+      }
+    }
+    void previewNavigation(int index){
+      String[] names={"Bảng tin","Khám phá","","Video","Live"};
+      String[] icons={"house","compass","plus","","radio"};
+      for(int i=0;i<5;i++){
+        float center=118+i*36;
+        boolean selected=i==(index<2?index:index+1);
+        int ink=selected?ACCENT:MUTED;
+        if(i==2){
+          box(center-13.5f,379,27,27,9,ACCENT);
+          glyph(WebIcons.load(MainActivity.this,"plus"),center-7,385.5f,14,WHITE);
+        }else{
+          if(i==3)playRectangleGlyph(center,392.5f,ink);
+          else glyph(WebIcons.load(MainActivity.this,icons[i]),center-7,385.5f,14,ink);
+          String tabLabel=I18n.t(names[i]);
+          pen.setTextSize(6.7f);pen.setTypeface(ApprovedTypography.font(MainActivity.this,Typeface.NORMAL));
+          word(tabLabel,center-pen.measureText(tabLabel)/2f,410,6.7f,ink,false);
+        }
+      }
+    }
+    void concentricRings(){
+      pen.setStyle(Paint.Style.STROKE);
+      pen.setStrokeWidth(1f);
+      pen.setShader(null);
+      pen.setColor((0x1e<<24)|(ACCENT&0xffffff));
+      for(int r:new int[]{140,170,200})canvas.drawCircle(190,224,r,pen);
+      pen.setStyle(Paint.Style.FILL);
+    }
+    @Override protected void onDraw(Canvas c){
+      canvas=c;
+      float scale=Math.min(getWidth()/330f,getHeight()/450f);
+      if(scale<=0)return;
+      int save=c.save();
+      c.translate((getWidth()-380*scale)/2f,(getHeight()-450*scale)/2f);
+      c.scale(scale,scale);
+      long elapsed=android.os.SystemClock.uptimeMillis()-clock;
+      boolean animate=introTabOverride<0&&android.animation.ValueAnimator.areAnimatorsEnabled();
+      int index=currentActive();
+      float phase=animate?(elapsed%1500)/1500f:0f;
+      concentricRings();
+      c.save();
+      pen.setShadowLayer(16,0,8,0x30000000);
+      box(89,12,202,423,34,0xffa6a6ad);
+      pen.clearShadowLayer();
+      box(91,14,198,419,32,0xff000000);
+      int screenClip=c.save();
+      Path inner=new Path();
+      inner.addRoundRect(new RectF(96,19,284,428),27,27,Path.Direction.CW);
+      c.clipPath(inner);
+      screen(index);
+      if(phase>.80f){
+        int alpha=(int)((phase-.80f)/.20f*255);
+        int layer=c.saveLayerAlpha(96,19,284,376,alpha);
+        screen((index+1)%4);
+        c.restoreToCount(layer);
+      }
+      previewNavigation(index);
+      box(172,25,36,10,5,0xff000000);
+      int barColor=WebTheme.isDark(MainActivity.this)?0x55ffffff:0xff1f1d2b;
+      box(164,418,52,3,1.5f,barColor);
+      c.restoreToCount(screenClip);
+      c.restore();
+      c.restoreToCount(save);
+      if(animate&&isShown()&&hasWindowFocus())postInvalidateDelayed(33);
     }
   }
   private class WelcomeScene extends View {
@@ -4824,17 +5540,24 @@ public class MainActivity extends Activity {
       String nVal = next.getText() == null ? "" : next.getText().toString();
       String rVal = retype.getText() == null ? "" : retype.getText().toString();
       if (cVal.isEmpty()) {
-        Toast.makeText(this, I18n.t("Vui lòng nhập mật khẩu hiện tại."), Toast.LENGTH_SHORT).show();
+        String msg = I18n.t("Vui lòng nhập mật khẩu hiện tại.");
+        android.util.Log.i("KinnectQA", "PASSWORD_VALIDATION: branch=empty_current error='" + msg + "' api_dispatched=false api_dispatch_count=" + NativeApi.shared.apiDispatchCount);
+        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
         return;
       }
       if (nVal.length() < 6) {
-        Toast.makeText(this, I18n.t("Mật khẩu mới phải có ít nhất 6 ký tự."), Toast.LENGTH_SHORT).show();
+        String msg = I18n.t("Mật khẩu mới phải có ít nhất 6 ký tự.");
+        android.util.Log.i("KinnectQA", "PASSWORD_VALIDATION: branch=short_new_password error='" + msg + "' api_dispatched=false api_dispatch_count=" + NativeApi.shared.apiDispatchCount);
+        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
         return;
       }
       if (!nVal.equals(rVal)) {
-        Toast.makeText(this, I18n.t("Mật khẩu nhập lại không khớp."), Toast.LENGTH_SHORT).show();
+        String msg = I18n.t("Mật khẩu nhập lại không khớp.");
+        android.util.Log.i("KinnectQA", "PASSWORD_VALIDATION: branch=mismatch error='" + msg + "' api_dispatched=false api_dispatch_count=" + NativeApi.shared.apiDispatchCount);
+        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
         return;
       }
+      android.util.Log.i("KinnectQA", "PASSWORD_VALIDATION: branch=passed api_dispatched=true");
       api.call("POST", "/api/me/password", json("current", cVal, "next", nVal), (r, e, s) ->
         Toast.makeText(this, e != null ? e : I18n.t("Đã đổi mật khẩu. Các thiết bị khác đã được đăng xuất."), Toast.LENGTH_LONG).show());
     }).setNegativeButton(I18n.t("Hủy"), null).show();
@@ -4884,16 +5607,36 @@ public class MainActivity extends Activity {
     request("GET", "/api/posts?user=" + u.optString("id"), null, d -> posts(d.optJSONArray("posts"), "Chưa có bài viết."));
   }
 
-  // ----- Danh sách bài viết dùng chung
-  private void posts(JSONArray posts, String empty) {
-    if (posts == null || posts.length() == 0) content.addView(emptyBlock("newspaper",I18n.t("Chưa có bài viết"),empty.contains(I18n.t("đầu tiên"))?I18n.t("Hãy là người đầu tiên chia sẻ."):I18n.t("Bài viết sẽ hiển thị tại đây.")));
-    int startIndex = content.getChildCount();
-    for (int i = 0; posts != null && i < posts.length(); i++) postCard(posts.optJSONObject(i));
-    for (int i = startIndex; i < content.getChildCount(); i++) {
-      View card = content.getChildAt(i);
-      card.setAlpha(0f);
-      card.setTranslationY(dp(14));
-      card.animate().alpha(1f).translationY(0f).setDuration(WebDesign.MOTION_BASE).setStartDelay(Math.min(220, (i - startIndex) * 35L)).start();
+  // ----- Danh sách bài viết dùng chung (nạp theo cửa sổ hiển thị + prefetch ảnh)
+  private static final int FEED_WINDOW_BATCH = 10;
+
+  private void posts(final JSONArray posts, String empty) {
+    final LinearLayout targetContainer = content;
+    if (posts == null || posts.length() == 0) {
+      targetContainer.addView(emptyBlock("newspaper", I18n.t("Chưa có bài viết"), empty.contains(I18n.t("đầu tiên")) ? I18n.t("Hãy là người đầu tiên chia sẻ.") : I18n.t("Bài viết sẽ hiển thị tại đây.")));
+      return;
+    }
+    final int expectedScreen = screen;
+    WindowedListBinder.bind(this, targetContainer, posts, FEED_WINDOW_BATCH, dp(900), () -> screen == expectedScreen, (start, end) -> {
+      MediaImageLoader.prefetchPosts(api, posts, start, Math.min(8, posts.length() - start), 1280);
+      renderPostSlice(targetContainer, posts, start, end);
+    });
+  }
+
+  private void renderPostSlice(LinearLayout targetContainer, JSONArray posts, int start, int end) {
+    LinearLayout savedContent = content;
+    content = targetContainer;
+    int startIndex = targetContainer.getChildCount();
+    try {
+      for (int i = start; i < end; i++) postCard(posts.optJSONObject(i));
+      for (int i = startIndex; i < targetContainer.getChildCount(); i++) {
+        View card = targetContainer.getChildAt(i);
+        card.setAlpha(0f);
+        card.setTranslationY(dp(14));
+        card.animate().alpha(1f).translationY(0f).setDuration(WebDesign.MOTION_BASE).setStartDelay(Math.min(220, (i - startIndex) * 35L)).start();
+      }
+    } finally {
+      content = savedContent;
     }
   }
 
@@ -4990,7 +5733,7 @@ public class MainActivity extends Activity {
     ap.setMargins(0, dp(4), 0, dp(4));
     c.addView(actions, ap);
     c.addView(thread);
-    if (!commentFocus.isEmpty()) { thread.setVisibility(View.VISIBLE); inlineComments(p, thread, false, commentFocus); }
+    if (commentFocus != null && !commentFocus.isEmpty()) { thread.setVisibility(View.VISIBLE); inlineComments(p, thread, false, commentFocus); }
   }
 
   private String reactionName(String key) {

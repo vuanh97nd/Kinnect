@@ -16,7 +16,7 @@ Path('dist').mkdir(exist_ok=True)
 run('python','scripts/build-native-icon-family.py')
 run('python','scripts/sync-android-languages.py')
 run(build/'aapt2.exe','compile','--dir','android/app/src/main/res','-o',native/'resources.zip')
-run(build/'aapt2.exe','link','--auto-add-overlay','-R',native/'resources.zip','-I',platform,'--manifest','android/app/src/main/AndroidManifest.xml','-o',native/'unsigned.apk')
+run(build/'aapt2.exe','link','--debug-mode','--auto-add-overlay','-R',native/'resources.zip','-I',platform,'--manifest','android/app/src/main/AndroidManifest.xml','-o',native/'unsigned.apk')
 jars=[deps/'webrtc/classes.jar']+[root/'work/play-tools/dependencies'/Path(d['file']).name for d in __import__('json').loads((root/'work/play-tools/dependencies/dependencies.json').read_text())]
 run(jdk/'java.exe','-jar',tools/'ecj.jar','-1.8','-encoding','UTF-8','-proc:none','-warn:none','-bootclasspath',str(platform)+';'+str(build/'core-lambda-stubs.jar'),'-classpath',';'.join(map(str,jars)),'-d',native/'classes',*Path('android/app/src/main/java/app/kinnect/live').glob('*.java'))
 classes=native/'classes.list';classes.write_text('\n'.join(str(p.resolve()) for p in (native/'classes').rglob('*.class')))

@@ -16,6 +16,7 @@ public final class NativeApi {
   private static final class Snapshot{final String etag,body;Snapshot(String e,String b){etag=e;body=b;}}
   private final java.util.Map<String,Snapshot> snapshots=java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<String,Snapshot>(){protected boolean removeEldestEntry(java.util.Map.Entry<String,Snapshot> e){return size()>32;}});
   private volatile int epoch = 0;
+  public volatile int apiDispatchCount = 0;
   private SessionStore sessions;
   private AppCache diskCache;private android.content.Context appContext;
   private final ExecutorService mediaCacheExecutor=Executors.newSingleThreadExecutor();
@@ -25,11 +26,42 @@ public final class NativeApi {
   private boolean cacheable(String path){String p=path.split("\\?",2)[0];return java.util.Arrays.asList("/api/me","/api/posts","/api/discover","/api/shorts","/api/conversations","/api/groups","/api/notifications","/api/friends","/api/friend-requests","/api/friend-suggestions").contains(p)||p.matches("/api/users/[^/]+(?:/messages)?")||p.matches("/api/groups/[^/]+(?:/messages)?");}
   public JSONObject cachedGet(String path){if(diskCache==null||cookie.isEmpty()||!cacheable(path))return null;byte[] bytes=diskCache.get(cacheScope(),"json:"+path,AppCache.WEEK);try{if(bytes==null)return null;JSONObject value=new JSONObject(new String(bytes,"UTF-8"));value.put("cached",true);return value;}catch(Exception e){return null;}}
   public byte[] cachedImage(String path){return diskCache==null||cookie.isEmpty()?null:diskCache.get(cacheScope(),"image:"+path,AppCache.WEEK);}
-  public File cachedVideo(String path){return diskCache==null||cookie.isEmpty()?null:diskCache.video(cacheScope(),path);}
-  public byte[] cachedThumbnail(String path){return diskCache==null||cookie.isEmpty()?null:diskCache.get(cacheScope(),"thumb:"+path,AppCache.WEEK);}
+  public void cacheImageBytes(String path,byte[] bytes){if(diskCache!=null&&!cookie.isEmpty()&&path!=null&&!path.isEmpty()&&bytes!=null&&bytes.length>0)diskCache.put(cacheScope(),"image:"+path,bytes);}
+  public synchronized void clearSnapshots(){snapshots.clear();}
+  public File cachedVideo(String path){
+    if(fixtureEnabled&&appContext!=null){
+      File fixtureFile=new File(appContext.getCacheDir(),"fixture_short.mp4");
+      if(!fixtureFile.exists()||fixtureFile.length()==0){
+        try(java.io.InputStream in=appContext.getAssets().open("short_sample.mp4");java.io.FileOutputStream out=new java.io.FileOutputStream(fixtureFile)){
+          byte[] buf=new byte[8192];int r;while((r=in.read(buf))!=-1)out.write(buf,0,r);
+        }catch(Exception ignored){}
+      }
+      if(fixtureFile.exists()&&fixtureFile.length()>0)return fixtureFile;
+    }
+    return diskCache==null||cookie.isEmpty()?null:diskCache.video(cacheScope(),path);
+  }
+  public byte[] cachedThumbnail(String path){
+    if(fixtureEnabled&&appContext!=null){
+      File fixtureFile=cachedVideo(path);
+      if(fixtureFile!=null&&fixtureFile.exists()){
+        android.media.MediaMetadataRetriever retriever=new android.media.MediaMetadataRetriever();
+        try{
+          retriever.setDataSource(fixtureFile.getAbsolutePath());
+          android.graphics.Bitmap frame=android.os.Build.VERSION.SDK_INT>=27?retriever.getScaledFrameAtTime(0,android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,360,640):null;
+          if(frame!=null){
+            ByteArrayOutputStream out=new ByteArrayOutputStream();
+            frame.compress(android.graphics.Bitmap.CompressFormat.JPEG,85,out);
+            frame.recycle();
+            return out.toByteArray();
+          }
+        }catch(Exception ignored){}finally{try{retriever.release();}catch(Exception ignored){}}
+      }
+    }
+    return diskCache==null||cookie.isEmpty()?null:diskCache.get(cacheScope(),"thumb:"+path,AppCache.WEEK);
+  }
   public void cacheThumbnail(String path,byte[] bytes){if(diskCache!=null&&!cookie.isEmpty())diskCache.put(cacheScope(),"thumb:"+path,bytes);}
   public void warmVideo(String path){
-    if(diskCache==null||cookie.isEmpty()||!path.matches("/api/shorts/[^/]+/video")||cachedVideo(path)!=null)return;
+    if(fixtureEnabled||diskCache==null||cookie.isEmpty()||!path.matches("/api/shorts/[^/]+/video")||cachedVideo(path)!=null)return;
     android.net.ConnectivityManager cm=(android.net.ConnectivityManager)appContext.getSystemService(android.content.Context.CONNECTIVITY_SERVICE);android.net.NetworkCapabilities capabilities=cm==null?null:cm.getNetworkCapabilities(cm.getActiveNetwork());if(capabilities==null||!capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI))return;
     final String scope=cacheScope(),server=origin,jar=jar(),key=scope+path;final int revision=epoch;if(!warming.add(key))return;
     mediaCacheExecutor.execute(()->{HttpURLConnection c=null;try{if(revision!=epoch)return;c=(HttpURLConnection)new URL(server+path).openConnection();c.setConnectTimeout(8000);c.setReadTimeout(15000);c.setInstanceFollowRedirects(false);c.setRequestProperty("Cookie",jar);if(c.getResponseCode()==200&&String.valueOf(c.getContentType()).startsWith("video/")&&c.getContentLengthLong()<=32L*1024*1024){byte[] bytes=read(c.getInputStream(),32*1024*1024);if(revision==epoch){diskCache.put(scope,"video:"+path,bytes);File local=diskCache.video(scope,path);if(local!=null){android.media.MediaMetadataRetriever retriever=new android.media.MediaMetadataRetriever();try{retriever.setDataSource(local.getAbsolutePath());android.graphics.Bitmap frame=android.os.Build.VERSION.SDK_INT>=27?retriever.getScaledFrameAtTime(0,android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,240,384):null;if(frame!=null){ByteArrayOutputStream out=new ByteArrayOutputStream();frame.compress(android.graphics.Bitmap.CompressFormat.JPEG,80,out);frame.recycle();if(revision==epoch)diskCache.put(scope,"thumb:"+path,out.toByteArray());}}finally{retriever.release();}}}}}catch(Exception|OutOfMemoryError ignored){}finally{if(c!=null)c.disconnect();warming.remove(key);}});
@@ -41,6 +73,47 @@ public final class NativeApi {
   public String origin() { return origin; }
   private volatile String origin = ServerConfig.DEFAULT_ORIGIN,
     cookie = "";
+  private volatile String debugLoopbackOrigin = null;
+  private volatile javax.net.ssl.SSLSocketFactory debugLoopbackSslFactory = null;
+
+  public String pinnedDebugLoopbackOrigin() { return debugLoopbackOrigin; }
+
+  public synchronized boolean pinDebugLoopback(android.content.Context context, String originUrl, String certSha256) {
+    if (context == null || originUrl == null || certSha256 == null) return false;
+    boolean isDebug = (context.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+    if (!isDebug) return false;
+    if (!originUrl.matches("^https://(10\\.0\\.2\\.2|127\\.0\\.0\\.1):\\d{1,5}$") || !certSha256.matches("^[0-9a-fA-F]{64}$")) return false;
+    final String expectedSha = certSha256.toLowerCase(java.util.Locale.ROOT);
+    try {
+      javax.net.ssl.TrustManager[] tms = new javax.net.ssl.TrustManager[] {
+        new javax.net.ssl.X509TrustManager() {
+          public java.security.cert.X509Certificate[] getAcceptedIssuers() { return new java.security.cert.X509Certificate[0]; }
+          public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
+          public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) throws java.security.cert.CertificateException {
+            if (chain == null || chain.length == 0) throw new java.security.cert.CertificateException("Empty cert chain");
+            try {
+              byte[] digest = java.security.MessageDigest.getInstance("SHA-256").digest(chain[0].getEncoded());
+              StringBuilder sb = new StringBuilder();
+              for (byte b : digest) sb.append(String.format(java.util.Locale.ROOT, "%02x", b));
+              if (!expectedSha.equals(sb.toString())) throw new java.security.cert.CertificateException("Pin mismatch");
+            } catch (java.security.NoSuchAlgorithmException e) {
+              throw new java.security.cert.CertificateException(e);
+            }
+          }
+        }
+      };
+      javax.net.ssl.SSLContext sc = javax.net.ssl.SSLContext.getInstance("TLS");
+      sc.init(null, tms, new java.security.SecureRandom());
+      debugLoopbackSslFactory = sc.getSocketFactory();
+      debugLoopbackOrigin = originUrl;
+      fixtureEnabled = false;
+      configure(originUrl);
+      android.util.Log.i("KinnectQA", "DEBUG_LOOPBACK_PINNED: origin=" + originUrl);
+      return true;
+    } catch (Exception e) {
+      return false;
+    }
+  }
 
   public interface Result {
     void done(JSONObject data, String error, int status);
@@ -51,6 +124,10 @@ public final class NativeApi {
   }
 
   public synchronized void configure(String value) {
+    if (debugLoopbackOrigin != null) {
+      origin = debugLoopbackOrigin;
+      return;
+    }
     String next = ServerConfig.normalize(value);
     if (!next.equals(origin)) {
       cookie = "";
@@ -88,6 +165,233 @@ public final class NativeApi {
     epoch++;snapshots.clear();
   }
 
+  private static volatile boolean fixtureEnabled = false;
+  public static synchronized boolean enableFixture(android.content.Context context, boolean enable) {
+    if (!enable) {
+      fixtureEnabled = false;
+      return false;
+    }
+    if (context == null) return false;
+    boolean isDebug = (context.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+    if (!isDebug) {
+      fixtureEnabled = false;
+      return false;
+    }
+    fixtureEnabled = true;
+    return true;
+  }
+  public static boolean isFixtureEnabled() {
+    if (shared != null && shared.debugLoopbackOrigin != null) return false;
+    if (!fixtureEnabled) {
+      java.io.File flag = new java.io.File("/data/local/tmp/kinnect_fixture");
+      if (flag.exists()) fixtureEnabled = true;
+    }
+    return fixtureEnabled;
+  }
+
+  private static final class FixtureResult {
+    final JSONObject data;
+    final String error;
+    final int status;
+    FixtureResult(JSONObject data, String error, int status) {
+      this.data = data;
+      this.error = error;
+      this.status = status;
+    }
+  }
+
+  private static final String FIXTURE_PREFS = "kinnect_qa_fixture_state";
+  private static final String FIXTURE_USER_DEFAULT = "{\"id\":\"usr_qa_review\",\"username\":\"minhanh\",\"name\":\"Minh Anh\",\"role\":\"user\",\"coins\":1200,\"bio\":\"Kinnect QA Review\",\"followersCount\":128,\"followingCount\":64,\"discoverable\":true,\"showDistance\":true,\"showActivity\":true,\"dmMode\":\"friends\"}";
+
+  public static synchronized void resetFixtureState(android.content.Context context) {
+    if (context == null) return;
+    boolean isDebug = (context.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+    if (!isDebug) return;
+    context.getSharedPreferences(FIXTURE_PREFS, android.content.Context.MODE_PRIVATE).edit().clear().commit();
+  }
+
+  public synchronized JSONObject fixtureUser(android.content.Context context) {
+    android.content.Context ctx = context != null ? context.getApplicationContext() : appContext;
+    if (!fixtureEnabled || ctx == null) {
+      try { return new JSONObject(FIXTURE_USER_DEFAULT); } catch (Exception e) { return new JSONObject(); }
+    }
+    boolean isDebug = (ctx.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+    if (!isDebug) {
+      try { return new JSONObject(FIXTURE_USER_DEFAULT); } catch (Exception e) { return new JSONObject(); }
+    }
+    String saved = ctx.getSharedPreferences(FIXTURE_PREFS, android.content.Context.MODE_PRIVATE).getString("user_json", null);
+    try {
+      return new JSONObject(saved != null && !saved.isEmpty() ? saved : FIXTURE_USER_DEFAULT);
+    } catch (Exception e) {
+      try { return new JSONObject(FIXTURE_USER_DEFAULT); } catch (Exception ignored) { return new JSONObject(); }
+    }
+  }
+
+  private synchronized JSONObject mergeFixtureUser(JSONObject patch) {
+    JSONObject u = fixtureUser(appContext);
+    if (patch != null && fixtureEnabled && appContext != null) {
+      boolean isDebug = (appContext.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+      if (isDebug) {
+        java.util.Iterator<String> keys = patch.keys();
+        while (keys.hasNext()) {
+          String k = keys.next();
+          try { u.put(k, patch.get(k)); } catch (Exception ignored) {}
+        }
+        appContext.getSharedPreferences(FIXTURE_PREFS, android.content.Context.MODE_PRIVATE)
+          .edit().putString("user_json", u.toString()).commit();
+      }
+    }
+    return u;
+  }
+
+  private FixtureResult offlineFixture(String method, String path, JSONObject data) {
+    String cleanPath = path.split("\\?", 2)[0];
+    long nowTime = System.currentTimeMillis();
+    long postTime = nowTime - 3600000L;
+    try {
+      if ("GET".equals(method) && "/api/me".equals(cleanPath)) {
+        JSONObject wrap = new JSONObject();
+        wrap.put("user", fixtureUser(appContext));
+        return new FixtureResult(wrap, null, 200);
+      }
+      if ("POST".equals(method) && "/api/me/password".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"message\":\"Đã đổi mật khẩu thành công\"}"), null, 200);
+      }
+      if ("GET".equals(method) && "/api/me/privacy-consent".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"accepted\":true}"), null, 200);
+      }
+      if ("POST".equals(method) && "/api/me/privacy-consent".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"success\":true}"), null, 200);
+      }
+      if ("PATCH".equals(method) && "/api/me".equals(cleanPath)) {
+        JSONObject wrap = new JSONObject();
+        wrap.put("user", mergeFixtureUser(data));
+        return new FixtureResult(wrap, null, 200);
+      }
+      if ("GET".equals(method) && "/api/me/sessions".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"sessions\":[{\"id\":\"sess_1\",\"label\":\"Pixel 6 · Android 14\",\"current\":true,\"expires\":\"2026-12-01T00:00:00Z\"}]}"), null, 200);
+      }
+      if ("GET".equals(method) && "/api/stories".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"stories\":[{\"id\":\"st_1\",\"body\":\"Khoảnh khắc cuối tuần cùng Kinnect!\",\"created\":" + postTime + ",\"mediaUrl\":\"/story.jpg\",\"user\":{\"id\":\"usr_story\",\"name\":\"Linh Nhi\",\"username\":\"linhnhi\"},\"author\":{\"id\":\"usr_story\",\"name\":\"Linh Nhi\",\"username\":\"linhnhi\"}}]}"), null, 200);
+      }
+      if ("GET".equals(method) && "/api/posts".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"posts\":[{\"id\":\"post_1\",\"body\":\"Chào mừng bạn đến với Kinnect! Trải nghiệm kết nối sống đúng mình.\",\"content\":\"Chào mừng bạn đến với Kinnect! Trải nghiệm kết nối sống đúng mình.\",\"created\":" + postTime + ",\"createdAt\":\"2026-11-13T00:00:00Z\",\"user_id\":\"usr_qa_review\",\"visibility\":\"public\",\"author\":{\"id\":\"usr_qa_review\",\"name\":\"Minh Anh\",\"username\":\"minhanh\"},\"likes\":15,\"comments\":4,\"reactionsCount\":24,\"myReaction\":\"love\"}]}"), null, 200);
+      }
+      if ("POST".equals(method) && cleanPath.matches("/api/posts/[^/]+/reaction")) {
+        return new FixtureResult(new JSONObject("{\"success\":true,\"myReaction\":\"love\",\"reactionsCount\":25}"), null, 200);
+      }
+      if ("GET".equals(method) && (cleanPath.matches("/api/posts/[^/]+/comments") || cleanPath.matches("/api/posts/[^/]+/comments/comments") || cleanPath.matches("/api/shorts/[^/]+/comments") || cleanPath.matches("/api/shorts/[^/]+/comments/comments"))) {
+        return new FixtureResult(new JSONObject("{\"comments\":[{\"id\":\"c_1\",\"body\":\"Chào mừng bạn gia nhập!\",\"content\":\"Chào mừng bạn gia nhập!\",\"author\":{\"id\":\"u2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\"},\"created\":" + (nowTime - 1800000L) + ",\"createdAt\":\"2026-11-13T00:05:00Z\",\"likes\":2,\"myReaction\":null},{\"id\":\"c_2\",\"parentId\":\"c_1\",\"body\":\"Cảm ơn Hoàng Nam nhé!\",\"content\":\"Cảm ơn Hoàng Nam nhé!\",\"author\":{\"id\":\"usr_qa_review\",\"name\":\"Minh Anh\",\"username\":\"minhanh\"},\"created\":" + (nowTime - 900000L) + ",\"createdAt\":\"2026-11-13T00:20:00Z\",\"likes\":1,\"myReaction\":\"love\"}]}"), null, 200);
+      }
+      if ("GET".equals(method) && cleanPath.matches("/api/users/[^/]+/stats")) {
+        return new FixtureResult(new JSONObject("{\"posts\":12,\"followers\":128,\"following\":64}"), null, 200);
+      }
+      if ("POST".equals(method) && cleanPath.matches("/api/stories/[^/]+/view")) {
+        return new FixtureResult(new JSONObject("{\"success\":true}"), null, 200);
+      }
+      if ("GET".equals(method) && cleanPath.matches("/api/users/[^/]+/followers")) {
+        return new FixtureResult(new JSONObject("{\"users\":[]}"), null, 200);
+      }
+      if ("GET".equals(method) && cleanPath.matches("/api/users/[^/]+/following")) {
+        return new FixtureResult(new JSONObject("{\"users\":[]}"), null, 200);
+      }
+      if ("POST".equals(method) && cleanPath.matches("/api/users/[^/]+/follow")) {
+        return new FixtureResult(new JSONObject("{\"success\":true}"), null, 200);
+      }
+      if ("POST".equals(method) && cleanPath.matches("/api/posts/[^/]+/like")) {
+        return new FixtureResult(new JSONObject("{\"success\":true,\"reactionsCount\":25,\"myReaction\":\"like\"}"), null, 200);
+      }
+      if ("GET".equals(method) && cleanPath.matches("/api/posts/[^/]+/reactions")) {
+        return new FixtureResult(new JSONObject("{\"users\":[{\"id\":\"u2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\",\"reaction\":\"love\"},{\"id\":\"u3\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\",\"reaction\":\"like\"}]}"), null, 200);
+      }
+      if ("POST".equals(method) && (cleanPath.matches("/api/posts/[^/]+/comments") || cleanPath.matches("/api/posts/[^/]+/comments/comments") || cleanPath.matches("/api/shorts/[^/]+/comments") || cleanPath.matches("/api/shorts/[^/]+/comments/comments"))) {
+        return new FixtureResult(new JSONObject("{\"comment\":{\"id\":\"c_new\",\"body\":\"Cảm ơn mọi người!\",\"content\":\"Cảm ơn mọi người!\",\"author\":{\"id\":\"usr_qa_review\",\"name\":\"Minh Anh\",\"username\":\"minhanh\"},\"created\":" + nowTime + ",\"createdAt\":\"2026-11-13T00:10:00Z\"}}"), null, 200);
+      }
+      if ("GET".equals(method) && "/api/discover".equals(cleanPath)) {
+        if (path.contains("khong_tim_thay")) {
+          return new FixtureResult(new JSONObject("{\"users\":[],\"total\":0}"), null, 200);
+        }
+        if (path.contains("c%C3%A0+ph%C3%AA") || path.contains("c%C3%A0%20ph%C3%AA") || path.contains("cà phê")) {
+          return new FixtureResult(new JSONObject("{\"users\":[{\"id\":\"u4\",\"name\":\"Kinnect Coffee & Book\",\"username\":\"cafe_kinnect\",\"bio\":\"Không gian cà phê & kết nối bạn bè\"},{\"id\":\"u2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\",\"bio\":\"Nhiếp ảnh & Cà phê sáng\"}]}"), null, 200);
+        }
+        return new FixtureResult(new JSONObject("{\"users\":[{\"id\":\"u1\",\"name\":\"Linh Nhi\",\"username\":\"linhnhi\",\"bio\":\"Yêu đời, thích khám phá\"},{\"id\":\"u2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\",\"bio\":\"Nhiếp ảnh & Sáng tạo nội dung\"},{\"id\":\"u3\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\",\"bio\":\"Yêu âm nhạc & Du lịch\"}]}"), null, 200);
+      }
+      if ("GET".equals(method) && "/api/shorts".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"shorts\":[{\"id\":\"s1\",\"title\":\"Khoảnh khắc cuộc sống\",\"video\":\"/api/shorts/s1/video\",\"author\":{\"id\":\"usr_qa_review\",\"name\":\"Minh Anh\",\"username\":\"minhanh\"},\"likes\":89,\"comments\":12},{\"id\":\"s2\",\"title\":\"Giai điệu kết nối\",\"video\":\"/api/shorts/s2/video\",\"author\":{\"id\":\"u2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\"},\"likes\":142,\"comments\":25}]}"), null, 200);
+      }
+      if ("GET".equals(method) && "/api/conversations".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"users\":[{\"id\":\"u3\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\",\"isActive\":true,\"unread\":1,\"last\":{\"body\":\"Hẹn gặp bạn cuối tuần này nhé!\",\"created\":" + (nowTime - 900000L) + ",\"mine\":false}}],\"conversations\":[{\"id\":\"c1\",\"title\":\"Bảo Ngọc\",\"lastMessage\":\"Hẹn gặp bạn cuối tuần này nhé!\",\"updatedAt\":\"2026-11-13T00:00:00Z\",\"unread\":1}]}"), null, 200);
+      }
+      if ("GET".equals(method) && "/api/groups".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"groups\":[{\"id\":\"g1\",\"name\":\"Cộng đồng Nhiếp ảnh Kinnect\",\"members\":[{\"id\":\"usr_qa_review\"},{\"id\":\"u2\"},{\"id\":\"u3\"}],\"unread\":0,\"last\":{\"body\":\"Chào mừng mọi người đến nhóm âm nhạc!\",\"created\":" + (nowTime - 1800000L) + ",\"name\":\"Hoàng Nam\",\"mine\":false}}]}"), null, 200);
+      }
+      if ("GET".equals(method) && cleanPath.matches("/api/users/[^/]+/messages")) {
+        return new FixtureResult(new JSONObject("{\"messages\":[{\"id\":\"m_1\",\"sender\":\"u3\",\"body\":\"Chào bạn, rất vui được làm quen!\",\"created\":" + (nowTime - 3600000L) + ",\"createdAt\":\"2026-11-13T00:00:00Z\"},{\"id\":\"m_2\",\"sender\":\"usr_qa_review\",\"body\":\"Chào Bảo Ngọc nhé!\",\"created\":" + (nowTime - 3540000L) + ",\"createdAt\":\"2026-11-13T00:01:00Z\"}]}"), null, 200);
+      }
+      if ("GET".equals(method) && cleanPath.matches("/api/groups/[^/]+/messages")) {
+        return new FixtureResult(new JSONObject("{\"messages\":[{\"id\":\"gm_1\",\"sender\":\"u2\",\"body\":\"Chào mừng mọi người đến nhóm âm nhạc!\",\"created\":" + (nowTime - 3600000L) + ",\"createdAt\":\"2026-11-13T00:00:00Z\"}]}"), null, 200);
+      }
+      if ("GET".equals(method) && "/api/friends".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"users\":[{\"id\":\"f1\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\",\"bio\":\"Yêu âm nhạc & Du lịch\"},{\"id\":\"f2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\",\"bio\":\"Nhiếp ảnh & Sáng tạo nội dung\"}],\"friends\":[{\"id\":\"f1\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\"},{\"id\":\"f2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\"}]}"), null, 200);
+      }
+      if ("GET".equals(method) && "/api/friend-suggestions".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"users\":[{\"id\":\"u4\",\"name\":\"Khánh Linh\",\"username\":\"linh_k\",\"bio\":\"Nhà thiết kế trải nghiệm\"}]}"), null, 200);
+      }
+      if ("GET".equals(method) && "/api/friend-requests".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"requests\":[{\"id\":\"fr_1\",\"user\":{\"id\":\"u4\",\"name\":\"Khánh Linh\",\"username\":\"linh_k\"},\"createdAt\":\"2026-11-13T00:00:00Z\"}]}"), null, 200);
+      }
+      if ("GET".equals(method) && "/api/notifications".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"notifications\":[{\"id\":\"n1\",\"kind\":\"like\",\"created\":" + (nowTime - 7200000L) + ",\"createdAt\":\"2026-11-13T00:00:00Z\",\"seen\":0,\"actor\":{\"id\":\"u2\",\"name\":\"Hoàng Nam\",\"username\":\"nam_h\"}}]}"), null, 200);
+      }
+      if ("POST".equals(method) && "/api/notifications".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"success\":true}"), null, 200);
+      }
+      if ("GET".equals(method) && "/api/store".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"packages\":[{\"id\":\"pkg_aurora\",\"name\":\"Phong cách Cực quang\",\"kind\":\"style\",\"tier\":\"featured\",\"priceCoins\":200,\"description\":\"Hiệu ứng viền hồ sơ phát sáng cực quang huyền ảo\"},{\"id\":\"pkg_neon\",\"name\":\"Phong cách Neon Tím\",\"kind\":\"style\",\"tier\":\"popular\",\"priceCoins\":350,\"description\":\"Đổi màu giao diện chủ đạo sang tông Neon Cyberpunk\"},{\"id\":\"pkg_studio_pro\",\"name\":\"Kinnect Studio Pro\",\"kind\":\"studio\",\"line\":\"video\",\"tier\":\"pro\",\"priceCoins\":500,\"description\":\"Quay video không giới hạn, mở khóa 24 bộ lọc điện ảnh\"}],\"products\":[{\"id\":\"prod_badge_vip\",\"name\":\"Huy hiệu VIP Kinnect\",\"kind\":\"style\",\"priceCoins\":150,\"description\":\"Huy hiệu nổi bật bên cạnh tên hiển thị\"}],\"coins\":1200,\"balance\":1200,\"ownedPackages\":[\"pkg_aurora\"],\"owned\":[]}"), null, 200);
+      }
+      if ("POST".equals(method) && "/api/store/packages/buy".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"success\":true,\"packageId\":\"pkg_aurora\",\"balance\":1000}"), null, 200);
+      }
+      if ("POST".equals(method) && "/api/store/packages/apply".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"success\":true,\"applied\":\"pkg_aurora\"}"), null, 200);
+      }
+      if ("GET".equals(method) && ("/api/commerce/catalog".equals(cleanPath) || "/api/studio/catalog".equals(cleanPath))) {
+        return new FixtureResult(new JSONObject("{\"accountId\":\"usr_qa_review\",\"studioProFree\":true,\"studioProPermanent\":true,\"owned\":[\"kinnect_studio_pro\"]}"), null, 200);
+      }
+      if ("GET".equals(method) && "/api/music".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"tracks\":[{\"id\":\"m1\",\"title\":\"Giai điệu kết nối\",\"artist\":\"Kinnect Audio\",\"duration\":185,\"url\":\"/music/m1.mp3\"},{\"id\":\"m2\",\"title\":\"Nắng sớm thành phố\",\"artist\":\"Minh Anh feat. Nam\",\"duration\":210,\"url\":\"/music/m2.mp3\"},{\"id\":\"m3\",\"title\":\"Khoảnh khắc thanh xuân\",\"artist\":\"Kinnect Vibes\",\"duration\":195,\"url\":\"/music/m3.mp3\"},{\"id\":\"m4\",\"title\":\"Nhịp đập cuộc sống\",\"artist\":\"Bảo Ngọc\",\"duration\":240,\"url\":\"/music/m4.mp3\"}]}"), null, 200);
+      }
+      if ("GET".equals(method) && "/api/live".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"rooms\":[{\"id\":\"room_1\",\"title\":\"Giao lưu âm nhạc cuối tuần\",\"host\":\"Minh Anh\",\"liveMode\":\"chat\",\"hostId\":\"usr_qa_review\",\"viewers\":42}]}"), null, 200);
+      }
+      if ("GET".equals(method) && "/api/live/gifts".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"enabled\":true,\"experience\":true,\"balance\":1200,\"version\":1,\"inventory\":[],\"items\":[{\"id\":\"rose\",\"costCoins\":10,\"tier\":\"small\",\"comboable\":true},{\"id\":\"star\",\"costCoins\":50,\"tier\":\"small\",\"comboable\":true},{\"id\":\"crown\",\"costCoins\":500,\"tier\":\"medium\",\"comboable\":true},{\"id\":\"castle\",\"costCoins\":2000,\"tier\":\"legendary\",\"comboable\":false}]}"), null, 200);
+      }
+      if ("GET".equals(method) && "/api/wallet".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"balance\":1200,\"diamonds\":450,\"currency\":\"VND\",\"records\":[{\"id\":\"w_1\",\"title\":\"Nạp xu\",\"amount\":500,\"created\":\"2026-11-12T10:00:00Z\",\"type\":\"topup\",\"category\":\"topup\"}]}"), null, 200);
+      }
+      if ("GET".equals(method) && "/api/call-config".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"iceServers\":[{\"urls\":\"stun:stun.l.google.com:19302\"}],\"token\":\"mock_rtc_token\"}"), null, 200);
+      }
+      if ("GET".equals(method) && "/api/support".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"user\":{\"id\":\"usr_support\",\"name\":\"Kinnect Support\",\"username\":\"support\"}}"), null, 200);
+      }
+      if ("GET".equals(method) && cleanPath.endsWith("/private")) {
+        return new FixtureResult(new JSONObject("{\"status\":\"owner\",\"photos\":[{\"id\":\"p_1\",\"url\":\"/private_1.jpg\"}]}"), null, 200);
+      }
+      if ("GET".equals(method) && "/api/me/private/requests".equals(cleanPath)) {
+        return new FixtureResult(new JSONObject("{\"requests\":[]}"), null, 200);
+      }
+      JSONObject notFound = new JSONObject();
+      try { notFound.put("error", "Fixture endpoint not mapped: " + method + " " + cleanPath); } catch (Exception ignored) {}
+      return new FixtureResult(notFound, "Fixture unmapped endpoint", 404);
+    } catch (Exception e) {
+      JSONObject err = new JSONObject();
+      try { err.put("error", "Fixture error: " + e.getMessage()); } catch (Exception ignored) {}
+      return new FixtureResult(err, e.getMessage(), 500);
+    }
+  }
+
   public interface Progress { void sent(long bytes,long total); }
   public void call(String method,String path,JSONObject data,Result callback){call(method,path,data,null,callback);}
   public void call(
@@ -97,6 +401,13 @@ public final class NativeApi {
     Progress progress,
     Result callback
   ) {
+    apiDispatchCount++;
+    android.util.Log.i("KinnectQA", "API_TRANSPORT_ATTEMPT: method=" + method + " path=" + path + " counter=" + apiDispatchCount + " fixture=" + fixtureEnabled);
+    if (fixtureEnabled) {
+      FixtureResult fr = offlineFixture(method, path, data);
+      main.post(() -> callback.done(fr.data, fr.error, fr.status));
+      return;
+    }
     final String primaryServer = origin,
       primarySession = cookie;
     final int primaryRevision = epoch;
@@ -104,7 +415,9 @@ public final class NativeApi {
     if(method.equals("GET")&&appContext!=null){android.net.ConnectivityManager cm=(android.net.ConnectivityManager)appContext.getSystemService(android.content.Context.CONNECTIVITY_SERVICE);if(cm!=null&&cm.getActiveNetwork()==null){JSONObject saved=cachedGet(path);if(saved!=null){main.post(()->{if(primaryRevision==epoch&&primaryServer.equals(origin))callback.done(saved,null,200);});return;}}}
     maybeProbePrimary();
     activeRequests.incrementAndGet();
+    android.util.Log.i("KinnectQA", "BEFORE_EXEC: " + path + " origin=" + primaryServer);
     executor.execute(() -> {
+      android.util.Log.i("KinnectQA", "INSIDE_EXEC: " + path);
       String server = primaryServer, session = primarySession;
       int revision = primaryRevision;
       boolean failedOver = false;
@@ -120,9 +433,17 @@ public final class NativeApi {
         if (
           !path.startsWith("/api/") || path.contains("..")
         ) throw new IOException(I18n.t("API không hợp lệ."));
+        if (debugLoopbackOrigin != null) {
+          android.util.Log.i("KinnectQA", "DEBUG_LOOPBACK_OPEN: server=" + server + " path=" + path + " match=" + server.equals(debugLoopbackOrigin));
+        }
         connection = (HttpURLConnection) new URL(
           server + path
         ).openConnection();
+        if (connection instanceof javax.net.ssl.HttpsURLConnection && debugLoopbackSslFactory != null && server.equals(debugLoopbackOrigin)) {
+          javax.net.ssl.HttpsURLConnection httpsConn = (javax.net.ssl.HttpsURLConnection) connection;
+          httpsConn.setSSLSocketFactory(debugLoopbackSslFactory);
+          httpsConn.setHostnameVerifier((hostname, sslSession) -> "10.0.2.2".equals(hostname) || "127.0.0.1".equals(hostname));
+        }
         connection.setInstanceFollowRedirects(false);
         connection.setConnectTimeout(8000);
         connection.setReadTimeout(method.equals("GET")?12000:600000);
@@ -172,13 +493,19 @@ public final class NativeApi {
         if (status < 200 || status >= 300) error = status >= 500 ? httpFailure(status) : result.optString("error", httpFailure(status));
         if(method.equals("GET")&&status==200&&diskCache!=null&&!session.isEmpty()&&cacheable(path))diskCache.put(server+"\n"+session,"json:"+path,response.getBytes("UTF-8"));
         if(method.equals("GET")&&(status==401||status==403)&&diskCache!=null)diskCache.clear();
-        if(!method.equals("GET")&&status>=200&&status<300&&(path.endsWith("/block")||path.equals("/api/me/avatar"))&&diskCache!=null)diskCache.clear();
+        if(!method.equals("GET")&&status>=200&&status<300&&(path.endsWith("/block")||path.equals("/api/me/avatar")||path.equals("/api/me/cover")||path.endsWith("/avatar"))){snapshots.clear();if(diskCache!=null)diskCache.clear();}
       } catch (OutOfMemoryError oom) {
         error = I18n.t("Thiết bị không đủ bộ nhớ để chuẩn bị tệp tải lên.");
       } catch (java.net.SocketTimeoutException timeout) {
+        if (debugLoopbackOrigin != null && server.equals(debugLoopbackOrigin)) {
+          android.util.Log.w("KinnectQA", "DEBUG_LOOPBACK_TIMEOUT: " + method + " " + path + " -> " + timeout.getMessage());
+        }
         failure = timeout;
         error = I18n.t(progress != null ? "Kết nối tải lên hết thời gian chờ. Kiểm tra mạng rồi thử lại." : "Kết nối chậm, vui lòng thử lại.");
       } catch (Exception caught) {
+        if (debugLoopbackOrigin != null && server.equals(debugLoopbackOrigin)) {
+          android.util.Log.w("KinnectQA", "DEBUG_LOOPBACK_EXC: " + method + " " + path + " -> " + caught.getClass().getName() + ": " + caught.getMessage());
+        }
         failure = caught;
         error = status >= 200 && status < 300 ? I18n.t("Máy chủ trả về dữ liệu không hợp lệ.") : status > 0 ? httpFailure(status) : I18n.t("Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.");
       } finally {
@@ -223,7 +550,7 @@ public final class NativeApi {
   private volatile long lastPrimaryProbe=0;
   private final java.util.concurrent.atomic.AtomicInteger activeRequests=new java.util.concurrent.atomic.AtomicInteger(0);
   private void maybeProbePrimary(){
-    if(!origin.equals(ServerConfig.FALLBACK_ORIGIN))return;
+    if(fixtureEnabled||!origin.equals(ServerConfig.FALLBACK_ORIGIN))return;
     if(activeRequests.get()>0)return;
     long now=System.currentTimeMillis();
     if(now-lastPrimaryProbe<60000)return;
@@ -260,10 +587,12 @@ public final class NativeApi {
           path.contains("..")
         ) throw new IOException();
         c = (HttpURLConnection) new URL(server + path).openConnection();
+        c.setUseCaches(false);
         c.setInstanceFollowRedirects(false);
         c.setConnectTimeout(10000);
         c.setReadTimeout(10000);
         c.setRequestProperty("Cookie", join(session, device));
+        if (path.contains("/avatar")) c.setRequestProperty("Cache-Control", "no-cache");
         int status=c.getResponseCode();
         if (status == 200) {bytes = read(c.getInputStream(),path.endsWith("/avatar") ? 1100000 : 30000000);if(diskCache!=null&&String.valueOf(c.getContentType()).startsWith("image/")&&!path.startsWith("/api/private-photos/")&&!path.startsWith("/api/chat-attachments/")&&revision==epoch)diskCache.put(scope,"image:"+path,bytes);}
         else if(status>=500&&diskCache!=null)bytes=diskCache.get(scope,"image:"+path,AppCache.WEEK);

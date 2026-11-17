@@ -137,7 +137,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     boolean dark = WebTheme.isDark(this);
     setTheme(getResources().getIdentifier(dark?"Kinnect.App.Dark":"Kinnect.App.Light","style",getPackageName()));
     super.onCreate(state);
-    CrashLog.install(this);
+    CrashLog.install(this);if(getIntent()!=null&&getIntent().getBooleanExtra("ui_review_fixture",false))NativeApi.enableFixture(this,true);
     int variant = dark ? 1 : 0;
     BG = WebDesign.BG[variant]; CARD = WebDesign.CARD[variant]; TEXT = WebDesign.INK[variant];
     MUTED = WebDesign.MUTED[variant]; ACCENT = WebDesign.PURPLE[variant]; SOFT = WebDesign.WASH[variant]; LINE = WebDesign.LINE[variant];
@@ -148,8 +148,31 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     root.setBackgroundColor(BG);
     root.setOnApplyWindowInsetsListener((v, i) -> { if(Build.VERSION.SDK_INT>=30){android.graphics.Insets bars=i.getInsets(android.view.WindowInsets.Type.systemBars());android.graphics.Insets keyboard=i.getInsets(android.view.WindowInsets.Type.ime());v.setPadding(bars.left,bars.top,bars.right,Math.max(bars.bottom,keyboard.bottom));}else v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom()); return i; });
     setContentView(root);giftExperience=new LiveGiftExperience(this,this::sendGift);
+    if(getIntent().getBooleanExtra("show_gifts",false))root.postDelayed(this::gifts,600);
     cameraSetup=getIntent().getBooleanExtra("cameraSetup",false);if(cameraSetup){liveMode="game".equals(getIntent().getStringExtra("liveMode"))?"game":"chat";gameTitle=getIntent().getStringExtra("gameTitle");if(gameTitle==null)gameTitle="";topicText=getIntent().getStringExtra("title");if(topicText==null)topicText="";pendingHostMic=getIntent().getBooleanExtra("mic",true);gameSound=getIntent().getBooleanExtra("sound",true);gameComments=getIntent().getBooleanExtra("comments",false);}
-    creationEntry=getIntent().getBooleanExtra(EXTRA_HOST,false);if(creationEntry)preparationWaiting();else lobby();
+    creationEntry=getIntent().getBooleanExtra(EXTRA_HOST,false);
+    boolean isDebug = (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+    boolean fixtureRoom = isDebug && NativeApi.isFixtureEnabled() && getIntent() != null && getIntent().getBooleanExtra("fixture_joined_room", false);
+    if(creationEntry)preparationWaiting();
+    else if (fixtureRoom) {
+      try {
+        JSONObject mockWelcome = new JSONObject("{\"multiGuest\":false,\"room\":{\"id\":\"fixture_room_1\",\"title\":\"Phòng Live QA Fixture\",\"host\":\"Minh Anh\",\"hostId\":\"usr_qa_review\",\"liveMode\":\"chat\",\"viewers\":42,\"comments\":true}}");
+        android.util.Log.i("KinnectQA", "LIVE_FIXTURE_ROOM_STATE: entered FIXTURE_ROOM_STATE (not a real WS-joined room)");
+        showRoom(mockWelcome);
+        if (status != null) status.setText("FIXTURE_ROOM_STATE · Mô phỏng phòng Live");
+      } catch (Exception ignored) {}
+      return;
+    }
+    else {
+      lobby();
+      if(NativeApi.isFixtureEnabled()){
+        ready=true;
+        try{
+          lastRooms=new JSONArray("[{\"id\":\"room_1\",\"title\":\"Giao lưu âm nhạc cuối tuần\",\"host\":\"Minh Anh\",\"liveMode\":\"chat\",\"hostId\":\"usr_qa_review\",\"viewers\":42}]");
+          renderRooms();
+        }catch(Exception ignored){}
+      }
+    }
     String origin = ServerConfig.DEFAULT_ORIGIN;
     NativeApi.shared.call("GET", "/api/call-config", null, (data, error, code) -> {
       if (isFinishing() || isDestroyed()) return;
@@ -657,7 +680,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
   }
 
   protected void onStop() { super.onStop();if(gameSession){gameControllerVisible=false;syncGameVisibility();}if(giftExperience!=null)giftExperience.stopVisuals();if(gameSession&&gameService!=null&&gameComments)gameService.overlayVisible(true); if ((joined || previewing) && !gameSession&&gameConnection==null&&!projectionPrompt&&!externalPicker&&!isChangingConfigurations()) finish(); }
-  @Override protected void onResume(){super.onResume();gameControllerVisible=true;syncGameVisibility();externalPicker=false;if(gameService!=null)gameService.overlayVisible(false);}
+  @Override protected void onResume(){super.onResume();gameControllerVisible=true;syncGameVisibility();externalPicker=false;if(gameService!=null)gameService.overlayVisible(false);if(getIntent().getBooleanExtra("show_gifts",false))root.postDelayed(this::gifts,800);}
   @Override public void onBackPressed(){if(joined){confirmLeave();return;}super.onBackPressed();}
 
   protected void onDestroy() {

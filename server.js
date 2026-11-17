@@ -522,6 +522,9 @@ export function createApp({ dbPath = ":memory:", fetchImpl, authLimit, emailSend
       "/v2.css": ["v2.css", "text/css"],
       "/v2.js": ["v2.js", "text/javascript"],
       "/v2-icons.js": ["v2-icons.js", "text/javascript"],
+      "/v2-auth-wall.js": ["v2-auth-wall.js", "text/javascript"],
+      "/v2-commerce.js": ["v2-commerce.js", "text/javascript"],
+      "/v2-admin.js": ["v2-admin.js", "text/javascript"],
       "/fonts/be-vietnam-pro-regular.ttf": ["fonts/be-vietnam-pro-regular.ttf", "font/ttf"],
       "/fonts/be-vietnam-pro-semibold.ttf": ["fonts/be-vietnam-pro-semibold.ttf", "font/ttf"],
     };

@@ -16,9 +16,13 @@ export async function syncFeed(request,client,json){
  if(!Array.isArray(rows)||rows.length>1000||rows.some(p=>typeof p.id!=='string'||typeof p.user_id!=='string'||typeof p.body!=='string'||!Number.isSafeInteger(p.created)||!['public','followers'].includes(p.visibility)))return json({error:'Invalid snapshot'},400);
  if(!Array.isArray(videos)||videos.length>1000||videos.some(v=>typeof v.id!=='string'||typeof v.user_id!=='string'||!Number.isSafeInteger(v.created)))return json({error:'Invalid video snapshot'},400);
  await client.query('BEGIN');try{
-  for(const p of rows)await client.query('INSERT INTO kinnect_core.feed_snapshot(id,author_id,body,visibility,hidden,created,data) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb) ON CONFLICT(id) DO UPDATE SET body=excluded.body,visibility=excluded.visibility,hidden=excluded.hidden,data=excluded.data',[p.id,p.user_id,p.body,p.visibility,p.hidden?1:0,p.created,JSON.stringify(p)]);
+  if(rows.length){
+   await client.query('INSERT INTO kinnect_core.feed_snapshot(id,author_id,body,visibility,hidden,created,data) SELECT * FROM UNNEST($1::text[],$2::text[],$3::text[],$4::text[],$5::integer[],$6::bigint[],$7::jsonb[]) ON CONFLICT(id) DO UPDATE SET body=excluded.body,visibility=excluded.visibility,hidden=excluded.hidden,data=excluded.data',[rows.map(p=>p.id),rows.map(p=>p.user_id),rows.map(p=>p.body),rows.map(p=>p.visibility),rows.map(p=>p.hidden?1:0),rows.map(p=>p.created),rows.map(p=>JSON.stringify(p))]);
+  }
   await client.query('UPDATE kinnect_core.feed_snapshot SET hidden=1 WHERE NOT(id=ANY($1::text[]))',[rows.map(p=>p.id)]);
-  for(const v of videos)await client.query('INSERT INTO kinnect_core.video_snapshot VALUES($1,$2,$3,$4,$5::jsonb) ON CONFLICT(id) DO UPDATE SET hidden=excluded.hidden,data=excluded.data',[v.id,v.user_id,v.hidden?1:0,v.created,JSON.stringify(v)]);
+  if(videos.length){
+   await client.query('INSERT INTO kinnect_core.video_snapshot(id,author_id,hidden,created,data) SELECT * FROM UNNEST($1::text[],$2::text[],$3::integer[],$4::bigint[],$5::jsonb[]) ON CONFLICT(id) DO UPDATE SET hidden=excluded.hidden,data=excluded.data',[videos.map(v=>v.id),videos.map(v=>v.user_id),videos.map(v=>v.hidden?1:0),videos.map(v=>v.created),videos.map(v=>JSON.stringify(v))]);
+  }
   await client.query('UPDATE kinnect_core.video_snapshot SET hidden=1 WHERE NOT(id=ANY($1::text[]))',[videos.map(v=>v.id)]);
   await client.query('COMMIT');
  }catch(e){await client.query('ROLLBACK');throw e;}
