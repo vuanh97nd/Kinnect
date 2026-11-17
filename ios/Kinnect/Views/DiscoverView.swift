@@ -47,6 +47,18 @@ struct DiscoverView: View {
         GridItem(.flexible(), spacing: 8)
     ]
 
+    // Lưới placeholder cùng số cột với lưới thật, để layout không nhảy khi dữ liệu về.
+    private var discoverSkeleton: some View {
+        LazyVGrid(columns: gridColumns, spacing: 8) {
+            ForEach(0..<6, id: \.self) { _ in
+                KSkeleton(height: 180)
+                    .clipShape(RoundedRectangle(cornerRadius: KTRadius.md))
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Đang tải khám phá")
+    }
+
     var body: some View {
         VStack(spacing: 8) {
             // 1. Top Segment Switcher: Dành cho bạn · Quanh đây · Đang theo dõi (Android parity)
@@ -138,7 +150,7 @@ struct DiscoverView: View {
                         .frame(maxWidth: .infinity)
                         .kinnectCard()
                     } else if isLoading && visiblePeople.isEmpty {
-                        ProgressView().tint(KinnectTheme.accentBright).padding(.vertical, 40)
+                        discoverSkeleton
                     } else if visiblePeople.isEmpty {
                         if let loadError {
                             KinnectStateView(mode: .error(

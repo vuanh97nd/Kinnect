@@ -487,22 +487,39 @@ struct WalletView: View {
         }
     }
 
+    // Skeleton giữ đúng nhịp của một dòng giao dịch thật (icon 36, 2 dòng chữ, số tiền).
+    private var transactionSkeleton: some View {
+        VStack(spacing: KTSpace.sm) {
+            ForEach(0..<4, id: \.self) { i in
+                HStack(spacing: KTSpace.md) {
+                    KSkeleton(width: 36, height: 36).clipShape(Circle())
+                    VStack(alignment: .leading, spacing: 6) {
+                        KSkeleton(width: i % 2 == 0 ? 120 : 88, height: 12)
+                        KSkeleton(width: 150, height: 10)
+                    }
+                    Spacer(minLength: 0)
+                    KSkeleton(width: 46, height: 12)
+                }
+                .padding(KTSpace.md)
+                .background(KTColor.surface)
+                .clipShape(RoundedRectangle(cornerRadius: KTRadius.sm))
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Đang tải lịch sử giao dịch")
+    }
+
     private var transactionHistoryList: some View {
         VStack(spacing: 8) {
             let list = filteredEntries
-            if list.isEmpty && !isLoading {
-                HStack {
-                    Spacer()
-                    VStack(spacing: 8) {
-                        KinnectIcon(glyph: .coin, size: 32, tint: KinnectTheme.textSecondary)
-                        Text("Chưa có giao dịch")
-                            .font(.subheadline)
-                            .foregroundColor(KinnectTheme.textSecondary)
-                    }
-                    .padding(.vertical, 24)
-                    Spacer()
-                }
-                .kinnectCard()
+            if isLoading && list.isEmpty {
+                transactionSkeleton
+            } else if list.isEmpty {
+                KEmptyState(
+                    systemImage: "creditcard",
+                    title: "Chưa có giao dịch",
+                    message: "Nạp xu hoặc nhận quà tặng để thấy lịch sử ở đây."
+                )
             } else {
                 ForEach(list) { entry in
                     Button {

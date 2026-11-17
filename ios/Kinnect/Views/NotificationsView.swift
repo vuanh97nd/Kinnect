@@ -62,7 +62,7 @@ struct NotificationsView: View {
                         .padding(.bottom, KinnectTheme.spaceSM)
                     }
                     if filteredNotifications.isEmpty && isLoading {
-                        KinnectStateView(mode: .loading("Đang tải thông báo…"))
+                        notificationSkeleton
                     } else if filteredNotifications.isEmpty && !isLoading {
                         if let loadError {
                             KinnectStateView(mode: .error(
@@ -194,6 +194,30 @@ struct NotificationsView: View {
             }
             return true
         }
+    }
+
+    // Skeleton cùng nhịp với notificationRow: avatar 44 + 2 dòng + chấm phải.
+    private var notificationSkeleton: some View {
+        VStack(spacing: 0) {
+            ForEach(0..<6, id: \.self) { i in
+                HStack(spacing: KTSpace.md) {
+                    KSkeleton(width: 44, height: 44).clipShape(Circle())
+                    VStack(alignment: .leading, spacing: 6) {
+                        KSkeleton(width: i % 2 == 0 ? 150 : 110, height: 12)
+                        KSkeleton(width: 210, height: 10)
+                    }
+                    Spacer(minLength: 0)
+                    KSkeleton(width: 8, height: 8).clipShape(Circle())
+                }
+                .padding(.horizontal, KTSpace.md)
+                .frame(height: 68)
+                if i < 5 {
+                    Divider().background(KinnectTheme.border).padding(.leading, 68)
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Đang tải thông báo")
     }
 
     private func notificationRow(_ item: NotificationItem) -> some View {
