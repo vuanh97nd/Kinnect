@@ -85,13 +85,13 @@ struct ProfileView: View {
                         // 1. Cover & Avatar Card with Handle, Bio & Stats (Parity Android 1.2.12 MainActivity.profileCard lines 2206-2278)
                         profileCard(user: user)
 
-                        // 2. Profile Tabs (Android 1.2.12 Parity)
-                        Picker("Mục hồ sơ", selection: $selectedTab) {
-                            ForEach(isSelf ? ProfileTab.allCases : [.about, .posts, .videos], id: \.self) { t in
-                                Text(t.rawValue).tag(t)
-                            }
-                        }
-                        .pickerStyle(.segmented)
+                        // 2. Profile Tabs — dùng KSegmented để trạng thái chọn dùng accent,
+                        // không phải pill xám của Picker hệ thống (trông như bị vô hiệu).
+                        KSegmented(
+                            options: isSelf ? ProfileTab.allCases : [.about, .posts, .videos],
+                            title: { $0.rawValue },
+                            selection: $selectedTab
+                        )
                         .padding(.horizontal, 4)
 
                         // 3. Tab Content
