@@ -470,6 +470,8 @@ CORE_SLUGS = [
     "09-iphone-wallet-store-dark",
     "10-iphone-live-stream-dark",
     "06-iphone-profile-dark",
+    "03-iphone-discover-dark",
+    "08-iphone-notifications-dark",
 ]
 
 

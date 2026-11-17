@@ -387,6 +387,10 @@ struct LiveStreamView: View {
                         .padding(.top, 4)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    // KinnectBottomBar cao 64pt và được vẽ đè lên nội dung Live (view này
+                    // ignoresSafeArea để video tràn viền). Không chừa khoảng này thì ô bình luận
+                    // nằm dưới thanh tab, gần như không bấm được.
+                    .padding(.bottom, 64)
 
                     // Right Floating Action Sidebar (uniform column alignment & right-edge clearance)
                     VStack(spacing: 16) {
