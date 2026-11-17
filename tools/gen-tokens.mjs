@@ -11,6 +11,14 @@ const tokens = JSON.parse(fs.readFileSync(path.join(ROOT, 'design/tokens.json'),
 const weightName = (w) =>
   ({ 400: 'regular', 500: 'medium', 600: 'semibold', 700: 'bold', 800: 'heavy' }[w] || 'regular');
 
+// "2xl" → "xxl", "3xl" → "xxxl": tên key trong JSON không dùng được làm identifier Swift
+// vì bắt đầu bằng chữ số. Mọi key khác giữ nguyên.
+const swiftIdent = (k) => {
+  const m = /^(\d+)xl$/.exec(k);
+  if (m) return 'x'.repeat(Number(m[1])) + 'l';
+  return /^[A-Za-z_]/.test(k) ? k : `_${k}`;
+};
+
 // ---------- 1. Swift ----------
 const c = tokens.colors.semantic;
 const colorKeys = Object.keys(c.light);
@@ -56,11 +64,11 @@ ${swiftType}
 // MARK: - Spacing / Radius
 
 enum KTSpace {
-${Object.entries(tokens.grid.spacing).map(([k, v]) => `    static let ${k}: CGFloat = ${v}`).join('\n')}
+${Object.entries(tokens.grid.spacing).map(([k, v]) => `    static let ${swiftIdent(k)}: CGFloat = ${v}`).join('\n')}
 }
 
 enum KTRadius {
-${Object.entries(tokens.grid.radius).map(([k, v]) => `    static let ${k}: CGFloat = ${v}`).join('\n')}
+${Object.entries(tokens.grid.radius).map(([k, v]) => `    static let ${swiftIdent(k)}: CGFloat = ${v}`).join('\n')}
 }
 
 // MARK: - Layout

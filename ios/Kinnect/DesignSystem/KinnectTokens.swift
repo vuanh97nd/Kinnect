@@ -57,8 +57,8 @@ enum KTSpace {
     static let md: CGFloat = 12
     static let lg: CGFloat = 16
     static let xl: CGFloat = 24
-    static let 2xl: CGFloat = 32
-    static let 3xl: CGFloat = 48
+    static let xxl: CGFloat = 32
+    static let xxxl: CGFloat = 48
 }
 
 enum KTRadius {
