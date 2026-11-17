@@ -107,6 +107,9 @@ struct MessagesView: View {
                             .padding(.horizontal, KinnectTheme.spaceLG)
                             .padding(.vertical, KinnectTheme.spaceSM)
                         }
+                        if isLoading && rows.isEmpty {
+                            conversationSkeletonList
+                        }
                         if rows.isEmpty && !isLoading {
                             if let loadError {
                                 KinnectStateView(mode: .error(
@@ -141,6 +144,9 @@ struct MessagesView: View {
                             }
                             .padding(.horizontal, KinnectTheme.spaceLG)
                             .padding(.vertical, KinnectTheme.spaceSM)
+                        }
+                        if isLoading && groups.isEmpty {
+                            conversationSkeletonList
                         }
                         if groups.isEmpty && !isLoading {
                             if let loadError {
@@ -255,43 +261,50 @@ struct MessagesView: View {
     }
 
     private var emptyDirectView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: unreadOnly ? "tray" : "bubble.left.and.bubble.right")
-                .font(.system(size: 40))
-                .foregroundColor(KinnectTheme.messageMeta)
-            Text(unreadOnly ? "Không có tin nhắn chưa đọc." : "Chưa có cuộc trò chuyện riêng nào")
-                .font(.subheadline)
-                .foregroundColor(KinnectTheme.textSecondary)
-            if !unreadOnly {
-                Button("Mở danh sách bạn bè", action: onOpenFriends)
-                    .font(.caption.bold())
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 9)
-                    .background(Capsule().fill(KinnectTheme.primaryGradient))
-                    .foregroundColor(.white)
-            }
-        }
-        .padding(.vertical, 48)
+        KEmptyState(
+            systemImage: unreadOnly ? "tray" : "bubble.left.and.bubble.right",
+            title: unreadOnly ? "Không có tin nhắn chưa đọc" : "Chưa có cuộc trò chuyện nào",
+            message: unreadOnly
+                ? "Bạn đã xem hết tin nhắn. Chuyển sang tab Tất cả để xem lại."
+                : "Kết nối với người bạn quan tâm để bắt đầu trò chuyện.",
+            actionTitle: unreadOnly ? nil : "Mở danh sách bạn bè",
+            action: unreadOnly ? nil : onOpenFriends
+        )
     }
 
     private var emptyGroupsView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "person.3")
-                .font(.system(size: 40))
-                .foregroundColor(KinnectTheme.messageMeta)
-            Text("Bạn chưa tham gia nhóm trò chuyện nào")
-                .font(.subheadline)
-                .foregroundColor(KinnectTheme.textSecondary)
-            Button("Tạo nhóm mới") {
-                showCreateGroupSheet = true
+        KEmptyState(
+            systemImage: "person.3",
+            title: "Chưa tham gia nhóm nào",
+            message: "Tạo nhóm để trò chuyện cùng nhiều người trong một nơi.",
+            actionTitle: "Tạo nhóm mới",
+            action: { showCreateGroupSheet = true }
+        )
+    }
+
+    // Skeleton khi đang tải lần đầu: giữ đúng nhịp của danh sách thật để không bị "nhảy" layout.
+    private var conversationSkeletonList: some View {
+        VStack(spacing: 0) {
+            ForEach(0..<6, id: \.self) { i in
+                HStack(spacing: KTSpace.md) {
+                    KSkeleton(width: 48, height: 48)
+                        .clipShape(Circle())
+                    VStack(alignment: .leading, spacing: KTSpace.sm) {
+                        KSkeleton(width: i % 2 == 0 ? 130 : 96, height: 13)
+                        KSkeleton(width: i % 3 == 0 ? 200 : 150, height: 11)
+                    }
+                    Spacer(minLength: 0)
+                    KSkeleton(width: 34, height: 10)
+                }
+                .padding(.horizontal, KTSpace.lg)
+                .frame(height: 76)
+                if i < 5 {
+                    Divider().background(KinnectTheme.borderSoft.opacity(0.6)).padding(.leading, 82)
+                }
             }
-            .font(.caption.bold())
-            .padding(.horizontal, 16)
-            .padding(.vertical, 9)
-            .background(Capsule().fill(KinnectTheme.primaryGradient))
-            .foregroundColor(.white)
         }
-        .padding(.vertical, 48)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Đang tải danh sách trò chuyện")
     }
 
     private func directConversationRow(conv: [String: Any], peer: KinnectUser) -> some View {

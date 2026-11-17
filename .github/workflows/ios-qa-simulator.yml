@@ -12,7 +12,7 @@ on:
       - codex/ios-qa-20261113
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   ios-qa-simulator:
@@ -69,3 +69,24 @@ jobs:
           name: ios-qa-simulator-logs
           path: logs/ios-qa-simulator.log
           if-no-files-found: warn
+
+      # Artifact tải về cần đăng nhập GitHub. Commit thẳng vào repo để ảnh công khai
+      # và đọc được từ ngoài (raw.githubusercontent.com) — phục vụ review giao diện.
+      - name: Publish screenshots to repo
+        if: always()
+        run: |
+          set -e
+          if [ ! -d dist/ios-ui-review ]; then
+            echo "Không có ảnh để publish."; exit 0
+          fi
+          DEST="outputs/ci-shots/run-${{ github.run_number }}"
+          mkdir -p "$DEST"
+          cp -r dist/ios-ui-review/. "$DEST"/
+          git config user.name  "kinnect-ci"
+          git config user.email "ci@kinnect.local"
+          git add "$DEST"
+          if git diff --cached --quiet; then
+            echo "Không có thay đổi ảnh."; exit 0
+          fi
+          git commit -m "chore(qa): publish simulator screenshots for run ${{ github.run_number }} [skip ci]"
+          git push origin "HEAD:${{ github.ref_name }}"
