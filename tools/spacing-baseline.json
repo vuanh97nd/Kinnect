@@ -1,5 +1,5 @@
 {
-  "total": 102,
+  "total": 88,
   "perFile": {
     "ios/Kinnect/Views/AuthView.swift": 5,
     "ios/Kinnect/Views/CameraStudioView.swift": 10,
@@ -19,11 +19,10 @@
     "ios/Kinnect/Views/PostCardAndCommentsView.swift": 3,
     "ios/Kinnect/Views/ProfileEditAndConnectionsSheets.swift": 1,
     "ios/Kinnect/Views/ProfileMediaAndAlbumSheets.swift": 1,
-    "ios/Kinnect/Views/ProfileView.swift": 7,
     "ios/Kinnect/Views/RootMainView.swift": 1,
     "ios/Kinnect/Views/ShortsVideoView.swift": 3,
     "ios/Kinnect/Views/StoreView.swift": 4,
-    "ios/Kinnect/Views/WalletStoreView.swift": 8,
+    "ios/Kinnect/Views/WalletStoreView.swift": 1,
     "ios/Kinnect/Views/WalletView.swift": 6
   }
 }

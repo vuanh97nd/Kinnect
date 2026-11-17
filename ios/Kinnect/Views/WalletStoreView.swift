@@ -267,7 +267,7 @@ struct WalletStoreView: View {
                         }
                         .font(.caption.bold())
                         .foregroundColor(KinnectTheme.textPrimary)
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 16)
                         .padding(.vertical, 8)
                         .background(
                             Capsule().fill(KinnectTheme.surfaceElevated)
@@ -341,7 +341,7 @@ struct WalletStoreView: View {
                                 .fixedSize(horizontal: true, vertical: false)
                         }
                         .padding(.vertical, 8)
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 16)
                         .background(
                             RoundedRectangle(cornerRadius: 14)
                                 .fill(KinnectTheme.surface)
@@ -413,7 +413,7 @@ struct WalletStoreView: View {
                                     .fixedSize(horizontal: true, vertical: false)
                             }
                             .foregroundColor(isSelected ? .white : KinnectTheme.textSecondary)
-                            .padding(.horizontal, 14)
+                            .padding(.horizontal, 16)
                             .padding(.vertical, 8)
                             .background(
                                 Capsule().fill(isSelected ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
@@ -697,7 +697,7 @@ struct WalletStoreView: View {
                                 .font(.caption.bold())
                         }
                         .foregroundColor(.white)
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 16)
                         .padding(.vertical, 9)
                         .background(
                             Capsule().fill(Color.white.opacity(0.14))
@@ -713,7 +713,7 @@ struct WalletStoreView: View {
                             Text(pkg.equipped ? "Đang sử dụng" : "Áp dụng")
                                 .font(.caption.bold())
                                 .foregroundColor(.white)
-                                .padding(.horizontal, 18)
+                                .padding(.horizontal, 16)
                                 .padding(.vertical, 9)
                                 .background(
                                     Capsule().fill(pkg.equipped ? KinnectTheme.surfaceElevated : KinnectTheme.online)
@@ -726,7 +726,7 @@ struct WalletStoreView: View {
                             Text("Đổi gói")
                                 .font(.caption.bold())
                                 .foregroundColor(.white)
-                                .padding(.horizontal, 18)
+                                .padding(.horizontal, 16)
                                 .padding(.vertical, 9)
                                 .background(
                                     Capsule().fill(
@@ -786,7 +786,7 @@ struct WalletStoreView: View {
                     } label: {
                         Text(storeKit.storeKitProducts[prod.id]?.displayPrice ?? prod.priceLabel)
                             .font(.caption.bold())
-                            .padding(.horizontal, 14)
+                            .padding(.horizontal, 16)
                             .padding(.vertical, 9)
                             .background(Capsule().fill(KinnectTheme.primaryGradient))
                             .foregroundColor(.white)

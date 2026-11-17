@@ -316,7 +316,7 @@ struct ProfileView: View {
 
                 Spacer()
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 16)
 
             // Action Button Row (Parity Android lines 2249-2270: full-width 44dp pencil "Chỉnh sửa hồ sơ" or peer actions)
             Group {
@@ -341,7 +341,7 @@ struct ProfileView: View {
                         .padding(.top, 10)
                 }
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 16)
 
             // Bio in Profile Card (Android parity lines 2272-2276: 13sp MUTED, lineSpacing 1.6f)
             if !user.bio.isEmpty {
@@ -349,7 +349,7 @@ struct ProfileView: View {
                     .font(KinnectTheme.scaled(13))
                     .foregroundColor(KinnectTheme.textSecondary)
                     .lineSpacing(4)
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, 16)
                     .padding(.top, 10)
             }
 
@@ -365,7 +365,7 @@ struct ProfileView: View {
                     selectedConnectionsInfo = ConnectionsInfo(kind: "following", title: "Đang theo dõi")
                 }
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 16)
             .padding(.top, 12)
             .padding(.bottom, 14)
         }
@@ -571,7 +571,7 @@ struct ProfileView: View {
                                 Text(item)
                                     .font(KinnectTheme.scaled(13, weight: .medium))
                                     .foregroundColor(KinnectTheme.accentBright)
-                                    .padding(.horizontal, 10)
+                                    .padding(.horizontal, 12)
                                     .padding(.vertical, 5)
                                     .background(
                                         RoundedRectangle(cornerRadius: 10)
@@ -777,7 +777,7 @@ struct ProfileView: View {
                     .foregroundColor(KinnectTheme.textSecondary)
             }
             .frame(maxWidth: .infinity)
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(RoundedRectangle(cornerRadius: 16).fill(KinnectTheme.surfaceElevated))
         }
@@ -1073,7 +1073,7 @@ struct ProfileView: View {
             peerMessageButton()
             peerMoreMenu(user: user)
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 16)
     }
 
     private func handlePeerFriendAction(user: KinnectUser) async {
