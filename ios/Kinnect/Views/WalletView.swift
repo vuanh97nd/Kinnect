@@ -364,7 +364,7 @@ struct WalletView: View {
 
             HStack(alignment: .firstTextBaseline) {
                 Text(isBalanceHidden ? "••••" : "\(earnedBalance.formattedWithSeparator())đ")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .font(KTType.displayM)
                     .foregroundColor(KinnectTheme.accentBright)
 
                 Spacer()
@@ -415,7 +415,7 @@ struct WalletView: View {
                             Text(giftIconEmoji(gift.giftId))
                                 .font(KinnectTheme.scaled(28))
                             Text(gift.name)
-                                .font(.system(size: 11, weight: .medium))
+                                .font(KTType.micro)
                                 .foregroundColor(KinnectTheme.textPrimary)
                                 .lineLimit(1)
                             Text("x\(gift.quantity)")

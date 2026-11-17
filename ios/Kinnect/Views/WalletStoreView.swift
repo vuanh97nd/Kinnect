@@ -253,7 +253,7 @@ struct WalletStoreView: View {
 
                 HStack(alignment: .firstTextBaseline) {
                     Text(isBalanceHidden ? "••••" : "\(earnedBalance.formattedWithSeparator())đ")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .font(KTType.displayM)
                         .foregroundColor(KinnectTheme.accentBright)
 
                     Spacer()

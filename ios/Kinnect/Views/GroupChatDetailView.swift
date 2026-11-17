@@ -515,7 +515,7 @@ struct GroupChatDetailView: View {
                             .lineLimit(1)
 
                         Text("\(max(groupMembers.count, 1)) thành viên")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(KTType.micro)
                             .foregroundColor(KinnectTheme.messageMeta)
                     }
                 }

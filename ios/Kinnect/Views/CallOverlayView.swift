@@ -228,7 +228,7 @@ struct CallOverlayView: View {
                                     .background(Color.red, in: Circle())
                                     .shadow(color: .red.opacity(0.4), radius: 6)
                                 Text("Kết thúc")
-                                    .font(.system(size: 11, weight: .medium))
+                                    .font(KTType.micro)
                                     .foregroundColor(.white)
                             }
                         }
@@ -447,7 +447,7 @@ struct CallOverlayView: View {
                                 .background(Color.red, in: Circle())
                                 .shadow(color: .red.opacity(0.4), radius: 6)
                             Text("Kết thúc")
-                                .font(.system(size: 11, weight: .medium))
+                                .font(KTType.micro)
                                 .foregroundColor(.white)
                         }
                     }
@@ -513,7 +513,7 @@ struct CallOverlayView: View {
                         Circle().fill(isActive ? Color.white.opacity(0.25) : Color.white.opacity(0.1))
                     )
                 Text(title)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(KTType.micro)
                     .foregroundColor(.white.opacity(0.85))
             }
         }
