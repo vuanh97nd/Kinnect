@@ -1,14 +1,17 @@
 package app.kinnect.live;
+
 import android.content.Context;
-import android.content.res.Configuration;
 
 public final class KinnectApplication extends android.app.Application {
-  // Giảm nhẹ cỡ chữ toàn app (đồng bộ với tỉ lệ dp UI_SCALE) để hiển thị nhiều nội dung hơn.
+  // KHÔNG ghi đè fontScale của người dùng.
+  // Trước đây: config.fontScale = config.fontScale * WebDesign.UI_SCALE (0.9f) → người đã tăng
+  // cỡ chữ trong Settings hệ thống (vì lý do thị lực) bị app thu nhỏ lại 10%, đồng thời mọi
+  // kích thước thiết kế bị lệch so với bản thiết kế. Tỉ lệ UI_SCALE chỉ dùng cho khoảng cách
+  // (dp), không dùng cho cỡ chữ.
   @Override protected void attachBaseContext(Context base) {
-    Configuration config = new Configuration(base.getResources().getConfiguration());
-    config.fontScale = config.fontScale * WebDesign.UI_SCALE;
-    super.attachBaseContext(base.createConfigurationContext(config));
+    super.attachBaseContext(base);
   }
+
   @Override public void onCreate(){
     super.onCreate();
     I18n.initialize(this);
