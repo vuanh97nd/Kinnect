@@ -105,8 +105,9 @@ struct DiscoverView: View {
                     }
                     .accessibilityLabel("Bộ lọc tổng hợp")
                 }
-                .padding(.horizontal, 14)
             }
+            // Padding đặt ngoài ScrollView để chip đầu không bị cắt ở mép trái.
+            .padding(.horizontal, 14)
 
             // Location banner if Nearby segment
             if let locationStatusText, segment == .nearby {
