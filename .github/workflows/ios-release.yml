@@ -103,22 +103,40 @@ jobs:
       - name: Publish build errors to repo
         if: failure()
         run: |
-          set -e
           DEST="outputs/ci-logs/run-${{ github.run_number }}.txt"
           mkdir -p outputs/ci-logs
           {
-            echo "run: ${{ github.run_number }}  sha: ${{ github.sha }}"
+            echo "run: ${{ github.run_number }}  sha: ${{ github.sha }}  ref: ${{ github.ref_name }}"
             echo "workflow: ios-release / build-ios"
-            echo "---- compiler errors ----"
-            grep -E "(error:|fatal error:|note: )" build.log | head -n 80 || echo "(không thấy dòng error: trong build.log)"
-            echo "---- last 40 lines ----"
-            tail -n 40 build.log || true
+            echo
+            if [ -f build.log ]; then
+              echo "---- error lines ----"
+              grep -E "(error:|fatal error:|The following build commands failed)" build.log | head -n 80 || echo "(không có dòng error:)"
+              echo
+              echo "---- last 60 lines ----"
+              tail -n 60 build.log
+            else
+              echo "(build.log không tồn tại — build fail trước bước archive)"
+            fi
           } > "$DEST"
+
           git config user.name  "kinnect-ci"
           git config user.email "ci@kinnect.local"
           git add "$DEST"
-          git commit -m "chore(ci): publish build errors for run ${{ github.run_number }} [skip ci]" || exit 0
-          git push origin "HEAD:${{ github.ref_name }}" || echo "push failed (branch protection?)"
+          git commit -m "chore(ci): publish build errors for run ${{ github.run_number }} [skip ci]" || { echo "không có gì để commit"; exit 0; }
+
+          # Nhánh này còn nhận push từ workflow screenshots nên push thẳng rất dễ bị
+          # non-fast-forward và bị nuốt lỗi. Thử rebase rồi push, lặp 3 lần.
+          for i in 1 2 3; do
+            if git pull --rebase --autostash origin "${{ github.ref_name }}" >/dev/null 2>&1 \
+               && git push origin "HEAD:${{ github.ref_name }}" >/dev/null 2>&1; then
+              echo "đã publish log (lần thử $i)"; exit 0
+            fi
+            echo "push lần $i thất bại, thử lại…"
+            sleep 5
+          done
+          echo "::warning::Không publish được build log sau 3 lần thử."
+          exit 0
 
       - name: Upload build log
         if: always()

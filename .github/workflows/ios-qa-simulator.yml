@@ -89,4 +89,12 @@ jobs:
             echo "Không có thay đổi ảnh."; exit 0
           fi
           git commit -m "chore(qa): publish simulator screenshots for run ${{ github.run_number }} [skip ci]"
-          git push origin "HEAD:${{ github.ref_name }}"
+          # Workflow build cũng push lên nhánh này, nên push thẳng dễ bị non-fast-forward.
+          for i in 1 2 3; do
+            if git pull --rebase --autostash origin "${{ github.ref_name }}" >/dev/null 2>&1 \
+               && git push origin "HEAD:${{ github.ref_name }}" >/dev/null 2>&1; then
+              echo "đã publish ảnh (lần thử $i)"; exit 0
+            fi
+            echo "push lần $i thất bại, thử lại…"; sleep 5
+          done
+          echo "::warning::Không publish được ảnh sau 3 lần thử."
