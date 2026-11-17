@@ -1,8 +1,7 @@
 {
-  "total": 88,
+  "total": 57,
   "perFile": {
     "ios/Kinnect/Views/AuthView.swift": 5,
-    "ios/Kinnect/Views/CameraStudioView.swift": 10,
     "ios/Kinnect/Views/Components/PinnedHeaderBar.swift": 1,
     "ios/Kinnect/Views/Components/ReactionPicker.swift": 3,
     "ios/Kinnect/Views/DirectChatDetailView.swift": 4,
@@ -11,8 +10,6 @@
     "ios/Kinnect/Views/FeedView.swift": 2,
     "ios/Kinnect/Views/FriendsView.swift": 5,
     "ios/Kinnect/Views/GroupChatDetailView.swift": 6,
-    "ios/Kinnect/Views/LiveRoomHostAndGiftViews.swift": 9,
-    "ios/Kinnect/Views/LiveStreamView.swift": 12,
     "ios/Kinnect/Views/MessageComponents.swift": 1,
     "ios/Kinnect/Views/MessagesView.swift": 3,
     "ios/Kinnect/Views/NotificationsView.swift": 1,

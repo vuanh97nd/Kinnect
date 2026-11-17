@@ -50,7 +50,7 @@ struct LiveStreamView: View {
                             Text("Bắt đầu phát Live ngay")
                                 .font(.subheadline.bold())
                         }
-                        .padding(.horizontal, 22)
+                        .padding(.horizontal, 22) // spacing-ok: padding trong nút capsule
                         .padding(.vertical, 12)
                         .background(Capsule().fill(KinnectTheme.primaryGradient))
                         .foregroundColor(.white)
@@ -232,7 +232,7 @@ struct LiveStreamView: View {
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.85))
                             .multilineTextAlignment(.center)
-                            .padding(.horizontal, 28)
+                            .padding(.horizontal, 28) // spacing-ok: đệm chữ trong khung video
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color.black)
@@ -286,7 +286,7 @@ struct LiveStreamView: View {
                             .foregroundColor(.white)
                             .lineLimit(1)
                     }
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .background(Capsule().fill(Color.white.opacity(0.18)))
 
@@ -310,7 +310,7 @@ struct LiveStreamView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 16)
                 .padding(.top, 54)
 
                 Spacer()
@@ -356,7 +356,7 @@ struct LiveStreamView: View {
                         HStack(spacing: 8) {
                             TextField("Bình luận phòng Live...", text: $chatText)
                                 .font(.subheadline)
-                                .padding(.horizontal, 14)
+                                .padding(.horizontal, 16)
                                 .padding(.vertical, 8)
                                 .background(Capsule().fill(Color.black.opacity(0.5)))
                                 .foregroundColor(.white)
@@ -494,7 +494,7 @@ struct LiveStreamView: View {
                 .foregroundColor(.white)
                 .lineLimit(2)
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 12)
         .padding(.vertical, 4)
         .background(Capsule().fill(Color.black.opacity(0.55)))
     }
@@ -631,7 +631,7 @@ struct CreateLiveRoomSheet: View {
 
                 preLiveBottomDock
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 16)
             .padding(.top, 10)
             .padding(.bottom, 12)
         }
@@ -766,7 +766,7 @@ struct CreateLiveRoomSheet: View {
             Text("HD 720p")
                 .font(.system(size: 11, weight: .bold))
                 .foregroundColor(.white.opacity(0.9))
-                .padding(.horizontal, 10)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(
                     Capsule()
@@ -789,7 +789,7 @@ struct CreateLiveRoomSheet: View {
                     Text(isGameMode ? "GAME" : "LIVE")
                         .font(.system(size: 8.5, weight: .black))
                         .foregroundColor(.white)
-                        .padding(.horizontal, 6)
+                        .padding(.horizontal, 6) // spacing-ok: padding nội bộ phần tử nhỏ
                         .padding(.vertical, 2)
                         .background(
                             Capsule().fill(
@@ -832,7 +832,7 @@ struct CreateLiveRoomSheet: View {
                                 Text(item)
                                     .font(.system(size: 11.5, weight: selected ? .bold : .medium))
                                     .foregroundColor(selected ? .black : .white.opacity(0.86))
-                                    .padding(.horizontal, 11)
+                                    .padding(.horizontal, 11) // spacing-ok: padding trong nút capsule
                                     .padding(.vertical, 6)
                                     .background(
                                         Capsule().fill(selected ? Color.white : Color.white.opacity(0.12))
@@ -959,7 +959,7 @@ struct CreateLiveRoomSheet: View {
                             .font(.system(size: 11, weight: .bold))
                     }
                     .foregroundColor(previewMicEnabled ? KinnectTheme.liveGameMint : KinnectTheme.liveCoralError)
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 12)
                     .padding(.vertical, 5)
                     .background(Capsule().fill(Color.white.opacity(0.1)))
                 }
@@ -1090,7 +1090,7 @@ struct CreateLiveRoomSheet: View {
                     .frame(width: 24, height: 3)
             }
             .padding(.vertical, 4)
-            .padding(.horizontal, 6)
+            .padding(.horizontal, 6) // spacing-ok: padding nội bộ phần tử nhỏ
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

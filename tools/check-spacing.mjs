@@ -34,6 +34,9 @@ for (const file of walk(ROOT)) {
     if (!m) return;
     const value = Number(m[1]);
     if (SCALE.has(value)) return;
+    // Miễn trừ có lý do: padding bên trong nút/capsule hoặc khoảng đệm của khung,
+    // không phải lề nội dung. Ép về thang sẽ làm phần tử co lại.
+    if (line.includes("spacing-ok")) return;
     const key = file.replace(/\\/g, "/");
     perFile[key] = (perFile[key] || 0) + 1;
     offenders.push({ file: key, line: i + 1, value });

@@ -86,7 +86,7 @@ struct LiveRoomFullScreenView: View {
                                 HStack(spacing: 5) {
                                     Text("LIVE")
                                         .font(.system(size: 8.5, weight: .black))
-                                        .padding(.horizontal, 5)
+                                        .padding(.horizontal, 5) // spacing-ok: padding nội bộ phần tử nhỏ
                                         .padding(.vertical, 1.5)
                                         .background(Capsule().fill(KinnectTheme.liveCrimson))
                                         .foregroundColor(.white)
@@ -114,7 +114,7 @@ struct LiveRoomFullScreenView: View {
                                 .foregroundColor(.white)
                                 .lineLimit(1)
                         }
-                        .padding(.horizontal, 10)
+                        .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(
                             Capsule()
@@ -135,7 +135,7 @@ struct LiveRoomFullScreenView: View {
                             } label: {
                                 Text(room.gamePaused ? "Tiếp tục" : "Tạm ẩn")
                                     .font(.caption2.weight(.bold))
-                                    .padding(.horizontal, 10)
+                                    .padding(.horizontal, 12)
                                     .padding(.vertical, 7)
                                     .background(Capsule().fill(KinnectTheme.liveAmberPause))
                                     .foregroundColor(.black)
@@ -178,14 +178,14 @@ struct LiveRoomFullScreenView: View {
                         }
                         .buttonStyle(.plain)
                     }
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, 16)
                     .padding(.top, 10)
 
                     if let banner = appState.liveLastReactionBanner {
                         Text(banner)
                             .font(.caption.bold())
                             .foregroundColor(.white)
-                            .padding(.horizontal, 14)
+                            .padding(.horizontal, 16)
                             .padding(.vertical, 7)
                             .background(Capsule().fill(KinnectTheme.primaryGradient))
                             .padding(.top, 6)
@@ -207,7 +207,7 @@ struct LiveRoomFullScreenView: View {
                                             .foregroundColor(.white)
                                             .kinnectMultiline()
                                     }
-                                    .padding(.horizontal, 10)
+                                    .padding(.horizontal, 12)
                                     .padding(.vertical, 5)
                                     .background(
                                         RoundedRectangle(cornerRadius: 11, style: .continuous)
@@ -219,7 +219,7 @@ struct LiveRoomFullScreenView: View {
                                     )
                                 }
                             }
-                            .padding(.horizontal, 14)
+                            .padding(.horizontal, 16)
                         }
                         .frame(maxHeight: 190)
                         .mask(
@@ -238,7 +238,7 @@ struct LiveRoomFullScreenView: View {
                         HStack(spacing: 8) {
                             TextField("Gửi bình luận…", text: $chatInput)
                                 .font(.subheadline)
-                                .padding(.horizontal, 14)
+                                .padding(.horizontal, 16)
                                 .padding(.vertical, 10)
                                 .background(
                                     Capsule()
@@ -312,7 +312,7 @@ struct LiveRoomFullScreenView: View {
                                     .background(Circle().fill(KinnectTheme.primaryGradient))
                             }
                         }
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 16)
                         .padding(.bottom, 18)
                     }
                     .padding(.top, 18)

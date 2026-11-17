@@ -432,7 +432,7 @@ struct CameraStudioView: View {
                                 } label: {
                                     Text(lens.title)
                                         .font(.caption.bold())
-                                        .padding(.horizontal, 10)
+                                        .padding(.horizontal, 12)
                                         .padding(.vertical, 6)
                                         .background(Capsule().fill(cameraController.activeLens == lens ? Color.white : Color.black.opacity(0.45)))
                                         .foregroundColor(cameraController.activeLens == lens ? .black : .white)
@@ -615,7 +615,7 @@ struct CameraStudioView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, 16)
                 }
 
             case .beauty:
@@ -663,7 +663,7 @@ struct CameraStudioView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, 16)
                 }
 
             case .stickers:
@@ -712,7 +712,7 @@ struct CameraStudioView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, 16)
                 }
             }
         }
@@ -848,7 +848,7 @@ struct CameraStudioView: View {
                             .font(.caption2.bold())
                             .lineLimit(1)
                     }
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .background(Capsule().fill(videoProject?.musicURL != nil || !selectedMusicTrack.isEmpty ? KinnectTheme.accentBright.opacity(0.85) : Color.white.opacity(0.15)))
                     .foregroundColor(.white)
@@ -865,7 +865,7 @@ struct CameraStudioView: View {
                     Text("Studio Pro")
                         .font(.caption2.bold())
                 }
-                .padding(.horizontal, 10)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(Capsule().fill(KinnectTheme.primaryGradient))
                 .foregroundColor(.white)
@@ -881,7 +881,7 @@ struct CameraStudioView: View {
                         .font(.caption2.weight(.semibold))
                         .foregroundColor(.white)
                 }
-                .padding(.horizontal, 10)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
             }
@@ -922,7 +922,7 @@ struct CameraStudioView: View {
                             Text(isComparingOriginal ? "Đang xem ảnh gốc" : "Giữ xem gốc")
                                 .font(.caption2.bold())
                         }
-                        .padding(.horizontal, 10)
+                        .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(Capsule().fill(Color.black.opacity(0.75)))
                         .foregroundColor(isComparingOriginal ? KinnectTheme.accentBright : .white)
@@ -944,7 +944,7 @@ struct CameraStudioView: View {
                     } label: {
                         Text("Vừa khung")
                             .font(.caption2.bold())
-                            .padding(.horizontal, 10)
+                            .padding(.horizontal, 12)
                             .padding(.vertical, 6)
                             .background(Capsule().fill(Color.black.opacity(0.75)))
                             .foregroundColor(.white)
@@ -1221,7 +1221,7 @@ struct CameraStudioView: View {
                                 } label: {
                                     Text(pack.rawValue)
                                         .font(.caption.weight(photoProject.proPack == pack ? .bold : .medium))
-                                        .padding(.horizontal, 14)
+                                        .padding(.horizontal, 16)
                                         .padding(.vertical, 8)
                                         .background(
                                             RoundedRectangle(cornerRadius: 10)
