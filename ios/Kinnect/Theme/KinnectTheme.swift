@@ -146,33 +146,31 @@ enum KinnectTheme {
         endPoint: .bottomTrailing
     )
 
-    static let messageVioletStart = Color(hex: "#8E2DE2")
-    static let messageVioletEnd = Color(hex: "#4A00E0")
+    // Giữ nguyên TÊN để mọi view đang dùng không phải sửa, nhưng giá trị
+    // suy ra từ 2 token accent — hết cảnh mỗi màn một sắc tím/hồng riêng.
+    static let messageVioletStart = KTColor.accent
+    static let messageVioletEnd = KTColor.accentBright
     static let messageBubbleGradient = LinearGradient(
-        colors: [messageVioletStart, messageVioletEnd],
+        colors: [messageVioletStart, messageVioletEnd.opacity(0.85)],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
 
     static let storyPurpleGradient = LinearGradient(
-        colors: [Color(red: 0x83 / 255.0, green: 0x54 / 255.0, blue: 0xEF / 255.0), Color(red: 0xD9 / 255.0, green: 0x4C / 255.0, blue: 0xAE / 255.0)],
+        colors: [KTColor.accent, KTColor.accentBright],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
     static let storyBlueGradient = LinearGradient(
-        colors: [Color(red: 0x39 / 255.0, green: 0x7B / 255.0, blue: 0xE9 / 255.0), Color(red: 0x72 / 255.0, green: 0x4E / 255.0, blue: 0xE5 / 255.0)],
+        colors: [KTColor.accentBright, KTColor.accent.opacity(0.9)],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
     static let storyBackdropDark = Color(red: 0.06, green: 0.06, blue: 0.10)
 
-    static let walletBalanceGradient = LinearGradient(
-        colors: [accent, Color(hex: "#C026D3")],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
+    static let walletBalanceGradient = KTGradient.primary
     static let walletStoreBalanceGradient = LinearGradient(
-        colors: [Color(hex: "#5B21B6"), Color(hex: "#C026D3")],
+        colors: [KTColor.accent.opacity(0.9), KTColor.accentBright],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
