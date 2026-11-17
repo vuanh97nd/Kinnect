@@ -360,6 +360,9 @@ struct MessagesView: View {
                         Text("\(unread)")
                             .font(KinnectTheme.scaled(12, weight: .bold))
                             .foregroundColor(.white)
+                            // Badge là chỉ báo số lượng, không phải nội dung đọc:
+                            // chặn scale ở accessibility1 để không phình to bằng cả dòng chữ.
+                            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)
                             .background(

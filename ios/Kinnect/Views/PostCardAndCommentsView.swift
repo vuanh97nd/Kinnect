@@ -48,15 +48,21 @@ struct PostCardView: View {
                     onOpenAuthorProfile?()
                 } label: {
                     VStack(alignment: .leading, spacing: 2) {
+                        // Ở cỡ chữ trợ năng lớn, tên không giới hạn dòng sẽ chiếm 3 dòng
+                        // và đẩy handle/thời gian ra ngoài card. Giới hạn 2 dòng + thu nhỏ nhẹ.
                         Text(post.author.name)
                             .font(.headline)
                             .foregroundColor(KinnectTheme.textPrimary)
-                            .kinnectMultiline()
+                            .lineLimit(2)
+                            .truncationMode(.tail)
+                            .minimumScaleFactor(0.85)
+                            .fixedSize(horizontal: false, vertical: true)
                         HStack(spacing: 6) {
                             if !post.author.handle.isEmpty {
                                 Text("@\(post.author.handle)")
                                     .font(.caption)
                                     .foregroundColor(KinnectTheme.textSecondary)
+                                    .lineLimit(1)
                                 Text("•")
                                     .font(.caption)
                                     .foregroundColor(KinnectTheme.textSecondary)
@@ -64,6 +70,7 @@ struct PostCardView: View {
                             Text(formatRelativeDate(post.createdAt))
                                 .font(.caption)
                                 .foregroundColor(KinnectTheme.textSecondary)
+                                .lineLimit(1)
                         }
                     }
                 }
