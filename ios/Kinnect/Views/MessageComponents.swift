@@ -186,7 +186,7 @@ struct NewDirectChatPickerSheet: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 16)
 
                 if isLoading {
                     ProgressView().padding(.vertical, 30)

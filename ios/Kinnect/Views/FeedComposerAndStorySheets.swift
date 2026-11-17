@@ -340,7 +340,7 @@ struct StoryComposerSheet: View {
                                                 .font(.caption)
                                         }
                                     }
-                                    .padding(.horizontal, 10)
+                                    .padding(.horizontal, 10) // spacing-ok: viền capsule nút đóng story
                                     .padding(.vertical, 5)
                                     .background(Capsule().fill(Color.black.opacity(0.65)))
                                     .foregroundColor(.white)
@@ -642,7 +642,7 @@ struct StoryDetailSheet: View {
                                             .font(.caption)
                                             .foregroundColor(.white)
                                     }
-                                    .padding(.horizontal, 10)
+                                    .padding(.horizontal, 10) // spacing-ok: viền capsule tên người xem story
                                     .padding(.vertical, 6)
                                     .background(Capsule().fill(KinnectTheme.surfaceElevated))
                                 }

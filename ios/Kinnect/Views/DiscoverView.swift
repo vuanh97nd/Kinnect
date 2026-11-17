@@ -68,7 +68,7 @@ struct DiscoverView: View {
                 title: { $0.rawValue },
                 selection: $segment
             )
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 16)
             .padding(.top, 6)
             .onChange(of: segment) { _ in
                 Task { await loadCurrentSegment() }
@@ -107,7 +107,7 @@ struct DiscoverView: View {
                 }
             }
             // Padding đặt ngoài ScrollView để chip đầu không bị cắt ở mép trái.
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 16)
 
             // Location banner if Nearby segment
             if let locationStatusText, segment == .nearby {
@@ -186,7 +186,7 @@ struct DiscoverView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 16)
                 .padding(.vertical, 8)
             }
             .refreshable {
@@ -511,7 +511,7 @@ private struct DiscoverSquareUserTile: View {
                                 Text("Mới")
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundColor(.white)
-                                    .padding(.horizontal, 7)
+                                    .padding(.horizontal, 7) // spacing-ok: badge Mới trên ảnh
                                     .padding(.vertical, 3)
                                     .background(Capsule().fill(KinnectTheme.accentBright))
                                     .padding(5)

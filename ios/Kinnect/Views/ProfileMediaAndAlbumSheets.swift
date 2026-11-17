@@ -447,7 +447,7 @@ struct ShortThumbnailView: View {
                         Text("\(Int(round(short.durationSec)))s")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(.white)
-                            .padding(.horizontal, 6)
+                            .padding(.horizontal, 6) // spacing-ok: badge thời lượng video
                             .padding(.vertical, 2)
                             .background(Color.black.opacity(0.55))
                             .cornerRadius(4)

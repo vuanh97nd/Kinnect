@@ -233,11 +233,11 @@ struct DirectChatDetailView: View {
                     }
                     .font(.caption.bold())
                     .foregroundColor(.white)
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 10) // spacing-ok: viền nút Lưu dạng capsule
                     .padding(.vertical, 5)
                     .background(Capsule().fill(KinnectTheme.primaryGradient))
                 }
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(KinnectTheme.surfaceElevated)
             }
@@ -351,7 +351,7 @@ struct DirectChatDetailView: View {
                     }
                 }
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(KinnectTheme.surface.ignoresSafeArea(edges: .bottom))
             .overlay(alignment: .top) {
@@ -434,7 +434,7 @@ struct DirectChatDetailView: View {
                                 .font(KinnectTheme.scaled(16))
                                 .foregroundColor(isMine ? .white : KinnectTheme.textPrimary)
                                 .kinnectMultiline()
-                                .padding(.horizontal, 14)
+                                .padding(.horizontal, 14) // spacing-ok: đệm nội bộ bong bóng tin nhắn
                                 .padding(.vertical, 9)
                                 .background(
                                     MessageBubbleShape(isMine: isMine)

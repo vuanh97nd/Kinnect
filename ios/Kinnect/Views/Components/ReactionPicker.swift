@@ -148,7 +148,7 @@ struct ReactionSummary: View {
 									.foregroundColor(myReaction == key ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
 							}
 						}
-						.padding(.horizontal, 6)
+						.padding(.horizontal, 6) // spacing-ok: viền capsule bộ đếm reaction
 						.padding(.vertical, 2)
 						.background(
 							Capsule()
@@ -169,7 +169,7 @@ struct ReactionSummary: View {
 					Text("+\(totalCount - shownCount)")
 						.font(.system(size: 10, weight: .semibold))
 						.foregroundColor(KinnectTheme.textSecondary)
-						.padding(.horizontal, 5)
+						.padding(.horizontal, 5) // spacing-ok: viền capsule số reaction ẩn
 						.padding(.vertical, 2)
 						.background(
 							Capsule()
@@ -190,7 +190,7 @@ struct FloatingReactionBadge: View {
 	var body: some View {
 		Text(DirectMessageItem.emoji(for: reaction))
 			.font(KinnectTheme.scaled(13))
-			.padding(.horizontal, 6)
+			.padding(.horizontal, 6) // spacing-ok: viền capsule emoji reaction
 			.padding(.vertical, 3)
 			.background(
 				Capsule()

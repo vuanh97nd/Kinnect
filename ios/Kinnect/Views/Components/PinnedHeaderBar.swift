@@ -69,7 +69,7 @@ struct PinnedHeaderBar: View {
 								Text("\(count > 99 ? "99+" : "\(count)")")
 									.font(.system(size: 10, weight: .bold))
 									.foregroundColor(.white)
-									.padding(.horizontal, 5)
+									.padding(.horizontal, 5) // spacing-ok: badge số lượng trên icon header
 									.padding(.vertical, 1)
 									.background(Capsule().fill(action.badgeColor))
 									.offset(x: 12, y: -12)

@@ -1208,7 +1208,7 @@ struct ShortCommentsSheet: View {
                     }
                     Spacer()
                 }
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 16)
                 .padding(.vertical, 4)
                 .background(KinnectTheme.surface)
 
@@ -1227,7 +1227,7 @@ struct ShortCommentsSheet: View {
                                 .foregroundColor(KinnectTheme.textSecondary)
                         }
                     }
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, 16)
                     .padding(.vertical, 6)
                     .background(KinnectTheme.surfaceElevated)
                 }
@@ -1248,7 +1248,7 @@ struct ShortCommentsSheet: View {
                     }
                     .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isPosting)
                 }
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 .background(KinnectTheme.surface)
             }

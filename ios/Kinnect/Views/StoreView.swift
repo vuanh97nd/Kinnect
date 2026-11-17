@@ -190,7 +190,7 @@ struct StoreView: View {
                         .font(KinnectTheme.scaled(13, weight: .bold))
                         .foregroundColor(KinnectTheme.warning)
                 }
-                .padding(.horizontal, 10)
+                .padding(.horizontal, 10) // spacing-ok: viền capsule số dư xu
                 .padding(.vertical, 6)
                 .background(Capsule().fill(KinnectTheme.surfaceElevated))
             }
@@ -269,7 +269,7 @@ struct StoreView: View {
                                 .fixedSize(horizontal: true, vertical: false)
                         }
                         .foregroundColor(isSelected ? .white : KinnectTheme.textSecondary)
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 14) // spacing-ok: viền capsule bộ lọc cửa hàng
                         .padding(.vertical, 8)
                         .background(
                             Capsule().fill(isSelected ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
@@ -483,7 +483,7 @@ struct StoreView: View {
                         Text("Đang dùng")
                             .font(.system(size: 8, weight: .bold))
                             .foregroundColor(.white)
-                            .padding(.horizontal, 6)
+                            .padding(.horizontal, 6) // spacing-ok: badge Đang dùng
                             .padding(.vertical, 3)
                             .background(Capsule().fill(KinnectTheme.online))
                     }
@@ -492,7 +492,7 @@ struct StoreView: View {
                         Text(pkg.badgeText.uppercased())
                             .font(.system(size: 8, weight: .black))
                             .foregroundColor(.white)
-                            .padding(.horizontal, 6)
+                            .padding(.horizontal, 6) // spacing-ok: badge trên vật phẩm
                             .padding(.vertical, 3)
                             .background(Capsule().fill(Color.black.opacity(0.5)))
                     }

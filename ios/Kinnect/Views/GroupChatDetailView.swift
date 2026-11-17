@@ -130,7 +130,7 @@ struct GroupChatDetailView: View {
                         if !msg.text.isEmpty {
                             formattedBubbleText(msg.text, isMine: isMine)
                                 .kinnectMultiline()
-                                .padding(.horizontal, 14)
+                                .padding(.horizontal, 14) // spacing-ok: đệm nội bộ bong bóng tin nhắn nhóm
                                 .padding(.vertical, 9)
                                 .background(
                                     MessageBubbleShape(isMine: isMine)
@@ -287,7 +287,7 @@ struct GroupChatDetailView: View {
                             .foregroundColor(KinnectTheme.textSecondary)
                     }
                 }
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 16)
                 .padding(.top, 6)
 
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -314,7 +314,7 @@ struct GroupChatDetailView: View {
                                         .foregroundColor(KinnectTheme.textSecondary)
                                 }
                             }
-                            .padding(.horizontal, 10)
+                            .padding(.horizontal, 10) // spacing-ok: viền chip nhắc @Cả nhóm
                             .padding(.vertical, 6)
                             .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated))
                         }
@@ -342,14 +342,14 @@ struct GroupChatDetailView: View {
                                             .foregroundColor(KinnectTheme.textSecondary)
                                     }
                                 }
-                                .padding(.horizontal, 10)
+                                .padding(.horizontal, 10) // spacing-ok: viền chip nhắc thành viên
                                 .padding(.vertical, 6)
                                 .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated))
                             }
                             .buttonStyle(.plain)
                         }
                     }
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, 16)
                     .padding(.bottom, 6)
                 }
             }
@@ -468,7 +468,7 @@ struct GroupChatDetailView: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(KinnectTheme.surface.ignoresSafeArea(edges: .bottom))
         .overlay(alignment: .top) {

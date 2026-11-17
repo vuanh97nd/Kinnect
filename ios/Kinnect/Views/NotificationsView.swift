@@ -150,7 +150,7 @@ struct NotificationsView: View {
                     Text("\(appState.unreadNotificationsCount)")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(.white)
-                        .padding(.horizontal, 7)
+                        .padding(.horizontal, 7) // spacing-ok: badge số thông báo chưa đọc
                         .padding(.vertical, 2)
                         .background(Capsule().fill(KinnectTheme.accentBright))
                 }

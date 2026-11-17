@@ -352,7 +352,7 @@ struct FeedView: View {
                                 .fixedSize(horizontal: false, vertical: true)
                             Spacer()
                         }
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 16)
                         .padding(.vertical, 12)
                         .background(
                             RoundedRectangle(cornerRadius: 12)
@@ -380,7 +380,7 @@ struct FeedView: View {
                                 .lineLimit(1)
                             Spacer()
                         }
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 14) // spacing-ok: viền capsule gợi ý
                         .padding(.vertical, 10)
                         .background(Capsule().fill(Color(uiColor: .tertiarySystemGroupedBackground)))
                     }

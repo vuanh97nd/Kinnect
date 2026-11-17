@@ -320,7 +320,7 @@ struct EditProfileSheet: View {
                     .font(.system(size: 11, weight: .bold))
             }
             .foregroundColor(isPublic ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
-            .padding(.horizontal, 6)
+            .padding(.horizontal, 6) // spacing-ok: viền capsule trạng thái công khai
             .padding(.vertical, 2)
             .background(Capsule().fill(KinnectTheme.surfaceElevated))
         }

@@ -230,7 +230,7 @@ struct WalletView: View {
                 Rectangle()
                     .fill(Color.white.opacity(0.25))
                     .frame(width: 1, height: 36)
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 12)
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 5) {
@@ -378,7 +378,7 @@ struct WalletView: View {
                     }
                     .font(.caption.bold())
                     .foregroundColor(KinnectTheme.textPrimary)
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, 14) // spacing-ok: viền nút Rút tiền dạng capsule
                     .padding(.vertical, 8)
                     .background(Capsule().fill(KinnectTheme.surfaceElevated))
                 }
@@ -452,7 +452,7 @@ struct WalletView: View {
                             Text(filter.rawValue)
                                 .font(.caption.bold())
                                 .foregroundColor(isSelected ? .white : KinnectTheme.textSecondary)
-                                .padding(.horizontal, 14)
+                                .padding(.horizontal, 14) // spacing-ok: viền capsule bộ lọc giao dịch
                                 .padding(.vertical, 7)
                                 .background(
                                     Capsule().fill(isSelected ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
@@ -560,7 +560,7 @@ struct WalletView: View {
                                 .fixedSize(horizontal: true, vertical: false)
                         }
                         .padding(.vertical, 10)
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 16)
                         .background(
                             RoundedRectangle(cornerRadius: 14)
                                 .fill(KinnectTheme.surface)
@@ -600,7 +600,7 @@ struct WalletView: View {
                 Text("1 xu = 100đ")
                     .font(KinnectTheme.scaled(12, weight: .bold))
                     .foregroundColor(KinnectTheme.accentBright)
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 10) // spacing-ok: viền capsule tỷ giá xu
                     .padding(.vertical, 5)
                     .background(Capsule().fill(KinnectTheme.accentSoft))
             }
@@ -684,7 +684,7 @@ struct WalletView: View {
                 Text(prod.priceLabel)
                     .font(.caption.bold())
                     .foregroundColor(.white)
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, 14) // spacing-ok: viền nút mua dạng capsule
                     .padding(.vertical, 8)
                     .background(Capsule().fill(KinnectTheme.primaryGradient))
             }

@@ -252,7 +252,7 @@ struct PostCardView: View {
                                         .foregroundColor(isSelected ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
                                         .lineLimit(1)
                                 }
-                                .padding(.horizontal, 5)
+                                .padding(.horizontal, 5) // spacing-ok: viền chip cảm xúc
                                 .padding(.vertical, 4)
                                 .background(
                                     RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -439,7 +439,7 @@ struct PostCommentsSheet: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, 16)
                     .padding(.vertical, 4)
                 }
                 .background(KinnectTheme.surface)
@@ -459,7 +459,7 @@ struct PostCommentsSheet: View {
                                 .foregroundColor(KinnectTheme.textSecondary)
                         }
                     }
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, 16)
                     .padding(.vertical, 6)
                     .background(KinnectTheme.surfaceElevated)
                 }

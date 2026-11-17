@@ -289,7 +289,7 @@ struct FriendsView: View {
                 Text("\(count)")
                     .font(.caption2.weight(.bold))
                     .foregroundColor(color)
-                    .padding(.horizontal, 6)
+                    .padding(.horizontal, 6) // spacing-ok: badge số lượng trên icon
                     .padding(.vertical, 2)
                     .background(Capsule().fill(color.opacity(0.15)))
             }
@@ -328,7 +328,7 @@ struct FriendsView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, 14) // spacing-ok: viền nút Nhắn tin dạng capsule
                     .padding(.vertical, 7)
                     .background(Capsule().fill(KinnectTheme.primaryGradient))
             }
@@ -354,7 +354,7 @@ struct FriendsView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundColor(KinnectTheme.textSecondary)
                 .lineLimit(1)
-                .padding(.horizontal, 10)
+                .padding(.horizontal, 10) // spacing-ok: viền nút Từ chối dạng capsule
                 .padding(.vertical, 7)
                 .background(Capsule().fill(KinnectTheme.surfaceElevated))
             }
@@ -381,7 +381,7 @@ struct FriendsView: View {
             .font(.caption.weight(.semibold))
             .foregroundColor(.white)
             .lineLimit(1)
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 14) // spacing-ok: viền nút Gửi lời mời dạng capsule
             .padding(.vertical, 8)
             .background(Capsule().fill(KinnectTheme.primaryGradient))
             .fixedSize()
@@ -548,7 +548,7 @@ struct FriendsView: View {
                 Task { await respondRequest(user: user, action: "reject") }
             }
             .font(.caption.bold())
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 10) // spacing-ok: viền nút Từ chối dạng capsule
             .padding(.vertical, 7)
             .background(Capsule().fill(KinnectTheme.surfaceElevated))
             .foregroundColor(KinnectTheme.textSecondary)

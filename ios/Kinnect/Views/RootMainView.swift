@@ -931,7 +931,7 @@ struct RootMainView: View {
                             Text("\(min(count, 99))")
                                 .font(.caption2.bold())
                                 .foregroundColor(.white)
-                                .padding(.horizontal, 6)
+                                .padding(.horizontal, 6) // spacing-ok: badge số lượng trên tab bar
                                 .padding(.vertical, 2)
                                 .background(Capsule().fill(KinnectTheme.danger))
                         }

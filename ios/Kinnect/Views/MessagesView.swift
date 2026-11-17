@@ -247,7 +247,7 @@ struct MessagesView: View {
             Text(title)
                 .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
                 .foregroundColor(isSelected ? .white : KinnectTheme.textSecondary)
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 14) // spacing-ok: viền capsule bộ lọc
                 .padding(.vertical, 6)
                 .background(
                     Capsule()
@@ -365,7 +365,7 @@ struct MessagesView: View {
                             // Badge là chỉ báo số lượng, không phải nội dung đọc:
                             // chặn scale ở accessibility1 để không phình to bằng cả dòng chữ.
                             .dynamicTypeSize(...DynamicTypeSize.accessibility1)
-                            .padding(.horizontal, 7)
+                            .padding(.horizontal, 7) // spacing-ok: badge chưa đọc
                             .padding(.vertical, 3)
                             .background(
                                 Capsule().fill(KinnectTheme.messageBubbleGradient)
@@ -422,7 +422,7 @@ struct MessagesView: View {
                         Text("\(group.unreadCount)")
                             .font(KinnectTheme.scaled(12, weight: .bold))
                             .foregroundColor(.white)
-                            .padding(.horizontal, 7)
+                            .padding(.horizontal, 7) // spacing-ok: badge chưa đọc nhóm
                             .padding(.vertical, 3)
                             .background(
                                 Capsule().fill(KinnectTheme.messageBubbleGradient)

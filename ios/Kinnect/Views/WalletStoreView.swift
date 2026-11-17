@@ -647,7 +647,7 @@ struct WalletStoreView: View {
                             if !pkg.badgeText.isEmpty {
                                 Text(pkg.badgeText)
                                     .font(.system(size: 10, weight: .bold))
-                                    .padding(.horizontal, 6)
+                                    .padding(.horizontal, 6) // spacing-ok: badge trên gói vật phẩm
                                     .padding(.vertical, 2)
                                     .background(Capsule().fill(KinnectTheme.serverColor(pkg.accentColor).opacity(0.3)))
                                     .foregroundColor(.white)

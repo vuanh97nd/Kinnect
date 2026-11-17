@@ -401,7 +401,7 @@ struct AuthView: View {
                 .padding(.bottom, 4)
         }
         .foregroundColor(LoginChrome.ink)
-        .padding(.horizontal, 9)
+        .padding(.horizontal, 8)
     }
 
     private func welcomeMiniTab(_ icon: String, title: String, index: Int) -> some View {
@@ -485,7 +485,7 @@ struct AuthView: View {
                     Text("LIVE")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundColor(.white)
-                        .padding(.horizontal, 6)
+                        .padding(.horizontal, 6) // spacing-ok: badge LIVE trong mockup đăng nhập
                         .padding(.vertical, 3)
                         .background(Capsule().fill(KinnectTheme.authLiveBadge))
                         .padding(8)
@@ -540,7 +540,7 @@ struct AuthView: View {
                         .foregroundColor(LoginChrome.muted)
                     Spacer()
                 }
-                .padding(.horizontal, 7)
+                .padding(.horizontal, 7) // spacing-ok: hàng nội bộ trong mockup bài viết
                 .padding(.vertical, 4)
                 .background(RoundedRectangle(cornerRadius: 8).fill(LoginChrome.wash))
 
@@ -973,7 +973,7 @@ struct AuthView: View {
             .foregroundColor(LoginChrome.ink)
             trailing()
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 16)
         .frame(height: 52)
         .background(
             RoundedRectangle(cornerRadius: 14)
@@ -1016,7 +1016,7 @@ struct AuthView: View {
                         Text(loc.currentLanguage.shortLabel)
                             .font(.caption.bold())
                     }
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 10) // spacing-ok: viền nút chọn ngôn ngữ
                     .padding(.vertical, 6)
                     .background(Capsule().fill(KinnectTheme.surfaceElevated))
                     .foregroundColor(KinnectTheme.textPrimary)
