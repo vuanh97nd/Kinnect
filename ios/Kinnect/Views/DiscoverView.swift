@@ -61,13 +61,13 @@ struct DiscoverView: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            // 1. Top Segment Switcher: Dành cho bạn · Quanh đây · Đang theo dõi (Android parity)
-            Picker("Khám phá", selection: $segment) {
-                ForEach(DiscoverSegment.allCases, id: \.self) { item in
-                    Text(item.rawValue).tag(item)
-                }
-            }
-            .pickerStyle(.segmented)
+            // 1. Top Segment Switcher — KSegmented thay Picker hệ thống (pill xám đọc như
+            // trạng thái vô hiệu). Đây là chỗ thứ ba dùng chung component này.
+            KSegmented(
+                options: DiscoverSegment.allCases,
+                title: { $0.rawValue },
+                selection: $segment
+            )
             .padding(.horizontal, 14)
             .padding(.top, 6)
             .onChange(of: segment) { _ in
@@ -75,34 +75,38 @@ struct DiscoverView: View {
             }
 
             // 2. Quick Filter Chips Row (Android parity: Tuổi, Cân nặng, Chiều cao, Giới tính, Sliders)
-            HStack(spacing: 6) {
-                FilterChipButton(title: "Tuổi", isSelected: minAge > 0 || maxAge > 0) {
-                    activeFilterType = .age
+            // Chip lọc: 4 chip + nút 44pt vượt chiều ngang màn hình, nên để trong
+            // ScrollView ngang thay vì HStack cố định (trước đây chip cuối bị cắt mất).
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    FilterChipButton(title: "Tuổi", isSelected: minAge > 0 || maxAge > 0) {
+                        activeFilterType = .age
+                    }
+                    FilterChipButton(title: "Cân nặng", isSelected: minWeight > 0 || maxWeight > 0) {
+                        activeFilterType = .weight
+                    }
+                    FilterChipButton(title: "Chiều cao", isSelected: minHeight > 0 || maxHeight > 0) {
+                        activeFilterType = .height
+                    }
+                    FilterChipButton(title: "Giới tính", isSelected: !selectedGender.isEmpty || !selectedOrientation.isEmpty || !selectedRole.isEmpty) {
+                        activeFilterType = .gender
+                    }
+                    Button {
+                        activeFilterType = .full
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(KinnectTheme.scaled(18, weight: .semibold))
+                            .foregroundColor(isFilterActive ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
+                            .frame(width: 44, height: 44)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(isFilterActive ? KinnectTheme.accent.opacity(0.18) : KinnectTheme.surfaceElevated)
+                            )
+                    }
+                    .accessibilityLabel("Bộ lọc tổng hợp")
                 }
-                FilterChipButton(title: "Cân nặng", isSelected: minWeight > 0 || maxWeight > 0) {
-                    activeFilterType = .weight
-                }
-                FilterChipButton(title: "Chiều cao", isSelected: minHeight > 0 || maxHeight > 0) {
-                    activeFilterType = .height
-                }
-                FilterChipButton(title: "Giới tính", isSelected: !selectedGender.isEmpty || !selectedOrientation.isEmpty || !selectedRole.isEmpty) {
-                    activeFilterType = .gender
-                }
-                Button {
-                    activeFilterType = .full
-                } label: {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(KinnectTheme.scaled(18, weight: .semibold))
-                        .foregroundColor(isFilterActive ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
-                        .frame(width: 44, height: 44)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(isFilterActive ? KinnectTheme.accent.opacity(0.18) : KinnectTheme.surfaceElevated)
-                        )
-                }
-                .accessibilityLabel("Bộ lọc tổng hợp")
+                .padding(.horizontal, 14)
             }
-            .padding(.horizontal, 14)
 
             // Location banner if Nearby segment
             if let locationStatusText, segment == .nearby {
