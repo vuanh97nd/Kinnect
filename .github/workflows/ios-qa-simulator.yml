@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       focus:
-        description: "Capture focus: full (default) or security"
+        description: "Capture focus: full, core, a11y, light, matrix or security"
         required: false
         default: ""
   push:

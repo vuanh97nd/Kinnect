@@ -454,7 +454,8 @@ def resolve_capture_scope(focus_value=None, only_login=False):
         scope = "security"
     else:
         raise ValueError(
-            f"Unsupported UI_REVIEW_FOCUS={raw!r}; expected '', 'full', 'core', 'a11y', or 'security'."
+            f"Unsupported UI_REVIEW_FOCUS={raw!r}; expected '', 'full', 'core', "
+            "'a11y', 'light', 'matrix', or 'security'."
         )
     if only_login and scope != "full":
         raise ValueError("Cannot combine UI_REVIEW_ONLY_LOGIN=1 with UI_REVIEW_FOCUS=security/core.")
@@ -476,12 +477,33 @@ CORE_SLUGS = [
     "08-iphone-notifications-dark",
 ]
 
+# Scope "matrix": chỉ các màn hình cần bằng chứng trên màn nhỏ / iPad.
+# iPhone chuẩn đã có trong scope core nên không chụp lại ở đây.
+MATRIX_COMPACT_SLUGS = (
+    "14-compact-iphone-auth-welcome-dark",
+    "14-compact-iphone-feed",
+    "15-compact-iphone-chat-detail",
+    "16-compact-iphone-wallet",
+    "16b-compact-iphone-dynamictype-max",
+    "16e-compact-iphone-friends",
+)
+MATRIX_IPAD_SLUGS = (
+    "17-ipad-feed-splitview",
+    "18-ipad-chat-detail",
+    "18b-ipad-dynamictype-max",
+)
 
-def select_screens_for_scope(all_screens, selected_slugs, scope, only_login=False, login_screens=None):
+
+def select_screens_for_scope(all_screens, selected_slugs, scope, only_login=False, login_screens=None, matrix_slugs=()):
     if scope == "matrix":
-        # Bỏ lượt iPhone chuẩn (đã có ở scope core), chỉ chạy compact + iPad
-        # để có bằng chứng đa thiết bị mà không tốn thời gian chụp trùng.
-        return []
+        # Gọi cho iPhone chuẩn với matrix_slugs rỗng → không chụp trùng core.
+        # Gọi cho iPhone compact với MATRIX_COMPACT_SLUGS → có ảnh màn nhỏ.
+        wanted = set(matrix_slugs or ())
+        selected = [entry for entry in all_screens if entry[0] in wanted]
+        missing = [slug for slug in wanted if slug not in {entry[0] for entry in selected}]
+        if missing:
+            raise RuntimeError(f"Missing matrix focus slugs from screen inventory: {missing}")
+        return selected
     if scope in ("core", "a11y", "light"):
         wanted = set(CORE_SLUGS)
         base = [entry for entry in all_screens if entry[0] in wanted]
@@ -685,8 +707,8 @@ def main():
             "file": str(f)
         })
 
-    if capture_scope == "security":
-        print("Skipping simulator video recordings in security captureScope.", flush=True)
+    if capture_scope in ("security", "matrix"):
+        print("Skipping simulator video recordings in captureScope:", capture_scope, flush=True)
     else:
         # Record >=12s auto-cycle video demo (1.5s per cycle, starting AFTER welcome screen is mounted on Tab 0)
         try:
@@ -855,9 +877,9 @@ def main():
         except Exception as e:
             print(f"Comprehensive test video recording failed: {e}", flush=True)
 
-    # 2. Compact / second iPhone screenshots
-    #    Scope "core" chỉ chụp iPhone chuẩn: bỏ hẳn nhánh compact + iPad để job xong trong vài phút.
-    if compact_iphone and capture_scope not in ("core", "a11y", "light", "matrix"):
+    #    Scope "core"/"a11y"/"light" chỉ chụp iPhone chuẩn: bỏ hẳn nhánh compact
+    #    + iPad để job xong trong vài phút. Scope "matrix" thì ngược lại.
+    if compact_iphone and capture_scope not in ("core", "a11y", "light"):
         if compact_iphone["udid"] != standard_iphone["udid"]:
             print(f"Shutting down previous standard simulator {standard_iphone['name']} to free resources...", flush=True)
             subprocess.run(["xcrun", "simctl", "shutdown", standard_iphone["udid"]], check=False)
@@ -886,10 +908,11 @@ def main():
         all_compact_screens = compact_login_screens + compact_other_screens
         compact_screens = select_screens_for_scope(
             all_compact_screens,
-            SECURITY_FOCUS_COMPACT_SLUGS,
+            MATRIX_COMPACT_SLUGS if capture_scope == "matrix" else SECURITY_FOCUS_COMPACT_SLUGS,
             capture_scope,
             only_login=only_login,
             login_screens=compact_login_screens,
+            matrix_slugs=MATRIX_COMPACT_SLUGS,
         )
         for slug, screen_arg, extra, desc in compact_screens:
             f = capture_screen(compact_iphone, slug, screen_arg, bundle_id, extra_args=extra, wait_sec=3.0)
@@ -903,17 +926,21 @@ def main():
             })
 
     # 3. iPad screenshots
-    if ipad and not only_login and capture_scope not in ("security", "core", "a11y", "light", "matrix"):
+    if ipad and not only_login and capture_scope not in ("security", "core", "a11y", "light"):
         active_to_shutdown = compact_iphone if (compact_iphone and compact_iphone["udid"] != standard_iphone["udid"]) else standard_iphone
         if active_to_shutdown and active_to_shutdown["udid"] != ipad["udid"]:
             print(f"Shutting down previous simulator {active_to_shutdown['name']} to free resources...", flush=True)
             subprocess.run(["xcrun", "simctl", "shutdown", active_to_shutdown["udid"]], check=False)
         boot_and_install(ipad, app_path, bundle_id)
-        for slug, screen_arg, extra, desc in [
+        ipad_inventory = [
             ("17-ipad-feed-splitview", "feed", [], "iPad NavigationSplitView: Sidebar + Bảng tin"),
             ("18-ipad-chat-detail", "chat-detail", [], "iPad NavigationSplitView: Danh sách Hội thoại (trái) + Chi tiết Chat (phải)"),
             ("18b-ipad-dynamictype-max", "feed", ["--ui-review-dynamictype-max"], "iPad: NavigationSplitView với Dynamic Type tối đa Accessibility 5")
-        ]:
+        ]
+        if capture_scope == "matrix":
+            wanted = set(MATRIX_IPAD_SLUGS)
+            ipad_inventory = [entry for entry in ipad_inventory if entry[0] in wanted]
+        for slug, screen_arg, extra, desc in ipad_inventory:
             f = capture_screen(ipad, slug, screen_arg, bundle_id, extra_args=extra, wait_sec=3.5)
             records.append({
                 "slug": slug,
