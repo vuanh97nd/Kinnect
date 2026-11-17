@@ -444,11 +444,13 @@ def resolve_capture_scope(focus_value=None, only_login=False):
         scope = "full"
     elif normalized == "core":
         scope = "core"
+    elif normalized == "a11y":
+        scope = "a11y"
     elif normalized == "security":
         scope = "security"
     else:
         raise ValueError(
-            f"Unsupported UI_REVIEW_FOCUS={raw!r}; expected '', 'full', 'core', or 'security'."
+            f"Unsupported UI_REVIEW_FOCUS={raw!r}; expected '', 'full', 'core', 'a11y', or 'security'."
         )
     if only_login and scope != "full":
         raise ValueError("Cannot combine UI_REVIEW_ONLY_LOGIN=1 with UI_REVIEW_FOCUS=security/core.")
@@ -470,13 +472,19 @@ CORE_SLUGS = [
 
 
 def select_screens_for_scope(all_screens, selected_slugs, scope, only_login=False, login_screens=None):
-    if scope == "core":
+    if scope in ("core", "a11y"):
         wanted = set(CORE_SLUGS)
-        selected = [entry for entry in all_screens if entry[0] in wanted]
-        missing = [slug for slug in CORE_SLUGS if slug not in {entry[0] for entry in selected}]
+        base = [entry for entry in all_screens if entry[0] in wanted]
+        missing = [slug for slug in CORE_SLUGS if slug not in {entry[0] for entry in base}]
         if missing:
             raise RuntimeError(f"Missing core slugs from screen inventory: {missing}")
-        return selected
+        if scope == "core":
+            return base
+        # a11y: cùng 8 màn nhưng ép Dynamic Type lớn nhất, để thấy chữ vỡ/đè ở đâu.
+        return [
+            (f"a11y-{slug}", screen_arg, list(extra) + ["--ui-review-dynamictype-max"], f"{desc} · Dynamic Type max")
+            for slug, screen_arg, extra, desc in base
+        ]
     if scope == "security":
         wanted = set(selected_slugs)
         selected = [entry for entry in all_screens if entry[0] in wanted]
@@ -834,7 +842,7 @@ def main():
 
     # 2. Compact / second iPhone screenshots
     #    Scope "core" chỉ chụp iPhone chuẩn: bỏ hẳn nhánh compact + iPad để job xong trong vài phút.
-    if compact_iphone and capture_scope != "core":
+    if compact_iphone and capture_scope not in ("core", "a11y"):
         if compact_iphone["udid"] != standard_iphone["udid"]:
             print(f"Shutting down previous standard simulator {standard_iphone['name']} to free resources...", flush=True)
             subprocess.run(["xcrun", "simctl", "shutdown", standard_iphone["udid"]], check=False)
@@ -880,7 +888,7 @@ def main():
             })
 
     # 3. iPad screenshots
-    if ipad and not only_login and capture_scope not in ("security", "core"):
+    if ipad and not only_login and capture_scope not in ("security", "core", "a11y"):
         active_to_shutdown = compact_iphone if (compact_iphone and compact_iphone["udid"] != standard_iphone["udid"]) else standard_iphone
         if active_to_shutdown and active_to_shutdown["udid"] != ipad["udid"]:
             print(f"Shutting down previous simulator {active_to_shutdown['name']} to free resources...", flush=True)
