@@ -242,13 +242,7 @@ struct WalletStoreView: View {
             .padding(20)
             .background(
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color(hex: "#5B21B6"), Color(hex: "#C026D3")],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .fill(KinnectTheme.walletStoreBalanceGradient)
             )
 
             // Panel: Thu nhập từ Live (Web Parity `wallet-earnings`)
@@ -400,13 +394,7 @@ struct WalletStoreView: View {
             .padding(18)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color(hex: "#3B1E6D"), Color(hex: "#1E1338")],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .fill(KinnectTheme.storeHeroGradient)
             )
 
             // Category Filter Pills matching Web `store-category`
@@ -456,15 +444,15 @@ struct WalletStoreView: View {
 
                     // Avatar with package border
                     Circle()
-                        .strokeBorder(Color(hex: preview.accentColor), lineWidth: 4)
+                        .strokeBorder(KinnectTheme.serverColor(preview.accentColor), lineWidth: 4)
                         .frame(width: 72, height: 72)
-                        .background(Circle().fill(Color(hex: preview.accentColor).opacity(0.2)))
+                        .background(Circle().fill(KinnectTheme.serverColor(preview.accentColor).opacity(0.2)))
                         .overlay(
                             Image(systemName: preview.iconName)
                                 .font(.system(size: 30, weight: .bold))
                                 .foregroundColor(.white)
                         )
-                        .shadow(color: Color(hex: preview.accentColor).opacity(0.6), radius: 10)
+                        .shadow(color: KinnectTheme.serverColor(preview.accentColor).opacity(0.6), radius: 10)
 
                     // Preview Chat Bubble matching Web `.store-preview-chat`
                     Text("Xin chào! Đây là bản xem thử.")
@@ -476,7 +464,7 @@ struct WalletStoreView: View {
                             RoundedRectangle(cornerRadius: 16)
                                 .fill(
                                     LinearGradient(
-                                        colors: [Color(hex: preview.accentColor), Color(hex: preview.accentColor).opacity(0.75)],
+                                        colors: [KinnectTheme.serverColor(preview.accentColor), KinnectTheme.serverColor(preview.accentColor).opacity(0.75)],
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
                                     )
@@ -499,7 +487,7 @@ struct WalletStoreView: View {
                         .fill(KinnectTheme.surface)
                         .overlay(
                             RoundedRectangle(cornerRadius: 20)
-                                .strokeBorder(Color(hex: preview.accentColor).opacity(0.4), lineWidth: 1.5)
+                                .strokeBorder(KinnectTheme.serverColor(preview.accentColor).opacity(0.4), lineWidth: 1.5)
                         )
                 )
             }
@@ -622,7 +610,7 @@ struct WalletStoreView: View {
 
     @ViewBuilder
     private func packageKindIcon(_ kind: String, accentHex: String) -> some View {
-        let accent = Color(hex: accentHex)
+        let accent = KinnectTheme.serverColor(accentHex)
         switch kind {
         case "live":
             KinnectIcon(glyph: .live, size: 20, selected: true, tint: accent)
@@ -661,7 +649,7 @@ struct WalletStoreView: View {
                                     .font(.system(size: 10, weight: .bold))
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
-                                    .background(Capsule().fill(Color(hex: pkg.accentColor).opacity(0.3)))
+                                    .background(Capsule().fill(KinnectTheme.serverColor(pkg.accentColor).opacity(0.3)))
                                     .foregroundColor(.white)
                             }
                         }
@@ -743,7 +731,7 @@ struct WalletStoreView: View {
                                 .background(
                                     Capsule().fill(
                                         LinearGradient(
-                                            colors: [Color(hex: pkg.accentColor), KinnectTheme.accentBright],
+                                            colors: [KinnectTheme.serverColor(pkg.accentColor), KinnectTheme.accentBright],
                                             startPoint: .leading,
                                             endPoint: .trailing
                                         )
@@ -984,7 +972,7 @@ private struct StorePackageArtworkView: View {
             } else {
                 // Background Gradient with Package Accent Colors
                 LinearGradient(
-                    colors: [Color(hex: pkg.accentColor).opacity(0.85), Color(hex: "#181326")],
+                    colors: [KinnectTheme.serverColor(pkg.accentColor).opacity(0.85), KinnectTheme.storeBannerDarkFallback],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
@@ -1019,7 +1007,7 @@ private struct StorePackageArtworkView: View {
                     Circle()
                         .strokeBorder(Color.white.opacity(0.85), lineWidth: 3)
                         .frame(width: 60, height: 60)
-                        .background(Circle().fill(Color(hex: pkg.accentColor)))
+                        .background(Circle().fill(KinnectTheme.serverColor(pkg.accentColor)))
                         .overlay(
                             Image(systemName: pkg.iconName)
                                 .font(KinnectTheme.scaled(26, weight: .bold))
@@ -1031,10 +1019,10 @@ private struct StorePackageArtworkView: View {
                     // Mini Chat Bubble (.store-art-chat)
                     VStack(alignment: .leading, spacing: 4) {
                         Capsule()
-                            .fill(Color(hex: pkg.accentColor))
+                            .fill(KinnectTheme.serverColor(pkg.accentColor))
                             .frame(width: 38, height: 4)
                         Capsule()
-                            .fill(Color(hex: pkg.accentColor).opacity(0.6))
+                            .fill(KinnectTheme.serverColor(pkg.accentColor).opacity(0.6))
                             .frame(width: 24, height: 4)
                     }
                     .padding(8)

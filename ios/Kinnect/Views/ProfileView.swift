@@ -3152,14 +3152,7 @@ struct ShortThumbnailView: View {
     var body: some View {
         ZStack {
             // Android parity 0xff42355d -> 0xff1d1929 gradient
-            LinearGradient(
-                colors: [
-                    Color(red: 0x42 / 255.0, green: 0x35 / 255.0, blue: 0x5d / 255.0),
-                    Color(red: 0x1d / 255.0, green: 0x19 / 255.0, blue: 0x29 / 255.0)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            KinnectTheme.profileDefaultBannerGradient
 
             if let uiImage = loader.image {
                 Image(uiImage: uiImage)

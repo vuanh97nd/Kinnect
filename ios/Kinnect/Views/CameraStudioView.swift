@@ -905,7 +905,7 @@ struct CameraStudioView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(maxWidth: .infinity, minHeight: 240, maxHeight: 340)
-                    .background(Color(red: 0.05, green: 0.04, blue: 0.08))
+                    .background(KinnectTheme.studioCanvasDark)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
@@ -2146,7 +2146,7 @@ final class CameraPreviewViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor(red: 0.05, green: 0.04, blue: 0.09, alpha: 1.0)
+        view.backgroundColor = KinnectTheme.studioPreviewUIColor
         setupViewfinderBackdrop()
         setupSessionIfAuthorized()
     }
@@ -2172,11 +2172,7 @@ final class CameraPreviewViewController: UIViewController {
     }
 
     private func setupViewfinderBackdrop() {
-        backdropLayer.colors = [
-            UIColor(red: 0.11, green: 0.07, blue: 0.22, alpha: 1.0).cgColor,
-            UIColor(red: 0.04, green: 0.03, blue: 0.08, alpha: 1.0).cgColor,
-            UIColor(red: 0.09, green: 0.05, blue: 0.16, alpha: 1.0).cgColor
-        ]
+        backdropLayer.colors = KinnectTheme.studioViewfinderCGColors
         backdropLayer.locations = [0.0, 0.55, 1.0]
         view.layer.addSublayer(backdropLayer)
 
@@ -2190,7 +2186,7 @@ final class CameraPreviewViewController: UIViewController {
         #endif
 
         // Grid & Crosshair overlay matching Google Camera in Android StudioActivity
-        gridLayer.strokeColor = UIColor(red: 0xFD / 255.0, green: 0xD6 / 255.0, blue: 0x63 / 255.0, alpha: 0.65).cgColor
+        gridLayer.strokeColor = KinnectTheme.studioGridGuideCGColor
         gridLayer.lineWidth = 1.0
         gridLayer.fillColor = UIColor.clear.cgColor
         gridLayer.isHidden = !showGrid

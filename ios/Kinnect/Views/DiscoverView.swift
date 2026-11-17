@@ -21,6 +21,7 @@ struct DiscoverView: View {
     @State private var people: [KinnectUser] = []
     @State private var posts: [PostItem] = []
     @State private var isLoading = false
+    @State private var loadError: String? = nil
     @State private var locationStatusText: String?
     @State private var selectedUserForDetail: KinnectUser?
     @State private var activeFilterType: FilterSheetType?
@@ -139,15 +140,31 @@ struct DiscoverView: View {
                     } else if isLoading && visiblePeople.isEmpty {
                         ProgressView().tint(KinnectTheme.accentBright).padding(.vertical, 40)
                     } else if visiblePeople.isEmpty {
-                        emptyDiscoveryView
+                        if let loadError {
+                            KinnectStateView(mode: .error(
+                                title: "Không tải được khám phá",
+                                message: loadError,
+                                retryTitle: "Thử lại",
+                                onRetry: { Task { await loadCurrentSegment() } }
+                            ))
+                        } else {
+                            emptyDiscoveryView
+                        }
                     } else {
-                        LazyVGrid(columns: gridColumns, spacing: 8) {
-                            ForEach(visiblePeople) { person in
-                                DiscoverSquareUserTile(
-                                    person: person,
-                                    isOnline: (person.isActive && person.showActivity) || appState.onlineUserIds.contains(person.id),
-                                    onTap: { selectedUserForDetail = person }
-                                )
+                        VStack(spacing: KinnectTheme.spaceMD) {
+                            if let loadError {
+                                KinnectErrorBanner(message: loadError) {
+                                    Task { await loadCurrentSegment() }
+                                }
+                            }
+                            LazyVGrid(columns: gridColumns, spacing: 8) {
+                                ForEach(visiblePeople) { person in
+                                    DiscoverSquareUserTile(
+                                        person: person,
+                                        isOnline: (person.isActive && person.showActivity) || appState.onlineUserIds.contains(person.id),
+                                        onTap: { selectedUserForDetail = person }
+                                    )
+                                }
                             }
                         }
                     }
@@ -310,27 +327,29 @@ struct DiscoverView: View {
             }
         }
 
-        switch segment {
-        case .forYou:
-            let path = "/api/discover?sort=interests\(filterParams)"
-            if let disc = try? await KinnectAPIClient.shared.requestJSON(path) {
+        do {
+            switch segment {
+            case .forYou:
+                let path = "/api/discover?sort=interests\(filterParams)"
+                let disc = try await KinnectAPIClient.shared.requestJSON(path)
                 self.people = (disc["people"] as? [[String: Any]] ?? disc["users"] as? [[String: Any]] ?? []).map(KinnectUser.from)
                 self.posts = (disc["posts"] as? [[String: Any]] ?? []).map(PostItem.from)
-            }
 
-        case .nearby:
-            let path = "/api/discover?nearby=1&radius=50&sort=new\(filterParams)"
-            if let res = try? await KinnectAPIClient.shared.requestJSON(path) {
+            case .nearby:
+                let path = "/api/discover?nearby=1&radius=50&sort=new\(filterParams)"
+                let res = try await KinnectAPIClient.shared.requestJSON(path)
+                self.people = (res["people"] as? [[String: Any]] ?? res["users"] as? [[String: Any]] ?? []).map(KinnectUser.from)
+                self.posts = (res["posts"] as? [[String: Any]] ?? []).map(PostItem.from)
+
+            case .following:
+                let path = "/api/discover?following=1\(filterParams)"
+                let res = try await KinnectAPIClient.shared.requestJSON(path)
                 self.people = (res["people"] as? [[String: Any]] ?? res["users"] as? [[String: Any]] ?? []).map(KinnectUser.from)
                 self.posts = (res["posts"] as? [[String: Any]] ?? []).map(PostItem.from)
             }
-
-        case .following:
-            let path = "/api/discover?following=1\(filterParams)"
-            if let res = try? await KinnectAPIClient.shared.requestJSON(path) {
-                self.people = (res["people"] as? [[String: Any]] ?? res["users"] as? [[String: Any]] ?? []).map(KinnectUser.from)
-                self.posts = (res["posts"] as? [[String: Any]] ?? []).map(PostItem.from)
-            }
+            self.loadError = nil
+        } catch {
+            self.loadError = error.localizedDescription
         }
     }
 

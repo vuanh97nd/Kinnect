@@ -33,6 +33,7 @@ struct MessagesView: View {
     @State private var showNewDirectChatSheet = false
     @State private var activeChatPeer: KinnectUser? = nil
     @State private var isLoading = false
+    @State private var loadError: String? = nil
     @State private var searchQuery: String = ""
 
     init(initialScope: ChatScope = .direct, onOpenFriends: @escaping () -> Void = {}, onBack: (() -> Void)? = nil) {
@@ -111,8 +112,24 @@ struct MessagesView: View {
                 LazyVStack(spacing: 0) {
                     if scope == .direct {
                         let rows = filteredConversations
+                        if let loadError, !rows.isEmpty {
+                            KinnectErrorBanner(message: loadError) {
+                                Task { await loadChats() }
+                            }
+                            .padding(.horizontal, KinnectTheme.spaceLG)
+                            .padding(.vertical, KinnectTheme.spaceSM)
+                        }
                         if rows.isEmpty && !isLoading {
-                            emptyDirectView
+                            if let loadError {
+                                KinnectStateView(mode: .error(
+                                    title: "Không tải được tin nhắn",
+                                    message: loadError,
+                                    retryTitle: "Thử lại",
+                                    onRetry: { Task { await loadChats() } }
+                                ))
+                            } else {
+                                emptyDirectView
+                            }
                         }
 
                         ForEach(rows, id: \.0) { index, conv, peer in
@@ -130,8 +147,24 @@ struct MessagesView: View {
                             }
                         }
                     } else {
+                        if let loadError, !groups.isEmpty {
+                            KinnectErrorBanner(message: loadError) {
+                                Task { await loadChats() }
+                            }
+                            .padding(.horizontal, KinnectTheme.spaceLG)
+                            .padding(.vertical, KinnectTheme.spaceSM)
+                        }
                         if groups.isEmpty && !isLoading {
-                            emptyGroupsView
+                            if let loadError {
+                                KinnectStateView(mode: .error(
+                                    title: "Không tải được nhóm chat",
+                                    message: loadError,
+                                    retryTitle: "Thử lại",
+                                    onRetry: { Task { await loadChats() } }
+                                ))
+                            } else {
+                                emptyGroupsView
+                            }
                         }
 
                         ForEach(groups) { group in
@@ -327,13 +360,7 @@ struct MessagesView: View {
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)
                             .background(
-                                Capsule().fill(
-                                    LinearGradient(
-                                        colors: [Color(hex: "#8E2DE2"), Color(hex: "#4A00E0")],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
+                                Capsule().fill(KinnectTheme.messageBubbleGradient)
                             )
                     }
                 }
@@ -390,13 +417,7 @@ struct MessagesView: View {
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)
                             .background(
-                                Capsule().fill(
-                                    LinearGradient(
-                                        colors: [Color(hex: "#8E2DE2"), Color(hex: "#4A00E0")],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
+                                Capsule().fill(KinnectTheme.messageBubbleGradient)
                             )
                     }
                 }
@@ -423,13 +444,23 @@ struct MessagesView: View {
         async let cTask = KinnectAPIClient.shared.requestJSON("/api/conversations")
         async let gTask = KinnectAPIClient.shared.requestJSON("/api/groups")
 
-        if let cRes = try? await cTask {
+        var fetchError: String? = nil
+        do {
+            let cRes = try await cTask
             let list = (cRes["users"] as? [[String: Any]]) ?? (cRes["conversations"] as? [[String: Any]]) ?? []
             self.conversations = list
+        } catch {
+            fetchError = error.localizedDescription
         }
-        if let gRes = try? await gTask {
+        do {
+            let gRes = try await gTask
             self.groups = (gRes["groups"] as? [[String: Any]] ?? []).map(ChatGroupItem.from)
+        } catch {
+            if fetchError == nil {
+                fetchError = error.localizedDescription
+            }
         }
+        self.loadError = fetchError
         await appState.refreshGlobalBadges()
     }
 }
@@ -490,15 +521,7 @@ struct ChatAttachmentBubbleView: View {
     }
 
     private var fileIconColor: Color {
-        let ext = (fileName as NSString).pathExtension.lowercased()
-        switch ext {
-        case "pdf": return Color(hex: "#EF4444")
-        case "doc", "docx": return Color(hex: "#3B82F6")
-        case "xls", "xlsx", "csv": return Color(hex: "#10B981")
-        case "zip", "rar", "tar", "gz": return Color(hex: "#8B5CF6")
-        case "mp3", "m4a", "wav", "aac": return Color(hex: "#F59E0B")
-        default: return KinnectTheme.accentBright
-        }
+        KinnectTheme.attachmentColor(forExtension: (fileName as NSString).pathExtension)
     }
 
     var body: some View {
@@ -639,7 +662,7 @@ struct DirectChatDetailView: View {
                                 Circle()
                                     .fill(
                                         (appState.onlineUserIds.contains(peer.id) || (peer.isActive && peer.showActivity))
-                                            ? Color(hex: "#2E9E66")
+                                            ? KinnectTheme.onlinePresence
                                             : KinnectTheme.messageMeta
                                     )
                                     .frame(width: 7, height: 7)
@@ -666,11 +689,11 @@ struct DirectChatDetailView: View {
                     } label: {
                         ZStack {
                             Circle()
-                                .fill(Color(hex: "#2E9E66").opacity(0.18))
+                                .fill(KinnectTheme.onlinePresence.opacity(0.18))
                                 .frame(width: 36, height: 36)
                             Image(systemName: "phone.fill")
                                 .font(KinnectTheme.scaled(15))
-                                .foregroundColor(Color(hex: "#2E9E66"))
+                                .foregroundColor(KinnectTheme.onlinePresence)
                         }
                     }
                     .buttonStyle(.plain)
@@ -887,7 +910,7 @@ struct DirectChatDetailView: View {
                                     .font(.system(size: 30))
                                     .foregroundStyle(
                                         LinearGradient(
-                                            colors: [Color(hex: "#8E2DE2"), Color(hex: "#4A00E0")],
+                                            colors: [KinnectTheme.messageVioletStart, KinnectTheme.messageVioletEnd],
                                             startPoint: .top,
                                             endPoint: .bottom
                                         )
@@ -1012,7 +1035,7 @@ struct DirectChatDetailView: View {
                                             isMine
                                                 ? AnyShapeStyle(
                                                     LinearGradient(
-                                                        colors: [Color(hex: "#8E2DE2"), Color(hex: "#4A00E0")],
+                                                        colors: [KinnectTheme.messageVioletStart, KinnectTheme.messageVioletEnd],
                                                         startPoint: .topLeading,
                                                         endPoint: .bottomTrailing
                                                     )
@@ -1505,7 +1528,7 @@ struct GroupChatDetailView: View {
                                             isMine
                                                 ? AnyShapeStyle(
                                                     LinearGradient(
-                                                        colors: [Color(hex: "#8E2DE2"), Color(hex: "#4A00E0")],
+                                                        colors: [KinnectTheme.messageVioletStart, KinnectTheme.messageVioletEnd],
                                                         startPoint: .topLeading,
                                                         endPoint: .bottomTrailing
                                                     )
@@ -1802,7 +1825,7 @@ struct GroupChatDetailView: View {
                             .font(.system(size: 30))
                             .foregroundStyle(
                                 LinearGradient(
-                                    colors: [Color(hex: "#8E2DE2"), Color(hex: "#4A00E0")],
+                                    colors: [KinnectTheme.messageVioletStart, KinnectTheme.messageVioletEnd],
                                     startPoint: .top,
                                     endPoint: .bottom
                                 )
@@ -1864,7 +1887,7 @@ struct GroupChatDetailView: View {
                         Circle()
                             .fill(
                                 LinearGradient(
-                                    colors: [Color(hex: "#8E2DE2"), Color(hex: "#4A00E0")],
+                                    colors: [KinnectTheme.messageVioletStart, KinnectTheme.messageVioletEnd],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 )
@@ -2266,7 +2289,7 @@ struct NewDirectChatPickerSheet: View {
                             } header: {
                                 Text("Đang trực tuyến (\(onlineFriends.count))")
                                     .font(.caption.bold())
-                                    .foregroundColor(Color(hex: "#2E9E66"))
+                                    .foregroundColor(KinnectTheme.onlinePresence)
                             }
                         }
 

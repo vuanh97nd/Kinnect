@@ -40,18 +40,9 @@ struct KinnectBottomBar: View {
             } label: {
                 ZStack {
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 0x7B / 255.0, green: 0x43 / 255.0, blue: 0xF7 / 255.0),
-                                    Color(red: 0xED / 255.0, green: 0x45 / 255.0, blue: 0xAA / 255.0)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .fill(KinnectTheme.brandSignatureGradient)
                         .frame(width: 46, height: 40)
-                        .shadow(color: Color(red: 0x7B / 255.0, green: 0x43 / 255.0, blue: 0xF7 / 255.0).opacity(0.35), radius: 4, y: 2)
+                        .shadow(color: KinnectTheme.brandViolet.opacity(0.35), radius: 4, y: 2)
 
                     Image(systemName: "plus")
                         .font(KinnectTheme.scaled(20, weight: .bold))

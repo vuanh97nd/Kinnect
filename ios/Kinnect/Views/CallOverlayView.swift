@@ -40,7 +40,7 @@ struct CallOverlayView: View {
             } else {
                 ZStack {
                     LinearGradient(
-                        colors: [Color(red: 0.12, green: 0.13, blue: 0.18), .black],
+                        colors: KinnectTheme.callVideoBackdropColors,
                         startPoint: .top,
                         endPoint: .bottom
                     ).ignoresSafeArea()
@@ -164,7 +164,7 @@ struct CallOverlayView: View {
                     } else if webrtc.isCameraOff {
                         ZStack {
                             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(Color(red: 0.12, green: 0.13, blue: 0.18))
+                                .fill(KinnectTheme.callPipBackground)
                             VStack(spacing: 4) {
                                 Image(systemName: "video.slash.fill")
                                     .font(KinnectTheme.scaled(22))
@@ -239,7 +239,7 @@ struct CallOverlayView: View {
                     .padding(.vertical, 16)
                     .background(
                         Capsule()
-                            .fill(Color(red: 0.1, green: 0.1, blue: 0.14).opacity(0.85))
+                            .fill(KinnectTheme.callDockFill)
                             .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
                             .shadow(color: .black.opacity(0.4), radius: 12, y: 4)
                     )
@@ -254,7 +254,7 @@ struct CallOverlayView: View {
     private func incomingCallView(_ call: ActiveCallSession) -> some View {
         ZStack {
             LinearGradient(
-                colors: [Color(red: 0.14, green: 0.16, blue: 0.22), .black],
+                colors: KinnectTheme.callBackdropColors,
                 startPoint: .top,
                 endPoint: .bottom
             ).ignoresSafeArea()
@@ -360,7 +360,7 @@ struct CallOverlayView: View {
     private func audioCallView(_ call: ActiveCallSession) -> some View {
         ZStack {
             LinearGradient(
-                colors: [Color(red: 0.14, green: 0.16, blue: 0.22), .black],
+                colors: KinnectTheme.callBackdropColors,
                 startPoint: .top,
                 endPoint: .bottom
             ).ignoresSafeArea()
@@ -404,7 +404,7 @@ struct CallOverlayView: View {
                         VStack(spacing: 4) {
                             Text("Đã kết nối")
                                 .font(.caption.weight(.semibold))
-                                .foregroundColor(Color(hex: "#4ADE80"))
+                                .foregroundColor(KinnectTheme.callConnectedTint)
                             callTimerLabel(call)
                                 .font(.title2.monospacedDigit().weight(.semibold))
                                 .foregroundColor(.white.opacity(0.92))
@@ -458,7 +458,7 @@ struct CallOverlayView: View {
                 .padding(.vertical, 16)
                 .background(
                     Capsule()
-                        .fill(Color(red: 0.1, green: 0.1, blue: 0.14).opacity(0.85))
+                        .fill(KinnectTheme.callDockFill)
                         .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
                         .shadow(color: .black.opacity(0.4), radius: 12, y: 4)
                 )

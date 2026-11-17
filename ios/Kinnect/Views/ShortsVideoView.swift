@@ -18,6 +18,7 @@ struct ShortsVideoView: View {
     @State private var items: [ShortItem] = []
     @State private var currentIndex: Int? = 0
     @State private var isLoading = false
+    @State private var loadError: String? = nil
     @State private var activeCommentShort: ShortItem?
     @State private var activeOptionsShort: ShortItem?
     @State private var selectedAuthorProfile: KinnectUser? = nil
@@ -40,19 +41,38 @@ struct ShortsVideoView: View {
         ZStack(alignment: .top) {
             Color.black.ignoresSafeArea()
 
-            if items.isEmpty && !isLoading {
-                VStack(spacing: 12) {
-                    KinnectIcon(glyph: .video, size: 48, tint: KinnectTheme.textSecondary)
-                    Text("Chưa có video ngắn")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                    Text("Các video ngắn thịnh hành sẽ hiển thị tại đây.")
-                        .font(.subheadline)
-                        .foregroundColor(KinnectTheme.textSecondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
-                }
+            if items.isEmpty && isLoading {
+                KinnectStateView(
+                    mode: .loading("Đang tải video ngắn…"),
+                    forceDarkSurface: true
+                )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if items.isEmpty && !isLoading {
+                if let loadError {
+                    KinnectStateView(
+                        mode: .error(
+                            title: "Không tải được video ngắn",
+                            message: loadError,
+                            retryTitle: "Thử lại",
+                            onRetry: { Task { await loadShorts() } }
+                        ),
+                        forceDarkSurface: true
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    KinnectStateView(
+                        mode: .empty(
+                            glyph: .video,
+                            systemIcon: nil,
+                            title: "Chưa có video ngắn",
+                            subtitle: "Các video ngắn thịnh hành sẽ hiển thị tại đây.",
+                            actionTitle: "Tải lại",
+                            onAction: { Task { await loadShorts() } }
+                        ),
+                        forceDarkSurface: true
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             } else if !items.isEmpty {
                 GeometryReader { geo in
                     let bottomSafeInset = geo.safeAreaInsets.bottom
@@ -128,22 +148,31 @@ struct ShortsVideoView: View {
             }
 
             // Top transparent floating bar (Đề xuất · Đang theo dõi) - Parity with Android 1.2.12
-            HStack(spacing: 24) {
-                Spacer()
-                tabHeaderButton(id: "for", title: "Đề xuất")
-                tabHeaderButton(id: "following", title: "Đang theo dõi")
-                Spacer()
-            }
-            .padding(.top, 8)
-            .padding(.bottom, 12)
-            .background(
-                LinearGradient(
-                    colors: [Color.black.opacity(0.7), Color.black.opacity(0.0)],
-                    startPoint: .top,
-                    endPoint: .bottom
+            VStack(spacing: KinnectTheme.spaceSM) {
+                HStack(spacing: 24) {
+                    Spacer()
+                    tabHeaderButton(id: "for", title: "Đề xuất")
+                    tabHeaderButton(id: "following", title: "Đang theo dõi")
+                    Spacer()
+                }
+                .padding(.top, 8)
+                .padding(.bottom, 12)
+                .background(
+                    LinearGradient(
+                        colors: [Color.black.opacity(0.7), Color.black.opacity(0.0)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .ignoresSafeArea(edges: .top)
                 )
-                .ignoresSafeArea(edges: .top)
-            )
+
+                if let loadError, !items.isEmpty {
+                    KinnectErrorBanner(message: loadError) {
+                        Task { await loadShorts() }
+                    }
+                    .padding(.horizontal, KinnectTheme.spaceMD)
+                }
+            }
         }
         .onChange(of: currentIndex) { next in
             userPaused = false
@@ -496,12 +525,14 @@ struct ShortsVideoView: View {
             )
             if let arr = res["shorts"] as? [[String: Any]] {
                 self.items = arr.map(ShortItem.from)
+                self.loadError = nil
                 if let accountId = AccountCache.shared.activeAccountId {
                     AccountCache.shared.saveJSONObject(arr, forKey: cacheKey, accountId: accountId)
                 }
             }
         } catch {
-            if items.isEmpty {
+            self.loadError = error.localizedDescription
+            if !items.isEmpty {
                 appState.showToast("Không thể tải video: \(error.localizedDescription)")
             }
         }
@@ -1013,14 +1044,7 @@ struct ShortClipPlayer: View {
     var body: some View {
         ZStack {
             // Elegant cinematic gradient background so video is never a black void
-            LinearGradient(
-                colors: [
-                    Color(red: 0.16, green: 0.08, blue: 0.32),
-                    Color(red: 0.05, green: 0.03, blue: 0.14)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            KinnectTheme.shortsBackdropGradient
             .ignoresSafeArea()
 
             if controller.failed {

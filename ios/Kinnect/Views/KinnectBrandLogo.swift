@@ -9,16 +9,7 @@ struct KinnectBrandLogo: View {
         ZStack {
             // Squircle gradient background (#7B43F7 -> #ED45AA)
             RoundedRectangle(cornerRadius: size * (42.0 / 192.0), style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0x7B / 255.0, green: 0x43 / 255.0, blue: 0xF7 / 255.0),
-                            Color(red: 0xED / 255.0, green: 0x45 / 255.0, blue: 0xAA / 255.0)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .fill(KinnectTheme.brandSignatureGradient)
                 .frame(width: size, height: size)
                 .shadow(color: Color.black.opacity(0.15), radius: 2, y: 1)
 

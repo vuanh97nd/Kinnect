@@ -16,6 +16,7 @@ struct NotificationsView: View {
     @State private var filter: NotificationFilter = .all
     @State private var notifications: [NotificationItem] = []
     @State private var isLoading = false
+    @State private var loadError: String? = nil
 
     // Navigation targets (Parity with Android MainActivity.openNotification)
     @State private var selectedPost: PostItem? = nil
@@ -53,8 +54,26 @@ struct NotificationsView: View {
 
                 // Notifications List
                 ScrollView {
-                    if filteredNotifications.isEmpty && !isLoading {
-                        emptyStateView
+                    if let loadError, !filteredNotifications.isEmpty {
+                        KinnectErrorBanner(message: loadError) {
+                            Task { await loadNotifications() }
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.bottom, KinnectTheme.spaceSM)
+                    }
+                    if filteredNotifications.isEmpty && isLoading {
+                        KinnectStateView(mode: .loading("Đang tải thông báo…"))
+                    } else if filteredNotifications.isEmpty && !isLoading {
+                        if let loadError {
+                            KinnectStateView(mode: .error(
+                                title: "Không tải được thông báo",
+                                message: loadError,
+                                retryTitle: "Thử lại",
+                                onRetry: { Task { await loadNotifications() } }
+                            ))
+                        } else {
+                            emptyStateView
+                        }
                     } else {
                         VStack(spacing: 0) {
                             ForEach(Array(filteredNotifications.enumerated()), id: \.element.id) { index, item in
@@ -276,9 +295,13 @@ struct NotificationsView: View {
         }
         isLoading = true
         defer { isLoading = false }
-        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/notifications") {
+        do {
+            let res = try await KinnectAPIClient.shared.requestJSON("/api/notifications")
             let list = res["notifications"] as? [[String: Any]] ?? []
             self.notifications = list.map(NotificationItem.from)
+            self.loadError = nil
+        } catch {
+            self.loadError = error.localizedDescription
         }
     }
 

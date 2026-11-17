@@ -498,7 +498,7 @@ struct RootMainView: View {
                                 }
                                 if let screen = UIReviewFixture.activeScreen {
                                     switch screen {
-                                    case "feed":
+                                    case "feed", "feed-error":
                                         activeTopSection = nil
                                         selectedTab = .feed
                                     case "discover":
@@ -539,7 +539,7 @@ struct RootMainView: View {
                                 case "video", "shorts":
                                     activeTopSection = nil
                                     selectedTab = .video
-                                case "feed":
+                                case "feed", "feed-error":
                                     activeTopSection = nil
                                     selectedTab = .feed
                                 default:

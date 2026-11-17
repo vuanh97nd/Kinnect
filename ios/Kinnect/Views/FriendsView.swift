@@ -19,6 +19,7 @@ struct FriendsView: View {
     @State private var discoverResults: [KinnectUser] = []
     @State private var isSearchingServer = false
     @State private var isLoading = false
+    @State private var loadError: String? = nil
     @State private var selectedProfileUser: KinnectUser? = nil
     @State private var activeChatPeer: KinnectUser? = nil
 
@@ -102,14 +103,28 @@ struct FriendsView: View {
                 LazyVStack(spacing: 14) {
                     switch tab {
                     case .friends:
+                        if let loadError, !(filteredFriends.isEmpty && filteredDiscoverResults.isEmpty && filteredSuggestions.isEmpty) {
+                            KinnectErrorBanner(message: loadError) {
+                                Task { await loadAll() }
+                            }
+                        }
                         if filteredFriends.isEmpty && filteredDiscoverResults.isEmpty && !isLoading && !isSearchingServer && filteredSuggestions.isEmpty {
-                            emptyPlaceholder(searchQuery.isEmpty ? "Chưa có bạn bè nào trong danh sách" : "Không tìm thấy người dùng phù hợp")
+                            if let loadError {
+                                KinnectStateView(mode: .error(
+                                    title: "Không tải được danh sách bạn bè",
+                                    message: loadError,
+                                    retryTitle: "Thử lại",
+                                    onRetry: { Task { await loadAll() } }
+                                ))
+                            } else {
+                                emptyPlaceholder(searchQuery.isEmpty ? "Chưa có bạn bè nào trong danh sách" : "Không tìm thấy người dùng phù hợp")
+                            }
                         } else {
                             let online = filteredFriends.filter { ($0.isActive && $0.showActivity) || appState.onlineUserIds.contains($0.id) }
                             let offline = filteredFriends.filter { !(($0.isActive && $0.showActivity) || appState.onlineUserIds.contains($0.id)) }
 
                             if !online.isEmpty {
-                                sectionHeader("Đang trực tuyến", count: online.count, color: Color(hex: "#2E9E66"))
+                                sectionHeader("Đang trực tuyến", count: online.count, color: KinnectTheme.onlinePresence)
                                 VStack(spacing: 0) {
                                     ForEach(online) { user in
                                         friendRow(user: user)
@@ -174,8 +189,22 @@ struct FriendsView: View {
                         }
 
                     case .requests:
+                        if let loadError, !incoming.isEmpty {
+                            KinnectErrorBanner(message: loadError) {
+                                Task { await loadAll() }
+                            }
+                        }
                         if incoming.isEmpty && !isLoading {
-                            emptyPlaceholder("Không có lời mời kết bạn nào")
+                            if let loadError {
+                                KinnectStateView(mode: .error(
+                                    title: "Không tải được lời mời kết bạn",
+                                    message: loadError,
+                                    retryTitle: "Thử lại",
+                                    onRetry: { Task { await loadAll() } }
+                                ))
+                            } else {
+                                emptyPlaceholder("Không có lời mời kết bạn nào")
+                            }
                         } else {
                             VStack(spacing: 0) {
                                 ForEach(incoming) { user in
@@ -189,8 +218,22 @@ struct FriendsView: View {
                         }
 
                     case .outgoing:
+                        if let loadError, !outgoing.isEmpty {
+                            KinnectErrorBanner(message: loadError) {
+                                Task { await loadAll() }
+                            }
+                        }
                         if outgoing.isEmpty && !isLoading {
-                            emptyPlaceholder("Không có lời mời nào đã gửi")
+                            if let loadError {
+                                KinnectStateView(mode: .error(
+                                    title: "Không tải được lời mời đã gửi",
+                                    message: loadError,
+                                    retryTitle: "Thử lại",
+                                    onRetry: { Task { await loadAll() } }
+                                ))
+                            } else {
+                                emptyPlaceholder("Không có lời mời nào đã gửi")
+                            }
                         } else {
                             VStack(spacing: 0) {
                                 ForEach(outgoing) { user in
@@ -367,7 +410,7 @@ struct FriendsView: View {
                         let active = (user.isActive && user.showActivity) || appState.onlineUserIds.contains(user.id)
                         Text("@\(user.handle.isEmpty ? user.name : user.handle) • \(active ? "Đang hoạt động" : "Ngoại tuyến")")
                             .font(.caption2)
-                            .foregroundColor(active ? Color(hex: "#2E9E66") : KinnectTheme.textSecondary)
+                            .foregroundColor(active ? KinnectTheme.onlinePresence : KinnectTheme.textSecondary)
                             .lineLimit(1)
                             .truncationMode(.tail)
                     }
@@ -456,7 +499,7 @@ struct FriendsView: View {
                         let active = (user.isActive && user.showActivity) || appState.onlineUserIds.contains(user.id)
                         Text("@\(user.handle.isEmpty ? user.name : user.handle) • \(active ? "Đang hoạt động" : "Ngoại tuyến")")
                             .font(.caption2)
-                            .foregroundColor(active ? Color(hex: "#2E9E66") : KinnectTheme.textSecondary)
+                            .foregroundColor(active ? KinnectTheme.onlinePresence : KinnectTheme.textSecondary)
                             .lineLimit(1)
                             .truncationMode(.tail)
                     }
@@ -554,9 +597,13 @@ struct FriendsView: View {
         async let rTask = KinnectAPIClient.shared.requestJSON("/api/friend-requests")
         async let sTask = KinnectAPIClient.shared.requestJSON("/api/friend-suggestions")
 
-        if let fRes = try? await fTask {
+        do {
+            let fRes = try await fTask
             let list = (fRes["users"] as? [[String: Any]]) ?? (fRes["friends"] as? [[String: Any]]) ?? []
             self.friends = list.map(KinnectUser.from)
+            self.loadError = nil
+        } catch {
+            self.loadError = error.localizedDescription
         }
         if let rRes = try? await rTask {
             let inc = rRes["incoming"] as? [[String: Any]] ?? []

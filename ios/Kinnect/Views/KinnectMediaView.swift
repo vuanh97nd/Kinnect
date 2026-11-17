@@ -17,7 +17,7 @@ struct KinnectMediaTile: View {
                     return 16.0 / 9.0
                 }()
                 ZStack {
-                    Color(red: 0.06, green: 0.08, blue: 0.13)
+                    KinnectTheme.mediaTileDark
                     if let image = thumbnail.image {
                         Image(uiImage: image)
                             .resizable()

@@ -544,6 +544,7 @@ def main():
         ("01e-iphone-auth-welcome-light", "auth-welcome", ["--ui-review-light"], "Màn hình chào mừng đầu tiên (Light)"),
         ("02-iphone-feed-dark", "feed", [], "Bảng tin không có category strip (Dark)"),
         ("02b-iphone-feed-comments", "feed-comments", [], "Bình luận Bảng tin: Threading đa tầng, Emoji nhanh, Nhắc @"),
+        ("02c-iphone-feed-error", "feed-error", [], "Bảng tin: Trạng thái lỗi tải dữ liệu và nút Thử lại"),
         ("03-iphone-discover-dark", "discover", [], "Khám phá (Dark)"),
         ("03b-iphone-shorts-video-dark", "shorts", [], "Tab Video Shorts (Android 1.2.12 build 118)"),
         ("03c-iphone-shorts-comments", "shorts-comments", [], "Bình luận Video: Threading đa tầng, Emoji nhanh, Nhắc @"),

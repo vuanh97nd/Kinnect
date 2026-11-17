@@ -484,7 +484,7 @@ struct LiveStreamView: View {
         HStack(alignment: .top, spacing: 6) {
             Text(name + ":")
                 .font(.caption2.bold())
-                .foregroundColor(Color(hex: colorHex))
+                .foregroundColor(KinnectTheme.serverColor(colorHex))
             Text(text)
                 .font(.caption2)
                 .foregroundColor(.white)
@@ -595,7 +595,7 @@ struct CreateLiveRoomSheet: View {
                 if let createErrorMessage, !createErrorMessage.isEmpty {
                     HStack(spacing: 8) {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(Color(red: 1.0, green: 0.42, blue: 0.42))
+                            .foregroundColor(KinnectTheme.liveCoralError)
                         Text(createErrorMessage)
                             .font(.caption.weight(.medium))
                             .foregroundColor(.white)
@@ -665,18 +665,14 @@ struct CreateLiveRoomSheet: View {
         if isGameMode {
             ZStack {
                 LinearGradient(
-                    colors: [
-                        Color(red: 0.04, green: 0.07, blue: 0.14),
-                        Color(red: 0.05, green: 0.11, blue: 0.16),
-                        Color(red: 0.03, green: 0.04, blue: 0.08)
-                    ],
+                    colors: KinnectTheme.liveGameStageColors,
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
                 Circle()
                     .fill(
                         RadialGradient(
-                            colors: [Color(hex: "#10B981").opacity(0.28), .clear],
+                            colors: [KinnectTheme.liveGameEmerald.opacity(0.28), .clear],
                             center: .center,
                             startRadius: 10,
                             endRadius: 210
@@ -687,7 +683,7 @@ struct CreateLiveRoomSheet: View {
                 Circle()
                     .fill(
                         RadialGradient(
-                            colors: [Color(hex: "#0284C7").opacity(0.22), .clear],
+                            colors: [KinnectTheme.liveGameCyan.opacity(0.22), .clear],
                             center: .center,
                             startRadius: 10,
                             endRadius: 180
@@ -741,7 +737,7 @@ struct CreateLiveRoomSheet: View {
 
             HStack(spacing: 6) {
                 Circle()
-                    .fill(isGameMode ? Color(hex: "#34D399") : Color(red: 0.96, green: 0.24, blue: 0.42))
+                    .fill(isGameMode ? KinnectTheme.liveGameMint : KinnectTheme.liveCrimson)
                     .frame(width: 7, height: 7)
                 Text(isGameMode ? "Chơi game · \(resolvedGameName)" : "Trực tiếp · Trò chuyện")
                     .font(.caption.weight(.bold))
@@ -755,7 +751,7 @@ struct CreateLiveRoomSheet: View {
                     .fill(.ultraThinMaterial)
                     .overlay(
                         Capsule().stroke(
-                            (isGameMode ? Color(hex: "#10B981") : Color.white).opacity(0.22),
+                            (isGameMode ? KinnectTheme.liveGameEmerald : Color.white).opacity(0.22),
                             lineWidth: 0.8
                         )
                     )
@@ -794,8 +790,8 @@ struct CreateLiveRoomSheet: View {
                         .background(
                             Capsule().fill(
                                 isGameMode
-                                    ? Color(hex: "#10B981")
-                                    : Color(red: 0.96, green: 0.24, blue: 0.42)
+                                    ? KinnectTheme.liveGameEmerald
+                                    : KinnectTheme.liveCrimson
                             )
                         )
                         .offset(y: 4)
@@ -812,7 +808,7 @@ struct CreateLiveRoomSheet: View {
                     HStack(spacing: 6) {
                         Image(systemName: isGameMode ? "gamecontroller.fill" : "sparkles")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(isGameMode ? Color(hex: "#34D399") : KinnectTheme.accentBright)
+                            .foregroundColor(isGameMode ? KinnectTheme.liveGameMint : KinnectTheme.accentBright)
                         Text(isGameMode ? "Phát luồng Game · \(resolvedGameName)" : topic)
                             .font(.caption.weight(.medium))
                             .foregroundColor(.white.opacity(0.78))
@@ -851,7 +847,7 @@ struct CreateLiveRoomSheet: View {
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke((isGameMode ? Color(hex: "#10B981") : Color.white).opacity(0.18), lineWidth: 0.9)
+                        .stroke((isGameMode ? KinnectTheme.liveGameEmerald : Color.white).opacity(0.18), lineWidth: 0.9)
                 )
         )
     }
@@ -889,7 +885,7 @@ struct CreateLiveRoomSheet: View {
             studioRailButton(
                 icon: previewMicEnabled ? "mic.fill" : "mic.slash.fill",
                 label: previewMicEnabled ? "Micro" : "Tắt mic",
-                tint: previewMicEnabled ? Color(hex: "#34D399") : Color(red: 1.0, green: 0.42, blue: 0.42),
+                tint: previewMicEnabled ? KinnectTheme.liveGameMint : KinnectTheme.liveCoralError,
                 isActive: !previewMicEnabled
             ) {
                 previewMicEnabled.toggle()
@@ -942,11 +938,11 @@ struct CreateLiveRoomSheet: View {
                 HStack(spacing: 6) {
                     Image(systemName: "gamecontroller.fill")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(Color(hex: "#34D399"))
+                        .foregroundColor(KinnectTheme.liveGameMint)
                     Text("THIẾT LẬP CHƠI GAME")
                         .font(.system(size: 11, weight: .black))
                         .tracking(0.6)
-                        .foregroundColor(Color(hex: "#34D399"))
+                        .foregroundColor(KinnectTheme.liveGameMint)
                 }
                 Spacer()
                 Button {
@@ -958,7 +954,7 @@ struct CreateLiveRoomSheet: View {
                         Text(previewMicEnabled ? "Mic Bật" : "Mic Tắt")
                             .font(.system(size: 11, weight: .bold))
                     }
-                    .foregroundColor(previewMicEnabled ? Color(hex: "#34D399") : Color(red: 1.0, green: 0.42, blue: 0.42))
+                    .foregroundColor(previewMicEnabled ? KinnectTheme.liveGameMint : KinnectTheme.liveCoralError)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(Capsule().fill(Color.white.opacity(0.1)))
@@ -979,7 +975,7 @@ struct CreateLiveRoomSheet: View {
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
                                 .background(
-                                    Capsule().fill(selected ? Color(hex: "#34D399") : Color.white.opacity(0.11))
+                                    Capsule().fill(selected ? KinnectTheme.liveGameMint : Color.white.opacity(0.11))
                                 )
                         }
                         .buttonStyle(.plain)
@@ -1000,12 +996,12 @@ struct CreateLiveRoomSheet: View {
                 Toggle("Âm thanh game", isOn: $gameSound)
                     .font(.subheadline.weight(.medium))
                     .foregroundColor(.white)
-                    .tint(Color(hex: "#10B981"))
+                    .tint(KinnectTheme.liveGameEmerald)
 
                 Toggle("Bình luận nổi trên màn hình", isOn: $gameComments)
                     .font(.subheadline.weight(.medium))
                     .foregroundColor(.white)
-                    .tint(Color(hex: "#10B981"))
+                    .tint(KinnectTheme.liveGameEmerald)
             }
 
             Text("Hiển thị huy hiệu Game trực tiếp, đồng bộ bảng xếp hạng quà tặng và bình luận thời gian thực.")
@@ -1020,7 +1016,7 @@ struct CreateLiveRoomSheet: View {
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(Color(hex: "#10B981").opacity(0.35), lineWidth: 1)
+                        .stroke(KinnectTheme.liveGameEmerald.opacity(0.35), lineWidth: 1)
                 )
         )
     }
@@ -1045,12 +1041,12 @@ struct CreateLiveRoomSheet: View {
                 .background(
                     Capsule().fill(
                         isGameMode
-                            ? LinearGradient(colors: [Color(hex: "#10B981"), Color(hex: "#0284C7")], startPoint: .leading, endPoint: .trailing)
-                            : LinearGradient(colors: [Color(red: 0.96, green: 0.24, blue: 0.42), Color(red: 0.56, green: 0.24, blue: 0.96)], startPoint: .leading, endPoint: .trailing)
+                            ? KinnectTheme.liveGameCTAGradient
+                            : KinnectTheme.liveChatCTAGradient
                     )
                 )
                 .foregroundColor(.white)
-                .shadow(color: (isGameMode ? Color(hex: "#10B981") : KinnectTheme.accent).opacity(0.45), radius: 12, y: 5)
+                .shadow(color: (isGameMode ? KinnectTheme.liveGameEmerald : KinnectTheme.accent).opacity(0.45), radius: 12, y: 5)
             }
             .buttonStyle(.plain)
             .disabled(isStarting)
@@ -1072,7 +1068,7 @@ struct CreateLiveRoomSheet: View {
 
     private func modeSwitchButton(id: String, title: String, icon: String) -> some View {
         let selected = (liveMode == id)
-        let accent = (id == "game") ? Color(hex: "#34D399") : Color(red: 0.98, green: 0.45, blue: 0.65)
+        let accent = (id == "game") ? KinnectTheme.liveGameMint : KinnectTheme.livePinkHighlight
         return Button {
             switchLiveMode(to: id)
         } label: {
@@ -1254,7 +1250,7 @@ struct LiveRoomFullScreenView: View {
                                         .font(.system(size: 8.5, weight: .black))
                                         .padding(.horizontal, 5)
                                         .padding(.vertical, 1.5)
-                                        .background(Capsule().fill(Color(red: 0.96, green: 0.24, blue: 0.42)))
+                                        .background(Capsule().fill(KinnectTheme.liveCrimson))
                                         .foregroundColor(.white)
                                     Label("\(room.viewerCount)", systemImage: "eye.fill")
                                         .font(.system(size: 10.5, weight: .semibold))
@@ -1274,7 +1270,7 @@ struct LiveRoomFullScreenView: View {
                         HStack(spacing: 5) {
                             Image(systemName: room.liveMode == "game" ? "gamecontroller.fill" : "waveform")
                                 .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(room.liveMode == "game" ? Color(hex: "#34D399") : KinnectTheme.accentBright)
+                                .foregroundColor(room.liveMode == "game" ? KinnectTheme.liveGameMint : KinnectTheme.accentBright)
                             Text(room.liveMode == "game" ? (room.gameTitle.isEmpty ? "Chơi game" : room.gameTitle) : "Trò chuyện")
                                 .font(.caption2.weight(.semibold))
                                 .foregroundColor(.white)
@@ -1303,7 +1299,7 @@ struct LiveRoomFullScreenView: View {
                                     .font(.caption2.weight(.bold))
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 7)
-                                    .background(Capsule().fill(Color(hex: "#F59E0B")))
+                                    .background(Capsule().fill(KinnectTheme.liveAmberPause))
                                     .foregroundColor(.black)
                             }
                             .buttonStyle(.plain)
@@ -1340,7 +1336,7 @@ struct LiveRoomFullScreenView: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, appState.isCurrentLiveHost ? 11 : 10)
                             .padding(.vertical, 8)
-                            .background(Capsule().fill(Color(red: 0.92, green: 0.24, blue: 0.34)))
+                            .background(Capsule().fill(KinnectTheme.liveEndRed))
                         }
                         .buttonStyle(.plain)
                     }
@@ -1805,14 +1801,14 @@ struct LiveGiftDrawerSheet: View {
         } else if gift.id == "star" {
             ZStack {
                 Circle()
-                    .fill(RadialGradient(colors: [Color(red: 0.67, green: 0.55, blue: 1.0).opacity(0.45), .clear], center: .center, startRadius: 2, endRadius: 24))
+                    .fill(RadialGradient(colors: [KinnectTheme.giftStarGlow.opacity(0.45), .clear], center: .center, startRadius: 2, endRadius: 24))
                 Image(systemName: "star.fill")
                     .font(.system(size: 28, weight: .bold))
-                    .foregroundStyle(LinearGradient(colors: [Color(red: 1.0, green: 0.94, blue: 0.68), Color(red: 0.96, green: 0.72, blue: 0.25)], startPoint: .top, endPoint: .bottom))
-                    .shadow(color: Color(red: 0.67, green: 0.55, blue: 1.0).opacity(0.65), radius: 5)
+                    .foregroundStyle(LinearGradient(colors: [KinnectTheme.giftStarGoldTop, KinnectTheme.giftStarGoldBottom], startPoint: .top, endPoint: .bottom))
+                    .shadow(color: KinnectTheme.giftStarGlow.opacity(0.65), radius: 5)
             }
             .frame(width: 44, height: 44)
-        } else if let vectorSpec = Self.vectorSymbol(for: gift.id) {
+        } else if let vectorSpec = KinnectTheme.seasonalEffectPalette(for: gift.id) {
             ZStack {
                 Circle()
                     .fill(RadialGradient(colors: [vectorSpec.primary.opacity(0.28), .clear], center: .center, startRadius: 2, endRadius: 24))
@@ -1825,21 +1821,6 @@ struct LiveGiftDrawerSheet: View {
             let symbol = gift.emoji == "🎁" ? LiveGiftCatalogItem.defaultEmoji(for: gift.id) : gift.emoji
             Text(symbol)
                 .font(.system(size: 38))
-        }
-    }
-
-    private static func vectorSymbol(for id: String) -> (systemName: String, primary: Color, secondary: Color)? {
-        switch id {
-        case "butterfly":
-            return ("sparkles", Color(red: 0.25, green: 0.85, blue: 0.82), Color(red: 0.56, green: 0.42, blue: 0.98))
-        case "aurora":
-            return ("sparkles", Color(red: 0.22, green: 0.82, blue: 0.92), Color(red: 0.48, green: 0.36, blue: 0.96))
-        case "meteor":
-            return ("sparkle", Color(red: 1.0, green: 0.85, blue: 0.35), Color(red: 0.98, green: 0.50, blue: 0.28))
-        case "lotus":
-            return ("leaf.fill", Color(red: 0.98, green: 0.48, blue: 0.72), Color(red: 0.65, green: 0.33, blue: 0.97))
-        default:
-            return nil
         }
     }
 
@@ -2119,55 +2100,8 @@ struct LiveFilterColorOverlay: View {
 
     var body: some View {
         Group {
-            switch filterId {
-            case "clear":
-                Color.cyan.opacity(0.08)
-            case "milk":
-                Color.white.opacity(0.12)
-            case "peach":
-                Color.pink.opacity(0.12)
-            case "warm":
-                Color.orange.opacity(0.12)
-            case "cool":
-                Color.blue.opacity(0.12)
-            case "film":
-                Color(red: 0.82, green: 0.72, blue: 0.52).opacity(0.16)
-            case "mono":
-                Color.gray.opacity(0.25)
-            case "noir":
-                Color.black.opacity(0.22)
-            case "vivid":
-                Color.purple.opacity(0.08)
-            case "sunset":
-                Color(red: 1.0, green: 0.42, blue: 0.22).opacity(0.16)
-            case "candy":
-                Color(red: 1.0, green: 0.5, blue: 0.8).opacity(0.16)
-            case "mint":
-                Color(red: 0.3, green: 0.9, blue: 0.7).opacity(0.12)
-            case "dream":
-                Color(red: 0.8, green: 0.6, blue: 0.9).opacity(0.14)
-            case "retro":
-                Color(red: 0.75, green: 0.65, blue: 0.35).opacity(0.16)
-            case "city":
-                Color(red: 0.2, green: 0.4, blue: 0.65).opacity(0.14)
-            case "cinema":
-                Color(red: 0.1, green: 0.3, blue: 0.45).opacity(0.15)
-            case "rose":
-                Color(red: 0.92, green: 0.4, blue: 0.55).opacity(0.15)
-            case "golden":
-                Color(red: 1.0, green: 0.84, blue: 0.0).opacity(0.15)
-            case "ice":
-                Color(red: 0.6, green: 0.9, blue: 1.0).opacity(0.15)
-            case "lavender":
-                Color(red: 0.75, green: 0.55, blue: 0.92).opacity(0.14)
-            case "choco":
-                Color(red: 0.55, green: 0.32, blue: 0.12).opacity(0.16)
-            case "polaroid":
-                Color(red: 0.92, green: 0.88, blue: 0.76).opacity(0.14)
-            case "teal":
-                Color(red: 0.0, green: 0.5, blue: 0.5).opacity(0.15)
-            default:
-                EmptyView()
+            if let overlayColor = KinnectTheme.liveFilterOverlay(for: filterId) {
+                overlayColor
             }
         }
     }
@@ -2216,30 +2150,30 @@ struct LiveEffectsSheet: View {
 
     // 24 Filters matching FxEngine.FILTERS
     private let filterList: [(id: String, name: String, color: Color)] = [
-        ("none", "Gốc", .gray),
-        ("clear", "Trong trẻo", .cyan),
-        ("milk", "Sữa", .white),
-        ("peach", "Hồng đào", .pink),
-        ("warm", "Ấm áp", .orange),
-        ("cool", "Mát lạnh", .blue),
-        ("film", "Phim cũ", Color(red: 0.82, green: 0.72, blue: 0.52)),
-        ("mono", "Đen trắng", .gray),
-        ("noir", "Tương phản", .black),
-        ("vivid", "Rực rỡ", .purple),
-        ("sunset", "Hoàng hôn", .orange),
-        ("candy", "Kẹo ngọt", .pink),
-        ("mint", "Bạc hà", .mint),
-        ("dream", "Mộng mơ", .purple),
-        ("retro", "Retro", Color(red: 0.75, green: 0.65, blue: 0.35)),
-        ("city", "Thành phố", .blue),
-        ("cinema", "Cinema", .indigo),
-        ("rose", "Rose", .red),
-        ("golden", "Golden", .yellow),
-        ("ice", "Ice", .teal),
-        ("lavender", "Lavender", Color(red: 0.75, green: 0.55, blue: 0.92)),
-        ("choco", "Choco", Color(red: 0.55, green: 0.32, blue: 0.12)),
-        ("polaroid", "Polaroid", Color(red: 0.92, green: 0.88, blue: 0.76)),
-        ("teal", "Teal", .teal)
+        ("none", "Gốc", KinnectTheme.liveFilterSwatch(for: "none")),
+        ("clear", "Trong trẻo", KinnectTheme.liveFilterSwatch(for: "clear")),
+        ("milk", "Sữa", KinnectTheme.liveFilterSwatch(for: "milk")),
+        ("peach", "Hồng đào", KinnectTheme.liveFilterSwatch(for: "peach")),
+        ("warm", "Ấm áp", KinnectTheme.liveFilterSwatch(for: "warm")),
+        ("cool", "Mát lạnh", KinnectTheme.liveFilterSwatch(for: "cool")),
+        ("film", "Phim cũ", KinnectTheme.liveFilterSwatch(for: "film")),
+        ("mono", "Đen trắng", KinnectTheme.liveFilterSwatch(for: "mono")),
+        ("noir", "Tương phản", KinnectTheme.liveFilterSwatch(for: "noir")),
+        ("vivid", "Rực rỡ", KinnectTheme.liveFilterSwatch(for: "vivid")),
+        ("sunset", "Hoàng hôn", KinnectTheme.liveFilterSwatch(for: "sunset")),
+        ("candy", "Kẹo ngọt", KinnectTheme.liveFilterSwatch(for: "candy")),
+        ("mint", "Bạc hà", KinnectTheme.liveFilterSwatch(for: "mint")),
+        ("dream", "Mộng mơ", KinnectTheme.liveFilterSwatch(for: "dream")),
+        ("retro", "Retro", KinnectTheme.liveFilterSwatch(for: "retro")),
+        ("city", "Thành phố", KinnectTheme.liveFilterSwatch(for: "city")),
+        ("cinema", "Cinema", KinnectTheme.liveFilterSwatch(for: "cinema")),
+        ("rose", "Rose", KinnectTheme.liveFilterSwatch(for: "rose")),
+        ("golden", "Golden", KinnectTheme.liveFilterSwatch(for: "golden")),
+        ("ice", "Ice", KinnectTheme.liveFilterSwatch(for: "ice")),
+        ("lavender", "Lavender", KinnectTheme.liveFilterSwatch(for: "lavender")),
+        ("choco", "Choco", KinnectTheme.liveFilterSwatch(for: "choco")),
+        ("polaroid", "Polaroid", KinnectTheme.liveFilterSwatch(for: "polaroid")),
+        ("teal", "Teal", KinnectTheme.liveFilterSwatch(for: "teal"))
     ]
 
     var body: some View {

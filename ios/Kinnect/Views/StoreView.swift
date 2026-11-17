@@ -248,13 +248,7 @@ struct StoreView: View {
         .padding(18)
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [Color(hex: "#3B1E6D"), Color(hex: "#1E1338")],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .fill(KinnectTheme.storeHeroGradient)
         )
     }
 
@@ -307,7 +301,7 @@ struct StoreView: View {
 
             ZStack {
                 Circle()
-                    .fill(Color(hex: "#23183D"))
+                    .fill(KinnectTheme.storeFrameBackdrop)
                     .frame(width: 68, height: 68)
                 Text("K")
                     .font(KinnectTheme.scaled(26, weight: .bold))
@@ -324,9 +318,9 @@ struct StoreView: View {
                         .frame(width: 76, height: 76)
                 } else {
                     Circle()
-                        .strokeBorder(Color(hex: preview.accentColor), lineWidth: 4)
+                        .strokeBorder(KinnectTheme.serverColor(preview.accentColor), lineWidth: 4)
                         .frame(width: 72, height: 72)
-                        .background(Circle().fill(Color(hex: preview.accentColor).opacity(0.2)))
+                        .background(Circle().fill(KinnectTheme.serverColor(preview.accentColor).opacity(0.2)))
                         .overlay(
                             Image(systemName: preview.iconName)
                                 .font(.system(size: 30, weight: .bold))
@@ -334,7 +328,7 @@ struct StoreView: View {
                         )
                 }
             }
-            .shadow(color: Color(hex: preview.accentColor).opacity(0.6), radius: 10)
+            .shadow(color: KinnectTheme.serverColor(preview.accentColor).opacity(0.6), radius: 10)
 
             Text("Xin chào! Đây là bản xem thử.")
                 .font(.subheadline.weight(.medium))
@@ -345,7 +339,7 @@ struct StoreView: View {
                     RoundedRectangle(cornerRadius: 16)
                         .fill(
                             LinearGradient(
-                                colors: [Color(hex: preview.accentColor), Color(hex: preview.accentColor).opacity(0.75)],
+                                colors: [KinnectTheme.serverColor(preview.accentColor), KinnectTheme.serverColor(preview.accentColor).opacity(0.75)],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
@@ -359,10 +353,10 @@ struct StoreView: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 18)
-                .fill(Color(hex: "#1A102E"))
+                .fill(KinnectTheme.storePreviewSurface)
                 .overlay(
                     RoundedRectangle(cornerRadius: 18)
-                        .strokeBorder(Color(hex: preview.accentColor).opacity(0.5), lineWidth: 1.5)
+                        .strokeBorder(KinnectTheme.serverColor(preview.accentColor).opacity(0.5), lineWidth: 1.5)
                 )
         )
     }
@@ -426,9 +420,9 @@ struct StoreView: View {
                     if let frame = frameImage {
                         // Avatar frame: circle background + frame image (84% of container)
                         Circle()
-                            .fill(Color(hex: "#23183D"))
+                            .fill(KinnectTheme.storeFrameBackdrop)
                             .frame(width: size * 0.72, height: size * 0.72)
-                            .shadow(color: Color(hex: package.accentColor).opacity(0.4), radius: size * 0.08)
+                            .shadow(color: KinnectTheme.serverColor(package.accentColor).opacity(0.4), radius: size * 0.08)
                         Text("K")
                             .font(.system(size: size * 0.22, weight: .bold))
                             .foregroundColor(.white)
@@ -442,7 +436,7 @@ struct StoreView: View {
                             .resizable()
                             .scaledToFit()
                             .frame(width: size * 0.7, height: size * 0.7)
-                            .shadow(color: Color(hex: package.accentColor).opacity(0.4), radius: size * 0.08)
+                            .shadow(color: KinnectTheme.serverColor(package.accentColor).opacity(0.4), radius: size * 0.08)
                     } else if let artwork = artworkImage {
                         // Artwork: fit entire container so any text on artwork is fully readable
                         Image(uiImage: artwork)
@@ -468,7 +462,7 @@ struct StoreView: View {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(
                         LinearGradient(
-                            colors: [Color(hex: pkg.accentColor), Color(hex: "#161329")],
+                            colors: [KinnectTheme.serverColor(pkg.accentColor), KinnectTheme.storeArtworkDarkFallback],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -568,7 +562,7 @@ struct StoreView: View {
                                 .background(
                                     Capsule().fill(
                                         LinearGradient(
-                                            colors: [Color(hex: pkg.accentColor), KinnectTheme.accentBright],
+                                            colors: [KinnectTheme.serverColor(pkg.accentColor), KinnectTheme.accentBright],
                                             startPoint: .leading,
                                             endPoint: .trailing
                                         )

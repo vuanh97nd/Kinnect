@@ -13,6 +13,7 @@ struct FeedView: View {
     @State private var stories: [StoryItem] = []
     @State private var posts: [PostItem] = []
     @State private var isLoading = false
+    @State private var loadError: String? = nil
 
     // Composer state
     @State private var showComposerSheet = false
@@ -33,20 +34,34 @@ struct FeedView: View {
 
                 storiesStrip
 
+                if let loadError, !visiblePosts.isEmpty {
+                    KinnectErrorBanner(message: loadError) {
+                        Task { await loadFeedAndStories() }
+                    }
+                }
+
                 if isLoading && posts.isEmpty {
                     ForEach(0..<3, id: \.self) { _ in
                         PostSkeletonCard()
                     }
                 } else if visiblePosts.isEmpty {
-                    VStack(spacing: 10) {
-                        Image(systemName: "newspaper.fill")
-                            .font(.largeTitle)
-                            .foregroundColor(KinnectTheme.textSecondary)
-                        Text("Chưa có bài viết nào")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundColor(KinnectTheme.textSecondary)
+                    if let loadError {
+                        KinnectStateView(mode: .error(
+                            title: "Không tải được bảng tin",
+                            message: loadError,
+                            retryTitle: "Thử lại",
+                            onRetry: { Task { await loadFeedAndStories() } }
+                        ))
+                    } else {
+                        KinnectStateView(mode: .empty(
+                            glyph: .feed,
+                            systemIcon: nil,
+                            title: "Chưa có bài viết nào",
+                            subtitle: "Hãy theo dõi thêm bạn bè hoặc đăng bài viết đầu tiên của bạn.",
+                            actionTitle: "Đăng bài mới",
+                            onAction: { showComposerSheet = true }
+                        ))
                     }
-                    .padding(.vertical, 36)
                 } else {
                     ForEach(visiblePosts) { post in
                         PostCardView(
@@ -383,6 +398,12 @@ struct FeedView: View {
     }
 
     private func restoreCachedFeed() {
+        #if DEBUG
+        if UIReviewFixture.activeScreen == "feed-error" {
+            self.posts = []
+            return
+        }
+        #endif
         guard let accountId = appState.currentUser?.id else { return }
         if let cached: [[String: Any]] = AccountCache.shared.loadJSONObject(forKey: "feed_posts", accountId: accountId) {
             self.posts = cached.map(PostItem.from)
@@ -396,12 +417,16 @@ struct FeedView: View {
         async let postsTask = KinnectAPIClient.shared.requestJSON("/api/posts")
         async let storiesTask = KinnectAPIClient.shared.requestJSON("/api/stories")
 
-        if let postsRes = try? await postsTask {
+        do {
+            let postsRes = try await postsTask
             let rawList = postsRes["posts"] as? [[String: Any]] ?? []
             self.posts = rawList.map(PostItem.from)
+            self.loadError = nil
             if let accountId = appState.currentUser?.id {
                 AccountCache.shared.saveJSONObject(rawList, forKey: "feed_posts", accountId: accountId)
             }
+        } catch {
+            self.loadError = error.localizedDescription
         }
         if let storiesRes = try? await storiesTask {
             let rawStories = storiesRes["stories"] as? [[String: Any]] ?? []
@@ -1007,13 +1032,7 @@ struct StoryComposerSheet: View {
                                     .foregroundColor(.white.opacity(0.85))
                             }
                             .frame(maxWidth: .infinity, minHeight: 110)
-                            .background(
-                                LinearGradient(
-                                    colors: [Color(red: 0x83 / 255.0, green: 0x54 / 255.0, blue: 0xEF / 255.0), Color(red: 0xD9 / 255.0, green: 0x4C / 255.0, blue: 0xAE / 255.0)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
+                            .background(KinnectTheme.storyPurpleGradient)
                             .clipShape(RoundedRectangle(cornerRadius: 18))
                         }
 
@@ -1036,13 +1055,7 @@ struct StoryComposerSheet: View {
                                     .lineLimit(1)
                             }
                             .frame(maxWidth: .infinity, minHeight: 110)
-                            .background(
-                                LinearGradient(
-                                    colors: [Color(red: 0x39 / 255.0, green: 0x7B / 255.0, blue: 0xE9 / 255.0), Color(red: 0x72 / 255.0, green: 0x4E / 255.0, blue: 0xE5 / 255.0)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
+                            .background(KinnectTheme.storyBlueGradient)
                             .clipShape(RoundedRectangle(cornerRadius: 18))
                         }
                     }
@@ -1056,7 +1069,7 @@ struct StoryComposerSheet: View {
                     // Main Story Canvas Preview
                     ZStack {
                         RoundedRectangle(cornerRadius: 20)
-                            .fill(Color(hex: backgroundColor))
+                            .fill(KinnectTheme.serverColor(backgroundColor))
                             .frame(height: 280)
 
                         if let previewImage {
@@ -1128,7 +1141,7 @@ struct StoryComposerSheet: View {
                     HStack(spacing: 12) {
                         ForEach(colors, id: \.self) { hex in
                             Circle()
-                                .fill(Color(hex: hex))
+                                .fill(KinnectTheme.serverColor(hex))
                                 .frame(width: 34, height: 34)
                                 .overlay(
                                     Circle().stroke(Color.white, lineWidth: backgroundColor == hex ? 3 : 0)
@@ -1346,7 +1359,7 @@ struct StoryDetailSheet: View {
 
                 ZStack {
                     RoundedRectangle(cornerRadius: 22)
-                        .fill(Color(hex: story.backgroundColor))
+                        .fill(KinnectTheme.serverColor(story.backgroundColor))
                         .frame(maxWidth: .infinity, minHeight: 340)
 
                     if !story.imageUrl.isEmpty {
@@ -1417,7 +1430,7 @@ struct StoryDetailSheet: View {
                 Spacer()
             }
             .padding(16)
-            .background(Color(red: 0.06, green: 0.06, blue: 0.1).ignoresSafeArea())
+            .background(KinnectTheme.storyBackdropDark.ignoresSafeArea())
             .navigationTitle("Tin 24h")
             .navigationBarTitleDisplayMode(.inline)
             .preferredColorScheme(.dark)
@@ -1461,6 +1474,7 @@ struct PostCommentsSheet: View {
     @State private var pendingCommentReactions: Set<String> = []
     @State private var replyingTo: CommentItem? = nil
     @State private var isLoading = false
+    @State private var loadError: String? = nil
 
     private let quickEmojis = ["😍", "😂", "🔥", "👏", "🥰", "😮", "😢", "💜"]
 
@@ -1516,19 +1530,37 @@ struct PostCommentsSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                if comments.isEmpty && !isLoading {
-                    VStack(spacing: 8) {
-                        Spacer()
-                        KinnectIcon(glyph: .comment, size: 36, tint: KinnectTheme.textSecondary)
-                        Text("Chưa có bình luận nào")
-                            .font(.subheadline.bold())
-                            .foregroundColor(KinnectTheme.textPrimary)
-                        Text("Hãy là người đầu tiên để lại bình luận!")
-                            .font(.caption)
-                            .foregroundColor(KinnectTheme.textSecondary)
-                        Spacer()
+                if let loadError, !comments.isEmpty {
+                    KinnectErrorBanner(message: loadError) {
+                        Task { await loadComments() }
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.horizontal, KinnectTheme.spaceLG)
+                    .padding(.vertical, KinnectTheme.spaceSM)
+                }
+
+                if comments.isEmpty && isLoading {
+                    KinnectStateView(mode: .loading("Đang tải bình luận…"))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if comments.isEmpty && !isLoading {
+                    if let loadError {
+                        KinnectStateView(mode: .error(
+                            title: "Không tải được bình luận",
+                            message: loadError,
+                            retryTitle: "Thử lại",
+                            onRetry: { Task { await loadComments() } }
+                        ))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        KinnectStateView(mode: .empty(
+                            glyph: .comment,
+                            systemIcon: nil,
+                            title: "Chưa có bình luận nào",
+                            subtitle: "Hãy là người đầu tiên để lại bình luận!",
+                            actionTitle: nil,
+                            onAction: nil
+                        ))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 } else {
                     List {
                         ForEach(commentRows) { row in
@@ -1741,9 +1773,13 @@ struct PostCommentsSheet: View {
     private func loadComments() async {
         isLoading = true
         defer { isLoading = false }
-        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/posts/\(post.id)/comments") {
+        do {
+            let res = try await KinnectAPIClient.shared.requestJSON("/api/posts/\(post.id)/comments")
             let list = res["comments"] as? [[String: Any]] ?? []
             self.comments = list.map(CommentItem.from)
+            self.loadError = nil
+        } catch {
+            self.loadError = error.localizedDescription
         }
     }
 

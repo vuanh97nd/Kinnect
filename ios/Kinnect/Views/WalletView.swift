@@ -266,13 +266,7 @@ struct WalletView: View {
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [Color(hex: "#7C3AED"), Color(hex: "#C026D3")],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .fill(KinnectTheme.walletBalanceGradient)
         )
     }
 

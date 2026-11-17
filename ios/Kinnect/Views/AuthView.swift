@@ -338,7 +338,7 @@ struct AuthView: View {
                     .padding(5)
                     .background(RoundedRectangle(cornerRadius: 32).fill(Color.black))
                     .overlay(RoundedRectangle(cornerRadius: 32)
-                        .stroke(Color(red: 0.65, green: 0.65, blue: 0.68), lineWidth: 2))
+                        .stroke(KinnectTheme.authFrameBorder, lineWidth: 2))
             }
             .frame(width: 330, height: 450)
             .scaleEffect(scale)
@@ -487,7 +487,7 @@ struct AuthView: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 3)
-                        .background(Capsule().fill(Color(red: 0.86, green: 0.15, blue: 0.47)))
+                        .background(Capsule().fill(KinnectTheme.authLiveBadge))
                         .padding(8)
                 }
         default:
@@ -576,7 +576,7 @@ struct AuthView: View {
                     HStack(spacing: 12) {
                         Image(systemName: "heart.fill")
                             .font(.system(size: 10))
-                            .foregroundColor(Color(red: 0.93, green: 0.28, blue: 0.6))
+                            .foregroundColor(KinnectTheme.rose)
                         Image(systemName: "message.fill")
                             .font(.system(size: 10))
                             .foregroundColor(LoginChrome.muted)

@@ -29,7 +29,7 @@ struct KinnectSplashScreen: View {
                         .offset(x: -ringOffset)
 
                     Circle()
-                        .stroke(Color(red: 0xED / 255.0, green: 0x45 / 255.0, blue: 0xAA / 255.0), lineWidth: 2.5)
+                        .stroke(KinnectTheme.brandMagenta, lineWidth: 2.5)
                         .frame(width: 20, height: 20)
                         .offset(x: ringOffset)
                 }

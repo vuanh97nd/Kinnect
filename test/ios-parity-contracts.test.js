@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { createApp } from "../server.js";
 
 test("native wallet/store responses, inventory, and retry-safe consumable purchases", async () => {
@@ -123,4 +123,44 @@ test("iOS Release boundary guards UIReviewFixture, ShortsVideoView and LiveStrea
   assert.match(liveSrc, /struct CreateLiveRoomSheet:[\s\S]*?preLiveBackdrop[\s\S]*?LiveCameraPreviewView[\s\S]*?preLiveGameSetupDeck[\s\S]*?previewController\.stop\(\)[\s\S]*?startLiveHostBroadcast\(\)/);
   assert.match(fixtureSrc, /case "create-live-chat":[\s\S]*?CreateLiveRoomSheet\(initialLiveMode:\s*"chat"\)/);
   assert.match(fixtureSrc, /case "create-live-game":[\s\S]*?CreateLiveRoomSheet\(initialLiveMode:\s*"game"\)/);
+});
+
+test("iOS Design System tokens, zero View color drift, and 4-state UI standardization", () => {
+  const viewsDirUrl = new URL("../ios/Kinnect/Views/", import.meta.url);
+  const viewFiles = readdirSync(viewsDirUrl).filter(name => name.endsWith(".swift")).sort();
+  assert.ok(viewFiles.length >= 15);
+
+  const driftHits = [];
+  for (const name of viewFiles) {
+    const src = readFileSync(new URL(name, viewsDirUrl), "utf8");
+    const matches = src.match(/Color\((?:red|hex):/g) || [];
+    if (matches.length > 0) {
+      driftHits.push({ file: name, count: matches.length });
+    }
+  }
+  assert.deepEqual(driftHits, []);
+
+  const themeSrc = readFileSync(new URL("../ios/Kinnect/Theme/KinnectTheme.swift", import.meta.url), "utf8");
+  for (const token of ["spaceXS", "spaceSM", "spaceMD", "spaceLG", "spaceXL", "space2XL"]) {
+    assert.match(themeSrc, new RegExp(`static let ${token}:\\s*CGFloat`));
+  }
+  assert.match(themeSrc, /struct KinnectErrorBanner:\s*View/);
+  assert.match(themeSrc, /struct KinnectStateView:\s*View/);
+
+  for (const screenFile of [
+    "FeedView.swift",
+    "ShortsVideoView.swift",
+    "DiscoverView.swift",
+    "FriendsView.swift",
+    "NotificationsView.swift",
+    "MessagesView.swift"
+  ]) {
+    const src = readFileSync(new URL(screenFile, viewsDirUrl), "utf8");
+    assert.match(src, /@State private var loadError:\s*String\?/, `${screenFile} missing @State loadError`);
+    assert.match(src, /KinnectStateView/, `${screenFile} missing KinnectStateView`);
+    assert.match(src, /KinnectErrorBanner/, `${screenFile} missing KinnectErrorBanner`);
+  }
+
+  const fixtureSrc = readFileSync(new URL("../ios/Kinnect/Core/UIReviewFixture.swift", import.meta.url), "utf8");
+  assert.match(fixtureSrc, /case "feed-error":\s*if clean == "\/api\/posts"/);
 });

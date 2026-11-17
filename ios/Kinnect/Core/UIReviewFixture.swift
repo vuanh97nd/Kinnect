@@ -82,6 +82,10 @@ enum UIReviewFixture {
             if clean.hasPrefix("/api/admin") || clean == "/api/music" {
                 return "Không tải được dữ liệu quản trị."
             }
+        case "feed-error":
+            if clean == "/api/posts" {
+                return "Không tải được bảng tin."
+            }
         case "live-error":
             if clean == "/api/live/rooms" {
                 return "Không tải được phòng Live."
@@ -1516,7 +1520,7 @@ enum UIReviewFixture {
             return AnyView(AuthView(initialStage: .forgotPassword))
 
         // MARK: - Main Tabs (5 tabs)
-        case "feed":
+        case "feed", "feed-error":
             return AnyView(
                 NavigationStack {
                     FeedView(onOpenCamera: {}, onOpenFriends: {})
