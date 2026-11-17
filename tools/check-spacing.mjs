@@ -25,6 +25,7 @@ function walk(dir, out = []) {
   return out;
 }
 
+const perFile = {};
 const offenders = [];
 for (const file of walk(ROOT)) {
   const lines = fs.readFileSync(file, "utf8").split("\n");
@@ -33,7 +34,9 @@ for (const file of walk(ROOT)) {
     if (!m) return;
     const value = Number(m[1]);
     if (SCALE.has(value)) return;
-    offenders.push({ file, line: i + 1, value });
+    const key = file.replace(/\\/g, "/");
+    perFile[key] = (perFile[key] || 0) + 1;
+    offenders.push({ file: key, line: i + 1, value });
   });
 }
 
@@ -41,18 +44,26 @@ const current = offenders.length;
 const update = process.argv.includes("--update");
 
 if (update) {
-  fs.writeFileSync(BASELINE_FILE, JSON.stringify({ iosOffScaleHorizontalPadding: current }, null, 2) + "\n");
+  const sorted = Object.fromEntries(Object.entries(perFile).sort(([a], [b]) => a.localeCompare(b)));
+  fs.writeFileSync(BASELINE_FILE, JSON.stringify({ total: current, perFile: sorted }, null, 2) + "\n");
   console.log(`Đã ghi baseline: ${current}`);
   process.exit(0);
 }
 
-const baseline = JSON.parse(fs.readFileSync(BASELINE_FILE, "utf8")).iosOffScaleHorizontalPadding;
+const baselineDoc = JSON.parse(fs.readFileSync(BASELINE_FILE, "utf8"));
+const baseline = baselineDoc.total;
 console.log(`Lề ngang ngoài thang: ${current} (baseline ${baseline})`);
 
-if (current > baseline) {
-  const extra = offenders.slice(baseline);
-  console.error(`\nTăng ${current - baseline} chỗ. Dùng bội số của thang 4 (4/8/12/16/24/32).`);
-  for (const o of extra) console.error(`  ${o.file}:${o.line}  .padding(.horizontal, ${o.value})`);
+const grown = Object.entries(perFile).filter(([f, n]) => n > (baselineDoc.perFile[f] || 0));
+
+if (grown.length) {
+  console.error(`\nCác file tăng lề ngoài thang — dùng bội số của thang 4 (4/8/12/16/24/32):`);
+  for (const [f, n] of grown) {
+    console.error(`  ${f}: ${baselineDoc.perFile[f] || 0} -> ${n}`);
+    for (const o of offenders.filter((x) => x.file === f && x.value % 4 !== 0)) {
+      console.error(`      dòng ${o.line}: .padding(.horizontal, ${o.value})`);
+    }
+  }
   process.exit(1);
 }
 
