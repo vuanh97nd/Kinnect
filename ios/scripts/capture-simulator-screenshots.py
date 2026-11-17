@@ -448,6 +448,8 @@ def resolve_capture_scope(focus_value=None, only_login=False):
         scope = "a11y"
     elif normalized == "light":
         scope = "light"
+    elif normalized == "matrix":
+        scope = "matrix"
     elif normalized == "security":
         scope = "security"
     else:
@@ -476,6 +478,10 @@ CORE_SLUGS = [
 
 
 def select_screens_for_scope(all_screens, selected_slugs, scope, only_login=False, login_screens=None):
+    if scope == "matrix":
+        # Bỏ lượt iPhone chuẩn (đã có ở scope core), chỉ chạy compact + iPad
+        # để có bằng chứng đa thiết bị mà không tốn thời gian chụp trùng.
+        return []
     if scope in ("core", "a11y", "light"):
         wanted = set(CORE_SLUGS)
         base = [entry for entry in all_screens if entry[0] in wanted]
@@ -851,7 +857,7 @@ def main():
 
     # 2. Compact / second iPhone screenshots
     #    Scope "core" chỉ chụp iPhone chuẩn: bỏ hẳn nhánh compact + iPad để job xong trong vài phút.
-    if compact_iphone and capture_scope not in ("core", "a11y", "light"):
+    if compact_iphone and capture_scope not in ("core", "a11y", "light", "matrix"):
         if compact_iphone["udid"] != standard_iphone["udid"]:
             print(f"Shutting down previous standard simulator {standard_iphone['name']} to free resources...", flush=True)
             subprocess.run(["xcrun", "simctl", "shutdown", standard_iphone["udid"]], check=False)
@@ -897,7 +903,7 @@ def main():
             })
 
     # 3. iPad screenshots
-    if ipad and not only_login and capture_scope not in ("security", "core", "a11y", "light"):
+    if ipad and not only_login and capture_scope not in ("security", "core", "a11y", "light", "matrix"):
         active_to_shutdown = compact_iphone if (compact_iphone and compact_iphone["udid"] != standard_iphone["udid"]) else standard_iphone
         if active_to_shutdown and active_to_shutdown["udid"] != ipad["udid"]:
             print(f"Shutting down previous simulator {active_to_shutdown['name']} to free resources...", flush=True)
