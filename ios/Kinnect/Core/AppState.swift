@@ -238,11 +238,13 @@ final class AppState: ObservableObject {
         KeychainStore.shared.saveAccountId(user.id)
         NativeSocketClient.shared.connectWithKeychainSession()
         PushKitManager.shared.startRegistration()
-        requestLocalNotificationAuthorizationIfNeeded()
         startActivityHeartbeat()
     }
 
-    private func requestLocalNotificationAuthorizationIfNeeded() {
+    /// KHÔNG xin quyền thông báo ngay khi đăng nhập.
+    /// iOS chỉ cho hỏi một lần; hỏi trước khi người dùng thấy giá trị thì tỉ lệ từ chối rất cao.
+    /// Chỉ gọi hàm này từ hành động có ngữ cảnh (bấm chuông thông báo, theo dõi ai đó...).
+    func requestNotificationAuthorizationOnDemand() {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             guard settings.authorizationStatus == .notDetermined else { return }
             UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { _, _ in }

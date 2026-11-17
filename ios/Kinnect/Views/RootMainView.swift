@@ -155,6 +155,9 @@ struct RootMainView: View {
         ToolbarItemGroup(placement: .navigationBarTrailing) {
             // Notifications
             Button {
+                // Xin quyền thông báo ĐÚNG LÚC: người dùng vừa mở hộp thông báo,
+                // đã thấy giá trị trước khi bị hỏi. Trước đây app hỏi ngay sau đăng nhập.
+                appState.requestNotificationAuthorizationOnDemand()
                 activeTopSection = (activeTopSection == .notifications) ? nil : .notifications
             } label: {
                 ZStack(alignment: .topTrailing) {

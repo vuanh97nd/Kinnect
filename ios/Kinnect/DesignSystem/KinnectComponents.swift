@@ -1,0 +1,278 @@
+// KinnectComponents.swift
+// Thư viện component dùng chung. Mọi giá trị lấy từ KinnectTokens.swift (sinh từ design/tokens.json).
+// Quy ước: KHÔNG hardcode màu/font/khoảng cách trong file view — dùng component ở đây.
+
+import SwiftUI
+
+// MARK: - Button
+
+enum KButtonKind {
+    case primary, secondary, ghost, danger
+}
+
+struct KButton: View {
+    let title: String
+    var kind: KButtonKind = .primary
+    var fullWidth: Bool = false
+    var isLoading: Bool = false
+    let action: () -> Void
+
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: KTSpace.sm) {
+                if isLoading {
+                    ProgressView().controlSize(.small).tint(foreground)
+                }
+                Text(title)
+                    .font(KTType.body)
+                    .fontWeight(.semibold)
+            }
+            .foregroundColor(foreground)
+            .frame(maxWidth: fullWidth ? .infinity : nil)
+            .frame(minHeight: KTLayout.touchTargetMin)
+            .padding(.horizontal, KTSpace.lg)
+            .background(background)
+            .overlay(
+                RoundedRectangle(cornerRadius: KTRadius.sm)
+                    .strokeBorder(borderColor, lineWidth: kind == .secondary ? 1 : 0)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: KTRadius.sm))
+            .opacity(isEnabled ? 1 : 0.45)
+            .contentShape(RoundedRectangle(cornerRadius: KTRadius.sm))
+        }
+        .buttonStyle(.plain)
+        .animation(KTMotion.animation(KTMotion.fast, reduceMotion: reduceMotion), value: isEnabled)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel(title)
+    }
+
+    private var foreground: Color {
+        switch kind {
+        case .primary: return KTColor.onAccent
+        case .secondary: return KTColor.textPrimary
+        case .ghost: return KTColor.accent
+        case .danger: return KTColor.onAccent
+        }
+    }
+
+    private var background: Color {
+        switch kind {
+        case .primary: return KTColor.accent
+        case .secondary: return .clear
+        case .ghost: return .clear
+        case .danger: return KTColor.danger
+        }
+    }
+
+    private var borderColor: Color {
+        kind == .secondary ? KTColor.border : .clear
+    }
+}
+
+// MARK: - Card
+
+struct KCard<Content: View>: View {
+    var padding: CGFloat = KTSpace.lg
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        content
+            .padding(padding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(KTColor.surface)
+            .clipShape(RoundedRectangle(cornerRadius: KTRadius.md))
+            .overlay(
+                RoundedRectangle(cornerRadius: KTRadius.md)
+                    .strokeBorder(KTColor.border, lineWidth: 1)
+            )
+    }
+}
+
+// MARK: - Setting row
+
+struct KRow: View {
+    let title: String
+    var subtitle: String? = nil
+    var systemImage: String? = nil
+    var trailing: String? = nil
+    var showsChevron: Bool = true
+    var action: (() -> Void)? = nil
+
+    var body: some View {
+        Group {
+            if let action {
+                Button(action: action) { content }.buttonStyle(.plain)
+            } else {
+                content
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(action == nil ? [] : .isButton)
+    }
+
+    private var content: some View {
+        HStack(spacing: KTSpace.md) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(KTColor.accent)
+                    .frame(width: 36, height: 36)
+                    .background(KTColor.accentSoft)
+                    .clipShape(RoundedRectangle(cornerRadius: KTRadius.sm))
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(KTType.body).foregroundColor(KTColor.textPrimary)
+                if let subtitle {
+                    Text(subtitle).font(KTType.meta).foregroundColor(KTColor.textTertiary)
+                }
+            }
+            Spacer(minLength: KTSpace.sm)
+            if let trailing {
+                Text(trailing).font(KTType.meta).foregroundColor(KTColor.textTertiary)
+            }
+            if showsChevron {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(KTColor.textTertiary)
+            }
+        }
+        .frame(minHeight: KTLayout.touchTargetMin)
+        .contentShape(Rectangle())
+    }
+}
+
+// MARK: - Input
+
+struct KInput: View {
+    let placeholder: String
+    @Binding var text: String
+    var error: String? = nil
+    var isSecure: Bool = false
+
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: KTSpace.xs) {
+            Group {
+                if isSecure {
+                    SecureField(placeholder, text: $text)
+                } else {
+                    TextField(placeholder, text: $text)
+                }
+            }
+            .font(KTType.body)
+            .foregroundColor(KTColor.textPrimary)
+            .focused($focused)
+            .padding(.horizontal, KTSpace.md)
+            .frame(minHeight: KTLayout.touchTargetMin)
+            .background(KTColor.surfaceElevated)
+            .clipShape(RoundedRectangle(cornerRadius: KTRadius.sm))
+            .overlay(
+                RoundedRectangle(cornerRadius: KTRadius.sm)
+                    .strokeBorder(error == nil ? KTColor.border : KTColor.danger, lineWidth: focused || error != nil ? 1.5 : 1)
+            )
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+
+            if let error {
+                Text(error)
+                    .font(KTType.meta)
+                    .foregroundColor(KTColor.danger)
+                    .accessibilityLabel("Lỗi: \(error)")
+            }
+        }
+    }
+}
+
+// MARK: - Empty state
+
+struct KEmptyState: View {
+    let systemImage: String
+    let title: String
+    let message: String
+    var actionTitle: String? = nil
+    var action: (() -> Void)? = nil
+
+    var body: some View {
+        VStack(spacing: KTSpace.md) {
+            Image(systemName: systemImage)
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundColor(KTColor.accent)
+                .frame(width: 56, height: 56)
+                .background(KTColor.accentSoft)
+                .clipShape(Circle())
+            Text(title)
+                .font(KTType.body)
+                .fontWeight(.semibold)
+                .foregroundColor(KTColor.textPrimary)
+                .multilineTextAlignment(.center)
+            Text(message)
+                .font(KTType.meta)
+                .foregroundColor(KTColor.textTertiary)
+                .multilineTextAlignment(.center)
+            if let actionTitle, let action {
+                KButton(title: actionTitle, kind: .primary, action: action)
+                    .padding(.top, KTSpace.xs)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, KTSpace.xxl)
+        .padding(.horizontal, KTSpace.lg)
+        .accessibilityElement(children: .contain)
+    }
+}
+
+// MARK: - Skeleton
+
+struct KSkeleton: View {
+    var width: CGFloat? = nil
+    var height: CGFloat = 14
+    @State private var phase: CGFloat = -1
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: height / 2)
+            .fill(KTColor.surfaceElevated)
+            .frame(width: width, height: height)
+            .overlay(
+                GeometryReader { geo in
+                    LinearGradient(
+                        colors: [.clear, KTColor.border.opacity(0.6), .clear],
+                        startPoint: .leading, endPoint: .trailing
+                    )
+                    .frame(width: geo.size.width * 0.5)
+                    .offset(x: phase * geo.size.width * 1.5)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: height / 2))
+            )
+            .onAppear {
+                withAnimation(.linear(duration: 1.4).repeatForever(autoreverses: false)) { phase = 1 }
+            }
+            .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Section header
+
+struct KSectionHeader: View {
+    let title: String
+    var trailing: String? = nil
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(KTType.label)
+                .foregroundColor(KTColor.textTertiary)
+                .textCase(.uppercase)
+            Spacer()
+            if let trailing {
+                Text(trailing).font(KTType.label).foregroundColor(KTColor.accent)
+            }
+        }
+        .padding(.top, KTSpace.xl)
+        .padding(.bottom, KTSpace.sm)
+        .accessibilityAddTraits(.isHeader)
+    }
+}

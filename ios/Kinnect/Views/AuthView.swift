@@ -504,8 +504,11 @@ struct AuthView: View {
                                 .foregroundColor(LoginChrome.purple)
                         }
                         Text(L10n.tr("Tạo tin"))
-                            .font(.system(size: 7))
+                            .font(KTType.micro)
                             .foregroundColor(LoginChrome.muted)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .frame(width: 44)
                     }
 
                     VStack(spacing: 2) {
@@ -516,8 +519,11 @@ struct AuthView: View {
                             .clipShape(Circle())
                             .overlay(Circle().stroke(LoginChrome.purple, lineWidth: 1.5))
                         Text("Minh Anh")
-                            .font(.system(size: 7))
+                            .font(KTType.micro)
                             .foregroundColor(LoginChrome.muted)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .frame(width: 44)
                     }
                     Spacer()
                 }

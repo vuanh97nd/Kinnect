@@ -24,6 +24,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Check design token contrast (WCAG AA)
+        run: node tools/check-contrast.mjs
+
       - name: Ensure XcodeGen is installed
         run: |
           if ! command -v xcodegen >/dev/null 2>&1; then
