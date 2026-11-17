@@ -809,7 +809,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
               liveStageRevision == expectedRevision else { return }
         removeLivePeerConnection(peerId: peerId)
         livePeerPublishesMap[peerId] = peerPublishes
-        let box = createLivePeerBox(peerId: peerId, roomId: liveRoomId, epoch: expectedEpoch, revision: expectedRevision)
+        guard let box = createLivePeerBox(peerId: peerId, roomId: liveRoomId, epoch: expectedEpoch, revision: expectedRevision) else { return }
         livePeerConnections[peerId] = box
 
         let constraints = offerConstraints(for: peerId, peerPublishes: peerPublishes)
@@ -876,12 +876,12 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
             } else if usesStage && liveRole == "viewer" {
                 liveConnectionError = nil
             }
-            let created = createLivePeerBox(
+            guard let created = createLivePeerBox(
                 peerId: peerId,
                 roomId: liveRoomId,
                 epoch: liveEpoch,
                 revision: liveStageRevision
-            )
+            ) else { return }
             livePeerConnections[peerId] = created
             box = created
         }
@@ -1085,7 +1085,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         )
     }
 
-    private func createLivePeerBox(peerId: String, roomId: String, epoch: Int, revision: Int) -> PeerConnectionBox {
+    private func createLivePeerBox(peerId: String, roomId: String, epoch: Int, revision: Int) -> PeerConnectionBox? {
         let config = RTCConfiguration()
         config.iceServers = cachedIceServers
         config.sdpSemantics = .unifiedPlan
@@ -1154,7 +1154,13 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
                 }
             }
         )
-        let pc = factory.peerConnection(with: config, constraints: constraints, delegate: box)!
+        guard let pc = factory.peerConnection(with: config, constraints: constraints, delegate: box) else {
+            print("[NativeWebRTCManager] Failed to create RTCPeerConnection for live peer \(peerId)")
+            DispatchQueue.main.async { [weak self] in
+                self?.liveConnectionError = "Không thể khởi tạo kết nối luồng video Live."
+            }
+            return nil
+        }
         box.pc = pc
         if shouldAttachLocalMedia(for: peerId) {
             if let aTrack = liveAudioTrack {

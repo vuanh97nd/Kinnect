@@ -201,22 +201,24 @@ struct PostCardView: View {
                 .accessibilityLabel("Bình luận")
 
                 // Column 3: Chia sẻ (Share) - Native SwiftUI ShareLink (safe on iPad popover & route permalink)
-                ShareLink(
-                    item: postShareURL,
-                    subject: Text(shareSubject),
-                    message: Text(post.text.isEmpty ? "Xem bài viết trên Kinnect" : post.text)
-                ) {
-                    HStack(spacing: 6) {
-                        KinnectIcon(glyph: .share, size: 18, tint: KinnectTheme.textSecondary)
-                        Text("Chia sẻ")
-                            .font(.caption.weight(.semibold))
-                            .foregroundColor(KinnectTheme.textSecondary)
+                if let shareURL = postShareURL {
+                    ShareLink(
+                        item: shareURL,
+                        subject: Text(shareSubject),
+                        message: Text(post.text.isEmpty ? "Xem bài viết trên Kinnect" : post.text)
+                    ) {
+                        HStack(spacing: 6) {
+                            KinnectIcon(glyph: .share, size: 18, tint: KinnectTheme.textSecondary)
+                            Text("Chia sẻ")
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .contentShape(Rectangle())
                     }
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .contentShape(Rectangle())
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Chia sẻ bài viết")
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Chia sẻ bài viết")
             }
             .overlay(alignment: .topLeading) {
                 if showReactionDock {
@@ -274,9 +276,10 @@ struct PostCardView: View {
         .zIndex(showReactionDock ? 50 : 0)
     }
 
-    private var postShareURL: URL {
-        let route = "/?s=postDetail&post=\(post.id)"
-        return ServerConfig.resolveURL(route) ?? URL(string: "\(ServerConfig.defaultOrigin)\(route)") ?? URL(string: "https://app.kinnect.io.vn\(route)")!
+    private var postShareURL: URL? {
+        let encodedId = post.id.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&=?#"))) ?? post.id
+        let route = "/?s=postDetail&post=\(encodedId)"
+        return ServerConfig.resolveURL(route) ?? URL(string: "\(ServerConfig.defaultOrigin)\(route)") ?? URL(string: "https://app.kinnect.io.vn\(route)")
     }
 
     private var shareSubject: String {

@@ -20,6 +20,12 @@ settings:
     TARGETED_DEVICE_FAMILY: "1,2"
     ENABLE_BITCODE: NO
     COMPRESS_PNG_FILES: YES
+    APS_ENVIRONMENT: development
+  configs:
+    Debug:
+      APS_ENVIRONMENT: development
+    Release:
+      APS_ENVIRONMENT: production
 
 targets:
   Kinnect:
@@ -90,6 +96,14 @@ targets:
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks"
         SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
         SUPPORTS_MACCATALYST: NO
+      configs:
+        Debug:
+          APS_ENVIRONMENT: development
+        Release:
+          APS_ENVIRONMENT: production
+    scheme:
+      testTargets:
+        - KinnectTests
     dependencies:
       - package: WebRTC
         product: WebRTC
@@ -107,3 +121,18 @@ targets:
       - sdk: CryptoKit.framework
       - sdk: AudioToolbox.framework
       - sdk: AuthenticationServices.framework
+
+  KinnectTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: KinnectTests
+    dependencies:
+      - target: Kinnect
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.kinnect.live.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Kinnect.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Kinnect"
+        BUNDLE_LOADER: "$(TEST_HOST)"

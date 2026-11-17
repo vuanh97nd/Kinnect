@@ -455,9 +455,11 @@ final class ImageMemoryCache {
                     }
                 }
                 guard let data = await KinnectAPIClient.shared.fetchBinaryData(path: path),
+                      !Task.isCancelled,
                       let uiImg = Self.downsample(data: data, maxPixelSize: CGFloat(bucketPx)) else {
                     return nil
                 }
+                guard !Task.isCancelled else { return nil }
                 self?.store(uiImg, forKey: path, maxPointSize: maxPointSize)
                 return uiImg
             }

@@ -118,7 +118,7 @@ struct FeedView: View {
             await loadFeedAndStories()
         }
         .task {
-            restoreCachedFeed()
+            await restoreCachedFeed()
             await loadFeedAndStories()
         }
         .onReceive(NotificationCenter.default.publisher(for: .kinnectContentModerated)) { _ in
@@ -397,7 +397,7 @@ struct FeedView: View {
         }
     }
 
-    private func restoreCachedFeed() {
+    private func restoreCachedFeed() async {
         #if DEBUG
         if UIReviewFixture.activeScreen == "feed-error" {
             self.posts = []
@@ -405,9 +405,14 @@ struct FeedView: View {
         }
         #endif
         guard let accountId = appState.currentUser?.id else { return }
-        if let cached: [[String: Any]] = AccountCache.shared.loadJSONObject(forKey: "feed_posts", accountId: accountId) {
-            self.posts = cached.map(PostItem.from)
-        }
+        await Task.detached(priority: .userInitiated) {
+            if let cached: [[String: Any]] = AccountCache.shared.loadJSONObject(forKey: "feed_posts", accountId: accountId) {
+                let mapped = cached.map(PostItem.from)
+                await MainActor.run {
+                    self.posts = mapped
+                }
+            }
+        }.value
     }
 
     private func loadFeedAndStories() async {

@@ -17,6 +17,44 @@ permissions:
   contents: write
 
 jobs:
+  test-ios:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Ensure XcodeGen is installed
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+          xcodegen --version
+
+      - name: Generate Xcode project from ios/project.yml
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Run KinnectTests on iOS Simulator
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project ios/Kinnect.xcodeproj \
+            -scheme Kinnect \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -only-testing:KinnectTests \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee test.log
+
+      - name: Upload test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-test-log
+          path: test.log
+          if-no-files-found: ignore
+
   build-ios:
     runs-on: macos-15
     timeout-minutes: 30
@@ -119,3 +157,98 @@ jobs:
               --notes "Gói cài đặt Kinnect iOS (.ipa) — Cài đặt lên iPhone/iPad từ Windows qua Sideloadly hoặc AltStore bằng Apple ID cá nhân miễn phí." \
               --prerelease
           fi
+
+  archive-signed:
+    runs-on: macos-15
+    timeout-minutes: 30
+    continue-on-error: false
+    if: startsWith(github.ref, 'refs/tags/ios-v')
+    env:
+      SIGNING_READY: ${{ secrets.ASC_KEY != '' && secrets.BUILD_CERTIFICATE_BASE64 != '' && secrets.BUILD_PROVISION_PROFILE_BASE64 != '' }}
+    steps:
+      - name: Checkout repository
+        if: env.SIGNING_READY == 'true'
+        uses: actions/checkout@v4
+
+      - name: Ensure XcodeGen is installed
+        if: env.SIGNING_READY == 'true'
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+          xcodegen --version
+
+      - name: Generate Xcode project from ios/project.yml
+        if: env.SIGNING_READY == 'true'
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Import signing certificate and provisioning profile
+        if: env.SIGNING_READY == 'true'
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          CERT_PATH="$RUNNER_TEMP/build_certificate.p12"
+          PP_PATH="$RUNNER_TEMP/build_pp.mobileprovision"
+
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o "$CERT_PATH"
+          echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode -o "$PP_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          security import "$CERT_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp "$PP_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/
+
+      - name: Build and export signed iOS Archive
+        if: env.SIGNING_READY == 'true'
+        env:
+          DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          PROVISIONING_PROFILE_SPECIFIER: ${{ secrets.PROVISIONING_PROFILE_SPECIFIER }}
+          CODE_SIGN_IDENTITY: ${{ secrets.CODE_SIGN_IDENTITY }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY: ${{ secrets.ASC_KEY }}
+        run: |
+          set -o pipefail
+          KEY_PATH="$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8"
+          echo -n "$ASC_KEY" | base64 --decode -o "$KEY_PATH" 2>/dev/null || printf "%s" "$ASC_KEY" > "$KEY_PATH"
+
+          xcodebuild archive \
+            -project ios/Kinnect.xcodeproj \
+            -scheme Kinnect \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath build/Kinnect-Signed.xcarchive \
+            APS_ENVIRONMENT=production \
+            DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="$CODE_SIGN_IDENTITY" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROVISIONING_PROFILE_SPECIFIER" \
+            CODE_SIGNING_REQUIRED=YES \
+            CODE_SIGNING_ALLOWED=YES
+
+          xcodebuild -exportArchive \
+            -archivePath build/Kinnect-Signed.xcarchive \
+            -exportOptionsPlist ios/ExportOptions-AppStore.plist \
+            -exportPath dist-signed \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: Upload signed IPA artifact
+        if: env.SIGNING_READY == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kinnect-signed-ios-ipa
+          path: dist-signed/*.ipa
+          if-no-files-found: error
