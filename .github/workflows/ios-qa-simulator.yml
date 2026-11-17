@@ -82,6 +82,11 @@ jobs:
           DEST="outputs/ci-shots/run-${{ github.run_number }}"
           mkdir -p "$DEST"
           cp -r dist/ios-ui-review/. "$DEST"/
+          # Giữ tối đa 2 lần chụp gần nhất: mỗi lần ~35-120MB, không dọn thì repo
+          # phình tới hàng GB (đã lên 583MB sau 12 lần chạy).
+          ls -1d outputs/ci-shots/run-* 2>/dev/null | sort -V | head -n -2 | while read -r old; do
+            echo "xoá $old"; rm -rf "$old"
+          done
           git config user.name  "kinnect-ci"
           git config user.email "ci@kinnect.local"
           git add "$DEST"
