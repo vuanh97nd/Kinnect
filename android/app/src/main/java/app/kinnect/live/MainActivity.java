@@ -111,7 +111,7 @@ public class MainActivity extends Activity {
       if(destination.equals("login")||destination.equals("auth_login")){auth(false);return;}
       if(destination.equals("register")||destination.equals("auth_register")){auth(true);return;}
       if(destination.equals("forgot")||destination.equals("auth_forgot")){forgot();return;}
-      if(me==null){
+      if(me==null && isDebug && NativeApi.isFixtureEnabled()){
         try{
           me=new JSONObject("{\"id\":\"usr_qa_review\",\"username\":\"minhanh\",\"name\":\"Minh Anh\",\"role\":\"user\",\"coins\":1200,\"bio\":\"Kinnect QA Review\",\"followersCount\":128,\"followingCount\":64}");
           onUserSignedIn(me);

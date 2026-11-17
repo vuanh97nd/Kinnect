@@ -19,6 +19,23 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - name: Guard against release-regression flags
+        run: |
+          set -e
+          fail=0
+          if grep -rn --exclude=android-validation.yml -- '--debug-mode' scripts/ .github/workflows/ android/app/ 2>/dev/null; then
+            echo "::error::--debug-mode xuất hiện lại trong build script. APK phát hành sẽ debuggable."
+            fail=1
+          fi
+          if grep -rn 'MANAGE_OWN_CALLS' android/app/src/main/AndroidManifest.xml 2>/dev/null; then
+            echo "::error::MANAGE_OWN_CALLS là quyền không dùng, không được thêm lại."
+            fail=1
+          fi
+          if grep -n 'android:name=".IncomingCallActivity" android:exported="true"' android/app/src/main/AndroidManifest.xml 2>/dev/null; then
+            echo "::error::IncomingCallActivity phải là exported=false (tránh UI hijacking)."
+            fail=1
+          fi
+          exit $fail
       - name: Prepare verified toolchain
         run: bash scripts/prepare-android-tools.sh
       - name: Test native policies
@@ -28,4 +45,4 @@ jobs:
       - name: Build testing APK
         run: bash scripts/build-apk.sh
       - name: Check web design export and native-only APK
-        run: python3 scripts/test-native-design.py --apk dist/kinnect-live-debug.apk
+        run: python3 scripts/test-native-design.py --apk dist/kinnect-live.apk

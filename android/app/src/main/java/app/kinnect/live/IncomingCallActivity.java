@@ -33,7 +33,7 @@ public final class IncomingCallActivity extends Activity {
       NativeApi.enableFixture(this, true);
     }
     JSONObject m = KinnectService.pendingIncoming;
-    if (m == null) {
+    if (m == null && NativeApi.isFixtureEnabled()) {
       try {
         m = new JSONObject("{\"callId\":\"call_qa_01\",\"from\":{\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\"},\"mode\":\"video\"}");
         KinnectService.pendingIncoming = m;

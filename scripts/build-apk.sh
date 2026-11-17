@@ -9,7 +9,7 @@ mapfile -t NETWORK_JARS < <(python3 -c 'import json; print("\n".join(d["file"] f
 NETWORK_CLASSPATH="$(IFS=:; echo "${NETWORK_JARS[*]}")"
 mkdir -p android/build/classes android/build/dex dist
 "$TOOLS/aapt2" compile --dir android/app/src/main/res -o android/build/resources.zip
-"$TOOLS/aapt2" link --debug-mode --auto-add-overlay -R android/build/resources.zip -I "$PLATFORM" --manifest android/app/src/main/AndroidManifest.xml -o android/build/unsigned.apk
+"$TOOLS/aapt2" link --auto-add-overlay -R android/build/resources.zip -I "$PLATFORM" --manifest android/app/src/main/AndroidManifest.xml -o android/build/unsigned.apk
 java -jar "$KINNECT_TOOLS/ecj.jar" -1.8 -encoding UTF-8 -proc:none -warn:none -bootclasspath "$PLATFORM:$TOOLS/core-lambda-stubs.jar" -classpath "$KINNECT_TOOLS/deps/webrtc/classes.jar:$NETWORK_CLASSPATH" -d android/build/classes android/app/src/main/java/app/kinnect/live/*.java
 find android/build/classes -name '*.class' -print > android/build/classes.list
 "$TOOLS/d8" --min-api 26 --lib "$PLATFORM" --output android/build/dex @android/build/classes.list "$KINNECT_TOOLS/deps/webrtc/classes.jar" "${NETWORK_JARS[@]}"
@@ -32,5 +32,5 @@ PY
 if [ ! -f android/debug.keystore ]; then
  keytool -genkeypair -keystore android/debug.keystore -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname 'CN=Kinnect Debug,O=Development,C=VN'
 fi
-"$TOOLS/apksigner" sign --ks android/debug.keystore --ks-pass pass:android --key-pass pass:android --out dist/kinnect-live-debug.apk android/build/aligned.apk
-"$TOOLS/apksigner" verify --verbose dist/kinnect-live-debug.apk
+"$TOOLS/apksigner" sign --ks android/debug.keystore --ks-pass pass:android --key-pass pass:android --out dist/kinnect-live.apk android/build/aligned.apk
+"$TOOLS/apksigner" verify --verbose dist/kinnect-live.apk
