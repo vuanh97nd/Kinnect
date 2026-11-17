@@ -38,6 +38,8 @@ jobs:
           exit $fail
       - name: Prepare verified toolchain
         run: bash scripts/prepare-android-tools.sh
+      - name: Run JVM audit suite (no emulator)
+        run: bash scripts/run-jvm-tests.sh
       - name: Test native policies
         run: bash scripts/test-android-config.sh
       - name: Parse all vectors with the AndroidX parser
