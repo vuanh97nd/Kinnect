@@ -1,0 +1,9 @@
+{
+  "lines" : [
+    "start index=0 playing=true muted=false",
+    "pause index=0 playing=false",
+    "mute giữ pause index=0 playing=false muted=true",
+    "resume index=0 playing=true muted=true",
+    "swipe index=1 playing=true muted=true"
+  ]
+}
