@@ -1,5 +1,5 @@
 // GENERATED FILE — do not edit by hand.
-// Source: design/tokens.json (v1.1.0) · regenerate with: node tools/gen-tokens.mjs
+// Source: design/tokens.json (v1.2.0) · regenerate with: node tools/gen-tokens.mjs
 import SwiftUI
 import UIKit
 
@@ -77,6 +77,13 @@ enum KTLayout {
     static let contentMaxWidth: CGFloat = 700
     static let touchTargetMin: CGFloat = 44
     static let bubbleMaxWidthRatio: CGFloat = 0.72
+
+    // Thanh tiêu đề: 5 số dùng chung iPhone và Android. Tỷ lệ icon:gap:lề = 5:3:4.
+    static let headerHeight: CGFloat = 56
+    static let headerSidePadding: CGFloat = 16
+    static let headerIconSize: CGFloat = 20
+    static let headerIconGap: CGFloat = 12
+    static let headerMaxTrailingActions = 3
 }
 
 // MARK: - Motion (tôn trọng Reduce Motion)

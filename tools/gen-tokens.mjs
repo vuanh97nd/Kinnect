@@ -77,6 +77,13 @@ enum KTLayout {
     static let contentMaxWidth: CGFloat = ${tokens.layout.contentMaxWidth}
     static let touchTargetMin: CGFloat = ${tokens.layout.touchTargetMin}
     static let bubbleMaxWidthRatio: CGFloat = ${tokens.layout.bubbleMaxWidthRatio}
+
+    // Thanh tiêu đề: 5 số dùng chung iPhone và Android. Tỷ lệ icon:gap:lề = 5:3:4.
+    static let headerHeight: CGFloat = ${tokens.layout.headerHeight}
+    static let headerSidePadding: CGFloat = ${tokens.layout.headerSidePadding}
+    static let headerIconSize: CGFloat = ${tokens.layout.headerIconSize}
+    static let headerIconGap: CGFloat = ${tokens.layout.headerIconGap}
+    static let headerMaxTrailingActions = ${tokens.layout.headerMaxTrailingActions}
 }
 
 // MARK: - Motion (tôn trọng Reduce Motion)

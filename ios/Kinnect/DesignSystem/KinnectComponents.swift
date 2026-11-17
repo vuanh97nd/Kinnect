@@ -254,6 +254,65 @@ struct KSkeleton: View {
     }
 }
 
+// MARK: - Top bar
+// Thanh tiêu đề dùng chung. Mọi số lấy từ KTLayout để iPhone và Android
+// (UiMetrics.java) không trôi khỏi nhau. Tỷ lệ icon:gap:lề = 20:12:16.
+
+struct KTopBar<Trailing: View>: View {
+    let title: String
+    var subtitle: String? = nil
+    var leadingSystemImage: String? = nil
+    var leadingLabel: String = "Quay lại"
+    var onLeadingTap: (() -> Void)? = nil
+    @ViewBuilder var trailing: () -> Trailing
+
+    var body: some View {
+        HStack(spacing: KTLayout.headerIconGap) {
+            if let leadingSystemImage, let onLeadingTap {
+                KTopBarIcon(systemName: leadingSystemImage, label: leadingLabel, action: onLeadingTap)
+            }
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(KTType.titleS)
+                    .foregroundColor(KTColor.textPrimary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(KTType.meta)
+                        .foregroundColor(KTColor.textSecondary)
+                        .lineLimit(1)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            trailing()
+        }
+        .padding(.horizontal, KTLayout.headerSidePadding)
+        .frame(height: KTLayout.headerHeight)
+    }
+}
+
+/// Icon 20pt nhìn, 44pt vùng chạm. Không dùng cỡ khác cho thanh tiêu đề.
+struct KTopBarIcon: View {
+    let systemName: String
+    var label: String
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: KTLayout.headerIconSize, weight: .semibold))
+                .foregroundColor(KTColor.textPrimary)
+                .frame(width: KTLayout.touchTargetMin, height: KTLayout.touchTargetMin)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+}
+
 // MARK: - Segmented control
 // Bản branded thay cho Picker(.segmented) của hệ thống: iOS vẽ tab đang chọn bằng
 // xám nên trông như bị vô hiệu, và trái hẳn ngôn ngữ "chip tím" của phần còn lại.
