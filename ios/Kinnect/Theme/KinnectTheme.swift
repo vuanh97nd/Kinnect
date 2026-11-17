@@ -1,3 +1,4 @@
+import ImageIO
 import SwiftUI
 import UIKit
 
@@ -371,28 +372,139 @@ extension Color {
     }
 }
 
-// MARK: - High-Performance In-Memory Image Cache (Zero Disk I/O & Butter-smooth 120 FPS)
+// MARK: - High-Performance Downsampled Image Cache & Bounded Prefetch
 final class ImageMemoryCache {
     static let shared = ImageMemoryCache()
     private let cache = NSCache<NSString, UIImage>()
+    private let lock = NSLock()
+    private var inFlight: [String: Task<UIImage?, Never>] = [:]
 
     private init() {
         cache.countLimit = 400
         cache.totalCostLimit = 120 * 1024 * 1024 // 120 MB
     }
 
-    func image(forKey key: String) -> UIImage? {
+    static func pixelBucket(forPointSize pointSize: CGFloat, scale: CGFloat) -> Int {
+        let rawPx = max(64, Int((pointSize * max(1, scale)).rounded(.up)))
+        let buckets = [160, 320, 640, 960, 1440, 2048]
+        return buckets.first(where: { rawPx <= $0 }) ?? 2048
+    }
+
+    static func cacheKey(forKey key: String, maxPointSize: CGFloat? = nil, scale: CGFloat = UIScreen.main.scale) -> String {
+        guard !key.isEmpty else { return "" }
+        guard let maxPointSize, maxPointSize > 0 else { return key }
+        return "\(key)#px=\(pixelBucket(forPointSize: maxPointSize, scale: scale))"
+    }
+
+    static func downsample(data: Data, maxPixelSize: CGFloat) -> UIImage? {
+        let clampedMax = max(64, maxPixelSize)
+        let sourceOptions: [CFString: Any] = [kCGImageSourceShouldCache: false]
+        guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions as CFDictionary) else {
+            return UIImage(data: data)
+        }
+        let downsampleOptions: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: clampedMax
+        ]
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, downsampleOptions as CFDictionary) else {
+            return UIImage(data: data)
+        }
+        return UIImage(cgImage: cgImage)
+    }
+
+    func image(forKey key: String, maxPointSize: CGFloat? = nil) -> UIImage? {
         guard !key.isEmpty else { return nil }
+        if let maxPointSize, maxPointSize > 0 {
+            let scoped = Self.cacheKey(forKey: key, maxPointSize: maxPointSize)
+            if let hit = cache.object(forKey: scoped as NSString) {
+                return hit
+            }
+        }
         return cache.object(forKey: key as NSString)
     }
 
-    func store(_ image: UIImage, forKey key: String) {
+    func store(_ image: UIImage, forKey key: String, maxPointSize: CGFloat? = nil) {
         guard !key.isEmpty else { return }
-        let cost = Int(image.size.width * image.size.height * 4)
-        cache.setObject(image, forKey: key as NSString, cost: cost)
+        let scoped = (maxPointSize ?? 0) > 0 ? Self.cacheKey(forKey: key, maxPointSize: maxPointSize) : key
+        let cost = max(1, Int(image.size.width * image.size.height * image.scale * image.scale * 4))
+        cache.setObject(image, forKey: scoped as NSString, cost: cost)
+    }
+
+    func loadImage(path: String, maxPointSize: CGFloat = 480) async -> UIImage? {
+        guard !path.isEmpty else { return nil }
+        let bucketPx = Self.pixelBucket(forPointSize: max(64, maxPointSize), scale: UIScreen.main.scale)
+        let cacheKey = "\(path)#px=\(bucketPx)"
+        if let mem = cache.object(forKey: cacheKey as NSString) {
+            return mem
+        }
+
+        let task: Task<UIImage?, Never> = {
+            lock.lock()
+            defer { lock.unlock() }
+            if let existing = inFlight[cacheKey] {
+                return existing
+            }
+            let created = Task.detached(priority: .userInitiated) { [weak self] () -> UIImage? in
+                defer {
+                    if let self {
+                        self.lock.lock()
+                        self.inFlight.removeValue(forKey: cacheKey)
+                        self.lock.unlock()
+                    }
+                }
+                guard let data = await KinnectAPIClient.shared.fetchBinaryData(path: path),
+                      let uiImg = Self.downsample(data: data, maxPixelSize: CGFloat(bucketPx)) else {
+                    return nil
+                }
+                self?.store(uiImg, forKey: path, maxPointSize: maxPointSize)
+                return uiImg
+            }
+            inFlight[cacheKey] = created
+            return created
+        }()
+        return await task.value
+    }
+
+    func prefetch(paths: [String], maxPointSize: CGFloat = 480) {
+        var unique: [String] = []
+        var seen = Set<String>()
+        for raw in paths {
+            let clean = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !clean.isEmpty, seen.insert(clean).inserted else { continue }
+            if image(forKey: clean, maxPointSize: maxPointSize) == nil {
+                unique.append(clean)
+            }
+            if unique.count >= 12 { break }
+        }
+        guard !unique.isEmpty else { return }
+        Task.detached(priority: .utility) {
+            await withTaskGroup(of: Void.self) { group in
+                let maxConcurrent = 3
+                var idx = 0
+                while idx < min(maxConcurrent, unique.count) {
+                    let target = unique[idx]
+                    idx += 1
+                    group.addTask { _ = await ImageMemoryCache.shared.loadImage(path: target, maxPointSize: maxPointSize) }
+                }
+                while await group.next() != nil {
+                    if idx < unique.count {
+                        let target = unique[idx]
+                        idx += 1
+                        group.addTask { _ = await ImageMemoryCache.shared.loadImage(path: target, maxPointSize: maxPointSize) }
+                    }
+                }
+            }
+        }
     }
 
     func clear() {
+        lock.lock()
+        let pending = Array(inFlight.values)
+        inFlight.removeAll()
+        lock.unlock()
+        pending.forEach { $0.cancel() }
         cache.removeAllObjects()
     }
 }
@@ -418,7 +530,7 @@ struct KinnectAvatarView: View {
         self.colorHex = colorHex
         self.size = size
         self.isOnline = isOnline
-        _loadedImage = State(initialValue: ImageMemoryCache.shared.image(forKey: avatarURL))
+        _loadedImage = State(initialValue: ImageMemoryCache.shared.image(forKey: avatarURL, maxPointSize: size))
     }
 
     init(user: KinnectUser, size: CGFloat = 44) {
@@ -427,7 +539,7 @@ struct KinnectAvatarView: View {
         self.colorHex = user.avatarColor
         self.size = size
         self.isOnline = user.isActive && user.showActivity
-        _loadedImage = State(initialValue: ImageMemoryCache.shared.image(forKey: user.avatarUrl))
+        _loadedImage = State(initialValue: ImageMemoryCache.shared.image(forKey: user.avatarUrl, maxPointSize: size))
     }
 
     var body: some View {
@@ -440,7 +552,7 @@ struct KinnectAvatarView: View {
                 } else {
                     ZStack {
                         LinearGradient(
-                            colors: [Color(hex: colorHex), KinnectTheme.accent],
+                            colors: [KinnectTheme.serverColor(colorHex), KinnectTheme.accent],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -465,7 +577,7 @@ struct KinnectAvatarView: View {
             }
         }
         .task(id: avatarURL) {
-            if let mem = ImageMemoryCache.shared.image(forKey: avatarURL) {
+            if let mem = ImageMemoryCache.shared.image(forKey: avatarURL, maxPointSize: size) {
                 loadedImage = mem
                 return
             }
@@ -473,11 +585,7 @@ struct KinnectAvatarView: View {
                 loadedImage = nil
                 return
             }
-            if let data = await KinnectAPIClient.shared.fetchBinaryData(path: avatarURL),
-               let uiImg = UIImage(data: data) {
-                ImageMemoryCache.shared.store(uiImg, forKey: avatarURL)
-                loadedImage = uiImg
-            }
+            loadedImage = await ImageMemoryCache.shared.loadImage(path: avatarURL, maxPointSize: size)
         }
     }
 
@@ -502,6 +610,10 @@ struct KinnectRemoteImageView: View {
     @State private var image: UIImage?
     @State private var failed = false
 
+    private var decodeMaxPointSize: CGFloat {
+        max(maxHeight, 360)
+    }
+
     init(
         rawURL: String,
         contentMode: ContentMode = .fit,
@@ -514,13 +626,13 @@ struct KinnectRemoteImageView: View {
         self.cornerRadius = cornerRadius
         self.maxHeight = maxHeight
         self.fillWidthNaturalHeight = fillWidthNaturalHeight
-        _image = State(initialValue: ImageMemoryCache.shared.image(forKey: rawURL))
+        _image = State(initialValue: ImageMemoryCache.shared.image(forKey: rawURL, maxPointSize: max(maxHeight, 360)))
     }
 
     init(path: String, maxHeight: CGFloat = 320) {
         self.rawURL = path
         self.maxHeight = maxHeight
-        _image = State(initialValue: ImageMemoryCache.shared.image(forKey: path))
+        _image = State(initialValue: ImageMemoryCache.shared.image(forKey: path, maxPointSize: max(maxHeight, 360)))
     }
 
     var body: some View {
@@ -566,7 +678,7 @@ struct KinnectRemoteImageView: View {
             }
         }
         .task(id: rawURL) {
-            if let mem = ImageMemoryCache.shared.image(forKey: rawURL) {
+            if let mem = ImageMemoryCache.shared.image(forKey: rawURL, maxPointSize: decodeMaxPointSize) {
                 image = mem
                 return
             }
@@ -574,9 +686,7 @@ struct KinnectRemoteImageView: View {
                 failed = true
                 return
             }
-            if let data = await KinnectAPIClient.shared.fetchBinaryData(path: rawURL),
-               let uiImg = UIImage(data: data) {
-                ImageMemoryCache.shared.store(uiImg, forKey: rawURL)
+            if let uiImg = await ImageMemoryCache.shared.loadImage(path: rawURL, maxPointSize: decodeMaxPointSize) {
                 image = uiImg
             } else {
                 failed = true

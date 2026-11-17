@@ -348,6 +348,8 @@ struct DiscoverView: View {
                 self.posts = (res["posts"] as? [[String: Any]] ?? []).map(PostItem.from)
             }
             self.loadError = nil
+            let prefetchPaths = self.people.prefix(9).map(\.avatarUrl) + self.posts.prefix(6).map(\.imageUrl)
+            ImageMemoryCache.shared.prefetch(paths: prefetchPaths, maxPointSize: 320)
         } catch {
             self.loadError = error.localizedDescription
         }

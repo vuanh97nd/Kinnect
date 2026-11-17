@@ -526,6 +526,8 @@ struct ShortsVideoView: View {
             if let arr = res["shorts"] as? [[String: Any]] {
                 self.items = arr.map(ShortItem.from)
                 self.loadError = nil
+                let avatarPaths = self.items.prefix(4).map(\.author.avatarUrl)
+                ImageMemoryCache.shared.prefetch(paths: avatarPaths, maxPointSize: 96)
                 if let accountId = AccountCache.shared.activeAccountId {
                     AccountCache.shared.saveJSONObject(arr, forKey: cacheKey, accountId: accountId)
                 }

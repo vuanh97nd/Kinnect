@@ -10,6 +10,8 @@ final class AccountCache {
     private let fileManager = FileManager.default
     private let queue = DispatchQueue(label: "app.kinnect.live.cache", qos: .utility)
     private let activeAccountDefaultsKey = "kinnect.active.account.id"
+    private let maxDiskCacheBytes: Int64 = 64 * 1024 * 1024
+    private var writesSincePrune: Int = 0
 
     private var rootDirectory: URL {
         let base = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first!
@@ -72,6 +74,37 @@ final class AccountCache {
                   let dir = self.scopeDirectory(origin: origin, accountId: accountId) else { return }
             let target = dir.appendingPathComponent(self.fileKey(key))
             try? data.write(to: target, options: .atomic)
+            self.writesSincePrune += 1
+            if self.writesSincePrune >= 20 {
+                self.writesSincePrune = 0
+                self.pruneDiskCacheIfNeeded()
+            }
+        }
+    }
+
+    private func pruneDiskCacheIfNeeded() {
+        guard let enumerator = fileManager.enumerator(
+            at: rootDirectory,
+            includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey],
+            options: [.skipsHiddenFiles]
+        ) else { return }
+        var entries: [(url: URL, size: Int64, modified: Date)] = []
+        var total: Int64 = 0
+        for case let fileURL as URL in enumerator {
+            guard let values = try? fileURL.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey]),
+                  values.isRegularFile == true else { continue }
+            let size = Int64(values.fileSize ?? 0)
+            total += size
+            entries.append((fileURL, size, values.contentModificationDate ?? .distantPast))
+        }
+        guard total > maxDiskCacheBytes else { return }
+        entries.sort { $0.modified < $1.modified }
+        let targetBytes = (maxDiskCacheBytes * 3) / 4
+        for item in entries {
+            guard total > targetBytes else { break }
+            if (try? fileManager.removeItem(at: item.url)) != nil {
+                total -= item.size
+            }
         }
     }
 

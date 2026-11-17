@@ -264,6 +264,8 @@ final class AppState: ObservableObject {
         KeychainStore.shared.clearAll()
         AccountCache.shared.wipeAllCaches()
         KinnectAuthenticatedFile.wipe()
+        ImageMemoryCache.shared.clear()
+        VideoThumbnailLoader.clearCache()
         resolvePendingLiveCreate(with: .failure(LiveCreateFailure(message: "Phiên đăng nhập đã kết thúc.")))
         currentUser = nil
         unreadNotificationsCount = 0

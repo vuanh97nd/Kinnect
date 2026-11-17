@@ -164,3 +164,53 @@ test("iOS Design System tokens, zero View color drift, and 4-state UI standardiz
   const fixtureSrc = readFileSync(new URL("../ios/Kinnect/Core/UIReviewFixture.swift", import.meta.url), "utf8");
   assert.match(fixtureSrc, /case "feed-error":\s*if clean == "\/api\/posts"/);
 });
+
+test("iOS ImageIO downsampling, bounded disk cache, prefetch, and modular View decomposition", () => {
+  const themeSrc = readFileSync(new URL("../ios/Kinnect/Theme/KinnectTheme.swift", import.meta.url), "utf8");
+  assert.match(themeSrc, /import ImageIO/);
+  assert.match(themeSrc, /CGImageSourceCreateThumbnailAtIndex/);
+  assert.match(themeSrc, /kCGImageSourceThumbnailMaxPixelSize/);
+  assert.match(themeSrc, /func loadImage\(path:\s*String,\s*maxPointSize:\s*CGFloat/);
+  assert.match(themeSrc, /func prefetch\(paths:\s*\[String\],\s*maxPointSize:\s*CGFloat/);
+  assert.match(themeSrc, /ImageMemoryCache\.shared\.loadImage\(path:\s*avatarURL,\s*maxPointSize:\s*size\)/);
+  assert.match(themeSrc, /ImageMemoryCache\.shared\.loadImage\(path:\s*rawURL,\s*maxPointSize:\s*decodeMaxPointSize\)/);
+
+  const cacheSrc = readFileSync(new URL("../ios/Kinnect/Core/AccountCache.swift", import.meta.url), "utf8");
+  assert.match(cacheSrc, /maxDiskCacheBytes:\s*Int64\s*=\s*64\s*\*\s*1024\s*\*\s*1024/);
+  assert.match(cacheSrc, /private func pruneDiskCacheIfNeeded\(\)/);
+
+  const appStateSrc = readFileSync(new URL("../ios/Kinnect/Core/AppState.swift", import.meta.url), "utf8");
+  const apiSrc = readFileSync(new URL("../ios/Kinnect/Core/KinnectAPIClient.swift", import.meta.url), "utf8");
+  assert.match(appStateSrc, /func clearSessionState\(\)[\s\S]*?ImageMemoryCache\.shared\.clear\(\)\s*VideoThumbnailLoader\.clearCache\(\)/);
+  assert.match(apiSrc, /func logoutAndWipe\(\)[\s\S]*?ImageMemoryCache\.shared\.clear\(\)/);
+
+  const viewsDirUrl = new URL("../ios/Kinnect/Views/", import.meta.url);
+  for (const extractedFile of [
+    "ProfileMediaAndAlbumSheets.swift",
+    "ProfileEditAndConnectionsSheets.swift",
+    "ProfileAccountSecuritySheets.swift",
+    "MessageComponents.swift",
+    "DirectChatDetailView.swift",
+    "GroupChatDetailView.swift",
+    "CameraStudioSheets.swift",
+    "CameraCaptureEngine.swift",
+    "LiveRoomHostAndGiftViews.swift",
+    "PostCardAndCommentsView.swift",
+    "FeedComposerAndStorySheets.swift"
+  ]) {
+    const src = readFileSync(new URL(extractedFile, viewsDirUrl), "utf8");
+    const lines = src.split(/\r?\n/).length;
+    assert.ok(lines > 50 && lines <= 1300, `${extractedFile} unexpected line count: ${lines}`);
+  }
+  for (const shrunkMainFile of [
+    ["ProfileView.swift", 1250],
+    ["MessagesView.swift", 550],
+    ["CameraStudioView.swift", 1700],
+    ["LiveStreamView.swift", 1250],
+    ["FeedView.swift", 600]
+  ]) {
+    const [file, maxLines] = shrunkMainFile;
+    const lines = readFileSync(new URL(file, viewsDirUrl), "utf8").split(/\r?\n/).length;
+    assert.ok(lines <= maxLines, `${file} expected <= ${maxLines} lines after split, got ${lines}`);
+  }
+});

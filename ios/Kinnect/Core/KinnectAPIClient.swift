@@ -312,6 +312,7 @@ final class KinnectAPIClient {
         KeychainStore.shared.clearAll()
         AccountCache.shared.wipeAllCaches()
         KinnectAuthenticatedFile.wipe()
+        ImageMemoryCache.shared.clear()
     }
 }
 
