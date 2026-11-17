@@ -329,14 +329,9 @@ enum KinnectTheme {
     static var surfaceBg: Color { background }
     static var cardBg: Color { surface }
 
-    static let primaryGradient = LinearGradient(
-        colors: [
-            Color(red: 0.49, green: 0.23, blue: 0.93),
-            Color(red: 0.86, green: 0.15, blue: 0.67)
-        ],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
+    // Một gradient duy nhất cho toàn app, suy ra từ 2 mã accent.
+    // Trước đây khai báo tay 2 màu RGB ở đây và mỗi màn lại tự thêm biến thể riêng.
+    static let primaryGradient = KTGradient.primary
 
     static let brandGradient = primaryGradient
 

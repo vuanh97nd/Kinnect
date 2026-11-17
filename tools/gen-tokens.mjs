@@ -91,6 +91,24 @@ enum KTMotion {
     }
 }
 
+// MARK: - Gradient
+// Chỉ suy ra từ accent + accentBright. Không thêm hex mới cho từng màn.
+
+enum KTGradient {
+    static let primary = LinearGradient(
+        colors: [KTColor.accent, KTColor.accentBright],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    /// Dùng cho vòng story / viền trang trí. Không đặt chữ trắng lên đây.
+    static let decorative = LinearGradient(
+        colors: [KTColor.accent, KTColor.accentBright.opacity(0.72)],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+}
+
 // MARK: - Elevation
 
 enum KTElevation {

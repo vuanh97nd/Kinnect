@@ -20,6 +20,7 @@ enum KTColor {
     static let success = dyn(light: "#0F7A4E", dark: "#21C45E")
     static let warning = dyn(light: "#F59E0A", dark: "#F59E0A")
     static let online = dyn(light: "#2E9E66", dark: "#2E9E66")
+    static let accentBright = dyn(light: "#8B5CF6", dark: "#A855F7")
 
     private static func dyn(light: String, dark: String) -> Color {
         Color(UIColor { trait in
@@ -88,6 +89,24 @@ enum KTMotion {
     static func animation(_ duration: Double, reduceMotion: Bool) -> Animation? {
         reduceMotion ? nil : .timingCurve(0.2, 0, 0, 1, duration: duration)
     }
+}
+
+// MARK: - Gradient
+// Chỉ suy ra từ accent + accentBright. Không thêm hex mới cho từng màn.
+
+enum KTGradient {
+    static let primary = LinearGradient(
+        colors: [KTColor.accent, KTColor.accentBright],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    /// Dùng cho vòng story / viền trang trí. Không đặt chữ trắng lên đây.
+    static let decorative = LinearGradient(
+        colors: [KTColor.accent, KTColor.accentBright.opacity(0.72)],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
 }
 
 // MARK: - Elevation
