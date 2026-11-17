@@ -49,7 +49,7 @@ struct NotificationsView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 16)
                 .padding(.top, 10)
 
                 // Notifications List
@@ -58,7 +58,7 @@ struct NotificationsView: View {
                         KinnectErrorBanner(message: loadError) {
                             Task { await loadNotifications() }
                         }
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 16)
                         .padding(.bottom, KinnectTheme.spaceSM)
                     }
                     if filteredNotifications.isEmpty && isLoading {
@@ -91,7 +91,7 @@ struct NotificationsView: View {
                                 .fill(KinnectTheme.surface)
                                 .overlay(RoundedRectangle(cornerRadius: 16).stroke(KinnectTheme.border, lineWidth: 1))
                         )
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 16)
                         .padding(.bottom, 16)
                     }
                 }
@@ -168,7 +168,7 @@ struct NotificationsView: View {
                         .font(KinnectTheme.scaled(12, weight: .semibold))
                 }
                 .foregroundColor(KinnectTheme.accentBright)
-                .padding(.horizontal, 10)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(Capsule().fill(KinnectTheme.surfaceElevated))
             }
@@ -273,7 +273,7 @@ struct NotificationsView: View {
                         .foregroundColor(item.read ? KinnectTheme.textSecondary : KinnectTheme.accentBright)
                 }
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .background(item.read ? Color.clear : KinnectTheme.accent.opacity(0.08))
             .contentShape(Rectangle())
@@ -582,7 +582,7 @@ private struct NotificationPostDetailView: View {
             HStack(spacing: 10) {
                 TextField("Viết bình luận…", text: $commentText)
                     .font(.subheadline)
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                     .background(RoundedRectangle(cornerRadius: 20).fill(KinnectTheme.surfaceElevated))
                     .foregroundColor(KinnectTheme.textPrimary)
@@ -598,7 +598,7 @@ private struct NotificationPostDetailView: View {
                 }
                 .disabled(commentText.trimmingCharacters(in: .whitespaces).isEmpty || isSubmittingComment)
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .background(KinnectTheme.surface.ignoresSafeArea(edges: .bottom))
         }
