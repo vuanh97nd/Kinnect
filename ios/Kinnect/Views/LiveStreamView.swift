@@ -286,7 +286,7 @@ struct LiveStreamView: View {
                             .foregroundColor(.white)
                             .lineLimit(1)
                     }
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, 10) // spacing-ok: đệm nội bộ badge chủ đề, tăng làm truncated tên host
                     .padding(.vertical, 6)
                     .background(Capsule().fill(Color.white.opacity(0.18)))
 
@@ -494,7 +494,7 @@ struct LiveStreamView: View {
                 .foregroundColor(.white)
                 .lineLimit(2)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 10) // spacing-ok: đệm nội bộ bong bóng chat Live
         .padding(.vertical, 4)
         .background(Capsule().fill(Color.black.opacity(0.55)))
     }
