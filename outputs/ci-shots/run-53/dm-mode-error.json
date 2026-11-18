@@ -1,8 +1,0 @@
-{
-  "retry" : true,
-  "successToast" : false,
-  "afterMode" : "everyone",
-  "priorMode" : "everyone",
-  "requestedMode" : "friends",
-  "rolledBack" : true
-}
