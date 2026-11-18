@@ -3995,32 +3995,14 @@ public class MainActivity extends Activity {
     side.addView(authorTile,new LinearLayout.LayoutParams(dp(54),dp(own?54:74)));
     final LinearLayout love=reelButton("heart",String.valueOf(item.optInt("likes")),item.optBoolean("liked")?PINK:WHITE,()->{});love.setContentDescription(item.optBoolean("liked")?I18n.t("Bỏ thích video"):I18n.t("Thích video"));love.setOnClickListener(v->{final boolean previous=item.optBoolean("liked");love.setEnabled(false);request(previous?"DELETE":"POST","/api/shorts/"+item.optString("id")+"/like",json(),result->{boolean liked=result.has("liked")?result.optBoolean("liked"):!previous;int count=result.has("likes")?result.optInt("likes"):Math.max(0,item.optInt("likes")+(liked==previous?0:liked?1:-1));try{item.put("liked",liked);item.put("likes",count);}catch(JSONException ignored){}((ImageView)love.getChildAt(0)).setImageTintList(android.content.res.ColorStateList.valueOf(liked?PINK:WHITE));((TextView)love.getChildAt(1)).setText(String.valueOf(count));love.setContentDescription(liked?I18n.t("Bỏ thích video"):I18n.t("Thích video"));},()->love.setEnabled(true));});side.addView(love);
     side.addView(reelButton("comment", item.has("comments") ? String.valueOf(item.optInt("comments")) : "0", WHITE, () -> shortComments(item)));
-    side.addView(reelButton("share", I18n.t("Chia sẻ"), WHITE, () -> {
+    side.addView(reelButton("share", "", WHITE, () -> {
       Intent send = new Intent(Intent.ACTION_SEND);
       send.setType("text/plain");
       send.putExtra(Intent.EXTRA_TEXT, "Xem video của @" + author.optString("username") + " trên Kinnect: https://app.kinnect.io.vn/?video=" + item.optString("id"));
       try { startActivity(Intent.createChooser(send, I18n.t("Chia sẻ video"))); } catch (Exception ignored) {}
-    }));
-    // Đã chuyển Tải video và Âm thanh vào shortOptions (Tùy chọn)
-    final LinearLayout muteBtn = reelButton(shortMuted ? "volume_x" : "sound", shortMuted ? I18n.t("Bật tiếng") : I18n.t("Tắt tiếng"), WHITE, () -> {});
-    muteBtn.setOnClickListener(v -> {
-      shortMuted = !shortMuted;
-      if (shortPlayer != null) {
-        shortPlayer.setVolume(shortMuted ? 0 : 1, shortMuted ? 0 : 1);
-      }
-      int pos = shortVideo != null ? shortVideo.getCurrentPosition() : 0;
-      boolean playing = shortVideo != null && shortVideo.isPlaying();
-      android.util.Log.i("KinnectQA", "SHORTS_EVENT: action=mute_toggle muted=" + shortMuted + " volume=" + (shortMuted ? 0 : 1) + " pos=" + pos + " isPlaying=" + playing);
-      ImageView iv = (ImageView) muteBtn.getChildAt(0);
-      TextView tv = (TextView) muteBtn.getChildAt(1);
-      iv.setImageDrawable(WebIcons.load(this, shortMuted ? "volume_x" : "sound"));
-      iv.setImageTintList(android.content.res.ColorStateList.valueOf(WHITE));
-      String caption = shortMuted ? I18n.t("Bật tiếng") : I18n.t("Tắt tiếng");
-      tv.setText(caption);
-      muteBtn.setContentDescription(caption);
-    });
-    side.addView(muteBtn);
-    side.addView(reelButton("more", I18n.t("Tùy chọn video"), WHITE, () -> shortOptions(item)));
+    }, I18n.t("Chia sẻ video")));
+    // Nút âm thanh nằm trong shortOptions (Tùy chọn) — cột bên phải chỉ giữ icon + số như TikTok.
+    side.addView(reelButton("more", "", WHITE, () -> shortOptions(item), I18n.t("Tùy chọn video")));
     ScrollView actionRail = new ScrollView(this);
     actionRail.setVerticalScrollBarEnabled(false);
     actionRail.setFillViewport(true);
@@ -4094,6 +4076,11 @@ public class MainActivity extends Activity {
   }
 
   private LinearLayout reelButton(String iconName, String caption, int color, Runnable click) {
+    return reelButton(iconName, caption, color, click, caption);
+  }
+
+  /** Cột nút kiểu TikTok: icon tròn, chỉ hiện số bên dưới (không hiện chữ). */
+  private LinearLayout reelButton(String iconName, String caption, int color, Runnable click, String a11yLabel) {
     LinearLayout box = column();
     box.setGravity(Gravity.CENTER_HORIZONTAL);
     box.setPadding(0, dp(8), 0, dp(3));
@@ -4105,14 +4092,18 @@ public class MainActivity extends Activity {
     i.setPadding(dp(10), dp(10), dp(10), dp(10));
     i.setElevation(dp(3));
     box.addView(i, new LinearLayout.LayoutParams(dp(46), dp(46)));
-    TextView text = label(caption, 11, WHITE);
-    text.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
-    text.setShadowLayer(4, 0, 1, 0xaa000000);
-    text.setGravity(Gravity.CENTER);
-    text.setPadding(dp(3), dp(2), dp(3), dp(2));
-    text.setMaxLines(2);
-    box.addView(text);
-    box.setContentDescription(caption);
+    // Chỉ giữ lại dòng số (lượt thích / bình luận). Các nhãn chữ "Chia sẻ",
+    // "Tùy chọn video" được bỏ để đồng bộ với iOS; vẫn để contentDescription cho TalkBack.
+    if (caption != null && caption.matches("\\d+")) {
+      TextView text = label(caption, 12, WHITE);
+      text.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+      text.setShadowLayer(4, 0, 1, 0xaa000000);
+      text.setGravity(Gravity.CENTER);
+      text.setPadding(dp(3), dp(2), dp(3), dp(2));
+      box.addView(text);
+    }
+    box.setContentDescription(a11yLabel == null || a11yLabel.isEmpty() ? iconName : a11yLabel);
+    box.setTooltipText(box.getContentDescription());
     box.setOnClickListener(v -> click.run());
     tactile(box);
     return box;
