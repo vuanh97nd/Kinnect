@@ -45,8 +45,8 @@ targets:
           - vi
           - en
         ITSAppUsesNonExemptEncryption: false
-        CFBundleShortVersionString: "1.2.12"
-        CFBundleVersion: "124"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         LSRequiresIPhoneOS: true
         CFBundleURLTypes:
           - CFBundleTypeRole: Editor
