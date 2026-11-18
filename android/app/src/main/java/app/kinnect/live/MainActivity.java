@@ -3994,7 +3994,7 @@ public class MainActivity extends Activity {
     if(!own){FrameLayout follow=new FrameLayout(this);FrameLayout mark=new FrameLayout(this);ImageView symbol=icon(author.optBoolean("following")?"check":"plus",15,WHITE);mark.setBackground(background(author.optBoolean("following")?ACCENT:PINK,99));mark.addView(symbol,new FrameLayout.LayoutParams(dp(15),dp(15),Gravity.CENTER));follow.addView(mark,new FrameLayout.LayoutParams(dp(25),dp(25),Gravity.CENTER));follow.setContentDescription(author.optBoolean("following")?I18n.t("Bỏ theo dõi tác giả"):I18n.t("Theo dõi tác giả"));follow.setOnClickListener(v->{follow.setEnabled(false);request(author.optBoolean("following")?"DELETE":"POST","/api/users/"+author.optString("id")+"/follow",json(),result->{JSONObject updated=result.optJSONObject("user");boolean followed=updated!=null?updated.optBoolean("following"):!author.optBoolean("following");try{author.put("following",followed);for(int i=0;shortRows!=null&&i<shortRows.length();i++){JSONObject who=shortRows.optJSONObject(i).optJSONObject("author");if(who!=null&&who.optString("id").equals(author.optString("id")))who.put("following",followed);}}catch(JSONException ignored){}symbol.setImageDrawable(WebIcons.load(this,followed?"check":"plus"));symbol.setImageTintList(android.content.res.ColorStateList.valueOf(WHITE));mark.setBackground(background(followed?ACCENT:PINK,99));follow.setContentDescription(followed?I18n.t("Bỏ theo dõi tác giả"):I18n.t("Theo dõi tác giả"));say(followed?I18n.t("Đã theo dõi"):I18n.t("Đã bỏ theo dõi"));},()->follow.setEnabled(true));});authorTile.addView(follow,new FrameLayout.LayoutParams(dp(44),dp(44),Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL));}
     side.addView(authorTile,new LinearLayout.LayoutParams(dp(54),dp(own?54:74)));
     final LinearLayout love=reelButton("heart",String.valueOf(item.optInt("likes")),item.optBoolean("liked")?PINK:WHITE,()->{});love.setContentDescription(item.optBoolean("liked")?I18n.t("Bỏ thích video"):I18n.t("Thích video"));love.setOnClickListener(v->{final boolean previous=item.optBoolean("liked");love.setEnabled(false);request(previous?"DELETE":"POST","/api/shorts/"+item.optString("id")+"/like",json(),result->{boolean liked=result.has("liked")?result.optBoolean("liked"):!previous;int count=result.has("likes")?result.optInt("likes"):Math.max(0,item.optInt("likes")+(liked==previous?0:liked?1:-1));try{item.put("liked",liked);item.put("likes",count);}catch(JSONException ignored){}((ImageView)love.getChildAt(0)).setImageTintList(android.content.res.ColorStateList.valueOf(liked?PINK:WHITE));((TextView)love.getChildAt(1)).setText(String.valueOf(count));love.setContentDescription(liked?I18n.t("Bỏ thích video"):I18n.t("Thích video"));},()->love.setEnabled(true));});side.addView(love);
-    side.addView(reelButton("comment", item.has("comments") ? String.valueOf(item.optInt("comments")) : "0", WHITE, () -> shortComments(item)));
+    side.addView(reelButton("comment", item.has("comments") ? String.valueOf(item.optInt("comments")) : "0", WHITE, () -> shortComments(item), I18n.t("Bình luận")));
     side.addView(reelButton("share", "", WHITE, () -> {
       Intent send = new Intent(Intent.ACTION_SEND);
       send.setType("text/plain");
@@ -4055,9 +4055,13 @@ public class MainActivity extends Activity {
         int cw=compact?dp(n==0?54:64):dp(64);
         if(cell.width!=cw){cell.width=cw;action.setLayoutParams(cell);}
         if(n>0 && action instanceof LinearLayout) {
-          TextView caption=(TextView)((LinearLayout)action).getChildAt(1);
-          caption.setSingleLine(compact);
-          caption.setEllipsize(android.text.TextUtils.TruncateAt.END);
+          LinearLayout box=(LinearLayout)action;
+          // Nút icon-only (chia sẻ / tùy chọn) không có TextView số bên dưới.
+          if(box.getChildCount()>1 && box.getChildAt(1) instanceof TextView) {
+            TextView caption=(TextView)box.getChildAt(1);
+            caption.setSingleLine(compact);
+            caption.setEllipsize(android.text.TextUtils.TruncateAt.END);
+          }
         }
       }
       FrameLayout.LayoutParams details=(FrameLayout.LayoutParams)meta.getLayoutParams();
