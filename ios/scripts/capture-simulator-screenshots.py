@@ -933,9 +933,11 @@ def main():
             subprocess.run(["xcrun", "simctl", "shutdown", active_to_shutdown["udid"]], check=False)
         boot_and_install(ipad, app_path, bundle_id)
         ipad_inventory = [
-            ("17-ipad-feed-splitview", "feed", [], "iPad NavigationSplitView: Sidebar + Bảng tin"),
-            ("18-ipad-chat-detail", "chat-detail", [], "iPad NavigationSplitView: Danh sách Hội thoại (trái) + Chi tiết Chat (phải)"),
-            ("18b-ipad-dynamictype-max", "feed", ["--ui-review-dynamictype-max"], "iPad: NavigationSplitView với Dynamic Type tối đa Accessibility 5")
+            # Tên slug "splitview" là legacy; ảnh thực tế là chế độ feed toàn màn hình
+            # của fixture UI review, không phải bằng chứng NavigationSplitView 2 cột.
+            ("17-ipad-feed-splitview", "feed", [], "iPad: Bảng tin toàn màn hình (fixture feed)"),
+            ("18-ipad-chat-detail", "chat-detail", [], "iPad: Chi tiết hội thoại (fixture chat-detail; không chứng minh split view 2 cột)"),
+            ("18b-ipad-dynamictype-max", "feed", ["--ui-review-dynamictype-max"], "iPad: Bảng tin với Dynamic Type tối đa Accessibility 5")
         ]
         if capture_scope == "matrix":
             wanted = set(MATRIX_IPAD_SLUGS)

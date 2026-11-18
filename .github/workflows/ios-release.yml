@@ -30,6 +30,9 @@ jobs:
       - name: Check header spacing ratchet
         run: node tools/check-spacing.mjs
 
+      - name: Check font-debt ratchet
+        run: node tools/check-fonts.mjs
+
       - name: Ensure XcodeGen is installed
         run: |
           if ! command -v xcodegen >/dev/null 2>&1; then
