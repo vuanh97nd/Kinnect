@@ -2910,6 +2910,7 @@ public class MainActivity extends Activity {
     protected int sizeOf(String key,Bitmap value){return Math.max(1,value.getAllocationByteCount()/1024);}
   };
   private void loadVideoPreview(JSONObject video,ImageView target){
+    if(video==null)return;
     String path=video.optString("video");if(!path.startsWith("/")||path.startsWith("//"))return;
     final String origin=api.origin(),key=origin+path;final int generation=screen;
     Bitmap cached=videoPreviews.get(key);if(cached!=null){target.setImageBitmap(cached);return;}
@@ -3953,7 +3954,10 @@ public class MainActivity extends Activity {
     if (shortRows == null || shortRows.length() == 0) return;
     shortIndex = VideoFeedPolicy.index(index, shortRows.length(), !shortsFollowing);
     if(reelViewport==null||reelViewport.getParent()!=root)shell(I18n.t("Video ngắn"), true);
-    final JSONObject item = shortRows.optJSONObject(shortIndex), author = item.optJSONObject("author");
+    final JSONObject item = shortRows.optJSONObject(shortIndex);
+    if (item == null) { say(I18n.t("Video không khả dụng.")); return; }
+    JSONObject rawAuthor = item.optJSONObject("author");
+    final JSONObject author = rawAuthor == null ? new JSONObject() : rawAuthor;
     // Keep the app shell stable while changing only the media stage.
     FrameLayout stage=reelStage();
     shortVideo = new VideoView(this);
@@ -3961,11 +3965,11 @@ public class MainActivity extends Activity {
     stage.addView(shortVideo, new FrameLayout.LayoutParams(-1, -1, Gravity.CENTER));
     Map<String, String> headers = new HashMap<>();
     headers.put("Cookie", api.jar());
-    final String videoPath=item.optString("video");final java.io.File savedVideo=api.cachedVideo(videoPath);
+    final String videoPath=item.optString("video");final boolean hasVideo=!videoPath.isEmpty();final java.io.File savedVideo=api.cachedVideo(videoPath);
     FrameLayout preview=new FrameLayout(this);ImageView poster=new ImageView(this);poster.setScaleType(ImageView.ScaleType.FIT_CENTER);preview.addView(poster,new FrameLayout.LayoutParams(-1,-1));byte[] thumbnail=api.cachedThumbnail(videoPath);if(thumbnail!=null)poster.setImageBitmap(BitmapFactory.decodeByteArray(thumbnail,0,thumbnail.length));
     TextView unavailable=label(I18n.t("Video chưa lưu trên máy · Chờ máy chủ hoạt động lại"),13,WHITE);unavailable.setGravity(Gravity.CENTER);unavailable.setPadding(dp(30),dp(12),dp(70),dp(12));unavailable.setBackgroundColor(0x99000000);unavailable.setVisibility(View.GONE);preview.addView(unavailable,new FrameLayout.LayoutParams(-1,-2,Gravity.CENTER));stage.addView(preview,new FrameLayout.LayoutParams(-1,-1));
     if(savedVideo!=null)shortVideo.setVideoURI(android.net.Uri.fromFile(savedVideo));
-    else if(!item.optBoolean("offline"))shortVideo.setVideoURI(android.net.Uri.parse(server()+videoPath),headers);
+    else if(hasVideo && !item.optBoolean("offline"))shortVideo.setVideoURI(android.net.Uri.parse(server()+videoPath),headers);
     else unavailable.setVisibility(View.VISIBLE);
     shortVideo.setOnPreparedListener(player -> {
       if (stopped || shortVideo != playerView) return;
