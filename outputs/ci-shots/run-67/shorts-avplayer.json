@@ -1,0 +1,43 @@
+{
+  "pauseRate" : 0,
+  "bufferTimeSeconds" : 0.797268541,
+  "probePlayerSwitch" : false,
+  "resumedWhileMuted" : true,
+  "muteHeldPause" : true,
+  "playTime" : 0.39176737499999997,
+  "secondPlayerBuffer" : {
+    "timeSeconds" : 0.45176845799999998,
+    "frameFile" : "shorts-avplayer-frame-second.png",
+    "width" : 720,
+    "received" : true,
+    "height" : 1280
+  },
+  "bufferHeight" : 1280,
+  "shortsSwipeClosed" : false,
+  "frameFile" : "shorts-avplayer-frame.png",
+  "muteRate" : 0,
+  "bufferReceived" : true,
+  "pixelProof" : true,
+  "swipeMethod" : "second-avplayer-probe-only",
+  "clockAdvanced" : true,
+  "cornerSample" : {
+    "g" : 35,
+    "r" : 65,
+    "b" : 108,
+    "usedAsProof" : false
+  },
+  "lines" : [
+    "file=ui_review_sample_shorts.mp4",
+    "status=ready",
+    "play time=0.392 rate=1.00",
+    "pause time=0.393 rate=0.00",
+    "mute-while-paused time=0.393 rate=0.00 muted=yes held=yes",
+    "resume time=0.797 rate=1.00 advanced=yes",
+    "clockAdvanced=yes",
+    "bufferReceived=yes 720x1280 time=0.797",
+    "frameSaved=yes",
+    "cornerSample r=65 g=35 b=108 notProof=yes",
+    "probePlayerSwitch=no shortsSwipeClosed=no"
+  ],
+  "bufferWidth" : 720
+}

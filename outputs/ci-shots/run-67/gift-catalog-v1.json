@@ -1,0 +1,11 @@
+{
+  "adapterScope" : "parse-and-drawer",
+  "star" : 100,
+  "version" : 1,
+  "count" : 16,
+  "crown" : 200,
+  "matchesIsolatedCatalog" : true,
+  "drawerFixtureCrown" : 200,
+  "rose" : 50,
+  "drawerPriceParity" : "closed-isolated-v1"
+}
