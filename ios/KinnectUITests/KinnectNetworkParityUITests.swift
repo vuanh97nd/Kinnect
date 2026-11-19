@@ -104,6 +104,16 @@ final class KinnectNetworkParityUITests: XCTestCase {
         return app
     }
 
+    private func focusAndType(_ field: XCUIElement, text: String) {
+        field.tap()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.35))
+        if (field.value(forKey: "hasKeyboardFocus") as? Bool) != true {
+            field.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.35))
+        }
+        field.typeText(text)
+    }
+
     private func loginViaUI(_ app: XCUIApplication) {
         let welcomeLogin = app.buttons["qa.welcome.login"]
         XCTAssertTrue(welcomeLogin.waitForExistence(timeout: 20), "Welcome login button should appear")
@@ -111,13 +121,11 @@ final class KinnectNetworkParityUITests: XCTestCase {
 
         let userField = app.textFields["qa.login.username"]
         XCTAssertTrue(userField.waitForExistence(timeout: 12), "Login username field should appear")
-        userField.tap()
-        userField.typeText(username)
+        focusAndType(userField, text: username)
 
         let passField = app.secureTextFields["qa.login.password"]
         XCTAssertTrue(passField.waitForExistence(timeout: 6), "Login password field should appear")
-        passField.tap()
-        passField.typeText(password)
+        focusAndType(passField, text: password)
 
         let submit = app.buttons["qa.login.submit"]
         XCTAssertTrue(submit.waitForExistence(timeout: 6), "Login submit button should exist")
@@ -548,10 +556,8 @@ final class KinnectNetworkParityUITests: XCTestCase {
             }
 
             // Login
-            app.textFields["qa.login.username"].tap()
-            app.textFields["qa.login.username"].typeText(username)
-            app.secureTextFields["qa.login.password"].tap()
-            app.secureTextFields["qa.login.password"].typeText(password)
+            focusAndType(app.textFields["qa.login.username"], text: username)
+            focusAndType(app.secureTextFields["qa.login.password"], text: password)
             app.buttons["qa.login.submit"].tap()
             XCTAssertTrue(app.buttons["qa.topbar.messages"].waitForExistence(timeout: 20))
             XCTAssertTrue(app.staticTexts["P1 parity post"].waitForExistence(timeout: 12))
