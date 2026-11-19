@@ -617,11 +617,13 @@ private struct ChangePasswordSheetView: View {
             errorMessage = "Mật khẩu nhập lại không khớp."
             return
         }
+        #if DEBUG
         if UIReviewFixture.activeScreen != nil {
             AppState.shared.showToast("Đã đổi mật khẩu. Các thiết bị khác đã được đăng xuất.")
             close()
             return
         }
+        #endif
         do {
             _ = try await KinnectAPIClient.shared.requestJSON(
                 "/api/me/password",
@@ -773,7 +775,10 @@ struct AdminConsoleView: View {
     @State private var confirm = false
 
     private var allowed: Bool {
-        UIReviewFixture.activeScreen == "admin" || appState.currentUser?.accountRole == "admin"
+        #if DEBUG
+        if UIReviewFixture.activeScreen == "admin" { return true }
+        #endif
+        return appState.currentUser?.accountRole == "admin"
     }
 
     var body: some View {
@@ -1061,10 +1066,12 @@ private struct RecoveryEmailSheet: View {
     }
 
     private func load() async {
+        #if DEBUG
         if UIReviewFixture.isEnabled {
             status = "Chưa xác minh email khôi phục."
             return
         }
+        #endif
         do {
             let data = try await KinnectAPIClient.shared.requestJSON("/api/recovery/email")
             if let saved = data["email"] as? String, !saved.isEmpty {
@@ -1080,10 +1087,12 @@ private struct RecoveryEmailSheet: View {
     private func start() async {
         busy = true
         defer { busy = false }
+        #if DEBUG
         if UIReviewFixture.isEnabled {
             AppState.shared.showToast("Bản xem giao diện không gửi email.")
             return
         }
+        #endif
         do {
             let data = try await KinnectAPIClient.shared.requestJSON(
                 "/api/recovery/email/start",

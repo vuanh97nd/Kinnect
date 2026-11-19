@@ -90,6 +90,9 @@ targets:
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks"
         SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
         SUPPORTS_MACCATALYST: NO
+      configs:
+        Release:
+          EXCLUDED_SOURCE_FILE_NAMES: "UIReviewFixture.swift"
     dependencies:
       - package: WebRTC
         product: WebRTC

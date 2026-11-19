@@ -139,6 +139,7 @@ struct AuthView: View {
             }
         }
         .onAppear {
+            #if DEBUG
             if let screen = UIReviewFixture.activeScreen {
                 loc.setLanguage(screen.hasSuffix("-en") ? .en : .vi)
                 if let option = CommandLine.arguments.firstIndex(of: "--ui-review-welcome-tab"),
@@ -209,6 +210,7 @@ struct AuthView: View {
                     stage = .forgotPassword
                 }
             }
+            #endif
         }
         .sheet(isPresented: $showLoginLanguageSheet) {
             loginLanguageSheet
@@ -310,7 +312,9 @@ struct AuthView: View {
         }
         .task {
             // Production always cycles; UI captures opt in explicitly to remain reproducible.
+            #if DEBUG
             guard !UIReviewFixture.isEnabled || CommandLine.arguments.contains("--ui-review-welcome-autocycle") else { return }
+            #endif
             while !Task.isCancelled {
                 do { try await Task.sleep(nanoseconds: 1_500_000_000) }
                 catch { return }
@@ -1367,11 +1371,15 @@ struct AuthView: View {
                         await appState.refreshGlobalBadges()
                     }
                 } catch {
+                    #if DEBUG
                     if UIReviewFixture.isEnabled {
                         appState.applyAuthenticatedUser(KinnectUser.from(UIReviewFixture.currentUserDict), rawDict: UIReviewFixture.currentUserDict, rememberMe: true)
                     } else {
                         errorMessage = "Apple Sign-In: \(error.localizedDescription)"
                     }
+                    #else
+                    errorMessage = "Apple Sign-In: \(error.localizedDescription)"
+                    #endif
                 }
             }
         case .failure(let error):
@@ -1409,11 +1417,15 @@ struct AuthView: View {
                 await appState.refreshGlobalBadges()
             }
         } catch {
+            #if DEBUG
             if UIReviewFixture.isEnabled {
                 appState.applyAuthenticatedUser(KinnectUser.from(UIReviewFixture.currentUserDict), rawDict: UIReviewFixture.currentUserDict, rememberMe: true)
             } else {
                 errorMessage = error.localizedDescription
             }
+            #else
+            errorMessage = error.localizedDescription
+            #endif
         }
     }
 
@@ -1440,11 +1452,15 @@ struct AuthView: View {
                 await appState.refreshGlobalBadges()
             }
         } catch {
+            #if DEBUG
             if UIReviewFixture.isEnabled {
                 appState.applyAuthenticatedUser(KinnectUser.from(UIReviewFixture.currentUserDict), rawDict: UIReviewFixture.currentUserDict, rememberMe: true)
             } else {
                 errorMessage = error.localizedDescription
             }
+            #else
+            errorMessage = error.localizedDescription
+            #endif
         }
     }
 
@@ -1468,11 +1484,15 @@ struct AuthView: View {
                 ? "Password reset request sent. Check your recovery email."
                 : "Yêu cầu khôi phục mật khẩu đã được gửi. Vui lòng kiểm tra email của bạn."
         } catch {
+            #if DEBUG
             if UIReviewFixture.isEnabled {
                 infoMessage = loc.currentLanguage == .en ? "Demo verification code dispatched." : "Đã gửi mã minh họa thành công."
             } else {
                 errorMessage = error.localizedDescription
             }
+            #else
+            errorMessage = error.localizedDescription
+            #endif
         }
     }
 

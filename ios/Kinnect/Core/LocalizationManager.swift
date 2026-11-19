@@ -58,11 +58,15 @@ final class LocalizationManager: ObservableObject {
             }
         }
         #endif
+        #if DEBUG
         if UIReviewFixture.isEnabled {
             let english = UIReviewFixture.activeScreen?.hasSuffix("-en") == true
             self.preference = english ? .en : .vi
             self.currentLanguage = english ? .en : .vi
-        } else if let saved = UserDefaults.standard.string(forKey: userDefaultsKey) {
+            return
+        }
+        #endif
+        if let saved = UserDefaults.standard.string(forKey: userDefaultsKey) {
             let preference = AppLanguagePreference(rawValue: saved) ?? .system
             self.preference = preference
             self.currentLanguage = Self.resolved(preference)

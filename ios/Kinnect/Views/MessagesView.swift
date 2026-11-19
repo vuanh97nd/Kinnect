@@ -653,8 +653,13 @@ struct DirectChatDetailView: View {
     @State private var showForwardSheet = false
     @State private var isPinned = false
     @State private var isMuted = false
+    #if DEBUG
     @State private var showReviewChatMenu = (UIReviewFixture.activeScreen == "chat-menu")
     @State private var showReviewMessageMenu = (UIReviewFixture.activeScreen == "message-menu")
+    #else
+    @State private var showReviewChatMenu = false
+    @State private var showReviewMessageMenu = false
+    #endif
     @State private var showPeerProfile = false
 
     var body: some View {
@@ -2581,6 +2586,7 @@ struct ForwardMessageSheet: View {
     }
 
     private func loadTargets() async {
+        #if DEBUG
         if UIReviewFixture.activeScreen != nil {
             self.conversations = [
                 [
@@ -2621,6 +2627,7 @@ struct ForwardMessageSheet: View {
             ]
             return
         }
+        #endif
         isLoading = true
         defer { isLoading = false }
         if let cRes = try? await KinnectAPIClient.shared.requestJSON("/api/conversations") {

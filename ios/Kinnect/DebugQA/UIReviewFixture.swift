@@ -1,3 +1,4 @@
+#if DEBUG
 import AVFoundation
 import Foundation
 import SwiftUI
@@ -1584,3 +1585,4 @@ enum UIReviewFixture {
         }
     }
 }
+#endif

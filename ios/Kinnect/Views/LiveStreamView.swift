@@ -167,10 +167,19 @@ struct LiveStreamView: View {
                 } else {
                     // Playable live video fallback with vignette overlay (Parity Android 1.2.12 build 118)
                     ZStack {
+                        #if DEBUG
                         ShortClipPlayer(
-                            path: UIReviewFixture.samplePlayableVideoURL()?.absoluteString ?? "https://kinnect.io.vn/media/welcome-feed-demo.mp4",
+                            path: UIReviewFixture.isEnabled
+                                ? (UIReviewFixture.samplePlayableVideoURL()?.absoluteString ?? "https://kinnect.io.vn/media/welcome-feed-demo.mp4")
+                                : "https://kinnect.io.vn/media/welcome-feed-demo.mp4",
                             active: true
                         )
+                        #else
+                        ShortClipPlayer(
+                            path: "https://kinnect.io.vn/media/welcome-feed-demo.mp4",
+                            active: true
+                        )
+                        #endif
                         LinearGradient(
                             colors: [
                                 Color.black.opacity(0.4),

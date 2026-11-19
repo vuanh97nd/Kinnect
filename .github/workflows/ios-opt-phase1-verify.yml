@@ -1,0 +1,186 @@
+name: iOS Opt Phase 1 Release Audit + Real Network QA
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'codex/opt-phase1-ios-20261119'
+
+env:
+  APP_VERSION: "1.2.17"
+  APP_BUILD: "129"
+
+jobs:
+  ios-opt-phase1:
+    name: iOS Phase 1 Release IPA Audit & Debug Real-Backend QA
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Node dependencies for createApp backend
+        run: |
+          npm ci --no-audit --no-fund
+          npm --prefix cloud-api ci --no-audit --no-fund
+
+      - name: Smoke-test createApp(:memory:) import before Xcode build
+        run: |
+          node -e "import('./server.js').then(({createApp}) => { const a = createApp({dbPath:':memory:'}); a.social.close(); console.log('createApp smoke OK'); })"
+
+      - name: Ensure XcodeGen is installed
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+          xcodegen --version
+
+      - name: Generate Xcode project from ios/project.yml
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build Release Archive & Package IPA (no GitHub Release publish)
+        run: |
+          mkdir -p dist/ios-qa-network/logs build/Payload
+          set -o pipefail
+          xcodebuild archive \
+            -project ios/Kinnect.xcodeproj \
+            -scheme Kinnect \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath build/Kinnect.xcarchive \
+            MARKETING_VERSION="${{ env.APP_VERSION }}" \
+            CURRENT_PROJECT_VERSION="${{ env.APP_BUILD }}" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            2>&1 | tee dist/ios-qa-network/logs/xcodebuild-release-archive.log
+
+          cp -R build/Kinnect.xcarchive/Products/Applications/Kinnect.app build/Payload/Kinnect.app
+          PLIST="build/Payload/Kinnect.app/Info.plist"
+          ACTUAL_VER=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST")
+          ACTUAL_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$PLIST")
+          echo "Release Info.plist version=$ACTUAL_VER build=$ACTUAL_BUILD"
+          if [ "$ACTUAL_VER" != "${{ env.APP_VERSION }}" ] || [ "$ACTUAL_BUILD" != "${{ env.APP_BUILD }}" ]; then
+            echo "ERROR: Info.plist version mismatch!"
+            exit 1
+          fi
+
+          codesign --force --deep --sign - build/Payload/Kinnect.app
+          (cd build && zip -qry "../dist/ios-qa-network/Kinnect-${{ env.APP_VERSION }}-b${{ env.APP_BUILD }}-ios.ipa" Payload)
+
+      - name: Audit Release Archive & Mach-O Binary for QA Fixture Exclusion
+        run: |
+          python3 - << 'PY'
+          import hashlib, json, os, subprocess, sys, zipfile
+          from pathlib import Path
+
+          out_dir = Path("dist/ios-qa-network")
+          ipa_path = out_dir / "Kinnect-1.2.17-b129-ios.ipa"
+          app_dir = Path("build/Payload/Kinnect.app")
+          macho_path = app_dir / "Kinnect"
+          archive_log = (out_dir / "logs/xcodebuild-release-archive.log").read_text(encoding="utf-8", errors="replace")
+
+          # 1. Compile-input check: UIReviewFixture.swift MUST NOT be compiled in Release
+          compile_fixture_lines = [
+              line for line in archive_log.splitlines()
+              if "UIReviewFixture.swift" in line
+          ]
+
+          # 2. Binary strings check: zero QA fixture / review / QA-harness flags in Release Mach-O
+          strings_out = subprocess.check_output(["strings", str(macho_path)], text=True, errors="replace")
+          forbidden_tokens = [
+              "--ui-review-screen",
+              "--ui-review-light",
+              "--ui-review-dynamictype-max",
+              "--ui-review-welcome-tab",
+              "--ui-review-welcome-autocycle",
+              "UIReviewFixture",
+              "fixture_user_me",
+              "fixture_user_peer",
+              "fixture_group_1",
+              "fixture_post_1",
+              "fixture_short_1",
+              "--qa-primary-origin",
+              "--qa-fallback-origin",
+              "--qa-leaf-sha256",
+              "--qa-reset-session",
+              "--qa-request-timeout",
+              "QALocalhostPinDelegate",
+          ]
+          token_hits = {tok: strings_out.count(tok) for tok in forbidden_tokens}
+          leaked_tokens = {k: v for k, v in token_hits.items() if v > 0}
+
+          # 3. Archive breakdown
+          ipa_bytes = ipa_path.stat().st_size
+          ipa_sha256 = hashlib.sha256(ipa_path.read_bytes()).hexdigest()
+          with zipfile.ZipFile(ipa_path, "r") as zf:
+              infos = zf.infolist()
+              raw_total = sum(i.file_size for i in infos)
+              entries = {i.filename: {"rawBytes": i.file_size, "compressedBytes": i.compress_size} for i in infos}
+
+          webrtc_present = "Payload/Kinnect.app/Frameworks/WebRTC.framework/WebRTC" in entries
+          otool_out = subprocess.check_output(["otool", "-L", str(macho_path)], text=True, errors="replace")
+          webrtc_linked = "WebRTC.framework/WebRTC" in otool_out
+
+          audit = {
+              "gitSha": os.environ.get("GITHUB_SHA", ""),
+              "githubRunId": os.environ.get("GITHUB_RUN_ID", ""),
+              "version": "1.2.17",
+              "build": "129",
+              "ipa": {
+                  "file": ipa_path.name,
+                  "bytes": ipa_bytes,
+                  "rawBytes": raw_total,
+                  "sha256": ipa_sha256,
+                  "entryCount": len(infos),
+              },
+              "macho": {
+                  "rawBytes": entries.get("Payload/Kinnect.app/Kinnect", {}).get("rawBytes", 0),
+                  "compressedBytes": entries.get("Payload/Kinnect.app/Kinnect", {}).get("compressedBytes", 0),
+              },
+              "assetsCar": entries.get("Payload/Kinnect.app/Assets.car", {}),
+              "webrtcFramework": {
+                  "presentInIpa": webrtc_present,
+                  "linkedInMachO": webrtc_linked,
+                  "details": entries.get("Payload/Kinnect.app/Frameworks/WebRTC.framework/WebRTC", {}),
+              },
+              "releaseCompileInputFixtureLines": len(compile_fixture_lines),
+              "releaseBinaryTokenScan": token_hits,
+              "leakedTokens": leaked_tokens,
+              "passed": (len(compile_fixture_lines) == 0 and len(leaked_tokens) == 0 and webrtc_present and webrtc_linked),
+          }
+          (out_dir / "release-audit.json").write_text(json.dumps(audit, indent=2), encoding="utf-8")
+          print("RELEASE_AUDIT:", json.dumps(audit))
+          if not audit["passed"]:
+              print("ERROR: Release QA isolation audit FAILED!", file=sys.stderr)
+              sys.exit(1)
+          PY
+
+      - name: Run Debug Simulator real-backend QA, unit tests, Debug fixture check & EN/VI parity suite
+        run: |
+          set -o pipefail
+          python3 ios/scripts/run-ios-network-qa.py 2>&1 | tee /tmp/ios-qa-runner.log
+
+      - name: Copy top-level runner log into artifact directory
+        if: always()
+        run: |
+          mkdir -p dist/ios-qa-network/logs
+          if [ -f /tmp/ios-qa-runner.log ]; then
+            cp /tmp/ios-qa-runner.log dist/ios-qa-network/logs/runner.log
+          fi
+
+      - name: Upload Phase 1 iOS Release IPA + Audit + Debug QA Evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-opt-phase1-evidence
+          path: dist/ios-qa-network/**
+          if-no-files-found: warn
+          retention-days: 14

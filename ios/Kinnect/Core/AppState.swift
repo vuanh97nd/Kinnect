@@ -56,7 +56,13 @@ final class AppState: ObservableObject {
         liveLastReactionBanner = nil
         liveGiftCombo = 0
 
-        if !UIReviewFixture.isEnabled && !isHost {
+        #if DEBUG
+        let skipLiveSocket = UIReviewFixture.isEnabled
+        #else
+        let skipLiveSocket = false
+        #endif
+
+        if !skipLiveSocket && !isHost {
             Task {
                 await NativeWebRTCManager.shared.refreshIceServers()
                 NativeSocketClient.shared.sendJSON([
@@ -71,7 +77,12 @@ final class AppState: ObservableObject {
     }
 
     func leaveCurrentLiveRoom() {
-        if currentLiveRoom != nil && !UIReviewFixture.isEnabled {
+        #if DEBUG
+        let skipLeaveSocket = UIReviewFixture.isEnabled
+        #else
+        let skipLeaveSocket = false
+        #endif
+        if currentLiveRoom != nil && !skipLeaveSocket {
             NativeSocketClient.shared.sendJSON(["type": "leave"])
         }
         NativeWebRTCManager.shared.stopLiveSession()
@@ -118,6 +129,7 @@ final class AppState: ObservableObject {
         isRestoringSession = true
         defer { isRestoringSession = false }
 
+        #if DEBUG
         if let reviewScreen = UIReviewFixture.activeScreen {
             if reviewScreen == "auth" {
                 self.currentUser = nil
@@ -129,6 +141,7 @@ final class AppState: ObservableObject {
             }
             return
         }
+        #endif
 
         // Check if user chose to remember session on this device
         let isRemembered = UserDefaults.standard.object(forKey: "kinnect_session_remembered") as? Bool ?? true

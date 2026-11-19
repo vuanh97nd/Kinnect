@@ -155,7 +155,10 @@ struct CameraStudioView: View {
     @State private var videoCompositionRevision = UUID().uuidString
 
     private var isVideoActive: Bool {
-        capturedVideoTempURL != nil || !videoDataURL.isEmpty || UIReviewFixture.activeScreen == "camera-studio-video-edit"
+        #if DEBUG
+        if UIReviewFixture.activeScreen == "camera-studio-video-edit" { return true }
+        #endif
+        return capturedVideoTempURL != nil || !videoDataURL.isEmpty
     }
 
     // Pickers
@@ -178,7 +181,12 @@ struct CameraStudioView: View {
 
     var body: some View {
         Group {
-            if previewImage == nil && videoDataURL.isEmpty && UIReviewFixture.activeScreen != "camera-studio-edit" {
+            #if DEBUG
+            let forceEditMode = (UIReviewFixture.activeScreen == "camera-studio-edit")
+            #else
+            let forceEditMode = false
+            #endif
+            if previewImage == nil && videoDataURL.isEmpty && !forceEditMode {
                 // 1. Direct-to-Camera Viewfinder Mode (100% Android StudioActivity Parity)
                 cameraViewfinderMode
             } else {
@@ -223,6 +231,7 @@ struct CameraStudioView: View {
                     self.videoDataURL = "data:video/mp4;base64,\(data.base64EncodedString())"
                 }
             }
+            #if DEBUG
             if UIReviewFixture.activeScreen == "camera-studio-video" {
                 captureMode = .video
             }
@@ -251,6 +260,7 @@ struct CameraStudioView: View {
                 previewImage = photoProject.render(maxDimension: 900)
                 caption = "[Fixture UI] Kiểm thử bảng chỉnh sửa Kinnect Studio với nút Lưu tách riêng."
             }
+            #endif
         }
         .onDisappear {
             cameraController.stop()
@@ -880,24 +890,43 @@ struct CameraStudioView: View {
     @ViewBuilder
     private var mediaEditStage: some View {
         ZStack(alignment: .bottom) {
-            if let vURL = capturedVideoTempURL ?? (UIReviewFixture.activeScreen == "camera-studio-video-edit" ? UIReviewFixture.samplePlayableVideoURL() : nil) {
+            #if DEBUG
+            let fixtureVideoURL = (UIReviewFixture.activeScreen == "camera-studio-video-edit") ? UIReviewFixture.samplePlayableVideoURL() : nil
+            #else
+            let fixtureVideoURL: URL? = nil
+            #endif
+            if let vURL = capturedVideoTempURL ?? fixtureVideoURL {
                 StudioVideoPlayerView(videoURL: vURL, videoProject: videoProject ?? StudioVideoProject(sourceURL: vURL), revisionId: videoCompositionRevision)
                     .frame(maxWidth: .infinity, minHeight: 280, maxHeight: 340)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
             } else {
-                let displayImg = isComparingOriginal
+                #if DEBUG
+                let displayImg: UIImage? = isComparingOriginal
                     ? (originalImage ?? UIReviewFixture.samplePreviewImage())
                     : (previewImage ?? UIReviewFixture.samplePreviewImage())
-                Image(uiImage: displayImg)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: .infinity, minHeight: 240, maxHeight: 340)
-                    .background(Color(red: 0.05, green: 0.04, blue: 0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(KinnectTheme.border, lineWidth: 1)
-                    )
+                #else
+                let displayImg: UIImage? = isComparingOriginal ? originalImage : previewImage
+                #endif
+                if let displayImg {
+                    Image(uiImage: displayImg)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity, minHeight: 240, maxHeight: 340)
+                        .background(Color(red: 0.05, green: 0.04, blue: 0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(KinnectTheme.border, lineWidth: 1)
+                        )
+                } else {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(red: 0.05, green: 0.04, blue: 0.08))
+                        .frame(maxWidth: .infinity, minHeight: 240, maxHeight: 340)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(KinnectTheme.border, lineWidth: 1)
+                        )
+                }
             }
 
             if capturedVideoTempURL == nil && videoDataURL.isEmpty {
@@ -1677,7 +1706,12 @@ struct StudioMusicPickerSheet: View {
         do {
             return try await KinnectAuthenticatedFile.fetch(path: track.path, fileExtension: ext.isEmpty ? "mp3" : ext)
         } catch {
-            return UIReviewFixture.sampleAudioURL()
+            #if DEBUG
+            if UIReviewFixture.isEnabled {
+                return UIReviewFixture.sampleAudioURL()
+            }
+            #endif
+            throw error
         }
     }
 
@@ -1980,10 +2014,12 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
             return
         }
         #endif
+        #if DEBUG
         let fallback = UIReviewFixture.samplePreviewImage()
         DispatchQueue.main.async { [weak self] in
             self?.onCapturedImage?(fallback)
         }
+        #endif
     }
 
     func toggleVideoRecording() {
@@ -2089,7 +2125,7 @@ final class CameraPreviewViewController: UIViewController {
         backdropLayer.locations = [0.0, 0.55, 1.0]
         view.layer.addSublayer(backdropLayer)
 
-        #if targetEnvironment(simulator)
+        #if DEBUG && targetEnvironment(simulator)
         let sim = UIImageView(image: UIReviewFixture.samplePreviewImage())
         sim.contentMode = .scaleAspectFill
         sim.clipsToBounds = true
@@ -2143,7 +2179,10 @@ final class CameraPreviewViewController: UIViewController {
             if previewLayer == nil {
                 attachHardwarePreview()
             }
-        } else if status == .notDetermined && !UIReviewFixture.isEnabled {
+        } else if status == .notDetermined {
+            #if DEBUG
+            if UIReviewFixture.isEnabled { return }
+            #endif
             AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
                 guard granted else { return }
                 DispatchQueue.main.async {
