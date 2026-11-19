@@ -7,7 +7,7 @@ final class KinnectNetworkParityUITests: XCTestCase {
     private var username: String { ProcessInfo.processInfo.environment["QA_USERNAME"] ?? "qa_parity_minh" }
     private var password: String { ProcessInfo.processInfo.environment["QA_PASSWORD"] ?? "" }
     private var outDir: String { ProcessInfo.processInfo.environment["QA_OUT_DIR"] ?? "/tmp/qa-ios-out" }
-    private var caDerPath: String { ProcessInfo.processInfo.environment["QA_CA_DER"] ?? "" }
+    private var leafSha256: String { ProcessInfo.processInfo.environment["QA_LEAF_SHA256"] ?? "" }
     private var deviceName: String { ProcessInfo.processInfo.environment["QA_DEVICE_NAME"] ?? "iPhone Simulator" }
     private var gitSha: String { ProcessInfo.processInfo.environment["QA_GIT_SHA"] ?? "unknown" }
 
@@ -87,8 +87,8 @@ final class KinnectNetworkParityUITests: XCTestCase {
             "--qa-appearance", theme,
             "--qa-lang", lang
         ]
-        if !caDerPath.isEmpty {
-            args.append(contentsOf: ["--qa-ca-der", caDerPath])
+        if !leafSha256.isEmpty {
+            args.append(contentsOf: ["--qa-leaf-sha256", leafSha256])
         }
         if resetSession {
             args.append("--qa-reset-session")

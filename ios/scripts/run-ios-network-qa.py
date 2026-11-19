@@ -3,6 +3,7 @@
 Orchestrates real-transport iOS XCUITest behavioral verification (IOS-N1, IOS-N2, IOS-N3)
 and real-backend parity screenshot captures on a macOS CI runner.
 """
+import hashlib
 import json
 import os
 import re
@@ -97,11 +98,13 @@ def generate_ephemeral_tls(cert_dir: Path):
         "-out", str(leaf_pem), "-days", "7", "-sha256",
         "-extfile", str(ext_cfg),
     ])
-    ca_der = Path("/tmp/qa-ios-ca.der")
+    leaf_der = cert_dir / "leaf.der"
     run([
-        "openssl", "x509", "-in", str(ca_pem), "-outform", "DER", "-out", str(ca_der)
+        "openssl", "x509", "-in", str(leaf_pem), "-outform", "DER", "-out", str(leaf_der)
     ])
-    return ca_pem, ca_der, leaf_key, leaf_pem
+    leaf_sha256 = hashlib.sha256(leaf_der.read_bytes()).hexdigest().lower()
+    print(f"Ephemeral QA leaf cert SHA-256: {leaf_sha256}", flush=True)
+    return ca_pem, leaf_sha256, leaf_key, leaf_pem
 
 
 def redact_secrets(text: str, secret: str) -> str:
@@ -176,7 +179,7 @@ def main():
     cert_tmp = Path(tempfile.mkdtemp(prefix="kinnect-qa-tls-"))
     server_proc = None
     try:
-        ca_pem, ca_der, leaf_key, leaf_pem = generate_ephemeral_tls(cert_tmp)
+        ca_pem, leaf_sha256, leaf_key, leaf_pem = generate_ephemeral_tls(cert_tmp)
 
         subprocess.run(["xcrun", "simctl", "boot", udid], check=False)
         run(["xcrun", "simctl", "bootstatus", udid, "-b"])
@@ -260,7 +263,7 @@ def main():
             "TEST_RUNNER_QA_USERNAME": info["seed"]["username"],
             "TEST_RUNNER_QA_PASSWORD": test_password,
             "TEST_RUNNER_QA_OUT_DIR": str(qa_tmp_out),
-            "TEST_RUNNER_QA_CA_DER": str(ca_der),
+            "TEST_RUNNER_QA_LEAF_SHA256": leaf_sha256,
             "TEST_RUNNER_QA_DEVICE_NAME": device["name"],
             "TEST_RUNNER_QA_GIT_SHA": git_sha,
         })

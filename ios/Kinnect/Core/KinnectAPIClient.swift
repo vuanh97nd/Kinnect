@@ -1,5 +1,6 @@
 import Foundation
 #if DEBUG
+import CryptoKit
 import Security
 #endif
 
@@ -60,11 +61,14 @@ final class KinnectAPIClient {
         config.timeoutIntervalForResource = 45
         config.httpShouldSetCookies = false
         #if DEBUG
-        if let idx = CommandLine.arguments.firstIndex(of: "--qa-ca-der"),
-           idx + 1 < CommandLine.arguments.count,
-           let derData = try? Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[idx + 1])),
-           let caCert = SecCertificateCreateWithData(nil, derData as CFData) {
-            self.session = URLSession(configuration: config, delegate: QALocalhostTrustDelegate(caCert: caCert), delegateQueue: nil)
+        if let idx = CommandLine.arguments.firstIndex(of: "--qa-leaf-sha256"),
+           idx + 1 < CommandLine.arguments.count {
+            let expectedHex = CommandLine.arguments[idx + 1].trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if expectedHex.count == 64 {
+                self.session = URLSession(configuration: config, delegate: QALocalhostPinDelegate(leafSha256: expectedHex), delegateQueue: nil)
+            } else {
+                self.session = URLSession(configuration: config)
+            }
         } else {
             self.session = URLSession(configuration: config)
         }
@@ -467,12 +471,12 @@ enum KinnectAuthenticatedFile {
 }
 
 #if DEBUG
-/// Strictly scoped loopback-only TLS anchor delegate for QA CI runs with `--qa-ca-der`.
-/// Evaluates full X.509 trust against the ephemeral QA Root CA for 127.0.0.1/localhost only.
-private final class QALocalhostTrustDelegate: NSObject, URLSessionDelegate {
-    private let caCert: SecCertificate
-    init(caCert: SecCertificate) {
-        self.caCert = caCert
+/// Strictly scoped loopback-only TLS leaf SHA-256 pin delegate for QA CI runs (`--qa-leaf-sha256`).
+/// Accepts ONLY 127.0.0.1/localhost when the presented leaf certificate DER SHA-256 matches exactly.
+private final class QALocalhostPinDelegate: NSObject, URLSessionDelegate {
+    private let leafSha256: String
+    init(leafSha256: String) {
+        self.leafSha256 = leafSha256
     }
     func urlSession(
         _ session: URLSession,
@@ -486,10 +490,14 @@ private final class QALocalhostTrustDelegate: NSObject, URLSessionDelegate {
             completionHandler(.performDefaultHandling, nil)
             return
         }
-        SecTrustSetAnchorCertificates(trust, [caCert] as CFArray)
-        SecTrustSetAnchorCertificatesOnly(trust, true)
-        var cfError: CFError?
-        if SecTrustEvaluateWithError(trust, &cfError) {
+        guard let chain = SecTrustCopyCertificateChain(trust) as? [SecCertificate],
+              let leaf = chain.first else {
+            completionHandler(.cancelAuthenticationChallenge, nil)
+            return
+        }
+        let der = SecCertificateCopyData(leaf) as Data
+        let hex = SHA256.hash(data: der).map { String(format: "%02x", $0) }.joined()
+        if hex == leafSha256 {
             completionHandler(.useCredential, URLCredential(trust: trust))
         } else {
             completionHandler(.cancelAuthenticationChallenge, nil)
