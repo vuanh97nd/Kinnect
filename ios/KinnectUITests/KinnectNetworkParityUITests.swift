@@ -228,7 +228,13 @@ final class KinnectNetworkParityUITests: XCTestCase {
         let groupsGetCount = counts["primary GET /api/groups"] as? Int ?? 0
         let dbAfter = metricsFinal["db"] as? [String: Any] ?? [:]
 
-        writeJSON("ios-n1-n2-evidence.json", [
+        let reqCounts: [String: Any] = [
+            "directMessagesGet": dmGetCount,
+            "groupMessagesGet": groupGetCount,
+            "conversationsGet": convGetCount,
+            "groupsGet": groupsGetCount
+        ]
+        let n1n2Payload: [String: Any] = [
             "fixtureEnabled": false,
             "primaryOrigin": primaryOrigin,
             "fallbackOrigin": fallbackOrigin,
@@ -239,14 +245,10 @@ final class KinnectNetworkParityUITests: XCTestCase {
             "dbBefore": dbBefore,
             "dbAfterDM": metricsAfterDM["db"] ?? [:],
             "dbAfterFinal": dbAfter,
-            "requestCounts": [
-                "directMessagesGet": dmGetCount,
-                "groupMessagesGet": groupGetCount,
-                "conversationsGet": convGetCount,
-                "groupsGet": groupsGetCount
-            ],
+            "requestCounts": reqCounts,
             "countsByEndpoint": counts
-        ])
+        ]
+        writeJSON("ios-n1-n2-evidence.json", n1n2Payload)
 
         XCTAssertEqual(dbAfter["directUnread"] as? Int, 0, "Backend directUnread must be 0")
         XCTAssertEqual(dbAfter["groupUnread"] as? Int, 0, "Backend groupUnread must be 0")
@@ -347,42 +349,48 @@ final class KinnectNetworkParityUITests: XCTestCase {
         let metricsGetFailover = try ctrlRequest("/_qa/metrics")
         let fallbackGet = metricsGetFailover["fallbackRequests"] as? [[String: Any]] ?? []
 
-        writeJSON("ios-n3-evidence.json", [
+        let subA: [String: Any] = [
+            "toastShown": toastShownA,
+            "toastText": toastTextA,
+            "restoredDraft": restoredDraftA,
+            "committedBeforeDrop": metricsA["committedBeforeDrop"] ?? 0,
+            "directPostCount": postCountA,
+            "directSentByMinh": dbA["directSentByMinh"] ?? -1,
+            "fallbackCount": fallbackA.count
+        ]
+        let subB: [String: Any] = [
+            "toastShown": toastShownB,
+            "toastText": toastTextB,
+            "restoredDraft": restoredDraftB,
+            "committedBeforeTimeout": metricsB["committedBeforeTimeout"] ?? 0,
+            "directPostCount": postCountB,
+            "directSentByMinh": dbB["directSentByMinh"] ?? -1,
+            "fallbackCount": fallbackB.count
+        ]
+        let subC: [String: Any] = [
+            "toastShown": toastShown500,
+            "fallbackCount": fallback500.count
+        ]
+        let subD: [String: Any] = [
+            "fallbackCount": fallback401.count
+        ]
+        let subE: [String: Any] = [
+            "fallbackCount": fallbackGet.count,
+            "fallbackRequests": fallbackGet
+        ]
+        let n3Payload: [String: Any] = [
             "fixtureEnabled": false,
             "primaryOrigin": primaryOrigin,
             "fallbackOrigin": fallbackOrigin,
             "dbInitial": dbInitial,
-            "subcaseA_dropAfterCommit": [
-                "toastShown": toastShownA,
-                "toastText": toastTextA,
-                "restoredDraft": restoredDraftA,
-                "committedBeforeDrop": metricsA["committedBeforeDrop"] ?? 0,
-                "directPostCount": postCountA,
-                "directSentByMinh": dbA["directSentByMinh"] ?? -1,
-                "fallbackCount": fallbackA.count
-            ],
-            "subcaseB_timeoutAfterCommit": [
-                "toastShown": toastShownB,
-                "toastText": toastTextB,
-                "restoredDraft": restoredDraftB,
-                "committedBeforeTimeout": metricsB["committedBeforeTimeout"] ?? 0,
-                "directPostCount": postCountB,
-                "directSentByMinh": dbB["directSentByMinh"] ?? -1,
-                "fallbackCount": fallbackB.count
-            ],
-            "subcaseC_http500NoFailover": [
-                "toastShown": toastShown500,
-                "fallbackCount": fallback500.count
-            ],
-            "subcaseD_http401NoFailover": [
-                "fallbackCount": fallback401.count
-            ],
-            "subcaseE_getTransportFailover": [
-                "fallbackCount": fallbackGet.count,
-                "fallbackRequests": fallbackGet
-            ],
+            "subcaseA_dropAfterCommit": subA,
+            "subcaseB_timeoutAfterCommit": subB,
+            "subcaseC_http500NoFailover": subC,
+            "subcaseD_http401NoFailover": subD,
+            "subcaseE_getTransportFailover": subE,
             "countsByEndpoint": metricsGetFailover["countsByEndpoint"] ?? [:]
-        ])
+        ]
+        writeJSON("ios-n3-evidence.json", n3Payload)
 
         // Hard assertions for IOS-N3
         XCTAssertTrue(toastShownA, "Socket drop POST must surface error toast")
@@ -428,7 +436,15 @@ final class KinnectNetworkParityUITests: XCTestCase {
         ) {
             let file = "\(slug).png"
             saveScreenshot(file)
-            records.append([
+            let seedDict: [String: Any] = [
+                "user": "QA Minh",
+                "peer": "QA Lan",
+                "post": "P1 parity post",
+                "message": "Hello parity",
+                "unreadDirect": 2,
+                "unreadGroup": 3
+            ]
+            let entry: [String: Any] = [
                 "platform": "ios",
                 "file": "captures/\(file)",
                 "slug": slug,
@@ -440,16 +456,10 @@ final class KinnectNetworkParityUITests: XCTestCase {
                 "device": deviceName,
                 "logicalWidth": logicalWidth,
                 "gitSha": gitSha,
-                "seed": [
-                    "user": "QA Minh",
-                    "peer": "QA Lan",
-                    "post": "P1 parity post",
-                    "message": "Hello parity",
-                    "unreadDirect": 2,
-                    "unreadGroup": 3
-                ],
+                "seed": seedDict,
                 "fixtureEnabled": false
-            ])
+            ]
+            records.append(entry)
         }
 
         for (locale, theme, largeText) in combos {
