@@ -24,6 +24,7 @@ final class KinnectPhase1RegressionTests: XCTestCase {
     func testWebRTCManagerInitializesWithoutCrash() {
         let manager = NativeWebRTCManager.shared
         XCTAssertNil(manager.activeCall, "No call should be active on clean initialization")
-        XCTAssertFalse(manager.isMuted, "Default mute state should be false")
+        XCTAssertFalse(manager.isMicMuted, "Default mic mute state should be false")
+        XCTAssertFalse(manager.isCameraOff, "Default camera off state should be false")
     }
 }
