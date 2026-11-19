@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#2c2419" />
+  <title>Kinnect Farm</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="kinnect-icon.png" />
+</head>
+<body>
+  <div id="app">
+    <!-- Splash: Kinnect company first -->
+    <section id="splash-kinnect" class="splash" aria-label="Kinnect">
+      <img src="kinnect-icon.png" alt="Kinnect" class="splash-logo" width="96" height="96" />
+      <p class="splash-sub">từ Kinnect</p>
+    </section>
+
+    <!-- Splash: game logo second -->
+    <section id="splash-game" class="splash hidden" aria-label="Kinnect Farm">
+      <div class="game-mark" aria-hidden="true">
+        <span class="grain">🌾</span>
+      </div>
+      <h1 class="game-title">Kinnect Farm</h1>
+      <p class="tagline">Nơi mọi thứ sống nhờ được nối.</p>
+      <p class="publisher">A Kinnect game</p>
+    </section>
+
+    <!-- Title -->
+    <section id="title-screen" class="screen hidden">
+      <div class="title-hero">
+        <p class="from-kinnect">từ Kinnect</p>
+        <h1 class="game-title">Kinnect Farm</h1>
+        <p class="tagline">Nông trại cổ điển · thung lũng nối liền</p>
+      </div>
+      <div class="title-actions">
+        <button type="button" id="btn-continue" class="btn primary">Tiếp tục nông trại</button>
+        <button type="button" id="btn-new" class="btn ghost">Nông trại mới</button>
+      </div>
+      <p id="net-note" class="almanac-note">Chưa nối máy chủ — đang chơi với hàng xóm làng (NPC).</p>
+    </section>
+
+    <!-- Main game -->
+    <section id="game-screen" class="screen hidden">
+      <header class="hud">
+        <div class="hud-left">
+          <strong class="brand-mini">Kinnect Farm</strong>
+          <span id="day-label" class="pill">Ngày 1 · Khô</span>
+        </div>
+        <div class="hud-right">
+          <span id="coin-label" class="pill gold">◎ 40</span>
+          <button type="button" id="btn-almanac" class="btn tiny">Sổ tay</button>
+          <button type="button" id="btn-valley" class="btn tiny">Thung lũng</button>
+          <button type="button" id="btn-market" class="btn tiny">Chợ Đêm</button>
+        </div>
+      </header>
+
+      <div class="stage-wrap">
+        <canvas id="farm" width="720" height="520" aria-label="Nông trại"></canvas>
+        <aside id="tooltip" class="tooltip hidden"></aside>
+      </div>
+
+      <nav class="toolbar" aria-label="Công cụ">
+        <button type="button" class="tool active" data-tool="select" title="Chọn">👆</button>
+        <button type="button" class="tool" data-tool="plant-herb" title="Rau thơm">🌿</button>
+        <button type="button" class="tool" data-tool="plant-grain" title="Lúa">🌾</button>
+        <button type="button" class="tool" data-tool="plant-root" title="Củ">🥕</button>
+        <button type="button" class="tool" data-tool="water" title="Tưới">💧</button>
+        <button type="button" class="tool" data-tool="harvest" title="Thu hoạch">🧺</button>
+        <button type="button" id="btn-end-day" class="btn primary end-day">Đóng ngày</button>
+      </nav>
+
+      <p id="status-line" class="status-line">Chạm ô đất để trồng. Cây tương thích cạnh nhau sẽ tạo dây Kinnect.</p>
+    </section>
+
+    <!-- Almanac modal -->
+    <div id="modal-almanac" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-card almanac">
+        <h2>Sổ tay nông trại</h2>
+        <div id="almanac-body"></div>
+        <button type="button" class="btn primary modal-close" data-close="modal-almanac">Đóng</button>
+      </div>
+    </div>
+
+    <!-- Valley modal -->
+    <div id="modal-valley" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-card almanac">
+        <h2>Thung lũng Kinnect</h2>
+        <p class="muted" id="valley-status"></p>
+        <ul id="valley-list" class="valley-list"></ul>
+        <button type="button" class="btn primary modal-close" data-close="modal-valley">Đóng</button>
+      </div>
+    </div>
+
+    <!-- Night market -->
+    <div id="modal-market" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-card market">
+        <h2>Chợ Đêm Liên Kết</h2>
+        <p class="muted" id="market-note"></p>
+        <div id="market-stalls" class="stalls"></div>
+        <button type="button" class="btn primary modal-close" data-close="modal-market">Rời chợ</button>
+      </div>
+    </div>
+  </div>
+  <script src="online-stub.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
