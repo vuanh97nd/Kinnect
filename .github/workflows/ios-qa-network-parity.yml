@@ -23,7 +23,13 @@ jobs:
           node-version: "22"
 
       - name: Install Node dependencies for createApp backend
-        run: npm ci
+        run: |
+          npm ci
+          npm --prefix cloud-api ci
+
+      - name: Smoke-test createApp(:memory:) import before Xcode build
+        run: |
+          node -e "import('./server.js').then(m => { const a = m.createApp({ dbPath: ':memory:', authLimit: 500 }); a.social.close(); console.log('BACKEND_IMPORT_OK'); })"
 
       - name: Ensure XcodeGen is installed
         run: |
