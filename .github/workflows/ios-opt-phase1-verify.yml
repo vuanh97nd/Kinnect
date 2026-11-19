@@ -27,7 +27,9 @@ jobs:
       - name: Install Node dependencies for createApp backend
         run: |
           npm ci --no-audit --no-fund
-          npm --prefix cloud-api ci --no-audit --no-fund
+          if [ -f cloud-api/package-lock.json ]; then
+            npm --prefix cloud-api ci --no-audit --no-fund
+          fi
 
       - name: Smoke-test createApp(:memory:) import before Xcode build
         run: |
