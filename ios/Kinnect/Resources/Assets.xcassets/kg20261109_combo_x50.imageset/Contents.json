@@ -1,0 +1,18 @@
+{
+  "info": {
+    "author": "xcode",
+    "version": 1
+  },
+  "images": [
+    {
+      "filename": "combo_x50-256.png",
+      "idiom": "universal",
+      "scale": "1x"
+    },
+    {
+      "filename": "combo_x50-512.png",
+      "idiom": "universal",
+      "scale": "2x"
+    }
+  ]
+}

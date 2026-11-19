@@ -1,0 +1,18 @@
+{
+  "info": {
+    "author": "xcode",
+    "version": 1
+  },
+  "images": [
+    {
+      "filename": "sticker_neon_glasses-256.png",
+      "idiom": "universal",
+      "scale": "1x"
+    },
+    {
+      "filename": "sticker_neon_glasses-512.png",
+      "idiom": "universal",
+      "scale": "2x"
+    }
+  ]
+}

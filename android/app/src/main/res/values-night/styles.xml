@@ -1,0 +1,9 @@
+<resources>
+  <style name="Kinnect.Launch" parent="android:Theme.Material.NoActionBar">
+    <item name="android:windowBackground">@drawable/launch_screen</item>
+    <item name="android:statusBarColor">#151419</item>
+    <item name="android:navigationBarColor">#151419</item>
+    <item name="android:windowLightStatusBar">false</item>
+  </style>
+</resources>
+

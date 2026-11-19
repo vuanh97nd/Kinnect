@@ -26,9 +26,9 @@ final class AccountCache {
         return uid.isEmpty ? nil : uid
     }
 
-    func setActiveAccount(_ accountId: String) {
+    func setActiveAccount(_ accountId: String, origin: String = ServerConfig.defaultOrigin) {
         UserDefaults.standard.set(accountId, forKey: activeAccountDefaultsKey)
-        KeychainStore.shared.saveAccountId(accountId, for: ServerConfig.defaultOrigin)
+        KeychainStore.shared.saveAccountId(accountId, for: origin)
     }
 
     func saveJSONObject(_ object: Any, forKey key: String, accountId: String) {
@@ -47,9 +47,12 @@ final class AccountCache {
         return obj
     }
 
-    private func scopeDirectory(origin: String, accountId: String) -> URL? {
+    private func canonicalOriginKey(_ origin: String) -> String? {
+        ServerConfig.normalize(origin)
+    }
+
+    private func scopeDirectory(canonicalOrigin: String, accountId: String) -> URL? {
         guard !accountId.isEmpty else { return nil }
-        let canonicalOrigin = (origin == ServerConfig.fallbackOrigin) ? ServerConfig.defaultOrigin : origin
         let digest = SHA256.hash(data: Data("\(canonicalOrigin)|\(accountId)".utf8))
             .map { String(format: "%02x", $0) }
             .joined()
@@ -63,25 +66,25 @@ final class AccountCache {
     }
 
     func store(_ data: Data, forKey key: String, origin: String = ServerConfig.currentOrigin, accountId: String) {
-        guard !accountId.isEmpty else { return }
-        let memKey = "\(origin)|\(accountId)|\(key)" as NSString
+        guard !accountId.isEmpty, let canonicalOrigin = canonicalOriginKey(origin) else { return }
+        let memKey = "\(canonicalOrigin)|\(accountId)|\(key)" as NSString
         memoryCache.setObject(data as NSData, forKey: memKey, cost: data.count)
 
         queue.async { [weak self] in
             guard let self = self,
-                  let dir = self.scopeDirectory(origin: origin, accountId: accountId) else { return }
+                  let dir = self.scopeDirectory(canonicalOrigin: canonicalOrigin, accountId: accountId) else { return }
             let target = dir.appendingPathComponent(self.fileKey(key))
             try? data.write(to: target, options: .atomic)
         }
     }
 
     func load(forKey key: String, maxAge: TimeInterval = 7 * 86400, origin: String = ServerConfig.currentOrigin, accountId: String) -> Data? {
-        guard !accountId.isEmpty else { return nil }
-        let memKey = "\(origin)|\(accountId)|\(key)" as NSString
+        guard !accountId.isEmpty, let canonicalOrigin = canonicalOriginKey(origin) else { return nil }
+        let memKey = "\(canonicalOrigin)|\(accountId)|\(key)" as NSString
         if let cached = memoryCache.object(forKey: memKey) {
             return cached as Data
         }
-        guard let dir = scopeDirectory(origin: origin, accountId: accountId) else { return nil }
+        guard let dir = scopeDirectory(canonicalOrigin: canonicalOrigin, accountId: accountId) else { return nil }
         let target = dir.appendingPathComponent(fileKey(key))
         guard let attrs = try? fileManager.attributesOfItem(atPath: target.path),
               let modified = attrs[.modificationDate] as? Date,
@@ -94,12 +97,12 @@ final class AccountCache {
     }
 
     func evict(forKey key: String, origin: String = ServerConfig.currentOrigin, accountId: String) {
-        guard !accountId.isEmpty else { return }
-        let memKey = "\(origin)|\(accountId)|\(key)" as NSString
+        guard !accountId.isEmpty, let canonicalOrigin = canonicalOriginKey(origin) else { return }
+        let memKey = "\(canonicalOrigin)|\(accountId)|\(key)" as NSString
         memoryCache.removeObject(forKey: memKey)
         queue.async { [weak self] in
             guard let self = self,
-                  let dir = self.scopeDirectory(origin: origin, accountId: accountId) else { return }
+                  let dir = self.scopeDirectory(canonicalOrigin: canonicalOrigin, accountId: accountId) else { return }
             let target = dir.appendingPathComponent(self.fileKey(key))
             try? self.fileManager.removeItem(at: target)
         }

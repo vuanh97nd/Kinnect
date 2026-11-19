@@ -1,0 +1,18 @@
+{
+  "info": {
+    "author": "xcode",
+    "version": 1
+  },
+  "images": [
+    {
+      "filename": "gift_rose-256.png",
+      "idiom": "universal",
+      "scale": "1x"
+    },
+    {
+      "filename": "gift_rose-512.png",
+      "idiom": "universal",
+      "scale": "2x"
+    }
+  ]
+}

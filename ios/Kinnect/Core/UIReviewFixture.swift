@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import SwiftUI
 import UIKit
 
 /// Isolated UI review fixture mode activated ONLY when launched with `--ui-review-screen <name>`.
@@ -25,6 +26,16 @@ enum UIReviewFixture {
         activeScreen != nil
     }
 
+    /// Camera and microphone prompts belong only to capture, live, and call screens.
+    /// Password, chat, and settings fixtures must not raise a system permission dialog.
+    static var allowsCapturePrompt: Bool {
+        guard isEnabled else { return true }
+        let screen = activeScreen ?? ""
+        if screen.hasPrefix("camera") || screen.hasPrefix("studio") { return true }
+        if screen.hasPrefix("live") || screen.contains("call") { return true }
+        return false
+    }
+
     static let currentUserDict: [String: Any] = [
         "id": "fixture_user_me",
         "name": "Nguyễn Minh Anh",
@@ -32,10 +43,26 @@ enum UIReviewFixture {
         "email": "minhanh@kinnect.local",
         "bio": "Thiết kế giao diện & nhiếp ảnh đường phố • Sài Gòn",
         "locationName": "Quận 1, TP. Hồ Chí Minh",
+        "city": "TP. Hồ Chí Minh",
         "avatarColor": "#7C3AED",
+        "age": 25,
+        "height": 175,
+        "weight": 68,
+        "gender": "Nam",
+        "orientation": "Gay / Đồng tính nam",
+        "communityRole": "Vers",
+        "pronouns": "Anh",
+        "relationshipRole": "Đang tìm hiểu",
+        "lookingFor": "Kết bạn, Trò chuyện",
+        "occupation": "Thiết kế sản phẩm",
+        "school": "Đại học Bách Khoa",
+        "interests": ["Nhiếp ảnh", "Du lịch", "Công nghệ", "Âm nhạc"],
         "friendsCount": 128,
         "followersCount": 1420,
         "followingCount": 95,
+        "postsCount": 24,
+        "joinedAt": 1704067200000,
+        "identityPublic": true,
         "isPrivate": false
     ]
 
@@ -45,10 +72,26 @@ enum UIReviewFixture {
         "handle": "hoangnam",
         "bio": "Thiết kế sản phẩm & nhiếp ảnh • Đà Nẵng",
         "locationName": "Đà Nẵng",
+        "city": "Đà Nẵng",
         "avatarColor": "#2563EB",
+        "age": 26,
+        "height": 178,
+        "weight": 72,
+        "gender": "Nam",
+        "orientation": "Gay / Đồng tính nam",
+        "communityRole": "Top",
+        "pronouns": "Anh",
+        "relationshipRole": "Đang tìm hiểu",
+        "lookingFor": "Kết bạn, Hẹn hò",
+        "occupation": "Thiết kế sản phẩm",
+        "school": "Đại học Bách Khoa",
+        "interests": ["Nhiếp ảnh", "Du lịch", "Công nghệ"],
         "distanceKm": 2.4,
         "isFollowing": true,
-        "isFriend": true
+        "isFriend": true,
+        "postsCount": 18,
+        "joinedAt": 1698796800000,
+        "identityPublic": true
     ]
 
     static let secondPeerDict: [String: Any] = [
@@ -57,8 +100,36 @@ enum UIReviewFixture {
         "handle": "thanhtruc",
         "bio": "Âm nhạc, du lịch & công nghệ • Hà Nội",
         "locationName": "Hà Nội",
+        "city": "Hà Nội",
         "avatarColor": "#EC4899",
+        "age": 24,
+        "height": 165,
+        "weight": 52,
+        "gender": "Nữ",
+        "orientation": "Song tính / Bisexual",
+        "communityRole": "Femme",
+        "pronouns": "Chị",
+        "relationshipRole": "Độc thân",
+        "lookingFor": "Kết bạn, Trò chuyện",
+        "occupation": "Lập trình viên",
+        "school": "Đại học Quốc Gia Hà Nội",
+        "interests": ["Âm nhạc", "Du lịch", "Cà phê"],
         "distanceKm": 5.8,
+        "isFollowing": false,
+        "isFriend": false,
+        "postsCount": 9,
+        "joinedAt": 1701388800000,
+        "identityPublic": true
+    ]
+
+    static let thirdPeerDict: [String: Any] = [
+        "id": "fixture_user_3",
+        "name": "Phạm Minh Hoàng",
+        "handle": "hoangpham",
+        "bio": "Lập trình viên iOS & đam mê thiết kế UI • Đà Nẵng",
+        "locationName": "Đà Nẵng",
+        "avatarColor": "#3B82F6",
+        "distanceKm": 12.4,
         "isFollowing": false,
         "isFriend": false
     ]
@@ -68,9 +139,10 @@ enum UIReviewFixture {
         "name": "Nhóm Thiết Kế Kinnect [Fixture]",
         "description": "Trao đổi giao diện iOS & Android",
         "avatarColor": "#6D4AFF",
-        "membersCount": 6,
-        "lastMessageText": "Bộ 40 icon vector đã lên chuẩn 24pt!",
-        "unreadCount": 1
+        "membersCount": 4,
+        "lastMessageText": "@Tất cả Tính năng nhắc tên Zalo đã sẵn sàng!",
+        "unreadCount": 1,
+        "members": [peerUserDict, secondPeerDict, thirdPeerDict]
     ]
 
     static func mockResponse(for path: String) -> [String: Any] {
@@ -78,7 +150,7 @@ enum UIReviewFixture {
 
         switch cleanPath {
         case "/api/me":
-            if activeScreen == "auth" {
+            if let act = activeScreen, act.hasPrefix("auth") || act == "forgot-password" {
                 return [:]
             }
             return ["user": currentUserDict]
@@ -149,7 +221,9 @@ enum UIReviewFixture {
                     "age": 24,
                     "height": 175,
                     "weight": 68,
-                    "gender": "nam",
+                    "gender": "Nam",
+                    "orientation": "Gay / Đồng tính nam",
+                    "communityRole": "Vers",
                     "distanceKm": 1.8,
                     "isFollowing": true,
                     "isFriend": true
@@ -164,7 +238,9 @@ enum UIReviewFixture {
                     "age": 22,
                     "height": 162,
                     "weight": 48,
-                    "gender": "nu",
+                    "gender": "Nữ",
+                    "orientation": "Lesbian / Đồng tính nữ",
+                    "communityRole": "Femme",
                     "distanceKm": 3.2,
                     "isFollowing": false,
                     "isFriend": false
@@ -179,7 +255,9 @@ enum UIReviewFixture {
                     "age": 26,
                     "height": 178,
                     "weight": 72,
-                    "gender": "nam",
+                    "gender": "Phi nhị nguyên",
+                    "orientation": "Queer",
+                    "communityRole": "Androgynous",
                     "distanceKm": 4.5,
                     "isFollowing": true,
                     "isFriend": false
@@ -194,7 +272,9 @@ enum UIReviewFixture {
                     "age": 23,
                     "height": 165,
                     "weight": 50,
-                    "gender": "nu",
+                    "gender": "Nam chuyển giới",
+                    "orientation": "Song tính / Bisexual",
+                    "communityRole": "Top",
                     "distanceKm": 5.1,
                     "isFollowing": false,
                     "isFriend": false
@@ -281,6 +361,7 @@ enum UIReviewFixture {
             ]
 
         case "/api/shorts":
+            let videoURL = samplePlayableVideoURL()?.absoluteString ?? ""
             return [
                 "shorts": [
                     [
@@ -288,13 +369,29 @@ enum UIReviewFixture {
                         "author": peerUserDict,
                         "title": "Dạo phố sáng cuối tuần [Fixture UI]",
                         "caption": "Video ngắn thử nghiệm bố cục Shorts trên iOS Simulator.",
-                        "videoUrl": "",
+                        "videoUrl": videoURL,
                         "durationSec": 15,
                         "likesCount": 128,
                         "commentsCount": 14,
                         "liked": true,
                         "createdAt": "2026-11-07T01:10:00.000Z"
                     ]
+                ]
+            ]
+
+        case "/api/music":
+            return [
+                "tracks": [
+                    ["file": "tiktok-01.mp3", "title": "LIỆU RẰNG · Remix DEMO", "artist": "Huy PT Remix", "url": "/music/tiktok-01.mp3"],
+                    ["file": "tiktok-02.mp3", "title": "Xin lỗi vì đã…", "artist": "Huy PT Remix", "url": "/music/tiktok-02.mp3"],
+                    ["file": "tiktok-03.mp3", "title": "EM ĐAU LẮM ANH À · Remix", "artist": "Huy PT Remix", "url": "/music/tiktok-03.mp3"],
+                    ["file": "tiktok-04.mp3", "title": "Nghe có vẻ mọi người không chuộng mixtape", "artist": "Huy PT Remix", "url": "/music/tiktok-04.mp3"],
+                    ["file": "tiktok-05.mp3", "title": "TỰ EM SAI · Remix", "artist": "Huy PT Remix", "url": "/music/tiktok-05.mp3"],
+                    ["file": "tiktok-06.mp3", "title": "Sự đời trớ trêu thay ngay khi…", "artist": "Huy PT Remix", "url": "/music/tiktok-06.mp3"],
+                    ["file": "tiktok-07.mp3", "title": "CÔ DÂU CỦA NGƯỜI TA · Remix", "artist": "Huy PT Remix", "url": "/music/tiktok-07.mp3"],
+                    ["file": "tiktok-08.mp3", "title": "Cứa lên da vết thương không lành…", "artist": "Huy PT Remix", "url": "/music/tiktok-08.mp3"],
+                    ["file": "tiktok-09.mp3", "title": "Em muốn kết thúc như thế này sao?", "artist": "Huy PT Remix", "url": "/music/tiktok-09.mp3"],
+                    ["file": "tiktok-10.mp3", "title": "Âm nhạc dùng để sáng tạo và thưởng thức", "artist": "Huy PT Remix", "url": "/music/tiktok-10.mp3"]
                 ]
             ]
 
@@ -335,7 +432,7 @@ enum UIReviewFixture {
         case "/api/friend-requests":
             return [
                 "incoming": [["fromUser": secondPeerDict]],
-                "outgoing": [["toUser": secondPeerDict]]
+                "outgoing": [["toUser": thirdPeerDict]]
             ]
 
         case "/api/me/privacy-consent":
@@ -359,7 +456,7 @@ enum UIReviewFixture {
                         "id": "fixture_gmsg_1",
                         "groupId": "fixture_group_1",
                         "sender": peerUserDict,
-                        "text": "[Fixture UI] Chào cả nhóm! Giao diện chat nhóm trên iOS hiển thị thanh công cụ, icon vector và avatar thành viên rất chuẩn.",
+                        "text": "@Tất cả Chào cả nhóm! Đã kích hoạt tính năng nhắc thành viên phong cách Zalo và gọi thoại iOS HIG.",
                         "createdAt": "2026-11-07T01:30:00.000Z",
                         "seenCount": 4
                     ],
@@ -367,9 +464,55 @@ enum UIReviewFixture {
                         "id": "fixture_gmsg_2",
                         "groupId": "fixture_group_1",
                         "sender": currentUserDict,
-                        "text": "[Fixture UI] Menu 3 chấm ở góc phải gồm Đổi tên nhóm, Thêm thành viên, Rời nhóm.",
+                        "text": "@minhanh_demo Cảm ơn bạn! Đã đồng bộ chuẩn 100% Android 1.2.12.",
                         "createdAt": "2026-11-07T01:31:00.000Z",
                         "seenCount": 3
+                    ],
+                    [
+                        "id": "fixture_gmsg_3",
+                        "groupId": "fixture_group_1",
+                        "sender": peerUserDict,
+                        "text": "Bản thiết kế và tài liệu thông số kỹ thuật đính kèm:",
+                        "attachment": [
+                            "name": "Kinnect-Thong-So-Ky-Thuat.pdf",
+                            "url": "/api/chat-attachments/fixture_pdf_1",
+                            "kind": "file",
+                            "type": "application/pdf"
+                        ],
+                        "createdAt": "2026-11-07T01:32:00.000Z",
+                        "seenCount": 4
+                    ],
+                    [
+                        "id": "fixture_gmsg_4",
+                        "groupId": "fixture_group_1",
+                        "sender": secondPeerDict,
+                        "text": "Ảnh chụp mẫu giao diện từ máy thật:",
+                        "imageUrl": sampleImageDataURL,
+                        "createdAt": "2026-11-07T01:33:00.000Z",
+                        "seenCount": 3
+                    ]
+                ]
+            ]
+
+        case _ where cleanPath.hasSuffix("/comments"):
+            return [
+                "comments": [
+                    [
+                        "id": "fixture_c_1",
+                        "author": peerUserDict,
+                        "text": "Bức ảnh đẹp quá bạn ơi! Chụp bằng ống kính nào thế? 📸",
+                        "createdAt": "2026-11-07T01:35:00.000Z",
+                        "liked": true,
+                        "likesCount": 5
+                    ],
+                    [
+                        "id": "fixture_c_2",
+                        "parentId": "fixture_c_1",
+                        "author": currentUserDict,
+                        "text": "@minhanh_demo Cảm ơn bạn nhé! Chụp bằng camera góc rộng 1x của Kinnect Studio.",
+                        "createdAt": "2026-11-07T01:36:00.000Z",
+                        "liked": true,
+                        "likesCount": 2
                     ]
                 ]
             ]
@@ -382,6 +525,7 @@ enum UIReviewFixture {
                 "notifications": [
                     [
                         "id": "fixture_notif_1",
+                        "type": "like",
                         "actor": peerUserDict,
                         "preview": "[Fixture UI] Hoàng Nam đã bày tỏ cảm xúc với bài viết của bạn.",
                         "read": false,
@@ -389,6 +533,7 @@ enum UIReviewFixture {
                     ],
                     [
                         "id": "fixture_notif_2",
+                        "type": "friend_request",
                         "actor": secondPeerDict,
                         "preview": "[Fixture UI] Thanh Trúc đã gửi lời mời kết bạn.",
                         "read": true,
@@ -430,37 +575,216 @@ enum UIReviewFixture {
 
         case "/api/store":
             return [
+                "ownedPackages": ["style_aurora"],
+                "liveTheme": "",
+                "membership": "",
                 "packages": [
                     [
-                        "id": "fixture_pkg_1",
-                        "title": "Khung Avatar Tím Tinh Vân",
-                        "subtitle": "Hiệu ứng viền tím Kinnect nổi bật trên hồ sơ & phòng Live",
-                        "category": "frame",
+                        "id": "style_aurora",
+                        "title": "Cực quang",
+                        "subtitle": "Sắc màu kết nối · Dải cực quang mềm, biểu trưng cho sự cởi mở",
+                        "category": "style",
                         "priceCoins": 500,
                         "badgeText": "HOT",
-                        "accentColor": "#7C3AED",
+                        "accentColor": "#8B5CF6",
                         "owned": true,
                         "equipped": true
                     ],
                     [
-                        "id": "fixture_pkg_2",
-                        "title": "Huy Hiệu Tiên Phong",
-                        "subtitle": "Huy hiệu hiển thị cạnh tên trên bảng tin và phòng Live",
-                        "category": "badge",
+                        "id": "style_galaxy",
+                        "title": "Galaxy",
+                        "subtitle": "Vũ trụ của bạn · Chiều sâu bầu trời đêm, dành cho cá tính riêng",
+                        "category": "style",
                         "priceCoins": 800,
+                        "badgeText": "VIP",
+                        "accentColor": "#312E81",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "style_neon",
+                        "title": "Neon",
+                        "subtitle": "Dấu ấn thành thị · Năng lượng trẻ, đường sáng tím và cyan",
+                        "category": "style",
+                        "priceCoins": 300,
                         "badgeText": "MỚI",
+                        "accentColor": "#7C3AED",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "style_ice",
+                        "title": "Băng hà",
+                        "subtitle": "Tinh thể băng xanh, cảm giác lạnh và sạch",
+                        "category": "style",
+                        "priceCoins": 600,
+                        "badgeText": "EPIC",
+                        "accentColor": "#38BDF8",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "style_ruby",
+                        "title": "Hồng ngọc",
+                        "subtitle": "Sắc ruby sâu, điểm nhấn quyến rũ",
+                        "category": "style",
+                        "priceCoins": 650,
+                        "badgeText": "EPIC",
+                        "accentColor": "#BE123C",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "style_forest",
+                        "title": "Rừng thẳm",
+                        "subtitle": "Xanh lá trầm, gần gũi thiên nhiên",
+                        "category": "style",
+                        "priceCoins": 350,
+                        "badgeText": "RARE",
+                        "accentColor": "#047857",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "style_paper",
+                        "title": "Giấy mỹ thuật",
+                        "subtitle": "Kem và mực, tối giản như trang giấy",
+                        "category": "style",
+                        "priceCoins": 300,
+                        "badgeText": "RARE",
+                        "accentColor": "#D6D3D1",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "style_ember",
+                        "title": "Lửa trại",
+                        "subtitle": "Hổ phách và đỏ than, ấm áp",
+                        "category": "style",
+                        "priceCoins": 900,
+                        "badgeText": "LEGENDARY",
+                        "accentColor": "#F59E0B",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "live_chill",
+                        "title": "Live Chill",
+                        "subtitle": "Không gian thư giãn · Sắc biển dịu khi trò chuyện",
+                        "category": "live",
+                        "priceCoins": 500,
+                        "badgeText": "HOT",
+                        "accentColor": "#0D9488",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "live_gaming",
+                        "title": "Live Gaming",
+                        "subtitle": "Sân khấu trận đấu · Đường nét góc cạnh chuyên nghiệp",
+                        "category": "live",
+                        "priceCoins": 800,
+                        "badgeText": "EPIC",
+                        "accentColor": "#4F46E5",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "live_spotlight",
+                        "title": "Live Spotlight",
+                        "subtitle": "Bạn là tâm điểm · Ánh đèn sân khấu và sắc vàng ấm",
+                        "category": "live",
+                        "priceCoins": 1200,
+                        "badgeText": "VIP",
+                        "accentColor": "#A16207",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "live_game_30",
+                        "title": "Live Game 30 ngày",
+                        "subtitle": "Phát màn hình game, bình luận nổi và trả lời",
+                        "category": "live",
+                        "priceCoins": 490,
+                        "badgeText": "PRO",
+                        "accentColor": "#6D28D9",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "gift_love",
+                        "title": "Bộ Quà Yêu Thương",
+                        "subtitle": "Bộ 6 hoa hồng 3D độc quyền gửi tặng phòng Live",
+                        "category": "gifts",
+                        "priceCoins": 300,
+                        "badgeText": "HOT",
+                        "accentColor": "#DB2777",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "gift_speed",
+                        "title": "Bộ Quà Tốc Độ",
+                        "subtitle": "Bộ siêu xe & sao băng 3D hiệu ứng sân khấu",
+                        "category": "gifts",
+                        "priceCoins": 1000,
+                        "badgeText": "EPIC",
                         "accentColor": "#2563EB",
                         "owned": false,
                         "equipped": false
                     ],
                     [
-                        "id": "fixture_pkg_studio",
-                        "title": "Gói Mở Khóa Studio Pro",
-                        "subtitle": "Mở khóa bộ lọc màu điện ảnh CIFilter, hiệu ứng Pro & xuất video HD",
+                        "id": "gift_royal",
+                        "title": "Bộ Quà Hoàng Gia",
+                        "subtitle": "Bộ lâu đài & vương miện 3D đỉnh cao phòng Live",
+                        "category": "gifts",
+                        "priceCoins": 2000,
+                        "badgeText": "VIP",
+                        "accentColor": "#7E22CE",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "member_plus",
+                        "title": "Hội Viên Plus",
+                        "subtitle": "Huy hiệu thành viên Plus trên hồ sơ và phòng Live",
+                        "category": "member",
+                        "priceCoins": 490,
+                        "badgeText": "PLUS",
+                        "accentColor": "#4338CA",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "member_creator",
+                        "title": "Hội Viên Creator",
+                        "subtitle": "Đặc quyền sáng tạo nội dung & huy hiệu Creator nổi bật",
+                        "category": "member",
+                        "priceCoins": 990,
+                        "badgeText": "CREATOR",
+                        "accentColor": "#C026D3",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "studio_video_30",
+                        "title": "Studio Video Pro 30 ngày",
+                        "subtitle": "Mở khóa toàn bộ hiệu ứng dựng phim Pro & xuất HD không watermark",
                         "category": "studio",
-                        "priceCoins": 1200,
+                        "priceCoins": 490,
                         "badgeText": "PRO",
-                        "accentColor": "#EC4899",
+                        "accentColor": "#7C3AED",
+                        "owned": false,
+                        "equipped": false
+                    ],
+                    [
+                        "id": "studio_photo_30",
+                        "title": "Studio Ảnh Pro 30 ngày",
+                        "subtitle": "Bộ lọc màu điện ảnh & công cụ chỉnh ảnh cao cấp",
+                        "category": "studio",
+                        "priceCoins": 490,
+                        "badgeText": "PRO",
+                        "accentColor": "#DB2777",
                         "owned": false,
                         "equipped": false
                     ]
@@ -577,6 +901,41 @@ enum UIReviewFixture {
                 ]
             ]
 
+        case "/api/support":
+            return [
+                "user": peerUserDict,
+                "contact": "anhvn53@wru.vn",
+                "operator": "Mr Ánh"
+            ]
+
+        case "/api/admin/reports":
+            return [
+                "reports": [[
+                    "id": "fixture_report_1",
+                    "target_type": "post",
+                    "target_id": "fixture_post_1",
+                    "status": "open",
+                    "reason": "Nội dung không phù hợp",
+                    "subject": [
+                        "username": "hoangnam",
+                        "body": "Bài viết mẫu",
+                        "userId": "fixture_user_peer",
+                        "hidden": false
+                    ]
+                ]]
+            ]
+
+        case "/api/admin/users":
+            return [
+                "users": [
+                    ["id": "fixture_user_peer", "username": "hoangnam", "role": "member", "suspended": 0],
+                    ["id": "fixture_user_me", "username": "minhanh", "role": "admin", "suspended": 0]
+                ]
+            ]
+
+        case "/api/admin/moderate":
+            return ["ok": true]
+
         default:
             if cleanPath.hasSuffix("/private") {
                 return [
@@ -621,6 +980,33 @@ enum UIReviewFixture {
                             "deliveredAt": "2026-11-07T01:36:01.000Z",
                             "seenAt": "2026-11-07T01:36:05.000Z",
                             "isSeen": true
+                        ],
+                        [
+                            "id": "fixture_msg_3",
+                            "fromUserId": "fixture_user_peer",
+                            "toUserId": "fixture_user_me",
+                            "text": "Tài liệu so sánh tính năng Android & iOS v1.2.12:",
+                            "attachment": [
+                                "name": "Bao-Cao-So-Sanh-Android-iOS.pdf",
+                                "url": "/api/chat-attachments/fixture_doc_1",
+                                "kind": "file",
+                                "type": "application/pdf"
+                            ],
+                            "createdAt": "2026-11-07T01:37:00.000Z",
+                            "deliveredAt": "2026-11-07T01:37:01.000Z",
+                            "seenAt": "2026-11-07T01:37:05.000Z",
+                            "isSeen": true
+                        ],
+                        [
+                            "id": "fixture_msg_4",
+                            "fromUserId": "fixture_user_me",
+                            "toUserId": "fixture_user_peer",
+                            "text": "Ảnh chụp màn hình Studio Pro:",
+                            "imageUrl": sampleImageDataURL,
+                            "createdAt": "2026-11-07T01:38:00.000Z",
+                            "deliveredAt": "2026-11-07T01:38:01.000Z",
+                            "seenAt": "",
+                            "isSeen": false
                         ]
                     ]
                 ]
@@ -820,5 +1206,381 @@ enum UIReviewFixture {
 
         return movieURL
     }
-}
 
+    /// Generates a valid playable PCM WAV audio file for background music muxing verification.
+    static func sampleAudioURL(named name: String = "kinnect_sample_music") -> URL {
+        let tempDir = FileManager.default.temporaryDirectory
+        let safeName = name.replacingOccurrences(of: " ", with: "_")
+        let fileURL = tempDir.appendingPathComponent("\(safeName).wav")
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            return fileURL
+        }
+        let sampleRate: Int32 = 44100
+        let numChannels: Int16 = 2
+        let bitsPerSample: Int16 = 16
+        let durationSeconds = 8
+        let numFrames = Int(sampleRate) * durationSeconds
+        let dataSize = Int32(numFrames * Int(numChannels) * Int(bitsPerSample / 8))
+        let totalSize = 36 + dataSize
+
+        var header = Data()
+        header.append(contentsOf: "RIFF".utf8)
+        var totalSizeLE = totalSize.littleEndian
+        header.append(Data(bytes: &totalSizeLE, count: 4))
+        header.append(contentsOf: "WAVE".utf8)
+        header.append(contentsOf: "fmt ".utf8)
+        var fmtChunkSize: Int32 = 16
+        header.append(Data(bytes: &fmtChunkSize, count: 4))
+        var audioFormat: Int16 = 1 // PCM
+        header.append(Data(bytes: &audioFormat, count: 2))
+        var channels = numChannels.littleEndian
+        header.append(Data(bytes: &channels, count: 2))
+        var rate = sampleRate.littleEndian
+        header.append(Data(bytes: &rate, count: 4))
+        var byteRate: Int32 = (sampleRate * Int32(numChannels) * Int32(bitsPerSample / 8)).littleEndian
+        header.append(Data(bytes: &byteRate, count: 4))
+        var blockAlign: Int16 = (numChannels * (bitsPerSample / 8)).littleEndian
+        header.append(Data(bytes: &blockAlign, count: 2))
+        var bps = bitsPerSample.littleEndian
+        header.append(Data(bytes: &bps, count: 2))
+        header.append(contentsOf: "data".utf8)
+        var dataSizeLE = dataSize.littleEndian
+        header.append(Data(bytes: &dataSizeLE, count: 4))
+
+        let freq: Double = name.contains("Lofi") ? 330.0 : name.contains("Acoustic") ? 440.0 : name.contains("EDM") ? 520.0 : 392.0
+        var samples = Data(capacity: Int(dataSize))
+        for i in 0..<numFrames {
+            let t = Double(i) / Double(sampleRate)
+            let val = sin(2.0 * .pi * freq * t) * 0.25 * sin(2.0 * .pi * (freq * 1.5) * t)
+            var sample = Int16(val * 32767.0).littleEndian
+            samples.append(Data(bytes: &sample, count: 2))
+            samples.append(Data(bytes: &sample, count: 2))
+        }
+
+        var fullData = header
+        fullData.append(samples)
+        try? fullData.write(to: fileURL)
+        return fileURL
+    }
+
+    /// Creates the appropriate SwiftUI view for the given screen name.
+    /// Used by SceneDelegate when --ui-review-screen argument is provided.
+    @MainActor
+    static func makeView(for screenName: String) -> AnyView {
+        switch screenName {
+        // MARK: - Auth Screens
+        case "auth-welcome", "auth":
+            return AnyView(AuthView(initialStage: .welcome))
+        case "auth-login", "auth-login-populated", "auth-login-error", "auth-login-keyboard", "auth-login-password-keyboard", "auth-login-en":
+            return AnyView(AuthView(initialStage: .login))
+        case "auth-register":
+            return AnyView(AuthView(initialStage: .register))
+        case "auth-reset", "auth-forgot", "forgot-password":
+            return AnyView(AuthView(initialStage: .forgotPassword))
+
+        // MARK: - Main Tabs (5 tabs)
+        case "feed":
+            return AnyView(
+                NavigationStack {
+                    FeedView(onOpenCamera: {}, onOpenFriends: {})
+                        .toolbar {
+                            RootMainView.headerLeadingLogoStatic()
+                            RootMainView.headerTrailingButtonsStatic()
+                        }
+                        .navigationTitle("")
+                        .navigationBarTitleDisplayMode(.inline)
+                }
+            )
+        case "discover":
+            return AnyView(
+                NavigationStack {
+                    DiscoverView(onOpenCamera: {})
+                        .toolbar {
+                            RootMainView.headerLeadingLogoStatic()
+                            RootMainView.headerTrailingButtonsStatic()
+                        }
+                        .navigationTitle("")
+                        .navigationBarTitleDisplayMode(.inline)
+                }
+            )
+        case "create", "camera-studio":
+            return AnyView(
+                NavigationStack {
+                    CameraStudioView()
+                        .toolbar {
+                            RootMainView.headerLeadingLogoStatic()
+                            RootMainView.headerTrailingButtonsStatic()
+                        }
+                        .navigationTitle("")
+                        .navigationBarTitleDisplayMode(.inline)
+                }
+            )
+        case "camera-studio-edit", "camera-studio-video-edit":
+            return AnyView(
+                CameraStudioView()
+            )
+        case "camera-studio-video":
+            return AnyView(
+                NavigationStack {
+                    CameraStudioView(initialMode: .video)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Video")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "studio-pro-sheet":
+            return AnyView(
+                NavigationStack {
+                    StudioProSheet(appliedEffect: .constant("Cinematic Teal & Orange"), onApply: { _ in })
+                }
+            )
+        case "video", "shorts", "live":
+            // Exercise the real main container so header/safe-area regressions
+            // are visible in simulator captures.
+            return AnyView(RootMainView())
+        case "live-room":
+            return AnyView(
+                LiveStreamView(onOpenWallet: {})
+            )
+
+        // MARK: - Messages & Chats
+        case "messages":
+            return AnyView(
+                NavigationStack {
+                    MessagesView(initialScope: .direct, onOpenFriends: {})
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Tin nhắn")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "chat-detail", "chat-menu", "message-menu":
+            return AnyView(
+                NavigationStack {
+                    DirectChatDetailView(peer: KinnectUser.from(UIReviewFixture.peerUserDict))
+                }
+            )
+        case "group-chat-detail":
+            return AnyView(
+                NavigationStack {
+                    GroupChatDetailView(group: ChatGroupItem.from(UIReviewFixture.fixtureGroupDict), onLeftGroup: {})
+                }
+            )
+        case "call-overlay", "call-incoming", "call-outgoing", "call-connected":
+            NativeWebRTCManager.shared.activeCall = ActiveCallSession(
+                callId: "fixture_call_1",
+                peerUser: KinnectUser.from(UIReviewFixture.peerUserDict),
+                mode: "video",
+                isIncoming: screenName != "call-outgoing",
+                state: screenName == "call-connected" ? .connected
+                    : screenName == "call-outgoing" ? .dialingOutgoing : .ringingIncoming
+            )
+            return AnyView(
+                CallOverlayView()
+            )
+        case "feed-comments":
+            return AnyView(
+                PostCommentsSheet(post: UIReviewFixture.mockPosts()[0], onChanged: {})
+            )
+        case "shorts-comments":
+            return AnyView(
+                ShortCommentsSheet(short: ShortItem.from([
+                    "id": "fixture_short_1",
+                    "title": "Khoảnh khắc hoàng hôn Hà Nội",
+                    "videoUrl": samplePlayableVideoURL()?.absoluteString ?? "",
+                    "author": UIReviewFixture.peerUserDict,
+                    "likesCount": 142,
+                    "commentsCount": 18,
+                    "liked": true
+                ]), onUpdated: {})
+            )
+        case "forward-message":
+            return AnyView(
+                NavigationStack {
+                    ForwardMessageSheet(text: "Tin nhắn chia sẻ từ Bảng tin Kinnect", imageUrl: "")
+                }
+            )
+
+        // MARK: - Profile & Settings
+        case "profile":
+            return AnyView(
+                NavigationStack {
+                    ProfileView(onOpenWallet: {}, onOpenFriends: {})
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Hồ sơ")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "profile-posts":
+            return AnyView(
+                NavigationStack {
+                    ProfileView(onOpenWallet: {}, onOpenFriends: {}, initialTab: .posts)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Bài viết")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "profile-albums":
+            return AnyView(
+                NavigationStack {
+                    ProfileView(onOpenWallet: {}, onOpenFriends: {}, initialTab: .albums)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Album ảnh")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "profile-videos":
+            return AnyView(
+                NavigationStack {
+                    ProfileView(onOpenWallet: {}, onOpenFriends: {}, initialTab: .videos)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Video")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "profile-edit":
+            return AnyView(
+                NavigationStack {
+                    EditProfileSheet(onSaved: {})
+                }
+            )
+        case "profile-public-album":
+            return AnyView(
+                NavigationStack {
+                    PublicAlbumManageSheet(posts: UIReviewFixture.mockPosts(), onRefresh: {})
+                }
+            )
+        case "profile-private-album":
+            return AnyView(
+                NavigationStack {
+                    PrivateAlbumManageSheet(
+                        photos: .constant(UIReviewFixture.mockPrivatePhotos()),
+                        requests: .constant(UIReviewFixture.mockPrivateRequests()),
+                        onRefresh: {}
+                    )
+                }
+            )
+        case "profile-sessions":
+            return AnyView(
+                NavigationStack {
+                    ActiveSessionsSheet()
+                }
+            )
+        case "account-menu", "me-menu":
+            return AnyView(
+                NavigationStack {
+                    AccountMenuView(onOpenProfile: {}, onOpenWallet: {}, onOpenFriends: {})
+                }
+            )
+
+        // MARK: - Friends
+        case "friends":
+            return AnyView(
+                NavigationStack {
+                    FriendsView(initialTab: .friends)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Bạn bè")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "friends-requests":
+            return AnyView(
+                NavigationStack {
+                    FriendsView(initialTab: .requests)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Lời mời kết bạn")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "friends-suggestions":
+            return AnyView(
+                NavigationStack {
+                    FriendsView(initialTab: .friends)
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Gợi ý kết bạn")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+
+        // MARK: - Notifications
+        case "notifications":
+            return AnyView(
+                NavigationStack {
+                    NotificationsView()
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Thông báo")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+
+        // MARK: - Wallet & Store
+        case "wallet":
+            return AnyView(
+                NavigationStack {
+                    WalletView()
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Ví Kinnect")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "store", "wallet-packages", "store-packages":
+            return AnyView(
+                NavigationStack {
+                    StoreView()
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Cửa hàng Kinnect")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+        case "wallet-topup":
+            return AnyView(
+                NavigationStack {
+                    WalletView()
+                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                        .navigationTitle("Nạp xu Kinnect")
+                        .navigationBarTitleDisplayMode(.large)
+                }
+            )
+
+        // MARK: - Modals / Sheets
+        case "privacy-consent":
+            return AnyView(
+                PrivacyConsentSheet(
+                    request: PrivacyConsentRequest(
+                        version: "2026.11",
+                        notice: "Chính sách quyền riêng tư và điều khoản dịch vụ Kinnect. Cam kết bảo mật theo tiêu chuẩn Apple và pháp luật Việt Nam."
+                    ),
+                    recordOnServer: false,
+                    onAccepted: {}
+                )
+            )
+        case "delete-account":
+            return AnyView(DeleteAccountConfirmationSheet())
+        case "ugc-report":
+            return AnyView(
+                UGCReportSheet(
+                    context: UGCReportContext(
+                        targetType: "user",
+                        targetId: "fixture_user_peer",
+                        targetUserId: "fixture_user_peer",
+                        targetTitle: "Lê Hoàng Nam"
+                    )
+                )
+            )
+        case "change-password":
+            return AnyView(ChangePasswordSheet())
+        case "blocked-users":
+            return AnyView(BlockedUsersSheet())
+        case "privacy-settings":
+            return AnyView(PrivacySettingsSheet())
+        case "support":
+            return AnyView(SupportContactSheet())
+        case "support-chat":
+            return AnyView(DirectChatDetailView(peer: KinnectUser.from(peerUserDict)))
+        case "admin":
+            return AnyView(AdminConsoleView())
+
+        default:
+            return AnyView(RootMainView())
+        }
+    }
+}

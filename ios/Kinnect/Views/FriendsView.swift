@@ -7,18 +7,54 @@ struct FriendsView: View {
     enum FriendTab: String, CaseIterable {
         case friends = "Bạn bè"
         case requests = "Lời mời"
-        case suggestions = "Gợi ý"
+        case outgoing = "Đã gửi"
     }
 
     @State private var tab: FriendTab = .friends
+    @State private var searchQuery: String = ""
     @State private var friends: [KinnectUser] = []
     @State private var incoming: [KinnectUser] = []
     @State private var outgoing: [KinnectUser] = []
     @State private var suggestions: [KinnectUser] = []
     @State private var isLoading = false
+    @State private var selectedProfileUser: KinnectUser? = nil
+    @State private var activeChatPeer: KinnectUser? = nil
+
+    var onBack: (() -> Void)? = nil
+
+    init(initialTab: FriendTab = .friends, onBack: (() -> Void)? = nil) {
+        _tab = State(initialValue: initialTab)
+        self.onBack = onBack
+    }
+
+    private var filteredFriends: [KinnectUser] {
+        let clean = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if clean.isEmpty { return friends }
+        let q = clean.hasPrefix("@") ? String(clean.dropFirst()) : clean
+        return friends.filter { $0.name.lowercased().contains(q) || $0.handle.lowercased().contains(q) }
+    }
+
+    // Suggestions filtered by search, max 6 - matches Android discover integration
+    private var filteredSuggestions: [KinnectUser] {
+        let clean = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        var filtered = suggestions
+        if !clean.isEmpty {
+            let q = clean.hasPrefix("@") ? String(clean.dropFirst()) : clean
+            filtered = filtered.filter { $0.name.lowercased().contains(q) || $0.handle.lowercased().contains(q) }
+        }
+        return Array(filtered.prefix(6))
+    }
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 0) {
+            // Pinned Header Bar (matching Android accountHeader pattern)
+            PinnedHeaderBar(
+                title: "Bạn bè",
+                onBack: onBack ?? { dismiss() },
+                trailingActions: []
+            )
+
+            // Tab Picker
             Picker("Bạn bè", selection: $tab) {
                 ForEach(FriendTab.allCases, id: \.self) { item in
                     Text(item.rawValue).tag(item)
@@ -27,45 +63,111 @@ struct FriendsView: View {
             .pickerStyle(.segmented)
             .padding(.horizontal, 16)
             .padding(.top, 8)
+            .padding(.bottom, 8)
+
+            // Search Bar matching Android searchField
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(KinnectTheme.textSecondary)
+                TextField("Tên hoặc @username", text: $searchQuery)
+                    .font(.subheadline)
+                    .foregroundColor(KinnectTheme.textPrimary)
+                if !searchQuery.isEmpty {
+                    Button { searchQuery = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+            .padding(.horizontal, 16)
 
             ScrollView {
-                LazyVStack(spacing: 12) {
+                LazyVStack(spacing: 14) {
                     switch tab {
                     case .friends:
-                        if friends.isEmpty && !isLoading {
-                            emptyPlaceholder("Chưa có bạn bè nào trong danh sách")
-                        }
-                        ForEach(friends) { user in
-                            friendRow(user: user)
+                        if filteredFriends.isEmpty && !isLoading && filteredSuggestions.isEmpty {
+                            emptyPlaceholder(searchQuery.isEmpty ? "Chưa có bạn bè nào trong danh sách" : "Không tìm thấy bạn bè phù hợp")
+                        } else {
+                            let online = filteredFriends.filter { ($0.isActive && $0.showActivity) || appState.onlineUserIds.contains($0.id) }
+                            let offline = filteredFriends.filter { !(($0.isActive && $0.showActivity) || appState.onlineUserIds.contains($0.id)) }
+
+                            if !online.isEmpty {
+                                sectionHeader("Đang trực tuyến", count: online.count, color: Color(hex: "#2E9E66"))
+                                VStack(spacing: 0) {
+                                    ForEach(online) { user in
+                                        friendRow(user: user)
+                                        if user.id != online.last?.id {
+                                            Divider().background(KinnectTheme.borderSoft).padding(.leading, 64)
+                                        }
+                                    }
+                                }
+                                .background(groupedCardBackground)
+                            }
+
+                            if !offline.isEmpty {
+                                sectionHeader("Ngoại tuyến", count: offline.count, color: KinnectTheme.textSecondary)
+                                VStack(spacing: 0) {
+                                    ForEach(offline) { user in
+                                        friendRow(user: user)
+                                        if user.id != offline.last?.id {
+                                            Divider().background(KinnectTheme.borderSoft).padding(.leading, 64)
+                                        }
+                                    }
+                                }
+                                .background(groupedCardBackground)
+                            }
+
+                            // Suggestions integrated at bottom of friends tab (max 6, search-filtered) - matches Android
+                            if !filteredSuggestions.isEmpty {
+                                sectionHeader("Gợi ý kết bạn", count: filteredSuggestions.count, color: KinnectTheme.accentBright)
+                                VStack(spacing: 0) {
+                                    ForEach(filteredSuggestions) { user in
+                                        suggestionRow(user: user)
+                                        if user.id != filteredSuggestions.last?.id {
+                                            Divider().background(KinnectTheme.borderSoft).padding(.leading, 64)
+                                        }
+                                    }
+                                }
+                                .background(groupedCardBackground)
+                            }
                         }
 
                     case .requests:
-                        if !incoming.isEmpty {
-                            sectionHeader("Lời mời kết bạn đến (\(incoming.count))")
-                            ForEach(incoming) { user in
-                                incomingRequestRow(user: user)
-                            }
-                        }
-                        if !outgoing.isEmpty {
-                            sectionHeader("Lời mời đã gửi (\(outgoing.count))")
-                            ForEach(outgoing) { user in
-                                outgoingRequestRow(user: user)
-                            }
-                        }
-                        if incoming.isEmpty && outgoing.isEmpty && !isLoading {
+                        if incoming.isEmpty && !isLoading {
                             emptyPlaceholder("Không có lời mời kết bạn nào")
+                        } else {
+                            VStack(spacing: 0) {
+                                ForEach(incoming) { user in
+                                    incomingRequestRow(user: user)
+                                    if user.id != incoming.last?.id {
+                                        Divider().background(KinnectTheme.borderSoft).padding(.leading, 64)
+                                    }
+                                }
+                            }
+                            .background(groupedCardBackground)
                         }
 
-                    case .suggestions:
-                        if suggestions.isEmpty && !isLoading {
-                            emptyPlaceholder("Hiện chưa có gợi ý kết bạn mới")
-                        }
-                        ForEach(suggestions) { user in
-                            suggestionRow(user: user)
+                    case .outgoing:
+                        if outgoing.isEmpty && !isLoading {
+                            emptyPlaceholder("Không có lời mời nào đã gửi")
+                        } else {
+                            VStack(spacing: 0) {
+                                ForEach(outgoing) { user in
+                                    outgoingRequestRow(user: user)
+                                    if user.id != outgoing.last?.id {
+                                        Divider().background(KinnectTheme.borderSoft).padding(.leading, 64)
+                                    }
+                                }
+                            }
+                            .background(groupedCardBackground)
                         }
                     }
                 }
-                .padding(14)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 20)
             }
             .refreshable {
                 await loadAll()
@@ -81,18 +183,43 @@ struct FriendsView: View {
             if UIReviewFixture.activeScreen == "friends-requests" {
                 tab = .requests
             } else if UIReviewFixture.activeScreen == "friends-suggestions" {
-                tab = .suggestions
+                tab = .friends
+            }
+        }
+        .sheet(item: $selectedProfileUser) { user in
+            ProfileView(targetUser: user)
+        }
+        .sheet(item: $activeChatPeer) { peer in
+            NavigationStack {
+                DirectChatDetailView(peer: peer)
             }
         }
     }
 
-    private func sectionHeader(_ text: String) -> some View {
-        HStack {
+    private func sectionHeader(_ text: String, count: Int? = nil, color: Color = KinnectTheme.textSecondary) -> some View {
+        HStack(spacing: 6) {
             Text(text)
                 .font(.caption.weight(.bold))
-                .foregroundColor(KinnectTheme.textSecondary)
+                .foregroundColor(color)
+            if let count {
+                Text("\(count)")
+                    .font(.caption2.weight(.bold))
+                    .foregroundColor(color)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(color.opacity(0.15)))
+            }
             Spacer()
         }
+    }
+
+    private var groupedCardBackground: some View {
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(KinnectTheme.surface)
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(KinnectTheme.borderSoft.opacity(0.8), lineWidth: 0.8)
+            )
     }
 
     private func emptyPlaceholder(_ text: String) -> some View {
@@ -102,34 +229,124 @@ struct FriendsView: View {
             .padding(.vertical, 36)
     }
 
+    // MARK: - Friendship Status Chip (matches Android personTile friendship actions)
+    @ViewBuilder
+    private func friendshipStatusChip(for user: KinnectUser) -> some View {
+        let status = user.friendshipStatus.lowercased()
+
+        switch status {
+        case "friends":
+            // Already friends - show "Nhắn tin" primary action
+            Button {
+                activeChatPeer = user
+            } label: {
+                Text("Nhắn tin")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(Capsule().fill(KinnectTheme.primaryGradient))
+            }
+            .fixedSize()
+            .accessibilityLabel("Nhắn tin với \(user.name)")
+
+        case "incoming":
+            // Incoming friend request - show "Chấp nhận" / "Từ chối"
+            HStack(spacing: 6) {
+                Button("Chấp nhận") {
+                    Task { await respondRequest(user: user, action: "accept") }
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(Capsule().fill(KinnectTheme.primaryGradient))
+
+                Button("Từ chối") {
+                    Task { await respondRequest(user: user, action: "reject") }
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundColor(KinnectTheme.textSecondary)
+                .lineLimit(1)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(Capsule().fill(KinnectTheme.surfaceElevated))
+            }
+            .fixedSize()
+
+        case "outgoing":
+            // Outgoing friend request - show "Huỷ lời mời"
+            Button("Huỷ lời mời") {
+                Task { await cancelRequest(user) }
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundColor(KinnectTheme.danger)
+            .lineLimit(1)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(Capsule().fill(KinnectTheme.surfaceElevated))
+            .fixedSize()
+
+        default:
+            // Not friends - show "Kết bạn"
+            Button("Kết bạn") {
+                Task { await sendRequest(user) }
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundColor(.white)
+            .lineLimit(1)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(Capsule().fill(KinnectTheme.primaryGradient))
+            .fixedSize()
+        }
+    }
+
     private func friendRow(user: KinnectUser) -> some View {
         HStack(spacing: 10) {
-            KinnectAvatarView(
-                name: user.name,
-                avatarURL: user.avatarUrl,
-                colorHex: user.avatarColor,
-                size: 46,
-                isOnline: appState.onlineUserIds.contains(user.id)
-            )
-            VStack(alignment: .leading, spacing: 2) {
-                Text(user.name)
-                    .font(.subheadline.bold())
-                    .foregroundColor(KinnectTheme.textPrimary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                if !user.handle.isEmpty {
-                    Text("@\(user.handle)")
-                        .font(.caption)
-                        .foregroundColor(KinnectTheme.textSecondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+            Button {
+                selectedProfileUser = user
+            } label: {
+                HStack(spacing: 10) {
+                    KinnectAvatarView(
+                        name: user.name,
+                        avatarURL: user.avatarUrl,
+                        colorHex: user.avatarColor,
+                        size: 46,
+                        isOnline: (user.isActive && user.showActivity) || appState.onlineUserIds.contains(user.id)
+                    )
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(user.name)
+                            .font(.subheadline.bold())
+                            .foregroundColor(KinnectTheme.textPrimary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        let active = (user.isActive && user.showActivity) || appState.onlineUserIds.contains(user.id)
+                        Text("@\(user.handle.isEmpty ? user.name : user.handle) • \(active ? "Đang hoạt động" : "Ngoại tuyến")")
+                            .font(.caption2)
+                            .foregroundColor(active ? Color(hex: "#2E9E66") : KinnectTheme.textSecondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
                 }
             }
-            .layoutPriority(1)
+            .buttonStyle(.plain)
 
-            Spacer(minLength: 6)
+            Spacer(minLength: 8)
 
-            HStack(spacing: 4) {
+            // Friends action icons (Tin nhắn, Gọi thoại, Gọi video, Thêm) - matches Android roundAction layout
+            HStack(spacing: 6) {
+                Button {
+                    activeChatPeer = user
+                } label: {
+                    KinnectIcon(glyph: .messages, size: 18, tint: KinnectTheme.accentBright)
+                        .frame(width: 36, height: 36)
+                        .background(Circle().fill(KinnectTheme.surfaceElevated))
+                }
+                .accessibilityLabel("Nhắn tin")
+
                 Button {
                     Task {
                         dismiss()
@@ -179,18 +396,63 @@ struct FriendsView: View {
         .kinnectCard()
     }
 
+    private func suggestionRow(user: KinnectUser) -> some View {
+        HStack(spacing: 10) {
+            Button {
+                selectedProfileUser = user
+            } label: {
+                HStack(spacing: 10) {
+                    KinnectAvatarView(
+                        name: user.name,
+                        avatarURL: user.avatarUrl,
+                        colorHex: user.avatarColor,
+                        size: 46,
+                        isOnline: (user.isActive && user.showActivity) || appState.onlineUserIds.contains(user.id)
+                    )
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(user.name)
+                            .font(.subheadline.bold())
+                            .foregroundColor(KinnectTheme.textPrimary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        let active = (user.isActive && user.showActivity) || appState.onlineUserIds.contains(user.id)
+                        Text("@\(user.handle.isEmpty ? user.name : user.handle) • \(active ? "Đang hoạt động" : "Ngoại tuyến")")
+                            .font(.caption2)
+                            .foregroundColor(active ? Color(hex: "#2E9E66") : KinnectTheme.textSecondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+
+            Spacer(minLength: 8)
+
+            friendshipStatusChip(for: user)
+        }
+        .kinnectCard()
+    }
+
     private func incomingRequestRow(user: KinnectUser) -> some View {
         HStack(spacing: 12) {
-            KinnectAvatarView(name: user.name, avatarURL: user.avatarUrl, colorHex: user.avatarColor, size: 46)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(user.name)
-                    .font(.subheadline.bold())
-                    .foregroundColor(KinnectTheme.textPrimary)
-                    .kinnectMultiline()
-                Text("Muốn kết bạn với bạn")
-                    .font(.caption)
-                    .foregroundColor(KinnectTheme.textSecondary)
+            Button {
+                selectedProfileUser = user
+            } label: {
+                HStack(spacing: 10) {
+                    KinnectAvatarView(name: user.name, avatarURL: user.avatarUrl, colorHex: user.avatarColor, size: 46)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(user.name)
+                            .font(.subheadline.bold())
+                            .foregroundColor(KinnectTheme.textPrimary)
+                            .kinnectMultiline()
+                        Text("Muốn kết bạn với bạn")
+                            .font(.caption)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                }
             }
+            .buttonStyle(.plain)
+
             Spacer()
             Button("Đồng ý") {
                 Task { await respondRequest(user: user, action: "accept") }
@@ -215,11 +477,19 @@ struct FriendsView: View {
 
     private func outgoingRequestRow(user: KinnectUser) -> some View {
         HStack(spacing: 12) {
-            KinnectAvatarView(name: user.name, avatarURL: user.avatarUrl, colorHex: user.avatarColor, size: 44)
-            Text(user.name)
-                .font(.subheadline.bold())
-                .foregroundColor(KinnectTheme.textPrimary)
-                .kinnectMultiline()
+            Button {
+                selectedProfileUser = user
+            } label: {
+                HStack(spacing: 10) {
+                    KinnectAvatarView(name: user.name, avatarURL: user.avatarUrl, colorHex: user.avatarColor, size: 44)
+                    Text(user.name)
+                        .font(.subheadline.bold())
+                        .foregroundColor(KinnectTheme.textPrimary)
+                        .kinnectMultiline()
+                }
+            }
+            .buttonStyle(.plain)
+
             Spacer()
             Button("Thu hồi") {
                 Task { await cancelRequest(user) }
@@ -233,38 +503,10 @@ struct FriendsView: View {
         .kinnectCard()
     }
 
-    private func suggestionRow(user: KinnectUser) -> some View {
-        HStack(spacing: 12) {
-            KinnectAvatarView(name: user.name, avatarURL: user.avatarUrl, colorHex: user.avatarColor, size: 46)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(user.name)
-                    .font(.subheadline.bold())
-                    .foregroundColor(KinnectTheme.textPrimary)
-                    .kinnectMultiline()
-                if !user.bio.isEmpty {
-                    Text(user.bio)
-                        .font(.caption)
-                        .foregroundColor(KinnectTheme.textSecondary)
-                        .kinnectMultiline()
-                }
-            }
-            Spacer()
-            Button("Kết bạn") {
-                Task { await sendRequest(user) }
-            }
-            .font(.caption.bold())
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(Capsule().fill(KinnectTheme.primaryGradient))
-            .foregroundColor(.white)
-        }
-        .kinnectCard()
-    }
-
     private func loadAll() async {
         if friends.isEmpty,
            let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/friends"),
-           let list = cached["friends"] as? [[String: Any]] {
+           let list = (cached["users"] as? [[String: Any]]) ?? (cached["friends"] as? [[String: Any]]) {
             self.friends = list.map(KinnectUser.from)
         }
         isLoading = true
@@ -275,7 +517,8 @@ struct FriendsView: View {
         async let sTask = KinnectAPIClient.shared.requestJSON("/api/friend-suggestions")
 
         if let fRes = try? await fTask {
-            self.friends = (fRes["friends"] as? [[String: Any]] ?? []).map(KinnectUser.from)
+            let list = (fRes["users"] as? [[String: Any]]) ?? (fRes["friends"] as? [[String: Any]]) ?? []
+            self.friends = list.map(KinnectUser.from)
         }
         if let rRes = try? await rTask {
             let inc = rRes["incoming"] as? [[String: Any]] ?? []
@@ -294,7 +537,8 @@ struct FriendsView: View {
             }
         }
         if let sRes = try? await sTask {
-            self.suggestions = (sRes["suggestions"] as? [[String: Any]] ?? []).map(KinnectUser.from)
+            let list = (sRes["users"] as? [[String: Any]]) ?? (sRes["suggestions"] as? [[String: Any]]) ?? []
+            self.suggestions = list.map(KinnectUser.from)
         }
     }
 

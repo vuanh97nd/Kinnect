@@ -16,6 +16,10 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
     var id: String
     var name: String
     var handle: String
+    var username: String {
+        get { handle.isEmpty ? name : handle }
+        set { handle = newValue }
+    }
     var email: String
     var phone: String
     var bio: String
@@ -28,11 +32,38 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
     var followingCount: Int
     var friendsCount: Int
     var isFollowing: Bool
+    var isFollowed: Bool {
+        get { isFollowing }
+        set { isFollowing = newValue }
+    }
     var friendshipStatus: String
     var distanceKm: Double?
     var isActive: Bool
     var age: Int
     var gender: String
+    var orientation: String
+    var communityRole: String
+    var coins: Int
+    var height: Int
+    var weight: Int
+    var pronouns: String
+    var relationshipRole: String
+    var lookingFor: String
+    var occupation: String
+    var school: String
+    var city: String
+    var interests: [String]
+    var cloudChatSync: Bool
+    var postsCount: Int
+    var joinedAt: Int64
+    var identityPublic: Bool
+    var profileVisibility: [String: Bool]
+    var showActivity: Bool
+    var showDistance: Bool
+    var discoverable: Bool
+    var hasLocation: Bool
+    var dmMode: String
+    var accountRole: String
 
     var avatarURL: String? { avatarUrl.isEmpty ? nil : avatarUrl }
 
@@ -56,7 +87,30 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         distanceKm: Double? = nil,
         isActive: Bool = false,
         age: Int = 0,
-        gender: String = ""
+        gender: String = "",
+        orientation: String = "",
+        communityRole: String = "",
+        coins: Int = 0,
+        height: Int = 0,
+        weight: Int = 0,
+        pronouns: String = "",
+        relationshipRole: String = "",
+        lookingFor: String = "",
+        occupation: String = "",
+        school: String = "",
+        city: String = "",
+        interests: [String] = [],
+        cloudChatSync: Bool = true,
+        postsCount: Int = 0,
+        joinedAt: Int64 = 0,
+        identityPublic: Bool = true,
+        profileVisibility: [String: Bool] = [:],
+        showActivity: Bool = true,
+        showDistance: Bool = true,
+        discoverable: Bool = true,
+        hasLocation: Bool = false,
+        dmMode: String = "everyone",
+        accountRole: String = ""
     ) {
         self.id = id
         self.name = name
@@ -78,10 +132,42 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         self.isActive = isActive
         self.age = age
         self.gender = gender
+        self.orientation = orientation
+        self.communityRole = communityRole
+        self.coins = coins
+        self.height = height
+        self.weight = weight
+        self.pronouns = pronouns
+        self.relationshipRole = relationshipRole
+        self.lookingFor = lookingFor
+        self.occupation = occupation
+        self.school = school
+        self.city = city
+        self.interests = interests
+        self.cloudChatSync = cloudChatSync
+        self.postsCount = postsCount
+        self.joinedAt = joinedAt
+        self.identityPublic = identityPublic
+        self.profileVisibility = profileVisibility
+        self.showActivity = showActivity
+        self.showDistance = showDistance
+        self.discoverable = discoverable
+        self.hasLocation = hasLocation
+        self.dmMode = dmMode
+        self.accountRole = accountRole
     }
 
     init(json: [String: Any]) {
         self = Self.from(json)
+    }
+
+    static var fallbackSelf: KinnectUser {
+        KinnectUser.from([
+            "id": "me",
+            "name": "Tôi",
+            "handle": "me",
+            "avatarColor": "#7C3AED"
+        ])
     }
 
     static func from(_ dict: [String: Any]) -> KinnectUser {
@@ -92,6 +178,23 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
             av = "/api/users/\(uid)/avatar"
         }
         let cov = (dict["coverUrl"] as? String) ?? (dict["cover"] as? String) ?? ""
+        var parsedInterests: [String] = []
+        if let arr = dict["interests"] as? [String] {
+            parsedInterests = arr
+        } else if let str = dict["interests"] as? String {
+            parsedInterests = str.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        }
+        let userCity = (dict["city"] as? String) ?? (dict["locationName"] as? String) ?? ""
+        var visDict: [String: Bool] = [:]
+        if let pv = dict["profileVisibility"] as? [String: Any] {
+            for (k, v) in pv {
+                if let b = v as? Bool {
+                    visDict[k] = b
+                }
+            }
+        }
+        let joined: Int64 = (dict["joinedAt"] as? Int64) ?? (dict["joinedAt"] as? NSNumber)?.int64Value ?? Int64((dict["joinedAt"] as? Int) ?? 0)
+
         return KinnectUser(
             id: uid,
             name: rawName.isEmpty ? "Người dùng Kinnect" : rawName,
@@ -102,7 +205,7 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
             avatarUrl: av,
             avatarColor: (dict["avatarColor"] as? String) ?? (dict["color"] as? String) ?? "#7C3AED",
             coverUrl: cov,
-            locationName: (dict["locationName"] as? String) ?? (dict["city"] as? String) ?? "",
+            locationName: userCity,
             isPrivate: (dict["isPrivate"] as? Bool) ?? false,
             followersCount: (dict["followersCount"] as? Int) ?? (dict["followers"] as? Int) ?? 0,
             followingCount: (dict["followingCount"] as? Int) ?? (dict["followingTotal"] as? Int) ?? 0,
@@ -112,7 +215,33 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
             distanceKm: (dict["distanceKm"] as? NSNumber)?.doubleValue,
             isActive: (dict["isActive"] as? Bool) ?? false,
             age: (dict["age"] as? Int) ?? (dict["userAge"] as? Int) ?? 0,
-            gender: (dict["gender"] as? String) ?? ""
+            gender: (dict["gender"] as? String) ?? "",
+            orientation: (dict["orientation"] as? String) ?? (dict["sexualOrientation"] as? String) ?? "",
+            communityRole: (dict["communityRole"] as? String) ?? (dict["role"] as? String) ?? "",
+            coins: (dict["coins"] as? Int) ?? (dict["coinBalance"] as? Int) ?? (dict["balance"] as? Int) ?? ((dict["coins"] as? NSNumber)?.intValue) ?? 0,
+            height: (dict["height"] as? Int) ?? Int((dict["height"] as? String) ?? "") ?? 0,
+            weight: (dict["weight"] as? Int) ?? Int((dict["weight"] as? String) ?? "") ?? 0,
+            pronouns: (dict["pronouns"] as? String) ?? "",
+            relationshipRole: (dict["relationshipRole"] as? String) ?? "",
+            lookingFor: (dict["lookingFor"] as? String) ?? "",
+            occupation: (dict["occupation"] as? String) ?? "",
+            school: (dict["school"] as? String) ?? "",
+            city: userCity,
+            interests: parsedInterests,
+            cloudChatSync: (dict["cloudChatSync"] as? Bool) ?? true,
+            postsCount: (dict["postsCount"] as? Int) ?? (dict["posts"] as? Int) ?? (dict["postCount"] as? Int) ?? 0,
+            joinedAt: joined,
+            identityPublic: (dict["identityPublic"] as? Bool) ?? true,
+            profileVisibility: visDict,
+            showActivity: (dict["showActivity"] as? Bool) ?? ((dict["show_activity"] as? Int) == 1) ?? true,
+            showDistance: (dict["showDistance"] as? Bool) ?? ((dict["show_distance"] as? Int) == 1) ?? true,
+            discoverable: (dict["discoverable"] as? Bool) ?? ((dict["discoverable"] as? Int) == 1) ?? true,
+            hasLocation: (dict["hasLocation"] as? Bool) ?? false,
+            dmMode: {
+                let raw = (dict["dmMode"] as? String) ?? (dict["dm_mode"] as? String) ?? "everyone"
+                return raw == "friends" ? "friends" : "everyone"
+            }(),
+            accountRole: (dict["role"] as? String) ?? ""
         )
     }
 }
@@ -128,6 +257,7 @@ struct PostItem: Identifiable, Equatable {
     var commentsCount: Int
     var liked: Bool
     var userReaction: String
+    var mediaKind: String = "image"
 
     static func from(_ dict: [String: Any]) -> PostItem {
         let authorDict = (dict["author"] as? [String: Any]) ?? (dict["user"] as? [String: Any]) ?? dict
@@ -143,7 +273,8 @@ struct PostItem: Identifiable, Equatable {
             likesCount: (dict["likesCount"] as? Int) ?? (dict["likes"] as? Int) ?? 0,
             commentsCount: (dict["commentsCount"] as? Int) ?? (dict["comments"] as? Int) ?? 0,
             liked: (dict["liked"] as? Bool) ?? false,
-            userReaction: (dict["userReaction"] as? String) ?? (dict["myReaction"] as? String) ?? "like"
+            userReaction: (dict["userReaction"] as? String) ?? (dict["myReaction"] as? String) ?? "like",
+            mediaKind: (mediaDict?["kind"] as? String) ?? (dict["mediaKind"] as? String) ?? (img.lowercased().contains(".mp4") ? "video" : "image")
         )
     }
 }
@@ -157,6 +288,7 @@ struct StoryItem: Identifiable, Equatable {
     var createdAt: String
     var viewsCount: Int
     var viewed: Bool
+    var mediaKind: String = "image"
 
     static func from(_ dict: [String: Any]) -> StoryItem {
         let authorDict = (dict["author"] as? [String: Any]) ?? (dict["user"] as? [String: Any]) ?? dict
@@ -170,7 +302,8 @@ struct StoryItem: Identifiable, Equatable {
             backgroundColor: (dict["backgroundColor"] as? String) ?? (dict["bgColor"] as? String) ?? "#7C3AED",
             createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
             viewsCount: (dict["viewsCount"] as? Int) ?? (dict["viewCount"] as? Int) ?? 0,
-            viewed: (dict["viewed"] as? Bool) ?? false
+            viewed: (dict["viewed"] as? Bool) ?? false,
+            mediaKind: (mediaDict?["kind"] as? String) ?? (img.lowercased().contains(".mp4") ? "video" : "image")
         )
     }
 }
@@ -180,14 +313,23 @@ struct CommentItem: Identifiable, Equatable {
     var author: KinnectUser
     var text: String
     var createdAt: String
+    var likesCount: Int = 0
+    var liked: Bool = false
+    var parentId: String? = nil
+    var myReaction: String = ""
 
     static func from(_ dict: [String: Any]) -> CommentItem {
         let authorDict = (dict["author"] as? [String: Any]) ?? (dict["user"] as? [String: Any]) ?? dict
+        let pId = (dict["parentId"] as? String) ?? (dict["parent_id"] as? String)
         return CommentItem(
             id: (dict["id"] as? String) ?? UUID().uuidString,
             author: KinnectUser.from(authorDict),
             text: (dict["text"] as? String) ?? (dict["body"] as? String) ?? (dict["content"] as? String) ?? "",
-            createdAt: isoString(from: dict["createdAt"] ?? dict["created"])
+            createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
+            likesCount: (dict["likesCount"] as? Int) ?? (dict["likes"] as? Int) ?? (dict["reactions"] as? [String: Int])?.values.reduce(0, +) ?? 0,
+            liked: (dict["liked"] as? Bool) ?? !((dict["myReaction"] as? String) ?? "").isEmpty,
+            parentId: (pId != nil && !pId!.isEmpty) ? pId : nil,
+            myReaction: (dict["myReaction"] as? String) ?? ((dict["liked"] as? Bool) == true ? "like" : "")
         )
     }
 }
@@ -231,6 +373,8 @@ struct DirectMessageItem: Identifiable, Equatable {
     var toUserId: String
     var text: String
     var imageUrl: String
+    var attachmentName: String = ""
+    var attachmentUrl: String = ""
     var createdAt: String
     var deliveredAt: String
     var seenAt: String
@@ -269,7 +413,18 @@ struct DirectMessageItem: Identifiable, Equatable {
         let att = dict["attachment"] as? [String: Any]
         let deliv = isoString(from: dict["deliveredAt"] ?? receipt?["deliveredAt"])
         let seen = isoString(from: dict["seenAt"] ?? dict["readAt"] ?? receipt?["seenAt"])
-        let img = (dict["imageUrl"] as? String) ?? (dict["attachmentUrl"] as? String) ?? (att?["url"] as? String) ?? ""
+        let attName = (att?["name"] as? String) ?? (dict["attachmentName"] as? String) ?? ""
+        let attData = (att?["data"] as? String) ?? (att?["url"] as? String) ?? (dict["attachmentUrl"] as? String) ?? ""
+        var img = (dict["imageUrl"] as? String) ?? (dict["attachmentUrl"] as? String) ?? (att?["url"] as? String) ?? ""
+        if img.isEmpty && attData.hasPrefix("data:image/") {
+            img = attData
+        }
+        let isImage = !img.isEmpty || (att?["kind"] as? String == "image") || attName.hasSuffix(".png") || attName.hasSuffix(".jpg") || attName.hasSuffix(".jpeg") || attName.hasSuffix(".webp")
+        let finalAttName = isImage ? "" : attName
+        let finalAttUrl = isImage ? "" : attData
+        if isImage && img.isEmpty {
+            img = attData
+        }
         let myRx = (dict["myReaction"] as? String) ?? (dict["reaction"] as? String) ?? (dict["rx"] as? String) ?? ""
         let rxDict = (dict["reactions"] as? [String: Int]) ?? [:]
         let effectiveRx = !myRx.isEmpty ? myRx : (rxDict.keys.first ?? "")
@@ -279,6 +434,8 @@ struct DirectMessageItem: Identifiable, Equatable {
             toUserId: (dict["toUserId"] as? String) ?? (dict["recipientId"] as? String) ?? (dict["recipient"] as? String) ?? "",
             text: (dict["text"] as? String) ?? (dict["body"] as? String) ?? (dict["content"] as? String) ?? "",
             imageUrl: img,
+            attachmentName: finalAttName,
+            attachmentUrl: finalAttUrl,
             createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
             deliveredAt: deliv,
             seenAt: seen,
@@ -297,19 +454,25 @@ struct ChatGroupItem: Identifiable, Hashable, Equatable {
     var membersCount: Int
     var lastMessageText: String
     var unreadCount: Int
+    var updatedAt: String
+    var members: [KinnectUser] = []
 
     static func from(_ dict: [String: Any]) -> ChatGroupItem {
-        let members = dict["members"] as? [Any]
+        let membersArray = (dict["members"] as? [[String: Any]])?.map(KinnectUser.from) ?? []
+        let rawMembers = dict["members"] as? [Any]
         let lastObj = (dict["lastMessage"] as? [String: Any]) ?? (dict["last"] as? [String: Any])
         let lastText = (lastObj?["text"] as? String) ?? (lastObj?["body"] as? String) ?? (dict["lastMessageText"] as? String) ?? ""
+        let updated = (lastObj?["createdAt"] as? String) ?? (dict["updatedAt"] as? String) ?? ""
         return ChatGroupItem(
             id: (dict["id"] as? String) ?? UUID().uuidString,
             name: (dict["name"] as? String) ?? "Nhóm Kinnect",
             description: (dict["description"] as? String) ?? "",
             avatarColor: (dict["avatarColor"] as? String) ?? "#7C3AED",
-            membersCount: (dict["membersCount"] as? Int) ?? members?.count ?? 1,
+            membersCount: (dict["membersCount"] as? Int) ?? rawMembers?.count ?? 1,
             lastMessageText: lastText,
-            unreadCount: (dict["unreadCount"] as? Int) ?? (dict["unread"] as? Int) ?? 0
+            unreadCount: (dict["unreadCount"] as? Int) ?? (dict["unread"] as? Int) ?? 0,
+            updatedAt: updated,
+            members: membersArray
         )
     }
 }
@@ -320,6 +483,8 @@ struct GroupMessageItem: Identifiable, Equatable {
     var sender: KinnectUser
     var text: String
     var imageUrl: String
+    var attachmentName: String = ""
+    var attachmentUrl: String = ""
     var createdAt: String
     var seenCount: Int
     var reaction: String = ""
@@ -330,6 +495,19 @@ struct GroupMessageItem: Identifiable, Equatable {
         let senderDict = (dict["sender"] as? [String: Any]) ?? (dict["author"] as? [String: Any]) ?? (dict["user"] as? [String: Any]) ?? dict
         let receipt = dict["receipt"] as? [String: Any]
         let seenBy = dict["seenBy"] as? [Any]
+        let att = dict["attachment"] as? [String: Any]
+        let attName = (att?["name"] as? String) ?? (dict["attachmentName"] as? String) ?? ""
+        let attData = (att?["data"] as? String) ?? (att?["url"] as? String) ?? (dict["attachmentUrl"] as? String) ?? ""
+        var img = (dict["imageUrl"] as? String) ?? (dict["attachmentUrl"] as? String) ?? (att?["url"] as? String) ?? ""
+        if img.isEmpty && attData.hasPrefix("data:image/") {
+            img = attData
+        }
+        let isImage = !img.isEmpty || (att?["kind"] as? String == "image") || attName.hasSuffix(".png") || attName.hasSuffix(".jpg") || attName.hasSuffix(".jpeg") || attName.hasSuffix(".webp")
+        let finalAttName = isImage ? "" : attName
+        let finalAttUrl = isImage ? "" : attData
+        if isImage && img.isEmpty {
+            img = attData
+        }
         let myRx = (dict["myReaction"] as? String) ?? (dict["reaction"] as? String) ?? (dict["rx"] as? String) ?? ""
         let rxDict = (dict["reactions"] as? [String: Int]) ?? [:]
         let effectiveRx = !myRx.isEmpty ? myRx : (rxDict.keys.first ?? "")
@@ -338,7 +516,9 @@ struct GroupMessageItem: Identifiable, Equatable {
             groupId: (dict["groupId"] as? String) ?? (dict["group_id"] as? String) ?? "",
             sender: KinnectUser.from(senderDict),
             text: (dict["text"] as? String) ?? (dict["body"] as? String) ?? (dict["content"] as? String) ?? "",
-            imageUrl: (dict["imageUrl"] as? String) ?? "",
+            imageUrl: img,
+            attachmentName: finalAttName,
+            attachmentUrl: finalAttUrl,
             createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
             seenCount: (dict["seenCount"] as? Int) ?? (receipt?["seenCount"] as? Int) ?? seenBy?.count ?? 0,
             reaction: effectiveRx,
@@ -446,6 +626,19 @@ struct LiveGiftCatalogItem: Identifiable, Equatable {
             tier: (dict["tier"] as? String) ?? "standard"
         )
     }
+
+    static let defaultCatalog: [LiveGiftCatalogItem] = [
+        LiveGiftCatalogItem(id: "rose", label: "Hoa hồng", emoji: "🌹", coins: 10, tier: "standard"),
+        LiveGiftCatalogItem(id: "heart", label: "Trái tim", emoji: "💖", coins: 20, tier: "standard"),
+        LiveGiftCatalogItem(id: "coffee", label: "Cà phê", emoji: "☕", coins: 50, tier: "standard"),
+        LiveGiftCatalogItem(id: "love_gun", label: "Súng tình yêu", emoji: "🔫", coins: 100, tier: "rare"),
+        LiveGiftCatalogItem(id: "fireworks", label: "Pháo hoa", emoji: "🎆", coins: 200, tier: "rare"),
+        LiveGiftCatalogItem(id: "yacht", label: "Du thuyền", emoji: "🛥️", coins: 500, tier: "rare"),
+        LiveGiftCatalogItem(id: "crown", label: "Vương miện", emoji: "👑", coins: 1000, tier: "epic"),
+        LiveGiftCatalogItem(id: "diamond", label: "Kim cương", emoji: "💎", coins: 2000, tier: "epic"),
+        LiveGiftCatalogItem(id: "sports_car", label: "Siêu xe", emoji: "🏎️", coins: 5000, tier: "legendary"),
+        LiveGiftCatalogItem(id: "castle", label: "Lâu đài", emoji: "🏰", coins: 10000, tier: "legendary")
+    ]
 }
 
 struct WalletEntryItem: Identifiable, Equatable {
@@ -482,6 +675,44 @@ struct StorePackageItem: Identifiable, Equatable {
     var accentColor: String
     var owned: Bool
     var equipped: Bool
+    var expiresAt: Int64?
+
+    var kind: String { category }
+
+    var iconName: String {
+        Self.iconName(for: id, category: category)
+    }
+
+    static func iconName(for id: String, category: String) -> String {
+        if id.starts(with: "studio_video_") { return "film.fill" }
+        if id.starts(with: "studio_photo_") { return "photo.fill" }
+        switch id {
+        case "style_neon", "style_aurora", "style_forest": return "sparkles"
+        case "style_galaxy": return "star.fill"
+        case "style_ice": return "snowflake"
+        case "style_ruby": return "heart.fill"
+        case "style_paper": return "newspaper.fill"
+        case "style_ember": return "flame.fill"
+        case "live_chill": return "antenna.radiowaves.left.and.right"
+        case "live_gaming", "live_game_30": return "gamecontroller.fill"
+        case "live_spotlight": return "sparkles"
+        case "gift_love": return "heart.fill"
+        case "gift_speed": return "bolt.fill"
+        case "gift_royal": return "crown.fill"
+        case "member_plus": return "crown.fill"
+        case "member_creator": return "film.fill"
+        case "studio_7", "studio_30": return "slider.horizontal.3"
+        default:
+            switch category {
+            case "style", "frame": return "paintpalette.fill"
+            case "studio": return "film.fill"
+            case "live": return "antenna.radiowaves.left.and.right"
+            case "gift", "gifts": return "gift.fill"
+            case "member", "membership": return "crown.fill"
+            default: return "sparkles"
+            }
+        }
+    }
 
     static func from(_ dict: [String: Any]) -> StorePackageItem {
         let colors = dict["colors"] as? [String]
@@ -494,7 +725,8 @@ struct StorePackageItem: Identifiable, Equatable {
             badgeText: (dict["badgeText"] as? String) ?? (dict["tier"] as? String) ?? "",
             accentColor: (dict["accentColor"] as? String) ?? colors?.first ?? "#7C3AED",
             owned: (dict["owned"] as? Bool) ?? false,
-            equipped: (dict["equipped"] as? Bool) ?? false
+            equipped: (dict["equipped"] as? Bool) ?? false,
+            expiresAt: (dict["expiresAt"] as? NSNumber)?.int64Value
         )
     }
 }
@@ -516,5 +748,35 @@ struct StoreDigitalProduct: Identifiable, Equatable {
             priceLabel: (dict["priceLabel"] as? String) ?? fallbackPrice,
             coinsGranted: (dict["coinsGranted"] as? Int) ?? (dict["coins"] as? Int) ?? 0
         )
+    }
+}
+
+struct GiftInventoryItem: Identifiable, Equatable {
+    var id: String { giftId }
+    let giftId: String
+    var quantity: Int
+    var name: String {
+        switch giftId {
+        case "rose": return "Hoa hồng"
+        case "coffee": return "Cà phê"
+        case "heart": return "Trái tim"
+        case "love_gun": return "Súng bắn tim"
+        case "diamond": return "Kim cương"
+        case "crown": return "Vương miện"
+        case "sports_car": return "Siêu xe"
+        case "yacht": return "Du thuyền"
+        case "castle": return "Lâu đài"
+        case "fireworks": return "Pháo hoa"
+        default: return giftId
+        }
+    }
+}
+
+extension Int {
+    func formattedWithSeparator() -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.groupingSeparator = "."
+        return formatter.string(from: NSNumber(value: self)) ?? "\(self)"
     }
 }

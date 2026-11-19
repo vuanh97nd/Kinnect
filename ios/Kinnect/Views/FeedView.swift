@@ -7,11 +7,11 @@ struct FeedView: View {
     let onOpenFriends: () -> Void
 
     @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var l10n = LocalizationManager.shared
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var stories: [StoryItem] = []
     @State private var posts: [PostItem] = []
-    @State private var selectedCategory: String = "all"
     @State private var isLoading = false
 
     // Composer state
@@ -24,50 +24,38 @@ struct FeedView: View {
     @State private var audiencePost: PostItem?
     @State private var showAudienceDialog = false
     @State private var hiddenPostIds: Set<String> = []
-
-    private struct FeedCategoryOption: Identifiable {
-        let id: String
-        let label: String
-        let icon: String
-    }
-
-    private let categories: [FeedCategoryOption] = [
-        FeedCategoryOption(id: "all", label: "Tất cả", icon: "sparkles"),
-        FeedCategoryOption(id: "community", label: "Cộng đồng", icon: "person.3.fill"),
-        FeedCategoryOption(id: "confessions", label: "Tâm sự", icon: "heart.text.square.fill"),
-        FeedCategoryOption(id: "questions", label: "Hỏi đáp", icon: "questionmark.bubble.fill"),
-        FeedCategoryOption(id: "events", label: "Sự kiện", icon: "calendar.badge.clock")
-    ]
+    @State private var selectedAuthorProfile: KinnectUser? = nil
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 14) {
-                storiesStrip
-
-                categoryFilterStrip
-
+            LazyVStack(spacing: 16) {
                 quickComposeRow
 
+                storiesStrip
+
                 if isLoading && posts.isEmpty {
-                    ProgressView()
-                        .tint(KinnectTheme.accentBright)
-                        .padding(.vertical, 32)
-                } else if filteredPosts.isEmpty {
+                    ForEach(0..<3, id: \.self) { _ in
+                        PostSkeletonCard()
+                    }
+                } else if visiblePosts.isEmpty {
                     VStack(spacing: 10) {
                         Image(systemName: "newspaper.fill")
                             .font(.largeTitle)
                             .foregroundColor(KinnectTheme.textSecondary)
-                        Text("Chưa có bài viết trong mục này")
+                        Text(l10n.localized("Chưa có bài viết nào"))
                             .font(.subheadline.weight(.medium))
                             .foregroundColor(KinnectTheme.textSecondary)
                     }
                     .padding(.vertical, 36)
                 } else {
-                    ForEach(filteredPosts) { post in
+                    ForEach(visiblePosts) { post in
                         PostCardView(
                             post: post,
                             currentUserId: appState.currentUser?.id ?? "",
                             isAuthorOnline: appState.onlineUserIds.contains(post.author.id),
+                            onOpenAuthorProfile: {
+                                selectedAuthorProfile = post.author
+                            },
                             onReact: { reaction in
                                 Task { await toggleReaction(post: post, reaction: reaction) }
                             },
@@ -84,7 +72,7 @@ struct FeedView: View {
                             },
                             onHide: {
                                 hiddenPostIds.insert(post.id)
-                                appState.showToast("Đã ẩn bài viết.")
+                                appState.showToast(l10n.localized("Đã ẩn bài viết."))
                             },
                             onDelete: {
                                 Task { await deletePost(post) }
@@ -94,21 +82,23 @@ struct FeedView: View {
                                     targetType: "post",
                                     targetId: post.id,
                                     targetUserId: post.author.id,
-                                    targetTitle: "Bài viết của \(post.author.name)"
+                                    targetTitle: L10n.isEnglish ? "Post by \(post.author.name)" : "Bài viết của \(post.author.name)"
                                 )
                             }
                         )
                     }
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .padding(.bottom, 72)
             .frame(maxWidth: 680)
             .frame(maxWidth: .infinity)
         }
-        .background(KinnectTheme.background)
-        .navigationTitle("")
-        .toolbar(.hidden, for: .navigationBar)
+        .background(Color(uiColor: .systemGroupedBackground))
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 72)
+        }
         .refreshable {
             await loadFeedAndStories()
         }
@@ -119,7 +109,7 @@ struct FeedView: View {
         .onReceive(NotificationCenter.default.publisher(for: .kinnectContentModerated)) { _ in
             Task { await loadFeedAndStories() }
         }
-        .sheet(isPresented: $showComposerSheet) {
+        .fullScreenCover(isPresented: $showComposerSheet) {
             PostComposerSheet {
                 Task { await loadFeedAndStories() }
             }
@@ -149,23 +139,27 @@ struct FeedView: View {
                 }
                 .padding(16)
                 .background(KinnectTheme.background.ignoresSafeArea())
-                .navigationTitle("Chỉnh sửa bài viết")
+                .navigationTitle(l10n.localized("Chỉnh sửa bài viết"))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Hủy") { editingPost = nil }
+                        Button(l10n.localized("Hủy")) { editingPost = nil }
                     }
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Lưu") {
+                        Button(l10n.localized("Lưu")) {
                             Task {
-                                _ = try? await KinnectAPIClient.shared.requestJSON(
-                                    "/api/posts/\(post.id)",
-                                    method: "PATCH",
-                                    body: ["body": editingPostText]
-                                )
-                                editingPost = nil
-                                await loadFeedAndStories()
-                                appState.showToast("Đã lưu bài viết!")
+                                do {
+                                    _ = try await KinnectAPIClient.shared.requestJSON(
+                                        "/api/posts/\(post.id)",
+                                        method: "PATCH",
+                                        body: ["body": editingPostText]
+                                    )
+                                    editingPost = nil
+                                    await loadFeedAndStories()
+                                    appState.showToast(l10n.localized("Đã lưu bài viết!"))
+                                } catch {
+                                    appState.showToast(error.localizedDescription)
+                                }
                             }
                         }
                     }
@@ -173,44 +167,48 @@ struct FeedView: View {
             }
         }
         .confirmationDialog(
-            "Ai có thể xem bài viết?",
+            l10n.localized("Ai có thể xem bài viết?"),
             isPresented: $showAudienceDialog,
             titleVisibility: .visible
         ) {
             if let p = audiencePost {
-                Button("Mọi thành viên (Công khai)") {
+                Button(l10n.localized("Mọi thành viên (Công khai)")) {
                     Task {
-                        _ = try? await KinnectAPIClient.shared.requestJSON(
-                            "/api/posts/\(p.id)",
-                            method: "PATCH",
-                            body: ["visibility": "public"]
-                        )
-                        appState.showToast("Đã đổi đối tượng xem thành Mọi thành viên.")
-                        await loadFeedAndStories()
+                        await changeAudience(post: p, visibility: "public", title: l10n.localized("Mọi thành viên"))
                     }
                 }
-                Button("Người theo dõi (Bạn bè)") {
+                Button(l10n.localized("Người theo dõi")) {
                     Task {
-                        _ = try? await KinnectAPIClient.shared.requestJSON(
-                            "/api/posts/\(p.id)",
-                            method: "PATCH",
-                            body: ["visibility": "followers"]
-                        )
-                        appState.showToast("Đã đổi đối tượng xem thành Người theo dõi.")
-                        await loadFeedAndStories()
+                        await changeAudience(post: p, visibility: "followers", title: l10n.localized("Người theo dõi"))
                     }
                 }
-                Button("Hủy", role: .cancel) {}
+                Button(l10n.localized("Hủy"), role: .cancel) {}
             }
+        }
+        .fullScreenCover(item: $selectedAuthorProfile) { user in
+            ProfileView(targetUser: user)
         }
     }
 
-    private var filteredPosts: [PostItem] {
+    private func changeAudience(post: PostItem, visibility: String, title: String) async {
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/posts/\(post.id)",
+                method: "PATCH",
+                body: ["visibility": visibility]
+            )
+            appState.showToast("Đã đổi đối tượng xem thành \(title).")
+            await loadFeedAndStories()
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+
+    private var visiblePosts: [PostItem] {
         posts.filter { post in
             guard !hiddenPostIds.contains(post.id) else { return false }
             guard !appState.blockedUserIds.contains(post.author.id) else { return false }
-            if selectedCategory == "all" { return true }
-            return post.category == selectedCategory
+            return true
         }
     }
 
@@ -238,7 +236,7 @@ struct FeedView: View {
                                 .frame(width: 22, height: 22)
                                 .overlay(KinnectIcon(glyph: .add, size: 14, selected: true, tint: .white))
                         }
-                        Text(dynamicTypeSize.isAccessibilitySize ? "Tạo\ntin" : "Tạo tin")
+                        Text(l10n.localized(dynamicTypeSize.isAccessibilitySize ? "Tạo\ntin" : "Tạo tin"))
                             .font(.caption2.weight(.semibold))
                             .foregroundColor(KinnectTheme.textPrimary)
                             .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
@@ -248,8 +246,8 @@ struct FeedView: View {
                     .padding(.horizontal, dynamicTypeSize.isAccessibilitySize ? 8 : 0)
                     .frame(width: storyCellWidth)
                 }
-                .accessibilityLabel("Tạo tin 24h mới")
-                .accessibilityHint("Nhấn đúp để mở trình tạo tin")
+                .accessibilityLabel(l10n.localized("Tạo tin 24h mới"))
+                .accessibilityHint(l10n.localized("Nhấn đúp để mở trình tạo tin"))
 
                 ForEach(stories.filter { !appState.blockedUserIds.contains($0.author.id) }) { story in
                     Button {
@@ -308,37 +306,6 @@ struct FeedView: View {
         return cleaned.isEmpty ? "Kinnect" : cleaned
     }
 
-    private var categoryFilterStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(categories) { cat in
-                    let active = (selectedCategory == cat.id)
-                    Button {
-                        selectedCategory = cat.id
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: cat.icon)
-                                .font(.caption)
-                            Text(cat.label)
-                                .font(.caption.weight(.semibold))
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(
-                            Capsule()
-                                .fill(active ? AnyShapeStyle(KinnectTheme.primaryGradient) : AnyShapeStyle(KinnectTheme.surfaceElevated))
-                        )
-                        .overlay(
-                            Capsule()
-                                .stroke(active ? Color.clear : KinnectTheme.border, lineWidth: 1)
-                        )
-                        .foregroundColor(active ? .white : KinnectTheme.textPrimary)
-                    }
-                }
-            }
-        }
-    }
-
     private var quickComposeRow: some View {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
@@ -353,7 +320,7 @@ struct FeedView: View {
                         Spacer()
                         KinnectIconButton(
                             glyph: .camera,
-                            label: "Mở Camera & Studio",
+                            label: l10n.localized("Mở Camera & Studio"),
                             tint: KinnectTheme.accentBright,
                             action: onOpenCamera
                         )
@@ -363,7 +330,7 @@ struct FeedView: View {
                         showComposerSheet = true
                     } label: {
                         HStack {
-                            Text("Đăng bài...")
+                            Text(l10n.localized("Bạn đang nghĩ gì?"))
                                 .font(.subheadline)
                                 .foregroundColor(KinnectTheme.textSecondary)
                                 .lineLimit(nil)
@@ -374,11 +341,11 @@ struct FeedView: View {
                         .padding(.vertical, 12)
                         .background(
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(KinnectTheme.surfaceElevated)
+                                .fill(Color(uiColor: .tertiarySystemGroupedBackground))
                         )
                     }
                 }
-                .kinnectCard()
+                .modifier(FeedCardStyle())
             } else {
                 HStack(spacing: 10) {
                     KinnectAvatarView(
@@ -392,7 +359,7 @@ struct FeedView: View {
                         showComposerSheet = true
                     } label: {
                         HStack {
-                            Text("Bạn đang nghĩ gì?")
+                            Text(l10n.localized("Bạn đang nghĩ gì?"))
                                 .font(.subheadline)
                                 .foregroundColor(KinnectTheme.textSecondary)
                                 .lineLimit(1)
@@ -400,17 +367,17 @@ struct FeedView: View {
                         }
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
-                        .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                        .background(Capsule().fill(Color(uiColor: .tertiarySystemGroupedBackground)))
                     }
 
                     KinnectIconButton(
                         glyph: .camera,
-                        label: "Mở Camera & Studio",
+                        label: l10n.localized("Mở Camera & Studio"),
                         tint: KinnectTheme.accentBright,
                         action: onOpenCamera
                     )
                 }
-                .kinnectCard()
+                .modifier(FeedCardStyle())
             }
         }
     }
@@ -476,17 +443,18 @@ struct FeedView: View {
                 requestId: reqId
             )
             posts.removeAll { $0.id == post.id }
-            appState.showToast("Đã xóa bài viết.")
+            appState.showToast(l10n.localized("Đã xóa bài viết."))
         } catch {
             appState.showToast(error.localizedDescription)
         }
     }
 }
 
-private struct PostCardView: View {
+struct PostCardView: View {
     let post: PostItem
     let currentUserId: String
     let isAuthorOnline: Bool
+    var onOpenAuthorProfile: (() -> Void)? = nil
     let onReact: (String) -> Void
     let onOpenComments: () -> Void
     var onEdit: (() -> Void)? = nil
@@ -495,42 +463,62 @@ private struct PostCardView: View {
     let onDelete: () -> Void
     let onReport: () -> Void
 
-    private let reactionOptions: [(key: String, emoji: String)] = [
-        ("like", "👍"),
-        ("love", "❤️"),
-        ("haha", "😆"),
-        ("wow", "😮"),
-        ("sad", "😢")
-    ]
+    @ObservedObject private var l10n = LocalizationManager.shared
+
+    private var reactionOptions: [(key: String, emoji: String, title: String)] {
+        [
+            ("like", "👍", l10n.localized("Thích")),
+            ("love", "❤️", l10n.localized("Yêu thích")),
+            ("haha", "😆", l10n.localized("Haha")),
+            ("wow", "😮", l10n.localized("Wow")),
+            ("sad", "😢", l10n.localized("Buồn")),
+            ("angry", "😡", l10n.localized("Phẫn nộ"))
+        ]
+    }
+
+    @State private var isBouncing = false
+    @State private var showReactionDock = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
-                KinnectAvatarView(
-                    name: post.author.name,
-                    avatarURL: post.author.avatarUrl,
-                    colorHex: post.author.avatarColor,
-                    size: 42,
-                    isOnline: isAuthorOnline
-                )
+                Button {
+                    onOpenAuthorProfile?()
+                } label: {
+                    KinnectAvatarView(
+                        name: post.author.name,
+                        avatarURL: post.author.avatarUrl,
+                        colorHex: post.author.avatarColor,
+                        size: 42,
+                        isOnline: isAuthorOnline
+                    )
+                }
+                .buttonStyle(.plain)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(post.author.name)
-                        .font(.subheadline.weight(.bold))
-                        .foregroundColor(KinnectTheme.textPrimary)
-                        .kinnectMultiline()
-                    HStack(spacing: 6) {
-                        Text(categoryLabel(post.category))
-                            .font(.caption2.weight(.semibold))
-                            .foregroundColor(KinnectTheme.accentBright)
-                        Text("•")
-                            .font(.caption2)
-                            .foregroundColor(KinnectTheme.textSecondary)
-                        Text(formatRelativeDate(post.createdAt))
-                            .font(.caption2)
-                            .foregroundColor(KinnectTheme.textSecondary)
+                Button {
+                    onOpenAuthorProfile?()
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(post.author.name)
+                            .font(.headline)
+                            .foregroundColor(KinnectTheme.textPrimary)
+                            .kinnectMultiline()
+                        HStack(spacing: 6) {
+                            if !post.author.handle.isEmpty {
+                                Text("@\(post.author.handle)")
+                                    .font(.caption)
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                                Text("•")
+                                    .font(.caption)
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                            }
+                            Text(formatRelativeDate(post.createdAt))
+                                .font(.caption)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        }
                     }
                 }
+                .buttonStyle(.plain)
 
                 Spacer()
 
@@ -538,31 +526,31 @@ private struct PostCardView: View {
                     if post.author.id == currentUserId {
                         if let onEdit {
                             Button(action: onEdit) {
-                                Label("Chỉnh sửa bài viết", systemImage: "pencil")
+                                Label(l10n.localized("Chỉnh sửa bài viết"), systemImage: "pencil")
                             }
                         }
                         if let onChangeAudience {
                             Button(action: onChangeAudience) {
-                                Label("Thay đổi đối tượng xem", systemImage: "globe")
+                                Label(l10n.localized("Thay đổi đối tượng xem"), systemImage: "globe")
                             }
                         }
                         if let onHide {
                             Button(action: onHide) {
-                                Label("Ẩn bài viết", systemImage: "eye.slash")
+                                Label(l10n.localized("Ẩn bài viết"), systemImage: "eye.slash")
                             }
                         }
                         Button(role: .destructive, action: onDelete) {
-                            Label("Xóa bài viết", systemImage: "trash")
+                            Label(l10n.localized("Xóa bài viết"), systemImage: "trash")
                         }
                     } else {
                         if let onHide {
                             Button(action: onHide) {
-                                Label("Ẩn bài viết", systemImage: "eye.slash")
+                                Label(l10n.localized("Ẩn bài viết"), systemImage: "eye.slash")
                             }
                         }
                         Button(role: .destructive, action: onReport) {
                             HStack {
-                                Text("Báo cáo / Chặn UGC")
+                                Text(l10n.localized("Báo cáo / Chặn UGC"))
                                 KinnectIcon(glyph: .report, size: 18, tint: KinnectTheme.danger)
                             }
                         }
@@ -572,7 +560,7 @@ private struct PostCardView: View {
                         .frame(minWidth: 44, minHeight: 44)
                         .contentShape(Rectangle())
                 }
-                .accessibilityLabel("Tùy chọn bài viết")
+                .accessibilityLabel(l10n.localized("Tùy chọn bài viết"))
             }
 
             if !post.text.isEmpty {
@@ -583,12 +571,7 @@ private struct PostCardView: View {
             }
 
             if !post.imageUrl.isEmpty {
-                KinnectRemoteImageView(
-                    rawURL: post.imageUrl,
-                    contentMode: .fill,
-                    cornerRadius: 14,
-                    maxHeight: 340
-                )
+                KinnectMediaTile(path: post.imageUrl, kind: post.mediaKind)
             }
 
             // Statistics Summary Row (Android parity: ❤️ 2 cảm xúc ... 0 bình luận)
@@ -597,35 +580,73 @@ private struct PostCardView: View {
                     HStack(spacing: 4) {
                         Text(post.liked ? reactionEmoji(for: post.userReaction) : "❤️")
                             .font(.caption)
-                        Text("\(post.likesCount) cảm xúc")
+                        Text(L10n.count(post.likesCount, vi: "cảm xúc", enSingular: "reaction", enPlural: "reactions"))
                             .font(.caption)
                             .foregroundColor(KinnectTheme.textSecondary)
                     }
                 } else {
-                    Text("Chưa có cảm xúc")
+                    Text(l10n.localized("Chưa có cảm xúc"))
                         .font(.caption)
                         .foregroundColor(KinnectTheme.textSecondary)
                 }
 
                 Spacer()
 
-                Text("\(post.commentsCount) bình luận")
+                Text(L10n.count(post.commentsCount, vi: "bình luận", enSingular: "comment", enPlural: "comments"))
                     .font(.caption)
                     .foregroundColor(KinnectTheme.textSecondary)
             }
             .padding(.top, 2)
             .padding(.bottom, 2)
 
-            Divider().background(KinnectTheme.border)
+            Divider()
+
+            if showReactionDock {
+                HStack(spacing: 8) {
+                    ForEach(reactionOptions, id: \.key) { item in
+                        Button {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            onReact(item.key)
+                            withAnimation(.spring(response: 0.25, dampingFraction: 0.6)) {
+                                showReactionDock = false
+                            }
+                        } label: {
+                            VStack(spacing: 2) {
+                                Text(item.emoji)
+                                    .font(.system(size: 26))
+                                Text(item.title)
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(KinnectTheme.textPrimary)
+                            }
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 4)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(Color(uiColor: .secondarySystemGroupedBackground))
+                        .shadow(color: Color.black.opacity(0.12), radius: 12, y: 4)
+                        .overlay(Capsule().stroke(KinnectTheme.borderSoft, lineWidth: 1))
+                )
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.8, anchor: .bottomLeading).combined(with: .opacity),
+                    removal: .scale(scale: 0.8, anchor: .bottomLeading).combined(with: .opacity)
+                ))
+                .padding(.leading, 8)
+                .zIndex(20)
+            }
 
             // Equal 3-Column Action Bar (Android parity: 33% Cảm xúc, 33% Bình luận, 33% Chia sẻ)
             HStack(spacing: 0) {
                 // Column 1: Cảm xúc (Reaction)
-                Menu {
-                    ForEach(reactionOptions, id: \.key) { item in
-                        Button("\(item.emoji) \(item.key.capitalized)") {
-                            onReact(item.key)
-                        }
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+                        showReactionDock.toggle()
                     }
                 } label: {
                     HStack(spacing: 6) {
@@ -637,40 +658,47 @@ private struct PostCardView: View {
                                 .foregroundColor(KinnectTheme.accentBright)
                         } else {
                             KinnectIcon(glyph: .reaction, size: 18, tint: KinnectTheme.textSecondary)
-                            Text("Cảm xúc")
+                            Text(l10n.localized("Cảm xúc"))
                                 .font(.caption.weight(.semibold))
                                 .foregroundColor(KinnectTheme.textSecondary)
                         }
                     }
+                    .scaleEffect(isBouncing ? 1.3 : 1.0)
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .contentShape(Rectangle())
-                } primaryAction: {
-                    onReact(post.liked ? post.userReaction : "like")
                 }
-                .accessibilityLabel("Cảm xúc")
+                .simultaneousGesture(
+                    LongPressGesture(minimumDuration: 0.25).onEnded { _ in
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+                            showReactionDock = true
+                        }
+                    }
+                )
+                .accessibilityLabel(l10n.localized("Cảm xúc"))
 
                 // Column 2: Bình luận (Comment)
                 Button(action: onOpenComments) {
                     HStack(spacing: 6) {
                         KinnectIcon(glyph: .comment, size: 18, tint: KinnectTheme.textSecondary)
-                        Text("Bình luận")
+                        Text(l10n.localized("Bình luận"))
                             .font(.caption.weight(.semibold))
                             .foregroundColor(KinnectTheme.textSecondary)
                     }
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .contentShape(Rectangle())
                 }
-                .accessibilityLabel("Bình luận")
+                .accessibilityLabel(l10n.localized("Bình luận"))
 
                 // Column 3: Chia sẻ (Share) - Native SwiftUI ShareLink (safe on iPad popover & route permalink)
                 ShareLink(
                     item: postShareURL,
                     subject: Text(shareSubject),
-                    message: Text(post.text.isEmpty ? "Xem bài viết trên Kinnect" : post.text)
+                    message: Text(post.text.isEmpty ? l10n.localized("Xem bài viết trên Kinnect") : post.text)
                 ) {
                     HStack(spacing: 6) {
                         KinnectIcon(glyph: .share, size: 18, tint: KinnectTheme.textSecondary)
-                        Text("Chia sẻ")
+                        Text(l10n.localized("Chia sẻ"))
                             .font(.caption.weight(.semibold))
                             .foregroundColor(KinnectTheme.textSecondary)
                     }
@@ -678,10 +706,10 @@ private struct PostCardView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Chia sẻ bài viết")
+                .accessibilityLabel(l10n.localized("Chia sẻ bài viết"))
             }
         }
-        .kinnectCard()
+        .modifier(FeedCardStyle())
     }
 
     private var postShareURL: URL {
@@ -690,35 +718,29 @@ private struct PostCardView: View {
     }
 
     private var shareSubject: String {
-        return "Bài viết từ \(post.author.name) trên Kinnect"
+        return L10n.isEnglish ? "Post by \(post.author.name) on Kinnect" : "Bài viết từ \(post.author.name) trên Kinnect"
     }
 
     private func reactionTitle(for key: String) -> String {
-        switch key {
-        case "love": return "Yêu thích"
-        case "haha": return "Haha"
-        case "wow": return "Wow"
-        case "sad": return "Buồn"
-        default: return "Thích"
+        switch key.lowercased() {
+        case "love": return l10n.localized("Yêu thích")
+        case "haha": return l10n.localized("Haha")
+        case "wow": return l10n.localized("Wow")
+        case "sad": return l10n.localized("Buồn")
+        case "angry": return l10n.localized("Phẫn nộ")
+        default: return l10n.localized("Thích")
         }
     }
 
     private func reactionEmoji(for key: String) -> String {
-        switch key {
+        switch key.lowercased() {
         case "love": return "❤️"
+        case "care": return "🥰"
         case "haha": return "😆"
         case "wow": return "😮"
         case "sad": return "😢"
+        case "angry": return "😡"
         default: return "👍"
-        }
-    }
-
-    private func categoryLabel(_ key: String) -> String {
-        switch key {
-        case "confessions": return "Tâm sự"
-        case "questions": return "Hỏi đáp"
-        case "events": return "Sự kiện"
-        default: return "Cộng đồng"
         }
     }
 }
@@ -727,147 +749,325 @@ struct PostComposerSheet: View {
     let onPosted: () -> Void
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
     @State private var text = ""
-    @State private var category = "community"
-    @State private var selectedPhotoItem: PhotosPickerItem?
-    @State private var imageDataURL: String = ""
+    @State private var visibility = "public"
+    @State private var photo: PhotosPickerItem?
+    @State private var video: PhotosPickerItem?
     @State private var previewImage: UIImage?
+    @State private var videoURL: URL?
+    @State private var mediaDataURL = ""
     @State private var isSubmitting = false
+    @State private var loadingMedia = false
+    @State private var showCamera = false
+    @State private var showMusic = false
+    @State private var musicTitle = ""
+    @State private var musicURL: URL?
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    Picker("Chuyên mục", selection: $category) {
-                        Text("Cộng đồng").tag("community")
-                        Text("Tâm sự").tag("confessions")
-                        Text("Hỏi đáp").tag("questions")
-                        Text("Sự kiện").tag("events")
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack(spacing: 12) {
+                        KinnectAvatarView(name: appState.currentUser?.name ?? "Bạn",
+                            avatarURL: appState.currentUser?.avatarUrl ?? "",
+                            colorHex: appState.currentUser?.avatarColor ?? "#7C3AED", size: 44)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(appState.currentUser?.name ?? "Bạn").font(.headline)
+                            Menu {
+                                Button("Mọi thành viên") { visibility = "public" }
+                                Button("Người theo dõi") { visibility = "followers" }
+                            } label: {
+                                Label(visibility == "public" ? "Mọi thành viên" : "Người theo dõi",
+                                      systemImage: visibility == "public" ? "globe" : "person.2")
+                                    .font(.caption.bold())
+                            }
+                        }
+                        Spacer()
                     }
-                    .pickerStyle(.segmented)
-
-                    TextField("Chia sẻ câu chuyện hoặc khoảnh khắc của bạn...", text: $text, axis: .vertical)
-                        .lineLimit(4...10)
-                        .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated))
-                        .foregroundColor(KinnectTheme.textPrimary)
-
+                    TextField("Bạn đang nghĩ gì?", text: $text, axis: .vertical)
+                        .font(.system(size: 18)).lineLimit(6...16)
+                        .onChange(of: text) { value in if value.count > 2000 { text = String(value.prefix(2000)) } }
+                    if loadingMedia { ProgressView("Đang chuẩn bị media…") }
                     if let previewImage {
-                        Image(uiImage: previewImage)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxHeight: 240)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                        Image(uiImage: previewImage).resizable().scaledToFit().frame(maxHeight: 360)
                     }
-
-                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                        Label("Chọn ảnh từ thư viện", systemImage: "photo.on.rectangle.angled")
-                            .font(.subheadline.weight(.semibold))
-                            .padding(12)
-                            .frame(maxWidth: .infinity)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                            .foregroundColor(KinnectTheme.accentBright)
-                    }
-                    .onChange(of: selectedPhotoItem) { newItem in
-                        guard let newItem else { return }
-                        Task {
-                            if let data = try? await newItem.loadTransferable(type: Data.self),
-                               let uiImg = UIImage(data: data),
-                               let compressed = uiImg.jpegData(compressionQuality: 0.72) {
-                                self.previewImage = uiImg
-                                self.imageDataURL = "data:image/jpeg;base64,\(compressed.base64EncodedString())"
-                            }
+                    if let videoURL {
+                        ShortClipPlayer(path: videoURL.absoluteString, active: true).frame(height: 320)
+                        Button { showMusic = true } label: {
+                            Label(musicTitle.isEmpty ? "Thêm nhạc" : musicTitle, systemImage: "music.note")
                         }
                     }
-
-                    Button {
-                        Task { await submitPost() }
-                    } label: {
-                        HStack {
-                            Spacer()
-                            if isSubmitting {
-                                ProgressView().tint(.white)
-                            } else {
-                                Text("Đăng bài viết")
-                                    .font(.headline)
-                            }
-                            Spacer()
+                    if !mediaDataURL.isEmpty || videoURL != nil {
+                        Button("Gỡ media", role: .destructive) {
+                            previewImage = nil; videoURL = nil; mediaDataURL = ""
+                            musicTitle = ""; musicURL = nil; photo = nil; video = nil
                         }
-                        .padding(.vertical, 14)
-                        .background(KinnectTheme.primaryGradient)
-                        .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
-                    .disabled(isSubmitting || (text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && imageDataURL.isEmpty))
                 }
                 .padding(16)
             }
             .background(KinnectTheme.background)
-            .navigationTitle("Tạo bài viết")
-            .navigationBarTitleDisplayMode(.inline)
+            .safeAreaInset(edge: .bottom) {
+                HStack(spacing: 0) {
+                    PhotosPicker(selection: $photo, matching: .images) {
+                        Label("Ảnh", systemImage: "photo").frame(maxWidth: .infinity, minHeight: 52)
+                    }
+                    PhotosPicker(selection: $video, matching: .videos) {
+                        Label("Video", systemImage: "video").frame(maxWidth: .infinity, minHeight: 52)
+                    }
+                    Button {
+                        if UIImagePickerController.isSourceTypeAvailable(.camera) { showCamera = true }
+                        else { appState.showToast("Thiết bị chưa có camera khả dụng.") }
+                    } label: {
+                        Label("Chụp/quay", systemImage: "camera").frame(maxWidth: .infinity, minHeight: 52)
+                    }
+                }
+                .font(.subheadline).background(KinnectTheme.surfaceElevated)
+                .disabled(loadingMedia || isSubmitting)
+            }
+            .navigationTitle("Bài viết mới").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Hủy") { dismiss() }
+                    Button { dismiss() } label: { Image(systemName: "xmark") }
+                        .accessibilityLabel("Đóng")
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(isSubmitting ? "Đang đăng…" : "Đăng") { Task { await submitPost() } }
+                        .font(.subheadline.bold())
+                        .disabled(isSubmitting || loadingMedia || (text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && mediaDataURL.isEmpty && videoURL == nil))
                 }
             }
         }
+        .onChange(of: photo) { item in
+            guard let item else { return }
+            Task {
+                loadingMedia = true
+                defer { loadingMedia = false }
+                if let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) {
+                    useImage(image)
+                } else { appState.showToast("Không đọc được ảnh đã chọn.") }
+            }
+        }
+        .onChange(of: video) { item in
+            guard let item else { return }
+            Task {
+                loadingMedia = true
+                defer { loadingMedia = false }
+                do {
+                    guard let data = try await item.loadTransferable(type: Data.self) else { return }
+                    let url = FileManager.default.temporaryDirectory.appendingPathComponent("Kinnect-Post-\(UUID().uuidString).mov")
+                    try data.write(to: url)
+                    videoURL = url; previewImage = nil; mediaDataURL = ""
+                } catch { appState.showToast(error.localizedDescription) }
+            }
+        }
+        .fullScreenCover(isPresented: $showCamera) {
+            KinnectComposerCamera { image, movie in
+                if let image { useImage(image) }
+                if let movie { videoURL = movie; previewImage = nil; mediaDataURL = "" }
+                showCamera = false
+            }
+            .ignoresSafeArea()
+        }
+        .sheet(isPresented: $showMusic) {
+            NavigationStack {
+                StudioMusicPickerSheet(selectedTrack: $musicTitle) { title, url in
+                    musicTitle = title; musicURL = url
+                }
+            }
+        }
+    }
+
+    private func useImage(_ image: UIImage) {
+        guard let data = image.jpegData(compressionQuality: 0.72), data.count <= 20 * 1024 * 1024 else {
+            appState.showToast("Ảnh vượt quá giới hạn 20 MB."); return
+        }
+        previewImage = image; videoURL = nil
+        mediaDataURL = "data:image/jpeg;base64,\(data.base64EncodedString())"
     }
 
     private func submitPost() async {
         isSubmitting = true
         defer { isSubmitting = false }
-        let reqId = "post_\(UUID().uuidString)"
         do {
-            _ = try await KinnectAPIClient.shared.requestJSON(
-                "/api/posts",
-                method: "POST",
-                body: [
-                    "text": text.trimmingCharacters(in: .whitespacesAndNewlines),
-                    "category": category,
-                    "imageUrl": imageDataURL
-                ],
-                requestId: reqId
-            )
-            onPosted()
-            dismiss()
-        } catch {
-            appState.showToast(error.localizedDescription)
-        }
+            var media = mediaDataURL
+            if let videoURL {
+                let project = StudioVideoProject(sourceURL: videoURL)
+                project.musicURL = musicURL; project.musicTitle = musicTitle
+                let output = try await project.exportVideo()
+                let data = try Data(contentsOf: output)
+                guard data.count <= 20 * 1024 * 1024 else {
+                    appState.showToast("Video vượt quá giới hạn 20 MB."); return
+                }
+                media = "data:video/mp4;base64,\(data.base64EncodedString())"
+            }
+            _ = try await KinnectAPIClient.shared.requestJSON("/api/posts", method: "POST",
+                body: KinnectWriteBody.post(text: text.trimmingCharacters(in: .whitespacesAndNewlines),
+                                           visibility: visibility, mediaDataURL: media),
+                requestId: "post_\(UUID().uuidString)")
+            onPosted(); dismiss()
+        } catch { appState.showToast(error.localizedDescription) }
     }
+}
+
+struct StoryMusicTrack: Identifiable {
+    let id: String
+    let title: String
+    let artist: String
 }
 
 struct StoryComposerSheet: View {
     let onCreated: () -> Void
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var l10n = LocalizationManager.shared
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var text = ""
     @State private var backgroundColor = "#7C3AED"
-    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var selectedMediaItem: PhotosPickerItem?
     @State private var imageDataURL = ""
     @State private var previewImage: UIImage?
+    @State private var selectedVideoName: String?
+    @State private var selectedMusic: StoryMusicTrack?
+    @State private var showMusicSheet = false
     @State private var isSubmitting = false
 
     private let colors = ["#7C3AED", "#EC4899", "#2563EB", "#059669", "#D97706"]
+    @State private var storyMusicTitle = ""
+    @State private var storyMusicURL: URL?
+    @State private var storyVideoURL: URL?
+    @State private var storyMediaLoading = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
+                    // Two prominent creation tiles (100% Android parity MainActivity lines 6140-6152: "Quay tin" & "Ảnh kèm nhạc")
+                    HStack(spacing: 12) {
+                        PhotosPicker(selection: $selectedMediaItem, matching: .videos) {
+                            VStack(spacing: 8) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.white.opacity(0.2))
+                                        .frame(width: 44, height: 44)
+                                    Image(systemName: "video.fill")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(.white)
+                                }
+                                Text("Quay tin")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(.white)
+                                Text("Camera · Nhạc · Hiệu ứng")
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.85))
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 110)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color(red: 0x83 / 255.0, green: 0x54 / 255.0, blue: 0xEF / 255.0), Color(red: 0xD9 / 255.0, green: 0x4C / 255.0, blue: 0xAE / 255.0)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 18))
+                        }
+
+                        PhotosPicker(selection: $selectedMediaItem, matching: .images) {
+                            VStack(spacing: 8) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.white.opacity(0.2))
+                                        .frame(width: 44, height: 44)
+                                    Image(systemName: "photo.fill")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(.white)
+                                }
+                                Text("Ảnh kèm nhạc")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(.white)
+                                Text("Chọn ảnh · thêm bài hát")
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.85))
+                                    .lineLimit(1)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 110)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color(red: 0x39 / 255.0, green: 0x7B / 255.0, blue: 0xE9 / 255.0), Color(red: 0x72 / 255.0, green: 0x4E / 255.0, blue: 0xE5 / 255.0)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 18))
+                        }
+                    }
+
+                    // 24-hour visibility note (Android line 6154 parity)
+                    Text("Tin hiển thị 24 giờ cho những người theo dõi bạn.")
+                        .font(.caption)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                        .multilineTextAlignment(.center)
+
+                    // Main Story Canvas Preview
                     ZStack {
                         RoundedRectangle(cornerRadius: 20)
                             .fill(Color(hex: backgroundColor))
-                            .frame(height: 260)
+                            .frame(height: 280)
 
                         if let previewImage {
                             Image(uiImage: previewImage)
                                 .resizable()
                                 .scaledToFill()
-                                .frame(height: 260)
+                                .frame(height: 280)
                                 .clipShape(RoundedRectangle(cornerRadius: 20))
+                        }
+
+                        if let storyVideoURL {
+                            ShortClipPlayer(path: storyVideoURL.absoluteString, active: true).frame(height: 280)
+                        } else if let videoName = selectedVideoName {
+                            VStack(spacing: 8) {
+                                Image(systemName: "video.circle.fill")
+                                    .font(.system(size: 48))
+                                    .foregroundColor(.white)
+                                Text(videoName)
+                                    .font(.caption.bold())
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 4)
+                                    .background(Capsule().fill(Color.black.opacity(0.5)))
+                            }
+                        }
+
+                        // Music overlay badge
+                        if let music = selectedMusic {
+                            VStack {
+                                HStack {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "music.note")
+                                            .font(.caption.bold())
+                                        Text(music.artist.isEmpty ? music.title : "\(music.title) — \(music.artist)")
+                                            .font(.caption.bold())
+                                            .lineLimit(1)
+                                        Button {
+                                            selectedMusic = nil
+                                            storyMusicTitle = ""
+                                            storyMusicURL = nil
+                                        } label: {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .font(.caption)
+                                        }
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(Capsule().fill(Color.black.opacity(0.65)))
+                                    .foregroundColor(.white)
+
+                                    Spacer()
+                                }
+                                .padding(12)
+                                Spacer()
+                            }
                         }
 
                         TextField("Nhập nội dung tin 24h...", text: $text, axis: .vertical)
@@ -875,8 +1075,11 @@ struct StoryComposerSheet: View {
                             .multilineTextAlignment(.center)
                             .foregroundColor(.white)
                             .padding(20)
+                            .background(previewImage != nil || selectedVideoName != nil ? Color.black.opacity(0.4) : Color.clear)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
 
+                    // Color Palette Selector
                     HStack(spacing: 12) {
                         ForEach(colors, id: \.self) { hex in
                             Circle()
@@ -891,22 +1094,50 @@ struct StoryComposerSheet: View {
                         }
                     }
 
-                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                        Label("Chọn ảnh cho Tin", systemImage: "photo")
-                            .font(.subheadline.weight(.semibold))
-                            .padding(12)
-                            .frame(maxWidth: .infinity)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                            .foregroundColor(KinnectTheme.accentBright)
+                    Button { showMusicSheet = true } label: {
+                        Label(storyMusicTitle.isEmpty ? "Thêm nhạc" : storyMusicTitle, systemImage: "music.note")
+                            .frame(maxWidth: .infinity, minHeight: 44)
                     }
-                    .onChange(of: selectedPhotoItem) { item in
+                    .disabled(isSubmitting || storyMediaLoading)
+                    if storyMediaLoading { ProgressView("Đang chuẩn bị media…") }
+
+                    // Photo/Video Picker Button
+                    PhotosPicker(selection: $selectedMediaItem, matching: .any(of: [.images, .videos])) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "photo.on.rectangle.angled")
+                            Text("Chọn ảnh hoặc video từ máy")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .padding(12)
+                        .frame(maxWidth: .infinity)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                        .foregroundColor(KinnectTheme.accentBright)
+                    }
+                    .onChange(of: selectedMediaItem) { item in
                         guard let item else { return }
                         Task {
-                            if let data = try? await item.loadTransferable(type: Data.self),
-                               let uiImg = UIImage(data: data),
-                               let jpeg = uiImg.jpegData(compressionQuality: 0.72) {
-                                previewImage = uiImg
-                                imageDataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
+                            storyMediaLoading = true
+                            defer { storyMediaLoading = false }
+                            if let data = try? await item.loadTransferable(type: Data.self) {
+                                if let uiImg = UIImage(data: data),
+                                   let jpeg = uiImg.jpegData(compressionQuality: 0.72) {
+                                    guard jpeg.count <= 20 * 1024 * 1024 else {
+                                        appState.showToast("Ảnh vượt quá giới hạn 20 MB."); return
+                                    }
+                                    previewImage = uiImg
+                                    selectedVideoName = nil
+                                    storyVideoURL = nil
+                                    imageDataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
+                                } else {
+                                    do {
+                                        let url = FileManager.default.temporaryDirectory.appendingPathComponent("Kinnect-Story-\(UUID().uuidString).mov")
+                                        try data.write(to: url)
+                                        storyVideoURL = url
+                                        previewImage = nil
+                                        selectedVideoName = "Đã chọn video 24h (\(data.count / 1024 / 1024) MB)"
+                                        imageDataURL = "data:video/mp4;base64,\(data.base64EncodedString())"
+                                    } catch { appState.showToast(error.localizedDescription) }
+                                }
                             }
                         }
                     }
@@ -929,16 +1160,25 @@ struct StoryComposerSheet: View {
                         .foregroundColor(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
-                    .disabled(isSubmitting || (text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && imageDataURL.isEmpty))
+                    .disabled(isSubmitting || storyMediaLoading || (text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && imageDataURL.isEmpty))
                 }
                 .padding(16)
             }
             .background(KinnectTheme.background)
-            .navigationTitle("Tạo Tin")
+            .navigationTitle("Tạo tin")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Đóng") { dismiss() }
+                }
+            }
+            .sheet(isPresented: $showMusicSheet) {
+                NavigationStack {
+                    StudioMusicPickerSheet(selectedTrack: $storyMusicTitle) { title, url in
+                        selectedMusic = title.isEmpty ? nil : StoryMusicTrack(id: url?.absoluteString ?? title, title: title, artist: "")
+                        storyMusicTitle = title
+                        storyMusicURL = url
+                    }
                 }
             }
         }
@@ -949,14 +1189,30 @@ struct StoryComposerSheet: View {
         defer { isSubmitting = false }
         let reqId = "story_\(UUID().uuidString)"
         do {
+            var media = imageDataURL
+            let source: URL?
+            if let storyVideoURL { source = storyVideoURL }
+            else if storyMusicURL != nil, let previewImage { source = try await KinnectStillVideo.make(image: previewImage) }
+            else { source = nil }
+            if storyMusicURL != nil && source == nil {
+                throw KinnectAPIError.serverMessage("Chọn ảnh hoặc video để ghép nhạc.")
+            }
+            if let source {
+                let project = StudioVideoProject(sourceURL: source)
+                project.musicURL = storyMusicURL
+                let output = try await project.exportVideo()
+                let data = try Data(contentsOf: output)
+                guard data.count <= 20 * 1024 * 1024 else { throw KinnectAPIError.serverMessage("Tin vượt quá giới hạn 20 MB.") }
+                media = "data:video/mp4;base64,\(data.base64EncodedString())"
+            }
             _ = try await KinnectAPIClient.shared.requestJSON(
                 "/api/stories",
                 method: "POST",
-                body: [
-                    "text": text.trimmingCharacters(in: .whitespacesAndNewlines),
-                    "imageUrl": imageDataURL,
-                    "backgroundColor": backgroundColor
-                ],
+                body: KinnectWriteBody.story(
+                    text: text.trimmingCharacters(in: .whitespacesAndNewlines),
+                    colorHex: backgroundColor,
+                    mediaDataURL: media
+                ),
                 requestId: reqId
             )
             onCreated()
@@ -971,6 +1227,7 @@ struct StoryDetailSheet: View {
     let story: StoryItem
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var l10n = LocalizationManager.shared
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var viewers: [KinnectUser] = []
 
@@ -1001,12 +1258,7 @@ struct StoryDetailSheet: View {
                         .frame(maxWidth: .infinity, minHeight: 340)
 
                     if !story.imageUrl.isEmpty {
-                        KinnectRemoteImageView(
-                            rawURL: story.imageUrl,
-                            contentMode: .fit,
-                            cornerRadius: 22,
-                            maxHeight: 380
-                        )
+                        KinnectMediaTile(path: story.imageUrl, kind: story.mediaKind)
                     }
 
                     if !story.text.isEmpty {
@@ -1087,53 +1339,132 @@ struct PostCommentsSheet: View {
     let onChanged: () -> Void
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var l10n = LocalizationManager.shared
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var comments: [CommentItem] = []
     @State private var newComment = ""
+    @State private var pendingCommentReactions: Set<String> = []
+    @State private var replyingTo: CommentItem? = nil
     @State private var isLoading = false
+
+    private let quickEmojis = ["😍", "😂", "🔥", "👏", "🥰", "😮", "😢", "💜"]
+
+    private let commentReactionOptions: [(key: String, emoji: String, title: String)] = [
+        ("like", "??", "Th?ch"), ("love", "??", "Y?u th?ch"),
+        ("haha", "??", "Haha"), ("wow", "??", "Wow"),
+        ("sad", "??", "Bu?n"), ("angry", "??", "Ph?n n?")
+    ]
+
+    private struct CommentRow: Identifiable {
+        let comment: CommentItem
+        let depth: Int
+        let parentAuthorName: String?
+        var id: String { comment.id }
+    }
+
+    private var commentRows: [CommentRow] {
+        let ids = Set(comments.map { $0.id })
+        let children = Dictionary(grouping: comments, by: { $0.parentId ?? "" })
+        var visited = Set<String>()
+        var rows: [CommentRow] = []
+        func appendThread(_ start: CommentItem) {
+            var stack: [(CommentItem, Int, String?)] = [(start, 0, nil)]
+            while let (comment, depth, parentName) = stack.popLast() {
+                guard visited.insert(comment.id).inserted else { continue }
+                rows.append(CommentRow(comment: comment, depth: depth, parentAuthorName: parentName))
+                for child in (children[comment.id] ?? []).reversed() {
+                    stack.append((child, depth + 1, comment.author.name))
+                }
+            }
+        }
+        for comment in comments where comment.parentId == nil || !ids.contains(comment.parentId ?? "") {
+            appendThread(comment)
+        }
+        // Also render malformed cycles once, without recursive SwiftUI views.
+        for comment in comments where !visited.contains(comment.id) {
+            appendThread(comment)
+        }
+        return rows
+    }
+
+    private func replyRoot(for comment: CommentItem) -> CommentItem {
+        var root = comment
+        var visited: Set<String> = [comment.id]
+        while let parentId = root.parentId,
+              let parent = comments.first(where: { $0.id == parentId }),
+              visited.insert(parent.id).inserted {
+            root = parent
+        }
+        return root
+    }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                List {
-                    ForEach(comments) { c in
-                        HStack(alignment: .top, spacing: 10) {
-                            KinnectAvatarView(
-                                name: c.author.name,
-                                avatarURL: c.author.avatarUrl,
-                                colorHex: c.author.avatarColor,
-                                size: 34
-                            )
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text(c.author.name)
-                                        .font(.caption.bold())
-                                        .foregroundColor(KinnectTheme.textPrimary)
-                                    Spacer()
-                                    if c.author.id == appState.currentUser?.id {
-                                        Button(role: .destructive) {
-                                            Task { await deleteComment(c) }
-                                        } label: {
-                                            Image(systemName: "trash")
-                                                .font(.caption)
-                                        }
-                                    }
-                                }
-                                Text(c.text)
-                                    .font(.subheadline)
-                                    .foregroundColor(KinnectTheme.textPrimary)
-                                    .kinnectMultiline()
+                if comments.isEmpty && !isLoading {
+                    VStack(spacing: 8) {
+                        Spacer()
+                        KinnectIcon(glyph: .comment, size: 36, tint: KinnectTheme.textSecondary)
+                        Text("Chưa có bình luận nào")
+                            .font(.subheadline.bold())
+                            .foregroundColor(KinnectTheme.textPrimary)
+                        Text("Hãy là người đầu tiên để lại bình luận!")
+                            .font(.caption)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    List {
+                        ForEach(commentRows) { row in
+                            commentRowView(row.comment, depth: min(row.depth, 1), parentAuthorName: row.parentAuthorName)
+                        }
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                }
+
+                // Quick emoji reaction bar
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(quickEmojis, id: \.self) { emoji in
+                            Button {
+                                newComment.append(emoji)
+                            } label: {
+                                Text(emoji)
+                                    .font(.title3)
+                                    .frame(minWidth: 32, minHeight: 32)
                             }
                         }
-                        .listRowBackground(KinnectTheme.surface)
                     }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 4)
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
+                .background(KinnectTheme.surface)
 
-                HStack(spacing: 10) {
-                    TextField("Viết bình luận...", text: $newComment)
+                // Replying banner
+                if let replying = replyingTo {
+                    HStack {
+                        Text("Đang trả lời \(replying.author.name) • Chạm để huỷ")
+                            .font(.caption)
+                            .foregroundColor(KinnectTheme.accentBright)
+                        Spacer()
+                        Button {
+                            replyingTo = nil
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 6)
+                    .background(KinnectTheme.surfaceElevated)
+                }
+
+                HStack(spacing: 8) {
+                    TextField(replyingTo != nil ? "Trả lời \(replyingTo!.author.name)..." : "Viết bình luận...", text: $newComment)
                         .padding(10)
                         .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
                         .foregroundColor(.white)
@@ -1166,6 +1497,133 @@ struct PostCommentsSheet: View {
         }
     }
 
+    private func commentRowView(_ c: CommentItem, depth: Int, parentAuthorName: String? = nil) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            if depth > 0 {
+                Image(systemName: "arrow.turn.down.right")
+                    .font(.caption2.bold())
+                    .foregroundColor(KinnectTheme.textSecondary)
+                    .padding(.top, 6)
+            }
+
+            KinnectAvatarView(
+                name: c.author.name,
+                avatarURL: c.author.avatarUrl,
+                colorHex: c.author.avatarColor,
+                size: depth > 0 ? 28 : 34
+            )
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(c.author.name)
+                        .font(.caption.bold())
+                        .foregroundColor(KinnectTheme.textPrimary)
+
+                    if let parent = parentAuthorName, depth > 0 {
+                        Text("▸ \(parent)")
+                            .font(.caption2)
+                            .foregroundColor(KinnectTheme.accentBright)
+                    }
+
+                    Spacer()
+
+                    if c.author.id == appState.currentUser?.id {
+                        Button(role: .destructive) {
+                            Task { await deleteComment(c) }
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.caption)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                Text(c.text)
+                    .font(.subheadline)
+                    .foregroundColor(KinnectTheme.textPrimary)
+                    .kinnectMultiline()
+
+                // Action bar: Trả lời, Thả cảm xúc, Thời gian
+                HStack(spacing: 14) {
+                    Button {
+                        replyingTo = replyRoot(for: c)
+                    } label: {
+                        Text("Trả lời")
+                            .font(.caption2.bold())
+                            .foregroundColor(KinnectTheme.accentBright)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        setCommentReaction(c, reaction: c.liked ? nil : "like")
+                    } label: {
+                        HStack(spacing: 3) {
+                            Text(commentReactionOptions.first(where: { $0.key == c.myReaction })?.emoji ?? "?")
+                                .font(.caption2)
+                                .foregroundColor(c.liked ? KinnectTheme.danger : KinnectTheme.textSecondary)
+                            if c.likesCount > 0 {
+                                Text("\(c.likesCount)")
+                                    .font(.caption2)
+                                    .foregroundColor(c.liked ? KinnectTheme.danger : KinnectTheme.textSecondary)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+
+                    .disabled(pendingCommentReactions.contains(c.id))
+                    .contextMenu {
+                        ForEach(commentReactionOptions, id: \.key) { option in
+                            Button {
+                                setCommentReaction(c, reaction: option.key)
+                            } label: {
+                                Text("\(option.emoji) \(option.title)")
+                            }
+                        }
+                        if c.liked {
+                            Button("G? c?m x?c", role: .destructive) {
+                                setCommentReaction(c, reaction: nil)
+                            }
+                        }
+                    }
+                    .accessibilityLabel("C?m x?c b?nh lu?n")
+                    .accessibilityHint("Nh?n gi? ?? ch?n m?t trong s?u c?m x?c")
+
+                    Text(formatRelativeDate(c.createdAt))
+                        .font(.caption2)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                }
+                .padding(.top, 2)
+            }
+        }
+        .padding(.leading, CGFloat(depth * 24))
+        .listRowBackground(KinnectTheme.surface)
+    }
+
+    private func setCommentReaction(_ item: CommentItem, reaction: String?) {
+        guard !pendingCommentReactions.contains(item.id) else { return }
+        pendingCommentReactions.insert(item.id)
+        Task {
+            defer { pendingCommentReactions.remove(item.id) }
+            do {
+                let response = try await KinnectAPIClient.shared.requestJSON(
+                    "/api/posts/\(post.id)/comments/\(item.id)/reaction",
+                    method: "POST",
+                    body: ["reaction": reaction.map { $0 as Any } ?? NSNull()]
+                )
+                if let updated = response["comment"] as? [String: Any],
+                   let idx = comments.firstIndex(where: { $0.id == item.id }) {
+                    var updatedComment = CommentItem.from(updated)
+                    updatedComment.author = comments[idx].author
+                    comments[idx] = updatedComment
+                }
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            } catch {
+                appState.showToast(error.localizedDescription)
+            }
+        }
+    }
+
     private func loadComments() async {
         isLoading = true
         defer { isLoading = false }
@@ -1178,13 +1636,39 @@ struct PostCommentsSheet: View {
     private func sendComment() async {
         let clean = newComment.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty else { return }
+        let draft = newComment
         newComment = ""
+        let replyTarget = replyingTo
+        let parent = replyTarget?.id
+        replyingTo = nil
         let reqId = "comment_\(post.id)_\(UUID().uuidString)"
         do {
+            var bodyDict: [String: Any] = ["body": clean]
+            if let parent = parent {
+                bodyDict["parentId"] = parent
+            }
             _ = try await KinnectAPIClient.shared.requestJSON(
                 "/api/posts/\(post.id)/comments",
                 method: "POST",
-                body: ["text": clean],
+                body: bodyDict,
+                requestId: reqId
+            )
+            await loadComments()
+            onChanged()
+        } catch {
+            newComment = draft
+            replyingTo = replyTarget
+            appState.showToast(error.localizedDescription)
+        }
+    }
+
+    private func deleteComment(_ item: CommentItem) async {
+        let reqId = "del_comment_\(item.id)"
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/posts/\(post.id)/comments/\(item.id)",
+                method: "DELETE",
+                body: [:],
                 requestId: reqId
             )
             await loadComments()
@@ -1193,29 +1677,29 @@ struct PostCommentsSheet: View {
             appState.showToast(error.localizedDescription)
         }
     }
-
-    private func deleteComment(_ item: CommentItem) async {
-        let reqId = "del_comment_\(item.id)"
-        _ = try? await KinnectAPIClient.shared.requestJSON(
-            "/api/posts/\(post.id)/comments/\(item.id)",
-            method: "DELETE",
-            body: [:],
-            requestId: reqId
-        )
-        await loadComments()
-        onChanged()
-    }
 }
 
 func formatRelativeDate(_ iso: String) -> String {
-    guard !iso.isEmpty else { return "Vừa xong" }
+    guard !iso.isEmpty else { return L10n.tr("Vừa xong") }
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     let date = formatter.date(from: iso) ?? ISO8601DateFormatter().date(from: iso)
-    guard let date else { return "Gần đây" }
+    guard let date else { return L10n.tr("Gần đây") }
     let rel = RelativeDateTimeFormatter()
-    rel.locale = Locale(identifier: "vi_VN")
+    rel.locale = L10n.isEnglish ? Locale(identifier: "en_US") : Locale(identifier: "vi_VN")
     rel.unitsStyle = .short
     return rel.localizedString(for: date, relativeTo: Date())
 }
 
+
+// Feed-only styling keeps the rest of the app's card appearance unchanged.
+private struct FeedCardStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color(uiColor: .secondarySystemGroupedBackground))
+            )
+    }
+}

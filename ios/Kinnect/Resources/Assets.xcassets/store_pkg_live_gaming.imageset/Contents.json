@@ -1,0 +1,23 @@
+{
+  "info": {
+    "author": "xcode",
+    "version": 1
+  },
+  "images": [
+    {
+      "filename": "store_pkg_live_gaming@1x.png",
+      "idiom": "universal",
+      "scale": "1x"
+    },
+    {
+      "filename": "store_pkg_live_gaming@2x.png",
+      "idiom": "universal",
+      "scale": "2x"
+    },
+    {
+      "filename": "store_pkg_live_gaming@3x.png",
+      "idiom": "universal",
+      "scale": "3x"
+    }
+  ]
+}

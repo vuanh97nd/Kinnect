@@ -1,0 +1,18 @@
+{
+  "info": {
+    "author": "xcode",
+    "version": 1
+  },
+  "images": [
+    {
+      "filename": "sticker_rainbow_paint-256.png",
+      "idiom": "universal",
+      "scale": "1x"
+    },
+    {
+      "filename": "sticker_rainbow_paint-512.png",
+      "idiom": "universal",
+      "scale": "2x"
+    }
+  ]
+}

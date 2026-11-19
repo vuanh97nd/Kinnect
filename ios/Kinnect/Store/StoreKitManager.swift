@@ -88,10 +88,13 @@ final class StoreKitManager: ObservableObject {
         isPurchasing = true
         defer { isPurchasing = false }
 
-        var options: Set<Product.PurchaseOption> = []
-        if let accountUuid = accountUuid {
-            options.insert(.appAccountToken(accountUuid))
+        let state = try await KinnectAPIClient.shared.requestJSON("/api/store")
+        guard state["appleBillingReady"] as? Bool == true,
+              let raw = state["accountUuid"] as? String, let serverAccount = UUID(uuidString: raw) else {
+            throw KinnectAPIError.serverMessage("App Store chưa mở thanh toán cho tài khoản này.")
         }
+        // Always bind purchases to the server's authenticated account, including callers without a UUID.
+        let options: Set<Product.PurchaseOption> = [.appAccountToken(serverAccount)]
 
         let purchaseResult = try await product.purchase(options: options)
         switch purchaseResult {
@@ -116,7 +119,10 @@ final class StoreKitManager: ObservableObject {
         transaction: Transaction
     ) async throws -> [String: Any] {
         let jws = result.jwsRepresentation
-        let token = jws.isEmpty ? String(transaction.id) : jws
+        guard !jws.isEmpty else {
+            throw KinnectAPIError.serverMessage("Thiếu chữ ký giao dịch Apple.")
+        }
+        let token = jws
         let requestId = "storekit_\(transaction.id)"
 
         let response = try await KinnectAPIClient.shared.requestJSON(
@@ -132,6 +138,9 @@ final class StoreKitManager: ObservableObject {
             requestId: requestId
         )
 
+        guard let state = response["state"] as? String, ["PURCHASED", "CANCELLED"].contains(state) else {
+            throw KinnectAPIError.serverMessage("Máy chủ chưa xác nhận giao dịch Apple.")
+        }
         await transaction.finish()
         return response
     }

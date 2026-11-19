@@ -1,0 +1,18 @@
+{
+  "info": {
+    "author": "xcode",
+    "version": 1
+  },
+  "images": [
+    {
+      "filename": "sticker_party_hat-256.png",
+      "idiom": "universal",
+      "scale": "1x"
+    },
+    {
+      "filename": "sticker_party_hat-512.png",
+      "idiom": "universal",
+      "scale": "2x"
+    }
+  ]
+}

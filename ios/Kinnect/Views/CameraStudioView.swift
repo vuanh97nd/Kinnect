@@ -5,6 +5,17 @@ import CoreImage.CIFilterBuiltins
 import PhotosUI
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
+
+enum StudioEditTool: String, CaseIterable, Identifiable {
+    case crop = "Cắt & xoay"
+    case color = "Điều chỉnh"
+    case beauty = "Làm mịn"
+    case audio = "Âm thanh"
+    case filters = "Bộ lọc Pro"
+
+    var id: String { rawValue }
+}
 
 struct CameraStudioView: View {
     @Environment(\.dismiss) private var dismiss
@@ -22,6 +33,12 @@ struct CameraStudioView: View {
         case story = "Tin 24h"
     }
 
+    enum CreativeTool: String, CaseIterable {
+        case filters = "Bộ lọc"
+        case beauty = "Làm đẹp"
+        case stickers = "Sticker"
+    }
+
     // Camera / Capture State
     @StateObject private var cameraController = CameraCaptureController()
     @State private var captureMode: CaptureMode = .photo
@@ -30,10 +47,96 @@ struct CameraStudioView: View {
     @State private var isFlashOn = false
     @State private var showMusicPickerSheet = false
     @State private var selectedMusicTrack = ""
+    @State private var selectedMusicURL: URL?
     @State private var showStudioProSheet = false
     @State private var showCreateLiveSheet = false
     @State private var studioProAppliedEffect = "Bộ lọc gốc"
     @State private var isUploading = false
+
+    // Creative Tool State (Web & Android Parity)
+    @State private var selectedCreativeTool: CreativeTool? = nil
+    @State private var activeFilter: String = "none"
+    @State private var filterIntensity: Double = 0.8
+    @State private var activeSticker: String = "none"
+    @State private var beautyValues: [String: Double] = [
+        "smooth": 0.5,
+        "whiten": 0.3,
+        "slim": 0.2,
+        "eyes": 0.2,
+        "lips": 0.3,
+        "blemish": 0.5,
+        "blush": 0.2
+    ]
+    @State private var activeBeautyKey: String = "smooth"
+
+    static let filterPresets: [(id: String, name: String)] = [
+        ("none", "Gốc"),
+        ("clear", "Trong trẻo"),
+        ("milk", "Sữa"),
+        ("peach", "Hồng đào"),
+        ("warm", "Ấm áp"),
+        ("cool", "Mát lạnh"),
+        ("film", "Phim cũ"),
+        ("mono", "Đen trắng"),
+        ("vivid", "Rực rỡ"),
+        ("sunset", "Hoàng hôn"),
+        ("candy", "Kẹo ngọt"),
+        ("mint", "Bạc hà"),
+        ("dream", "Mộng mơ"),
+        ("retro", "Retro"),
+        ("cinema", "Cinema"),
+        ("rose", "Rose"),
+        ("golden", "Golden"),
+        ("ice", "Ice"),
+        ("teal", "Teal"),
+        ("teal_orange", "Teal & Cam"),
+        ("cyberpunk", "Cyberpunk"),
+        ("vintage", "Vintage"),
+        ("drama", "Kịch tính"),
+        ("noir", "Noir"),
+        ("beauty_glow", "Glow sáng")
+    ]
+
+    static let beautyTools: [(key: String, title: String, icon: String)] = [
+        ("smooth", "Mịn da", "sparkles"),
+        ("whiten", "Sáng da", "sun.max.fill"),
+        ("slim", "Gọn mặt", "face.dashed"),
+        ("eyes", "Mắt to", "eye.fill"),
+        ("lips", "Môi đầy", "mouth.fill"),
+        ("blemish", "Giảm đốm", "wand.and.stars"),
+        ("blush", "Má hồng", "heart.fill")
+    ]
+
+    static let stickers: [(id: String, name: String, emoji: String)] = [
+        ("none", "Không", "🚫"),
+        ("glasses", "Kính râm", "🕶️"),
+        ("bunny", "Tai thỏ", "🐰"),
+        ("cat", "Tai mèo", "🐱"),
+        ("dog", "Cún con", "🐶"),
+        ("crown", "Vương miện", "👑"),
+        ("flowers", "Vòng hoa", "🌸"),
+        ("bow", "Nơ xinh", "🎀"),
+        ("freckles", "Tàn nhang", "🤎"),
+        ("hearts", "Tim bay", "💕"),
+        ("sparkle", "Lấp lánh", "✨"),
+        ("stars", "Sao xoay", "⭐"),
+        ("round_glasses", "Kính tròn", "👓"),
+        ("heart_glasses", "Kính tim", "💗"),
+        ("butterfly", "Bướm", "🦋"),
+        ("halo", "Thiên thần", "😇"),
+        ("rainbow", "Cầu vồng", "🌈"),
+        ("bubbles", "Bong bóng", "🫧"),
+        ("snow", "Tuyết", "❄️"),
+        ("confetti", "Lễ hội", "🎉"),
+        ("devil", "Tiểu quỷ", "😈"),
+        ("mask", "Mặt nạ", "🎭"),
+        ("fire", "Hào quang", "🔥"),
+        ("music", "Nốt nhạc", "🎵"),
+        ("party", "Mũ tiệc", "🥳"),
+        ("pixel", "Pixel", "👾"),
+        ("retro", "Cổ điển", "🕶️"),
+        ("blush", "Má hồng", "☺️")
+    ]
 
     // Media Data
     @State private var originalImage: UIImage?
@@ -44,11 +147,33 @@ struct CameraStudioView: View {
     @State private var title = ""
     @State private var caption = ""
 
+    // Studio Pro Project Models (Real Photo & Video Editors)
+    @StateObject private var photoProject = StudioPhotoProject(originalImage: UIImage())
+    @State private var videoProject: StudioVideoProject? = nil
+    @State private var selectedTool: StudioEditTool = .color
+    @State private var isComparingOriginal = false
+    @State private var videoCompositionRevision = UUID().uuidString
+
+    private var isVideoActive: Bool {
+        capturedVideoTempURL != nil || !videoDataURL.isEmpty || UIReviewFixture.activeScreen == "camera-studio-video-edit"
+    }
+
     // Pickers
     @State private var selectedLibraryItem: PhotosPickerItem?
+    var onClose: (() -> Void)? = nil
 
-    init(initialMode: CaptureMode = .photo) {
+    init(initialMode: CaptureMode = .photo, onClose: (() -> Void)? = nil) {
         _captureMode = State(initialValue: initialMode)
+        self.onClose = onClose
+    }
+
+    private func closeCameraView() {
+        cameraController.stop()
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
+        }
     }
 
     var body: some View {
@@ -64,17 +189,34 @@ struct CameraStudioView: View {
         .background(KinnectTheme.background)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
+            Task {
+                _ = await MediaPermissionHandler.shared.requestCameraAccess()
+                _ = await MediaPermissionHandler.shared.requestMicrophoneAccess()
+                cameraController.configureIfAuthorized()
+                cameraController.start()
+            }
             cameraController.onCapturedImage = { uiImg in
                 self.originalImage = uiImg
-                self.previewImage = uiImg
+                self.photoProject.originalImage = uiImg
+                self.photoProject.resetAll()
+                self.previewImage = self.photoProject.render(maxDimension: 900)
                 self.target = .feedPost
-                if let jpeg = uiImg.jpegData(compressionQuality: 0.75) {
+                if let jpeg = (self.previewImage ?? uiImg).jpegData(compressionQuality: 0.85) {
                     self.imageDataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
                 }
             }
             cameraController.onCapturedVideoData = { data, tempURL in
                 self.capturedVideoTempURL = tempURL
+                self.previewImage = nil
+                self.originalImage = nil
                 self.target = .shortVideo
+                let vp = StudioVideoProject(sourceURL: tempURL)
+                if !self.selectedMusicTrack.isEmpty {
+                    vp.musicTitle = self.selectedMusicTrack
+                    vp.musicURL = self.selectedMusicURL
+                }
+                self.videoProject = vp
+                self.syncVideoProjectSliders(to: vp)
                 if data.count > 8 * 1024 * 1024 {
                     appState.showToast("Video vượt quá giới hạn 8MB của máy chủ.")
                 } else {
@@ -88,8 +230,14 @@ struct CameraStudioView: View {
                 target = .shortVideo
                 title = "Video ngắn Kinnect Shorts"
                 caption = "Video ngắn quay bằng Camera Studio và phát qua AVPlayer native."
+                selectedMusicTrack = "Lofi Chill Sài Gòn"
                 if let movieURL = UIReviewFixture.samplePlayableVideoURL() {
                     self.capturedVideoTempURL = movieURL
+                    let vp = StudioVideoProject(sourceURL: movieURL)
+                    vp.musicTitle = "Lofi Chill Sài Gòn"
+                    vp.musicVolume = 0.8
+                    vp.originalAudioVolume = 1.0
+                    self.videoProject = vp
                     if let d = try? Data(contentsOf: movieURL) {
                         self.videoDataURL = "data:video/mp4;base64,\(d.base64EncodedString())"
                     }
@@ -98,13 +246,26 @@ struct CameraStudioView: View {
             if UIReviewFixture.activeScreen == "camera-studio-edit" && previewImage == nil {
                 let sample = UIReviewFixture.samplePreviewImage()
                 originalImage = sample
-                previewImage = sample
+                photoProject.originalImage = sample
+                photoProject.resetAll()
+                previewImage = photoProject.render(maxDimension: 900)
                 caption = "[Fixture UI] Kiểm thử bảng chỉnh sửa Kinnect Studio với nút Lưu tách riêng."
             }
         }
+        .onDisappear {
+            cameraController.stop()
+        }
         .sheet(isPresented: $showMusicPickerSheet) {
             NavigationStack {
-                StudioMusicPickerSheet(selectedTrack: $selectedMusicTrack)
+                StudioMusicPickerSheet(
+                    selectedTrack: $selectedMusicTrack,
+                    onSelectTrack: { title, url in
+                        selectedMusicTrack = title
+                        selectedMusicURL = url
+                        videoProject?.musicTitle = title
+                        videoProject?.musicURL = url
+                    }
+                )
             }
         }
         .sheet(isPresented: $showStudioProSheet) {
@@ -113,10 +274,13 @@ struct CameraStudioView: View {
                     appliedEffect: $studioProAppliedEffect,
                     onApply: { effect in
                         studioProAppliedEffect = effect
-                        if let base = originalImage {
+                        if let pack = StudioProPack.allCases.first(where: { $0.rawValue == effect }) {
+                            photoProject.proPack = pack
+                            updatePhotoPreview()
+                        } else if let base = originalImage {
                             let filtered = applyProFilter(named: effect, to: base)
                             self.previewImage = filtered
-                            if let jpeg = filtered.jpegData(compressionQuality: 0.75) {
+                            if let jpeg = filtered.jpegData(compressionQuality: 0.85) {
                                 self.imageDataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
                             }
                         }
@@ -126,7 +290,9 @@ struct CameraStudioView: View {
             }
         }
         .sheet(isPresented: $showCreateLiveSheet) {
-            CreateLiveRoomSheet()
+            CreateLiveRoomSheet(onStarted: {
+                closeCameraView()
+            })
         }
     }
 
@@ -141,11 +307,63 @@ struct CameraStudioView: View {
             )
             .ignoresSafeArea()
 
+            // AR Face Sticker Overlay on Camera Viewfinder (Web & Android Parity)
+            if activeSticker != "none", let s = Self.stickers.first(where: { $0.id == activeSticker }) {
+                if let img = stickerImage(for: s.id) {
+                    Image(uiImage: img)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 140, height: 140)
+                        .shadow(color: .black.opacity(0.4), radius: 8, x: 0, y: 4)
+                        .offset(y: stickerOffset(for: activeSticker))
+                        .transition(.scale.combined(with: .opacity))
+                        .allowsHitTesting(false)
+                } else {
+                    Text(s.emoji)
+                        .font(.system(size: 96))
+                        .shadow(color: .black.opacity(0.4), radius: 8, x: 0, y: 4)
+                        .offset(y: stickerOffset(for: activeSticker))
+                        .transition(.scale.combined(with: .opacity))
+                        .allowsHitTesting(false)
+                }
+            }
+
+            if cameraController.isPermissionDenied {
+                VStack(spacing: 16) {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 48))
+                        .foregroundColor(.white.opacity(0.85))
+                    Text("Cần quyền truy cập Camera")
+                        .font(.headline.weight(.bold))
+                        .foregroundColor(.white)
+                    Text("Vui lòng cấp quyền Camera và Micro trong Cài đặt iPhone để chụp ảnh, quay video và phát trực tiếp.")
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                    Button {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    } label: {
+                        Text("Mở Cài đặt iPhone")
+                            .font(.body.weight(.semibold))
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
+                            .background(Capsule().fill(Color.white))
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black.opacity(0.85))
+                .zIndex(15)
+            }
+
             VStack(spacing: 0) {
                 // Top Camera Chrome: Close, Aspect ratio 9:16, Music, Flash
                 HStack(spacing: 16) {
                     KinnectIconButton(glyph: .close, label: "Thoát Camera", tint: .white) {
-                        dismiss()
+                        closeCameraView()
                     }
 
                     Spacer()
@@ -193,6 +411,38 @@ struct CameraStudioView: View {
 
                 // Bottom Controls: Library Picker, Shutter, Mode Selector
                 VStack(spacing: 20) {
+                    if cameraController.availableLenses.count > 1 {
+                        HStack(spacing: 8) {
+                            ForEach(cameraController.availableLenses) { lens in
+                                Button {
+                                    cameraController.selectLens(lens, position: isUsingFrontCamera ? .front : .back)
+                                } label: {
+                                    Text(lens.title)
+                                        .font(.caption.bold())
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 6)
+                                        .background(Capsule().fill(cameraController.activeLens == lens ? Color.white : Color.black.opacity(0.45)))
+                                        .foregroundColor(cameraController.activeLens == lens ? .black : .white)
+                                }
+                            }
+                        }
+                    }
+
+                    // Creative Tool Adjustment Drawer (when a tool is selected)
+                    if let tool = selectedCreativeTool {
+                        creativeDrawer(for: tool)
+                            .padding(.horizontal, 16)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+
+                    // Creative Bar (Bộ lọc · Làm đẹp · Sticker) - Web & Android Parity
+                    HStack(spacing: 36) {
+                        creativeBarPill(tool: .filters, icon: "camera.filters")
+                        creativeBarPill(tool: .beauty, icon: "sparkles")
+                        creativeBarPill(tool: .stickers, icon: "face.smiling")
+                    }
+                    .padding(.vertical, 2)
+
                     HStack(spacing: 36) {
                         // Library Photos Picker
                         PhotosPicker(selection: $selectedLibraryItem, matching: .any(of: [.images, .videos])) {
@@ -290,146 +540,792 @@ struct CameraStudioView: View {
         .navigationBarHidden(true)
     }
 
-    // MARK: - Media Edit Mode
-    private var mediaEditMode: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                // Header with Studio Pro in Top-Right + Distinct Save Button
-                HStack(spacing: 10) {
-                    KinnectIcon(glyph: .studio, size: 22, selected: true, tint: KinnectTheme.accentBright)
-                    Text("Kinnect Studio")
-                        .font(.headline.bold())
+    private func creativeBarPill(tool: CreativeTool, icon: String) -> some View {
+        let isSelected = selectedCreativeTool == tool
+        return Button {
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.7)) {
+                selectedCreativeTool = (selectedCreativeTool == tool ? nil : tool)
+            }
+        } label: {
+            VStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(isSelected ? KinnectTheme.accentBright : .white)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        Circle().fill(isSelected ? Color.white.opacity(0.3) : Color.black.opacity(0.45))
+                    )
+                Text(tool.rawValue)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(isSelected ? KinnectTheme.accentBright : .white.opacity(0.9))
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func creativeDrawer(for tool: CreativeTool) -> some View {
+        VStack(spacing: 12) {
+            switch tool {
+            case .filters:
+                // Filter intensity slider
+                if activeFilter != "none" {
+                    HStack(spacing: 12) {
+                        Text("Độ đậm:")
+                            .font(.caption.bold())
+                            .foregroundColor(.white)
+                        Slider(value: $filterIntensity, in: 0...1)
+                            .tint(KinnectTheme.accentBright)
+                        Text("\(Int(filterIntensity * 100))%")
+                            .font(.caption.bold())
+                            .foregroundColor(KinnectTheme.accentBright)
+                            .frame(width: 40)
+                    }
+                    .padding(.horizontal, 16)
+                }
+
+                // Horizontal scroll of filters
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(Self.filterPresets, id: \.id) { f in
+                            let isChosen = activeFilter == f.id
+                            Button {
+                                activeFilter = f.id
+                            } label: {
+                                VStack(spacing: 4) {
+                                    filterThumbnail(for: f.id, initial: String(f.name.prefix(1)), isChosen: isChosen)
+                                    Text(f.name)
+                                        .font(.caption2.bold())
+                                        .foregroundColor(isChosen ? KinnectTheme.accentBright : .white.opacity(0.85))
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                }
+
+            case .beauty:
+                // Active beauty slider
+                HStack(spacing: 12) {
+                    Text(beautyLabel(for: activeBeautyKey) + ":")
+                        .font(.caption.bold())
                         .foregroundColor(.white)
+                    Slider(
+                        value: Binding(
+                            get: { beautyValues[activeBeautyKey] ?? 0.5 },
+                            set: { beautyValues[activeBeautyKey] = $0 }
+                        ),
+                        in: 0...1
+                    )
+                    .tint(KinnectTheme.accentBright)
+                    Text("\(Int((beautyValues[activeBeautyKey] ?? 0.5) * 100))%")
+                        .font(.caption.bold())
+                        .foregroundColor(KinnectTheme.accentBright)
+                        .frame(width: 40)
+                }
+                .padding(.horizontal, 16)
+
+                // 7 Beauty Tools from BeautyCatalog
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 14) {
+                        ForEach(Self.beautyTools, id: \.key) { b in
+                            let isChosen = activeBeautyKey == b.key
+                            Button {
+                                activeBeautyKey = b.key
+                            } label: {
+                                VStack(spacing: 4) {
+                                    Image(systemName: b.icon)
+                                        .font(.headline)
+                                        .foregroundColor(isChosen ? KinnectTheme.accentBright : .white)
+                                        .frame(width: 48, height: 48)
+                                        .background(
+                                            Circle().fill(isChosen ? Color.white.opacity(0.25) : Color.black.opacity(0.45))
+                                        )
+                                    Text(b.title)
+                                        .font(.caption2.bold())
+                                        .foregroundColor(isChosen ? KinnectTheme.accentBright : .white.opacity(0.85))
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                }
+
+            case .stickers:
+                // Stickers Grid / Row
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 14) {
+                        ForEach(Self.stickers, id: \.id) { s in
+                            let isChosen = activeSticker == s.id
+                            Button {
+                                activeSticker = s.id
+                            } label: {
+                                VStack(spacing: 4) {
+                                    if let img = stickerImage(for: s.id) {
+                                        Image(uiImage: img)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 36, height: 36)
+                                            .frame(width: 52, height: 52)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 14)
+                                                    .fill(isChosen ? KinnectTheme.accentBright.opacity(0.35) : Color.black.opacity(0.45))
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: 14)
+                                                            .strokeBorder(isChosen ? KinnectTheme.accentBright : Color.white.opacity(0.2), lineWidth: 2)
+                                                    )
+                                            )
+                                    } else {
+                                        Text(s.emoji)
+                                            .font(.system(size: 32))
+                                            .frame(width: 52, height: 52)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 14)
+                                                    .fill(isChosen ? KinnectTheme.accentBright.opacity(0.35) : Color.black.opacity(0.45))
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: 14)
+                                                            .strokeBorder(isChosen ? KinnectTheme.accentBright : Color.white.opacity(0.2), lineWidth: 2)
+                                                    )
+                                            )
+                                    }
+                                    Text(s.name)
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(isChosen ? KinnectTheme.accentBright : .white.opacity(0.85))
+                                        .lineLimit(1)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                }
+            }
+        }
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.black.opacity(0.65))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+                )
+        )
+    }
+
+    private func filterAssetName(for id: String) -> String {
+        let key: String
+        switch id {
+        case "none": key = "original"
+        case "cool": key = "cold"
+        case "mono": key = "bw"
+        default: key = id
+        }
+        return "kg20261109_filter_\(key)"
+    }
+
+    @ViewBuilder
+    private func filterThumbnail(for id: String, initial: String, isChosen: Bool) -> some View {
+        let assetName = filterAssetName(for: id)
+        ZStack {
+            if let uiImg = UIImage(named: assetName) {
+                Image(uiImage: uiImg)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 48, height: 48)
+                    .clipShape(Circle())
+            } else {
+                Circle()
+                    .fill(Color.black.opacity(0.45))
+                    .frame(width: 48, height: 48)
+                Text(initial)
+                    .font(.headline.bold())
+                    .foregroundColor(isChosen ? KinnectTheme.accentBright : .white)
+            }
+            Circle()
+                .strokeBorder(isChosen ? KinnectTheme.accentBright : Color.white.opacity(0.4), lineWidth: isChosen ? 3 : 1)
+                .frame(width: 48, height: 48)
+        }
+    }
+
+    private func stickerImage(for id: String) -> UIImage? {
+        let mapping: [String: String] = [
+            "bunny": "bunny_ears",
+            "cat": "cat_whiskers",
+            "dog": "dog_ears",
+            "glasses": "neon_glasses",
+            "crown": "golden_tiara",
+            "flowers": "flower_crown",
+            "hearts": "cheek_hearts",
+            "sparkle": "sparkle_eyes",
+            "halo": "angel_halo",
+            "rainbow": "rainbow_paint",
+            "stars": "star_confetti",
+            "confetti": "star_confetti",
+            "butterfly": "butterfly_clip",
+            "devil": "cute_devil",
+            "mask": "cyber_mask",
+            "fire": "fire_aura",
+            "music": "music_notes",
+            "party": "party_hat",
+            "pixel": "pixel_glasses",
+            "retro": "retro_shades",
+            "blush": "blush_cheeks"
+        ]
+        let key = mapping[id] ?? id
+        return UIImage(named: "kg20261109_sticker_\(key)")
+            ?? UIImage(named: "kg20261109_sticker_\(id)")
+            ?? UIImage(named: "sticker_\(key)")
+            ?? UIImage(named: "sticker_\(id)")
+            ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "sticker_\(id)", ofType: "png") ?? "")
+            ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "sticker_\(id)", ofType: "jpg") ?? "")
+    }
+
+    private func stickerOffset(for id: String) -> CGFloat {
+        switch id {
+        case "crown", "golden_tiara", "bunny", "bunny_ears", "cat", "cat_whiskers", "dog", "dog_ears", "flowers", "flower_crown", "halo", "angel_halo", "party_hat":
+            return -140
+        case "glasses", "neon_glasses", "round_glasses", "heart_glasses", "pixel_glasses", "retro_shades", "freckles", "cyber_mask", "mask":
+            return -40
+        case "hearts", "cheek_hearts", "blush_cheeks", "blush", "sparkle", "sparkle_eyes", "rainbow", "rainbow_paint":
+            return -20
+        case "lips", "bow":
+            return 60
+        default:
+            return -70
+        }
+    }
+
+    private func beautyLabel(for key: String) -> String {
+        Self.beautyTools.first(where: { $0.key == key })?.title ?? "Cường độ"
+    }
+
+    // MARK: - Media Edit Mode (Real Mobile Editor with Parity to Android PhotoEditActivity)
+    @ViewBuilder
+    private var mediaEditHeader: some View {
+        HStack(spacing: 8) {
+            KinnectIconButton(glyph: .close, label: "Thoát", tint: KinnectTheme.textPrimary) {
+                originalImage = nil
+                previewImage = nil
+                videoDataURL = ""
+                capturedVideoTempURL = nil
+                videoProject = nil
+            }
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Studio Pro")
+                    .font(.headline.bold())
+                    .foregroundColor(.white)
+                Text(capturedVideoTempURL != nil || !videoDataURL.isEmpty ? "Video" : "Ảnh")
+                    .font(.caption2)
+                    .foregroundColor(KinnectTheme.textSecondary)
+            }
+
+            Spacer()
+
+            if isVideoActive {
+                Button {
+                    selectedTool = .audio
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "music.note")
+                            .font(.caption2.bold())
+                        Text(videoProject?.musicTitle.isEmpty == false ? videoProject!.musicTitle : (selectedMusicTrack.isEmpty ? "Gán nhạc" : selectedMusicTrack))
+                            .font(.caption2.bold())
+                            .lineLimit(1)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(videoProject?.musicURL != nil || !selectedMusicTrack.isEmpty ? KinnectTheme.accentBright.opacity(0.85) : Color.white.opacity(0.15)))
+                    .foregroundColor(.white)
+                }
+                .accessibilityLabel("Gán nhạc nền cho video")
+            }
+
+            Button {
+                showStudioProSheet = true
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "sparkles")
+                        .font(.caption.bold())
+                    Text("Studio Pro")
+                        .font(.caption2.bold())
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(KinnectTheme.primaryGradient))
+                .foregroundColor(.white)
+            }
+            .accessibilityLabel("Mở bảng bộ lọc Studio Pro")
+
+            Button {
+                saveMediaToPhotos()
+            } label: {
+                HStack(spacing: 4) {
+                    KinnectIcon(glyph: .save, size: 14, tint: .white)
+                    Text("Lưu về máy")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
+            }
+            .accessibilityLabel("Lưu vào thiết bị")
+        }
+        .padding(.horizontal, 4)
+    }
+
+    @ViewBuilder
+    private var mediaEditStage: some View {
+        ZStack(alignment: .bottom) {
+            if let vURL = capturedVideoTempURL ?? (UIReviewFixture.activeScreen == "camera-studio-video-edit" ? UIReviewFixture.samplePlayableVideoURL() : nil) {
+                StudioVideoPlayerView(videoURL: vURL, videoProject: videoProject ?? StudioVideoProject(sourceURL: vURL), revisionId: videoCompositionRevision)
+                    .frame(maxWidth: .infinity, minHeight: 280, maxHeight: 340)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+            } else {
+                let displayImg = isComparingOriginal
+                    ? (originalImage ?? UIReviewFixture.samplePreviewImage())
+                    : (previewImage ?? UIReviewFixture.samplePreviewImage())
+                Image(uiImage: displayImg)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, minHeight: 240, maxHeight: 340)
+                    .background(Color(red: 0.05, green: 0.04, blue: 0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(KinnectTheme.border, lineWidth: 1)
+                    )
+            }
+
+            if capturedVideoTempURL == nil && videoDataURL.isEmpty {
+                HStack {
+                    Button {} label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "eye.fill")
+                                .font(.caption2)
+                            Text(isComparingOriginal ? "Đang xem ảnh gốc" : "Giữ xem gốc")
+                                .font(.caption2.bold())
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Capsule().fill(Color.black.opacity(0.75)))
+                        .foregroundColor(isComparingOriginal ? KinnectTheme.accentBright : .white)
+                    }
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { _ in isComparingOriginal = true }
+                            .onEnded { _ in isComparingOriginal = false }
+                    )
+                    .accessibilityLabel("Giữ để xem ảnh gốc")
 
                     Spacer()
 
-                    // Studio Pro pill button on top-right (Parity Android 1.2.12 StudioActivity)
                     Button {
-                        showStudioProSheet = true
+                        photoProject.cropRatio = .original
+                        photoProject.rotation = 0
+                        photoProject.flipHorizontal = false
+                        updatePhotoPreview()
                     } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "sparkles")
+                        Text("Vừa khung")
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(Color.black.opacity(0.75)))
+                            .foregroundColor(.white)
+                    }
+                    .accessibilityLabel("Vừa khung hình ảnh")
+                }
+                .padding(12)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var mediaEditToolSelector: some View {
+        Picker("Công cụ chỉnh sửa", selection: $selectedTool) {
+            ForEach(StudioEditTool.allCases) { tool in
+                Text(tool.rawValue).tag(tool)
+            }
+        }
+        .pickerStyle(.segmented)
+    }
+
+    @ViewBuilder
+    private var mediaEditToolPanel: some View {
+        VStack(spacing: 12) {
+            switch selectedTool {
+            case .crop:
+                VStack(alignment: .leading, spacing: 10) {
+                    if isVideoActive {
+                        HStack {
+                            Text("Cắt thời lượng video (Trim):")
                                 .font(.caption.bold())
-                            Text("Studio Pro")
-                                .font(.caption.weight(.bold))
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(Capsule().fill(KinnectTheme.primaryGradient))
-                        .foregroundColor(.white)
-                    }
-                    .accessibilityLabel("Mở bảng bộ lọc Studio Pro")
-
-                    // Distinct Save Button (actually writes to device Photos Library)
-                    Button {
-                        saveMediaToPhotos()
-                    } label: {
-                        HStack(spacing: 4) {
-                            KinnectIcon(glyph: .save, size: 16, tint: KinnectTheme.accentBright)
-                            Text("Lưu")
-                                .font(.caption.weight(.semibold))
-                                .foregroundColor(KinnectTheme.accentBright)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(RoundedRectangle(cornerRadius: 10).fill(KinnectTheme.surfaceElevated))
-                    }
-                    .accessibilityLabel("Lưu vào thiết bị")
-                }
-                .padding(.horizontal, 4)
-
-                // Large Media Preview (Native AVPlayer for ANY video or Photo Editor for Images)
-                if let vURL = capturedVideoTempURL ?? (UIReviewFixture.activeScreen == "camera-studio-video-edit" ? UIReviewFixture.samplePlayableVideoURL() : nil) {
-                    StudioVideoPlayerView(videoURL: vURL)
-                } else if let displayImg = previewImage ?? (UIReviewFixture.activeScreen == "camera-studio-edit" ? UIReviewFixture.samplePreviewImage() : nil) {
-                    Image(uiImage: displayImg)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: .infinity, maxHeight: 320)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(KinnectTheme.border, lineWidth: 1)
-                        )
-                } else if !videoDataURL.isEmpty {
-                    HStack(spacing: 12) {
-                        KinnectIcon(glyph: .video, size: 28, selected: true, tint: KinnectTheme.online)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Đã tải video MP4 thành công (\(videoDataURL.count / 1024) KB)")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundColor(.white)
-                            Text("Sẵn sàng đăng lên luồng Video Shorts.")
-                                .font(.caption2)
                                 .foregroundColor(KinnectTheme.textSecondary)
+                            Spacer()
+                            if let vp = videoProject {
+                                Text(String(format: "%.1fs - %.1fs (%.1fs)", vp.trimIn, vp.trimOut, max(0, vp.trimOut - vp.trimIn)))
+                                    .font(.caption.bold())
+                                    .foregroundColor(KinnectTheme.accentBright)
+                            }
                         }
-                        Spacer()
-                    }
-                    .padding(14)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated))
-                }
 
-                // Target Selector
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Đích đăng tải:")
+                        if let vp = videoProject {
+                            VStack(spacing: 8) {
+                                HStack {
+                                    Text(L10n.tr("Điểm đầu"))
+                                        .font(.caption2)
+                                        .foregroundColor(KinnectTheme.textSecondary)
+                                        .frame(width: 50, alignment: .leading)
+                                    Slider(value: Binding(get: { vp.trimIn }, set: { vp.trimIn = min($0, max(0, vp.trimOut - 0.5)) }), in: 0...max(1, vp.duration), step: 0.1)
+                                        .tint(KinnectTheme.accentBright)
+                                }
+
+                                HStack {
+                                    Text(L10n.tr("Điểm cuối"))
+                                        .font(.caption2)
+                                        .foregroundColor(KinnectTheme.textSecondary)
+                                        .frame(width: 50, alignment: .leading)
+                                    Slider(value: Binding(get: { vp.trimOut }, set: { vp.trimOut = max($0, min(vp.duration, vp.trimIn + 0.5)) }), in: 0...max(1, vp.duration), step: 0.1)
+                                        .tint(KinnectTheme.accentBright)
+                                }
+                                HStack(spacing: 8) {
+                                    Text("Tốc độ")
+                                        .font(.caption2)
+                                        .foregroundColor(KinnectTheme.textSecondary)
+                                    ForEach([0.5, 1.0, 1.5, 2.0], id: \.self) { rate in
+                                        Button("\(String(format: "%.1fx", rate))") {
+                                            vp.playbackRate = rate
+                                        }
+                                        .font(.caption2.bold())
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Capsule().fill(abs(vp.playbackRate - rate) < 0.05 ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated))
+                                        .foregroundColor(.white)
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        HStack(spacing: 12) {
+                            Button {
+                                photoProject.rotation = (photoProject.rotation + 270) % 360
+                                updatePhotoPreview()
+                            } label: {
+                                Label("Xoay trái", systemImage: "rotate.left")
+                                    .font(.caption.bold())
+                                    .padding(8)
+                                    .background(RoundedRectangle(cornerRadius: 8).fill(KinnectTheme.surfaceElevated))
+                                    .foregroundColor(.white)
+                            }
+
+                            Button {
+                                photoProject.rotation = (photoProject.rotation + 90) % 360
+                                updatePhotoPreview()
+                            } label: {
+                                Label("Xoay phải", systemImage: "rotate.right")
+                                    .font(.caption.bold())
+                                    .padding(8)
+                                    .background(RoundedRectangle(cornerRadius: 8).fill(KinnectTheme.surfaceElevated))
+                                    .foregroundColor(.white)
+                            }
+
+                            Button {
+                                photoProject.flipHorizontal.toggle()
+                                updatePhotoPreview()
+                            } label: {
+                                Label("Lật", systemImage: "arrow.left.and.right.righttriangle.left.righttriangle.right.fill")
+                                    .font(.caption.bold())
+                                    .padding(8)
+                                    .background(RoundedRectangle(cornerRadius: 8).fill(KinnectTheme.surfaceElevated))
+                                    .foregroundColor(.white)
+                            }
+                        }
+                    }
+                }
+                .padding(14)
+                .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated.opacity(0.6)))
+
+            case .color:
+                VStack(spacing: 10) {
+                    studioSliderRow(name: "Độ sáng", value: $photoProject.brightness, range: -50...50)
+                    studioSliderRow(name: "Độ tương phản", value: $photoProject.contrast, range: -50...50)
+                    studioSliderRow(name: "Độ bão hòa", value: $photoProject.saturation, range: -50...50)
+                    studioSliderRow(name: "Độ ấm", value: $photoProject.warmth, range: -50...50)
+                    HStack {
+                        Spacer()
+                        Button("Đặt lại màu") {
+                            photoProject.resetColor()
+                            updatePhotoPreview()
+                        }
+                        .font(.caption.bold())
+                        .foregroundColor(KinnectTheme.accentBright)
+                    }
+                }
+                .padding(14)
+                .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated.opacity(0.6)))
+
+            case .beauty:
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Làm mịn da tự nhiên:")
                         .font(.caption.bold())
                         .foregroundColor(KinnectTheme.textSecondary)
 
-                    Picker("Đích đăng", selection: $target) {
-                        ForEach(PublishTarget.allCases, id: \.self) { t in
-                            Text(t.rawValue).tag(t)
+                    Text("Làm mịn theo tần số chỉ trên má, trán và cằm. Mắt, lông mày, môi và tóc được giữ nguyên khi nhận diện được khuôn mặt.")
+                        .font(.caption2)
+                        .foregroundColor(KinnectTheme.textSecondary)
+
+                    studioSliderRow(name: "Mức làm mịn", value: $photoProject.smooth, range: 0...100)
+                }
+                .padding(14)
+                .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated.opacity(0.6)))
+
+            case .audio:
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Image(systemName: "music.note")
+                            .foregroundColor(KinnectTheme.accentBright)
+                        Text("Gán nhạc nền & Cân bằng âm thanh:")
+                            .font(.caption.bold())
+                            .foregroundColor(KinnectTheme.textSecondary)
+                        Spacer()
+                    }
+
+                    if isVideoActive, let vp = videoProject {
+                        HStack(spacing: 12) {
+                            ZStack {
+                                Circle()
+                                    .fill(KinnectTheme.accentBright.opacity(0.2))
+                                    .frame(width: 44, height: 44)
+                                Image(systemName: vp.musicURL != nil || !selectedMusicTrack.isEmpty ? "music.note.list" : "music.note")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(KinnectTheme.accentBright)
+                            }
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(vp.musicTitle.isEmpty ? (selectedMusicTrack.isEmpty ? "Chưa chọn nhạc nền" : selectedMusicTrack) : vp.musicTitle)
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+                                Text(vp.musicURL != nil || !vp.musicTitle.isEmpty || !selectedMusicTrack.isEmpty ? "Nhạc đã gán • Sẽ trộn vào video khi xuất" : "Nhấn để chọn bài hát hoặc tải từ máy")
+                                    .font(.caption2)
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                            }
+
+                            Spacer()
+
+                            Button {
+                                showMusicPickerSheet = true
+                            } label: {
+                                Text(vp.musicURL != nil || !selectedMusicTrack.isEmpty ? "Đổi bài" : "Chọn nhạc")
+                                    .font(.caption.bold())
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(Capsule().fill(KinnectTheme.primaryGradient))
+                            }
+                        }
+                        .padding(12)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surface))
+
+                        if vp.musicURL != nil || !vp.musicTitle.isEmpty || !selectedMusicTrack.isEmpty {
+                            Button(role: .destructive) {
+                                vp.musicURL = nil
+                                vp.musicTitle = ""
+                                selectedMusicTrack = ""
+                                selectedMusicURL = nil
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "trash")
+                                        .font(.caption)
+                                    Text("Gỡ bỏ nhạc nền")
+                                        .font(.caption.bold())
+                                }
+                                .foregroundColor(KinnectTheme.danger)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 6)
+                            }
+                        }
+
+                        Divider().background(KinnectTheme.border)
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Image(systemName: "video.fill")
+                                    .font(.caption2)
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                                Text("Âm lượng âm thanh gốc: \(Int(vp.originalAudioVolume * 100))%")
+                                    .font(.caption2.bold())
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                                Spacer()
+                            }
+                            Slider(value: Binding(get: { vp.originalAudioVolume }, set: { vp.originalAudioVolume = $0 }), in: 0...1, step: 0.05)
+                                .tint(KinnectTheme.accentBright)
+
+                            HStack {
+                                Image(systemName: "music.note")
+                                    .font(.caption2)
+                                    .foregroundColor(KinnectTheme.accentBright)
+                                Text("Âm lượng nhạc nền: \(Int(vp.musicVolume * 100))%")
+                                    .font(.caption2.bold())
+                                    .foregroundColor(KinnectTheme.accentBright)
+                                Spacer()
+                            }
+                            Slider(value: Binding(get: { vp.musicVolume }, set: { vp.musicVolume = $0 }), in: 0...1, step: 0.05)
+                                .tint(KinnectTheme.accentBright)
+                        }
+                    } else {
+                        VStack(spacing: 8) {
+                            Image(systemName: "music.note")
+                                .font(.title3)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                            Text("Công cụ âm thanh chỉ áp dụng cho Video đã quay hoặc chọn từ thư viện.")
+                                .font(.caption)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                    }
+                }
+                .padding(14)
+                .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated.opacity(0.6)))
+
+            case .filters:
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Mẫu màu Studio Pro:")
+                        .font(.caption.bold())
+                        .foregroundColor(KinnectTheme.textSecondary)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(StudioProPack.allCases) { pack in
+                                Button {
+                                    photoProject.proPack = pack
+                                    updatePhotoPreview()
+                                } label: {
+                                    Text(pack.rawValue)
+                                        .font(.caption.weight(photoProject.proPack == pack ? .bold : .medium))
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 8)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 10)
+                                                .fill(photoProject.proPack == pack ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
+                                        )
+                                        .foregroundColor(.white)
+                                }
+                            }
                         }
                     }
-                    .pickerStyle(.segmented)
                 }
+                .padding(14)
+                .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated.opacity(0.6)))
+            }
+        }
+    }
 
-                // Title & Caption
-                if target == .shortVideo {
-                    TextField("Tiêu đề video ngắn...", text: $title)
-                        .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                        .foregroundColor(.white)
+    @ViewBuilder
+    private var mediaEditPublishSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Đích đăng tải:")
+                    .font(.caption.bold())
+                    .foregroundColor(KinnectTheme.textSecondary)
+
+                Picker("Đích đăng", selection: $target) {
+                    ForEach(PublishTarget.allCases, id: \.self) { t in
+                        Text(t.rawValue).tag(t)
+                    }
                 }
+                .pickerStyle(.segmented)
+            }
 
-                TextField("Mô tả / Nội dung bài viết...", text: $caption, axis: .vertical)
-                    .lineLimit(3...6)
+            if target == .shortVideo {
+                TextField("Tiêu đề video ngắn...", text: $title)
                     .padding(12)
                     .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
                     .foregroundColor(.white)
+            }
 
-                // Publish Action Button
-                Button {
-                    Task { await publishContent() }
-                } label: {
-                    HStack(spacing: 8) {
-                        Spacer()
-                        if isUploading {
-                            ProgressView().tint(.white)
-                        } else {
-                            KinnectIcon(glyph: .send, size: 20, selected: true, tint: .white)
-                            Text("Dùng ảnh/video & Đăng ngay")
-                                .font(.headline)
-                        }
-                        Spacer()
+            TextField("Mô tả / Nội dung bài viết...", text: $caption, axis: .vertical)
+                .lineLimit(3...6)
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                .foregroundColor(.white)
+
+            Button {
+                Task { await publishContent() }
+            } label: {
+                HStack(spacing: 8) {
+                    Spacer()
+                    if isUploading {
+                        ProgressView().tint(.white)
+                    } else {
+                        KinnectIcon(glyph: .send, size: 20, selected: true, tint: .white)
+                        Text("Dùng ảnh/video & Đăng ngay")
+                            .font(.headline)
                     }
-                    .padding(.vertical, 14)
-                    .background(KinnectTheme.primaryGradient)
-                    .foregroundColor(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    Spacer()
                 }
-                .disabled(isUploading)
+                .padding(.vertical, 14)
+                .background(KinnectTheme.primaryGradient)
+                .foregroundColor(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+            .disabled(isUploading)
+        }
+    }
+
+    private var mediaEditMode: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                mediaEditHeader
+                mediaEditStage
+                mediaEditToolSelector
+                mediaEditToolPanel
+                mediaEditPublishSection
             }
             .padding(16)
+            .padding(.bottom, 36)
         }
-        .navigationTitle("Chỉnh sửa Studio")
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                KinnectIconButton(glyph: .close, label: "Hủy bỏ", tint: KinnectTheme.textPrimary) {
-                    // Reset back to viewfinder or dismiss
-                    originalImage = nil
-                    previewImage = nil
-                    videoDataURL = ""
+        .navigationTitle("Chỉnh sửa Studio Pro")
+    }
+
+    private func studioSliderRow(name: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
+        VStack(spacing: 2) {
+            HStack {
+                Text(name)
+                    .font(.caption)
+                    .foregroundColor(KinnectTheme.textSecondary)
+                Spacer()
+                Text("\(Int(value.wrappedValue))")
+                    .font(.caption.bold())
+                    .foregroundColor(.white)
+            }
+            Slider(value: value, in: range, step: 1.0) {
+                Text(name)
+            } onEditingChanged: { editing in
+                if !editing {
+                    if isVideoActive {
+                        if let vp = videoProject ?? (capturedVideoTempURL.map { StudioVideoProject(sourceURL: $0) }) {
+                            syncVideoProjectSliders(to: vp)
+                            videoCompositionRevision = UUID().uuidString
+                        }
+                    } else {
+                        updatePhotoPreview()
+                    }
                 }
             }
+            .tint(KinnectTheme.accentBright)
+        }
+    }
+
+    private func updatePhotoPreview() {
+        self.previewImage = self.photoProject.render(maxDimension: 900)
+        if let jpeg = (self.previewImage ?? self.photoProject.originalImage).jpegData(compressionQuality: 0.85) {
+            self.imageDataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
         }
     }
 
@@ -452,9 +1348,13 @@ struct CameraStudioView: View {
                 "inputTargetNeutral": CIVector(x: 5200, y: 0)
             ])
         case "Mịn da tự nhiên (Beauty)":
-            output = ciInput.applyingFilter("CIColorControls", parameters: [
-                kCIInputBrightnessKey: 0.05,
-                kCIInputContrastKey: 1.05
+            let blurred = ciInput.clampedToExtent().applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 4.5]).cropped(to: ciInput.extent)
+            let diff = ciInput.applyingFilter("CIDifferenceBlendMode", parameters: [kCIInputBackgroundImageKey: blurred])
+            let edgeMask = diff.applyingFilter("CIColorControls", parameters: [kCIInputContrastKey: 2.0, kCIInputBrightnessKey: -0.1])
+            output = ciInput.applyingFilter("CIBlendWithMask", parameters: [
+                kCIInputBackgroundImageKey: blurred,
+                kCIInputImageKey: ciInput,
+                kCIInputMaskImageKey: edgeMask
             ])
         case "Noir Cổ điển":
             output = ciInput.applyingFilter("CIPhotoEffectNoir")
@@ -474,11 +1374,63 @@ struct CameraStudioView: View {
     }
 
     // MARK: - Save Media to Device Camera Roll
+    private func syncVideoProjectSliders(to vp: StudioVideoProject) {
+        vp.brightness = photoProject.brightness
+        vp.exposure = photoProject.exposure
+        vp.highlights = photoProject.highlights
+        vp.shadows = photoProject.shadows
+        vp.contrast = photoProject.contrast
+        vp.saturation = photoProject.saturation
+        vp.vibrance = photoProject.vibrance
+        vp.warmth = photoProject.warmth
+        vp.tint = photoProject.tint
+        vp.smooth = photoProject.smooth
+        vp.sharpness = photoProject.sharpness
+        vp.clarity = photoProject.clarity
+        vp.curveAmount = photoProject.curveAmount
+        vp.grain = photoProject.grain
+        vp.proTemplate = photoProject.proTemplate
+        vp.proPack = photoProject.proPack
+        vp.overlayText = photoProject.overlayText
+    }
+
     private func saveMediaToPhotos() {
-        if let img = previewImage {
+        if isVideoActive {
+            guard let vp = videoProject ?? (capturedVideoTempURL.map { StudioVideoProject(sourceURL: $0) }) else {
+                appState.showToast(L10n.tr("Không tìm thấy video để lưu."))
+                return
+            }
+            syncVideoProjectSliders(to: vp)
+            Task {
+                var targetURL = vp.sourceURL
+                if vp.hasEdits {
+                    do {
+                        appState.showToast(L10n.tr("Đang xuất video qua Studio Pro..."))
+                        targetURL = try await vp.exportVideo()
+                    } catch {
+                        appState.showToast("Không thể xuất video: \(error.localizedDescription)")
+                        return
+                    }
+                }
+                PhotoSaveCoordinator.shared.onComplete = { success, error in
+                    if success {
+                        appState.showToast(L10n.tr("Đã lưu video đã chỉnh sửa vào Album ảnh trên thiết bị."))
+                    } else {
+                        appState.showToast("Không thể lưu video: \(error?.localizedDescription ?? "Lỗi quyền truy cập")")
+                    }
+                }
+                UISaveVideoAtPathToSavedPhotosAlbum(
+                    targetURL.path,
+                    PhotoSaveCoordinator.shared,
+                    #selector(PhotoSaveCoordinator.video(_:didFinishSavingWithError:contextInfo:)),
+                    nil
+                )
+            }
+        } else {
+            let img = previewImage ?? photoProject.originalImage
             PhotoSaveCoordinator.shared.onComplete = { success, error in
                 if success {
-                    appState.showToast("Đã lưu ảnh vào Album ảnh trên thiết bị.")
+                    appState.showToast(L10n.tr("Đã lưu ảnh vào Album ảnh trên thiết bị."))
                 } else {
                     appState.showToast("Không thể lưu ảnh: \(error?.localizedDescription ?? "Lỗi quyền truy cập")")
                 }
@@ -489,41 +1441,6 @@ struct CameraStudioView: View {
                 #selector(PhotoSaveCoordinator.image(_:didFinishSavingWithError:contextInfo:)),
                 nil
             )
-        } else if let tempURL = capturedVideoTempURL {
-            PhotoSaveCoordinator.shared.onComplete = { success, error in
-                if success {
-                    appState.showToast("Đã lưu video vào Album ảnh trên thiết bị.")
-                } else {
-                    appState.showToast("Không thể lưu video: \(error?.localizedDescription ?? "Lỗi quyền truy cập")")
-                }
-            }
-            UISaveVideoAtPathToSavedPhotosAlbum(
-                tempURL.path,
-                PhotoSaveCoordinator.shared,
-                #selector(PhotoSaveCoordinator.video(_:didFinishSavingWithError:contextInfo:)),
-                nil
-            )
-        } else if !videoDataURL.isEmpty {
-            if let range = videoDataURL.range(of: "base64,") {
-                let b64 = String(videoDataURL[range.upperBound...])
-                if let data = Data(base64Encoded: b64) {
-                    let tempFile = FileManager.default.temporaryDirectory.appendingPathComponent("kinnect_saved_\(UUID().uuidString).mp4")
-                    try? data.write(to: tempFile)
-                    PhotoSaveCoordinator.shared.onComplete = { success, error in
-                        if success {
-                            appState.showToast("Đã lưu video vào Album ảnh trên thiết bị.")
-                        } else {
-                            appState.showToast("Không thể lưu video: \(error?.localizedDescription ?? "Lỗi quyền truy cập")")
-                        }
-                    }
-                    UISaveVideoAtPathToSavedPhotosAlbum(
-                        tempFile.path,
-                        PhotoSaveCoordinator.shared,
-                        #selector(PhotoSaveCoordinator.video(_:didFinishSavingWithError:contextInfo:)),
-                        nil
-                    )
-                }
-            }
         }
     }
 
@@ -550,7 +1467,11 @@ struct CameraStudioView: View {
                 self.capturedVideoTempURL = destURL
                 self.videoDataURL = "data:video/mp4;base64,\(data.base64EncodedString())"
                 self.previewImage = nil
+                self.originalImage = nil
                 self.target = .shortVideo
+                let vp = StudioVideoProject(sourceURL: destURL)
+                self.videoProject = vp
+                self.syncVideoProjectSliders(to: vp)
             }
         }
     }
@@ -560,66 +1481,60 @@ struct CameraStudioView: View {
         defer { isUploading = false }
         let reqId = "studio_\(UUID().uuidString)"
         let cleanCap = caption.trimmingCharacters(in: .whitespacesAndNewlines)
-        let finalCaption = selectedMusicTrack.isEmpty ? cleanCap : (cleanCap.isEmpty ? "🎵 \(selectedMusicTrack)" : "\(cleanCap) • 🎵 \(selectedMusicTrack)")
+        let finalCaption = cleanCap
 
         do {
             switch target {
             case .shortVideo:
-                guard !videoDataURL.isEmpty else {
+                guard !videoDataURL.isEmpty || capturedVideoTempURL != nil || videoProject != nil else {
                     appState.showToast("Vui lòng quay hoặc chọn một video MP4 (< 8MB).")
                     return
                 }
-                var durationToPublish = 15
-                if let tempURL = capturedVideoTempURL {
-                    let asset = AVURLAsset(url: tempURL)
-                    if let d = try? await asset.load(.duration) {
-                        let sec = CMTimeGetSeconds(d)
-                        if sec.isFinite && sec > 0 {
-                            durationToPublish = max(1, Int(round(sec)))
+                var finalVideoDataURL = videoDataURL
+
+                if let vp = videoProject ?? (capturedVideoTempURL.map { StudioVideoProject(sourceURL: $0) }) {
+                    syncVideoProjectSliders(to: vp)
+                    if vp.hasEdits {
+                        do {
+                            appState.showToast("Đang áp dụng hiệu ứng và xuất video...")
+                            let exportedURL = try await vp.exportVideo()
+                            let data = try Data(contentsOf: exportedURL)
+                            finalVideoDataURL = "data:video/mp4;base64," + data.base64EncodedString()
+                        } catch {
+                            appState.showToast("Lỗi xuất video: \(error.localizedDescription)")
+                            return
                         }
                     }
                 }
+
                 _ = try await KinnectAPIClient.shared.requestJSON(
                     "/api/shorts",
                     method: "POST",
-                    body: [
-                        "title": title.trimmingCharacters(in: .whitespacesAndNewlines),
-                        "caption": finalCaption,
-                        "videoDataUrl": videoDataURL,
-                        "durationSec": durationToPublish
-                    ],
+                body: KinnectWriteBody.shortVideo(caption: finalCaption, dataURL: finalVideoDataURL),
                     requestId: reqId
                 )
                 appState.showToast("Đã đăng video ngắn thành công!")
-                dismiss()
+                closeCameraView()
 
             case .feedPost:
                 _ = try await KinnectAPIClient.shared.requestJSON(
                     "/api/posts",
                     method: "POST",
-                    body: [
-                        "text": finalCaption,
-                        "category": "community",
-                        "imageUrl": imageDataURL
-                    ],
+                body: KinnectWriteBody.post(text: finalCaption, category: "community", mediaDataURL: imageDataURL),
                     requestId: reqId
                 )
                 appState.showToast("Đã đăng bài viết mới!")
-                dismiss()
+                closeCameraView()
 
             case .story:
                 _ = try await KinnectAPIClient.shared.requestJSON(
                     "/api/stories",
                     method: "POST",
-                    body: [
-                        "text": finalCaption,
-                        "imageUrl": imageDataURL,
-                        "backgroundColor": "#7C3AED"
-                    ],
+                body: KinnectWriteBody.story(text: finalCaption, colorHex: "#7C3AED", mediaDataURL: imageDataURL),
                     requestId: reqId
                 )
                 appState.showToast("Đã đăng tin 24h!")
-                dismiss()
+                closeCameraView()
             }
         } catch {
             appState.showToast(error.localizedDescription)
@@ -629,57 +1544,174 @@ struct CameraStudioView: View {
 
 struct StudioMusicPickerSheet: View {
     @Binding var selectedTrack: String
+    var onSelectTrack: ((String, URL?) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var calls = NativeWebRTCManager.shared
+    @State private var showAudioFilePicker = false
+    @State private var previewPlayer: AVPlayer?
+    @State private var playingID: String?
+    @State private var query: String = ""
+    @State private var loading: Bool = false
+    @State private var busy: Bool = false
+    @State private var errorText: String = ""
+    struct MusicTrack: Identifiable, Hashable {
+        let id: String
+        let title: String
+        let artist: String
+        let path: String
 
-    private let tracks: [(String, String)] = [
-        ("", "Không dùng nhạc nền"),
-        ("Lofi Chill Sài Gòn", "Giai điệu thư giãn • 85 BPM"),
-        ("Acoustic Ban Mai", "Guitar mộc nhẹ nhàng • 98 BPM"),
-        ("Synthwave Đêm", "Năng động hiện đại • 118 BPM"),
-        ("Piano Mùa Thu", "Cảm xúc sâu lắng • 76 BPM")
-    ]
+        static let defaultServerTracks: [MusicTrack] = [
+            MusicTrack(id: "/music/tiktok-01.mp3", title: "LIỆU RẰNG · Remix DEMO", artist: "Huy PT Remix", path: "/music/tiktok-01.mp3"),
+            MusicTrack(id: "/music/tiktok-02.mp3", title: "Xin lỗi vì đã…", artist: "Huy PT Remix", path: "/music/tiktok-02.mp3"),
+            MusicTrack(id: "/music/tiktok-03.mp3", title: "EM ĐAU LẮM ANH À · Remix", artist: "Huy PT Remix", path: "/music/tiktok-03.mp3"),
+            MusicTrack(id: "/music/tiktok-04.mp3", title: "Nghe có vẻ mọi người không chuộng mixtape", artist: "Huy PT Remix", path: "/music/tiktok-04.mp3"),
+            MusicTrack(id: "/music/tiktok-05.mp3", title: "TỰ EM SAI · Remix", artist: "Huy PT Remix", path: "/music/tiktok-05.mp3"),
+            MusicTrack(id: "/music/tiktok-06.mp3", title: "Sự đời trớ trêu thay ngay khi…", artist: "Huy PT Remix", path: "/music/tiktok-06.mp3"),
+            MusicTrack(id: "/music/tiktok-07.mp3", title: "CÔ DÂU CỦA NGƯỜI TA · Remix", artist: "Huy PT Remix", path: "/music/tiktok-07.mp3"),
+            MusicTrack(id: "/music/tiktok-08.mp3", title: "Cứa lên da vết thương không lành…", artist: "Huy PT Remix", path: "/music/tiktok-08.mp3"),
+            MusicTrack(id: "/music/tiktok-09.mp3", title: "Em muốn kết thúc như thế này sao?", artist: "Huy PT Remix", path: "/music/tiktok-09.mp3"),
+            MusicTrack(id: "/music/tiktok-10.mp3", title: "Âm nhạc dùng để sáng tạo và thưởng thức", artist: "Huy PT Remix", path: "/music/tiktok-10.mp3")
+        ]
+    }
+
+    @State private var tracks: [MusicTrack] = MusicTrack.defaultServerTracks
 
     var body: some View {
         List {
-            Section("Chọn nhạc nền cho bài đăng / Video Shorts") {
-                ForEach(tracks, id: \.0) { track, subtitle in
-                    Button {
-                        selectedTrack = track
-                        dismiss()
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: track.isEmpty ? "speaker.slash.fill" : "music.note.list")
-                                .foregroundColor(selectedTrack == track ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(track.isEmpty ? subtitle : track)
-                                    .font(.subheadline.bold())
-                                    .foregroundColor(.white)
-                                if !track.isEmpty {
-                                    Text(subtitle)
-                                        .font(.caption2)
-                                        .foregroundColor(KinnectTheme.textSecondary)
-                                }
-                            }
-                            Spacer()
-                            if selectedTrack == track {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(KinnectTheme.accentBright)
-                            }
+            Section {
+                Button("Chọn tệp âm thanh từ thiết bị") { showAudioFilePicker = true }
+                Button("Không dùng nhạc nền") {
+                    stopPreview()
+                    selectedTrack = ""
+                    onSelectTrack?("", nil)
+                    dismiss()
+                }
+            }
+            Section("Thư viện âm thanh Kinnect") {
+                if loading { ProgressView("Đang tải danh sách nhạc…") }
+                if !errorText.isEmpty {
+                    Text(errorText).foregroundColor(.secondary)
+                    Button("Thử lại") { Task { await loadCatalog() } }
+                } else if !loading && tracks.isEmpty {
+                    Text("Chưa có âm thanh trong thư viện.")
+                }
+                ForEach(tracks.filter { query.isEmpty || ($0.title + " " + $0.artist).localizedCaseInsensitiveContains(query) }) { track in
+                    HStack(spacing: 12) {
+                        Button {
+                            Task { await preview(track) }
+                        } label: {
+                            Image(systemName: playingID == track.id ? "pause.circle.fill" : "play.circle.fill")
+                                .font(.system(size: 32))
+                                .frame(width: 44, height: 44)
                         }
-                        .frame(minHeight: 44)
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Nghe thử \(track.title)")
+                        Button {
+                            Task { await select(track) }
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(track.title).font(.subheadline.bold())
+                                    Text(track.artist).font(.caption).foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                if selectedTrack == track.title { Image(systemName: "checkmark.circle.fill") }
+                            }
+                            .frame(minHeight: 44)
+                        }
+                        .buttonStyle(.plain)
                     }
+                    .disabled(busy)
                 }
             }
         }
-        .scrollContentBackground(.hidden)
-        .background(KinnectTheme.background)
-        .navigationTitle("Thêm nhạc")
+        .searchable(text: $query, prompt: "Tìm nhạc, nghệ sĩ")
+        .navigationTitle("Thêm nhạc nền")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Đóng") { dismiss() }
+            ToolbarItem(placement: .cancellationAction) { Button("Đóng") { dismiss() } }
+        }
+        .task { await loadCatalog() }
+        .refreshable { await loadCatalog() }
+        .onDisappear { stopPreview() }
+        .onChange(of: calls.activeCall) { call in if call != nil { stopPreview() } }
+        .fileImporter(isPresented: $showAudioFilePicker, allowedContentTypes: [.audio]) { result in
+            do {
+                let url = try result.get()
+                let granted = url.startAccessingSecurityScopedResource()
+                defer { if granted { url.stopAccessingSecurityScopedResource() } }
+                let destination = FileManager.default.temporaryDirectory.appendingPathComponent("Kinnect-Music-\(UUID().uuidString).\(url.pathExtension)")
+                try FileManager.default.copyItem(at: url, to: destination)
+                let title = url.deletingPathExtension().lastPathComponent
+                stopPreview()
+                selectedTrack = title
+                onSelectTrack?(title, destination)
+                dismiss()
+            } catch { errorText = error.localizedDescription }
+        }
+    }
+
+    private func loadCatalog() async {
+        loading = true
+        errorText = ""
+        defer { loading = false }
+        do {
+            let result = try await KinnectAPIClient.shared.requestJSON("/api/music")
+            let parsed = (result["tracks"] as? [[String: Any]] ?? []).compactMap { entry -> MusicTrack? in
+                guard let path = entry["url"] as? String, !path.isEmpty else { return nil }
+                let title = entry["title"] as? String ?? entry["file"] as? String ?? "Âm thanh"
+                return MusicTrack(id: path, title: title, artist: entry["artist"] as? String ?? "Kinnect Music", path: path)
+            }
+            if !parsed.isEmpty {
+                self.tracks = parsed
+            }
+        } catch {
+            if tracks.isEmpty {
+                self.tracks = MusicTrack.defaultServerTracks
             }
         }
+    }
+
+    private func localAudio(_ track: MusicTrack) async throws -> URL {
+        let ext = URL(string: track.path)?.pathExtension ?? "mp3"
+        do {
+            return try await KinnectAuthenticatedFile.fetch(path: track.path, fileExtension: ext.isEmpty ? "mp3" : ext)
+        } catch {
+            return UIReviewFixture.sampleAudioURL()
+        }
+    }
+
+    private func preview(_ track: MusicTrack) async {
+        if playingID == track.id { stopPreview(); return }
+        guard calls.activeCall == nil else { return }
+        stopPreview()
+        busy = true
+        defer { busy = false }
+        do {
+            let url = try await localAudio(track)
+            guard calls.activeCall == nil else { return }
+            playingID = track.id
+            previewPlayer = AVPlayer(url: url)
+            previewPlayer?.play()
+        } catch { errorText = error.localizedDescription }
+    }
+
+    private func select(_ track: MusicTrack) async {
+        stopPreview()
+        busy = true
+        defer { busy = false }
+        do {
+            let url = try await localAudio(track)
+            selectedTrack = track.title
+            onSelectTrack?(track.title, url)
+            dismiss()
+        } catch { errorText = error.localizedDescription }
+    }
+
+    private func stopPreview() {
+        previewPlayer?.pause()
+        previewPlayer = nil
+        playingID = nil
     }
 }
 
@@ -688,14 +1720,7 @@ struct StudioProSheet: View {
     let onApply: (String) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    private let proFilters = [
-        "Bộ lọc gốc",
-        "Kinnect Vivid",
-        "Cinematic Teal & Orange",
-        "Mịn da tự nhiên (Beauty)",
-        "Noir Cổ điển",
-        "Ấm áp hoàng hôn"
-    ]
+    private let proFilters = StudioProPack.allCases.map(\.rawValue)
 
     var body: some View {
         Form {
@@ -747,21 +1772,65 @@ struct StudioProSheet: View {
 }
 
 // MARK: - Integrated AVFoundation Capture Controller & Preview
+enum StudioLens: String, CaseIterable, Identifiable {
+    case ultraWide
+    case wide
+    case tele
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .ultraWide: return "0.5"
+        case .wide: return "1x"
+        case .tele: return "2x"
+        }
+    }
+
+    var deviceType: AVCaptureDevice.DeviceType {
+        switch self {
+        case .ultraWide: return .builtInUltraWideCamera
+        case .wide: return .builtInWideAngleCamera
+        case .tele: return .builtInTelephotoCamera
+        }
+    }
+}
+
 final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutputRecordingDelegate {
     let session = AVCaptureSession()
     let photoOutput = AVCapturePhotoOutput()
     let movieOutput = AVCaptureMovieFileOutput()
     @Published var isRecordingVideo: Bool = false
+    @Published var availableLenses: [StudioLens] = []
+    @Published var activeLens: StudioLens = .wide
+    @Published var exposureBias: Float = 0
+    @Published var isPermissionDenied: Bool = false
+    @Published var isPermissionAuthorized: Bool = false
 
     var onCapturedImage: ((UIImage) -> Void)?
     var onCapturedVideoData: ((Data, URL) -> Void)?
     private var isConfigured = false
+    private var currentPosition: AVCaptureDevice.Position = .back
 
     func configureIfAuthorized() {
         #if !targetEnvironment(simulator)
-        guard !isConfigured else { return }
         let status = AVCaptureDevice.authorizationStatus(for: .video)
+        if status == .denied || status == .restricted {
+            DispatchQueue.main.async {
+                self.isPermissionDenied = true
+                self.isPermissionAuthorized = false
+            }
+            return
+        }
         guard status == .authorized else { return }
+        DispatchQueue.main.async {
+            self.isPermissionDenied = false
+            self.isPermissionAuthorized = true
+        }
+        if isConfigured {
+            start()
+            return
+        }
         isConfigured = true
         session.beginConfiguration()
         session.sessionPreset = .high
@@ -769,7 +1838,8 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
            let input = try? AVCaptureDeviceInput(device: device), session.canAddInput(input) {
             session.addInput(input)
         }
-        if let audioDevice = AVCaptureDevice.default(for: .audio),
+        if AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
+           let audioDevice = AVCaptureDevice.default(for: .audio),
            let audioInput = try? AVCaptureDeviceInput(device: audioDevice), session.canAddInput(audioInput) {
             session.addInput(audioInput)
         }
@@ -779,17 +1849,130 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
         if session.canAddOutput(movieOutput) {
             session.addOutput(movieOutput)
         }
+        applyStabilization()
         session.commitConfiguration()
+        refreshLenses(position: .back)
+        NotificationCenter.default.addObserver(self, selector: #selector(stopForInterruption), name: UIApplication.willResignActiveNotification, object: nil)
+        start()
+        #endif
+    }
+
+    func start() {
+        #if !targetEnvironment(simulator)
+        guard !session.isRunning else { return }
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             self?.session.startRunning()
         }
         #endif
     }
 
+    func stop() {
+        #if !targetEnvironment(simulator)
+        if movieOutput.isRecording {
+            movieOutput.stopRecording()
+        }
+        if session.isRunning {
+            session.stopRunning()
+        }
+        NotificationCenter.default.removeObserver(self, name: UIApplication.willResignActiveNotification, object: nil)
+        #endif
+    }
+
+    deinit {
+        stop()
+    }
+
+    @objc private func stopForInterruption() {
+        #if !targetEnvironment(simulator)
+        if movieOutput.isRecording {
+            movieOutput.stopRecording()
+        }
+        #endif
+    }
+
+    func refreshLenses(position: AVCaptureDevice.Position) {
+        currentPosition = position
+        let found = StudioLens.allCases.filter {
+            AVCaptureDevice.default($0.deviceType, for: .video, position: position) != nil
+        }
+        availableLenses = found.isEmpty ? [.wide] : found
+        if !availableLenses.contains(activeLens) {
+            activeLens = availableLenses.contains(.wide) ? .wide : availableLenses[0]
+        }
+    }
+
+    func selectLens(_ lens: StudioLens, position: AVCaptureDevice.Position) {
+        #if !targetEnvironment(simulator)
+        guard let device = AVCaptureDevice.default(lens.deviceType, for: .video, position: position),
+              let input = try? AVCaptureDeviceInput(device: device) else { return }
+        session.beginConfiguration()
+        for existing in session.inputs {
+            if let devInput = existing as? AVCaptureDeviceInput, devInput.device.hasMediaType(.video) {
+                session.removeInput(devInput)
+            }
+        }
+        if session.canAddInput(input) {
+            session.addInput(input)
+            activeLens = lens
+        }
+        applyStabilization()
+        session.commitConfiguration()
+        #endif
+    }
+
+    func focus(at devicePoint: CGPoint) {
+        #if !targetEnvironment(simulator)
+        guard let device = currentVideoDevice() else { return }
+        do {
+            try device.lockForConfiguration()
+            if device.isFocusPointOfInterestSupported {
+                device.focusPointOfInterest = devicePoint
+                device.focusMode = .autoFocus
+            }
+            if device.isExposurePointOfInterestSupported {
+                device.exposurePointOfInterest = devicePoint
+                device.exposureMode = .autoExpose
+            }
+            device.unlockForConfiguration()
+        } catch {
+            return
+        }
+        #endif
+    }
+
+    func setExposureBias(_ bias: Float) {
+        #if !targetEnvironment(simulator)
+        guard let device = currentVideoDevice() else { return }
+        let clamped = min(device.maxExposureTargetBias, max(device.minExposureTargetBias, bias))
+        do {
+            try device.lockForConfiguration()
+            device.setExposureTargetBias(clamped, completionHandler: nil)
+            device.unlockForConfiguration()
+            exposureBias = clamped
+        } catch {
+            return
+        }
+        #endif
+    }
+
+    private func currentVideoDevice() -> AVCaptureDevice? {
+        session.inputs.compactMap { $0 as? AVCaptureDeviceInput }.first { $0.device.hasMediaType(.video) }?.device
+    }
+
+    func applyStabilization() {
+        guard let connection = movieOutput.connection(with: .video), connection.isVideoStabilizationSupported else { return }
+        connection.preferredVideoStabilizationMode = .cinematic
+    }
+
     func capturePhoto(flash: Bool) {
         #if !targetEnvironment(simulator)
         if session.isRunning && !photoOutput.connections.isEmpty {
-            let settings = AVCapturePhotoSettings()
+            let settings: AVCapturePhotoSettings
+            if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
+                settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
+            } else {
+                settings = AVCapturePhotoSettings()
+            }
             if photoOutput.supportedFlashModes.contains(flash ? .on : .off) {
                 settings.flashMode = flash ? .on : .off
             }
@@ -866,6 +2049,9 @@ final class CameraPreviewViewController: UIViewController {
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private let backdropLayer = CAGradientLayer()
     private let gridLayer = CAShapeLayer()
+    private var simulatedImageView: UIImageView?
+    private var lastConfiguredPosition: AVCaptureDevice.Position? = nil
+    private var lastFlashState: Bool? = nil
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -874,11 +2060,24 @@ final class CameraPreviewViewController: UIViewController {
         setupSessionIfAuthorized()
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        setupSessionIfAuthorized()
+        controller?.configureIfAuthorized()
+        controller?.start()
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         backdropLayer.frame = view.bounds
+        simulatedImageView?.frame = view.bounds
         updateGridPath()
-        previewLayer?.frame = view.bounds
+        if let previewLayer {
+            previewLayer.frame = view.bounds
+            if let conn = previewLayer.connection, conn.isVideoOrientationSupported {
+                conn.videoOrientation = .portrait
+            }
+        }
     }
 
     private func setupViewfinderBackdrop() {
@@ -890,8 +2089,18 @@ final class CameraPreviewViewController: UIViewController {
         backdropLayer.locations = [0.0, 0.55, 1.0]
         view.layer.addSublayer(backdropLayer)
 
-        gridLayer.strokeColor = UIColor.white.withAlphaComponent(0.12).cgColor
-        gridLayer.lineWidth = 0.8
+        #if targetEnvironment(simulator)
+        let sim = UIImageView(image: UIReviewFixture.samplePreviewImage())
+        sim.contentMode = .scaleAspectFill
+        sim.clipsToBounds = true
+        sim.frame = view.bounds
+        view.addSubview(sim)
+        simulatedImageView = sim
+        #endif
+
+        // Grid & Crosshair overlay matching Google Camera in Android StudioActivity
+        gridLayer.strokeColor = UIColor(red: 0xFD / 255.0, green: 0xD6 / 255.0, blue: 0x63 / 255.0, alpha: 0.65).cgColor
+        gridLayer.lineWidth = 1.0
         gridLayer.fillColor = UIColor.clear.cgColor
         view.layer.addSublayer(gridLayer)
     }
@@ -901,6 +2110,8 @@ final class CameraPreviewViewController: UIViewController {
         let h = view.bounds.height
         guard w > 0, h > 0 else { return }
         let path = UIBezierPath()
+
+        // 3x3 Grid
         path.move(to: CGPoint(x: w / 3, y: 0))
         path.addLine(to: CGPoint(x: w / 3, y: h))
         path.move(to: CGPoint(x: 2 * w / 3, y: 0))
@@ -909,6 +2120,19 @@ final class CameraPreviewViewController: UIViewController {
         path.addLine(to: CGPoint(x: w, y: h / 3))
         path.move(to: CGPoint(x: 0, y: 2 * h / 3))
         path.addLine(to: CGPoint(x: w, y: 2 * h / 3))
+
+        // Amber balance center crosshair (+) matching Android StudioActivity lines 1795-1803
+        let cx = w / 2
+        let cy = h / 2
+        let cross: CGFloat = 12
+        path.move(to: CGPoint(x: cx - cross, y: cy))
+        path.addLine(to: CGPoint(x: cx + cross, y: cy))
+        path.move(to: CGPoint(x: cx, y: cy - cross))
+        path.addLine(to: CGPoint(x: cx, y: cy + cross))
+
+        // Center balance ring
+        path.addArc(withCenter: CGPoint(x: cx, y: cy), radius: 18, startAngle: 0, endAngle: .pi * 2, clockwise: true)
+
         gridLayer.path = path.cgPath
     }
 
@@ -916,7 +2140,9 @@ final class CameraPreviewViewController: UIViewController {
         #if !targetEnvironment(simulator)
         let status = AVCaptureDevice.authorizationStatus(for: .video)
         if status == .authorized {
-            attachHardwarePreview()
+            if previewLayer == nil {
+                attachHardwarePreview()
+            }
         } else if status == .notDetermined && !UIReviewFixture.isEnabled {
             AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
                 guard granted else { return }
@@ -932,16 +2158,47 @@ final class CameraPreviewViewController: UIViewController {
         #if !targetEnvironment(simulator)
         guard let ctrl = controller else { return }
         ctrl.configureIfAuthorized()
-        let layer = AVCaptureVideoPreviewLayer(session: ctrl.session)
-        layer.videoGravity = .resizeAspectFill
-        layer.frame = view.bounds
-        view.layer.addSublayer(layer)
-        previewLayer = layer
+        if previewLayer == nil {
+            let layer = AVCaptureVideoPreviewLayer(session: ctrl.session)
+            layer.videoGravity = .resizeAspectFill
+            layer.frame = view.bounds
+            if let conn = layer.connection, conn.isVideoOrientationSupported {
+                conn.videoOrientation = .portrait
+            }
+            view.layer.insertSublayer(layer, at: 0)
+            previewLayer = layer
+            backdropLayer.isHidden = true
+            simulatedImageView?.removeFromSuperview()
+            simulatedImageView = nil
+            let tap = UITapGestureRecognizer(target: self, action: #selector(handleFocusTap(_:)))
+            view.addGestureRecognizer(tap)
+            let pan = UIPanGestureRecognizer(target: self, action: #selector(handleExposurePan(_:)))
+            view.addGestureRecognizer(pan)
+        } else {
+            previewLayer?.frame = view.bounds
+            backdropLayer.isHidden = true
+        }
+        ctrl.start()
         #endif
+    }
+
+    @objc private func handleFocusTap(_ gesture: UITapGestureRecognizer) {
+        guard let previewLayer else { return }
+        let point = previewLayer.captureDevicePointConverted(fromLayerPoint: gesture.location(in: view))
+        controller?.focus(at: point)
+    }
+
+    @objc private func handleExposurePan(_ gesture: UIPanGestureRecognizer) {
+        let delta = Float(-gesture.translation(in: view).y / 120)
+        controller?.setExposureBias((controller?.exposureBias ?? 0) + delta)
+        gesture.setTranslation(.zero, in: view)
     }
 
     func setCamera(front: Bool) {
         #if !targetEnvironment(simulator)
+        let pos: AVCaptureDevice.Position = front ? .front : .back
+        guard pos != lastConfiguredPosition else { return }
+        lastConfiguredPosition = pos
         guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized,
               let session = controller?.session else { return }
         session.beginConfiguration()
@@ -950,17 +2207,21 @@ final class CameraPreviewViewController: UIViewController {
                 session.removeInput(devInput)
             }
         }
-        let pos: AVCaptureDevice.Position = front ? .front : .back
         if let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: pos),
            let input = try? AVCaptureDeviceInput(device: device), session.canAddInput(input) {
             session.addInput(input)
         }
+        controller?.applyStabilization()
         session.commitConfiguration()
+        controller?.refreshLenses(position: pos)
+        controller?.activeLens = .wide
         #endif
     }
 
     func setFlash(on: Bool) {
         #if !targetEnvironment(simulator)
+        guard on != lastFlashState else { return }
+        lastFlashState = on
         guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized,
               let device = AVCaptureDevice.default(for: .video), device.hasTorch else { return }
         try? device.lockForConfiguration()
@@ -1007,6 +2268,8 @@ final class PhotoSaveCoordinator: NSObject {
 // MARK: - Dedicated Native Video Player with AVPlayer & Integrated Controls
 struct StudioVideoPlayerView: View {
     let videoURL: URL
+    var videoProject: StudioVideoProject? = nil
+    var revisionId: String = ""
     @State private var player: AVPlayer?
     @State private var isPlaying: Bool = true
     @State private var currentTime: Double = 0
@@ -1143,10 +2406,23 @@ struct StudioVideoPlayerView: View {
             teardownPlayer()
             setupPlayer()
         }
+        .onChange(of: revisionId) { _ in
+            guard let curItem = player?.currentItem else { return }
+            if let vp = videoProject, vp.hasEdits {
+                curItem.videoComposition = vp.makeVideoComposition(for: curItem.asset)
+            } else {
+                curItem.videoComposition = nil
+            }
+        }
     }
 
     private func setupPlayer() {
-        let p = AVPlayer(url: videoURL)
+        let asset = AVURLAsset(url: videoURL)
+        let item = AVPlayerItem(asset: asset)
+        if let vp = videoProject, vp.hasEdits {
+            item.videoComposition = vp.makeVideoComposition(for: asset)
+        }
+        let p = AVPlayer(playerItem: item)
         p.isMuted = isMuted
         self.player = p
 

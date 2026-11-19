@@ -29,10 +29,28 @@ enum KinnectTheme {
     static var border: Color {
         Color(UIColor { trait in
             trait.userInterfaceStyle == .light
-                ? UIColor.black.withAlphaComponent(0.08)
-                : UIColor.white.withAlphaComponent(0.10)
+                    ? UIColor.black.withAlphaComponent(0.15)
+                    : UIColor.white.withAlphaComponent(0.20)
         })
     }
+
+    static var borderSoft: Color {
+        Color(UIColor { trait in
+            trait.userInterfaceStyle == .light
+                    ? UIColor.black.withAlphaComponent(0.08)
+                    : UIColor.white.withAlphaComponent(0.10)
+        })
+    }
+
+    static var line: Color { border }
+
+        // MARK: - Corner Radius Scale
+        static let radiusXS: CGFloat = 8
+        static let radiusSM: CGFloat = 12
+        static let radiusMD: CGFloat = 16
+        static let radiusLG: CGFloat = 24
+        static let radiusXL: CGFloat = 32
+        static let radiusPill: CGFloat = 999
 
     static let accent = Color(red: 0.49, green: 0.23, blue: 0.93)           // #7C3AED
     static let accentBright = Color(red: 0.65, green: 0.33, blue: 0.97)     // #A855F7
@@ -55,9 +73,32 @@ enum KinnectTheme {
         })
     }
 
+    static var textTertiary: Color {
+        textSecondary.opacity(0.65)
+    }
+
+    // MARK: - Typography Fonts
+    static let body: Font = .system(size: 15)
+    static let bodyBold: Font = .system(size: 15, weight: .bold)
+    static let caption: Font = .system(size: 12)
+    static let captionBold: Font = .system(size: 12, weight: .bold)
+
+    /// Time and small icons under chat bubbles. Dark mode stays light so it
+    /// remains readable on the purple-black background. Light mode stays dark.
+    static var messageMeta: Color {
+        Color(UIColor { trait in
+            trait.userInterfaceStyle == .light
+                ? UIColor(red: 0.29, green: 0.25, blue: 0.38, alpha: 1.0)
+                : UIColor(red: 0.82, green: 0.78, blue: 0.93, alpha: 1.0)
+        })
+    }
+
     static let rose = Color(red: 0.93, green: 0.28, blue: 0.60)
     static let emerald = Color(red: 0.09, green: 0.64, blue: 0.45)
     static let online = Color(red: 0.13, green: 0.77, blue: 0.37)
+    static let success = Color(red: 0.13, green: 0.77, blue: 0.37)
+    static let callGreen = Color(red: 0.19, green: 0.82, blue: 0.35)
+    static let callRed = Color(red: 1.0, green: 0.27, blue: 0.23)
     static let amber = Color(red: 0.96, green: 0.62, blue: 0.04)
     static let warning = Color(red: 0.96, green: 0.62, blue: 0.04)
     static let danger = Color(red: 0.94, green: 0.27, blue: 0.27)
@@ -77,12 +118,19 @@ enum KinnectTheme {
     static let brandGradient = primaryGradient
 
     static func relativeTime(from timestampMs: Int64) -> String {
-        guard timestampMs > 0 else { return "Vừa xong" }
+        guard timestampMs > 0 else { return L10n.tr("Vừa xong") }
         let seconds = max(0, Int((Int64(Date().timeIntervalSince1970 * 1000) - timestampMs) / 1000))
-        if seconds < 45 { return "Vừa xong" }
-        if seconds < 3600 { return "\(seconds / 60) phút" }
-        if seconds < 86400 { return "\(seconds / 3600) giờ" }
-        return "\(seconds / 86400) ngày"
+        if seconds < 45 { return L10n.tr("Vừa xong") }
+        if seconds < 3600 {
+            let mins = seconds / 60
+            return L10n.isEnglish ? "\(mins)m" : "\(mins) phút"
+        }
+        if seconds < 86400 {
+            let hrs = seconds / 3600
+            return L10n.isEnglish ? "\(hrs)h" : "\(hrs) giờ"
+        }
+        let days = seconds / 86400
+        return L10n.isEnglish ? "\(days)d" : "\(days) ngày"
     }
 }
 
@@ -108,6 +156,32 @@ extension Color {
     }
 }
 
+// MARK: - High-Performance In-Memory Image Cache (Zero Disk I/O & Butter-smooth 120 FPS)
+final class ImageMemoryCache {
+    static let shared = ImageMemoryCache()
+    private let cache = NSCache<NSString, UIImage>()
+
+    private init() {
+        cache.countLimit = 400
+        cache.totalCostLimit = 120 * 1024 * 1024 // 120 MB
+    }
+
+    func image(forKey key: String) -> UIImage? {
+        guard !key.isEmpty else { return nil }
+        return cache.object(forKey: key as NSString)
+    }
+
+    func store(_ image: UIImage, forKey key: String) {
+        guard !key.isEmpty else { return }
+        let cost = Int(image.size.width * image.size.height * 4)
+        cache.setObject(image, forKey: key as NSString, cost: cost)
+    }
+
+    func clear() {
+        cache.removeAllObjects()
+    }
+}
+
 struct KinnectAvatarView: View {
     let name: String
     let avatarURL: String
@@ -129,6 +203,7 @@ struct KinnectAvatarView: View {
         self.colorHex = colorHex
         self.size = size
         self.isOnline = isOnline
+        _loadedImage = State(initialValue: ImageMemoryCache.shared.image(forKey: avatarURL))
     }
 
     init(user: KinnectUser, size: CGFloat = 44) {
@@ -136,7 +211,8 @@ struct KinnectAvatarView: View {
         self.avatarURL = user.avatarUrl
         self.colorHex = user.avatarColor
         self.size = size
-        self.isOnline = user.isActive
+        self.isOnline = user.isActive && user.showActivity
+        _loadedImage = State(initialValue: ImageMemoryCache.shared.image(forKey: user.avatarUrl))
     }
 
     var body: some View {
@@ -174,12 +250,17 @@ struct KinnectAvatarView: View {
             }
         }
         .task(id: avatarURL) {
+            if let mem = ImageMemoryCache.shared.image(forKey: avatarURL) {
+                loadedImage = mem
+                return
+            }
             guard !avatarURL.isEmpty else {
                 loadedImage = nil
                 return
             }
             if let data = await KinnectAPIClient.shared.fetchBinaryData(path: avatarURL),
                let uiImg = UIImage(data: data) {
+                ImageMemoryCache.shared.store(uiImg, forKey: avatarURL)
                 loadedImage = uiImg
             }
         }
@@ -215,11 +296,13 @@ struct KinnectRemoteImageView: View {
         self.contentMode = contentMode
         self.cornerRadius = cornerRadius
         self.maxHeight = maxHeight
+        _image = State(initialValue: ImageMemoryCache.shared.image(forKey: rawURL))
     }
 
     init(path: String, maxHeight: CGFloat = 320) {
         self.rawURL = path
         self.maxHeight = maxHeight
+        _image = State(initialValue: ImageMemoryCache.shared.image(forKey: path))
     }
 
     var body: some View {
@@ -241,12 +324,17 @@ struct KinnectRemoteImageView: View {
             }
         }
         .task(id: rawURL) {
+            if let mem = ImageMemoryCache.shared.image(forKey: rawURL) {
+                image = mem
+                return
+            }
             guard !rawURL.isEmpty else {
                 failed = true
                 return
             }
             if let data = await KinnectAPIClient.shared.fetchBinaryData(path: rawURL),
                let uiImg = UIImage(data: data) {
+                ImageMemoryCache.shared.store(uiImg, forKey: rawURL)
                 image = uiImg
             } else {
                 failed = true
@@ -265,12 +353,123 @@ extension View {
     func kinnectCard() -> some View {
         self.padding(14)
             .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: KinnectTheme.radiusMD, style: .continuous)
                     .fill(KinnectTheme.surface)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            RoundedRectangle(cornerRadius: KinnectTheme.radiusMD, style: .continuous)
                             .stroke(KinnectTheme.border, lineWidth: 1)
                     )
             )
+    }
+
+    /// Shimmer wave animation for skeleton loading
+    func kinnectShimmer() -> some View {
+        modifier(KinnectShimmerModifier())
+    }
+}
+
+// MARK: - Skeleton Shimmer Loading (Micro-interactions & UX Parity)
+public struct KinnectShimmerModifier: ViewModifier {
+    @State private var phase: CGFloat = -1.0
+
+    public func body(content: Content) -> some View {
+        content
+            .overlay(
+                GeometryReader { geo in
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.0),
+                            Color.white.opacity(0.12),
+                            Color.white.opacity(0.0)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .frame(width: geo.size.width * 1.5)
+                    .offset(x: phase * geo.size.width)
+                }
+            )
+            .clipped()
+            .onAppear {
+                withAnimation(
+                    .linear(duration: 1.4)
+                    .repeatForever(autoreverses: false)
+                ) {
+                    phase = 1.8
+                }
+            }
+    }
+}
+
+public struct PostSkeletonCard: View {
+    public init() {}
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(KinnectTheme.surfaceElevated)
+                    .frame(width: 42, height: 42)
+                VStack(alignment: .leading, spacing: 6) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(KinnectTheme.surfaceElevated)
+                        .frame(width: 130, height: 14)
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(KinnectTheme.surfaceElevated)
+                        .frame(width: 80, height: 10)
+                }
+                Spacer()
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(KinnectTheme.surfaceElevated)
+                    .frame(maxWidth: .infinity, minHeight: 12)
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(KinnectTheme.surfaceElevated)
+                    .frame(width: 220, height: 12)
+            }
+            RoundedRectangle(cornerRadius: KinnectTheme.radiusLG)
+                .fill(KinnectTheme.surfaceElevated)
+                .frame(maxWidth: .infinity)
+                .frame(height: 200)
+            HStack {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(KinnectTheme.surfaceElevated)
+                    .frame(width: 70, height: 18)
+                Spacer()
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(KinnectTheme.surfaceElevated)
+                    .frame(width: 80, height: 18)
+                Spacer()
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(KinnectTheme.surfaceElevated)
+                    .frame(width: 60, height: 18)
+            }
+            .padding(.top, 4)
+        }
+        .kinnectCard()
+        .kinnectShimmer()
+    }
+}
+
+public struct StorySkeletonStrip: View {
+    public init() {}
+    public var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(0..<5, id: \.self) { _ in
+                    VStack(spacing: 6) {
+                        Circle()
+                            .fill(KinnectTheme.surfaceElevated)
+                            .frame(width: 58, height: 58)
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(KinnectTheme.surfaceElevated)
+                            .frame(width: 44, height: 10)
+                    }
+                    .frame(width: 68)
+                }
+            }
+            .padding(.vertical, 6)
+        }
+        .kinnectShimmer()
     }
 }

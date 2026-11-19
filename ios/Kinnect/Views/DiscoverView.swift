@@ -25,7 +25,7 @@ struct DiscoverView: View {
     @State private var selectedUserForDetail: KinnectUser?
     @State private var activeFilterType: FilterSheetType?
 
-    // Quick filter states
+    // Quick filter states (matching Android MainActivity lines 1650-1668)
     @State private var minAge: Int = 0
     @State private var maxAge: Int = 0
     @State private var minWeight: Int = 0
@@ -33,6 +33,11 @@ struct DiscoverView: View {
     @State private var minHeight: Int = 0
     @State private var maxHeight: Int = 0
     @State private var selectedGender: String = ""
+    @State private var selectedOrientation: String = ""
+    @State private var selectedRole: String = ""
+    @State private var selectedIntent: String = ""
+    @State private var isOnlineOnly: Bool = false
+    @State private var isRecentOnly: Bool = false
     @State private var hasLocationPermission: Bool = true
 
     private let gridColumns = [
@@ -67,22 +72,20 @@ struct DiscoverView: View {
                 FilterChipButton(title: "Chiều cao", isSelected: minHeight > 0 || maxHeight > 0) {
                     activeFilterType = .height
                 }
-                FilterChipButton(title: "Giới tính", isSelected: !selectedGender.isEmpty) {
+                FilterChipButton(title: "Giới tính", isSelected: !selectedGender.isEmpty || !selectedOrientation.isEmpty || !selectedRole.isEmpty) {
                     activeFilterType = .gender
                 }
                 Button {
                     activeFilterType = .full
                 } label: {
-                    KinnectIcon(
-                        glyph: .more,
-                        size: 20,
-                        tint: isFilterActive ? KinnectTheme.accentBright : KinnectTheme.textSecondary
-                    )
-                    .frame(width: 44, height: 44)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(isFilterActive ? KinnectTheme.accent.opacity(0.18) : KinnectTheme.surfaceElevated)
-                    )
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(isFilterActive ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
+                        .frame(width: 44, height: 44)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(isFilterActive ? KinnectTheme.accent.opacity(0.18) : KinnectTheme.surfaceElevated)
+                        )
                 }
                 .accessibilityLabel("Bộ lọc tổng hợp")
             }
@@ -104,7 +107,36 @@ struct DiscoverView: View {
             // 3. Main Content: 3-Column Adaptive Grid (Android AdaptivePeopleGrid)
             ScrollView {
                 VStack(spacing: 12) {
-                    if isLoading && visiblePeople.isEmpty {
+                    if segment == .nearby && appState.currentUser?.hasLocation != true {
+                        VStack(spacing: 12) {
+                            KinnectIcon(glyph: .nearby, size: 40, tint: KinnectTheme.accentBright)
+                            Text("Khám phá quanh bạn")
+                                .font(.headline.bold())
+                                .foregroundColor(KinnectTheme.textPrimary)
+                            Text("Chỉ dùng vị trí gần đúng, lưu theo ô khoảng 5 km trong tối đa 24 giờ hiệu lực; không công khai tọa độ. Bạn có thể tắt và xóa ở Hồ sơ.")
+                                .font(.caption)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 20)
+                            Button {
+                                Task { await requestEnableLocation() }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "location.fill")
+                                    Text("Bật vị trí")
+                                        .font(.subheadline.bold())
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 10)
+                                .background(KinnectTheme.primaryGradient)
+                                .clipShape(Capsule())
+                            }
+                        }
+                        .padding(.vertical, 32)
+                        .frame(maxWidth: .infinity)
+                        .kinnectCard()
+                    } else if isLoading && visiblePeople.isEmpty {
                         ProgressView().tint(KinnectTheme.accentBright).padding(.vertical, 40)
                     } else if visiblePeople.isEmpty {
                         emptyDiscoveryView
@@ -113,7 +145,7 @@ struct DiscoverView: View {
                             ForEach(visiblePeople) { person in
                                 DiscoverSquareUserTile(
                                     person: person,
-                                    isOnline: appState.onlineUserIds.contains(person.id),
+                                    isOnline: (person.isActive && person.showActivity) || appState.onlineUserIds.contains(person.id),
                                     onTap: { selectedUserForDetail = person }
                                 )
                             }
@@ -143,6 +175,11 @@ struct DiscoverView: View {
                 minHeight: $minHeight,
                 maxHeight: $maxHeight,
                 selectedGender: $selectedGender,
+                selectedOrientation: $selectedOrientation,
+                selectedRole: $selectedRole,
+                selectedIntent: $selectedIntent,
+                isOnlineOnly: $isOnlineOnly,
+                isRecentOnly: $isRecentOnly,
                 onApply: {
                     Task { await loadCurrentSegment() }
                 },
@@ -151,24 +188,31 @@ struct DiscoverView: View {
                     minWeight = 0; maxWeight = 0
                     minHeight = 0; maxHeight = 0
                     selectedGender = ""
+                    selectedOrientation = ""
+                    selectedRole = ""
+                    selectedIntent = ""
+                    isOnlineOnly = false
+                    isRecentOnly = false
                     Task { await loadCurrentSegment() }
                 }
             )
         }
-        .sheet(item: $selectedUserForDetail) { person in
-            DiscoverUserDetailSheet(
-                person: person,
-                isOnline: appState.onlineUserIds.contains(person.id),
-                onFollowToggle: { Task { await toggleFollow(person) } },
-                onCallVideo: {
-                    Task { await NativeWebRTCManager.shared.startOutgoingCall(targetUser: person, mode: "video") }
-                }
-            )
+        .fullScreenCover(item: $selectedUserForDetail) { person in
+            NavigationStack {
+                ProfileView(targetUser: person)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Đóng") { selectedUserForDetail = nil }
+                        }
+                    }
+            }
         }
     }
 
     private var isFilterActive: Bool {
-        minAge > 0 || maxAge > 0 || minWeight > 0 || maxWeight > 0 || minHeight > 0 || maxHeight > 0 || !selectedGender.isEmpty
+        minAge > 0 || maxAge > 0 || minWeight > 0 || maxWeight > 0 || minHeight > 0 || maxHeight > 0 ||
+        !selectedGender.isEmpty || !selectedOrientation.isEmpty || !selectedRole.isEmpty || !selectedIntent.isEmpty ||
+        isOnlineOnly || isRecentOnly
     }
 
     private var visiblePeople: [KinnectUser] {
@@ -176,7 +220,23 @@ struct DiscoverView: View {
             guard !appState.blockedUserIds.contains(p.id) && p.id != appState.currentUser?.id else { return false }
             if minAge > 0 && p.age < minAge { return false }
             if maxAge > 0 && p.age > maxAge { return false }
-            if !selectedGender.isEmpty && p.gender.lowercased() != selectedGender.lowercased() { return false }
+            if minWeight > 0 && p.weight < minWeight { return false }
+            if maxWeight > 0 && p.weight > maxWeight { return false }
+            if minHeight > 0 && p.height < minHeight { return false }
+            if maxHeight > 0 && p.height > maxHeight { return false }
+            if isOnlineOnly && !p.isActive { return false }
+            if !selectedGender.isEmpty {
+                if !p.gender.localizedCaseInsensitiveContains(selectedGender) { return false }
+            }
+            if !selectedOrientation.isEmpty {
+                if !p.orientation.localizedCaseInsensitiveContains(selectedOrientation) { return false }
+            }
+            if !selectedRole.isEmpty {
+                if !p.communityRole.localizedCaseInsensitiveContains(selectedRole) { return false }
+            }
+            if !selectedIntent.isEmpty {
+                if !p.lookingFor.localizedCaseInsensitiveContains(selectedIntent) { return false }
+            }
             return true
         }
     }
@@ -259,30 +319,10 @@ struct DiscoverView: View {
             }
 
         case .nearby:
-            locationStatusText = "Đang xác định vị trí GPS..."
-            if let coord = await MediaPermissionHandler.shared.requestCurrentLocation() {
-                locationStatusText = String(format: "Vị trí: %.4f, %.4f (bán kính 50km)", coord.latitude, coord.longitude)
-                _ = try? await KinnectAPIClient.shared.requestJSON(
-                    "/api/me/location",
-                    method: "PATCH",
-                    body: [
-                        "lat": coord.latitude,
-                        "lng": coord.longitude
-                    ],
-                    requestId: "loc_\(Int(Date().timeIntervalSince1970))"
-                )
-                let path = "/api/discover?nearby=1&lat=\(coord.latitude)&lng=\(coord.longitude)&radiusKm=50\(filterParams)"
-                if let res = try? await KinnectAPIClient.shared.requestJSON(path) {
-                    self.people = (res["people"] as? [[String: Any]] ?? res["users"] as? [[String: Any]] ?? []).map(KinnectUser.from)
-                    self.posts = (res["posts"] as? [[String: Any]] ?? []).map(PostItem.from)
-                }
-            } else {
-                locationStatusText = "Chưa cấp quyền vị trí. Đang hiển thị khu vực mặc định."
-                let path = "/api/discover?nearby=1\(filterParams)"
-                if let res = try? await KinnectAPIClient.shared.requestJSON(path) {
-                    self.people = (res["people"] as? [[String: Any]] ?? res["users"] as? [[String: Any]] ?? []).map(KinnectUser.from)
-                    self.posts = (res["posts"] as? [[String: Any]] ?? []).map(PostItem.from)
-                }
+            let path = "/api/discover?nearby=1&radius=50&sort=new\(filterParams)"
+            if let res = try? await KinnectAPIClient.shared.requestJSON(path) {
+                self.people = (res["people"] as? [[String: Any]] ?? res["users"] as? [[String: Any]] ?? []).map(KinnectUser.from)
+                self.posts = (res["posts"] as? [[String: Any]] ?? []).map(PostItem.from)
             }
 
         case .following:
@@ -291,6 +331,31 @@ struct DiscoverView: View {
                 self.people = (res["people"] as? [[String: Any]] ?? res["users"] as? [[String: Any]] ?? []).map(KinnectUser.from)
                 self.posts = (res["posts"] as? [[String: Any]] ?? []).map(PostItem.from)
             }
+        }
+    }
+
+    private func requestEnableLocation() async {
+        locationStatusText = "Đang lấy vị trí gần đúng…"
+        if let coord = await MediaPermissionHandler.shared.requestCurrentLocation() {
+            let body: [String: Any] = [
+                "enabled": true,
+                "latitude": coord.latitude,
+                "longitude": coord.longitude
+            ]
+            _ = try? await KinnectAPIClient.shared.requestJSON(
+                "/api/me/location",
+                method: "PATCH",
+                body: body,
+                requestId: "loc_\(Int(Date().timeIntervalSince1970))"
+            )
+            if var me = appState.currentUser {
+                me.hasLocation = true
+                appState.currentUser = me
+            }
+            locationStatusText = "Đang tìm kiếm quanh đây trong bán kính 50 km"
+            await loadCurrentSegment()
+        } else {
+            locationStatusText = "Chưa cấp quyền vị trí. Bạn có thể bật vị trí trong Cài đặt máy."
         }
     }
 
@@ -375,8 +440,24 @@ private struct DiscoverSquareUserTile: View {
                             )
                     }
 
-                    // Top-Right Badge: "Mới" or Online
-                    if isOnline {
+                    // Top-Left Online Dot (Android parity lines 1639: 10dp ONLINE dot with 2dp CARD stroke)
+                    if isOnline || person.isActive {
+                        VStack {
+                            HStack {
+                                Circle()
+                                    .fill(KinnectTheme.online)
+                                    .frame(width: 10, height: 10)
+                                    .overlay(Circle().stroke(KinnectTheme.surface, lineWidth: 2))
+                                    .padding(7)
+                                Spacer()
+                            }
+                            Spacer()
+                        }
+                    }
+
+                    // Top-Right Badge: "Mới" (Android parity lines 1638: RegistrationBadge.today)
+                    let isNew = person.joinedAt > 0 && (Date().timeIntervalSince1970 * 1000 - Double(person.joinedAt)) < 86_400_000
+                    if isNew {
                         VStack {
                             HStack {
                                 Spacer()
@@ -404,19 +485,30 @@ private struct DiscoverSquareUserTile: View {
                     // Overlay Meta: Distance & Name
                     VStack(alignment: .leading, spacing: 1) {
                         if let dist = person.distanceKm {
-                            Text(String(format: "%.1f km", dist))
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(Color.white.opacity(0.9))
+                            HStack(spacing: 3) {
+                                Image(systemName: "location.fill")
+                                    .font(.system(size: 8))
+                                    .foregroundColor(.white.opacity(0.85))
+                                Text(String(format: "%.1f km", dist))
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(Color.white.opacity(0.95))
+                            }
                         } else if !person.locationName.isEmpty {
-                            Text(person.locationName)
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(Color.white.opacity(0.9))
-                                .lineLimit(1)
+                            HStack(spacing: 3) {
+                                Image(systemName: "mappin.circle.fill")
+                                    .font(.system(size: 8))
+                                    .foregroundColor(.white.opacity(0.85))
+                                Text(person.locationName)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundColor(Color.white.opacity(0.9))
+                                    .lineLimit(1)
+                            }
                         }
                         Text(person.name)
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.system(size: 12, weight: .bold))
                             .foregroundColor(.white)
-                            .lineLimit(1)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.85)
                     }
                     .padding(.horizontal, 8)
                     .padding(.bottom, 6)
@@ -512,7 +604,7 @@ private struct DiscoverUserDetailSheet: View {
     }
 }
 
-// 7. Interactive Discover Filter Sheet
+// 7. Interactive Discover Filter Sheet (100% Parity with Android MainActivity lines 1650-1668)
 private struct DiscoverFilterSheet: View {
     let type: DiscoverView.FilterSheetType
     @Binding var minAge: Int
@@ -522,11 +614,34 @@ private struct DiscoverFilterSheet: View {
     @Binding var minHeight: Int
     @Binding var maxHeight: Int
     @Binding var selectedGender: String
+    @Binding var selectedOrientation: String
+    @Binding var selectedRole: String
+    @Binding var selectedIntent: String
+    @Binding var isOnlineOnly: Bool
+    @Binding var isRecentOnly: Bool
     let onApply: () -> Void
     let onReset: () -> Void
     @Environment(\.dismiss) private var dismiss
 
-    private let genders = ["", "Nam", "Nữ", "Khác"]
+    private let genders = [
+        "", "Nam", "Nữ", "Nam chuyển giới", "Nữ chuyển giới",
+        "Phi nhị nguyên", "Linh hoạt giới", "Vô giới", "Khác"
+    ]
+
+    private let orientations = [
+        "", "Gay / Đồng tính nam", "Lesbian / Đồng tính nữ", "Song tính / Bisexual",
+        "Toàn tính / Pansexual", "Vô tính / Asexual", "Dị tính", "Queer",
+        "Á tính / Demisexual", "Đang tìm hiểu", "Khác"
+    ]
+
+    private let communityRoles = [
+        "", "Top", "Bottom", "Vers", "Vers Top", "Vers Bottom",
+        "Side", "Femme", "Masc / Butch", "Androgynous", "Stem", "Đang tìm hiểu", "Khác"
+    ]
+
+    private let intents = [
+        "", "Trò chuyện", "Kết bạn", "Hẹn hò"
+    ]
 
     var body: some View {
         NavigationStack {
@@ -540,27 +655,54 @@ private struct DiscoverFilterSheet: View {
 
                 if type == .weight || type == .full {
                     Section("Cân nặng (kg)") {
-                        Stepper("Tối thiểu: \(minWeight > 0 ? "\(minWeight) kg" : "Bất kỳ")", value: $minWeight, in: 0...200, step: 5)
-                        Stepper("Tối đa: \(maxWeight > 0 ? "\(maxWeight) kg" : "Bất kỳ")", value: $maxWeight, in: 0...200, step: 5)
+                        Stepper("Tối thiểu: \(minWeight > 0 ? "\(minWeight) kg" : "Bất kỳ")", value: $minWeight, in: 0...400, step: 5)
+                        Stepper("Tối đa: \(maxWeight > 0 ? "\(maxWeight) kg" : "Bất kỳ")", value: $maxWeight, in: 0...400, step: 5)
                     }
                 }
 
                 if type == .height || type == .full {
                     Section("Chiều cao (cm)") {
-                        Stepper("Tối thiểu: \(minHeight > 0 ? "\(minHeight) cm" : "Bất kỳ")", value: $minHeight, in: 0...220, step: 5)
-                        Stepper("Tối đa: \(maxHeight > 0 ? "\(maxHeight) cm" : "Bất kỳ")", value: $maxHeight, in: 0...220, step: 5)
+                        Stepper("Tối thiểu: \(minHeight > 0 ? "\(minHeight) cm" : "Bất kỳ")", value: $minHeight, in: 0...250, step: 5)
+                        Stepper("Tối đa: \(maxHeight > 0 ? "\(maxHeight) cm" : "Bất kỳ")", value: $maxHeight, in: 0...250, step: 5)
                     }
                 }
 
                 if type == .gender || type == .full {
-                    Section("Giới tính") {
-                        Picker("Giới tính", selection: $selectedGender) {
+                    Section("Bản dạng giới & Xu hướng (LGBT+)") {
+                        Picker("Bản dạng giới", selection: $selectedGender) {
                             Text("Tất cả").tag("")
-                            Text("Nam").tag("Nam")
-                            Text("Nữ").tag("Nữ")
-                            Text("Khác").tag("Khác")
+                            ForEach(genders.filter { !$0.isEmpty }, id: \.self) { g in
+                                Text(g).tag(g)
+                            }
                         }
-                        .pickerStyle(.segmented)
+
+                        Picker("Xu hướng tính dục", selection: $selectedOrientation) {
+                            Text("Tất cả").tag("")
+                            ForEach(orientations.filter { !$0.isEmpty }, id: \.self) { o in
+                                Text(o).tag(o)
+                            }
+                        }
+
+                        Picker("Vai trò tự mô tả", selection: $selectedRole) {
+                            Text("Tất cả").tag("")
+                            ForEach(communityRoles.filter { !$0.isEmpty }, id: \.self) { r in
+                                Text(r).tag(r)
+                            }
+                        }
+
+                        Picker("Mục đích kết nối", selection: $selectedIntent) {
+                            Text("Tất cả").tag("")
+                            ForEach(intents.filter { !$0.isEmpty }, id: \.self) { i in
+                                Text(i).tag(i)
+                            }
+                        }
+                    }
+
+                    Section("Trạng thái hoạt động") {
+                        Toggle("Đang online", isOn: $isOnlineOnly)
+                            .tint(KinnectTheme.accentBright)
+                        Toggle("Hoạt động gần đây", isOn: $isRecentOnly)
+                            .tint(KinnectTheme.accentBright)
                     }
                 }
             }

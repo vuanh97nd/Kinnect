@@ -36,7 +36,9 @@ final class AppState: ObservableObject {
     @Published var isCurrentLiveHost: Bool = false
     @Published var liveChatMessages: [LiveChatMessage] = []
     @Published var liveGiftRanking: [[String: Any]] = []
+    @Published var navigationTargetRef: String = ""
     @Published var liveLastReactionBanner: String?
+    @Published var liveGiftCombo: Int = 0
 
     func joinLiveRoom(_ room: LiveRoomItem) {
         if currentLiveRoom?.id == room.id {
@@ -52,6 +54,7 @@ final class AppState: ObservableObject {
         liveChatMessages = []
         liveGiftRanking = []
         liveLastReactionBanner = nil
+        liveGiftCombo = 0
 
         if !UIReviewFixture.isEnabled && !isHost {
             Task {
@@ -77,6 +80,7 @@ final class AppState: ObservableObject {
         liveChatMessages = []
         liveGiftRanking = []
         liveLastReactionBanner = nil
+        liveGiftCombo = 0
     }
 
     private init() {
@@ -90,9 +94,9 @@ final class AppState: ObservableObject {
                 await NativeWebRTCManager.shared.acceptIncomingCall(callId: callId)
             }
         }
-        CallKitManager.shared.onEndCall = { _ in
+        CallKitManager.shared.onEndCall = { callId in
             Task { @MainActor in
-                NativeWebRTCManager.shared.endOrRejectCurrentCall(sendSocket: true)
+                NativeWebRTCManager.shared.endOrRejectCurrentCall(sendSocket: true, fallbackCallId: callId)
             }
         }
         CallKitManager.shared.onSetMuted = { _, isMuted in
@@ -164,27 +168,31 @@ final class AppState: ObservableObject {
     }
 
     func applyAuthenticatedUser(_ user: KinnectUser, rawDict: [String: Any], rememberMe: Bool = true) {
+        let origin = KinnectAPIClient.shared.baseURL
         self.currentUser = user
         UserDefaults.standard.set(rememberMe, forKey: "kinnect_session_remembered")
-        AccountCache.shared.setActiveAccount(user.id)
+        AccountCache.shared.setActiveAccount(user.id, origin: origin)
         AccountCache.shared.saveJSONObject(rawDict, forKey: "profile_me", accountId: user.id)
-        KeychainStore.shared.setRememberMe(rememberMe)
-        KeychainStore.shared.saveAccountId(user.id)
+        KeychainStore.shared.setRememberMe(rememberMe, for: origin)
+        KeychainStore.shared.saveAccountId(user.id, for: origin)
         NativeSocketClient.shared.connectWithKeychainSession()
         PushKitManager.shared.startRegistration()
+        startActivityHeartbeat()
     }
 
     func logout() async {
+        await PushKitManager.shared.unregisterStoredTokens()
         _ = try? await KinnectAPIClient.shared.requestJSON("/api/logout", method: "POST", body: [:])
         clearSessionState()
     }
 
     func clearSessionState() {
+        stopActivityHeartbeat()
         NativeWebRTCManager.shared.endOrRejectCurrentCall(sendSocket: false)
         NativeWebRTCManager.shared.stopLiveSession()
         CallKitManager.shared.endAllCalls()
         NativeSocketClient.shared.disconnect()
-        KeychainStore.shared.clearAll()
+        KeychainStore.shared.clearAuthSessions()
         AccountCache.shared.wipeAllCaches()
         currentUser = nil
         unreadNotificationsCount = 0
@@ -197,18 +205,38 @@ final class AppState: ObservableObject {
 
     func refreshGlobalBadges() async {
         guard currentUser != nil else { return }
-        if let notifRes = try? await KinnectAPIClient.shared.requestJSON("/api/notifications") {
+        // Sequential: KinnectAPIClient.activeOrigin is unsynchronized shared state.
+        // Overlapping calls can read it while a transport fallback writes it.
+        let notifRes = try? await KinnectAPIClient.shared.requestJSON("/api/notifications")
+        let convRes = try? await KinnectAPIClient.shared.requestJSON("/api/conversations")
+        let groupRes = try? await KinnectAPIClient.shared.requestJSON("/api/groups")
+
+        if let notifRes {
             let items = (notifRes["notifications"] as? [[String: Any]] ?? []).map(NotificationItem.from)
             self.unreadNotificationsCount = items.filter { !$0.read }.count
         }
-        if let convRes = try? await KinnectAPIClient.shared.requestJSON("/api/conversations") {
-            let list = convRes["conversations"] as? [[String: Any]] ?? []
-            var total = 0
-            for item in list {
-                total += (item["unreadCount"] as? Int ?? 0)
-            }
-            self.unreadMessagesCount = total
+        // Real API: { users: [{ unread }] } plus /api/groups { groups: [{ unread }] }.
+        // UI review fixture: { conversations: [{ unreadCount }] } and groups[].unreadCount.
+        guard let convRes else { return }
+        let direct = (convRes["users"] as? [[String: Any]])
+            ?? (convRes["conversations"] as? [[String: Any]])
+            ?? []
+        var total = Self.unreadTotal(direct)
+        if let groupRes {
+            let groups = groupRes["groups"] as? [[String: Any]] ?? []
+            total += Self.unreadTotal(groups)
         }
+        self.unreadMessagesCount = total
+    }
+
+    /// Prefer the live `unread` field, then the fixture `unreadCount` field.
+    private static func unreadTotal(_ items: [[String: Any]]) -> Int {
+        var total = 0
+        for item in items {
+            let count = (item["unread"] as? Int) ?? (item["unreadCount"] as? Int) ?? 0
+            if count > 0 { total += count }
+        }
+        return total
     }
 
     func refreshBlockedUsers() async {
@@ -318,7 +346,9 @@ final class AppState: ObservableObject {
             let qty = json["quantity"] as? Int ?? 1
             let isGift = (json["experience"] as? Bool) ?? (json["isGift"] as? Bool) ?? (json["giftId"] != nil)
             if isGift {
-                self.liveLastReactionBanner = "🎁 \(senderName) đã gửi \(qty)x \(label)"
+                let same = self.liveLastReactionBanner?.contains(label) == true
+                self.liveGiftCombo = same ? self.liveGiftCombo + qty : qty
+                self.liveLastReactionBanner = "🎁 \(senderName) đã gửi \(self.liveGiftCombo)x \(label)"
             } else {
                 self.liveLastReactionBanner = "💜 \(senderName) thả cảm xúc \(label)"
             }
@@ -328,7 +358,11 @@ final class AppState: ObservableObject {
             } else if let ranking = json["giftRanking"] as? [[String: Any]] {
                 self.liveGiftRanking = ranking
             }
-        case "live-gift-error":
+        case "live-gift-receipt":
+            NotificationCenter.default.post(name: Notification.Name("kinnectLiveGiftResult"), object: nil, userInfo: json)
+            Task { await refreshGlobalBadges() }
+        case "live-mode-error", "live-gift-error":
+            NotificationCenter.default.post(name: Notification.Name("kinnectLiveGiftResult"), object: nil, userInfo: json)
             if let message = json["message"] as? String {
                 showToast(message)
             }
@@ -350,6 +384,8 @@ final class AppState: ObservableObject {
             }
         case "call-incoming":
             NativeWebRTCManager.shared.handleIncomingCallSocket(json)
+        case "call-ringing":
+            NativeWebRTCManager.shared.handleCallRingingSocket(json)
         case "call-accepted":
             NativeWebRTCManager.shared.handleCallAcceptedSocket(json)
         case "call-signal":
@@ -373,6 +409,44 @@ final class AppState: ObservableObject {
         default:
             break
         }
+    }
+
+    // MARK: - Active Status Reporting (1:1 Android MainActivity.activity lines 5411-5415)
+    private var lastActivityReportTime: TimeInterval = 0
+    private var activityTimer: Timer?
+
+    func reportActiveStatus(force: Bool = false) {
+        guard currentUser != nil else { return }
+        let now = Date().timeIntervalSince1970
+        if !force && (now - lastActivityReportTime < 50.0) {
+            return
+        }
+        lastActivityReportTime = now
+        Task {
+            _ = try? await KinnectAPIClient.shared.requestJSON(
+                "/api/me/activity",
+                method: "POST",
+                body: [:]
+            )
+        }
+    }
+
+    func startActivityHeartbeat() {
+        activityTimer?.invalidate()
+        reportActiveStatus(force: true)
+        activityTimer = Timer.scheduledTimer(withTimeInterval: 50.0, repeats: true) { [weak self] _ in
+            self?.reportActiveStatus(force: true)
+        }
+    }
+
+    func stopActivityHeartbeat() {
+        activityTimer?.invalidate()
+        activityTimer = nil
+    }
+
+    func navigate(to route: String) {
+        reportActiveStatus()
+        NotificationCenter.default.post(name: .kinnectNavigateRoute, object: route)
     }
 
     /// Presents the explicit privacy consent sheet. If the version or full notice is unknown
@@ -400,6 +474,7 @@ final class AppState: ObservableObject {
 }
 
 extension Notification.Name {
+    static let kinnectNavigateRoute = Notification.Name("kinnectNavigateRoute")
     static let kinnectMessagesChanged = Notification.Name("kinnectMessagesChanged")
     static let kinnectNotificationsChanged = Notification.Name("kinnectNotificationsChanged")
     static let kinnectContentModerated = Notification.Name("kinnectContentModerated")
