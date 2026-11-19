@@ -346,9 +346,12 @@ final class KinnectNetworkParityUITests: XCTestCase {
         let fallback401 = metrics401["fallbackRequests"] as? [[String: Any]] ?? []
 
         // Subcase E: GET transport failure on primary CAN fail over to fallback (bounded)
+        // Navigate away (Khám phá) and back (Bảng tin) so FeedView.task deterministically fires GET /api/posts.
         _ = try ctrlRequest("/_qa/fault", method: "POST", body: ["dropPrimaryFeedGet": 5])
-        startCoord.press(forDuration: 0.1, thenDragTo: endCoord)
-        RunLoop.current.run(until: Date().addingTimeInterval(3.5))
+        app.buttons["Khám phá"].firstMatch.tap()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.8))
+        app.buttons["Bảng tin"].firstMatch.tap()
+        RunLoop.current.run(until: Date().addingTimeInterval(4.5))
         saveScreenshot("n3-get-failover.png")
         let metricsGetFailover = try ctrlRequest("/_qa/metrics")
         let fallbackGet = metricsGetFailover["fallbackRequests"] as? [[String: Any]] ?? []
