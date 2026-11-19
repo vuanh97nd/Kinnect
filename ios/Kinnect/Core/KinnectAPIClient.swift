@@ -1,4 +1,7 @@
 import Foundation
+#if DEBUG
+import Security
+#endif
 
 enum KinnectAPIError: LocalizedError {
     case invalidURL
@@ -56,7 +59,18 @@ final class KinnectAPIClient {
         config.timeoutIntervalForRequest = requestTimeout
         config.timeoutIntervalForResource = 45
         config.httpShouldSetCookies = false
+        #if DEBUG
+        if let idx = CommandLine.arguments.firstIndex(of: "--qa-ca-der"),
+           idx + 1 < CommandLine.arguments.count,
+           let derData = try? Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[idx + 1])),
+           let caCert = SecCertificateCreateWithData(nil, derData as CFData) {
+            self.session = URLSession(configuration: config, delegate: QALocalhostTrustDelegate(caCert: caCert), delegateQueue: nil)
+        } else {
+            self.session = URLSession(configuration: config)
+        }
+        #else
         self.session = URLSession(configuration: config)
+        #endif
     }
 
     var currentAccountId: String {
@@ -451,3 +465,35 @@ enum KinnectAuthenticatedFile {
         return destination
     }
 }
+
+#if DEBUG
+/// Strictly scoped loopback-only TLS anchor delegate for QA CI runs with `--qa-ca-der`.
+/// Evaluates full X.509 trust against the ephemeral QA Root CA for 127.0.0.1/localhost only.
+private final class QALocalhostTrustDelegate: NSObject, URLSessionDelegate {
+    private let caCert: SecCertificate
+    init(caCert: SecCertificate) {
+        self.caCert = caCert
+    }
+    func urlSession(
+        _ session: URLSession,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        let space = challenge.protectionSpace
+        guard space.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+              let trust = space.serverTrust,
+              space.host == "127.0.0.1" || space.host == "localhost" else {
+            completionHandler(.performDefaultHandling, nil)
+            return
+        }
+        SecTrustSetAnchorCertificates(trust, [caCert] as CFArray)
+        SecTrustSetAnchorCertificatesOnly(trust, true)
+        var cfError: CFError?
+        if SecTrustEvaluateWithError(trust, &cfError) {
+            completionHandler(.useCredential, URLCredential(trust: trust))
+        } else {
+            completionHandler(.cancelAuthenticationChallenge, nil)
+        }
+    }
+}
+#endif

@@ -5,6 +5,7 @@ and real-backend parity screenshot captures on a macOS CI runner.
 """
 import json
 import os
+import re
 import secrets
 import shutil
 import signal
@@ -96,10 +97,29 @@ def generate_ephemeral_tls(cert_dir: Path):
         "-out", str(leaf_pem), "-days", "7", "-sha256",
         "-extfile", str(ext_cfg),
     ])
-    return ca_pem, leaf_key, leaf_pem
+    ca_der = Path("/tmp/qa-ios-ca.der")
+    run([
+        "openssl", "x509", "-in", str(ca_pem), "-outform", "DER", "-out", str(ca_der)
+    ])
+    return ca_pem, ca_der, leaf_key, leaf_pem
 
 
-def run_xcuitest_case(udid, test_id, env, log_file: Path, video_file: Path | None = None):
+def redact_secrets(text: str, secret: str) -> str:
+    if not text:
+        return text
+    out = re.sub(
+        r"Type '[^']*' into \"qa\.login\.password\" SecureTextField",
+        'Type \'[REDACTED]\' into "qa.login.password" SecureTextField',
+        text,
+    )
+    if secret:
+        out = out.replace(secret, "[REDACTED]")
+        if len(secret) >= 12:
+            out = out.replace(secret[:12], "[REDACTED]")
+    return out
+
+
+def run_xcuitest_case(udid, test_id, env, log_file: Path, secret: str, video_file: Path | None = None):
     rec_proc = None
     if video_file is not None:
         rec_proc = subprocess.Popen(
@@ -121,8 +141,9 @@ def run_xcuitest_case(udid, test_id, env, log_file: Path, video_file: Path | Non
         "CODE_SIGNING_ALLOWED=NO",
     ]
     print(f"+ {' '.join(cmd)}", flush=True)
-    with open(log_file, "w", encoding="utf-8") as fh:
-        proc = subprocess.run(cmd, stdout=fh, stderr=subprocess.STDOUT, text=True, env=env)
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env)
+    sanitized = redact_secrets(proc.stdout or "", secret)
+    log_file.write_text(sanitized, encoding="utf-8")
 
     if rec_proc is not None:
         time.sleep(0.4)
@@ -132,7 +153,7 @@ def run_xcuitest_case(udid, test_id, env, log_file: Path, video_file: Path | Non
         except Exception:
             rec_proc.kill()
 
-    tail = log_file.read_text(encoding="utf-8", errors="replace").splitlines()[-40:]
+    tail = sanitized.splitlines()[-40:]
     print(f"--- {test_id} exit={proc.returncode} ---", flush=True)
     for line in tail:
         print("  " + line, flush=True)
@@ -155,7 +176,7 @@ def main():
     cert_tmp = Path(tempfile.mkdtemp(prefix="kinnect-qa-tls-"))
     server_proc = None
     try:
-        ca_pem, leaf_key, leaf_pem = generate_ephemeral_tls(cert_tmp)
+        ca_pem, ca_der, leaf_key, leaf_pem = generate_ephemeral_tls(cert_tmp)
 
         subprocess.run(["xcrun", "simctl", "boot", udid], check=False)
         run(["xcrun", "simctl", "bootstatus", udid, "-b"])
@@ -239,6 +260,7 @@ def main():
             "TEST_RUNNER_QA_USERNAME": info["seed"]["username"],
             "TEST_RUNNER_QA_PASSWORD": test_password,
             "TEST_RUNNER_QA_OUT_DIR": str(qa_tmp_out),
+            "TEST_RUNNER_QA_CA_DER": str(ca_der),
             "TEST_RUNNER_QA_DEVICE_NAME": device["name"],
             "TEST_RUNNER_QA_GIT_SHA": git_sha,
         })
@@ -248,6 +270,7 @@ def main():
             "KinnectUITests/KinnectNetworkParityUITests/testIOS_N1_N2_UnreadTotalAndMarkReadNoLoop",
             test_env,
             LOGS_DIR / "xcuitest-n1-n2.log",
+            test_password,
             VIDEOS_DIR / "ios-n1-n2.mp4",
         )
         rc_n3 = run_xcuitest_case(
@@ -255,6 +278,7 @@ def main():
             "KinnectUITests/KinnectNetworkParityUITests/testIOS_N3_PostCommitDropAndFallbackBounds",
             test_env,
             LOGS_DIR / "xcuitest-n3.log",
+            test_password,
             VIDEOS_DIR / "ios-n3.mp4",
         )
         rc_parity = run_xcuitest_case(
@@ -262,6 +286,7 @@ def main():
             "KinnectUITests/KinnectNetworkParityUITests/testParityCapturesRealBackend",
             test_env,
             LOGS_DIR / "xcuitest-parity.log",
+            test_password,
             None,
         )
 

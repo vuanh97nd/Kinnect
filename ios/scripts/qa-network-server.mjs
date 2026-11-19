@@ -467,6 +467,12 @@ const ctrlServer = http.createServer(async (req, res) => {
 });
 
 await resetAndSeed();
+primaryServer.on('tlsClientError', (err) => {
+  console.error('PRIMARY_TLS_CLIENT_ERROR:', err?.code || err?.message || String(err));
+});
+fallbackServer.on('tlsClientError', (err) => {
+  console.error('FALLBACK_TLS_CLIENT_ERROR:', err?.code || err?.message || String(err));
+});
 await new Promise((r) => primaryServer.listen(0, '127.0.0.1', r));
 await new Promise((r) => fallbackServer.listen(0, '127.0.0.1', r));
 await new Promise((r) => ctrlServer.listen(0, '127.0.0.1', r));
