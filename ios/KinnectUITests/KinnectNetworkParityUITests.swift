@@ -559,12 +559,14 @@ final class KinnectNetworkParityUITests: XCTestCase {
 
             // 2. Feed screen (verify real localized UI copy, never relabel)
             if isEN {
-                XCTAssertTrue(app.staticTexts["What's on your mind?"].waitForExistence(timeout: 5), "EN feed composer must render English")
-                XCTAssertFalse(app.staticTexts["Bạn đang nghĩ gì?"].exists, "EN feed must not render Vietnamese composer placeholder")
+                XCTAssertTrue(app.buttons["What's on your mind?"].waitForExistence(timeout: 5), "EN feed composer must render English")
+                XCTAssertTrue(app.staticTexts["No reactions yet"].exists, "EN feed reaction summary must render English")
+                XCTAssertFalse(app.buttons["Bạn đang nghĩ gì?"].exists, "EN feed must not render Vietnamese composer placeholder")
                 XCTAssertFalse(app.staticTexts["Chưa có cảm xúc"].exists, "EN feed must not render Vietnamese reaction summary")
                 XCTAssertFalse(app.buttons["Bảng tin"].exists, "EN bottom bar must not render Vietnamese Feed tab")
             } else {
-                XCTAssertTrue(app.staticTexts["Bạn đang nghĩ gì?"].waitForExistence(timeout: 5), "VI feed composer must render Vietnamese")
+                XCTAssertTrue(app.buttons["Bạn đang nghĩ gì?"].waitForExistence(timeout: 5), "VI feed composer must render Vietnamese")
+                XCTAssertTrue(app.staticTexts["Chưa có cảm xúc"].exists, "VI feed reaction summary must render Vietnamese")
             }
             record(slug: "parity-feed-\(suffix)", screen: "feed", state: "seeded-unread-5", locale: locale, theme: theme, largeText: largeText, logicalWidth: logicalWidth)
 
@@ -589,8 +591,10 @@ final class KinnectNetworkParityUITests: XCTestCase {
             app.staticTexts["QA Lan"].firstMatch.tap()
             XCTAssertTrue(app.staticTexts["Hello parity"].waitForExistence(timeout: 10))
             if isEN {
-                XCTAssertTrue(app.staticTexts["Offline"].waitForExistence(timeout: 5), "EN direct chat must render Offline status")
-                XCTAssertFalse(app.staticTexts["Ngoại tuyến"].exists, "EN direct chat must not render Vietnamese status")
+                let offlinePred = NSPredicate(format: "label CONTAINS %@", "Offline")
+                let viOfflinePred = NSPredicate(format: "label CONTAINS %@", "Ngoại tuyến")
+                XCTAssertTrue(app.descendants(matching: .any).matching(offlinePred).firstMatch.waitForExistence(timeout: 5), "EN direct chat must render Offline status")
+                XCTAssertFalse(app.descendants(matching: .any).matching(viOfflinePred).firstMatch.exists, "EN direct chat must not render Vietnamese status")
             }
             record(slug: "parity-direct-chat-\(suffix)", screen: "direct-chat", state: "opened-hello-parity", locale: locale, theme: theme, largeText: largeText, logicalWidth: logicalWidth)
 
@@ -618,11 +622,13 @@ final class KinnectNetworkParityUITests: XCTestCase {
             XCTAssertTrue(app.staticTexts["QA Minh"].waitForExistence(timeout: 10))
             if isEN {
                 XCTAssertTrue(app.staticTexts["Profile"].waitForExistence(timeout: 5), "EN profile header must render Profile")
-                XCTAssertTrue(app.staticTexts["Edit profile"].exists, "EN profile must render Edit profile button")
+                XCTAssertTrue(app.buttons["Edit profile"].exists, "EN profile must render Edit profile button")
+                XCTAssertTrue(app.staticTexts["About"].exists, "EN profile must render About section")
                 XCTAssertFalse(app.staticTexts["Trang cá nhân"].exists, "EN profile must not render Vietnamese header")
-                XCTAssertFalse(app.staticTexts["Chỉnh sửa hồ sơ"].exists, "EN profile must not render Vietnamese edit button")
+                XCTAssertFalse(app.buttons["Chỉnh sửa hồ sơ"].exists, "EN profile must not render Vietnamese edit button")
             } else {
                 XCTAssertTrue(app.staticTexts["Trang cá nhân"].waitForExistence(timeout: 5), "VI profile header must render Trang cá nhân")
+                XCTAssertTrue(app.buttons["Chỉnh sửa hồ sơ"].exists, "VI profile must render Chỉnh sửa hồ sơ button")
             }
             record(slug: "parity-profile-\(suffix)", screen: "profile", state: "self-qa-minh", locale: locale, theme: theme, largeText: largeText, logicalWidth: logicalWidth)
 
