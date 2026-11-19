@@ -53,6 +53,9 @@ final class MediaPermissionHandler: NSObject, ObservableObject, CLLocationManage
     }
 
     func requestMicrophoneAccess() async -> Bool {
+        if UIReviewFixture.isEnabled && !UIReviewFixture.allowsCapturePrompt {
+            return false
+        }
         let status = AVCaptureDevice.authorizationStatus(for: .audio)
         let granted: Bool
         switch status {
@@ -68,6 +71,9 @@ final class MediaPermissionHandler: NSObject, ObservableObject, CLLocationManage
     }
 
     func requestCameraAccess() async -> Bool {
+        if UIReviewFixture.isEnabled && !UIReviewFixture.allowsCapturePrompt {
+            return AVCaptureDevice.authorizationStatus(for: .video) == .authorized
+        }
         let status = AVCaptureDevice.authorizationStatus(for: .video)
         let granted: Bool
         switch status {

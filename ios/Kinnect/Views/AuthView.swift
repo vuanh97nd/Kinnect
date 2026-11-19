@@ -262,6 +262,7 @@ struct AuthView: View {
                         .frame(height: 44)
                         .background(RoundedRectangle(cornerRadius: 12).fill(LoginChrome.purple))
                 }
+                .modifier(QAAccessibilityModifier(id: "qa.welcome.login", value: nil))
             }
             .frame(height: 48)
 
@@ -778,6 +779,7 @@ struct AuthView: View {
             }
             .disabled(isLoading || loginUsername.isEmpty || loginPassword.isEmpty)
             .id("login-submit")
+            .modifier(QAAccessibilityModifier(id: "qa.login.submit", value: nil))
 
             loginDivider(L10n.tr("Mới đến Kinnect?"))
                 .padding(.top, 4)
@@ -847,13 +849,32 @@ struct AuthView: View {
                             .font(.system(size: 17))
                             .foregroundColor(LoginChrome.ink)
                         Spacer()
-                        if loc.currentLanguage == language {
+                        if loc.preference.rawValue == language.rawValue {
                             Image(systemName: "checkmark")
                                 .foregroundColor(LoginChrome.purple)
                         }
                     }
                     .padding(.vertical, 8)
                 }
+            }
+
+            Button {
+                loc.setPreference(.system)
+                showLoginLanguageSheet = false
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "gearshape")
+                        .foregroundColor(LoginChrome.purple)
+                    Text(L10n.tr("Theo hệ thống"))
+                        .font(.system(size: 17))
+                        .foregroundColor(LoginChrome.ink)
+                    Spacer()
+                    if loc.preference == .system {
+                        Image(systemName: "checkmark")
+                            .foregroundColor(LoginChrome.purple)
+                    }
+                }
+                .padding(.vertical, 8)
             }
 
             Button {
@@ -930,10 +951,12 @@ struct AuthView: View {
             Group {
                 if secure {
                     SecureField(placeholder, text: text)
+                        .modifier(QAAccessibilityModifier(id: field == .username ? "qa.login.username" : "qa.login.password", value: nil))
                 } else {
                     TextField(placeholder, text: text)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .modifier(QAAccessibilityModifier(id: field == .username ? "qa.login.username" : "qa.login.password", value: nil))
                 }
             }
             .focused($focusedLoginField, equals: field)

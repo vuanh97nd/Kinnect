@@ -54,7 +54,8 @@ struct KinnectTopBar: View {
                 glyph: .messages,
                 label: "Tin nhắn",
                 badgeCount: appState.unreadMessagesCount,
-                isSelected: activeTopSection == .messages
+                isSelected: activeTopSection == .messages,
+                qaId: "qa.topbar.messages"
             ) {
                 toggleSection(.messages)
             }
@@ -93,6 +94,7 @@ struct KinnectTopBar: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Tài khoản")
+            .modifier(QAAccessibilityModifier(id: "qa.topbar.profile", value: nil))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 6)
@@ -117,6 +119,7 @@ struct KinnectTopBar: View {
         label: String,
         badgeCount: Int = 0,
         isSelected: Bool,
+        qaId: String = "",
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -140,6 +143,7 @@ struct KinnectTopBar: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
+        .modifier(QAAccessibilityModifier(id: qaId.isEmpty ? "qa.topbar.\(label)" : qaId, value: "\(badgeCount)"))
     }
 }
 

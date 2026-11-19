@@ -960,12 +960,25 @@ public class MainActivity extends Activity {
   private int avatarRevision;
   private final java.util.WeakHashMap<ImageView,String> avatarViews=new java.util.WeakHashMap<>();
   private ImageView toolbarAvatar;
-  private void clearClientSessionCaches() {
-    api.clear();
+  private void clearInMemorySessionCaches() {
     avatarCache.evictAll();
     MediaImageLoader.clear();
     clearRetainedFeed();
     feedRows = null;
+  }
+  private void clearClientSessionCaches() {
+    api.clear();
+    clearInMemorySessionCaches();
+  }
+  private void handleUnauthorized() {
+    me = null;
+    if (api.isOriginSwitchAuthRequired()) {
+      api.clearTransientSession();
+      clearInMemorySessionCaches();
+    } else {
+      clearClientSessionCaches();
+    }
+    auth(false);
   }
 
   private Bitmap decodeAvatarBitmap(byte[] bytes) {
@@ -1354,7 +1367,11 @@ public class MainActivity extends Activity {
       if (isFinishing() || isDestroyed() || generation != screen) return;
       content.removeView(loadingView);
       if (error != null || data == null) {
-        if (status == 401 && me != null) { me = null; clearClientSessionCaches(); auth(false); return; }
+        if (status == 401 && me != null) {
+          handleUnauthorized();
+          say(error != null && !error.isEmpty() ? error : I18n.t("Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại."));
+          return;
+        }
         String msg = error != null && !error.isEmpty() ? error : I18n.t("Chưa tải được danh sách thiết bị.");
         say(msg);
         LinearLayout errCard = card();
@@ -1582,9 +1599,7 @@ public class MainActivity extends Activity {
             new Sheet(this).setTitle(I18n.t("Thông báo sử dụng dữ liệu")).setMessage(I18n.t(error)).setPositiveButton(I18n.t("Tôi đồng ý"),(dialog,which)->request("POST","/api/me/privacy-consent",json("accepted",true,"version",answer.optString("version")),accepted->request(method,path,data,done,finished))).setNegativeButton(I18n.t("Để sau"),null).show();return;
           }
           if (status == 401 && me != null) {
-            me = null;
-            clearClientSessionCaches();
-            auth(false);
+            handleUnauthorized();
           }
           say(error);
           return;
@@ -1831,6 +1846,8 @@ public class MainActivity extends Activity {
 
   private long lastFeedTap;
   private JSONArray feedRows;private int feedScrollY;
+  /** Set by a post mutation so the next real GET /api/posts drops its etag snapshot at dispatch. */
+  private boolean postsGetSnapshotStale;
   private void selectNavigation(String next){if(next.equals("feed")&&tab.equals("feed")&&onTabRoot&&feedRefresh!=null){if(content.getParent()instanceof PullRefreshScrollView){PullRefreshScrollView scroll=(PullRefreshScrollView)content.getParent();feedScrollY=0;scroll.smoothScrollTo(0,0);scroll.refreshNow();}return;}navigate(next);}
   private void navigate(String next) {
     headerActive = next.equals("inbox") ? "inbox" : "";
@@ -2264,8 +2281,27 @@ public class MainActivity extends Activity {
     final boolean memoryFeed=feedRows!=null;
     if(feedRows==null){JSONObject saved=api.cachedGet("/api/posts");if(saved!=null)feedRows=saved.optJSONArray("posts");}
     if(feedRows!=null){LinearLayout saved=content;content=list;try{posts(feedRows,"Chưa có bài viết.");}finally{content=saved;}final ScrollView scroll=(ScrollView)content.getParent();scroll.post(()->scroll.scrollTo(0,feedScrollY));}
-    final String[] signature={feedRows==null?"":feedRows.toString()};final boolean[] fetching={false};
-    feedRefresh=complete->{if(fetching[0]){complete.run();return;}fetching[0]=true;request("GET","/api/posts",null,data->{JSONArray posts=data.optJSONArray("posts");if(posts==null||posts.toString().equals(signature[0]))return;signature[0]=posts.toString();feedRows=posts;WindowedListBinder.clearPending(list);MediaImageLoader.prefetchPosts(api,posts,0,Math.min(8,posts.length()),1280);LinearLayout next=column();java.util.Set<String> existing=new java.util.HashSet<>();for(int i=0;i<list.getChildCount();i++)if(list.getChildAt(i).getTag()instanceof String)existing.add((String)list.getChildAt(i).getTag());LinearLayout saved=content;content=next;try{if(posts.length()==0)posts(posts,"Chưa có bài viết.");for(int i=0;i<posts.length();i++){JSONObject post=posts.optJSONObject(i);String key="post:"+post.optString("id")+":"+post.toString();if(existing.contains(key)){View placeholder=new View(this);placeholder.setTag(key);next.addView(placeholder);}else postCard(post);}}finally{content=saved;}reconcileChatRows(list,next);},()->{fetching[0]=false;complete.run();});};
+    final String[] signature={feedRows==null?"":feedRows.toString()};final boolean[] fetching={false};final boolean[] refreshAgain={false};
+    final RefreshLoader[] activeFeedRefresh=new RefreshLoader[1];
+    activeFeedRefresh[0]=complete->{
+      if(fetching[0]){refreshAgain[0]=true;complete.run();return;}
+      fetching[0]=true;
+      if(postsGetSnapshotStale){postsGetSnapshotStale=false;api.clearGetSnapshot("/api/posts");}
+      request("GET","/api/posts",null,data->{
+        JSONArray posts=data.optJSONArray("posts");
+        if(posts==null)return;
+        if(posts.toString().equals(signature[0])){feedRows=posts;return;}
+        signature[0]=posts.toString();feedRows=posts;WindowedListBinder.clearPending(list);MediaImageLoader.prefetchPosts(api,posts,0,Math.min(8,posts.length()),1280);LinearLayout next=column();java.util.Set<String> existing=new java.util.HashSet<>();for(int i=0;i<list.getChildCount();i++)if(list.getChildAt(i).getTag()instanceof String)existing.add((String)list.getChildAt(i).getTag());LinearLayout saved=content;content=next;try{if(posts.length()==0)posts(posts,"Chưa có bài viết.");for(int i=0;i<posts.length();i++){JSONObject post=posts.optJSONObject(i);String key="post:"+post.optString("id")+":"+post.toString();if(existing.contains(key)){View placeholder=new View(this);placeholder.setTag(key);next.addView(placeholder);}else postCard(post);}}finally{content=saved;}reconcileChatRows(list,next);
+      },()->{
+        fetching[0]=false;
+        boolean again=refreshAgain[0];
+        refreshAgain[0]=false;
+        complete.run();
+        // Armed only while a GET is in flight, then cleared here. A failed GET does not arm it, so this is one retry, not a loop.
+        if(again&&feedRefresh==activeFeedRefresh[0])feedRefresh.run(()->{});
+      });
+    };
+    feedRefresh=activeFeedRefresh[0];
     if(!memoryFeed)feedRefresh.run(()->{});
   }
 
@@ -5819,6 +5855,15 @@ public class MainActivity extends Activity {
     });
   }
 
+  private void refreshAfterPostMutation() {
+    clearRetainedFeed();
+    feedRows = null;
+    postsGetSnapshotStale = true;
+    api.clearGetSnapshot("/api/posts");
+    if (feedRefresh != null) feedRefresh.run(() -> {});
+    else refreshPage();
+  }
+
   private android.app.Dialog postOptions(final JSONObject post, boolean mine, final LinearLayout card) {
     List<String> labels = new ArrayList<>(), icons = new ArrayList<>();
     List<Runnable> actions = new ArrayList<>();
@@ -5828,11 +5873,11 @@ public class MainActivity extends Activity {
       actions.add(() -> {
         LinearLayout form = column();
         EditText body = input(form, I18n.t("Bạn đang nghĩ gì?"), post.optString("body"), true);
-        new Sheet(this).setTitle(I18n.t("Chỉnh sửa bài viết")).setView(form).setPositiveButton(I18n.t("Lưu"), (d, w) -> request("PATCH", "/api/posts/" + post.optString("id"), json("body", body.getText().toString()), result -> refreshPage())).setNegativeButton(I18n.t("Huỷ"), null).show();
+        new Sheet(this).setTitle(I18n.t("Chỉnh sửa bài viết")).setView(form).setPositiveButton(I18n.t("Lưu"), (d, w) -> request("PATCH", "/api/posts/" + post.optString("id"), json("body", body.getText().toString()), result -> refreshAfterPostMutation())).setNegativeButton(I18n.t("Huỷ"), null).show();
       });
       icons.add("globe");
       labels.add(I18n.t("Thay đổi đối tượng xem"));
-      actions.add(() -> new Sheet(this).setTitle(I18n.t("Ai có thể xem bài viết?")).setItemIcons(new String[]{"globe","users_round"}).setItems(new String[] { I18n.t("Mọi thành viên"), I18n.t("Người theo dõi") }, (d, w) -> request("PATCH", "/api/posts/" + post.optString("id"), json("visibility", w == 0 ? "public" : "followers"), result -> refreshPage())).show());
+      actions.add(() -> new Sheet(this).setTitle(I18n.t("Ai có thể xem bài viết?")).setItemIcons(new String[]{"globe","users_round"}).setItems(new String[] { I18n.t("Mọi thành viên"), I18n.t("Người theo dõi") }, (d, w) -> request("PATCH", "/api/posts/" + post.optString("id"), json("visibility", w == 0 ? "public" : "followers"), result -> refreshAfterPostMutation())).show());
     }
     icons.add("eye_off");
     labels.add(I18n.t("Ẩn bài viết"));
@@ -5850,7 +5895,7 @@ public class MainActivity extends Activity {
     });
     icons.add(mine ? "trash" : "flag");
     labels.add(mine ? I18n.t("Xoá bài viết") : I18n.t("Báo cáo bài viết"));
-    actions.add(() -> { if (mine) confirm(I18n.t("Xoá bài viết?"), () -> request("DELETE", "/api/posts/" + post.optString("id"), json(), result -> refreshPage())); else report("post", post.optString("id")); });
+    actions.add(() -> { if (mine) confirm(I18n.t("Xoá bài viết?"), () -> request("DELETE", "/api/posts/" + post.optString("id"), json(), result -> refreshAfterPostMutation())); else report("post", post.optString("id")); });
     return new Sheet(this).setTitle(I18n.t("Tùy chọn bài viết")).setItemIcons(icons.toArray(new String[0])).setItems(labels.toArray(new String[0]),(dialog,index)->actions.get(index).run()).show();
   }
 

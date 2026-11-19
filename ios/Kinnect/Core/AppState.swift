@@ -204,18 +204,38 @@ final class AppState: ObservableObject {
 
     func refreshGlobalBadges() async {
         guard currentUser != nil else { return }
-        if let notifRes = try? await KinnectAPIClient.shared.requestJSON("/api/notifications") {
+        // Sequential: KinnectAPIClient.activeOrigin is unsynchronized shared state.
+        // Overlapping calls can read it while a transport fallback writes it.
+        let notifRes = try? await KinnectAPIClient.shared.requestJSON("/api/notifications")
+        let convRes = try? await KinnectAPIClient.shared.requestJSON("/api/conversations")
+        let groupRes = try? await KinnectAPIClient.shared.requestJSON("/api/groups")
+
+        if let notifRes {
             let items = (notifRes["notifications"] as? [[String: Any]] ?? []).map(NotificationItem.from)
             self.unreadNotificationsCount = items.filter { !$0.read }.count
         }
-        if let convRes = try? await KinnectAPIClient.shared.requestJSON("/api/conversations") {
-            let list = convRes["conversations"] as? [[String: Any]] ?? []
-            var total = 0
-            for item in list {
-                total += (item["unreadCount"] as? Int ?? 0)
-            }
-            self.unreadMessagesCount = total
+        // Real API: { users: [{ unread }] } plus /api/groups { groups: [{ unread }] }.
+        // UI review fixture: { conversations: [{ unreadCount }] } and groups[].unreadCount.
+        guard let convRes else { return }
+        let direct = (convRes["users"] as? [[String: Any]])
+            ?? (convRes["conversations"] as? [[String: Any]])
+            ?? []
+        var total = Self.unreadTotal(direct)
+        if let groupRes {
+            let groups = groupRes["groups"] as? [[String: Any]] ?? []
+            total += Self.unreadTotal(groups)
         }
+        self.unreadMessagesCount = total
+    }
+
+    /// Prefer the live `unread` field, then the fixture `unreadCount` field.
+    private static func unreadTotal(_ items: [[String: Any]]) -> Int {
+        var total = 0
+        for item in items {
+            let count = (item["unread"] as? Int) ?? (item["unreadCount"] as? Int) ?? 0
+            if count > 0 { total += count }
+        }
+        return total
     }
 
     func refreshBlockedUsers() async {

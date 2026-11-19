@@ -1,8 +1,22 @@
 import Foundation
 
 enum ServerConfig {
+    #if DEBUG
+    private static func qaLaunchOrigin(_ flag: String) -> String? {
+        let args = CommandLine.arguments
+        guard let idx = args.firstIndex(of: flag), idx + 1 < args.count else { return nil }
+        return normalize(args[idx + 1])
+    }
+    static var defaultOrigin: String {
+        qaLaunchOrigin("--qa-primary-origin") ?? "https://app.kinnect.io.vn"
+    }
+    static var fallbackOrigin: String {
+        qaLaunchOrigin("--qa-fallback-origin") ?? "https://kinnect-allocation.vuanh97nd.workers.dev"
+    }
+    #else
     static let defaultOrigin = "https://app.kinnect.io.vn"
     static let fallbackOrigin = "https://kinnect-allocation.vuanh97nd.workers.dev"
+    #endif
     static let appVersion = "1.2.12"
     static let buildNumber = "124"
     static let bundleId = "app.kinnect.live"
@@ -31,6 +45,11 @@ enum ServerConfig {
 
     static var currentOrigin: String {
         get {
+            #if DEBUG
+            if let qaOrigin = qaLaunchOrigin("--qa-primary-origin") {
+                return qaOrigin
+            }
+            #endif
             if let saved = UserDefaults.standard.string(forKey: savedOriginKey),
                let normalized = normalize(saved) {
                 return normalized

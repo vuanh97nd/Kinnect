@@ -1,0 +1,58 @@
+name: iOS QA Real Network + Parity
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/qa-ios-network-20261119
+
+permissions:
+  contents: read
+
+jobs:
+  ios-qa-network-parity:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Node dependencies for createApp backend
+        run: npm ci
+
+      - name: Ensure XcodeGen is installed
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+          xcodegen --version
+
+      - name: Generate Xcode project from ios/project.yml
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Run real-backend iOS XCUITest network & parity suite
+        run: |
+          set -o pipefail
+          python3 ios/scripts/run-ios-network-qa.py 2>&1 | tee ios-qa-network-runner.log
+
+      - name: Copy top-level runner log into artifact directory
+        if: always()
+        run: |
+          mkdir -p dist/ios-qa-network/logs
+          if [ -f ios-qa-network-runner.log ]; then
+            cp ios-qa-network-runner.log dist/ios-qa-network/logs/runner.log
+          fi
+
+      - name: Upload iOS network QA evidence & parity captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-qa-network-parity
+          path: dist/ios-qa-network
+          if-no-files-found: warn

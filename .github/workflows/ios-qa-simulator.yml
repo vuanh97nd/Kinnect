@@ -1,0 +1,54 @@
+name: iOS QA Simulator Screenshots
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/ios-qa-20261113
+
+permissions:
+  contents: read
+
+jobs:
+  ios-qa-simulator:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Ensure XcodeGen is installed
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+          xcodegen --version
+
+      - name: Generate Xcode project from ios/project.yml
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Prepare log and output directories
+        run: |
+          mkdir -p dist/ios-ui-review logs
+
+      - name: Capture real iOS Simulator screenshots
+        run: |
+          set -o pipefail
+          python3 ios/scripts/capture-simulator-screenshots.py 2>&1 | tee logs/ios-qa-simulator.log
+
+      - name: Upload real simulator screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ui-review-screenshots
+          path: dist/ios-ui-review
+          if-no-files-found: warn
+
+      - name: Upload capture logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-qa-simulator-logs
+          path: logs/ios-qa-simulator.log
+          if-no-files-found: warn

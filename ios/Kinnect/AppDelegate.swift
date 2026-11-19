@@ -7,6 +7,13 @@ final class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationC
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
+        #if DEBUG
+        if CommandLine.arguments.contains("--qa-reset-session") {
+            KeychainStore.shared.clearAll()
+            AccountCache.shared.wipeAllCaches()
+            UserDefaults.standard.removeObject(forKey: "kinnect_session_remembered")
+        }
+        #endif
         UNUserNotificationCenter.current().delegate = self
         _ = CallKitManager.shared
         MediaPermissionHandler.shared.configureAudioSessionForMedia()
@@ -49,7 +56,14 @@ final class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationC
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        completionHandler([.banner, .sound, .badge])
+        let kind = (notification.request.content.userInfo["kind"] as? String)
+            ?? (notification.request.content.userInfo["type"] as? String)
+            ?? ""
+        if KinnectNotificationPrefs.allowsPresentation(kind: kind) {
+            completionHandler([.banner, .sound, .badge])
+        } else {
+            completionHandler([])
+        }
     }
 
     func userNotificationCenter(

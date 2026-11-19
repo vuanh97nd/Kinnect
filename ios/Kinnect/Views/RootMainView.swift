@@ -65,6 +65,14 @@ struct RootMainView: View {
     @AppStorage("app_appearance_mode") private var appearanceMode: String = "system"
 
     private var activeColorScheme: ColorScheme? {
+        #if DEBUG
+        if let idx = CommandLine.arguments.firstIndex(of: "--qa-appearance"),
+           idx + 1 < CommandLine.arguments.count {
+            let mode = CommandLine.arguments[idx + 1].lowercased()
+            if mode == "light" { return .light }
+            if mode == "dark" { return .dark }
+        }
+        #endif
         if UIReviewFixture.forceLightMode { return .light }
         switch appearanceMode {
         case "light": return .light
@@ -481,6 +489,7 @@ struct RootMainView: View {
                                         .padding(.top, 12)
                                         .padding(.horizontal, 16)
                                         .zIndex(100)
+                                        .modifier(QAAccessibilityModifier(id: "qa.toast", value: nil))
                                 }
                             }
                             .preferredColorScheme(activeColorScheme)
@@ -1085,5 +1094,24 @@ struct RootMainView: View {
         } else {
             content
         }
+    }
+}
+
+struct QAAccessibilityModifier: ViewModifier {
+    let id: String
+    let value: String?
+    func body(content: Content) -> some View {
+        #if DEBUG
+        if let value {
+            content
+                .accessibilityIdentifier(id)
+                .accessibilityValue(value)
+        } else {
+            content
+                .accessibilityIdentifier(id)
+        }
+        #else
+        content
+        #endif
     }
 }

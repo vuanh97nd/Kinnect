@@ -28,6 +28,11 @@ public final class NativeApi {
   public byte[] cachedImage(String path){return diskCache==null||cookie.isEmpty()?null:diskCache.get(cacheScope(),"image:"+path,AppCache.WEEK);}
   public void cacheImageBytes(String path,byte[] bytes){if(diskCache!=null&&!cookie.isEmpty()&&path!=null&&!path.isEmpty()&&bytes!=null&&bytes.length>0)diskCache.put(cacheScope(),"image:"+path,bytes);}
   public synchronized void clearSnapshots(){snapshots.clear();}
+  /** Remove one GET etag entry. The next call of this path cannot 304-replay the stored body. Does not bump epoch or touch disk cache. */
+  public synchronized void clearGetSnapshot(String path){
+    if(path==null||path.isEmpty())return;
+    snapshots.remove(epoch+":"+origin+path);
+  }
   public File cachedVideo(String path){
     if(fixtureEnabled&&appContext!=null){
       File fixtureFile=new File(appContext.getCacheDir(),"fixture_short.mp4");
@@ -73,6 +78,7 @@ public final class NativeApi {
   public String origin() { return origin; }
   private volatile String origin = ServerConfig.DEFAULT_ORIGIN,
     cookie = "";
+  private volatile boolean originSwitchAuthRequired = false;
   private volatile String debugLoopbackOrigin = null;
   private volatile javax.net.ssl.SSLSocketFactory debugLoopbackSslFactory = null;
 
@@ -158,9 +164,23 @@ public final class NativeApi {
     snapshots.clear();
   }
 
+  public synchronized boolean isOriginSwitchAuthRequired() {
+    return originSwitchAuthRequired || ServerConfig.FALLBACK_ORIGIN.equals(origin);
+  }
+
+  public synchronized void clearTransientSession() {
+    cookie = "";
+    device = "";
+    originSwitchAuthRequired = false;
+    epoch++;
+    snapshots.clear();
+  }
+
   public synchronized void clear() {
     if(diskCache!=null)diskCache.clear();
     cookie = "";
+    device = "";
+    originSwitchAuthRequired = false;
     if(sessions!=null)sessions.wipe();
     epoch++;snapshots.clear();
   }
@@ -473,8 +493,8 @@ public final class NativeApi {
           for (int i = 0; setCookies != null && i < setCookies.size(); i++) {
             String responseCookie = setCookies.get(i);
             if (responseCookie == null || !server.equals(origin) || revision != epoch) continue;
-            if(responseCookie.startsWith("kinnect_session=")){String next=responseCookie.split(";",2)[0];if(next.equals("kinnect_session="))next="";sessionChanged|=!cookie.equals(next);cookie=next;if(sessions!=null)sessions.save(origin,cookie);}
-            if (responseCookie.startsWith("kinnect_device=")) {device = responseCookie.split(";", 2)[0];if(sessions!=null)sessions.saveDevice(origin,device);}
+            if(responseCookie.startsWith("kinnect_session=")){String next=responseCookie.split(";",2)[0];if(next.equals("kinnect_session="))next="";sessionChanged|=!cookie.equals(next);cookie=next;if(!next.isEmpty())originSwitchAuthRequired=false;if(sessions!=null&&!ServerConfig.FALLBACK_ORIGIN.equals(origin))sessions.save(origin,cookie);}
+            if (responseCookie.startsWith("kinnect_device=")) {device = responseCookie.split(";", 2)[0];if(sessions!=null&&!ServerConfig.FALLBACK_ORIGIN.equals(origin))sessions.saveDevice(origin,device);}
           }
         }
         synchronized(this){if(sessionChanged&&server.equals(origin)&&revision==epoch){epoch++;deliveryRevision=epoch;}}
@@ -490,9 +510,13 @@ public final class NativeApi {
           result = new JSONObject();
         }
         if(method.equals("GET")&&status==200&&response.length()<262144&&connection.getHeaderField("ETag")!=null&&revision==epoch)snapshots.put(snapshotKey,new Snapshot(connection.getHeaderField("ETag"),response));
-        if (status < 200 || status >= 300) error = status >= 500 ? httpFailure(status) : result.optString("error", httpFailure(status));
+        boolean originSwitch401 = status == 401 && (originSwitchAuthRequired || ServerConfig.FALLBACK_ORIGIN.equals(server));
+        boolean fallbackForbidden = status == 403 && ServerConfig.FALLBACK_ORIGIN.equals(server);
+        if (status < 200 || status >= 300) error = originSwitch401
+          ? I18n.t(ServerConfig.FALLBACK_ORIGIN.equals(server) ? "Đang dùng máy chủ dự phòng. Vui lòng đăng nhập lại trên máy chủ này." : "Phiên đăng nhập chưa có trên máy chủ này. Vui lòng đăng nhập lại.")
+          : (status >= 500 ? httpFailure(status) : result.optString("error", httpFailure(status)));
         if(method.equals("GET")&&status==200&&diskCache!=null&&!session.isEmpty()&&cacheable(path))diskCache.put(server+"\n"+session,"json:"+path,response.getBytes("UTF-8"));
-        if(method.equals("GET")&&(status==401||status==403)&&diskCache!=null)diskCache.clear();
+        if(method.equals("GET")&&(status==401||status==403)&&diskCache!=null&&!originSwitch401&&!fallbackForbidden)diskCache.clear();
         if(!method.equals("GET")&&status>=200&&status<300&&(path.endsWith("/block")||path.equals("/api/me/avatar")||path.equals("/api/me/cover")||path.endsWith("/avatar"))){snapshots.clear();if(diskCache!=null)diskCache.clear();}
       } catch (OutOfMemoryError oom) {
         error = I18n.t("Thiết bị không đủ bộ nhớ để chuẩn bị tệp tải lên.");
@@ -541,8 +565,10 @@ public final class NativeApi {
     if(next.isEmpty()||next.equals(failed))return false;
     if(appContext!=null){android.net.ConnectivityManager cm=(android.net.ConnectivityManager)appContext.getSystemService(android.content.Context.CONNECTIVITY_SERVICE);if(cm!=null&&cm.getActiveNetwork()==null)return false;}
     origin=next;epoch++;snapshots.clear();
-    cookie=sessions==null?"":sessions.load(next);
-    device=sessions==null?"":sessions.loadDevice(next);
+    // Do not transfer or reuse primary session/device cookies across origins.
+    cookie="";
+    device="";
+    originSwitchAuthRequired=true;
     return true;
   }
 
@@ -563,6 +589,7 @@ public final class NativeApi {
     origin=ServerConfig.DEFAULT_ORIGIN;epoch++;snapshots.clear();
     cookie=sessions==null?"":sessions.load(origin);
     device=sessions==null?"":sessions.loadDevice(origin);
+    originSwitchAuthRequired=cookie.isEmpty();
   }
 
   private static String httpFailure(int status) {

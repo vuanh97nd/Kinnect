@@ -83,6 +83,16 @@ enum KinnectTheme {
     static let caption: Font = .system(size: 12)
     static let captionBold: Font = .system(size: 12, weight: .bold)
 
+    /// Time and small icons under chat bubbles. Dark mode stays light so it
+    /// remains readable on the purple-black background. Light mode stays dark.
+    static var messageMeta: Color {
+        Color(UIColor { trait in
+            trait.userInterfaceStyle == .light
+                ? UIColor(red: 0.29, green: 0.25, blue: 0.38, alpha: 1.0)
+                : UIColor(red: 0.82, green: 0.78, blue: 0.93, alpha: 1.0)
+        })
+    }
+
     static let rose = Color(red: 0.93, green: 0.28, blue: 0.60)
     static let emerald = Color(red: 0.09, green: 0.64, blue: 0.45)
     static let online = Color(red: 0.13, green: 0.77, blue: 0.37)
