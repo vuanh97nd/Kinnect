@@ -33,10 +33,15 @@ struct MessagesView: View {
     let onOpenFriends: () -> Void
     var onBack: (() -> Void)? = nil
     @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var l10n = LocalizationManager.shared
 
     enum ChatScope: String, CaseIterable {
         case direct = "Tin nhắn riêng"
         case groups = "Nhóm chat"
+
+        var localizedTitle: String {
+            L10n.tr(rawValue)
+        }
     }
 
     @State private var scope: ChatScope = .direct
@@ -60,12 +65,12 @@ struct MessagesView: View {
         VStack(spacing: 0) {
             // Pinned Header Bar (matching Android accountHeader pattern)
             PinnedHeaderBar(
-                title: "Tin nhắn",
+                title: l10n.localized("Tin nhắn"),
                 onBack: onBack,
                 trailingActions: [
                     PinnedHeaderBar.TrailingAction(
                         systemImage: scope == .direct ? "square.and.pencil" : "person.2.badge.plus",
-                        accessibilityLabel: scope == .direct ? "Soạn tin nhắn mới" : "Tạo nhóm mới",
+                        accessibilityLabel: scope == .direct ? l10n.localized("Soạn tin nhắn mới") : l10n.localized("Tạo nhóm mới"),
                         action: {
                             if scope == .direct {
                                 showNewDirectChatSheet = true
@@ -81,7 +86,7 @@ struct MessagesView: View {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(KinnectTheme.messageMeta)
-                TextField("Tìm cuộc trò chuyện…", text: $searchQuery)
+                TextField(l10n.localized("Tìm cuộc trò chuyện…"), text: $searchQuery)
                     .font(.system(size: 15))
                     .foregroundColor(KinnectTheme.textPrimary)
                 if !searchQuery.isEmpty {
@@ -98,9 +103,9 @@ struct MessagesView: View {
             .padding(.bottom, 8)
 
             // Scope Segmented Control
-            Picker("Loại tin nhắn", selection: $scope) {
+            Picker(l10n.localized("Loại tin nhắn"), selection: $scope) {
                 ForEach(ChatScope.allCases, id: \.self) { s in
-                    Text(s.rawValue).tag(s)
+                    Text(s.localizedTitle).tag(s)
                 }
             }
             .pickerStyle(.segmented)
@@ -110,11 +115,11 @@ struct MessagesView: View {
             // Filters: [Tất cả | Chưa đọc]
             if scope == .direct {
                 HStack(spacing: 8) {
-                    filterCapsule(title: "Tất cả", isSelected: !unreadOnly) {
+                    filterCapsule(title: l10n.localized("Tất cả"), isSelected: !unreadOnly) {
                         unreadOnly = false
                     }
                     .modifier(QAAccessibilityModifier(id: "qa.messages.filter.all", value: !unreadOnly ? "selected" : ""))
-                    filterCapsule(title: "Chưa đọc", isSelected: unreadOnly) {
+                    filterCapsule(title: l10n.localized("Chưa đọc"), isSelected: unreadOnly) {
                         unreadOnly = true
                     }
                     .modifier(QAAccessibilityModifier(id: "qa.messages.filter.unread", value: unreadOnly ? "selected" : ""))
@@ -261,11 +266,11 @@ struct MessagesView: View {
             Image(systemName: unreadOnly ? "tray" : "bubble.left.and.bubble.right")
                 .font(.system(size: 40))
                 .foregroundColor(KinnectTheme.messageMeta)
-            Text(unreadOnly ? "Không có tin nhắn chưa đọc." : "Chưa có cuộc trò chuyện riêng nào")
+            Text(unreadOnly ? l10n.localized("Không có tin nhắn chưa đọc.") : l10n.localized("Chưa có cuộc trò chuyện riêng nào"))
                 .font(.subheadline)
                 .foregroundColor(KinnectTheme.textSecondary)
             if !unreadOnly {
-                Button("Mở danh sách bạn bè", action: onOpenFriends)
+                Button(l10n.localized("Mở danh sách bạn bè"), action: onOpenFriends)
                     .font(.caption.bold())
                     .padding(.horizontal, 16)
                     .padding(.vertical, 9)
@@ -281,10 +286,10 @@ struct MessagesView: View {
             Image(systemName: "person.3")
                 .font(.system(size: 40))
                 .foregroundColor(KinnectTheme.messageMeta)
-            Text("Bạn chưa tham gia nhóm trò chuyện nào")
+            Text(l10n.localized("Bạn chưa tham gia nhóm trò chuyện nào"))
                 .font(.subheadline)
                 .foregroundColor(KinnectTheme.textSecondary)
-            Button("Tạo nhóm mới") {
+            Button(l10n.localized("Tạo nhóm mới")) {
                 showCreateGroupSheet = true
             }
             .font(.caption.bold())
@@ -301,7 +306,7 @@ struct MessagesView: View {
         let lastMsg = (lastObj?["body"] as? String)
             ?? ((conv["lastMessage"] as? [String: Any])?["text"] as? String)
             ?? (conv["preview"] as? String)
-            ?? "Nhấn để trò chuyện"
+            ?? l10n.localized("Nhấn để trò chuyện")
         let unread = (conv["unread"] as? Int) ?? (conv["unreadCount"] as? Int) ?? 0
         let rawTime = (lastObj?["createdAt"] as? String)
             ?? (conv["updatedAt"] as? String)
@@ -666,7 +671,8 @@ struct DirectChatDetailView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Quay lại")
+                .accessibilityLabel(L10n.tr("Quay lại"))
+                .modifier(QAAccessibilityModifier(id: "qa.nav.back", value: nil))
 
                 Button {
                     showPeerProfile = true
@@ -697,8 +703,8 @@ struct DirectChatDetailView: View {
 
                                 Text(
                                     (appState.onlineUserIds.contains(peer.id) || (peer.isActive && peer.showActivity))
-                                        ? "Đang trực tuyến"
-                                        : "Ngoại tuyến"
+                                        ? L10n.tr("Đang trực tuyến")
+                                        : L10n.tr("Ngoại tuyến")
                                 )
                                 .font(.system(size: 12))
                                 .foregroundColor(Color(UIColor.secondaryLabel))
@@ -725,7 +731,7 @@ struct DirectChatDetailView: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Gọi thoại")
+                    .accessibilityLabel(L10n.tr("Gọi thoại"))
 
                     Button {
                         Task { await NativeWebRTCManager.shared.startOutgoingCall(targetUser: peer, mode: "video") }
@@ -740,7 +746,7 @@ struct DirectChatDetailView: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Gọi video")
+                    .accessibilityLabel(L10n.tr("Gọi video"))
 
                     Menu {
                         Button {
@@ -753,13 +759,13 @@ struct DirectChatDetailView: View {
                                         body: ["pinned": next]
                                     )
                                     isPinned = next
-                                    appState.showToast(isPinned ? "Đã ghim hội thoại." : "Đã bỏ ghim.")
+                                    appState.showToast(isPinned ? L10n.tr("Đã ghim hội thoại.") : L10n.tr("Đã bỏ ghim."))
                                 } catch {
                                     appState.showToast(error.localizedDescription)
                                 }
                             }
                         } label: {
-                            Label(isPinned ? "Bỏ ghim hội thoại" : "Ghim hội thoại", systemImage: isPinned ? "pin.slash" : "pin")
+                            Label(isPinned ? L10n.tr("Bỏ ghim hội thoại") : L10n.tr("Ghim hội thoại"), systemImage: isPinned ? "pin.slash" : "pin")
                         }
                         Button {
                             Task {
@@ -771,13 +777,13 @@ struct DirectChatDetailView: View {
                                         body: ["muted": next]
                                     )
                                     isMuted = next
-                                    appState.showToast(isMuted ? "Đã tắt thông báo." : "Đã bật thông báo.")
+                                    appState.showToast(isMuted ? L10n.tr("Đã tắt thông báo.") : L10n.tr("Đã bật thông báo."))
                                 } catch {
                                     appState.showToast(error.localizedDescription)
                                 }
                             }
                         } label: {
-                            Label(isMuted ? "Bật thông báo" : "Tắt thông báo", systemImage: isMuted ? "bell" : "bell.slash")
+                            Label(isMuted ? L10n.tr("Bật thông báo") : L10n.tr("Tắt thông báo"), systemImage: isMuted ? "bell" : "bell.slash")
                         }
                         Button(role: .destructive) {
                             appState.activeReportContext = UGCReportContext(
@@ -787,12 +793,12 @@ struct DirectChatDetailView: View {
                                 targetTitle: peer.name
                             )
                         } label: {
-                            Label("Báo cáo người dùng", systemImage: "exclamationmark.bubble")
+                            Label(L10n.tr("Báo cáo người dùng"), systemImage: "exclamationmark.bubble")
                         }
                         Button(role: .destructive) {
                             Task { await appState.blockUser(userId: peer.id, userName: peer.name) }
                         } label: {
-                            Label("Chặn người dùng", systemImage: "hand.raised.fill")
+                            Label(L10n.tr("Chặn người dùng"), systemImage: "hand.raised.fill")
                         }
                     } label: {
                         ZStack {
@@ -804,7 +810,7 @@ struct DirectChatDetailView: View {
                                 .foregroundColor(KinnectTheme.textSecondary)
                         }
                     }
-                    .accessibilityLabel("Tùy chọn cuộc trò chuyện")
+                    .accessibilityLabel(L10n.tr("Tùy chọn cuộc trò chuyện"))
                 }
             }
             .padding(.horizontal, 12)
@@ -839,17 +845,17 @@ struct DirectChatDetailView: View {
                     Image(systemName: "pencil.circle.fill")
                         .font(.system(size: 16))
                         .foregroundColor(KinnectTheme.accentBright)
-                    Text("Đang sửa tin nhắn")
+                    Text(L10n.tr("Đang sửa tin nhắn"))
                         .font(.caption.bold())
                         .foregroundColor(KinnectTheme.accentBright)
                     Spacer()
-                    Button("Hủy") {
+                    Button(L10n.tr("Hủy")) {
                         editingMessageId = nil
                         editingMessageText = ""
                     }
                     .font(.caption)
                     .foregroundColor(KinnectTheme.textSecondary)
-                    Button("Lưu") {
+                    Button(L10n.tr("Lưu")) {
                         Task { await saveEditedMessage(messageId: editId) }
                     }
                     .font(.caption.bold())
@@ -867,12 +873,12 @@ struct DirectChatDetailView: View {
             HStack(alignment: .bottom, spacing: 8) {
                 Menu {
                     PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                        Label("Thư viện ảnh", systemImage: "photo.on.rectangle.angled")
+                        Label(L10n.tr("Thư viện ảnh"), systemImage: "photo.on.rectangle.angled")
                     }
                     Button {
                         showFileImporter = true
                     } label: {
-                        Label("Tệp & Tài liệu", systemImage: "folder")
+                        Label(L10n.tr("Tệp & Tài liệu"), systemImage: "folder")
                     }
                 } label: {
                     Image(systemName: "plus.circle.fill")
@@ -880,7 +886,7 @@ struct DirectChatDetailView: View {
                         .foregroundColor(KinnectTheme.messageMeta)
                         .frame(width: 34, height: 38)
                 }
-                .accessibilityLabel("Đính kèm tệp hoặc ảnh")
+                .accessibilityLabel(L10n.tr("Đính kèm tệp hoặc ảnh"))
 
                 PhotosPicker(selection: $selectedPhoto, matching: .images) {
                     Image(systemName: "camera.fill")
@@ -888,7 +894,7 @@ struct DirectChatDetailView: View {
                         .foregroundColor(KinnectTheme.textSecondary)
                         .frame(width: 32, height: 38)
                 }
-                .accessibilityLabel("Chọn ảnh nhanh")
+                .accessibilityLabel(L10n.tr("Chọn ảnh nhanh"))
                 .onChange(of: selectedPhoto) { newItem in
                     guard let newItem else { return }
                     Task {
@@ -905,7 +911,7 @@ struct DirectChatDetailView: View {
                     TextField(
                         "",
                         text: $editingMessageText,
-                        prompt: Text("Nội dung tin nhắn mới...").foregroundColor(KinnectTheme.textSecondary)
+                        prompt: Text(L10n.tr("Nội dung tin nhắn mới...")).foregroundColor(KinnectTheme.textSecondary)
                     )
                     .font(.system(size: 16))
                     .padding(.horizontal, 12)
@@ -921,7 +927,7 @@ struct DirectChatDetailView: View {
                         TextField(
                             "",
                             text: $text,
-                            prompt: Text("Tin nhắn…").foregroundColor(KinnectTheme.textSecondary),
+                            prompt: Text(L10n.tr("Tin nhắn…")).foregroundColor(KinnectTheme.textSecondary),
                             axis: .vertical
                         )
                         .lineLimit(1...5)
@@ -963,7 +969,7 @@ struct DirectChatDetailView: View {
 
                     if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         Button {
-                            appState.showToast("Ghi âm tin nhắn thoại (Đang hoàn thiện)")
+                            appState.showToast(L10n.tr("Ghi âm tin nhắn thoại (Đang hoàn thiện)"))
                         } label: {
                             Image(systemName: "mic.fill")
                                 .font(.system(size: 18))
@@ -994,18 +1000,18 @@ struct DirectChatDetailView: View {
             .transition(.move(edge: .bottom).combined(with: .opacity))
             .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showPeerProfile)
         }
-        .confirmationDialog("Tùy chọn hội thoại", isPresented: $showReviewChatMenu, titleVisibility: .visible) {
-            Button(isPinned ? "Bỏ ghim hội thoại" : "Ghim hội thoại") {}
-            Button(isMuted ? "Bật thông báo" : "Tắt thông báo") {}
-            Button("Báo cáo người dùng", role: .destructive) {}
-            Button("Chặn người dùng", role: .destructive) {}
-            Button("Hủy", role: .cancel) {}
+        .confirmationDialog(L10n.tr("Tùy chọn hội thoại"), isPresented: $showReviewChatMenu, titleVisibility: .visible) {
+            Button(isPinned ? L10n.tr("Bỏ ghim hội thoại") : L10n.tr("Ghim hội thoại")) {}
+            Button(isMuted ? L10n.tr("Bật thông báo") : L10n.tr("Tắt thông báo")) {}
+            Button(L10n.tr("Báo cáo người dùng"), role: .destructive) {}
+            Button(L10n.tr("Chặn người dùng"), role: .destructive) {}
+            Button(L10n.tr("Hủy"), role: .cancel) {}
         }
-        .confirmationDialog("Tùy chọn tin nhắn", isPresented: $showReviewMessageMenu, titleVisibility: .visible) {
-            Button("Sửa tin nhắn") {}
-            Button("Chuyển tiếp tin nhắn") {}
-            Button("Thu hồi / Xóa tin nhắn", role: .destructive) {}
-            Button("Hủy", role: .cancel) {}
+        .confirmationDialog(L10n.tr("Tùy chọn tin nhắn"), isPresented: $showReviewMessageMenu, titleVisibility: .visible) {
+            Button(L10n.tr("Sửa tin nhắn")) {}
+            Button(L10n.tr("Chuyển tiếp tin nhắn")) {}
+            Button(L10n.tr("Thu hồi / Xóa tin nhắn"), role: .destructive) {}
+            Button(L10n.tr("Hủy"), role: .cancel) {}
         }
         .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.item]) { result in
             switch result {
@@ -1798,7 +1804,7 @@ struct GroupChatDetailView: View {
                     .foregroundColor(KinnectTheme.messageMeta)
                     .frame(width: 34, height: 38)
             }
-            .accessibilityLabel("Đính kèm tệp hoặc ảnh")
+            .accessibilityLabel(L10n.tr("Đính kèm tệp hoặc ảnh"))
 
             PhotosPicker(selection: $selectedPhoto, matching: .images) {
                 Image(systemName: "camera.fill")
@@ -1806,7 +1812,7 @@ struct GroupChatDetailView: View {
                     .foregroundColor(KinnectTheme.textSecondary)
                     .frame(width: 32, height: 38)
             }
-            .accessibilityLabel("Chọn ảnh nhanh")
+            .accessibilityLabel(L10n.tr("Chọn ảnh nhanh"))
             .onChange(of: selectedPhoto) { newItem in
                 guard let newItem else { return }
                 Task {
@@ -1834,13 +1840,13 @@ struct GroupChatDetailView: View {
                     .foregroundColor(KinnectTheme.accentBright)
                     .frame(width: 32, height: 38)
             }
-            .accessibilityLabel("Nhắc tên thành viên")
+            .accessibilityLabel(L10n.tr("Nhắc tên thành viên"))
 
             HStack(alignment: .bottom, spacing: 6) {
                 TextField(
                     "",
                     text: $text,
-                    prompt: Text("Tin nhắn nhóm…").foregroundColor(KinnectTheme.textSecondary),
+                    prompt: Text(L10n.tr("Tin nhắn nhóm…")).foregroundColor(KinnectTheme.textSecondary),
                     axis: .vertical
                 )
                 .lineLimit(1...5)
@@ -1880,7 +1886,7 @@ struct GroupChatDetailView: View {
 
             if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Button {
-                    appState.showToast("Ghi âm tin nhắn thoại (Đang hoàn thiện)")
+                    appState.showToast(L10n.tr("Ghi âm tin nhắn thoại (Đang hoàn thiện)"))
                 } label: {
                     Image(systemName: "mic.fill")
                         .font(.system(size: 18))
@@ -1911,7 +1917,8 @@ struct GroupChatDetailView: View {
                         .frame(width: 32, height: 44)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Quay lại")
+                .accessibilityLabel(L10n.tr("Quay lại"))
+                .modifier(QAAccessibilityModifier(id: "qa.nav.back", value: nil))
 
                 // Group Avatar + Title
                 HStack(spacing: 10) {
@@ -1936,7 +1943,7 @@ struct GroupChatDetailView: View {
                             .foregroundColor(KinnectTheme.textPrimary)
                             .lineLimit(1)
 
-                        Text("\(max(groupMembers.count, 1)) thành viên")
+                        Text(L10n.count(max(groupMembers.count, 1), vi: "thành viên", enSingular: "member", enPlural: "members"))
                             .font(.system(size: 11, weight: .medium))
                             .foregroundColor(KinnectTheme.messageMeta)
                     }
@@ -1949,22 +1956,22 @@ struct GroupChatDetailView: View {
                         newGroupName = group.name
                         showRenameSheet = true
                     } label: {
-                        Label("Đổi tên nhóm", systemImage: "pencil")
+                        Label(L10n.tr("Đổi tên nhóm"), systemImage: "pencil")
                     }
                     Button {
                         showAddMemberSheet = true
                     } label: {
-                        Label("Thêm thành viên", systemImage: "person.badge.plus")
+                        Label(L10n.tr("Thêm thành viên"), systemImage: "person.badge.plus")
                     }
                     Button {
                         showMembersSheet = true
                     } label: {
-                        Label("Thành viên & phân quyền", systemImage: "person.3")
+                        Label(L10n.tr("Thành viên & phân quyền"), systemImage: "person.3")
                     }
                     Button(role: .destructive) {
                         Task { await leaveGroup() }
                     } label: {
-                        Label("Rời nhóm", systemImage: "rectangle.portrait.and.arrow.right")
+                        Label(L10n.tr("Rời nhóm"), systemImage: "rectangle.portrait.and.arrow.right")
                     }
                 } label: {
                     ZStack {
@@ -1976,7 +1983,7 @@ struct GroupChatDetailView: View {
                             .foregroundColor(KinnectTheme.textSecondary)
                     }
                 }
-                .accessibilityLabel("Tùy chọn nhóm")
+                .accessibilityLabel(L10n.tr("Tùy chọn nhóm"))
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)

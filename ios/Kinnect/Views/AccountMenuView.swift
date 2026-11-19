@@ -28,6 +28,7 @@ enum KinnectNotificationPrefs {
 /// Features user profile header card, store, wallet, friends, privacy, security, theme, support, password, logout.
 struct AccountMenuView: View {
     @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var l10n = LocalizationManager.shared
     @Environment(\.dismiss) private var dismiss
 
     var onOpenProfile: () -> Void
@@ -77,7 +78,7 @@ struct AccountMenuView: View {
             } else {
                 // Pinned Header Bar (matching Android accountHeader pattern)
                 PinnedHeaderBar(
-                    title: "Tài khoản",
+                    title: l10n.localized("Tài khoản"),
                     onBack: onBack ?? { dismiss() },
                     trailingActions: []
                 )
@@ -99,8 +100,8 @@ struct AccountMenuView: View {
         }
         .background(KinnectTheme.background.ignoresSafeArea())
         .navigationBarHidden(true)
-        .confirmationDialog("Đăng xuất khỏi Kinnect?", isPresented: $showLogoutConfirm, titleVisibility: .visible) {
-            Button("Đăng xuất", role: .destructive) {
+        .confirmationDialog(l10n.localized("Đăng xuất khỏi Kinnect?"), isPresented: $showLogoutConfirm, titleVisibility: .visible) {
+            Button(l10n.localized("Đăng xuất"), role: .destructive) {
                 if let onBack = onBack {
                     onBack()
                 } else {
@@ -110,9 +111,9 @@ struct AccountMenuView: View {
                     await appState.logout()
                 }
             }
-            Button("Hủy", role: .cancel) { }
+            Button(l10n.localized("Hủy"), role: .cancel) { }
         } message: {
-            Text("Bạn có thể đăng nhập lại bất kỳ lúc nào.")
+            Text(l10n.localized("Bạn có thể đăng nhập lại bất kỳ lúc nào."))
         }
     }
 
@@ -141,7 +142,7 @@ struct AccountMenuView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(appState.currentUser?.name ?? "Người dùng Kinnect")
+                    Text(appState.currentUser?.name ?? l10n.localized("Người dùng Kinnect"))
                         .font(.title3.weight(.bold))
                         .foregroundColor(KinnectTheme.textPrimary)
 
@@ -167,14 +168,15 @@ struct AccountMenuView: View {
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Trang cá nhân")
+        .accessibilityLabel(l10n.localized("Trang cá nhân"))
+        .modifier(QAAccessibilityModifier(id: "qa.account.profile", value: nil))
     }
 
     @ViewBuilder
     private var adminMenuGroup: some View {
         if appState.currentUser?.accountRole == "admin" {
             VStack(spacing: 0) {
-                menuRow(systemName: "checkmark.shield", title: "Bảng quản trị") {
+                menuRow(systemName: "checkmark.shield", title: l10n.localized("Bảng quản trị")) {
                     withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = .admin }
                 }
             }
@@ -184,31 +186,31 @@ struct AccountMenuView: View {
 
     private var mainMenuGroup: some View {
         VStack(spacing: 0) {
-            menuRow(systemName: "bag", title: "Cửa hàng Kinnect") { onOpenStore?() }
+            menuRow(systemName: "bag", title: l10n.localized("Cửa hàng Kinnect")) { onOpenStore?() }
             menuDivider
-            menuRow(systemName: "creditcard", title: "Ví Kinnect") { onOpenWallet() }
+            menuRow(systemName: "creditcard", title: l10n.localized("Ví Kinnect")) { onOpenWallet() }
             menuDivider
-            menuRow(systemName: "hand.raised", title: "Cài đặt và quyền riêng tư") {
+            menuRow(systemName: "hand.raised", title: l10n.localized("Cài đặt và quyền riêng tư")) {
                 withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = .privacy }
             }
             menuDivider
-            menuRow(systemName: "lock.shield", title: "Bảo mật và đăng nhập") {
+            menuRow(systemName: "lock.shield", title: l10n.localized("Bảo mật và đăng nhập")) {
                 withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = .security }
             }
             menuDivider
-            menuRow(systemName: "bell", title: "Cài đặt thông báo") {
+            menuRow(systemName: "bell", title: l10n.localized("Cài đặt thông báo")) {
                 withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = .notifications }
             }
             menuDivider
-            menuRow(systemName: "circle.lefthalf.filled", title: "Giao diện") {
+            menuRow(systemName: "circle.lefthalf.filled", title: l10n.localized("Giao diện")) {
                 withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = .appearance }
             }
             menuDivider
-            menuRow(systemName: "questionmark.circle", title: "Trợ giúp và hỗ trợ") {
+            menuRow(systemName: "questionmark.circle", title: l10n.localized("Trợ giúp và hỗ trợ")) {
                 withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = .support }
             }
             menuDivider
-            menuRow(systemName: "info.circle", title: "Giới thiệu Kinnect") {
+            menuRow(systemName: "info.circle", title: l10n.localized("Giới thiệu Kinnect")) {
                 withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = .about }
             }
         }
@@ -217,11 +219,11 @@ struct AccountMenuView: View {
 
     private var endMenuGroup: some View {
         VStack(spacing: 0) {
-            menuRow(systemName: "key", title: "Đổi mật khẩu") {
+            menuRow(systemName: "key", title: l10n.localized("Đổi mật khẩu")) {
                 withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = .password }
             }
             menuDivider
-            menuRow(systemName: "rectangle.portrait.and.arrow.right", title: "Đăng xuất", isDestructive: true) {
+            menuRow(systemName: "rectangle.portrait.and.arrow.right", title: l10n.localized("Đăng xuất"), isDestructive: true) {
                 showLogoutConfirm = true
             }
         }
@@ -245,7 +247,7 @@ struct AccountMenuView: View {
     }
 
     private var footerLabel: some View {
-        Text("Kinnect · Kết nối theo cách của bạn.")
+        Text(l10n.localized("Kinnect · Kết nối theo cách của bạn."))
             .font(.caption)
             .foregroundColor(KinnectTheme.textSecondary)
             .padding(.top, 4)

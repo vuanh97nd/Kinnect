@@ -11,6 +11,7 @@ import UIKit
 /// - Live (radio)
 /// Active tabs feature the Google Pixel M3 pill highlight shape (64x32pt, PRIMARY_SOFT) behind the icon.
 struct KinnectBottomBar: View {
+    @ObservedObject private var l10n = LocalizationManager.shared
     @Binding var selectedTab: KinnectNavTab
     var onCreateTap: () -> Void
 
@@ -19,17 +20,19 @@ struct KinnectBottomBar: View {
             // Tab 1: Bảng tin
             tabButton(
                 tab: .feed,
-                title: "Bảng tin",
+                title: l10n.localized("Bảng tin"),
                 glyph: .feed,
-                systemImage: "house.fill"
+                systemImage: "house.fill",
+                qaId: "qa.tab.feed"
             )
 
             // Tab 2: Khám phá
             tabButton(
                 tab: .discover,
-                title: "Khám phá",
+                title: l10n.localized("Khám phá"),
                 glyph: .discover,
-                systemImage: "magnifyingglass"
+                systemImage: "magnifyingglass",
+                qaId: "qa.tab.discover"
             )
 
             // Tab 3: Center FAB "Tạo" (Google Material 3 squircle FAB matching Android line 481-491)
@@ -61,22 +64,25 @@ struct KinnectBottomBar: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Tạo nội dung")
+            .accessibilityLabel(l10n.localized("Tạo nội dung"))
+            .modifier(QAAccessibilityModifier(id: "qa.tab.create", value: nil))
 
             // Tab 4: Video (Explicit "Video" label below icon)
             tabButton(
                 tab: .video,
-                title: "Video",
+                title: l10n.localized("Video"),
                 glyph: .video,
-                systemImage: "play.rectangle.fill"
+                systemImage: "play.rectangle.fill",
+                qaId: "qa.tab.video"
             )
 
             // Tab 5: Live
             tabButton(
                 tab: .live,
-                title: "Live",
+                title: l10n.localized("Live"),
                 glyph: .live,
-                systemImage: "dot.radiowaves.left.and.right"
+                systemImage: "dot.radiowaves.left.and.right",
+                qaId: "qa.tab.live"
             )
         }
         .padding(.horizontal, 4)
@@ -93,7 +99,8 @@ struct KinnectBottomBar: View {
         tab: KinnectNavTab,
         title: String,
         glyph: KinnectGlyph,
-        systemImage: String
+        systemImage: String,
+        qaId: String
     ) -> some View {
         let isSelected = (selectedTab == tab)
         return Button {
@@ -135,6 +142,7 @@ struct KinnectBottomBar: View {
         .buttonStyle(.plain)
         .accessibilityLabel(title)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+        .modifier(QAAccessibilityModifier(id: qaId, value: isSelected ? "selected" : nil))
     }
 }
 

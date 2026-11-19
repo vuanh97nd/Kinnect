@@ -40,7 +40,8 @@ struct PinnedHeaderBar: View {
 						.contentShape(Rectangle())
 				}
 				.buttonStyle(.plain)
-				.accessibilityLabel("Quay lại")
+				.accessibilityLabel(L10n.tr("Quay lại"))
+				.modifier(QAAccessibilityModifier(id: "qa.nav.back", value: nil))
 			} else {
 				// Spacer to maintain alignment when no back button
 				Color.clear.frame(width: 44, height: 44)

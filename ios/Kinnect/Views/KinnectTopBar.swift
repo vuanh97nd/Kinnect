@@ -5,6 +5,7 @@ import SwiftUI
 /// 1. Thông báo, 2. Cửa hàng, 3. Bạn bè, 4. Tin nhắn, 5. Tài khoản.
 struct KinnectTopBar: View {
     @ObservedObject var appState: AppState
+    @ObservedObject private var l10n = LocalizationManager.shared
     @Binding var activeTopSection: KinnectTopSection?
     var onLogoTap: (() -> Void)? = nil
 
@@ -17,16 +18,18 @@ struct KinnectTopBar: View {
                 KinnectBrandLogo(size: 40)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Về đầu Bảng tin Kinnect")
+            .accessibilityLabel(l10n.localized("Về đầu Bảng tin Kinnect"))
+            .modifier(QAAccessibilityModifier(id: "qa.topbar.logo", value: nil))
 
             Spacer(minLength: 8)
 
             // Trailing icon 1: Notifications (Bell)
             topBarButton(
                 glyph: .notifications,
-                label: "Thông báo",
+                label: l10n.localized("Thông báo"),
                 badgeCount: appState.unreadNotificationsCount,
-                isSelected: activeTopSection == .notifications
+                isSelected: activeTopSection == .notifications,
+                qaId: "qa.topbar.notifications"
             ) {
                 toggleSection(.notifications)
             }
@@ -34,8 +37,9 @@ struct KinnectTopBar: View {
             // Trailing icon 2: Store / Cửa hàng
             topBarButton(
                 glyph: .store,
-                label: "Cửa hàng",
-                isSelected: activeTopSection == .store
+                label: l10n.localized("Cửa hàng"),
+                isSelected: activeTopSection == .store,
+                qaId: "qa.topbar.store"
             ) {
                 toggleSection(.store)
             }
@@ -43,8 +47,9 @@ struct KinnectTopBar: View {
             // Trailing icon 3: Friends / Bạn bè
             topBarButton(
                 glyph: .friends,
-                label: "Bạn bè",
-                isSelected: activeTopSection == .friends
+                label: l10n.localized("Bạn bè"),
+                isSelected: activeTopSection == .friends,
+                qaId: "qa.topbar.friends"
             ) {
                 toggleSection(.friends)
             }
@@ -52,7 +57,7 @@ struct KinnectTopBar: View {
             // Trailing icon 4: Messages / Tin nhắn
             topBarButton(
                 glyph: .messages,
-                label: "Tin nhắn",
+                label: l10n.localized("Tin nhắn"),
                 badgeCount: appState.unreadMessagesCount,
                 isSelected: activeTopSection == .messages,
                 qaId: "qa.topbar.messages"
@@ -93,7 +98,7 @@ struct KinnectTopBar: View {
                 .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Tài khoản")
+            .accessibilityLabel(l10n.localized("Tài khoản"))
             .modifier(QAAccessibilityModifier(id: "qa.topbar.profile", value: nil))
         }
         .padding(.horizontal, 16)

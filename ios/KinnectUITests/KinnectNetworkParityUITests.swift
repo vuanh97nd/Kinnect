@@ -486,7 +486,8 @@ final class KinnectNetworkParityUITests: XCTestCase {
             ("vi", "light", false),
             ("en", "dark", false),
             ("en", "light", false),
-            ("vi", "dark", true)
+            ("vi", "dark", true),
+            ("en", "dark", true)
         ]
 
         func record(
@@ -508,8 +509,6 @@ final class KinnectNetworkParityUITests: XCTestCase {
                 "unreadDirect": 2,
                 "unreadGroup": 3
             ]
-            let actualLang = (screen == "auth") ? locale : "vi"
-            let localeMismatch = (locale == "en" && screen != "auth")
             let entry: [String: Any] = [
                 "platform": "ios",
                 "file": "captures/\(file)",
@@ -517,8 +516,8 @@ final class KinnectNetworkParityUITests: XCTestCase {
                 "screen": screen,
                 "state": state,
                 "locale": locale,
-                "actualRenderedLanguage": actualLang,
-                "localeMismatch": localeMismatch,
+                "actualRenderedLanguage": locale,
+                "localeMismatch": false,
                 "theme": theme,
                 "textScale": largeText ? "accessibilityLarge" : "default",
                 "device": deviceName,
@@ -535,6 +534,7 @@ final class KinnectNetworkParityUITests: XCTestCase {
             let app = launchApp(theme: theme, lang: locale, resetSession: true, largeText: largeText)
             let logicalWidth = Int(round(app.frame.width))
             let suffix = "\(locale)-\(theme)" + (largeText ? "-large" : "-default")
+            let isEN = (locale == "en")
 
             // 1. Auth screen
             XCTAssertTrue(app.buttons["qa.welcome.login"].waitForExistence(timeout: 20))
@@ -557,12 +557,27 @@ final class KinnectNetworkParityUITests: XCTestCase {
             XCTAssertTrue(app.staticTexts["P1 parity post"].waitForExistence(timeout: 12))
             _ = waitForBadgeValue(app.buttons["qa.topbar.messages"], expected: "5", timeout: 8)
 
-            // 2. Feed screen
+            // 2. Feed screen (verify real localized UI copy, never relabel)
+            if isEN {
+                XCTAssertTrue(app.staticTexts["What's on your mind?"].waitForExistence(timeout: 5), "EN feed composer must render English")
+                XCTAssertFalse(app.staticTexts["Bạn đang nghĩ gì?"].exists, "EN feed must not render Vietnamese composer placeholder")
+                XCTAssertFalse(app.staticTexts["Chưa có cảm xúc"].exists, "EN feed must not render Vietnamese reaction summary")
+                XCTAssertFalse(app.buttons["Bảng tin"].exists, "EN bottom bar must not render Vietnamese Feed tab")
+            } else {
+                XCTAssertTrue(app.staticTexts["Bạn đang nghĩ gì?"].waitForExistence(timeout: 5), "VI feed composer must render Vietnamese")
+            }
             record(slug: "parity-feed-\(suffix)", screen: "feed", state: "seeded-unread-5", locale: locale, theme: theme, largeText: largeText, logicalWidth: logicalWidth)
 
             // 3. Inbox screen (direct unread = 2)
             app.buttons["qa.topbar.messages"].tap()
             XCTAssertTrue(app.staticTexts["QA Lan"].waitForExistence(timeout: 10))
+            if isEN {
+                XCTAssertTrue(app.staticTexts["Messages"].waitForExistence(timeout: 5), "EN inbox header must render Messages")
+                XCTAssertTrue(app.buttons["Groups"].exists, "EN inbox scope must render Groups")
+                XCTAssertFalse(app.staticTexts["Tin nhắn"].exists, "EN inbox must not render Vietnamese header")
+            } else {
+                XCTAssertTrue(app.staticTexts["Tin nhắn"].waitForExistence(timeout: 5), "VI inbox header must render Tin nhắn")
+            }
             record(slug: "parity-inbox-\(suffix)", screen: "inbox", state: "direct-unread-2", locale: locale, theme: theme, largeText: largeText, logicalWidth: logicalWidth)
 
             if largeText {
@@ -573,25 +588,42 @@ final class KinnectNetworkParityUITests: XCTestCase {
             // 4. Direct Chat screen
             app.staticTexts["QA Lan"].firstMatch.tap()
             XCTAssertTrue(app.staticTexts["Hello parity"].waitForExistence(timeout: 10))
+            if isEN {
+                XCTAssertTrue(app.staticTexts["Offline"].waitForExistence(timeout: 5), "EN direct chat must render Offline status")
+                XCTAssertFalse(app.staticTexts["Ngoại tuyến"].exists, "EN direct chat must not render Vietnamese status")
+            }
             record(slug: "parity-direct-chat-\(suffix)", screen: "direct-chat", state: "opened-hello-parity", locale: locale, theme: theme, largeText: largeText, logicalWidth: logicalWidth)
 
             // 5. Group Chat screen
-            app.buttons["Quay lại"].firstMatch.tap()
-            XCTAssertTrue(app.buttons["Nhóm chat"].firstMatch.waitForExistence(timeout: 8))
-            app.buttons["Nhóm chat"].firstMatch.tap()
+            app.buttons["qa.nav.back"].firstMatch.tap()
+            let groupSeg = app.buttons[isEN ? "Groups" : "Nhóm chat"].firstMatch
+            XCTAssertTrue(groupSeg.waitForExistence(timeout: 8))
+            groupSeg.tap()
             XCTAssertTrue(app.staticTexts["QA Parity Group"].waitForExistence(timeout: 10))
             app.staticTexts["QA Parity Group"].firstMatch.tap()
             XCTAssertTrue(app.staticTexts["Hello parity group 1"].waitForExistence(timeout: 10))
+            if isEN {
+                XCTAssertTrue(app.staticTexts["2 members"].waitForExistence(timeout: 5), "EN group chat must render '2 members'")
+                XCTAssertFalse(app.staticTexts["2 thành viên"].exists, "EN group chat must not render Vietnamese member count")
+            }
             record(slug: "parity-group-chat-\(suffix)", screen: "group-chat", state: "opened-qa-parity-group", locale: locale, theme: theme, largeText: largeText, logicalWidth: logicalWidth)
 
             // 6. Profile screen
-            app.buttons["Quay lại"].firstMatch.tap()
+            app.buttons["qa.nav.back"].firstMatch.tap()
             RunLoop.current.run(until: Date().addingTimeInterval(0.5))
             app.buttons["qa.topbar.profile"].tap()
-            let profileCard = app.buttons["Trang cá nhân"].firstMatch
+            let profileCard = app.buttons["qa.account.profile"].firstMatch
             XCTAssertTrue(profileCard.waitForExistence(timeout: 8))
             profileCard.tap()
             XCTAssertTrue(app.staticTexts["QA Minh"].waitForExistence(timeout: 10))
+            if isEN {
+                XCTAssertTrue(app.staticTexts["Profile"].waitForExistence(timeout: 5), "EN profile header must render Profile")
+                XCTAssertTrue(app.staticTexts["Edit profile"].exists, "EN profile must render Edit profile button")
+                XCTAssertFalse(app.staticTexts["Trang cá nhân"].exists, "EN profile must not render Vietnamese header")
+                XCTAssertFalse(app.staticTexts["Chỉnh sửa hồ sơ"].exists, "EN profile must not render Vietnamese edit button")
+            } else {
+                XCTAssertTrue(app.staticTexts["Trang cá nhân"].waitForExistence(timeout: 5), "VI profile header must render Trang cá nhân")
+            }
             record(slug: "parity-profile-\(suffix)", screen: "profile", state: "self-qa-minh", locale: locale, theme: theme, largeText: largeText, logicalWidth: logicalWidth)
 
             app.terminate()

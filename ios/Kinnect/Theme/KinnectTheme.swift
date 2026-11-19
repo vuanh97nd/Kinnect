@@ -118,12 +118,19 @@ enum KinnectTheme {
     static let brandGradient = primaryGradient
 
     static func relativeTime(from timestampMs: Int64) -> String {
-        guard timestampMs > 0 else { return "Vừa xong" }
+        guard timestampMs > 0 else { return L10n.tr("Vừa xong") }
         let seconds = max(0, Int((Int64(Date().timeIntervalSince1970 * 1000) - timestampMs) / 1000))
-        if seconds < 45 { return "Vừa xong" }
-        if seconds < 3600 { return "\(seconds / 60) phút" }
-        if seconds < 86400 { return "\(seconds / 3600) giờ" }
-        return "\(seconds / 86400) ngày"
+        if seconds < 45 { return L10n.tr("Vừa xong") }
+        if seconds < 3600 {
+            let mins = seconds / 60
+            return L10n.isEnglish ? "\(mins)m" : "\(mins) phút"
+        }
+        if seconds < 86400 {
+            let hrs = seconds / 3600
+            return L10n.isEnglish ? "\(hrs)h" : "\(hrs) giờ"
+        }
+        let days = seconds / 86400
+        return L10n.isEnglish ? "\(days)d" : "\(days) ngày"
     }
 }
 

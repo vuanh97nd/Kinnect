@@ -11,14 +11,16 @@ struct ReactionPicker: View {
 	let onDismiss: () -> Void
 
 	// Android REACTIONS: like, love, haha, wow, sad, angry
-	private let reactions: [(key: String, emoji: String, title: String)] = [
-		("like", "👍", "Thích"),
-		("love", "❤️", "Yêu thích"),
-		("haha", "😂", "Haha"),
-		("wow", "😮", "Wow"),
-		("sad", "😢", "Buồn"),
-		("angry", "😡", "Phẫn nộ")
-	]
+	private var reactions: [(key: String, emoji: String, title: String)] {
+		[
+			("like", "👍", L10n.tr("Thích")),
+			("love", "❤️", L10n.tr("Yêu thích")),
+			("haha", "😂", L10n.tr("Haha")),
+			("wow", "😮", L10n.tr("Wow")),
+			("sad", "😢", L10n.tr("Buồn")),
+			("angry", "😡", L10n.tr("Phẫn nộ"))
+		]
+	}
 
 	@State private var animatedIndices: Set<Int> = []
 	@State private var pressedIndex: Int? = nil
@@ -118,7 +120,7 @@ private struct ReactionButton: View {
 				.onChanged { _ in onPress(true) }
 				.onEnded { _ in onPress(false) }
 		)
-		.accessibilityLabel("\(reaction.title) \(count > 0 ? "\(count) người" : "")")
+		.accessibilityLabel(count > 0 ? "\(reaction.title) \(L10n.count(count, vi: "người", enSingular: "person", enPlural: "people"))" : reaction.title)
 		.accessibilityAddTraits(isSelected ? .isSelected : [])
 		.onAppear {
 			hasAppeared = true

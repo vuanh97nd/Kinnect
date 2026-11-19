@@ -11,11 +11,11 @@ enum KinnectNavTab: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .feed: return "Bảng tin"
-        case .discover: return "Khám phá"
-        case .create: return "Tạo"
-        case .video: return "Video"
-        case .live: return "Live"
+        case .feed: return L10n.tr("Bảng tin")
+        case .discover: return L10n.tr("Khám phá")
+        case .create: return L10n.tr("Tạo")
+        case .video: return L10n.tr("Video")
+        case .live: return L10n.tr("Live")
         }
     }
 
@@ -55,6 +55,7 @@ struct RootMainView: View {
     typealias TopSection = KinnectTopSection
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var webrtc = NativeWebRTCManager.shared
+    @ObservedObject private var l10n = LocalizationManager.shared
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var selectedTab: KinnectNavTab = .feed
@@ -492,6 +493,7 @@ struct RootMainView: View {
                                         .modifier(QAAccessibilityModifier(id: "qa.toast", value: nil))
                                 }
                             }
+                            .environment(\.locale, l10n.currentLanguage.locale)
                             .preferredColorScheme(activeColorScheme)
                             .modifier(UIReviewDynamicTypeModifier())
                             .task {
@@ -574,7 +576,7 @@ struct RootMainView: View {
     private var iPadSplitView: some View {
         NavigationSplitView {
             List {
-                Section("Điều hướng") {
+                Section(l10n.localized("Điều hướng")) {
                     ForEach(KinnectNavTab.allCases) { tab in
                         let isSelected = (activeTopSection == nil && selectedTab == tab)
                         Button {
@@ -609,13 +611,13 @@ struct RootMainView: View {
                     }
                 }
 
-                Section("Liên lạc & Cá nhân") {
+                Section(l10n.localized("Liên lạc & Cá nhân")) {
                     Button {
                         activeTopSection = .messages
                     } label: {
                         HStack(spacing: 12) {
                             KinnectIcon(glyph: .messages, size: 24, tint: KinnectTheme.accentBright)
-                            Text("Tin nhắn")
+                            Text(l10n.localized("Tin nhắn"))
                                 .foregroundColor(KinnectTheme.textPrimary)
                             Spacer()
                             if appState.unreadMessagesCount > 0 {
@@ -630,20 +632,20 @@ struct RootMainView: View {
                     } label: {
                         HStack(spacing: 12) {
                             KinnectIcon(glyph: .profile, size: 24, tint: KinnectTheme.textPrimary)
-                            Text("Hồ sơ cá nhân")
+                            Text(l10n.localized("Hồ sơ cá nhân"))
                                 .foregroundColor(KinnectTheme.textPrimary)
                         }
                         .frame(minHeight: 44)
                     }
                 }
 
-                Section("Tiện ích") {
+                Section(l10n.localized("Tiện ích")) {
                     Button {
                         showCameraStudioSheet = true
                     } label: {
                         HStack(spacing: 12) {
                             KinnectIcon(glyph: .camera, size: 24, tint: KinnectTheme.accentBright)
-                            Text("Tạo ảnh / Video")
+                            Text(l10n.localized("Tạo ảnh / Video"))
                                 .foregroundColor(KinnectTheme.textPrimary)
                         }
                         .frame(minHeight: 44)
@@ -653,7 +655,7 @@ struct RootMainView: View {
                     } label: {
                         HStack(spacing: 12) {
                             KinnectIcon(glyph: .friends, size: 24, tint: KinnectTheme.textPrimary)
-                            Text("Bạn bè")
+                            Text(l10n.localized("Bạn bè"))
                                 .foregroundColor(KinnectTheme.textPrimary)
                         }
                         .frame(minHeight: 44)
@@ -663,7 +665,7 @@ struct RootMainView: View {
                     } label: {
                         HStack(spacing: 12) {
                             KinnectIcon(glyph: .notifications, size: 24, tint: KinnectTheme.textPrimary)
-                            Text("Thông báo")
+                            Text(l10n.localized("Thông báo"))
                                 .foregroundColor(KinnectTheme.textPrimary)
                             Spacer()
                             if appState.unreadNotificationsCount > 0 {
@@ -677,7 +679,7 @@ struct RootMainView: View {
                     } label: {
                         HStack(spacing: 12) {
                             KinnectIcon(glyph: .wallet, size: 24, tint: KinnectTheme.warning)
-                            Text("Ví Kinnect & Cửa hàng Kinnect")
+                            Text(l10n.localized("Ví Kinnect & Cửa hàng Kinnect"))
                                 .foregroundColor(KinnectTheme.textPrimary)
                         }
                         .frame(minHeight: 44)

@@ -15,17 +15,17 @@ enum KinnectAPIError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            return "Địa chỉ máy chủ không hợp lệ."
+            return L10n.tr("Địa chỉ máy chủ không hợp lệ.")
         case .networkError(let msg):
-            return msg
+            return L10n.tr(msg)
         case .serverError(_, let message):
-            return message
+            return L10n.tr(message)
         case .serverMessage(let message):
-            return message
+            return L10n.tr(message)
         case .unauthorized:
-            return "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
+            return L10n.tr("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
         case .originSwitchUnauthorized:
-            return "Đang dùng máy chủ dự phòng. Vui lòng đăng nhập lại trên máy chủ này."
+            return L10n.tr("Đang dùng máy chủ dự phòng. Vui lòng đăng nhập lại trên máy chủ này.")
         }
     }
 }

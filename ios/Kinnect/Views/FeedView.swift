@@ -7,6 +7,7 @@ struct FeedView: View {
     let onOpenFriends: () -> Void
 
     @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var l10n = LocalizationManager.shared
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var stories: [StoryItem] = []
@@ -41,7 +42,7 @@ struct FeedView: View {
                         Image(systemName: "newspaper.fill")
                             .font(.largeTitle)
                             .foregroundColor(KinnectTheme.textSecondary)
-                        Text("Chưa có bài viết nào")
+                        Text(l10n.localized("Chưa có bài viết nào"))
                             .font(.subheadline.weight(.medium))
                             .foregroundColor(KinnectTheme.textSecondary)
                     }
@@ -71,7 +72,7 @@ struct FeedView: View {
                             },
                             onHide: {
                                 hiddenPostIds.insert(post.id)
-                                appState.showToast("Đã ẩn bài viết.")
+                                appState.showToast(l10n.localized("Đã ẩn bài viết."))
                             },
                             onDelete: {
                                 Task { await deletePost(post) }
@@ -81,7 +82,7 @@ struct FeedView: View {
                                     targetType: "post",
                                     targetId: post.id,
                                     targetUserId: post.author.id,
-                                    targetTitle: "Bài viết của \(post.author.name)"
+                                    targetTitle: L10n.isEnglish ? "Post by \(post.author.name)" : "Bài viết của \(post.author.name)"
                                 )
                             }
                         )
@@ -138,14 +139,14 @@ struct FeedView: View {
                 }
                 .padding(16)
                 .background(KinnectTheme.background.ignoresSafeArea())
-                .navigationTitle("Chỉnh sửa bài viết")
+                .navigationTitle(l10n.localized("Chỉnh sửa bài viết"))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Hủy") { editingPost = nil }
+                        Button(l10n.localized("Hủy")) { editingPost = nil }
                     }
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Lưu") {
+                        Button(l10n.localized("Lưu")) {
                             Task {
                                 do {
                                     _ = try await KinnectAPIClient.shared.requestJSON(
@@ -155,7 +156,7 @@ struct FeedView: View {
                                     )
                                     editingPost = nil
                                     await loadFeedAndStories()
-                                    appState.showToast("Đã lưu bài viết!")
+                                    appState.showToast(l10n.localized("Đã lưu bài viết!"))
                                 } catch {
                                     appState.showToast(error.localizedDescription)
                                 }
@@ -166,22 +167,22 @@ struct FeedView: View {
             }
         }
         .confirmationDialog(
-            "Ai có thể xem bài viết?",
+            l10n.localized("Ai có thể xem bài viết?"),
             isPresented: $showAudienceDialog,
             titleVisibility: .visible
         ) {
             if let p = audiencePost {
-                Button("Mọi thành viên (Công khai)") {
+                Button(l10n.localized("Mọi thành viên (Công khai)")) {
                     Task {
-                        await changeAudience(post: p, visibility: "public", title: "Mọi thành viên")
+                        await changeAudience(post: p, visibility: "public", title: l10n.localized("Mọi thành viên"))
                     }
                 }
-                Button("Người theo dõi") {
+                Button(l10n.localized("Người theo dõi")) {
                     Task {
-                        await changeAudience(post: p, visibility: "followers", title: "Người theo dõi")
+                        await changeAudience(post: p, visibility: "followers", title: l10n.localized("Người theo dõi"))
                     }
                 }
-                Button("Hủy", role: .cancel) {}
+                Button(l10n.localized("Hủy"), role: .cancel) {}
             }
         }
         .fullScreenCover(item: $selectedAuthorProfile) { user in
@@ -235,7 +236,7 @@ struct FeedView: View {
                                 .frame(width: 22, height: 22)
                                 .overlay(KinnectIcon(glyph: .add, size: 14, selected: true, tint: .white))
                         }
-                        Text(dynamicTypeSize.isAccessibilitySize ? "Tạo\ntin" : "Tạo tin")
+                        Text(l10n.localized(dynamicTypeSize.isAccessibilitySize ? "Tạo\ntin" : "Tạo tin"))
                             .font(.caption2.weight(.semibold))
                             .foregroundColor(KinnectTheme.textPrimary)
                             .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
@@ -245,8 +246,8 @@ struct FeedView: View {
                     .padding(.horizontal, dynamicTypeSize.isAccessibilitySize ? 8 : 0)
                     .frame(width: storyCellWidth)
                 }
-                .accessibilityLabel("Tạo tin 24h mới")
-                .accessibilityHint("Nhấn đúp để mở trình tạo tin")
+                .accessibilityLabel(l10n.localized("Tạo tin 24h mới"))
+                .accessibilityHint(l10n.localized("Nhấn đúp để mở trình tạo tin"))
 
                 ForEach(stories.filter { !appState.blockedUserIds.contains($0.author.id) }) { story in
                     Button {
@@ -319,7 +320,7 @@ struct FeedView: View {
                         Spacer()
                         KinnectIconButton(
                             glyph: .camera,
-                            label: "Mở Camera & Studio",
+                            label: l10n.localized("Mở Camera & Studio"),
                             tint: KinnectTheme.accentBright,
                             action: onOpenCamera
                         )
@@ -329,7 +330,7 @@ struct FeedView: View {
                         showComposerSheet = true
                     } label: {
                         HStack {
-                            Text("Bạn đang nghĩ gì?")
+                            Text(l10n.localized("Bạn đang nghĩ gì?"))
                                 .font(.subheadline)
                                 .foregroundColor(KinnectTheme.textSecondary)
                                 .lineLimit(nil)
@@ -358,7 +359,7 @@ struct FeedView: View {
                         showComposerSheet = true
                     } label: {
                         HStack {
-                            Text("Bạn đang nghĩ gì?")
+                            Text(l10n.localized("Bạn đang nghĩ gì?"))
                                 .font(.subheadline)
                                 .foregroundColor(KinnectTheme.textSecondary)
                                 .lineLimit(1)
@@ -371,7 +372,7 @@ struct FeedView: View {
 
                     KinnectIconButton(
                         glyph: .camera,
-                        label: "Mở Camera & Studio",
+                        label: l10n.localized("Mở Camera & Studio"),
                         tint: KinnectTheme.accentBright,
                         action: onOpenCamera
                     )
@@ -442,7 +443,7 @@ struct FeedView: View {
                 requestId: reqId
             )
             posts.removeAll { $0.id == post.id }
-            appState.showToast("Đã xóa bài viết.")
+            appState.showToast(l10n.localized("Đã xóa bài viết."))
         } catch {
             appState.showToast(error.localizedDescription)
         }
@@ -462,14 +463,18 @@ struct PostCardView: View {
     let onDelete: () -> Void
     let onReport: () -> Void
 
-    private let reactionOptions: [(key: String, emoji: String, title: String)] = [
-        ("like", "👍", "Thích"),
-        ("love", "❤️", "Yêu thích"),
-        ("haha", "😆", "Haha"),
-        ("wow", "😮", "Wow"),
-        ("sad", "😢", "Buồn"),
-        ("angry", "😡", "Phẫn nộ")
-    ]
+    @ObservedObject private var l10n = LocalizationManager.shared
+
+    private var reactionOptions: [(key: String, emoji: String, title: String)] {
+        [
+            ("like", "👍", l10n.localized("Thích")),
+            ("love", "❤️", l10n.localized("Yêu thích")),
+            ("haha", "😆", l10n.localized("Haha")),
+            ("wow", "😮", l10n.localized("Wow")),
+            ("sad", "😢", l10n.localized("Buồn")),
+            ("angry", "😡", l10n.localized("Phẫn nộ"))
+        ]
+    }
 
     @State private var isBouncing = false
     @State private var showReactionDock = false
@@ -521,31 +526,31 @@ struct PostCardView: View {
                     if post.author.id == currentUserId {
                         if let onEdit {
                             Button(action: onEdit) {
-                                Label("Chỉnh sửa bài viết", systemImage: "pencil")
+                                Label(l10n.localized("Chỉnh sửa bài viết"), systemImage: "pencil")
                             }
                         }
                         if let onChangeAudience {
                             Button(action: onChangeAudience) {
-                                Label("Thay đổi đối tượng xem", systemImage: "globe")
+                                Label(l10n.localized("Thay đổi đối tượng xem"), systemImage: "globe")
                             }
                         }
                         if let onHide {
                             Button(action: onHide) {
-                                Label("Ẩn bài viết", systemImage: "eye.slash")
+                                Label(l10n.localized("Ẩn bài viết"), systemImage: "eye.slash")
                             }
                         }
                         Button(role: .destructive, action: onDelete) {
-                            Label("Xóa bài viết", systemImage: "trash")
+                            Label(l10n.localized("Xóa bài viết"), systemImage: "trash")
                         }
                     } else {
                         if let onHide {
                             Button(action: onHide) {
-                                Label("Ẩn bài viết", systemImage: "eye.slash")
+                                Label(l10n.localized("Ẩn bài viết"), systemImage: "eye.slash")
                             }
                         }
                         Button(role: .destructive, action: onReport) {
                             HStack {
-                                Text("Báo cáo / Chặn UGC")
+                                Text(l10n.localized("Báo cáo / Chặn UGC"))
                                 KinnectIcon(glyph: .report, size: 18, tint: KinnectTheme.danger)
                             }
                         }
@@ -555,7 +560,7 @@ struct PostCardView: View {
                         .frame(minWidth: 44, minHeight: 44)
                         .contentShape(Rectangle())
                 }
-                .accessibilityLabel("Tùy chọn bài viết")
+                .accessibilityLabel(l10n.localized("Tùy chọn bài viết"))
             }
 
             if !post.text.isEmpty {
@@ -575,19 +580,19 @@ struct PostCardView: View {
                     HStack(spacing: 4) {
                         Text(post.liked ? reactionEmoji(for: post.userReaction) : "❤️")
                             .font(.caption)
-                        Text("\(post.likesCount) cảm xúc")
+                        Text(L10n.count(post.likesCount, vi: "cảm xúc", enSingular: "reaction", enPlural: "reactions"))
                             .font(.caption)
                             .foregroundColor(KinnectTheme.textSecondary)
                     }
                 } else {
-                    Text("Chưa có cảm xúc")
+                    Text(l10n.localized("Chưa có cảm xúc"))
                         .font(.caption)
                         .foregroundColor(KinnectTheme.textSecondary)
                 }
 
                 Spacer()
 
-                Text("\(post.commentsCount) bình luận")
+                Text(L10n.count(post.commentsCount, vi: "bình luận", enSingular: "comment", enPlural: "comments"))
                     .font(.caption)
                     .foregroundColor(KinnectTheme.textSecondary)
             }
@@ -653,7 +658,7 @@ struct PostCardView: View {
                                 .foregroundColor(KinnectTheme.accentBright)
                         } else {
                             KinnectIcon(glyph: .reaction, size: 18, tint: KinnectTheme.textSecondary)
-                            Text("Cảm xúc")
+                            Text(l10n.localized("Cảm xúc"))
                                 .font(.caption.weight(.semibold))
                                 .foregroundColor(KinnectTheme.textSecondary)
                         }
@@ -670,30 +675,30 @@ struct PostCardView: View {
                         }
                     }
                 )
-                .accessibilityLabel("Cảm xúc")
+                .accessibilityLabel(l10n.localized("Cảm xúc"))
 
                 // Column 2: Bình luận (Comment)
                 Button(action: onOpenComments) {
                     HStack(spacing: 6) {
                         KinnectIcon(glyph: .comment, size: 18, tint: KinnectTheme.textSecondary)
-                        Text("Bình luận")
+                        Text(l10n.localized("Bình luận"))
                             .font(.caption.weight(.semibold))
                             .foregroundColor(KinnectTheme.textSecondary)
                     }
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .contentShape(Rectangle())
                 }
-                .accessibilityLabel("Bình luận")
+                .accessibilityLabel(l10n.localized("Bình luận"))
 
                 // Column 3: Chia sẻ (Share) - Native SwiftUI ShareLink (safe on iPad popover & route permalink)
                 ShareLink(
                     item: postShareURL,
                     subject: Text(shareSubject),
-                    message: Text(post.text.isEmpty ? "Xem bài viết trên Kinnect" : post.text)
+                    message: Text(post.text.isEmpty ? l10n.localized("Xem bài viết trên Kinnect") : post.text)
                 ) {
                     HStack(spacing: 6) {
                         KinnectIcon(glyph: .share, size: 18, tint: KinnectTheme.textSecondary)
-                        Text("Chia sẻ")
+                        Text(l10n.localized("Chia sẻ"))
                             .font(.caption.weight(.semibold))
                             .foregroundColor(KinnectTheme.textSecondary)
                     }
@@ -701,7 +706,7 @@ struct PostCardView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Chia sẻ bài viết")
+                .accessibilityLabel(l10n.localized("Chia sẻ bài viết"))
             }
         }
         .modifier(FeedCardStyle())
@@ -713,17 +718,17 @@ struct PostCardView: View {
     }
 
     private var shareSubject: String {
-        return "Bài viết từ \(post.author.name) trên Kinnect"
+        return L10n.isEnglish ? "Post by \(post.author.name) on Kinnect" : "Bài viết từ \(post.author.name) trên Kinnect"
     }
 
     private func reactionTitle(for key: String) -> String {
         switch key.lowercased() {
-        case "love": return "Yêu thích"
-        case "haha": return "Haha"
-        case "wow": return "Wow"
-        case "sad": return "Buồn"
-        case "angry": return "Phẫn nộ"
-        default: return "Thích"
+        case "love": return l10n.localized("Yêu thích")
+        case "haha": return l10n.localized("Haha")
+        case "wow": return l10n.localized("Wow")
+        case "sad": return l10n.localized("Buồn")
+        case "angry": return l10n.localized("Phẫn nộ")
+        default: return l10n.localized("Thích")
         }
     }
 
@@ -915,6 +920,7 @@ struct StoryComposerSheet: View {
     let onCreated: () -> Void
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var l10n = LocalizationManager.shared
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var text = ""
@@ -1221,6 +1227,7 @@ struct StoryDetailSheet: View {
     let story: StoryItem
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var l10n = LocalizationManager.shared
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var viewers: [KinnectUser] = []
 
@@ -1332,6 +1339,7 @@ struct PostCommentsSheet: View {
     let onChanged: () -> Void
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var l10n = LocalizationManager.shared
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var comments: [CommentItem] = []
@@ -1672,13 +1680,13 @@ struct PostCommentsSheet: View {
 }
 
 func formatRelativeDate(_ iso: String) -> String {
-    guard !iso.isEmpty else { return "Vừa xong" }
+    guard !iso.isEmpty else { return L10n.tr("Vừa xong") }
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     let date = formatter.date(from: iso) ?? ISO8601DateFormatter().date(from: iso)
-    guard let date else { return "Gần đây" }
+    guard let date else { return L10n.tr("Gần đây") }
     let rel = RelativeDateTimeFormatter()
-    rel.locale = Locale(identifier: "vi_VN")
+    rel.locale = L10n.isEnglish ? Locale(identifier: "en_US") : Locale(identifier: "vi_VN")
     rel.unitsStyle = .short
     return rel.localizedString(for: date, relativeTo: Date())
 }

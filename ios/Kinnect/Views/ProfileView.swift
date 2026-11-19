@@ -15,6 +15,7 @@ struct ProfileView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var pushKit = PushKitManager.shared
+    @ObservedObject private var l10n = LocalizationManager.shared
 
     private var isSelf: Bool {
         guard let target = targetUser else { return true }
@@ -34,6 +35,10 @@ struct ProfileView: View {
         case posts = "Bài viết"
         case albums = "Album ảnh"
         case videos = "Video"
+
+        var localizedTitle: String {
+            L10n.tr(rawValue)
+        }
     }
 
     @State private var selectedTab: ProfileTab = .about
@@ -86,9 +91,9 @@ struct ProfileView: View {
                         profileCard(user: user)
 
                         // 2. Profile Tabs (Android 1.2.12 Parity)
-                        Picker("Mục hồ sơ", selection: $selectedTab) {
+                        Picker(l10n.localized("Mục hồ sơ"), selection: $selectedTab) {
                             ForEach(isSelf ? ProfileTab.allCases : [.about, .posts, .videos], id: \.self) { t in
-                                Text(t.rawValue).tag(t)
+                                Text(t.localizedTitle).tag(t)
                             }
                         }
                         .pickerStyle(.segmented)
@@ -240,12 +245,12 @@ struct ProfileView: View {
     // MARK: - Header & Visual Helpers (Parity Android shell & profileCard)
     private var profilePinnedHeader: some View {
         PinnedHeaderBar(
-            title: isSelf ? "Trang cá nhân" : (activeUser?.name ?? "Hồ sơ"),
+            title: isSelf ? l10n.localized("Trang cá nhân") : (activeUser?.name ?? l10n.localized("Hồ sơ")),
             onBack: onBack ?? { dismiss() },
             trailingActions: isSelf ? [
                 PinnedHeaderBar.TrailingAction(
                     systemImage: "pencil",
-                    accessibilityLabel: "Chỉnh sửa hồ sơ",
+                    accessibilityLabel: l10n.localized("Chỉnh sửa hồ sơ"),
                     action: { showEditProfileSheet = true }
                 )
             ] : []
@@ -281,7 +286,7 @@ struct ProfileView: View {
                             .background(Circle().fill(Color.black.opacity(0.45)))
                     }
                     .padding(8)
-                    .accessibilityLabel("Đổi ảnh bìa")
+                    .accessibilityLabel(l10n.localized("Đổi ảnh bìa"))
                 }
             }
             .frame(maxWidth: .infinity, minHeight: 130, maxHeight: 130)
@@ -293,7 +298,7 @@ struct ProfileView: View {
                         PhotosPicker(selection: $selectedAvatarItem, matching: .images) {
                             avatarBadge(user: user, size: 88)
                         }
-                        .accessibilityLabel("Đổi ảnh đại diện")
+                        .accessibilityLabel(l10n.localized("Đổi ảnh đại diện"))
                     } else {
                         avatarBadge(user: user, size: 88)
                     }
@@ -327,7 +332,7 @@ struct ProfileView: View {
                         HStack(spacing: 8) {
                             Image(systemName: "pencil")
                                 .font(.subheadline.bold())
-                            Text("Chỉnh sửa hồ sơ")
+                            Text(l10n.localized("Chỉnh sửa hồ sơ"))
                                 .font(.subheadline.bold())
                         }
                         .frame(maxWidth: .infinity, minHeight: 44)
@@ -355,14 +360,14 @@ struct ProfileView: View {
 
             // Stats Bar: 3 soft cards (Android parity lines 4508-4529: bài viết, người theo dõi, đang theo dõi)
             HStack(spacing: 8) {
-                statCard(count: user.postsCount, label: "bài viết") {
+                statCard(count: user.postsCount, label: L10n.pluralLabel(user.postsCount, vi: "bài viết", enSingular: "post", enPlural: "posts")) {
                     selectedTab = .posts
                 }
-                statCard(count: user.followersCount, label: "người theo dõi") {
-                    selectedConnectionsInfo = ConnectionsInfo(kind: "followers", title: "Người theo dõi")
+                statCard(count: user.followersCount, label: L10n.pluralLabel(user.followersCount, vi: "người theo dõi", enSingular: "follower", enPlural: "followers")) {
+                    selectedConnectionsInfo = ConnectionsInfo(kind: "followers", title: l10n.localized("Người theo dõi"))
                 }
-                statCard(count: user.followingCount, label: "đang theo dõi") {
-                    selectedConnectionsInfo = ConnectionsInfo(kind: "following", title: "Đang theo dõi")
+                statCard(count: user.followingCount, label: L10n.isEnglish ? "following" : "đang theo dõi") {
+                    selectedConnectionsInfo = ConnectionsInfo(kind: "following", title: l10n.localized("Đang theo dõi"))
                 }
             }
             .padding(.horizontal, 14)
@@ -430,10 +435,10 @@ struct ProfileView: View {
             Image(systemName: "person.crop.circle")
                 .font(.system(size: 40))
                 .foregroundColor(KinnectTheme.textSecondary)
-            Text("Chưa có thông tin công khai")
+            Text(l10n.localized("Chưa có thông tin công khai"))
                 .font(.headline)
                 .foregroundColor(KinnectTheme.textPrimary)
-            Text(isSelf ? "Cập nhật hồ sơ để mọi người hiểu bạn hơn." : "Thành viên này chưa chia sẻ thông tin giới thiệu.")
+            Text(isSelf ? l10n.localized("Cập nhật hồ sơ để mọi người hiểu bạn hơn.") : l10n.localized("Thành viên này chưa chia sẻ thông tin giới thiệu."))
                 .font(.subheadline)
                 .foregroundColor(KinnectTheme.textSecondary)
                 .multilineTextAlignment(.center)
@@ -447,7 +452,7 @@ struct ProfileView: View {
         let date = Date(timeIntervalSince1970: Double(timestamp) / 1000.0)
         let formatter = DateFormatter()
         formatter.dateFormat = "MM/yyyy"
-        return "Tham gia Kinnect từ " + formatter.string(from: date)
+        return L10n.joinedKinnect(monthYear: formatter.string(from: date))
     }
 
     @ViewBuilder
@@ -457,14 +462,14 @@ struct ProfileView: View {
             VStack(alignment: .leading, spacing: 0) {
                 // Header: "Giới thiệu", globe icon, "Công khai"
                 HStack {
-                    Text("Giới thiệu")
+                    Text(l10n.localized("Giới thiệu"))
                         .font(.headline.weight(.bold))
                         .foregroundColor(KinnectTheme.textPrimary)
                     Spacer()
                     Image(systemName: "globe")
                         .font(.caption)
                         .foregroundColor(KinnectTheme.textSecondary)
-                    Text(user.isPrivate ? "Riêng tư" : "Công khai")
+                    Text(user.isPrivate ? l10n.localized("Riêng tư") : l10n.localized("Công khai"))
                         .font(.caption2.bold())
                         .foregroundColor(KinnectTheme.textSecondary)
                 }
@@ -473,7 +478,7 @@ struct ProfileView: View {
                 // 0. Tiểu sử (Bio)
                 if isFieldVisible(key: "bio", user: user) && !user.bio.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Tiểu sử")
+                        Text(l10n.localized("Tiểu sử"))
                             .font(.system(size: 12))
                             .foregroundColor(KinnectTheme.textSecondary)
                         Text(user.bio)
@@ -488,82 +493,82 @@ struct ProfileView: View {
                 // Canonical Identity & Details List (matching Android lines 2338-2339)
                 // 1. Tuổi
                 if isFieldVisible(key: "age", user: user) && user.age > 0 {
-                    profileDetailRow(label: "Tuổi", value: "\(user.age) tuổi")
+                    profileDetailRow(label: l10n.localized("Tuổi"), value: L10n.isEnglish ? "\(user.age)" : "\(user.age) tuổi")
                     Divider().background(KinnectTheme.borderSoft)
                 }
 
                 // 2. Nơi sống
                 let displayCity = user.city.isEmpty ? user.locationName : user.city
                 if isFieldVisible(key: "city", user: user) && !displayCity.isEmpty {
-                    profileDetailRow(label: "Nơi sống", value: displayCity)
+                    profileDetailRow(label: l10n.localized("Nơi sống"), value: displayCity)
                     Divider().background(KinnectTheme.borderSoft)
                 }
 
                 // 3. Chiều cao
                 if isFieldVisible(key: "height", user: user) && user.height > 0 {
-                    profileDetailRow(label: "Chiều cao", value: "\(user.height) cm")
+                    profileDetailRow(label: l10n.localized("Chiều cao"), value: "\(user.height) cm")
                     Divider().background(KinnectTheme.borderSoft)
                 }
 
                 // 4. Cân nặng
                 if isFieldVisible(key: "weight", user: user) && user.weight > 0 {
-                    profileDetailRow(label: "Cân nặng", value: "\(user.weight) kg")
+                    profileDetailRow(label: l10n.localized("Cân nặng"), value: "\(user.weight) kg")
                     Divider().background(KinnectTheme.borderSoft)
                 }
 
                 // 5. Nghề nghiệp
                 if isFieldVisible(key: "occupation", user: user) && !user.occupation.isEmpty {
-                    profileDetailRow(label: "Nghề nghiệp", value: user.occupation)
+                    profileDetailRow(label: l10n.localized("Nghề nghiệp"), value: user.occupation)
                     Divider().background(KinnectTheme.borderSoft)
                 }
 
                 // 6. Trường học
                 if isFieldVisible(key: "school", user: user) && !user.school.isEmpty {
-                    profileDetailRow(label: "Trường học", value: user.school)
+                    profileDetailRow(label: l10n.localized("Trường học"), value: user.school)
                     Divider().background(KinnectTheme.borderSoft)
                 }
 
                 // Giới tính & Bản sắc LGBT (Android parity: Bản dạng giới, Xu hướng, Vai trò cộng đồng, Cách xưng hô)
                 // 7. Bản dạng giới
                 if isFieldVisible(key: "gender", user: user) && !user.gender.isEmpty {
-                    profileDetailRow(label: "Bản dạng giới", value: localizedIdentityValue("gender", user.gender))
+                    profileDetailRow(label: l10n.localized("Bản dạng giới"), value: localizedIdentityValue("gender", user.gender))
                     Divider().background(KinnectTheme.borderSoft)
                 }
 
                 // 8. Xu hướng
                 if isFieldVisible(key: "orientation", user: user) && !user.orientation.isEmpty {
-                    profileDetailRow(label: "Xu hướng", value: localizedIdentityValue("orientation", user.orientation))
+                    profileDetailRow(label: l10n.localized("Xu hướng"), value: localizedIdentityValue("orientation", user.orientation))
                     Divider().background(KinnectTheme.borderSoft)
                 }
 
                 // 9. Vai trò cộng đồng
                 if isFieldVisible(key: "communityRole", user: user) && !user.communityRole.isEmpty {
-                    profileDetailRow(label: "Vai trò cộng đồng", value: localizedIdentityValue("communityRole", user.communityRole))
+                    profileDetailRow(label: l10n.localized("Vai trò cộng đồng"), value: localizedIdentityValue("communityRole", user.communityRole))
                     Divider().background(KinnectTheme.borderSoft)
                 }
 
                 // 10. Cách xưng hô
                 if isFieldVisible(key: "pronouns", user: user) && !user.pronouns.isEmpty {
-                    profileDetailRow(label: "Cách xưng hô", value: localizedIdentityValue("pronouns", user.pronouns))
+                    profileDetailRow(label: l10n.localized("Cách xưng hô"), value: localizedIdentityValue("pronouns", user.pronouns))
                     Divider().background(KinnectTheme.borderSoft)
                 }
 
                 // 11. Tình trạng quan hệ
                 if isFieldVisible(key: "relationshipRole", user: user) && !user.relationshipRole.isEmpty {
-                    profileDetailRow(label: "Tình trạng quan hệ", value: localizedIdentityValue("relationshipRole", user.relationshipRole))
+                    profileDetailRow(label: l10n.localized("Tình trạng quan hệ"), value: localizedIdentityValue("relationshipRole", user.relationshipRole))
                     Divider().background(KinnectTheme.borderSoft)
                 }
 
                 // 12. Mong muốn
                 if isFieldVisible(key: "lookingFor", user: user) && !user.lookingFor.isEmpty {
-                    profileDetailRow(label: "Mong muốn", value: user.lookingFor)
+                    profileDetailRow(label: l10n.localized("Mong muốn"), value: user.lookingFor)
                     Divider().background(KinnectTheme.borderSoft)
                 }
 
                 // Sở thích (Interests Tags)
                 if isFieldVisible(key: "interests", user: user) && !user.interests.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Sở thích")
+                        Text(l10n.localized("Sở thích"))
                             .font(.system(size: 12))
                             .foregroundColor(KinnectTheme.textSecondary)
                         WrappingHStack(horizontalSpacing: 6, verticalSpacing: 6) {
@@ -614,10 +619,10 @@ struct ProfileView: View {
             if myPosts.isEmpty {
                 VStack(spacing: 8) {
                     KinnectIcon(glyph: .feed, size: 36, tint: KinnectTheme.textSecondary)
-                    Text("Chưa có bài viết nào")
+                    Text(l10n.localized("Chưa có bài viết nào"))
                         .font(.headline)
                         .foregroundColor(KinnectTheme.textPrimary)
-                    Text("Những bài viết bạn chia sẻ trên Bảng tin sẽ xuất hiện tại đây.")
+                    Text(l10n.localized("Những bài viết bạn chia sẻ trên Bảng tin sẽ xuất hiện tại đây."))
                         .font(.caption)
                         .foregroundColor(KinnectTheme.textSecondary)
                         .multilineTextAlignment(.center)
@@ -650,12 +655,12 @@ struct ProfileView: View {
                                 do {
                                     _ = try await KinnectAPIClient.shared.requestJSON("/api/posts/\(post.id)", method: "DELETE")
                                     userPosts.removeAll { $0.id == post.id }
-                                    appState.showToast("Đã xóa bài viết")
+                                    appState.showToast(l10n.localized("Đã xóa bài viết"))
                                 } catch { appState.showToast(error.localizedDescription) }
                             }
                         },
                         onReport: {
-                            appState.activeReportContext = UGCReportContext(targetType: "post", targetId: post.id, targetUserId: post.author.id, targetTitle: "Bài viết của \(post.author.name)")
+                            appState.activeReportContext = UGCReportContext(targetType: "post", targetId: post.id, targetUserId: post.author.id, targetTitle: L10n.isEnglish ? "Post by \(post.author.name)" : "Bài viết của \(post.author.name)")
                         }
                     )
                 }
@@ -677,19 +682,19 @@ struct ProfileView: View {
                         .overlay(
                             VStack(spacing: 6) {
                                 KinnectIcon(glyph: .photo, size: 32, tint: KinnectTheme.accentBright)
-                                Text("\(publicPhotoCount) ảnh bài viết")
+                                Text(L10n.count(publicPhotoCount, vi: "ảnh bài viết", enSingular: "post photo", enPlural: "post photos"))
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundColor(KinnectTheme.accentBright)
                             }
                         )
                     HStack {
-                        Text("Ảnh công khai")
+                        Text(l10n.localized("Ảnh công khai"))
                             .font(.subheadline.bold())
                             .foregroundColor(KinnectTheme.textPrimary)
                         Spacer()
                         KinnectIcon(glyph: .chevronRight, size: 14, tint: KinnectTheme.textSecondary)
                     }
-                    Text("Chạm để xem & tải ảnh mới")
+                    Text(l10n.localized("Chạm để xem & tải ảnh mới"))
                         .font(.caption2)
                         .foregroundColor(KinnectTheme.textSecondary)
                 }
@@ -709,19 +714,19 @@ struct ProfileView: View {
                         .overlay(
                             VStack(spacing: 6) {
                                 KinnectIcon(glyph: .lock, size: 30, tint: KinnectTheme.warning)
-                                Text("\(privatePhotos.count)/24 ảnh • \(pendingPrivateRequestsCount) chờ duyệt")
+                                Text(L10n.isEnglish ? "\(privatePhotos.count)/24 photos • \(pendingPrivateRequestsCount) pending" : "\(privatePhotos.count)/24 ảnh • \(pendingPrivateRequestsCount) chờ duyệt")
                                     .font(.system(size: 9, weight: .bold))
                                     .foregroundColor(KinnectTheme.warning)
                             }
                         )
                     HStack {
-                        Text("Album riêng tư")
+                        Text(l10n.localized("Album riêng tư"))
                             .font(.subheadline.bold())
                             .foregroundColor(KinnectTheme.textPrimary)
                         Spacer()
                         KinnectIcon(glyph: .chevronRight, size: 14, tint: KinnectTheme.textSecondary)
                     }
-                    Text("Quản lý ảnh & duyệt quyền xem")
+                    Text(l10n.localized("Quản lý ảnh & duyệt quyền xem"))
                         .font(.caption2)
                         .foregroundColor(KinnectTheme.textSecondary)
                 }
@@ -738,10 +743,10 @@ struct ProfileView: View {
             if myShorts.isEmpty {
                 VStack(spacing: 8) {
                     KinnectIcon(glyph: .video, size: 36, tint: KinnectTheme.textSecondary)
-                    Text("Chưa có video ngắn nào")
+                    Text(l10n.localized("Chưa có video ngắn nào"))
                         .font(.headline)
                         .foregroundColor(KinnectTheme.textPrimary)
-                    Text("Các video ngắn bạn đăng trên luồng Shorts sẽ hiển thị tại đây.")
+                    Text(l10n.localized("Các video ngắn bạn đăng trên luồng Shorts sẽ hiển thị tại đây."))
                         .font(.caption)
                         .foregroundColor(KinnectTheme.textSecondary)
                         .multilineTextAlignment(.center)
