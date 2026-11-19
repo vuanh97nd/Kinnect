@@ -26,9 +26,9 @@ final class AccountCache {
         return uid.isEmpty ? nil : uid
     }
 
-    func setActiveAccount(_ accountId: String) {
+    func setActiveAccount(_ accountId: String, origin: String = ServerConfig.defaultOrigin) {
         UserDefaults.standard.set(accountId, forKey: activeAccountDefaultsKey)
-        KeychainStore.shared.saveAccountId(accountId, for: ServerConfig.defaultOrigin)
+        KeychainStore.shared.saveAccountId(accountId, for: origin)
     }
 
     func saveJSONObject(_ object: Any, forKey key: String, accountId: String) {
@@ -49,7 +49,7 @@ final class AccountCache {
 
     private func scopeDirectory(origin: String, accountId: String) -> URL? {
         guard !accountId.isEmpty else { return nil }
-        let canonicalOrigin = (origin == ServerConfig.fallbackOrigin) ? ServerConfig.defaultOrigin : origin
+        let canonicalOrigin = ServerConfig.normalize(origin) ?? origin
         let digest = SHA256.hash(data: Data("\(canonicalOrigin)|\(accountId)".utf8))
             .map { String(format: "%02x", $0) }
             .joined()

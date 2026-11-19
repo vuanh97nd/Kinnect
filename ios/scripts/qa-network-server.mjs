@@ -44,6 +44,7 @@ function createFaultState() {
     hangNextDirectPostMs: 0,
     return500NextDirectPost: false,
     return401NextFeedGet: false,
+    return401NextMeGet: false,
     dropPrimaryFeedGet: 0,
   };
 }
@@ -213,6 +214,25 @@ const primaryServer = https.createServer(tlsOptions, async (clientReq, clientRes
 
   const isDirectPost = method === 'POST' && /^\/api\/users\/[^/]+\/messages$/.test(urlPath);
   const isFeedGet = method === 'GET' && urlPath === '/api/posts';
+  const isMeGet = method === 'GET' && urlPath === '/api/me';
+
+  if (isMeGet && faults.return401NextMeGet) {
+    faults.return401NextMeGet = false;
+    logRequest({
+      ts: new Date().toISOString(),
+      origin: 'primary',
+      method,
+      path: urlPath,
+      status: 401,
+      hasSessionCookie,
+      hasDeviceCookie,
+      fault: 'return401NextMeGet',
+      durationMs: Date.now() - started,
+    });
+    clientRes.writeHead(401, { 'Content-Type': 'application/json' });
+    clientRes.end(JSON.stringify({ error: 'QA injected primary 401 on /api/me' }));
+    return;
+  }
 
   if (isDirectPost && faults.return500NextDirectPost) {
     faults.return500NextDirectPost = false;
@@ -384,7 +404,8 @@ const fallbackServer = https.createServer(tlsOptions, async (req, res) => {
   const hasDeviceCookie = cookieHeader.includes('kinnect_device=');
   await readReqBody(req);
 
-  const status = method === 'GET' && urlPath === '/api/posts' ? 200 : 401;
+  // Fallback origin is isolated and unauthenticated; it must return 401 rather than 200 via leaked cookies.
+  const status = 401;
   const entry = {
     ts: new Date().toISOString(),
     origin: 'fallback',
@@ -400,23 +421,7 @@ const fallbackServer = https.createServer(tlsOptions, async (req, res) => {
   logRequest(entry);
 
   res.writeHead(status, { 'Content-Type': 'application/json' });
-  if (status === 200) {
-    res.end(
-      JSON.stringify({
-        posts: [
-          {
-            id: 'qa_fallback_post',
-            body: 'Fallback origin post',
-            created: Date.now(),
-            author: { id: 'qa_fb', name: 'QA Fallback', username: 'qa_fb' },
-          },
-        ],
-        fallback: true,
-      })
-    );
-  } else {
-    res.end(JSON.stringify({ error: 'Fallback unauthorized' }));
-  }
+  res.end(JSON.stringify({ error: 'Fallback unauthorized' }));
 });
 
 // 3. Control HTTP server for XCUITest orchestration
@@ -450,10 +455,14 @@ const ctrlServer = http.createServer(async (req, res) => {
         const k = `${r.origin} ${r.method} ${r.path}`;
         countsByEndpoint[k] = (countsByEndpoint[k] || 0) + 1;
       }
+      const recentPrimaryFeedGets = metrics.requests
+        .filter((r) => r.origin === 'primary' && r.method === 'GET' && r.path === '/api/posts')
+        .slice(-5);
       return sendJson(200, {
         totalRequests: metrics.requests.length,
         countsByEndpoint,
         fallbackRequests: metrics.fallbackRequests,
+        recentPrimaryFeedGets,
         committedBeforeDrop: metrics.committedBeforeDrop,
         committedBeforeTimeout: metrics.committedBeforeTimeout,
         db: queryDbSnapshot(),

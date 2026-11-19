@@ -345,16 +345,44 @@ final class KinnectNetworkParityUITests: XCTestCase {
         let metrics401 = try ctrlRequest("/_qa/metrics")
         let fallback401 = metrics401["fallbackRequests"] as? [[String: Any]] ?? []
 
-        // Subcase E: GET transport failure on primary CAN fail over to fallback (bounded)
+        // Subcase E: GET transport failure on primary CAN fail over to fallback (bounded, unauthenticated -> 401, ZERO cookies)
         // Navigate away (Khám phá) and back (Bảng tin) so FeedView.task deterministically fires GET /api/posts.
         _ = try ctrlRequest("/_qa/fault", method: "POST", body: ["dropPrimaryFeedGet": 5])
         app.buttons["Khám phá"].firstMatch.tap()
         RunLoop.current.run(until: Date().addingTimeInterval(0.8))
         app.buttons["Bảng tin"].firstMatch.tap()
-        RunLoop.current.run(until: Date().addingTimeInterval(4.5))
-        saveScreenshot("n3-get-failover.png")
+        RunLoop.current.run(until: Date().addingTimeInterval(3.5))
+        saveScreenshot("n3-get-failover-401-no-cookies.png")
         let metricsGetFailover = try ctrlRequest("/_qa/metrics")
         let fallbackGet = metricsGetFailover["fallbackRequests"] as? [[String: Any]] ?? []
+        let firstFallback = fallbackGet.first ?? [:]
+        let fbStatus = firstFallback["status"] as? Int ?? -1
+        let fbHasSessionCookie = firstFallback["hasSessionCookie"] as? Bool ?? true
+        let fbHasDeviceCookie = firstFallback["hasDeviceCookie"] as? Bool ?? true
+
+        // Subcase F: Primary recovery after fallback 401 preserves persisted primary session
+        _ = try ctrlRequest("/_qa/fault", method: "POST", body: ["dropPrimaryFeedGet": 0])
+        app.buttons["Khám phá"].firstMatch.tap()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.8))
+        app.buttons["Bảng tin"].firstMatch.tap()
+        let recoveredPostVisible = app.staticTexts["P1 parity post"].waitForExistence(timeout: 10)
+        let stillAuthenticatedAfterFallback401 = app.buttons["qa.topbar.messages"].exists
+        saveScreenshot("n3-primary-recovery-after-fallback401.png")
+        let metricsRecovery = try ctrlRequest("/_qa/metrics")
+        let fallbackAfterRecovery = metricsRecovery["fallbackRequests"] as? [[String: Any]] ?? []
+        let recentPrimaryFeeds = metricsRecovery["recentPrimaryFeedGets"] as? [[String: Any]] ?? []
+        let lastPrimaryFeed = recentPrimaryFeeds.last ?? [:]
+        let recoveredPrimaryStatus = lastPrimaryFeed["status"] as? Int ?? -1
+        let recoveredPrimaryHasSession = lastPrimaryFeed["hasSessionCookie"] as? Bool ?? false
+
+        // Subcase G: Genuine primary 401 on /api/me triggers clean logout
+        _ = try ctrlRequest("/_qa/fault", method: "POST", body: ["return401NextMeGet": true])
+        app.terminate()
+        let relaunchedApp = launchApp(theme: "dark", lang: "vi", resetSession: false, requestTimeout: 3)
+        let primary401LoggedOut = relaunchedApp.buttons["qa.welcome.login"].waitForExistence(timeout: 15)
+        saveScreenshot("n3-primary-401-logged-out.png")
+        let metricsFinalN3 = try ctrlRequest("/_qa/metrics")
+        let fallbackFinalN3 = metricsFinalN3["fallbackRequests"] as? [[String: Any]] ?? []
 
         let subA: [String: Any] = [
             "toastShown": toastShownA,
@@ -383,7 +411,21 @@ final class KinnectNetworkParityUITests: XCTestCase {
         ]
         let subE: [String: Any] = [
             "fallbackCount": fallbackGet.count,
+            "fallbackStatus": fbStatus,
+            "hasSessionCookie": fbHasSessionCookie,
+            "hasDeviceCookie": fbHasDeviceCookie,
             "fallbackRequests": fallbackGet
+        ]
+        let subF: [String: Any] = [
+            "recoveredPostVisible": recoveredPostVisible,
+            "stillAuthenticatedAfterFallback401": stillAuthenticatedAfterFallback401,
+            "recoveredPrimaryStatus": recoveredPrimaryStatus,
+            "recoveredPrimaryHasSessionCookie": recoveredPrimaryHasSession,
+            "fallbackCountAfterRecovery": fallbackAfterRecovery.count
+        ]
+        let subG: [String: Any] = [
+            "primary401LoggedOut": primary401LoggedOut,
+            "fallbackCountFinal": fallbackFinalN3.count
         ]
         let n3Payload: [String: Any] = [
             "fixtureEnabled": false,
@@ -395,7 +437,9 @@ final class KinnectNetworkParityUITests: XCTestCase {
             "subcaseC_http500NoFailover": subC,
             "subcaseD_http401NoFailover": subD,
             "subcaseE_getTransportFailover": subE,
-            "countsByEndpoint": metricsGetFailover["countsByEndpoint"] ?? [:]
+            "subcaseF_primaryRecoveryAfterFallback401": subF,
+            "subcaseG_genuinePrimary401Logout": subG,
+            "countsByEndpoint": metricsFinalN3["countsByEndpoint"] ?? [:]
         ]
         writeJSON("ios-n3-evidence.json", n3Payload)
 
@@ -416,8 +460,21 @@ final class KinnectNetworkParityUITests: XCTestCase {
 
         XCTAssertEqual(fallback500.count, 0, "HTTP 500 must NEVER fail over")
         XCTAssertEqual(fallback401.count, 0, "HTTP 401 must NEVER fail over")
-        XCTAssertGreaterThanOrEqual(fallbackGet.count, 1, "GET transport failure should fail over to fallbackOrigin")
-        XCTAssertLessThanOrEqual(fallbackGet.count, 3, "GET failover must be bounded")
+
+        // Round 2 strict cookie-origin isolation assertions
+        XCTAssertEqual(fallbackGet.count, 1, "GET transport failure should fail over to fallbackOrigin exactly once")
+        XCTAssertEqual(fbStatus, 401, "Unauthenticated fallbackOrigin must return HTTP 401")
+        XCTAssertFalse(fbHasSessionCookie, "fallbackOrigin must NEVER receive primary kinnect_session cookie")
+        XCTAssertFalse(fbHasDeviceCookie, "fallbackOrigin must NEVER receive primary kinnect_device cookie")
+
+        // Primary recovery & genuine primary 401 logout assertions
+        XCTAssertTrue(recoveredPostVisible, "Primary feed must recover after fallback 401")
+        XCTAssertTrue(stillAuthenticatedAfterFallback401, "Fallback 401 must preserve saved primary session")
+        XCTAssertEqual(recoveredPrimaryStatus, 200, "Recovered primary GET /api/posts must return HTTP 200")
+        XCTAssertTrue(recoveredPrimaryHasSession, "Recovered primary GET /api/posts must still carry primary kinnect_session cookie")
+        XCTAssertEqual(fallbackAfterRecovery.count, 1, "Recovery must go back to primary without hitting fallback again")
+        XCTAssertTrue(primary401LoggedOut, "Genuine primary 401 on /api/me must clear session and return to welcome login")
+        XCTAssertEqual(fallbackFinalN3.count, 1, "Genuine primary 401 must NEVER fail over to fallbackOrigin")
     }
 
     // MARK: - Parity Captures (Real createApp Backend, UIReviewFixture = false)
@@ -451,6 +508,8 @@ final class KinnectNetworkParityUITests: XCTestCase {
                 "unreadDirect": 2,
                 "unreadGroup": 3
             ]
+            let actualLang = (screen == "auth") ? locale : "vi"
+            let localeMismatch = (locale == "en" && screen != "auth")
             let entry: [String: Any] = [
                 "platform": "ios",
                 "file": "captures/\(file)",
@@ -458,6 +517,8 @@ final class KinnectNetworkParityUITests: XCTestCase {
                 "screen": screen,
                 "state": state,
                 "locale": locale,
+                "actualRenderedLanguage": actualLang,
+                "localeMismatch": localeMismatch,
                 "theme": theme,
                 "textScale": largeText ? "accessibilityLarge" : "default",
                 "device": deviceName,

@@ -268,6 +268,14 @@ def main():
             "TEST_RUNNER_QA_GIT_SHA": git_sha,
         })
 
+        rc_unit = run_xcuitest_case(
+            udid,
+            "KinnectTests/KinnectOriginIsolationTests",
+            test_env,
+            LOGS_DIR / "xctest-origin-isolation.log",
+            test_password,
+            None,
+        )
         rc_n1_n2 = run_xcuitest_case(
             udid,
             "KinnectUITests/KinnectNetworkParityUITests/testIOS_N1_N2_UnreadTotalAndMarkReadNoLoop",
@@ -302,6 +310,21 @@ def main():
                     dst.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(item, dst)
 
+        # Enrich captures/manifest.json with exact byte sizes and SHA-256 hashes
+        manifest_path = CAPTURES_DIR / "manifest.json"
+        if manifest_path.exists():
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            for cap in manifest.get("captures", []):
+                rel_file = cap.get("file", "")
+                fp = OUT_DIR / rel_file
+                if fp.exists():
+                    raw = fp.read_bytes()
+                    cap["bytes"] = len(raw)
+                    cap["sha256"] = hashlib.sha256(raw).hexdigest()
+            manifest_path.write_text(
+                json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
+
         summary = {
             "gitSha": git_sha,
             "githubRunId": os.environ.get("GITHUB_RUN_ID"),
@@ -312,6 +335,7 @@ def main():
             "fixtureEnabled": False,
             "exitCodes": {
                 "buildForTesting": bres.returncode,
+                "originIsolationUnitTests": rc_unit,
                 "IOS_N1_N2": rc_n1_n2,
                 "IOS_N3": rc_n3,
                 "parityCaptures": rc_parity,
@@ -323,7 +347,7 @@ def main():
         )
         print("RUN_SUMMARY:", json.dumps(summary), flush=True)
 
-        if rc_n1_n2 != 0 or rc_n3 != 0 or rc_parity != 0:
+        if rc_unit != 0 or rc_n1_n2 != 0 or rc_n3 != 0 or rc_parity != 0:
             sys.exit(1)
     finally:
         if server_proc is not None and server_proc.poll() is None:

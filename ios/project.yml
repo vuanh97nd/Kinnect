@@ -108,6 +108,27 @@ targets:
       - sdk: AudioToolbox.framework
       - sdk: AuthenticationServices.framework
 
+  KinnectTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: KinnectTests
+    dependencies:
+      - target: Kinnect
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.kinnect.live.tests
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Kinnect.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Kinnect"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: ""
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGNING_ALLOWED: NO
+        AD_HOC_CODE_SIGNING_ALLOWED: YES
+        SUPPORTED_PLATFORMS: "iphonesimulator"
+
   KinnectUITests:
     type: bundle.ui-testing
     platform: iOS
@@ -133,8 +154,10 @@ schemes:
     build:
       targets:
         Kinnect: all
+        KinnectTests: [test]
         KinnectUITests: [test]
     test:
       config: Debug
       targets:
+        - KinnectTests
         - KinnectUITests

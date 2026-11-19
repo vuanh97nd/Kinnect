@@ -58,10 +58,10 @@ final class KeychainStore {
     }
 
     func setRememberMe(_ remember: Bool, for origin: String = ServerConfig.defaultOrigin) {
+        guard let key = normalizedOriginKey(origin) else { return }
         lock.lock()
         defer { lock.unlock() }
         self.isPersistent = remember
-        let key = originKey(origin)
 
         if !remember {
             // Delete persistent items from Keychain for this origin
@@ -70,7 +70,7 @@ final class KeychainStore {
             deleteItemLocked(account: "uid:\(key)")
 
             // Clean HTTPCookieStorage to avoid leaking persistent session cookies across relaunch
-            if let url = URL(string: origin) ?? URL(string: ServerConfig.defaultOrigin) {
+            if let url = URL(string: key) {
                 if let cookies = HTTPCookieStorage.shared.cookies(for: url) {
                     for cookie in cookies {
                         if cookie.name == "kinnect_session" || cookie.name == "kinnect_device" {
@@ -94,7 +94,7 @@ final class KeychainStore {
     }
 
     func saveSessionCookie(_ value: String, for origin: String = ServerConfig.defaultOrigin) {
-        let key = originKey(origin)
+        guard let key = normalizedOriginKey(origin) else { return }
         lock.lock()
         memorySessionCookie[key] = value
         let persistent = isPersistent
@@ -104,11 +104,11 @@ final class KeychainStore {
             deleteItemLocked(account: "session:\(key)")
         }
         lock.unlock()
-        syncToHTTPCookieStorage(origin: origin)
+        syncToHTTPCookieStorage(origin: key)
     }
 
     func loadSessionCookie(for origin: String = ServerConfig.defaultOrigin) -> String {
-        let key = originKey(origin)
+        guard let key = normalizedOriginKey(origin) else { return "" }
         lock.lock()
         if let mem = memorySessionCookie[key], !mem.isEmpty {
             lock.unlock()
@@ -128,7 +128,7 @@ final class KeychainStore {
     }
 
     func saveDeviceCookie(_ value: String, for origin: String = ServerConfig.defaultOrigin) {
-        let key = originKey(origin)
+        guard let key = normalizedOriginKey(origin) else { return }
         lock.lock()
         memoryDeviceCookie[key] = value
         let persistent = isPersistent
@@ -138,11 +138,11 @@ final class KeychainStore {
             deleteItemLocked(account: "device:\(key)")
         }
         lock.unlock()
-        syncToHTTPCookieStorage(origin: origin)
+        syncToHTTPCookieStorage(origin: key)
     }
 
     func loadDeviceCookie(for origin: String = ServerConfig.defaultOrigin) -> String {
-        let key = originKey(origin)
+        guard let key = normalizedOriginKey(origin) else { return "" }
         lock.lock()
         if let mem = memoryDeviceCookie[key], !mem.isEmpty {
             lock.unlock()
@@ -162,7 +162,7 @@ final class KeychainStore {
     }
 
     func saveAccountId(_ userId: String, for origin: String = ServerConfig.defaultOrigin) {
-        let key = originKey(origin)
+        guard let key = normalizedOriginKey(origin) else { return }
         lock.lock()
         memoryAccountId[key] = userId
         let persistent = isPersistent
@@ -175,7 +175,7 @@ final class KeychainStore {
     }
 
     func loadAccountId(for origin: String = ServerConfig.defaultOrigin) -> String {
-        let key = originKey(origin)
+        guard let key = normalizedOriginKey(origin) else { return "" }
         lock.lock()
         if let mem = memoryAccountId[key], !mem.isEmpty {
             lock.unlock()
@@ -224,7 +224,7 @@ final class KeychainStore {
     }
 
     func clearSession(for origin: String = ServerConfig.defaultOrigin) {
-        let key = originKey(origin)
+        guard let key = normalizedOriginKey(origin) else { return }
         lock.lock()
         memorySessionCookie.removeValue(forKey: key)
         memoryAccountId.removeValue(forKey: key)
@@ -232,9 +232,35 @@ final class KeychainStore {
         deleteItemLocked(account: "uid:\(key)")
         lock.unlock()
 
-        if let url = URL(string: origin), let cookies = HTTPCookieStorage.shared.cookies(for: url) {
-            for c in cookies where c.name == "kinnect_session" || c.name == "kinnect_device" {
+        if let url = URL(string: key), let cookies = HTTPCookieStorage.shared.cookies(for: url) {
+            for c in cookies where c.name == "kinnect_session" {
                 HTTPCookieStorage.shared.deleteCookie(c)
+            }
+        }
+    }
+
+    /// Clears auth sessions and account IDs across all known origins on explicit logout
+    /// while preserving remembered-device cookies (`device:<origin>`).
+    func clearAuthSessions() {
+        lock.lock()
+        var origins = Set<String>()
+        if let def = normalizedOriginKey(ServerConfig.defaultOrigin) { origins.insert(def) }
+        if let fb = normalizedOriginKey(ServerConfig.fallbackOrigin) { origins.insert(fb) }
+        for k in memorySessionCookie.keys { origins.insert(k) }
+        for k in memoryAccountId.keys { origins.insert(k) }
+        memorySessionCookie.removeAll()
+        memoryAccountId.removeAll()
+        for key in origins {
+            deleteItemLocked(account: "session:\(key)")
+            deleteItemLocked(account: "uid:\(key)")
+        }
+        lock.unlock()
+
+        for key in origins {
+            if let url = URL(string: key), let cookies = HTTPCookieStorage.shared.cookies(for: url) {
+                for c in cookies where c.name == "kinnect_session" {
+                    HTTPCookieStorage.shared.deleteCookie(c)
+                }
             }
         }
     }
@@ -252,11 +278,10 @@ final class KeychainStore {
         SecItemDelete(query as CFDictionary)
     }
 
-    private func originKey(_ origin: String) -> String {
-        if origin == ServerConfig.fallbackOrigin {
-            return ServerConfig.defaultOrigin
-        }
-        return ServerConfig.normalize(origin) ?? ServerConfig.defaultOrigin
+    /// Strict per-origin isolation key including scheme, lowercased host, and non-default port.
+    /// Never aliases `fallbackOrigin` to `defaultOrigin` and never falls back to `defaultOrigin` on invalid input.
+    func normalizedOriginKey(_ origin: String) -> String? {
+        ServerConfig.normalize(origin)
     }
 
     private func setStringLocked(_ value: String, account: String) {

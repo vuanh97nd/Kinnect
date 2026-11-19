@@ -168,12 +168,13 @@ final class AppState: ObservableObject {
     }
 
     func applyAuthenticatedUser(_ user: KinnectUser, rawDict: [String: Any], rememberMe: Bool = true) {
+        let origin = KinnectAPIClient.shared.baseURL
         self.currentUser = user
         UserDefaults.standard.set(rememberMe, forKey: "kinnect_session_remembered")
-        AccountCache.shared.setActiveAccount(user.id)
+        AccountCache.shared.setActiveAccount(user.id, origin: origin)
         AccountCache.shared.saveJSONObject(rawDict, forKey: "profile_me", accountId: user.id)
-        KeychainStore.shared.setRememberMe(rememberMe)
-        KeychainStore.shared.saveAccountId(user.id)
+        KeychainStore.shared.setRememberMe(rememberMe, for: origin)
+        KeychainStore.shared.saveAccountId(user.id, for: origin)
         NativeSocketClient.shared.connectWithKeychainSession()
         PushKitManager.shared.startRegistration()
         startActivityHeartbeat()
@@ -191,7 +192,7 @@ final class AppState: ObservableObject {
         NativeWebRTCManager.shared.stopLiveSession()
         CallKitManager.shared.endAllCalls()
         NativeSocketClient.shared.disconnect()
-        KeychainStore.shared.clearAll()
+        KeychainStore.shared.clearAuthSessions()
         AccountCache.shared.wipeAllCaches()
         currentUser = nil
         unreadNotificationsCount = 0

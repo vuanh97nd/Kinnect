@@ -10,6 +10,7 @@ enum KinnectAPIError: LocalizedError {
     case serverError(status: Int, message: String)
     case serverMessage(String)
     case unauthorized
+    case originSwitchUnauthorized
 
     var errorDescription: String? {
         switch self {
@@ -23,6 +24,8 @@ enum KinnectAPIError: LocalizedError {
             return message
         case .unauthorized:
             return "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
+        case .originSwitchUnauthorized:
+            return "Đang dùng máy chủ dự phòng. Vui lòng đăng nhập lại trên máy chủ này."
         }
     }
 }
@@ -78,7 +81,7 @@ final class KinnectAPIClient {
     }
 
     var currentAccountId: String {
-        return KeychainStore.shared.loadAccountId(for: ServerConfig.defaultOrigin)
+        return KeychainStore.shared.loadAccountId(for: snapshotOrigin())
     }
 
     var baseURL: String {
@@ -369,6 +372,9 @@ final class KinnectAPIClient {
         }
 
         if http.statusCode == 401 && path != "/api/login" && path != "/api/me/password" {
+            if origin == ServerConfig.fallbackOrigin {
+                throw KinnectAPIError.originSwitchUnauthorized
+            }
             throw KinnectAPIError.unauthorized
         }
 
@@ -426,7 +432,7 @@ final class KinnectAPIClient {
 
     func logoutAndWipe() async {
         _ = try? await request(method: "POST", path: "/api/logout", body: [:], isIdempotent: true, allowPrivacyAutoRetry: false)
-        KeychainStore.shared.clearAll()
+        KeychainStore.shared.clearAuthSessions()
         AccountCache.shared.wipeAllCaches()
     }
 }
