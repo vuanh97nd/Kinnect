@@ -42,7 +42,8 @@ result = {"generatedAt": __import__("datetime").datetime.now(__import__("datetim
           "tokens": list(TOKENS.values()), "apks": {}}
 problems = []
 for variant, name in [("release", os.environ.get("KINNECT_RELEASE_NAME", f"Kinnect-1.2.17-{PHASE}-{ABI_MODE}-release.apk")), ("debug", os.environ.get("KINNECT_DEBUG_NAME", f"Kinnect-1.2.17-{PHASE}-{ABI_MODE}-debug.apk"))]:
-    apk = BUILDS / variant / name
+    override = os.environ.get(f"KINNECT_{variant.upper()}_APK")
+    apk = pathlib.Path(override) if override else (BUILDS / variant / name)
     entries, hits = scan_apk(apk)
     present = sorted(k for k, v in hits.items() if v)
     result["apks"][variant] = {
