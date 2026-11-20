@@ -329,8 +329,10 @@ async function dump() {
       await adb('shell', 'uiautomator', 'dump', '/data/local/tmp/uidump.xml');
       last = await adb('shell', 'cat', '/data/local/tmp/uidump.xml');
       if (last.includes('<hierarchy')) return last;
+      fs.appendFileSync(path.join(LOGS, 'dump-errors.log'), new Date().toISOString() + ' no-hierarchy ' + last.slice(0, 300).replace(/\n/g, ' ') + '\n');
     } catch (error) {
       last = String(error.stderr || error.message || error);
+      fs.appendFileSync(path.join(LOGS, 'dump-errors.log'), new Date().toISOString() + ' ' + last.slice(0, 300).replace(/\n/g, ' ') + '\n');
     }
   }
   return last;
@@ -657,8 +659,15 @@ async function confirmLogout() {
 async function restartCold() {
   await adb('shell', 'logcat', '-c');
   await launch(['--ez', 'qa_local_loopback_wipe', 'false', '--ez', 'qa_force_primary_failure', 'false', '--ez', 'qa_debug_offline', 'false', '--ez', 'qa_log_session', 'true', '--ez', 'qa_switchback', 'true', '-e', 'qa_theme', 'dark', '-e', 'app_language', 'vi']);
-  const xml = await waitXml(12000, (x) => signedOut(x) || signedIn(x));
-  const logs = await qaLogs();
+  const xml = await waitXml(30000, (x) => signedOut(x) || signedIn(x));
+  let logs = await qaLogs();
+  // The saved-primary/switchback lines can land a few moments after the first signed-out frame
+  // on this slow emulator; snapshotting instantly used to record a partial log.
+  const start = Date.now();
+  while (Date.now() - start < 10000 && !(logs.includes('DEBUG_PRIMARY_SAVED') && logs.includes('DEBUG_SWITCHBACK'))) {
+    await sleep(400);
+    logs = await qaLogs();
+  }
   return { xml, logs };
 }
 async function ensureSignedIn() {
@@ -723,6 +732,7 @@ async function runN1(seedInfo) {
     const staleMe = observed.slice(staleMark).filter((r) => r.method === 'GET' && r.path === '/api/me');
     const staleCallbackRejected = signedOut(afterStale) && !signedIn(afterStale) && staleLogs.includes('DEBUG_SESSION_WIPED') && staleMe.some((r) => r.held);
     const staleRestart = await restartCold();
+    saveXml('n1-stale-restart', staleRestart.xml);
     const staleStayedOut = signedOut(staleRestart.xml) && !signedIn(staleRestart.xml) && staleRestart.logs.includes('DEBUG_PRIMARY_SAVED: false') && staleRestart.logs.includes('DEBUG_SWITCHBACK: hasSession=false');
 
     async function proveExplicit(kind) {
@@ -786,6 +796,7 @@ async function runN1(seedInfo) {
     saveXml('n1-primary401', afterPrimary);
     await shot('n1-primary401-ui', { theme: 'dark', locale: 'vi', screen: 'auth', state: signedOut(afterPrimary) ? 'signed-out' : 'unexpected', set: 'behavior' });
     const primaryRestart = await restartCold();
+    saveXml('n1-primary-restart', primaryRestart.xml);
     const primaryStayedOut = signedOut(primaryRestart.xml) && !signedIn(primaryRestart.xml) && primaryRestart.logs.includes('DEBUG_PRIMARY_SAVED: false') && logs401.includes('DEBUG_SESSION_WIPED');
 
     const pass = Boolean(login.signedIn || login.already)
@@ -983,7 +994,7 @@ async function captureSignedIn(theme, locale) {
   if (!xml.includes('P1 parity post') || !signedIn(xml)) throw new Error('feed missing parity post ' + theme + ' ' + locale);
   await shot(`feed-${theme}-${locale}`, { set: 'parity', theme, locale, screen: 'feed', state: 'P1 parity post', postSource, textScale: 'default' });
   await launch(launchArgs(theme, locale, 'inbox'));
-  xml = await waitXml(12000, (x) => x.includes('QA Lan') && x.includes('QA Group') && x.includes('Hello parity'));
+  xml = await waitXml(12000, (x) => x.includes('QA Lan') && x.includes('QA Group') && x.includes('Hello parity') && xIncludesCounts(x));
   if (!(xml.includes('QA Lan') && xml.includes('QA Group') && xIncludesCounts(xml))) throw new Error('inbox seed mismatch ' + theme + ' ' + locale);
   await shot(`inbox-${theme}-${locale}`, { set: 'parity', theme, locale, screen: 'inbox', state: 'unread-direct-2-group-3', unread });
   await launch(launchArgs(theme, locale, 'profile'));
@@ -1021,52 +1032,81 @@ async function leaveChat() {
   return waitXml(8000, (x) => x.includes('QA Lan') || x.includes('QA Group') || x.includes('Tin nhắn') || x.includes('Messages'));
 }
 
+async function composerServed() {
+  // mInputShown can stay true after the IME loses its served view, so the input connection
+  // (mServedView=app.kinnect.live.KinnectInput) is the authoritative focus signal here.
+  try {
+    const info = String(await adb('shell', 'dumpsys', 'input_method'));
+    return /mServedView=app\.kinnect\.live\.KinnectInput/.test(info);
+  } catch { return false; }
+}
 async function focusComposer() {
   let xml = await dump();
-  for (let attempt = 0; attempt < 4; attempt++) {
+  for (let attempt = 0; attempt < 6; attempt++) {
     const node = composerNode(xml);
     if (!node) throw new Error('chat composer missing');
-    if (node.focused && (node.desc === 'Tin nhắn' || node.desc === 'Message')) return xml;
+    if (node.focused || (await composerServed())) return xml;
     await tap([node.x, node.y], 'composer');
-    await sleep(450);
+    // This emulator renders slowly; the IME/focus round-trip can take seconds.
+    for (let i = 0; i < 20 && !(await composerServed()); i++) await sleep(250);
+    await sleep(700);
     xml = await dump();
+    const again = composerNode(xml);
+    if (!again) throw new Error('chat composer missing');
+    // The chat reload can rebuild the composer and drop focus shortly after the first tap;
+    // only return once focus survives a settled re-check.
+    if (again.focused || (await composerServed())) {
+      await sleep(900);
+      if ((await composerServed()) || composerNode(await dump()).focused) return xml;
+      xml = await dump();
+      continue;
+    }
   }
   saveXml('composer-unfocused', xml);
   throw new Error('chat composer did not take focus');
 }
-async function imeShown() {
-  try { return String(await adb('shell', 'dumpsys', 'input_method')).includes('mInputShown=true'); } catch { return false; }
-}
 async function ensureComposerReady() {
   await focusComposer();
-  for (let i = 0; i < 20 && !(await imeShown()); i++) await sleep(150);
   await sleep(400);
-  let node = composerNode(await dump());
-  if (node && !node.focused) {
-    await tap([node.x, node.y], 'composer');
-    await sleep(800);
-    node = composerNode(await dump());
-  }
-  if (!node || !node.focused) throw new Error('chat composer lost focus after IME settle');
+  const xml = await dump();
+  const node = composerNode(xml);
+  if (!node) throw new Error('chat composer missing after IME settle');
+  return xml;
 }
 async function putDraft(value) {
   let xml = '';
   let node = null;
+  const failures = [];
   for (let attempt = 0; attempt < 5; attempt++) {
     if (attempt) await sleep(700);
-    try { await ensureComposerReady(); } catch { continue; }
-    await adb('shell', 'input', 'keyevent', '123');
-    for (let chunk = 0; chunk < 4; chunk++) await adb('shell', 'input', 'keyevent', ...Array(20).fill('67'));
-    await sleep(250);
+    try { await ensureComposerReady(); } catch (error) {
+      failures.push('attempt' + attempt + ': ' + String(error.message || error));
+      continue;
+    }
+    await sleep(300);
     const before = composerNode(await dump());
-    if (!before || !before.focused) continue;
+    if (!before || !(before.focused || (await composerServed()))) { failures.push('attempt' + attempt + ': composer not focused'); continue; }
+    if (before.text && !before.text.includes('Nhắn tin') && !before.text.includes('Message')) {
+      await adb('shell', 'input', 'keyevent', '123');
+      for (let chunk = 0; chunk < 4; chunk++) await adb('shell', 'input', 'keyevent', ...Array(20).fill('67'));
+      await sleep(400);
+    }
     await typeText(value);
-    await sleep(700);
-    xml = await dump();
-    node = composerNode(xml);
+    // `input text` injects characters one by one; poll so a dump cannot race the tail.
+    const start = Date.now();
+    const seen = [];
+    do {
+      await sleep(400);
+      xml = await dump();
+      node = composerNode(xml);
+      seen.push(node ? node.text : 'missing');
+    } while (Date.now() - start < 5000 && (!node || node.text !== value));
     if (node && node.text === value) break;
+    failures.push('attempt' + attempt + ': text=' + (node ? JSON.stringify(node.text) : 'missing')
+      + ' seen=' + JSON.stringify(seen.slice(-4)) + ' served=' + (await composerServed()));
   }
   saveXml('draft-' + value, xml);
+  if (failures.length) fs.appendFileSync(path.join(LOGS, 'draft-attempts.log'), value + ' :: ' + failures.join(' | ') + '\n');
   if (!node || node.text !== value) throw new Error('draft text is ' + (node ? node.text : 'missing') + ' wanted ' + value);
   return { xml, focused: Boolean(node.focused), visible: true, fieldText: node.text };
 }
@@ -1469,6 +1509,7 @@ async function main() {
     stage('captures-auth');
     await captureAuthMatrix();
   }
+  if (only === 'N3FOCUS') { stage('focus-signin'); await uiLogin(); }
   if (only === 'ALL' || only === 'AND-N3' || only === 'N3FOCUS') await runN3AndChats();
   const afterRun = sourceFingerprint('after-run');
   const provenancePath = path.join(OUT, 'build-provenance.json');
