@@ -9,7 +9,7 @@ public final class NativeSocket extends WebSocketListener {
  private final Events events; private final Handler main=new Handler(Looper.getMainLooper());
  private final OkHttpClient client=new OkHttpClient.Builder().pingInterval(25,TimeUnit.SECONDS).build();
  private WebSocket socket; private volatile boolean closed;
- public NativeSocket(String origin,Events events){this.events=events;if(NativeApi.isFixtureEnabled()){closed=true;return;}socket=client.newWebSocket(new Request.Builder().url(origin.replaceFirst("https:","wss:")+"/").header("Origin",origin).header("Cookie",NativeApi.shared.cookieFor(origin)).build(),this);}
+ public NativeSocket(String origin,Events events){this.events=events;if(QaRuntime.isFixtureEnabled()){closed=true;return;}socket=client.newWebSocket(new Request.Builder().url(origin.replaceFirst("https:","wss:")+"/").header("Origin",origin).header("Cookie",NativeApi.shared.cookieFor(origin)).build(),this);}
  public void send(JSONObject value){if(!closed&&socket!=null)socket.send(value.toString());}
  @Override public void onMessage(WebSocket ws,String text){try{JSONObject value=new JSONObject(text);main.post(()->{if(!closed)events.event(value);});}catch(JSONException ignored){}}
  @Override public void onFailure(WebSocket ws,Throwable error,Response response){main.post(()->{if(!closed)events.closed();});}

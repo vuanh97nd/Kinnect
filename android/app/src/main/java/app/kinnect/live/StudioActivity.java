@@ -101,9 +101,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     getWindow().setStatusBarColor(0xff000000);
     getWindow().setNavigationBarColor(0xff000000);
-    if (getIntent() != null && getIntent().getBooleanExtra("ui_review_fixture", false)) {
-      NativeApi.enableFixture(this, true);
-    }
+    QaRuntime.armReviewFixture(this, getIntent());
     story = getIntent().getBooleanExtra(EXTRA_STORY, false);
     String startMode = getIntent().getStringExtra(EXTRA_MODE);
     if (startMode != null) mode = startMode;
@@ -1648,28 +1646,7 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
     stopPreview();
     try {
       previewPlayer = new MediaPlayer();
-      boolean isDebug = (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
-      if (isDebug && NativeApi.isFixtureEnabled() && url != null && url.contains("/music/")) {
-        final String assetPath = url.contains("m1") ? "gifts/aurora.wav"
-          : url.contains("m2") ? "gifts/butterfly.wav"
-          : url.contains("m3") ? "gifts/lotus.wav"
-          : "gifts/star.wav";
-        java.io.File cacheFile = new java.io.File(getCacheDir(), "qa_preview_" + assetPath.replace("/", "_"));
-        try (java.io.InputStream in = getAssets().open(assetPath);
-             java.io.OutputStream out = new java.io.FileOutputStream(cacheFile)) {
-          byte[] buf = new byte[8192];
-          int n;
-          while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
-        }
-        previewPlayer.setDataSource(cacheFile.getAbsolutePath());
-        previewPlayer.setLooping(true);
-        previewPlayer.setOnPreparedListener(mp -> {
-          mp.start();
-          android.util.Log.i("KinnectQA", "MUSIC_PREVIEW_PLAY: url=" + url + " asset=" + assetPath + " isPlaying=" + mp.isPlaying());
-        });
-        previewPlayer.prepareAsync();
-        return;
-      }
+      if (QaRuntime.fixtureMusicPreview(this, previewPlayer, url)) return;
       Map<String, String> headers = new HashMap<>();
       headers.put("Cookie", api.jar());
       previewPlayer.setDataSource(this, Uri.parse(url), headers);
@@ -1680,12 +1657,9 @@ public final class StudioActivity extends Activity implements Choreographer.Fram
 
   private void stopPreview() {
     if (previewPlayer != null) {
-      boolean isDebug = (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
       boolean wasPlaying = false;
       try { wasPlaying = previewPlayer.isPlaying(); } catch (Exception ignored) {}
-      if (isDebug && NativeApi.isFixtureEnabled()) {
-        android.util.Log.i("KinnectQA", "MUSIC_PREVIEW_STOP: wasPlaying=" + wasPlaying);
-      }
+      QaRuntime.musicPreviewStop(this, wasPlaying);
       try { previewPlayer.release(); } catch (Exception ignored) {}
       previewPlayer = null;
     }

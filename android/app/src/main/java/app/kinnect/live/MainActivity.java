@@ -74,32 +74,30 @@ public class MainActivity extends Activity {
   private NativeCalls calls;
   private boolean onUserSignedIn(JSONObject user){
     if(user==null)return false;
-    if(!NativeApi.isFixtureEnabled()&&api.cookieFor(server()).isEmpty())return false;
+    if(!QaRuntime.isFixtureEnabled()&&api.cookieFor(server()).isEmpty())return false;
     me=user;
-    if(NativeApi.isFixtureEnabled())return true;
+    if(QaRuntime.isFixtureEnabled())return true;
     KinnectService.start(this);
     ensureCalls();
     return true;
   }
-  private void ensureCalls(){if(NativeApi.isFixtureEnabled())return;if(me!=null&&!mediaCallListening){mediaCallListening=true;KinnectService.listen(mediaCallEvents);}if(KinnectService.pendingIncoming!=null){mediaCallGate.update("call-incoming",KinnectService.pendingIncoming.optString("callId"));mediaCallBlocked=mediaCallGate.blocked();pauseForCall();}if(me!=null&&calls==null){calls=new NativeCalls(this,server());setupBackground();}}
+  private void ensureCalls(){if(QaRuntime.isFixtureEnabled())return;if(me!=null&&!mediaCallListening){mediaCallListening=true;KinnectService.listen(mediaCallEvents);}if(KinnectService.pendingIncoming!=null){mediaCallGate.update("call-incoming",KinnectService.pendingIncoming.optString("callId"));mediaCallBlocked=mediaCallGate.blocked();pauseForCall();}if(me!=null&&calls==null){calls=new NativeCalls(this,server());setupBackground();}}
   // Một lần: xin đủ quyền thông báo/cuộc gọi, cho phép toàn màn hình và chạy nền.
-  private void setupBackground(){if(NativeApi.isFixtureEnabled())return;if(Distribution.PLAY){if(Build.VERSION.SDK_INT>=33&&checkSelfPermission("android.permission.POST_NOTIFICATIONS")!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"},950);return;}android.content.SharedPreferences p=getSharedPreferences("native_setup",0);if(p.getBoolean("asked_v1",false)){backgroundExtras(false);return;}p.edit().putBoolean("asked_v1",true).apply();java.util.ArrayList<String> want=new java.util.ArrayList<>();if(Build.VERSION.SDK_INT>=33)want.add("android.permission.POST_NOTIFICATIONS");want.add(Manifest.permission.RECORD_AUDIO);want.add(Manifest.permission.CAMERA);if(Build.VERSION.SDK_INT>=31)want.add("android.permission.BLUETOOTH_CONNECT");java.util.ArrayList<String> missing=new java.util.ArrayList<>();for(String w:want)if(checkSelfPermission(w)!=PackageManager.PERMISSION_GRANTED)missing.add(w);if(missing.isEmpty())backgroundExtras(true);else requestPermissions(missing.toArray(new String[0]),950);}
+  private void setupBackground(){if(QaRuntime.isFixtureEnabled())return;if(Distribution.PLAY){if(Build.VERSION.SDK_INT>=33&&checkSelfPermission("android.permission.POST_NOTIFICATIONS")!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"},950);return;}android.content.SharedPreferences p=getSharedPreferences("native_setup",0);if(p.getBoolean("asked_v1",false)){backgroundExtras(false);return;}p.edit().putBoolean("asked_v1",true).apply();java.util.ArrayList<String> want=new java.util.ArrayList<>();if(Build.VERSION.SDK_INT>=33)want.add("android.permission.POST_NOTIFICATIONS");want.add(Manifest.permission.RECORD_AUDIO);want.add(Manifest.permission.CAMERA);if(Build.VERSION.SDK_INT>=31)want.add("android.permission.BLUETOOTH_CONNECT");java.util.ArrayList<String> missing=new java.util.ArrayList<>();for(String w:want)if(checkSelfPermission(w)!=PackageManager.PERMISSION_GRANTED)missing.add(w);if(missing.isEmpty())backgroundExtras(true);else requestPermissions(missing.toArray(new String[0]),950);}
   private void backgroundExtras(boolean prompt){if(Distribution.PLAY)return;try{if(Build.VERSION.SDK_INT>=34&&!getSystemService(android.app.NotificationManager.class).canUseFullScreenIntent()){if(prompt)new Sheet(this).setTitle(I18n.t("Cuộc gọi toàn màn hình")).setMessage(I18n.t("Cho phép Kinnect hiện cuộc gọi đến toàn màn hình, kể cả khi khóa máy.")).setPositiveButton(I18n.t("Cho phép"),(d,w)->{try{startActivity(new Intent("android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT",android.net.Uri.parse("package:"+getPackageName())));}catch(RuntimeException ignored){}}).setNegativeButton(I18n.t("Để sau"),(d,w)->battery()).show();else battery();return;}}catch(RuntimeException ignored){}if(prompt)battery();}
   private void battery(){android.os.PowerManager pm=(android.os.PowerManager)getSystemService(POWER_SERVICE);if(pm!=null&&pm.isIgnoringBatteryOptimizations(getPackageName())){say(I18n.t("Đã cho phép chạy ngầm không giới hạn pin."));return;}try{startActivity(new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,android.net.Uri.parse("package:"+getPackageName())));}catch(RuntimeException ignored){}}
   private void openAutostartSettings(){String m=Build.MANUFACTURER.toLowerCase(java.util.Locale.ROOT);Intent i=new Intent();try{if(m.contains("xiaomi")||m.contains("redmi")||m.contains("poco")){i.setComponent(new ComponentName("com.miui.securitycenter","com.miui.permcenter.autostart.AutoStartManagementActivity"));}else if(m.contains("oppo")||m.contains("realme")){try{i.setComponent(new ComponentName("com.coloros.safecenter","com.coloros.safecenter.permission.startup.StartupAppListActivity"));}catch(Exception e){i.setComponent(new ComponentName("com.oppo.safe","com.oppo.safe.permission.startup.StartupAppListActivity"));}}else if(m.contains("vivo")){try{i.setComponent(new ComponentName("com.iqoo.secure","com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity"));}catch(Exception e){i.setComponent(new ComponentName("com.vivo.permissionmanager","com.vivo.permissionmanager.activity.BgStartUpManagerActivity"));}}else if(m.contains("huawei")||m.contains("honor")){i.setComponent(new ComponentName("com.huawei.systemmanager","com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"));}else if(m.contains("samsung")){i.setComponent(new ComponentName("com.samsung.android.lool","com.samsung.android.sm.battery.ui.BatteryActivity"));}else{i=new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:"+getPackageName()));}i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);startActivity(i);}catch(Exception fallback){try{startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:"+getPackageName())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));}catch(Exception ignored){}}}
   private void handleExtras(Intent intent){
     if(intent==null)return;
     boolean isDebug = (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
-    if(isDebug) applyDebugTransportIntent(intent);
+    applyDebugTransportIntent(intent);
     if(intent.hasExtra("app_language")){
       String lang=intent.getStringExtra("app_language");
       if("vi".equals(lang)||"en".equals(lang))try{I18n.select(this,lang);}catch(Exception ignored){}
     }
-    if(isDebug && intent.getBooleanExtra("ui_review_fixture",false)){
-      if(intent.getBooleanExtra("reset_fixture_state",false)) NativeApi.resetFixtureState(this);
-      NativeApi.enableFixture(this, true);
+    if(QaRuntime.armReviewFixture(this, intent)){
       if(me==null)try{
-        me=NativeApi.shared.fixtureUser(this);
+        me=QaRuntime.fixtureUser(this);
         onUserSignedIn(me);
       }catch(Exception ignored){}
     }
@@ -108,16 +106,16 @@ public class MainActivity extends Activity {
       intent.removeExtra("commerce_destination");
       if(destination.equals("splash")){splash();return;}
       if(destination.equals("intro")||destination.equals("welcome")){
-        introTabOverride = (isDebug && NativeApi.isFixtureEnabled()) ? intent.getIntExtra("welcome_tab", -1) : -1;
+        introTabOverride = QaRuntime.isFixtureEnabled() ? intent.getIntExtra("welcome_tab", -1) : -1;
         intro();
         return;
       }
       if(destination.equals("login")||destination.equals("auth_login")){auth(false);return;}
       if(destination.equals("register")||destination.equals("auth_register")){auth(true);return;}
       if(destination.equals("forgot")||destination.equals("auth_forgot")){forgot();return;}
-      if(me==null && isDebug && NativeApi.isFixtureEnabled()){
+      if(me==null && QaRuntime.isFixtureEnabled()){
         try{
-          me=new JSONObject("{\"id\":\"usr_qa_review\",\"username\":\"minhanh\",\"name\":\"Minh Anh\",\"role\":\"user\",\"coins\":1200,\"bio\":\"Kinnect QA Review\",\"followersCount\":128,\"followingCount\":64}");
+          me=QaRuntime.reviewUser();
           onUserSignedIn(me);
         }catch(Exception ignored){}
       }
@@ -170,21 +168,21 @@ public class MainActivity extends Activity {
         else if(destination.equals("shorts_comments")){
           navigate("shorts");
           try{
-            shortComments(new JSONObject("{\"id\":\"s1\",\"title\":\"Khoảnh khắc cuộc sống\",\"author\":{\"id\":\"usr_qa_review\",\"name\":\"Minh Anh\"},\"comments\":12}"));
+            shortComments(QaRuntime.shortCommentsItem());
           }catch(Exception ignored){}
         }
         else if(destination.equals("inbox")||destination.equals("inbox_list")){
           navigate("inbox");
         }
         else if(destination.equals("chat_direct")){
-          try{chat(new JSONObject("{\"id\":\"usr_chat_mock\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\",\"isActive\":true}"));}catch(Exception ignored){}
+          try{chat(QaRuntime.chatDirectUser());}catch(Exception ignored){}
         }
         else if(destination.equals("chat_group")){
-          try{groupChat(new JSONObject("{\"id\":\"grp_mock\",\"name\":\"Nhóm Âm Nhạc\",\"members\":[{},{},{}]}"));}catch(Exception ignored){}
+          try{groupChat(QaRuntime.chatGroup());}catch(Exception ignored){}
         }
         else if(destination.equals("chat_menu")){
           try{
-            JSONObject mockUser=new JSONObject("{\"id\":\"usr_chat_mock\",\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\"}");
+            JSONObject mockUser=QaRuntime.chatMenuUser();
             chat(mockUser);
             directChatMenu(mockUser);
           }catch(Exception ignored){}
@@ -257,8 +255,11 @@ public class MainActivity extends Activity {
         }
         else if(destination.equals("call_incoming")){
           try{
-            KinnectService.pendingIncoming=new JSONObject("{\"callId\":\"call_qa_01\",\"from\":{\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\"},\"mode\":\"video\"}");
-            startActivity(new Intent(this,IncomingCallActivity.class));
+            JSONObject call=QaRuntime.incomingCall();
+            if(call!=null){
+              KinnectService.pendingIncoming=call;
+              startActivity(new Intent(this,IncomingCallActivity.class));
+            }
           }catch(Exception ignored){}
         }
         else if(destination.equals("studio_camera")){
@@ -304,26 +305,12 @@ public class MainActivity extends Activity {
   }
 
   private void applyDebugThemePref() {
-    if ((getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0 || getIntent() == null) return;
-    String theme = getIntent().getStringExtra("qa_theme");
-    if ("light".equals(theme) || "dark".equals(theme) || "auto".equals(theme)) {
-      getSharedPreferences("kinnect_settings", 0).edit().putString("theme", theme).commit();
-    }
+    QaRuntime.applyTheme(this, getIntent());
   }
 
   private void applyDebugTransportIntent(Intent intent) {
-    if (intent == null || (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) return;
-    if (api.pinnedDebugLoopbackOrigin() == null) return;
-    if (intent.hasExtra("qa_force_primary_failure") || intent.hasExtra("qa_debug_offline")) {
-      api.applyDebugTransportFlags(
-        intent.hasExtra("qa_force_primary_failure") ? Boolean.valueOf(intent.getBooleanExtra("qa_force_primary_failure", false)) : null,
-        intent.hasExtra("qa_debug_offline") ? Boolean.valueOf(intent.getBooleanExtra("qa_debug_offline", false)) : null
-      );
-    }
-    if (intent.getBooleanExtra("qa_log_session", false)) api.debugLogSavedPrimary();
-    if (intent.getBooleanExtra("qa_switchback", false)) {
-      boolean restored = api.debugSwitchBack();
-      if (restored && me == null) {
+    QaRuntime.applyTransportIntent(this, intent, api, () -> {
+      if (me == null) {
         api.call("GET", "/api/me", null, (data, error, status) -> {
           if (isDestroyed() || isFinishing()) return;
           JSONObject user = data == null ? null : data.optJSONObject("user");
@@ -331,7 +318,7 @@ public class MainActivity extends Activity {
           else auth(false);
         });
       }
-    }
+    });
   }
 
   @Override
@@ -352,22 +339,23 @@ public class MainActivity extends Activity {
         I18n.initialize(this);
       }
     }
-    if (isDebug && getIntent() != null && getIntent().hasExtra("qa_local_loopback_origin")) {
-      String fallback = getIntent().getStringExtra("qa_local_loopback_fallback");
-      if (fallback != null && !fallback.isEmpty()) api.pinDebugFailover(this, getIntent().getStringExtra("qa_local_loopback_origin"), fallback, getIntent().getStringExtra("qa_local_loopback_cert_sha256"));
-      else api.pinDebugLoopback(this, getIntent().getStringExtra("qa_local_loopback_origin"), getIntent().getStringExtra("qa_local_loopback_cert_sha256"));
-    }
+    QaRuntime.pinFromIntent(this, getIntent(), api);
     api.initialize(this,server());
-    if (isDebug) applyDebugTransportIntent(getIntent());
-    if (isDebug && getIntent() != null && getIntent().getBooleanExtra("qa_session_regression", false)) {
-      boolean pass = false;
-      try { pass = runExplicitLogoutRegression(); }
-      catch (Throwable error) { android.util.Log.i("KinnectQA", "QA_SESSION_REGRESSION_ERROR"); }
-      android.util.Log.i("KinnectQA", pass ? "QA_SESSION_REGRESSION_PASS" : "QA_SESSION_REGRESSION_FAIL");
+    applyDebugTransportIntent(getIntent());
+    if (QaRuntime.wantsSessionRegression(getIntent())) {
+      Boolean pass = null;
+      try { pass = Boolean.valueOf(runExplicitLogoutRegression()); }
+      catch (Throwable ignored) {}
+      QaRuntime.sessionRegression(pass);
       finish();
       return;
     }
-    if (isDebug && getIntent() != null && getIntent().getBooleanExtra("qa_local_loopback_wipe", false) && api.pinnedDebugLoopbackOrigin() != null) {
+    if (QaRuntime.wantsWebRtcSelfTest(this, getIntent())) {
+      QaRuntime.runWebRtcSelfTest(this);
+      finish();
+      return;
+    }
+    if (QaRuntime.wantsLoopbackWipe(getIntent(), api)) {
       clearClientSessionCaches();
     }
     getWindow().setStatusBarColor(CARD);
@@ -375,13 +363,9 @@ public class MainActivity extends Activity {
     if (!WebTheme.isDark(this))
       getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
     splash();
-    if (isDebug && getIntent() != null && getIntent().getBooleanExtra("ui_review_fixture", false)) {
-      if (getIntent().getBooleanExtra("reset_fixture_state", false)) {
-        NativeApi.resetFixtureState(this);
-      }
-      NativeApi.enableFixture(this, true);
+    if (QaRuntime.armReviewFixture(this, getIntent())) {
       try {
-        me = NativeApi.shared.fixtureUser(this);
+        me = QaRuntime.fixtureUser(this);
         onUserSignedIn(me);
         handleExtras(getIntent());
         return;
@@ -390,7 +374,7 @@ public class MainActivity extends Activity {
     final long shownAt = System.currentTimeMillis();
     final boolean hasSession = !api.cookieFor(server()).isEmpty();
     if (hasSession) {
-      if (api.pinnedDebugLoopbackOrigin() == null) KinnectService.start(this);
+      if (QaRuntime.pinnedOrigin() == null) KinnectService.start(this);
       api.call("GET", "/api/me", null, (data, error, status) -> {
         if (isDestroyed()) return;
         long wait = Math.max(0, 450 - (System.currentTimeMillis() - shownAt));
@@ -510,7 +494,7 @@ public class MainActivity extends Activity {
   }
 
   private String server() {
-    String pinned = api.pinnedDebugLoopbackOrigin();
+    String pinned = QaRuntime.pinnedOrigin();
     return pinned != null ? pinned : ServerConfig.DEFAULT_ORIGIN;
   }
 
@@ -1049,37 +1033,37 @@ public class MainActivity extends Activity {
     me = null;
   }
   private void onExplicitLogoutFinished(String error, int status) {
-    android.util.Log.i("KinnectQA", "DEBUG_EXPLICIT_LOGOUT: status=" + status + " failed=" + (error != null));
+    QaRuntime.explicitLogout(status, error != null);
     discardExplicitLogoutLocally();
     if (root != null && !isFinishing() && !isDestroyed()) intro();
   }
   private boolean runExplicitLogoutRegression() throws JSONException {
-    String primary = api.pinnedDebugLoopbackOrigin();
-    if (primary == null || api.pinnedDebugFallbackOrigin() == null) return false;
-    final String session = "kinnect_session=qa_synthetic_not_a_real_login";
-    final String device = "kinnect_device=qa_synthetic_device";
+    String primary = QaRuntime.loopbackOrigin();
+    if (primary == null || QaRuntime.fallbackOrigin() == null) return false;
+    final String session = QaRuntime.syntheticSessionCookie();
+    final String device = QaRuntime.syntheticDeviceCookie();
     api.clear();
     api.adopt(primary, session + "; " + device);
-    if (!api.debugSavedPrimarySession() || !api.debugForceFailover()) return false;
-    me = new JSONObject("{\"id\":\"qa\"}");
+    if (!QaRuntime.savedPrimary(api) || !QaRuntime.forceFailover(api)) return false;
+    me = QaRuntime.regressionUser();
     applyUnauthorizedSession();
-    if (!api.debugSavedPrimarySession() || !api.cookieFor(api.origin()).isEmpty() || !api.debugSwitchBack()) return false;
-    me = new JSONObject("{\"id\":\"qa\"}");
+    if (!QaRuntime.savedPrimary(api) || !api.cookieFor(api.origin()).isEmpty() || !QaRuntime.switchBack(api)) return false;
+    me = QaRuntime.regressionUser();
     applyUnauthorizedSession();
-    if (api.debugSavedPrimarySession() || !api.cookieFor(api.origin()).isEmpty()) return false;
+    if (QaRuntime.savedPrimary(api) || !api.cookieFor(api.origin()).isEmpty()) return false;
     int[] statuses = {401, 500, 0};
     String[] failures = {"unauthorized", "server", "offline"};
     for (int i = 0; i < statuses.length; i++) {
       api.adopt(primary, session + "; " + device);
-      if (!api.debugSavedPrimarySession() || !api.debugForceFailover()) return false;
-      me = new JSONObject("{\"id\":\"qa\"}");
+      if (!QaRuntime.savedPrimary(api) || !QaRuntime.forceFailover(api)) return false;
+      me = QaRuntime.regressionUser();
       onExplicitLogoutFinished(failures[i], statuses[i]);
-      if (api.debugSavedPrimarySession() || !api.cookieFor(api.origin()).isEmpty() || api.rememberedDevice().isEmpty() || me != null) return false;
-      if (!api.debugForceFailover() || api.debugSwitchBack()) return false;
-      if (onUserSignedIn(new JSONObject("{\"id\":\"stale\"}")) || me != null) return false;
+      if (QaRuntime.savedPrimary(api) || !api.cookieFor(api.origin()).isEmpty() || api.rememberedDevice().isEmpty() || me != null) return false;
+      if (!QaRuntime.forceFailover(api) || QaRuntime.switchBack(api)) return false;
+      if (onUserSignedIn(QaRuntime.staleUser()) || me != null) return false;
     }
-    api.debugForgetRememberedDevice();
-    return api.rememberedDevice().isEmpty() && !api.debugSavedPrimarySession();
+    QaRuntime.forgetDevice(api);
+    return api.rememberedDevice().isEmpty() && !QaRuntime.savedPrimary(api);
   }
 
   private Bitmap decodeAvatarBitmap(byte[] bytes) {
@@ -1610,9 +1594,7 @@ public class MainActivity extends Activity {
     text=I18n.t(text);
     if (notice != null) notice.setText(text);
     if (text == null || text.trim().isEmpty()) return;
-    if ((getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
-      android.util.Log.i("KinnectQA", "UI_SAY: " + text.replace('\n', ' '));
-    }
+    QaRuntime.uiSay(this, text);
     long toastNow=android.os.SystemClock.elapsedRealtime();
     if(text.equals(lastToastMessage)&&toastNow-lastToastAt<6000)return;
     lastToastMessage=text;lastToastAt=toastNow;
@@ -1952,7 +1934,7 @@ public class MainActivity extends Activity {
     subBack = null;
     currentPage = () -> navigate(next);
     currentKey = "tab:" + next;
-    if(!NativeApi.isFixtureEnabled()){
+    if(!QaRuntime.isFixtureEnabled()){
       ensureCalls();
       activity();
     }
@@ -4116,7 +4098,7 @@ public class MainActivity extends Activity {
       player.setLooping(true);
       player.setVolume(shortMuted ? 0 : 1, shortMuted ? 0 : 1);
       if(!mediaCallBlocked)shortVideo.start();
-      android.util.Log.i("KinnectQA", "SHORTS_EVENT: action=playing index=" + shortIndex + " id=" + item.optString("id") + " pos=" + shortVideo.getCurrentPosition() + " muted=" + shortMuted);
+      QaRuntime.shortsPlaying(shortIndex, item.optString("id"), shortVideo.getCurrentPosition(), shortMuted);
     });
     shortVideo.setOnErrorListener((player, what, extra) -> {preview.setVisibility(View.VISIBLE);unavailable.setVisibility(View.VISIBLE);return true;});
     if(shortEnter!=0){int direction=shortEnter;shortEnter=0;VerticalMediaStage.enter(stage,direction);}
@@ -4127,7 +4109,7 @@ public class MainActivity extends Activity {
     pauseBadge.addView(icon("play", 28, WHITE), new FrameLayout.LayoutParams(dp(28), dp(28), Gravity.CENTER));
     pauseBadge.setVisibility(View.GONE);
     stage.addView(pauseBadge, new FrameLayout.LayoutParams(dp(64), dp(64), Gravity.CENTER));
-    stage.setOnClickListener(v->{if(shortVideo!=null){if(shortVideo.isPlaying()){shortVideo.pause();android.util.Log.i("KinnectQA", "SHORTS_EVENT: action=pause pos=" + shortVideo.getCurrentPosition() + " isPlaying=false");pauseBadge.setAlpha(0f);pauseBadge.setScaleX(0.85f);pauseBadge.setScaleY(0.85f);pauseBadge.setVisibility(View.VISIBLE);pauseBadge.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(150).start();}else if(!mediaCallBlocked){shortVideo.start();android.util.Log.i("KinnectQA", "SHORTS_EVENT: action=start pos=" + shortVideo.getCurrentPosition() + " isPlaying=true");pauseBadge.animate().alpha(0f).setDuration(120).withEndAction(()->pauseBadge.setVisibility(View.GONE)).start();}}});
+    stage.setOnClickListener(v->{if(shortVideo!=null){if(shortVideo.isPlaying()){shortVideo.pause();QaRuntime.shortsPause(shortVideo.getCurrentPosition());pauseBadge.setAlpha(0f);pauseBadge.setScaleX(0.85f);pauseBadge.setScaleY(0.85f);pauseBadge.setVisibility(View.VISIBLE);pauseBadge.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(150).start();}else if(!mediaCallBlocked){shortVideo.start();QaRuntime.shortsStart(shortVideo.getCurrentPosition());pauseBadge.animate().alpha(0f).setDuration(120).withEndAction(()->pauseBadge.setVisibility(View.GONE)).start();}}});
     // Cột nút bên phải
     LinearLayout side = column();
     side.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -4918,11 +4900,11 @@ public class MainActivity extends Activity {
     super.onResume();
     stopped = false;
     try{getSystemService(android.app.NotificationManager.class).cancel(KinnectService.ID_BG);}catch(RuntimeException ignored){}
-    boolean shouldSyncMe = (storeReturning || leftForeground) && me != null && !NativeApi.isFixtureEnabled();
+    boolean shouldSyncMe = (storeReturning || leftForeground) && me != null && !QaRuntime.isFixtureEnabled();
     leftForeground = false;
     if(shouldSyncMe){storeReturning=false;final long resumeEpoch=avatarRevision;api.call("GET","/api/me",null,(data,error,status)->{if(error==null&&data!=null&&!isDestroyed()&&me!=null){if(avatarUploadInFlight||resumeEpoch!=avatarRevision||System.currentTimeMillis()-lastAvatarMutationAt<5000)return;JSONObject fresh=data.optJSONObject("user");boolean styleChanged=fresh!=null&&!fresh.optString("storeStyle").equals(me.optString("storeStyle"));boolean avatarChanged=fresh!=null&&!fresh.optString("avatar","").equals(me.optString("avatar",""));if(avatarChanged)applyUpdatedAvatar(fresh,null);else if(fresh!=null)me=fresh;if(styleChanged)refreshPage();}});}
     KinnectService.appVisible = true;
-    if(!NativeApi.isFixtureEnabled()){
+    if(!QaRuntime.isFixtureEnabled()){
       notificationHandler.removeCallbacksAndMessages(null);
       notificationHandler.post(notificationPoll);
       ensureCalls();
@@ -5679,23 +5661,23 @@ public class MainActivity extends Activity {
       String rVal = retype.getText() == null ? "" : retype.getText().toString();
       if (cVal.isEmpty()) {
         String msg = I18n.t("Vui lòng nhập mật khẩu hiện tại.");
-        android.util.Log.i("KinnectQA", "PASSWORD_VALIDATION: branch=empty_current error='" + msg + "' api_dispatched=false api_dispatch_count=" + NativeApi.shared.apiDispatchCount);
+        QaRuntime.passwordEmptyCurrent(msg, NativeApi.shared.apiDispatchCount);
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
         return;
       }
       if (nVal.length() < 6) {
         String msg = I18n.t("Mật khẩu mới phải có ít nhất 6 ký tự.");
-        android.util.Log.i("KinnectQA", "PASSWORD_VALIDATION: branch=short_new_password error='" + msg + "' api_dispatched=false api_dispatch_count=" + NativeApi.shared.apiDispatchCount);
+        QaRuntime.passwordShort(msg, NativeApi.shared.apiDispatchCount);
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
         return;
       }
       if (!nVal.equals(rVal)) {
         String msg = I18n.t("Mật khẩu nhập lại không khớp.");
-        android.util.Log.i("KinnectQA", "PASSWORD_VALIDATION: branch=mismatch error='" + msg + "' api_dispatched=false api_dispatch_count=" + NativeApi.shared.apiDispatchCount);
+        QaRuntime.passwordMismatch(msg, NativeApi.shared.apiDispatchCount);
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
         return;
       }
-      android.util.Log.i("KinnectQA", "PASSWORD_VALIDATION: branch=passed api_dispatched=true");
+      QaRuntime.passwordPassed();
       api.call("POST", "/api/me/password", json("current", cVal, "next", nVal), (r, e, s) ->
         Toast.makeText(this, e != null ? e : I18n.t("Đã đổi mật khẩu. Các thiết bị khác đã được đăng xuất."), Toast.LENGTH_LONG).show());
     }).setNegativeButton(I18n.t("Hủy"), null).show();

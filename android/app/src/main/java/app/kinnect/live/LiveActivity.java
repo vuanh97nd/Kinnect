@@ -137,7 +137,7 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     boolean dark = WebTheme.isDark(this);
     setTheme(getResources().getIdentifier(dark?"Kinnect.App.Dark":"Kinnect.App.Light","style",getPackageName()));
     super.onCreate(state);
-    CrashLog.install(this);if(getIntent()!=null&&getIntent().getBooleanExtra("ui_review_fixture",false))NativeApi.enableFixture(this,true);
+    CrashLog.install(this);QaRuntime.armReviewFixture(this,getIntent());
     int variant = dark ? 1 : 0;
     BG = WebDesign.BG[variant]; CARD = WebDesign.CARD[variant]; TEXT = WebDesign.INK[variant];
     MUTED = WebDesign.MUTED[variant]; ACCENT = WebDesign.PURPLE[variant]; SOFT = WebDesign.WASH[variant]; LINE = WebDesign.LINE[variant];
@@ -151,25 +151,24 @@ public final class LiveActivity extends Activity implements NativeSocket.Events 
     if(getIntent().getBooleanExtra("show_gifts",false))root.postDelayed(this::gifts,600);
     cameraSetup=getIntent().getBooleanExtra("cameraSetup",false);if(cameraSetup){liveMode="game".equals(getIntent().getStringExtra("liveMode"))?"game":"chat";gameTitle=getIntent().getStringExtra("gameTitle");if(gameTitle==null)gameTitle="";topicText=getIntent().getStringExtra("title");if(topicText==null)topicText="";pendingHostMic=getIntent().getBooleanExtra("mic",true);gameSound=getIntent().getBooleanExtra("sound",true);gameComments=getIntent().getBooleanExtra("comments",false);}
     creationEntry=getIntent().getBooleanExtra(EXTRA_HOST,false);
-    boolean isDebug = (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
-    boolean fixtureRoom = isDebug && NativeApi.isFixtureEnabled() && getIntent() != null && getIntent().getBooleanExtra("fixture_joined_room", false);
+    boolean fixtureRoom = QaRuntime.wantsFixtureRoom(this, getIntent());
     if(creationEntry)preparationWaiting();
     else if (fixtureRoom) {
       try {
-        JSONObject mockWelcome = new JSONObject("{\"multiGuest\":false,\"room\":{\"id\":\"fixture_room_1\",\"title\":\"Phòng Live QA Fixture\",\"host\":\"Minh Anh\",\"hostId\":\"usr_qa_review\",\"liveMode\":\"chat\",\"viewers\":42,\"comments\":true}}");
-        android.util.Log.i("KinnectQA", "LIVE_FIXTURE_ROOM_STATE: entered FIXTURE_ROOM_STATE (not a real WS-joined room)");
+        JSONObject mockWelcome = QaRuntime.liveFixtureWelcome();
+        QaRuntime.liveFixtureEntered();
         showRoom(mockWelcome);
-        if (status != null) status.setText("FIXTURE_ROOM_STATE · Mô phỏng phòng Live");
+        if (status != null) status.setText(QaRuntime.liveFixtureStatusText());
       } catch (Exception ignored) {}
       return;
     }
     else {
       lobby();
-      if(NativeApi.isFixtureEnabled()){
+      if(QaRuntime.isFixtureEnabled()){
         ready=true;
         try{
-          lastRooms=new JSONArray("[{\"id\":\"room_1\",\"title\":\"Giao lưu âm nhạc cuối tuần\",\"host\":\"Minh Anh\",\"liveMode\":\"chat\",\"hostId\":\"usr_qa_review\",\"viewers\":42}]");
-          renderRooms();
+          JSONArray fixtureRooms=QaRuntime.liveFixtureRooms();
+          if(fixtureRooms!=null){lastRooms=fixtureRooms;renderRooms();}
         }catch(Exception ignored){}
       }
     }

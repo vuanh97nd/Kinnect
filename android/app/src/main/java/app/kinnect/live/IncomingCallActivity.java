@@ -29,14 +29,12 @@ public final class IncomingCallActivity extends Activity {
     getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     getWindow().setStatusBarColor(0xff11131a);
     getWindow().setNavigationBarColor(0xff0d0e14);
-    if (getIntent() != null && getIntent().getBooleanExtra("ui_review_fixture", false)) {
-      NativeApi.enableFixture(this, true);
-    }
+    QaRuntime.armReviewFixture(this, getIntent());
     JSONObject m = KinnectService.pendingIncoming;
-    if (m == null && NativeApi.isFixtureEnabled()) {
+    if (m == null && QaRuntime.isFixtureEnabled()) {
       try {
-        m = new JSONObject("{\"callId\":\"call_qa_01\",\"from\":{\"name\":\"Bảo Ngọc\",\"username\":\"baongoc\"},\"mode\":\"video\"}");
-        KinnectService.pendingIncoming = m;
+        m = QaRuntime.incomingCall();
+        if (m != null) KinnectService.pendingIncoming = m;
       } catch (Exception ignored) {}
     }
     if (m == null) { finish(); return; }
