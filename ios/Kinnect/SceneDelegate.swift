@@ -12,6 +12,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let windowScene = (scene as? UIWindowScene) else { return }
         let window = UIWindow(windowScene: windowScene)
 
+        #if DEBUG
         // UI Review Fixture Mode: Activated with `--ui-review-screen <screenName>`
         if UIReviewFixture.isEnabled,
            let screenName = UIReviewFixture.activeScreen {
@@ -25,16 +26,20 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                     : UIColor(red: 0.05, green: 0.04, blue: 0.11, alpha: 1.0)
             }
             window.rootViewController = hostingController
-        } else {
-            let rootView = RootMainView().environmentObject(AppState.shared)
-            let hostingController = UIHostingController(rootView: rootView)
-            hostingController.view.backgroundColor = UIColor { trait in
-                trait.userInterfaceStyle == .light
-                    ? UIColor(red: 0.96, green: 0.95, blue: 0.98, alpha: 1.0)
-                    : UIColor(red: 0.05, green: 0.04, blue: 0.11, alpha: 1.0)
-            }
-            window.rootViewController = hostingController
+            self.window = window
+            window.makeKeyAndVisible()
+            return
         }
+        #endif
+
+        let rootView = RootMainView().environmentObject(AppState.shared)
+        let hostingController = UIHostingController(rootView: rootView)
+        hostingController.view.backgroundColor = UIColor { trait in
+            trait.userInterfaceStyle == .light
+                ? UIColor(red: 0.96, green: 0.95, blue: 0.98, alpha: 1.0)
+                : UIColor(red: 0.05, green: 0.04, blue: 0.11, alpha: 1.0)
+        }
+        window.rootViewController = hostingController
 
         self.window = window
         window.makeKeyAndVisible()

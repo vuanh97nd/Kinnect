@@ -73,8 +73,8 @@ struct RootMainView: View {
             if mode == "light" { return .light }
             if mode == "dark" { return .dark }
         }
-        #endif
         if UIReviewFixture.forceLightMode { return .light }
+        #endif
         switch appearanceMode {
         case "light": return .light
         case "dark": return .dark
@@ -82,6 +82,7 @@ struct RootMainView: View {
         }
     }
 
+    #if DEBUG
     // Shared leading brand logo for main tabs (Android parity: 40dp logo only)
     @ToolbarContentBuilder
     static func headerLeadingLogoStatic() -> some ToolbarContent {
@@ -89,6 +90,7 @@ struct RootMainView: View {
             KinnectBrandLogo(size: 36)
         }
     }
+    #endif
 
     @ToolbarContentBuilder
     private func headerLeadingLogo() -> some ToolbarContent {
@@ -97,6 +99,7 @@ struct RootMainView: View {
         }
     }
 
+    #if DEBUG
     // Shared trailing toolbar for all tabs (P1) - static version for UI Review Fixture
     @ToolbarContentBuilder
     static func headerTrailingButtonsStatic() -> some ToolbarContent {
@@ -156,6 +159,7 @@ struct RootMainView: View {
     }
     @State private var fixturePrivatePhotos: [PrivatePhotoItem] = UIReviewFixture.mockPrivatePhotos()
     @State private var fixturePrivateRequests: [PrivateAccessRequestItem] = UIReviewFixture.mockPrivateRequests()
+    #endif
     @State private var splitColumnVisibility: NavigationSplitViewVisibility = .all
 
         // Shared trailing toolbar for all tabs (P1) - instance version
@@ -277,191 +281,25 @@ struct RootMainView: View {
         ZStack(alignment: .top) {
             KinnectTheme.background.ignoresSafeArea()
 
-            if UIReviewFixture.activeScreen == "auth" || UIReviewFixture.activeScreen?.hasPrefix("auth-welcome") == true {
-                AuthView(initialStage: .welcome)
-            } else if UIReviewFixture.activeScreen?.hasPrefix("auth-login") == true {
-                AuthView(initialStage: .login)
-            } else if UIReviewFixture.activeScreen == "auth-register" {
-                AuthView(initialStage: .register)
-            } else if UIReviewFixture.activeScreen == "auth-reset" || UIReviewFixture.activeScreen == "auth-forgot" || UIReviewFixture.activeScreen == "forgot-password" {
-                AuthView(initialStage: .forgotPassword)
+            #if DEBUG
+            if UIReviewFixture.isEnabled {
+                debugReviewScreenContent
             } else if isShowingSplash || (appState.isRestoringSession && appState.currentUser == nil) {
                 KinnectSplashScreen()
             } else if appState.currentUser == nil {
                 AuthView(initialStage: .welcome)
-            } else if UIReviewFixture.activeScreen == "chat-detail" || UIReviewFixture.activeScreen == "chat-menu" || UIReviewFixture.activeScreen == "message-menu" {
-                if horizontalSizeClass == .regular {
-                    // iPad two-column layout: Conversation List on left + Chat Detail on right
-                    VStack(spacing: 0) {
-                                            NavigationSplitView(columnVisibility: $splitColumnVisibility) {
-                                                NavigationStack {
-                                                    MessagesView(onOpenFriends: { activeTopSection = .friends })
-                                                }
-                                                .navigationTitle("")
-                                                .toolbar(.hidden, for: .navigationBar)
-                                            } detail: {
-                                                NavigationStack {
-                                                    DirectChatDetailView(peer: KinnectUser.from(UIReviewFixture.peerUserDict))
-                                                }
-                                            }
-                                            .navigationSplitViewStyle(.balanced)
-                                        }
-                                    } else {
-                                        NavigationStack {
-                                            DirectChatDetailView(peer: KinnectUser.from(UIReviewFixture.peerUserDict))
-                                        }
-                                    }
-                                } else if UIReviewFixture.activeScreen == "camera-studio" || UIReviewFixture.activeScreen == "camera-studio-edit" || UIReviewFixture.activeScreen == "camera-studio-video-edit" {
-                                    NavigationStack {
-                                        CameraStudioView()
-                                    }
-                                } else if UIReviewFixture.activeScreen == "camera-studio-video" {
-                                    NavigationStack {
-                                        CameraStudioView(initialMode: .video)
-                                    }
-                                } else if UIReviewFixture.activeScreen == "studio-pro-sheet" {
-                                    NavigationStack {
-                                        StudioProSheet(
-                                            appliedEffect: .constant("Cinematic Teal & Orange"),
-                                            onApply: { _ in }
-                                        )
-                                    }
-                                } else if UIReviewFixture.activeScreen == "group-chat-detail" {
-                                    NavigationStack {
-                                        GroupChatDetailView(group: ChatGroupItem.from(UIReviewFixture.fixtureGroupDict), onLeftGroup: {})
-                                    }
-                                } else if UIReviewFixture.activeScreen == "profile-edit" {
-                                    EditProfileSheet(onSaved: {})
-                                } else if UIReviewFixture.activeScreen == "profile-public-album" {
-                                    PublicAlbumManageSheet(
-                                        posts: UIReviewFixture.mockPosts(),
-                                        onRefresh: {}
-                                    )
-                                } else if UIReviewFixture.activeScreen == "profile-private-album" {
-                                    PrivateAlbumManageSheet(
-                                        photos: $fixturePrivatePhotos,
-                                        requests: $fixturePrivateRequests,
-                                        onRefresh: {}
-                                    )
-                                } else if UIReviewFixture.activeScreen == "profile-sessions" {
-                                    ActiveSessionsSheet()
-                                } else if UIReviewFixture.activeScreen == "privacy-consent" {
-                                    PrivacyConsentSheet(
-                                        request: PrivacyConsentRequest(
-                                            version: "2026.11",
-                                            notice: "Chính sách quyền riêng tư và điều khoản dịch vụ Kinnect. Cam kết bảo mật theo tiêu chuẩn Apple và pháp luật Việt Nam."
-                                        ),
-                                        recordOnServer: false,
-                                        onAccepted: {}
-                                    )
-                                } else if UIReviewFixture.activeScreen == "delete-account" {
-                                    DeleteAccountConfirmationSheet()
-                                } else if UIReviewFixture.activeScreen == "ugc-report" {
-                                    UGCReportSheet(
-                                        context: UGCReportContext(
-                                            targetType: "user",
-                                            targetId: "fixture_user_peer",
-                                            targetUserId: "fixture_user_peer",
-                                            targetTitle: "Lê Hoàng Nam"
-                                        )
-                                    )
-                                } else if UIReviewFixture.activeScreen == "forward-message" {
-                                    ForwardMessageSheet(text: "Tin nhắn chia sẻ từ Bảng tin Kinnect", imageUrl: "")
-                                } else if UIReviewFixture.activeScreen == "change-password" {
-                                    ChangePasswordSheet()
-                                } else if UIReviewFixture.activeScreen == "blocked-users" {
-                                    BlockedUsersSheet()
-                                } else if UIReviewFixture.activeScreen == "privacy-settings" {
-                                    PrivacySettingsSheet()
-                                } else if UIReviewFixture.activeScreen == "support" {
-                                    SupportContactSheet()
-                                } else if UIReviewFixture.activeScreen == "messages" {
-                                    NavigationStack {
-                                        MessagesView(initialScope: .direct, onOpenFriends: { activeTopSection = .friends })
-                                            .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                                            .navigationTitle("Tin nhắn")
-                                            .navigationBarTitleDisplayMode(.large)
-                                    }
-                                } else if UIReviewFixture.activeScreen == "profile" {
-                                    NavigationStack {
-                                        ProfileView(onOpenWallet: { activeTopSection = .wallet }, onOpenFriends: { activeTopSection = .friends })
-                                            .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                                            .navigationTitle("Hồ sơ")
-                                            .navigationBarTitleDisplayMode(.large)
-                                    }
-                                } else if UIReviewFixture.activeScreen == "profile-posts" {
-                                    NavigationStack {
-                                        ProfileView(onOpenWallet: { activeTopSection = .wallet }, onOpenFriends: { activeTopSection = .friends }, initialTab: .posts)
-                                            .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                                            .navigationTitle("Bài viết")
-                                            .navigationBarTitleDisplayMode(.large)
-                                    }
-                                } else if UIReviewFixture.activeScreen == "profile-albums" {
-                                    NavigationStack {
-                                        ProfileView(onOpenWallet: { activeTopSection = .wallet }, onOpenFriends: { activeTopSection = .friends }, initialTab: .albums)
-                                            .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                                            .navigationTitle("Album ảnh")
-                                            .navigationBarTitleDisplayMode(.large)
-                                    }
-                                } else if UIReviewFixture.activeScreen == "profile-videos" {
-                                    NavigationStack {
-                                        ProfileView(onOpenWallet: { activeTopSection = .wallet }, onOpenFriends: { activeTopSection = .friends }, initialTab: .videos)
-                                            .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                                            .navigationTitle("Video")
-                                            .navigationBarTitleDisplayMode(.large)
-                                    }
-                                } else if UIReviewFixture.activeScreen == "friends" {
-                                    NavigationStack {
-                                        FriendsView(initialTab: .friends)
-                                            .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                                            .navigationTitle("Bạn bè")
-                                            .navigationBarTitleDisplayMode(.large)
-                                    }
-                                } else if UIReviewFixture.activeScreen == "friends-requests" {
-                                    NavigationStack {
-                                        FriendsView(initialTab: .requests)
-                                            .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                                            .navigationTitle("Lời mời kết bạn")
-                                            .navigationBarTitleDisplayMode(.large)
-                                    }
-                                } else if UIReviewFixture.activeScreen == "friends-suggestions" {
-                                    NavigationStack {
-                                        FriendsView(initialTab: .friends)
-                                            .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                                            .navigationTitle("Gợi ý kết bạn")
-                                            .navigationBarTitleDisplayMode(.large)
-                                    }
-                                } else if UIReviewFixture.activeScreen == "notifications" {
-                                    NavigationStack {
-                                        NotificationsView()
-                                            .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                                            .navigationTitle("Thông báo")
-                                            .navigationBarTitleDisplayMode(.large)
-                                    }
-                                } else if UIReviewFixture.activeScreen == "wallet" {
-                                    NavigationStack {
-                                        WalletView(onBack: { })
-                                            .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                                            .navigationTitle("Ví Kinnect")
-                                            .navigationBarTitleDisplayMode(.large)
-                                    }
-                                } else if UIReviewFixture.activeScreen == "wallet-topup" {
-                                    NavigationStack {
-                                        WalletView(onBack: { })
-                                            .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                                            .navigationTitle("Nạp xu Kinnect")
-                                            .navigationBarTitleDisplayMode(.large)
-                                    }
-                                } else if UIReviewFixture.activeScreen == "wallet-packages" || UIReviewFixture.activeScreen == "store-packages" || UIReviewFixture.activeScreen == "store" {
-                                    NavigationStack {
-                                        StoreView(onBack: { }, onOpenWallet: { })
-                                            .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                                            .navigationTitle("Cửa hàng Kinnect")
-                                            .navigationBarTitleDisplayMode(.large)
-                                    }
-                                } else {
-                                    authenticatedLayout
-                                }
+            } else {
+                authenticatedLayout
+            }
+            #else
+            if isShowingSplash || (appState.isRestoringSession && appState.currentUser == nil) {
+                KinnectSplashScreen()
+            } else if appState.currentUser == nil {
+                AuthView(initialStage: .welcome)
+            } else {
+                authenticatedLayout
+            }
+            #endif
 
                                 if webrtc.activeCall != nil {
                                     CallOverlayView()
@@ -498,41 +336,43 @@ struct RootMainView: View {
                             .modifier(UIReviewDynamicTypeModifier())
                             .task {
                                 await appState.bootstrapSession()
+                                #if DEBUG
                                 if UIReviewFixture.isEnabled {
                                     isShowingSplash = false
-                                } else {
-                                    try? await Task.sleep(nanoseconds: 700_000_000)
-                                    withAnimation(.easeOut(duration: 0.25)) {
-                                        isShowingSplash = false
+                                    if let screen = UIReviewFixture.activeScreen {
+                                        switch screen {
+                                        case "feed":
+                                            activeTopSection = nil
+                                            selectedTab = .feed
+                                        case "discover":
+                                            activeTopSection = nil
+                                            selectedTab = .discover
+                                        case "shorts", "video":
+                                            activeTopSection = nil
+                                            selectedTab = .video
+                                        case "live":
+                                            activeTopSection = nil
+                                            selectedTab = .live
+                                        case "messages":
+                                            activeTopSection = .messages
+                                        case "profile", "profile-posts", "profile-albums", "profile-videos":
+                                            activeTopSection = .profile
+                                        case "friends", "friends-requests", "friends-suggestions":
+                                            activeTopSection = .friends
+                                        case "notifications":
+                                            activeTopSection = .notifications
+                                        case "wallet", "wallet-topup", "wallet-packages":
+                                            activeTopSection = .wallet
+                                        default:
+                                            break
+                                        }
                                     }
+                                    return
                                 }
-                                if let screen = UIReviewFixture.activeScreen {
-                                    switch screen {
-                                    case "feed":
-                                        activeTopSection = nil
-                                        selectedTab = .feed
-                                    case "discover":
-                                        activeTopSection = nil
-                                        selectedTab = .discover
-                                    case "shorts", "video":
-                                        activeTopSection = nil
-                                        selectedTab = .video
-                                    case "live":
-                                        activeTopSection = nil
-                                        selectedTab = .live
-                                    case "messages":
-                                        activeTopSection = .messages
-                                    case "profile", "profile-posts", "profile-albums", "profile-videos":
-                                        activeTopSection = .profile
-                                    case "friends", "friends-requests", "friends-suggestions":
-                                        activeTopSection = .friends
-                                    case "notifications":
-                                        activeTopSection = .notifications
-                                    case "wallet", "wallet-topup", "wallet-packages":
-                                        activeTopSection = .wallet
-                                    default:
-                                        break
-                                    }
+                                #endif
+                                try? await Task.sleep(nanoseconds: 700_000_000)
+                                withAnimation(.easeOut(duration: 0.25)) {
+                                    isShowingSplash = false
                                 }
                             }
                             .onReceive(NotificationCenter.default.publisher(for: .kinnectNavigateRoute)) { notif in
@@ -563,6 +403,186 @@ struct RootMainView: View {
                                 PrivacyConsentSheet(request: req, onAccepted: {})
                             }
                         }
+
+    #if DEBUG
+    @ViewBuilder
+    private var debugReviewScreenContent: some View {
+        let screen = UIReviewFixture.activeScreen ?? ""
+        if screen == "auth" || screen.hasPrefix("auth-welcome") {
+            AuthView(initialStage: .welcome)
+        } else if screen.hasPrefix("auth-login") {
+            AuthView(initialStage: .login)
+        } else if screen == "auth-register" {
+            AuthView(initialStage: .register)
+        } else if screen == "auth-reset" || screen == "auth-forgot" || screen == "forgot-password" {
+            AuthView(initialStage: .forgotPassword)
+        } else if screen == "chat-detail" || screen == "chat-menu" || screen == "message-menu" {
+            if horizontalSizeClass == .regular {
+                VStack(spacing: 0) {
+                    NavigationSplitView(columnVisibility: $splitColumnVisibility) {
+                        NavigationStack {
+                            MessagesView(onOpenFriends: { activeTopSection = .friends })
+                        }
+                        .navigationTitle("")
+                        .toolbar(.hidden, for: .navigationBar)
+                    } detail: {
+                        NavigationStack {
+                            DirectChatDetailView(peer: KinnectUser.from(UIReviewFixture.peerUserDict))
+                        }
+                    }
+                    .navigationSplitViewStyle(.balanced)
+                }
+            } else {
+                NavigationStack {
+                    DirectChatDetailView(peer: KinnectUser.from(UIReviewFixture.peerUserDict))
+                }
+            }
+        } else if screen == "camera-studio" || screen == "camera-studio-edit" || screen == "camera-studio-video-edit" {
+            NavigationStack {
+                CameraStudioView()
+            }
+        } else if screen == "camera-studio-video" {
+            NavigationStack {
+                CameraStudioView(initialMode: .video)
+            }
+        } else if screen == "studio-pro-sheet" {
+            NavigationStack {
+                StudioProSheet(
+                    appliedEffect: .constant("Cinematic Teal & Orange"),
+                    onApply: { _ in }
+                )
+            }
+        } else if screen == "group-chat-detail" {
+            NavigationStack {
+                GroupChatDetailView(group: ChatGroupItem.from(UIReviewFixture.fixtureGroupDict), onLeftGroup: {})
+            }
+        } else if screen == "profile-edit" {
+            EditProfileSheet(onSaved: {})
+        } else if screen == "profile-public-album" {
+            PublicAlbumManageSheet(posts: UIReviewFixture.mockPosts(), onRefresh: {})
+        } else if screen == "profile-private-album" {
+            PrivateAlbumManageSheet(photos: $fixturePrivatePhotos, requests: $fixturePrivateRequests, onRefresh: {})
+        } else if screen == "profile-sessions" {
+            ActiveSessionsSheet()
+        } else if screen == "privacy-consent" {
+            PrivacyConsentSheet(
+                request: PrivacyConsentRequest(
+                    version: "2026.11",
+                    notice: "Chính sách quyền riêng tư và điều khoản dịch vụ Kinnect. Cam kết bảo mật theo tiêu chuẩn Apple và pháp luật Việt Nam."
+                ),
+                recordOnServer: false,
+                onAccepted: {}
+            )
+        } else if screen == "delete-account" {
+            DeleteAccountConfirmationSheet()
+        } else if screen == "ugc-report" {
+            UGCReportSheet(
+                context: UGCReportContext(
+                    targetType: "user",
+                    targetId: "fixture_user_peer",
+                    targetUserId: "fixture_user_peer",
+                    targetTitle: "Lê Hoàng Nam"
+                )
+            )
+        } else if screen == "forward-message" {
+            ForwardMessageSheet(text: "Tin nhắn chia sẻ từ Bảng tin Kinnect", imageUrl: "")
+        } else if screen == "change-password" {
+            ChangePasswordSheet()
+        } else if screen == "blocked-users" {
+            BlockedUsersSheet()
+        } else if screen == "privacy-settings" {
+            PrivacySettingsSheet()
+        } else if screen == "support" {
+            SupportContactSheet()
+        } else if screen == "messages" {
+            NavigationStack {
+                MessagesView(initialScope: .direct, onOpenFriends: { activeTopSection = .friends })
+                    .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                    .navigationTitle("Tin nhắn")
+                    .navigationBarTitleDisplayMode(.large)
+            }
+        } else if screen == "profile" {
+            NavigationStack {
+                ProfileView(onOpenWallet: { activeTopSection = .wallet }, onOpenFriends: { activeTopSection = .friends })
+                    .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                    .navigationTitle("Hồ sơ")
+                    .navigationBarTitleDisplayMode(.large)
+            }
+        } else if screen == "profile-posts" {
+            NavigationStack {
+                ProfileView(onOpenWallet: { activeTopSection = .wallet }, onOpenFriends: { activeTopSection = .friends }, initialTab: .posts)
+                    .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                    .navigationTitle("Bài viết")
+                    .navigationBarTitleDisplayMode(.large)
+            }
+        } else if screen == "profile-albums" {
+            NavigationStack {
+                ProfileView(onOpenWallet: { activeTopSection = .wallet }, onOpenFriends: { activeTopSection = .friends }, initialTab: .albums)
+                    .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                    .navigationTitle("Album ảnh")
+                    .navigationBarTitleDisplayMode(.large)
+            }
+        } else if screen == "profile-videos" {
+            NavigationStack {
+                ProfileView(onOpenWallet: { activeTopSection = .wallet }, onOpenFriends: { activeTopSection = .friends }, initialTab: .videos)
+                    .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                    .navigationTitle("Video")
+                    .navigationBarTitleDisplayMode(.large)
+            }
+        } else if screen == "friends" {
+            NavigationStack {
+                FriendsView(initialTab: .friends)
+                    .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                    .navigationTitle("Bạn bè")
+                    .navigationBarTitleDisplayMode(.large)
+            }
+        } else if screen == "friends-requests" {
+            NavigationStack {
+                FriendsView(initialTab: .requests)
+                    .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                    .navigationTitle("Lời mời kết bạn")
+                    .navigationBarTitleDisplayMode(.large)
+            }
+        } else if screen == "friends-suggestions" {
+            NavigationStack {
+                FriendsView(initialTab: .friends)
+                    .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                    .navigationTitle("Gợi ý kết bạn")
+                    .navigationBarTitleDisplayMode(.large)
+            }
+        } else if screen == "notifications" {
+            NavigationStack {
+                NotificationsView()
+                    .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                    .navigationTitle("Thông báo")
+                    .navigationBarTitleDisplayMode(.large)
+            }
+        } else if screen == "wallet" {
+            NavigationStack {
+                WalletView(onBack: { })
+                    .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                    .navigationTitle("Ví Kinnect")
+                    .navigationBarTitleDisplayMode(.large)
+            }
+        } else if screen == "wallet-topup" {
+            NavigationStack {
+                WalletView(onBack: { })
+                    .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                    .navigationTitle("Nạp xu Kinnect")
+                    .navigationBarTitleDisplayMode(.large)
+            }
+        } else if screen == "wallet-packages" || screen == "store-packages" || screen == "store" {
+            NavigationStack {
+                StoreView(onBack: { }, onOpenWallet: { })
+                    .toolbar { RootMainView.headerTrailingButtonsStatic() }
+                    .navigationTitle("Cửa hàng Kinnect")
+                    .navigationBarTitleDisplayMode(.large)
+            }
+        } else {
+            authenticatedLayout
+        }
+    }
+    #endif
 
     @ViewBuilder
     private var authenticatedLayout: some View {
@@ -1087,8 +1107,9 @@ struct RootMainView: View {
                         }
                     }
 
-                    private struct UIReviewDynamicTypeModifier: ViewModifier {
+private struct UIReviewDynamicTypeModifier: ViewModifier {
     func body(content: Content) -> some View {
+        #if DEBUG
         if UIReviewFixture.forceMaxDynamicType {
             content.dynamicTypeSize(...DynamicTypeSize.accessibility2)
         } else if UIReviewFixture.isEnabled {
@@ -1096,6 +1117,9 @@ struct RootMainView: View {
         } else {
             content
         }
+        #else
+        content
+        #endif
     }
 }
 

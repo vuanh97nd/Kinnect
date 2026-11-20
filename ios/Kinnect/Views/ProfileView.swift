@@ -123,6 +123,7 @@ struct ProfileView: View {
         .toolbar(.hidden, for: .navigationBar)
         .task {
             if isSelf {
+                #if DEBUG
                 if let screen = UIReviewFixture.activeScreen {
                     switch screen {
                     case "profile-posts": selectedTab = .posts
@@ -136,6 +137,7 @@ struct ProfileView: View {
                     default: break
                     }
                 }
+                #endif
                 await refreshMe()
             } else if let target = targetUser {
                 await refreshPeer(target: target)
@@ -2282,11 +2284,13 @@ struct ChangePasswordSheet: View {
             errorMessage = "Mật khẩu xác nhận không khớp."
             return
         }
+        #if DEBUG
         if UIReviewFixture.activeScreen != nil {
             appState.showToast("Đã đổi mật khẩu. Các thiết bị khác đã được đăng xuất.")
             dismiss()
             return
         }
+        #endif
         isSubmitting = true
         defer { isSubmitting = false }
         do {
@@ -2357,6 +2361,7 @@ struct BlockedUsersSheet: View {
     }
 
     private func loadBlocks() async {
+        #if DEBUG
         if UIReviewFixture.isEnabled {
             self.blockedUsers = [
                 KinnectUser.from([
@@ -2374,6 +2379,7 @@ struct BlockedUsersSheet: View {
             ]
             return
         }
+        #endif
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/me/blocks") {
             let list = res["users"] as? [[String: Any]] ?? []
             self.blockedUsers = list.map(KinnectUser.from)
@@ -2665,6 +2671,7 @@ struct PrivacySettingsSheet: View {
     }
 
     private func loadSettings() async {
+        #if DEBUG
         if UIReviewFixture.activeScreen != nil {
             self.discoverable = true
             self.showDistance = true
@@ -2673,6 +2680,7 @@ struct PrivacySettingsSheet: View {
             self.cloudChatSync = true
             return
         }
+        #endif
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/me") {
             let user = (res["user"] as? [String: Any]) ?? res
             self.discoverable = (user["discoverable"] as? Bool) ?? ((user["discoverable"] as? Int) == 1)
@@ -2685,11 +2693,13 @@ struct PrivacySettingsSheet: View {
     }
 
     private func saveSettings() async {
+        #if DEBUG
         if UIReviewFixture.activeScreen != nil {
             appState.showToast("Đã cập nhật quyền riêng tư.")
             dismiss()
             return
         }
+        #endif
         isSaving = true
         defer { isSaving = false }
         do {
@@ -2828,10 +2838,12 @@ struct SupportContactSheet: View {
                 }
             }
             .task {
+                #if DEBUG
                 if UIReviewFixture.activeScreen != nil {
                     contactText = "minhanh@kinnect.vn"
                     noteText = "Cần hỗ trợ hướng dẫn kích hoạt gói Studio Pro trên thiết bị mới."
                 }
+                #endif
             }
         }
     }
@@ -2842,11 +2854,13 @@ struct SupportContactSheet: View {
     }
 
     private func submitSupport() async {
+        #if DEBUG
         if UIReviewFixture.activeScreen != nil {
             appState.showToast("Đã gửi yêu cầu hỗ trợ thành công.")
             dismiss()
             return
         }
+        #endif
         isSubmitting = true
         defer { isSubmitting = false }
         do {

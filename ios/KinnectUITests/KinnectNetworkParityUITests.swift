@@ -650,4 +650,22 @@ final class KinnectNetworkParityUITests: XCTestCase {
             "captures": records
         ])
     }
+
+    // MARK: - Phase 1 Debug Fixture Verification (confirms Debug build retains working UIReviewFixture)
+
+    func testDebugUIReviewFixtureModeWorks() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--ui-review-screen", "feed",
+            "--qa-appearance", "dark"
+        ]
+        app.launch()
+
+        // Fixture feed should render mock posts without touching any live server
+        let fixtureLoaded = app.staticTexts["Nguyễn Minh Anh"].waitForExistence(timeout: 20)
+            || app.staticTexts["Lê Hoàng Nam"].waitForExistence(timeout: 5)
+        saveScreenshot("debug-fixture-feed.png")
+        XCTAssertTrue(fixtureLoaded, "Debug build must still render UIReviewFixture feed when launched with --ui-review-screen feed")
+        app.terminate()
+    }
 }
