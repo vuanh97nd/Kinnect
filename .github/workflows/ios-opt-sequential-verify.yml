@@ -149,7 +149,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ios-opt-${{ github.ref_name }}-evidence
+          name: ios-opt-run-${{ github.run_id }}-evidence
           path: dist/ios-qa-network/**
           if-no-files-found: warn
           retention-days: 14

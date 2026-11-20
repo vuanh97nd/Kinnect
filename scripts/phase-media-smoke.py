@@ -247,8 +247,8 @@ def main():
             if 'SHORTS_EVENT: action=playing' in qa_log():
                 break
             time.sleep(0.2)
-        # short_sample.mp4 is 1.948s looping; tap stage after 1.0s to record advancing position before wrap.
-        time.sleep(1.0)
+        # short_sample.mp4 is 1.948s looping; wait 1.3s so SwiftShader software decode passes 500ms before wrap.
+        time.sleep(1.3)
         adb('shell', 'input', 'tap', '450', '1200')
         time.sleep(0.4)
         adb('shell', 'input', 'tap', '450', '1200')
