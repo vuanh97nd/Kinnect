@@ -48,16 +48,8 @@ public class MainActivity extends Activity {
     void clear(){calls.clear();}
   }
   static final class ChatTextPolicy {
-    static int mentionIndex(String text,String username){
-      if(text==null||username==null||username.isEmpty())return -1;
-      String token="@"+username;
-      for(int at=text.indexOf(token);at>=0;at=text.indexOf(token,at+token.length())){
-        int end=at+token.length();char before=at==0?' ':text.charAt(at-1);
-        boolean start=at==0||Character.isWhitespace(before)||before=='('||before=='['||before=='{';
-        boolean finish=end==text.length()||!(Character.isLetterOrDigit(text.charAt(end))||"_.-".indexOf(text.charAt(end))>=0);
-        if(start&&finish)return at;
-      }
-      return -1;
+    static int mentionIndex(String text, String username) {
+      return MainActivityHelpers.mentionIndex(text, username);
     }
   }
   private final CallPlaybackGate mediaCallGate=new CallPlaybackGate();
@@ -304,6 +296,19 @@ public class MainActivity extends Activity {
     void accept(JSONObject data);
   }
 
+  private final WelcomeShowcaseViews.Host showcaseHost = new WelcomeShowcaseViews.Host() {
+    @Override public int card() { return CARD; }
+    @Override public int text() { return TEXT; }
+    @Override public int muted() { return MUTED; }
+    @Override public int accent() { return ACCENT; }
+    @Override public int soft() { return SOFT; }
+    @Override public int pink() { return PINK; }
+    @Override public int white() { return WHITE; }
+    @Override public int primarySoft() { return PRIMARY_SOFT; }
+    @Override public int introTabOverride() { return introTabOverride; }
+    @Override public void clearIntroTabOverride() { introTabOverride = -1; }
+  };
+
   private void applyDebugThemePref() {
     QaRuntime.applyTheme(this, getIntent());
   }
@@ -397,100 +402,7 @@ public class MainActivity extends Activity {
   }
 
   private void splash() {
-    if (splashAnimator != null) {
-      splashAnimator.cancel();
-      splashAnimator = null;
-    }
-    float density = getResources().getDisplayMetrics().density;
-    int logoPx = Math.round(96f * density);
-    final float logoRadius = 22f * density;
-    int gapPx = Math.round(18f * density);
-    int ringPx = Math.round(22f * density);
-    int ringStroke = Math.max(2, Math.round(2.5f * density));
-    int ringsWidth = Math.round(96f * density);
-    int ringsHeight = Math.round(36f * density);
-    float spread = 16f * density;
-    float overlap = 5f * density;
-
-    FrameLayout s = new FrameLayout(this);
-    s.setClipChildren(false);
-    s.setClipToPadding(false);
-    s.setBackgroundColor(BG);
-
-    LinearLayout c = column();
-    c.setGravity(Gravity.CENTER_HORIZONTAL);
-    c.setClipChildren(false);
-    c.setClipToPadding(false);
-
-    ImageView logo = new ImageView(this);
-    logo.setImageResource(getResources().getIdentifier("kinnect_logo", "drawable", getPackageName()));
-    logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
-    logo.setElevation(Math.round(12f * density));
-    logo.setOutlineProvider(new android.view.ViewOutlineProvider() {
-      @Override public void getOutline(View view, android.graphics.Outline outline) {
-        outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), logoRadius);
-      }
-    });
-    LinearLayout.LayoutParams logoLp = new LinearLayout.LayoutParams(logoPx, logoPx);
-    logoLp.gravity = Gravity.CENTER_HORIZONTAL;
-    c.addView(logo, logoLp);
-
-    TextView name = label("Kinnect", 26, ACCENT);
-    name.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 30f);
-    name.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
-    name.setIncludeFontPadding(false);
-    name.setSingleLine(true);
-    name.setGravity(Gravity.CENTER);
-    LinearLayout.LayoutParams nameLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-    nameLp.gravity = Gravity.CENTER_HORIZONTAL;
-    nameLp.topMargin = gapPx;
-    c.addView(name, nameLp);
-
-    FrameLayout rings = new FrameLayout(this);
-    rings.setClipChildren(false);
-    rings.setClipToPadding(false);
-    View[] ringViews = new View[2];
-    int[] ringColors = { ACCENT, 0xffed45aa };
-    boolean animate = android.animation.ValueAnimator.areAnimatorsEnabled();
-    for (int i = 0; i < 2; i++) {
-      View ring = new View(this);
-      GradientDrawable outline = new GradientDrawable();
-      outline.setShape(GradientDrawable.OVAL);
-      outline.setColor(0x00000000);
-      outline.setStroke(ringStroke, ringColors[i]);
-      ring.setBackground(outline);
-      float initialOffset = animate ? (i == 0 ? -spread : spread) : (i == 0 ? -overlap : overlap);
-      ring.setTranslationX(initialOffset);
-      FrameLayout.LayoutParams rp = new FrameLayout.LayoutParams(ringPx, ringPx, Gravity.CENTER);
-      rings.addView(ring, rp);
-      ringViews[i] = ring;
-    }
-    LinearLayout.LayoutParams space = new LinearLayout.LayoutParams(ringsWidth, ringsHeight);
-    space.gravity = Gravity.CENTER_HORIZONTAL;
-    space.topMargin = gapPx;
-    c.addView(rings, space);
-
-    s.addView(c, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
-    setContentView(s);
-    getWindow().setStatusBarColor(BG);
-    getWindow().setNavigationBarColor(BG);
-
-    if (animate) {
-      android.view.animation.Interpolator ease = new android.view.animation.AccelerateDecelerateInterpolator();
-      android.animation.ObjectAnimator pulseX = android.animation.ObjectAnimator.ofFloat(logo, View.SCALE_X, 1f, 1.05f);
-      android.animation.ObjectAnimator pulseY = android.animation.ObjectAnimator.ofFloat(logo, View.SCALE_Y, 1f, 1.05f);
-      android.animation.ObjectAnimator move0 = android.animation.ObjectAnimator.ofFloat(ringViews[0], View.TRANSLATION_X, -spread, -overlap);
-      android.animation.ObjectAnimator move1 = android.animation.ObjectAnimator.ofFloat(ringViews[1], View.TRANSLATION_X, spread, overlap);
-      for (android.animation.ObjectAnimator anim : new android.animation.ObjectAnimator[] { pulseX, pulseY, move0, move1 }) {
-        anim.setDuration(600);
-        anim.setInterpolator(ease);
-        anim.setRepeatCount(android.animation.ValueAnimator.INFINITE);
-        anim.setRepeatMode(android.animation.ValueAnimator.REVERSE);
-      }
-      splashAnimator = new android.animation.AnimatorSet();
-      splashAnimator.playTogether(pulseX, pulseY, move0, move1);
-      splashAnimator.start();
-    }
+    splashAnimator = MainSplashView.show(this, splashAnimator, BG, ACCENT, column(), label("Kinnect", 26, ACCENT));
   }
 
   private String server() {
@@ -517,31 +429,7 @@ public class MainActivity extends Activity {
   // Giải mã entity HTML (&#127752;, &amp;…) mà server trả về trong nội dung bài viết/tin nhắn.
   // Lặp tối đa 4 lần vì server đôi khi mã hoá 2 lớp (vd &amp;#127752;).
   private String decodeEntities(String s) {
-    if (s == null || s.indexOf('&') < 0) return s;
-    java.util.regex.Pattern p = java.util.regex.Pattern.compile("&#(\\d+);|&#[xX]([0-9a-fA-F]+);|&(amp|lt|gt|quot|apos|nbsp);");
-    String out = s;
-    for (int pass = 0; pass < 4 && out.indexOf('&') >= 0; pass++) {
-      java.util.regex.Matcher m = p.matcher(out);
-      StringBuffer next = new StringBuffer();
-      boolean changed = false;
-      while (m.find()) {
-      String rep;
-      if (m.group(1) != null || m.group(2) != null) {
-        int cp = 0;
-        try { cp = m.group(1) != null ? Integer.parseInt(m.group(1)) : Integer.parseInt(m.group(2), 16); } catch (NumberFormatException ignored) {}
-        rep = Character.isValidCodePoint(cp) ? new String(Character.toChars(cp)) : m.group();
-      } else {
-        String n = m.group(3);
-        rep = n.equals("amp") ? "&" : n.equals("lt") ? "<" : n.equals("gt") ? ">" : n.equals("quot") ? "\"" : n.equals("apos") ? "'" : " ";
-      }
-        m.appendReplacement(next, java.util.regex.Matcher.quoteReplacement(rep));
-        changed = true;
-      }
-      if (!changed) break;
-      m.appendTail(next);
-      out = next.toString();
-    }
-    return out;
+    return MainActivityHelpers.decodeEntities(s);
   }
 
   private TextView label(String text, int size, int color) {
@@ -606,11 +494,7 @@ public class MainActivity extends Activity {
 
   /** Trộn hai màu để tạo gradient thương hiệu nhưng vẫn giữ tương phản chữ trắng ≥ 4.5:1. */
   private int mix(int a, int b, float t) {
-    float u = 1f - t;
-    return 0xff000000
-      | (Math.round(((a >> 16) & 0xff) * u + ((b >> 16) & 0xff) * t) << 16)
-      | (Math.round(((a >> 8) & 0xff) * u + ((b >> 8) & 0xff) * t) << 8)
-      | Math.round((a & 0xff) * u + (b & 0xff) * t);
+    return MainActivityHelpers.mixColor(a, b, t);
   }
 
   private GradientDrawable brandGradient(int radius) {
@@ -621,18 +505,7 @@ public class MainActivity extends Activity {
 
   /** Phản hồi chạm nhẹ (scale) cho CTA/nút hành động — không chặn sự kiện click. */
   private void tactile(View v) {
-    v.setOnTouchListener((view, event) -> {
-      switch (event.getActionMasked()) {
-        case android.view.MotionEvent.ACTION_DOWN:
-          view.animate().scaleX(0.96f).scaleY(0.96f).setDuration(WebDesign.MOTION_FAST).start();
-          break;
-        case android.view.MotionEvent.ACTION_UP:
-        case android.view.MotionEvent.ACTION_CANCEL:
-          view.animate().scaleX(1f).scaleY(1f).setDuration(WebDesign.MOTION_BASE).start();
-          break;
-      }
-      return false;
-    });
+    MainActivityHelpers.installTactile(v);
   }
 
   private EditText input(
@@ -1375,19 +1248,6 @@ public class MainActivity extends Activity {
 
   private FrameLayout settingsIcon(String name,int tint){FrameLayout tile=new FrameLayout(this);tile.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);ImageView image=new ImageView(this);image.setImageDrawable(new FlowIconDrawable(WebIcons.load(this,name),name));tile.addView(image,new FrameLayout.LayoutParams(-1,-1));return tile;}
 
-  /** Crisp scalable paths: no emoji fonts or bitmap scaling. Same 24-unit grid and rounded 1.8-unit stroke. */
-  private final class SettingsGlyph extends android.graphics.drawable.Drawable {
-    private final String kind; private final Paint pen=new Paint(Paint.ANTI_ALIAS_FLAG); private final int tint, back;
-    SettingsGlyph(String kind,int tint,int back){this.kind=kind;this.tint=tint;this.back=back;}
-    private void line(Canvas c,float x,float y,float ex,float ey){c.drawLine(x,y,ex,ey,pen);}
-    private void pin(Canvas c,float x,float y){Path p=new Path();p.moveTo(x,y+7);p.cubicTo(x-1,y+5,x-3,y+3,x-3,y+1);p.cubicTo(x-3,y-3,x+3,y-3,x+3,y+1);p.cubicTo(x+3,y+3,x+1,y+5,x,y+7);c.drawPath(p,pen);c.drawCircle(x,y+.5f,.65f,pen);}
-    private void person(Canvas c){c.drawCircle(9,6,3,pen);Path p=new Path();p.moveTo(3,19);p.cubicTo(3,11,15,11,15,19);c.drawPath(p,pen);}
-    private void badge(Canvas c){pen.setStyle(Paint.Style.FILL);pen.setColor(back);c.drawCircle(17.5f,17.5f,6,pen);pen.setStyle(Paint.Style.STROKE);pen.setColor(tint);}
-    public void draw(Canvas canvas){android.graphics.drawable.Drawable d=WebIcons.load(MainActivity.this,kind);d.setTint(tint);d.setBounds(getBounds());d.draw(canvas);}
-    public void setAlpha(int alpha){pen.setAlpha(alpha);invalidateSelf();}
-    public void setColorFilter(ColorFilter filter){pen.setColorFilter(filter);invalidateSelf();}
-    public int getOpacity(){return PixelFormat.TRANSLUCENT;}
-  }
 
   private void groupRow(LinearLayout group, String iconName, String title, boolean danger, Runnable action) {
     if (group.getChildCount() > 0) {
@@ -2769,7 +2629,7 @@ public class MainActivity extends Activity {
       GradientDrawable o = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { ACCENT, 0xffd946c4 });
       o.setShape(GradientDrawable.OVAL);
       g.setBackground(o);
-      ImageView groupGlyph=new ImageView(this);groupGlyph.setImageDrawable(new SettingsGlyph("group_three",WHITE,ACCENT));g.addView(groupGlyph,new FrameLayout.LayoutParams(dp(28),dp(28),Gravity.CENTER));
+      ImageView groupGlyph=new ImageView(this);groupGlyph.setImageDrawable(new MainActivityHelpers.SettingsGlyphDrawable(this, "group_three",WHITE,ACCENT));g.addView(groupGlyph,new FrameLayout.LayoutParams(dp(28),dp(28),Gravity.CENTER));
       face.addView(g, new LinearLayout.LayoutParams(dp(50), dp(50)));
     }
     if (online) {
@@ -5149,7 +5009,7 @@ public class MainActivity extends Activity {
     headline.setAutoSizeTextTypeUniformWithConfiguration(22,28,1,android.util.TypedValue.COMPLEX_UNIT_SP);
     content.addView(headline,new LinearLayout.LayoutParams(-1,-2));
 
-    View showcase=new PhoneFeatureShowcase();
+    View showcase = new WelcomeShowcaseViews.PhoneFeatureShowcase(this, showcaseHost);
     showcase.setContentDescription(I18n.t("Điện thoại minh họa luân phiên các tính năng Bảng tin, Khám phá, Video và Live. Chạm để chuyển tính năng."));
     content.addView(showcase,new LinearLayout.LayoutParams(-1,0,1));
 
@@ -5173,279 +5033,6 @@ public class MainActivity extends Activity {
     version.setGravity(Gravity.CENTER);
     version.setPadding(0,dp(2),0,0);
     content.addView(version,new LinearLayout.LayoutParams(-1,-2));
-  }
-  private final class PhoneFeatureShowcase extends WelcomeScene {
-    final android.graphics.drawable.Drawable miniLogo=getResources().getDrawable(getResources().getIdentifier("kinnect_logo","drawable",getPackageName()));
-    final String[] tabs={"Bảng tin","Khám phá","Video","Live"};
-    long clock=android.os.SystemClock.uptimeMillis();
-    int manual=1;
-    PhoneFeatureShowcase(){
-      super();
-      setClickable(true);
-      setContentDescription(I18n.t("Xem trước Bảng tin, Khám phá, Tạo nội dung, Video và Live"));
-    }
-    int currentActive(){
-      if(introTabOverride>=0&&introTabOverride<4)return introTabOverride;
-      boolean animate=android.animation.ValueAnimator.areAnimatorsEnabled();
-      return (manual+(animate?(int)((android.os.SystemClock.uptimeMillis()-clock)/1500):0))%4;
-    }
-    void selectPreview(int index){
-      introTabOverride=-1;
-      manual=index;
-      clock=android.os.SystemClock.uptimeMillis();
-      invalidate();
-    }
-    @Override public boolean onTouchEvent(android.view.MotionEvent event){
-      if(event.getAction()==android.view.MotionEvent.ACTION_DOWN)return true;
-      if(event.getAction()!=android.view.MotionEvent.ACTION_UP)return true;
-      performClick();
-      float scale=Math.min(getWidth()/330f,getHeight()/450f);
-      if(scale<=0)return true;
-      float x=(event.getX()-(getWidth()-380*scale)/2)/scale,y=(event.getY()-(getHeight()-450*scale)/2)/scale;
-      if(y>=374&&y<=416&&x>=96&&x<=284){
-        int tab=Math.max(0,Math.min(4,(int)((x-100)/36)));
-        if(tab==2)selectPreview((currentActive()+1)%4);
-        else selectPreview(tab<2?tab:tab-1);
-        return true;
-      }
-      if(x>=96&&x<=284&&y>=19&&y<374){
-        selectPreview((currentActive()+1)%4);
-      }
-      return true;
-    }
-    @Override public boolean performClick(){super.performClick();return true;}
-    void iphoneStatus(){
-      for(int i=0;i<4;i++)box(236+i*3.2f,35.5f-(i+1)*1.7f,2.2f,(i+1)*1.7f,.6f,TEXT);
-      pen.setColor(TEXT);pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth(1.3f);
-      canvas.drawArc(new RectF(250,28.5f,260,38.5f),222,96,false,pen);
-      canvas.drawArc(new RectF(252.3f,30.8f,257.7f,36.2f),222,96,false,pen);
-      pen.setStyle(Paint.Style.FILL);circle(255f,35.3f,.85f,TEXT);
-      pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth(.85f);
-      canvas.drawRoundRect(new RectF(263,28.8f,275.5f,35.2f),1.6f,1.6f,pen);
-      pen.setStyle(Paint.Style.FILL);
-      box(264.3f,30.1f,9.6f,3.8f,.6f,TEXT);
-      box(276.4f,30.9f,1.1f,2.3f,.4f,TEXT);
-    }
-
-    @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused)invalidate();}
-    @Override protected void onAttachedToWindow(){super.onAttachedToWindow();invalidate();}
-    void glyph(android.graphics.drawable.Drawable icon,float x,float y,int size,int color){
-      if(icon!=miniLogo)icon.setTint(color);
-      icon.setBounds((int)x,(int)y,(int)x+size,(int)y+size);
-      icon.draw(canvas);
-    }
-    android.graphics.Bitmap demoPhoto;
-    android.graphics.Bitmap decodeAssetThumbnail(String assetName){
-      try(java.io.InputStream stream=getAssets().open(assetName)){
-        byte[] bytes=NativeApi.read(stream,8*1024*1024);
-        return MediaImageLoader.decodeSampledBitmap(bytes,320);
-      }catch(Exception ignored){return null;}
-    }
-    void photo(float x,float y,float w,float h,float topRadius,float bottomRadius){
-      if(demoPhoto==null)demoPhoto=decodeAssetThumbnail("welcome-profile.png");
-      if(demoPhoto==null)return;
-      int saved=canvas.save();
-      Path clip=new Path();
-      float[] radii={topRadius,topRadius,topRadius,topRadius,bottomRadius,bottomRadius,bottomRadius,bottomRadius};
-      clip.addRoundRect(new RectF(x,y,x+w,y+h),radii,Path.Direction.CW);
-      canvas.clipPath(clip);
-      box(x,y,w,h,0,SOFT);
-      float ratio=Math.max(w/demoPhoto.getWidth(),h/demoPhoto.getHeight());
-      float rw=demoPhoto.getWidth()*ratio,rh=demoPhoto.getHeight()*ratio;
-      pen.setFilterBitmap(true);
-      canvas.drawBitmap(demoPhoto,null,new RectF(x+(w-rw)/2f,y,x+(w+rw)/2f,y+rh),pen);
-      canvas.restoreToCount(saved);
-    }
-    void photo(float x,float y,float w,float h,float radius){photo(x,y,w,h,radius,radius);}
-    final android.graphics.Bitmap[] demoPeople=new android.graphics.Bitmap[4];
-    void personPhoto(int index,float x,float y,float w,float h,float topRadius,float bottomRadius){
-      if(demoPeople[index]==null)demoPeople[index]=decodeAssetThumbnail(index==0?"welcome-profile.png":"welcome-profile-"+index+".png");
-      android.graphics.Bitmap previous=demoPhoto;
-      demoPhoto=demoPeople[index];
-      photo(x,y,w,h,topRadius,bottomRadius);
-      demoPhoto=previous;
-    }
-    void filledHeart(float x,float y,float s,int color){
-      Path p=new Path();
-      float cx=x+s/2f;
-      p.moveTo(cx,y+s*0.88f);
-      p.cubicTo(x+s*0.12f,y+s*0.62f,x+s*0.03f,y+s*0.42f,x+s*0.03f,y+s*0.28f);
-      p.cubicTo(x+s*0.03f,y+s*0.11f,x+s*0.17f,y+s*0.02f,x+s*0.31f,y+s*0.02f);
-      p.cubicTo(x+s*0.41f,y+s*0.02f,x+s*0.48f,y+s*0.08f,cx,y+s*0.15f);
-      p.cubicTo(x+s*0.52f,y+s*0.08f,x+s*0.59f,y+s*0.02f,x+s*0.69f,y+s*0.02f);
-      p.cubicTo(x+s*0.83f,y+s*0.02f,x+s*0.97f,y+s*0.11f,x+s*0.97f,y+s*0.28f);
-      p.cubicTo(x+s*0.97f,y+s*0.42f,x+s*0.88f,y+s*0.62f,cx,y+s*0.88f);
-      p.close();
-      pen.setStyle(Paint.Style.FILL);pen.setShader(null);pen.setColor(color);
-      canvas.drawPath(p,pen);
-    }
-    void filledBubble(float x,float y,float s,int color){
-      pen.setStyle(Paint.Style.FILL);pen.setShader(null);pen.setColor(color);
-      canvas.drawOval(new RectF(x,y+s*0.06f,x+s*0.96f,y+s*0.82f),pen);
-      Path tail=new Path();
-      tail.moveTo(x+s*0.18f,y+s*0.68f);tail.lineTo(x+s*0.06f,y+s*0.94f);tail.lineTo(x+s*0.42f,y+s*0.76f);tail.close();
-      canvas.drawPath(tail,pen);
-    }
-    void playRectangleGlyph(float cx,float cy,int color){
-      pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth(1.35f);pen.setShader(null);pen.setColor(color);
-      canvas.drawRoundRect(new RectF(cx-7.5f,cy-5.3f,cx+7.5f,cy+5.3f),2.3f,2.3f,pen);
-      pen.setStyle(Paint.Style.FILL);
-      Path tri=new Path();
-      tri.moveTo(cx-2.1f,cy-2.6f);tri.lineTo(cx-2.1f,cy+2.6f);tri.lineTo(cx+2.8f,cy);tri.close();
-      canvas.drawPath(tri,pen);
-    }
-    void screen(int index){
-      box(96,19,188,409,27,CARD);
-      word("9:41",109,34.5f,8.2f,TEXT,true);
-      iphoneStatus();
-      glyph(miniLogo,104,48,18,WHITE);
-      word("Kinnect",126,61.5f,13.5f,ACCENT,true);
-      glyph(WebIcons.load(MainActivity.this,"bell"),239,50,12,TEXT);
-      photo(258,48,16,16,8);
-      word(I18n.t(tabs[index]),105,79,8.2f,MUTED,false);
-      if(index==0){
-        circle(120,104,13.5f,SOFT);
-        glyph(WebIcons.load(MainActivity.this,"plus"),113,97,14,ACCENT);
-        String storyCta=I18n.t("Tạo tin");
-        pen.setTextSize(6.8f);pen.setTypeface(ApprovedTypography.font(MainActivity.this,Typeface.NORMAL));
-        word(storyCta,120-pen.measureText(storyCta)/2f,126,6.8f,MUTED,false);
-        pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth(1.5f);pen.setColor(ACCENT);
-        canvas.drawCircle(156,104,15f,pen);
-        pen.setStyle(Paint.Style.FILL);
-        personPhoto(0,143,91,26,26,13,13);
-        String authorShort="Minh Anh";
-        pen.setTextSize(6.8f);
-        word(authorShort,156-pen.measureText(authorShort)/2f,126,6.8f,MUTED,false);
-        box(104,135,172,25,8,SOFT);
-        personPhoto(0,109,138.5f,18,18,9,9);
-        word(I18n.t("Bạn đang nghĩ gì?"),133,150.5f,7.8f,MUTED,false);
-        box(104,167,172,199,10,SOFT);
-        personPhoto(0,111,174,20,20,10,10);
-        word("Minh Anh · 27",136,182.5f,8.2f,TEXT,true);
-        word(I18n.t("Hồ sơ minh họa"),136,192.5f,6.8f,MUTED,false);
-        word(I18n.t("Tập luyện mỗi ngày"),111,206.5f,8f,TEXT,false);
-        personPhoto(0,111,213,158,125,7,7);
-        filledHeart(113,346,12,0xffec4899);
-        filledBubble(136,346,12,MUTED);
-        glyph(WebIcons.load(MainActivity.this,"forward"),159,345,13,MUTED);
-      }else if(index==1){
-        box(104,89,172,22,7,SOFT);
-        word(I18n.t("Dành cho bạn"),112,102.5f,7.5f,ACCENT,true);
-        String followTab=I18n.t("Đang theo dõi");
-        pen.setTextSize(7.5f);pen.setTypeface(ApprovedTypography.font(MainActivity.this,Typeface.BOLD));
-        word(followTab,268-pen.measureText(followTab),102.5f,7.5f,TEXT,true);
-        box(104,117,172,22,7,SOFT);
-        glyph(WebIcons.load(MainActivity.this,"search"),110,123,10,MUTED);
-        word(I18n.t("Tên đăng nhập"),124,131,7.8f,MUTED,false);
-        String[] people={"Minh Anh, 27","Gia Huy, 28","Hoàng Nam, 30","Quang Minh, 26"};
-        for(int i=0;i<4;i++){
-          float px=104+(i%2)*90,py=147+(i/2)*112;
-          box(px,py,82,104,8,SOFT);
-          personPhoto(i,px,py,82,83,8,0);
-          pen.setTextSize(7.4f);pen.setTypeface(ApprovedTypography.font(MainActivity.this,Typeface.BOLD));
-          float labelX=px+(82-pen.measureText(people[i]))/2f;
-          word(people[i],labelX,py+96,7.4f,TEXT,true);
-        }
-      }else if(index==2){
-        personPhoto(1,104,89,172,279,10,10);
-        int scrim=canvas.save();
-        Path clip=new Path();
-        clip.addRoundRect(new RectF(104,89,276,368),10,10,Path.Direction.CW);
-        canvas.clipPath(clip);
-        pen.setStyle(Paint.Style.FILL);
-        pen.setShader(new android.graphics.LinearGradient(0,318,0,368,0x00000000,0x78000000,android.graphics.Shader.TileMode.CLAMP));
-        canvas.drawRect(104,318,276,368,pen);
-        pen.setShader(null);
-        canvas.restoreToCount(scrim);
-        word("@minhanh_demo",112,358,8.5f,WHITE,true);
-      }else{
-        personPhoto(2,104,89,172,279,10,10);
-        box(111,97,34,16,8,0xffdb2777);
-        pen.setTextSize(7.2f);pen.setTypeface(ApprovedTypography.font(MainActivity.this,Typeface.BOLD));
-        float liveW=pen.measureText("LIVE");
-        word("LIVE",111+(34-liveW)/2f,107.8f,7.2f,WHITE,true);
-      }
-    }
-    void previewNavigation(int index){
-      String[] names={"Bảng tin","Khám phá","","Video","Live"};
-      String[] icons={"house","compass","plus","","radio"};
-      for(int i=0;i<5;i++){
-        float center=118+i*36;
-        boolean selected=i==(index<2?index:index+1);
-        int ink=selected?ACCENT:MUTED;
-        if(i==2){
-          box(center-13.5f,379,27,27,9,ACCENT);
-          glyph(WebIcons.load(MainActivity.this,"plus"),center-7,385.5f,14,WHITE);
-        }else{
-          if(i==3)playRectangleGlyph(center,392.5f,ink);
-          else glyph(WebIcons.load(MainActivity.this,icons[i]),center-7,385.5f,14,ink);
-          String tabLabel=I18n.t(names[i]);
-          pen.setTextSize(6.7f);pen.setTypeface(ApprovedTypography.font(MainActivity.this,Typeface.NORMAL));
-          word(tabLabel,center-pen.measureText(tabLabel)/2f,410,6.7f,ink,false);
-        }
-      }
-    }
-    void concentricRings(){
-      pen.setStyle(Paint.Style.STROKE);
-      pen.setStrokeWidth(1f);
-      pen.setShader(null);
-      pen.setColor((0x1e<<24)|(ACCENT&0xffffff));
-      for(int r:new int[]{140,170,200})canvas.drawCircle(190,224,r,pen);
-      pen.setStyle(Paint.Style.FILL);
-    }
-    @Override protected void onDraw(Canvas c){
-      canvas=c;
-      float scale=Math.min(getWidth()/330f,getHeight()/450f);
-      if(scale<=0)return;
-      int save=c.save();
-      c.translate((getWidth()-380*scale)/2f,(getHeight()-450*scale)/2f);
-      c.scale(scale,scale);
-      long elapsed=android.os.SystemClock.uptimeMillis()-clock;
-      boolean animate=introTabOverride<0&&android.animation.ValueAnimator.areAnimatorsEnabled();
-      int index=currentActive();
-      float phase=animate?(elapsed%1500)/1500f:0f;
-      concentricRings();
-      c.save();
-      pen.setShadowLayer(16,0,8,0x30000000);
-      box(89,12,202,423,34,0xffa6a6ad);
-      pen.clearShadowLayer();
-      box(91,14,198,419,32,0xff000000);
-      int screenClip=c.save();
-      Path inner=new Path();
-      inner.addRoundRect(new RectF(96,19,284,428),27,27,Path.Direction.CW);
-      c.clipPath(inner);
-      screen(index);
-      if(phase>.80f){
-        int alpha=(int)((phase-.80f)/.20f*255);
-        int layer=c.saveLayerAlpha(96,19,284,376,alpha);
-        screen((index+1)%4);
-        c.restoreToCount(layer);
-      }
-      previewNavigation(index);
-      box(172,25,36,10,5,0xff000000);
-      int barColor=WebTheme.isDark(MainActivity.this)?0x55ffffff:0xff1f1d2b;
-      box(164,418,52,3,1.5f,barColor);
-      c.restoreToCount(screenClip);
-      c.restore();
-      c.restoreToCount(save);
-      if(animate&&isShown()&&hasWindowFocus())postInvalidateDelayed(33);
-    }
-  }
-  private class WelcomeScene extends View {
-    final Paint pen=new Paint(Paint.ANTI_ALIAS_FLAG);final RectF rect=new RectF();Canvas canvas;
-    WelcomeScene(){super(MainActivity.this);setLayerType(View.LAYER_TYPE_SOFTWARE,null);}
-    void box(float x,float y,float w,float h,float radius,int color){pen.setStyle(Paint.Style.FILL);pen.setShader(null);pen.setColor(color);rect.set(x,y,x+w,y+h);canvas.drawRoundRect(rect,radius,radius,pen);}
-    void word(String text,float x,float y,float size,int color,boolean bold){pen.setShader(null);pen.setColor(color);pen.setTypeface(ApprovedTypography.font(MainActivity.this,bold?Typeface.BOLD:Typeface.NORMAL));pen.setTextSize(size);canvas.drawText(text,x,y,pen);}
-    void circle(float x,float y,float r,int color){pen.setShader(null);pen.setColor(color);canvas.drawCircle(x,y,r,pen);}
-    @Override protected void onDraw(Canvas c){super.onDraw(c);canvas=c;float scale=Math.min(getWidth()/380f,getHeight()/310f);int saved=c.save();c.translate((getWidth()-380*scale)/2,(getHeight()-310*scale)/2);c.scale(scale,scale);
-      circle(198,150,132,PRIMARY_SOFT);circle(312,73,25,(PINK&0xffffff)|0x18000000);circle(56,235,20,PRIMARY_SOFT);
-      c.save();c.rotate(-7,124,151);pen.setShadowLayer(13,0,7,0x1c2a154a);box(46,39,164,231,23,CARD);pen.clearShadowLayer();
-      pen.setShader(new android.graphics.LinearGradient(62,55,195,175,new int[]{0xff8b5cf6,0xffec4899},null,android.graphics.Shader.TileMode.CLAMP));rect.set(56,49,200,177);c.drawRoundRect(rect,17,17,pen);pen.setShader(null);
-      circle(128,100,22,0xffeadcff);box(87,128,82,46,30,0xffeadcff);word("HỒ SƠ MINH HỌA",65,195,8,MUTED,true);word("Là chính bạn",65,217,16,TEXT,true);box(65,232,62,20,10,PRIMARY_SOFT);word("Âm nhạc",73,246,9,ACCENT,true);box(134,232,55,20,10,SOFT);word("Du lịch",142,246,9,MUTED,true);c.restore();
-      c.save();c.rotate(8,261,126);pen.setShadowLayer(12,0,6,0x242a154a);box(208,42,126,180,20,0xff30204b);pen.clearShadowLayer();box(218,52,106,160,14,0xff4c2b70);circle(269,116,34,0xff714096);pen.setColor(WHITE);Path triangle=new Path();triangle.moveTo(261,101);triangle.lineTo(261,130);triangle.lineTo(283,115);triangle.close();c.drawPath(triangle,pen);word("VIDEO",229,78,10,0xffeadcff,true);word("Chất riêng của bạn",228,188,9,WHITE,true);c.restore();
-      pen.setShadowLayer(10,0,5,0x202a154a);box(140,226,209,57,17,CARD);pen.clearShadowLayer();circle(165,255,14,PRIMARY_SOFT);word("K",160,261,15,ACCENT,true);word("Bắt đầu bằng lời chào",188,250,12,TEXT,true);word("Nhắn tin · Gọi thoại · Video",188,267,9,MUTED,false);
-      box(20,190,91,30,15,CARD);circle(35,205,4,0xff10b981);word("LIVE",47,210,11,TEXT,true);word("MINH HỌA TÍNH NĂNG",126,308,8,MUTED,false);c.restoreToCount(saved);
-    }
   }
 
   // ----- Đăng nhập nhanh trên thiết bị này + Google/Facebook
@@ -6748,7 +6335,7 @@ public class MainActivity extends Activity {
   private JSONObject photoGroup;
   private Bitmap groupSample(String preset,int size){
     int[] colors=preset.equals("ocean")?new int[]{0xff0284c7,0xff22d3ee}:preset.equals("sunset")?new int[]{0xfff97316,0xffec4899}:preset.equals("forest")?new int[]{0xff059669,0xff84cc16}:new int[]{0xff7c3aed,0xffc084fc};
-    Bitmap bitmap=Bitmap.createBitmap(size,size,Bitmap.Config.ARGB_8888);android.graphics.Canvas c=new android.graphics.Canvas(bitmap);android.graphics.Paint paint=new android.graphics.Paint(3);paint.setShader(new android.graphics.LinearGradient(0,0,size,size,colors,null,android.graphics.Shader.TileMode.CLAMP));c.drawCircle(size/2f,size/2f,size/2f,paint);SettingsGlyph glyph=new SettingsGlyph("group_three",WHITE,colors[0]);glyph.setBounds(size/5,size/5,size*4/5,size*4/5);glyph.draw(c);return bitmap;
+    Bitmap bitmap=Bitmap.createBitmap(size,size,Bitmap.Config.ARGB_8888);android.graphics.Canvas c=new android.graphics.Canvas(bitmap);android.graphics.Paint paint=new android.graphics.Paint(3);paint.setShader(new android.graphics.LinearGradient(0,0,size,size,colors,null,android.graphics.Shader.TileMode.CLAMP));c.drawCircle(size/2f,size/2f,size/2f,paint);MainActivityHelpers.SettingsGlyphDrawable glyph=new MainActivityHelpers.SettingsGlyphDrawable(this, "group_three",WHITE,colors[0]);glyph.setBounds(size/5,size/5,size*4/5,size*4/5);glyph.draw(c);return bitmap;
   }
   private void groupPhotoOptions(final JSONObject g){
     LinearLayout choices=column();String[] presets={"violet","ocean","sunset","forest"},names={"Tím kết nối","Biển xanh","Hoàng hôn","Rừng xanh"};
@@ -6924,7 +6511,7 @@ public class MainActivity extends Activity {
       GradientDrawable o = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { ACCENT, 0xffd946c4 });
       o.setShape(GradientDrawable.OVAL);
       g.setBackground(o);
-      ImageView groupGlyph=new ImageView(this);groupGlyph.setImageDrawable(new SettingsGlyph("group_three",WHITE,ACCENT));g.addView(groupGlyph,new FrameLayout.LayoutParams(dp(28),dp(28),Gravity.CENTER));
+      ImageView groupGlyph=new ImageView(this);groupGlyph.setImageDrawable(new MainActivityHelpers.SettingsGlyphDrawable(this, "group_three",WHITE,ACCENT));g.addView(groupGlyph,new FrameLayout.LayoutParams(dp(28),dp(28),Gravity.CENTER));
       head.addView(g, new LinearLayout.LayoutParams(dp(42), dp(42)));
     }
     LinearLayout who = column();
@@ -7007,7 +6594,7 @@ public class MainActivity extends Activity {
 
   private FrameLayout chatHeaderButton(String glyph,String description,Runnable action){
     FrameLayout button=new FrameLayout(this);button.setBackground(pressable(PRIMARY_SOFT,99));ImageView image=new ImageView(this);
-    if(glyph.equals("menu_lines"))image.setImageDrawable(new SettingsGlyph("menu_lines",ACCENT,PRIMARY_SOFT));else image.setImageDrawable(WebIcons.load(this,glyph));image.setImageTintList(android.content.res.ColorStateList.valueOf(ACCENT));
+    if(glyph.equals("menu_lines"))image.setImageDrawable(new MainActivityHelpers.SettingsGlyphDrawable(this, "menu_lines",ACCENT,PRIMARY_SOFT));else image.setImageDrawable(WebIcons.load(this,glyph));image.setImageTintList(android.content.res.ColorStateList.valueOf(ACCENT));
     button.addView(image,new FrameLayout.LayoutParams(dp(20),dp(20),Gravity.CENTER));button.setContentDescription(description);button.setOnClickListener(v->action.run());LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(dp(38),dp(38));p.leftMargin=dp(6);button.setLayoutParams(p);return button;
   }
   private JSONArray mentionIds(String body,JSONObject group){JSONArray ids=new JSONArray(),members=group==null?null:group.optJSONArray("members");for(int i=0;members!=null&&i<members.length();i++){JSONObject u=members.optJSONObject(i);if(!u.optString("id").equals(me.optString("id"))&&ChatTextPolicy.mentionIndex(body,u.optString("username"))>=0)ids.put(u.optString("id"));}return ids;}

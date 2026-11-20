@@ -59,9 +59,9 @@ if OUT.exists():
         if child.is_dir():
             shutil.rmtree(child, ignore_errors=True)
         else:
-            child.unlink()
-(OUT / "classes").mkdir(parents=True)
-(OUT / "dex").mkdir()
+            child.unlink(missing_ok=True)
+(OUT / "classes").mkdir(parents=True, exist_ok=True)
+(OUT / "dex").mkdir(parents=True, exist_ok=True)
 
 manifest_path = WORKTREE / "android/app/src/main/AndroidManifest.xml"
 version = re.search(r'versionName="([^"]+)"', manifest_path.read_text(encoding="utf-8")).group(1)
