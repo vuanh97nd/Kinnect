@@ -784,9 +784,7 @@ struct CameraStudioView: View {
             "blush": "blush_cheeks"
         ]
         let key = mapping[id] ?? id
-        return UIImage(named: "kg20261109_sticker_\(key)")
-            ?? UIImage(named: "kg20261109_sticker_\(id)")
-            ?? UIImage(named: "sticker_\(key)")
+        return UIImage(named: "sticker_\(key)")
             ?? UIImage(named: "sticker_\(id)")
             ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "sticker_\(id)", ofType: "png") ?? "")
             ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "sticker_\(id)", ofType: "jpg") ?? "")

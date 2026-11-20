@@ -5,12 +5,12 @@
   },
   "images": [
     {
-      "filename": "filter_cinema-256.png",
+      "filename": "filter_cinema-256.jpg",
       "idiom": "universal",
       "scale": "1x"
     },
     {
-      "filename": "filter_cinema-512.png",
+      "filename": "filter_cinema-512.jpg",
       "idiom": "universal",
       "scale": "2x"
     }

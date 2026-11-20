@@ -5,17 +5,17 @@
   },
   "images": [
     {
-      "filename": "store_pkg_style_ice@1x.png",
+      "filename": "store_pkg_style_ice@1x.jpg",
       "idiom": "universal",
       "scale": "1x"
     },
     {
-      "filename": "store_pkg_style_ice@2x.png",
+      "filename": "store_pkg_style_ice@2x.jpg",
       "idiom": "universal",
       "scale": "2x"
     },
     {
-      "filename": "store_pkg_style_ice@3x.png",
+      "filename": "store_pkg_style_ice@3x.jpg",
       "idiom": "universal",
       "scale": "3x"
     }

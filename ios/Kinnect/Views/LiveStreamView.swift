@@ -1159,9 +1159,7 @@ struct LiveGiftDrawerSheet: View {
     @ViewBuilder
     private func giftIconView(_ gift: LiveGiftCatalogItem) -> some View {
         let key = giftAssetName(for: gift.id)
-        if let img = UIImage(named: "kg20261109_gift_\(key)")
-            ?? UIImage(named: "kg20261109_gift_\(gift.id)")
-            ?? UIImage(named: "gift_\(key)")
+        if let img = UIImage(named: "gift_\(key)")
             ?? UIImage(named: "gift_\(gift.id)")
             ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "gift_\(key)", ofType: "png") ?? "")
             ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "gift_\(key)_3d", ofType: "jpg") ?? "") {
@@ -1229,8 +1227,7 @@ struct LiveFloatingReactionView: View {
 
     var body: some View {
         Group {
-            if let img = UIImage(named: "kg20261109_gift_\(symbol)")
-                ?? UIImage(named: "kg20261109_gift_\(symbol == "car" ? "sports_car" : symbol)")
+            if let img = UIImage(named: "gift_\(symbol == "car" ? "sports_car" : symbol)")
                 ?? UIImage(named: "gift_\(symbol)") {
                 Image(uiImage: img)
                     .resizable()
@@ -1357,8 +1354,7 @@ struct LiveGiftBurstShowcaseView: View {
     private var giftArtworkView: some View {
         let key = giftAssetName(for: effect.giftId)
         if let img = UIImage(named: "gift_\(key)")
-            ?? UIImage(named: "gift_\(effect.giftId)")
-            ?? UIImage(named: "kg20261109_gift_\(key)") {
+            ?? UIImage(named: "gift_\(effect.giftId)") {
             Image(uiImage: img)
                 .resizable()
                 .scaledToFit()
@@ -1398,9 +1394,34 @@ struct LiveStickerOverlayView: View {
         }
     }
 
+    private func canonicalStickerAsset(_ id: String) -> String {
+        switch id {
+        case "bunny": return "bunny_ears"
+        case "crown": return "golden_tiara"
+        case "glasses": return "pixel_glasses"
+        case "cat": return "cat_whiskers"
+        case "dog": return "dog_ears"
+        case "flowers": return "flower_crown"
+        case "hearts": return "cheek_hearts"
+        case "sparkle": return "sparkle_eyes"
+        case "halo": return "angel_halo"
+        case "rainbow": return "rainbow_paint"
+        case "stars", "confetti": return "star_confetti"
+        case "butterfly": return "butterfly_clip"
+        case "devil": return "cute_devil"
+        case "mask": return "cyber_mask"
+        case "fire": return "fire_aura"
+        case "music": return "music_notes"
+        case "party": return "party_hat"
+        case "blush": return "blush_cheeks"
+        default: return id
+        }
+    }
+
     @ViewBuilder
     private var stickerContentView: some View {
-        if let img = UIImage(named: "sticker_\(stickerId)") {
+        if let img = UIImage(named: "sticker_\(canonicalStickerAsset(stickerId))")
+            ?? UIImage(named: "sticker_\(stickerId)") {
             Image(uiImage: img)
                 .resizable()
                 .scaledToFit()
