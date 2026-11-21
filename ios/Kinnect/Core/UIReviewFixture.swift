@@ -26,16 +26,6 @@ enum UIReviewFixture {
         activeScreen != nil
     }
 
-    /// Camera and microphone prompts belong only to capture, live, and call screens.
-    /// Password, chat, and settings fixtures must not raise a system permission dialog.
-    static var allowsCapturePrompt: Bool {
-        guard isEnabled else { return true }
-        let screen = activeScreen ?? ""
-        if screen.hasPrefix("camera") || screen.hasPrefix("studio") { return true }
-        if screen.hasPrefix("live") || screen.contains("call") { return true }
-        return false
-    }
-
     static let currentUserDict: [String: Any] = [
         "id": "fixture_user_me",
         "name": "Nguyễn Minh Anh",
@@ -901,41 +891,6 @@ enum UIReviewFixture {
                 ]
             ]
 
-        case "/api/support":
-            return [
-                "user": peerUserDict,
-                "contact": "anhvn53@wru.vn",
-                "operator": "Mr Ánh"
-            ]
-
-        case "/api/admin/reports":
-            return [
-                "reports": [[
-                    "id": "fixture_report_1",
-                    "target_type": "post",
-                    "target_id": "fixture_post_1",
-                    "status": "open",
-                    "reason": "Nội dung không phù hợp",
-                    "subject": [
-                        "username": "hoangnam",
-                        "body": "Bài viết mẫu",
-                        "userId": "fixture_user_peer",
-                        "hidden": false
-                    ]
-                ]]
-            ]
-
-        case "/api/admin/users":
-            return [
-                "users": [
-                    ["id": "fixture_user_peer", "username": "hoangnam", "role": "member", "suspended": 0],
-                    ["id": "fixture_user_me", "username": "minhanh", "role": "admin", "suspended": 0]
-                ]
-            ]
-
-        case "/api/admin/moderate":
-            return ["ok": true]
-
         default:
             if cleanPath.hasSuffix("/private") {
                 return [
@@ -1342,10 +1297,6 @@ enum UIReviewFixture {
             return AnyView(
                 LiveStreamView(onOpenWallet: {})
             )
-        case "live-setup":
-            return AnyView(CreateLiveRoomSheet(initialMode: "chat"))
-        case "live-setup-game":
-            return AnyView(CreateLiveRoomSheet(initialMode: "game"))
 
         // MARK: - Messages & Chats
         case "messages":
@@ -1376,8 +1327,7 @@ enum UIReviewFixture {
                 mode: "video",
                 isIncoming: screenName != "call-outgoing",
                 state: screenName == "call-connected" ? .connected
-                    : screenName == "call-outgoing" ? .dialingOutgoing : .ringingIncoming,
-                connectedAt: screenName == "call-connected" ? Date().addingTimeInterval(-85) : nil
+                    : screenName == "call-outgoing" ? .dialingOutgoing : .ringingIncoming
             )
             return AnyView(
                 CallOverlayView()
@@ -1579,10 +1529,6 @@ enum UIReviewFixture {
             return AnyView(PrivacySettingsSheet())
         case "support":
             return AnyView(SupportContactSheet())
-        case "support-chat":
-            return AnyView(DirectChatDetailView(peer: KinnectUser.from(peerUserDict)))
-        case "admin":
-            return AnyView(AdminConsoleView())
 
         default:
             return AnyView(RootMainView())
