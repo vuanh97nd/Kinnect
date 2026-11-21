@@ -20,11 +20,19 @@ struct CallOverlayView: View {
                 }
             }
             .onAppear {
-                updateTimer(call)
+                updateTimer(state: call.state, callConnectedAt: call.connectedAt)
                 haloPulsing = true
             }
-            .onChange(of: call.state) { _ in updateTimer(call) }
-            .onChange(of: call.callId) { _ in connectedAt = nil; updateTimer(call) }
+            .onChange(of: call.state) { newState in
+                updateTimer(state: newState, callConnectedAt: webrtc.activeCall?.connectedAt)
+            }
+            .onChange(of: call.connectedAt) { newDate in
+                if let newDate { connectedAt = newDate }
+            }
+            .onChange(of: call.callId) { _ in
+                connectedAt = webrtc.activeCall?.connectedAt
+                updateTimer(state: webrtc.activeCall?.state ?? call.state, callConnectedAt: webrtc.activeCall?.connectedAt)
+            }
         }
     }
 
@@ -53,9 +61,15 @@ struct CallOverlayView: View {
                         Text(call.peerUser.name)
                             .font(.system(size: 26, weight: .bold))
                             .foregroundColor(.white)
-                        Text(call.state == .connected ? "Đang chờ video từ đối phương..." : status(call))
-                            .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.8))
+                        if call.state == .connected, let start = call.connectedAt ?? connectedAt {
+                            callDurationText(since: start)
+                                .font(.subheadline.monospacedDigit().weight(.semibold))
+                                .foregroundColor(.white.opacity(0.9))
+                        } else {
+                            Text(status(call))
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.8))
+                        }
                     }
                 }
                 .ignoresSafeArea()
@@ -94,10 +108,10 @@ struct CallOverlayView: View {
                                 .font(.system(size: 18, weight: .bold))
                                 .foregroundColor(.white)
                                 .shadow(color: .black.opacity(0.6), radius: 4)
-                            if call.state == .connected, let connectedAt {
-                                Text(connectedAt, style: .timer)
-                                    .font(.caption.monospacedDigit())
-                                    .foregroundColor(.white.opacity(0.9))
+                            if call.state == .connected, let start = call.connectedAt ?? connectedAt {
+                                callDurationText(since: start)
+                                    .font(.caption.monospacedDigit().weight(.semibold))
+                                    .foregroundColor(.white.opacity(0.95))
                                     .shadow(color: .black.opacity(0.6), radius: 4)
                             } else {
                                 Text(status(call))
@@ -390,10 +404,10 @@ struct CallOverlayView: View {
                     Text(call.peerUser.name)
                         .font(.system(size: 28, weight: .bold))
                         .foregroundColor(.white)
-                    if call.state == .connected, let connectedAt {
-                        Text(connectedAt, style: .timer)
-                            .font(.title3.monospacedDigit())
-                            .foregroundColor(.white.opacity(0.85))
+                    if call.state == .connected, let start = call.connectedAt ?? connectedAt {
+                        callDurationText(since: start)
+                            .font(.title3.monospacedDigit().weight(.semibold))
+                            .foregroundColor(.white.opacity(0.9))
                     } else {
                         Text(status(call))
                             .font(.subheadline)
@@ -452,9 +466,31 @@ struct CallOverlayView: View {
         }
     }
 
-    private func updateTimer(_ call: ActiveCallSession) {
-        if call.state == .connected && connectedAt == nil { connectedAt = Date() }
-        if call.state != .connected { connectedAt = nil }
+    @ViewBuilder
+    private func callDurationText(since start: Date) -> some View {
+        TimelineView(.periodic(from: start, by: 1.0)) { context in
+            let elapsed = max(0, Int(context.date.timeIntervalSince(start)))
+            let hours = elapsed / 3600
+            let mins = (elapsed % 3600) / 60
+            let secs = elapsed % 60
+            if hours > 0 {
+                Text(String(format: "%d:%02d:%02d", hours, mins, secs))
+            } else {
+                Text(String(format: "%02d:%02d", mins, secs))
+            }
+        }
+    }
+
+    private func updateTimer(state: ActiveCallSession.CallLifecycleState, callConnectedAt: Date?) {
+        if state == .connected {
+            if let callConnectedAt {
+                connectedAt = callConnectedAt
+            } else if connectedAt == nil {
+                connectedAt = Date()
+            }
+        } else {
+            connectedAt = nil
+        }
     }
 
     private func status(_ call: ActiveCallSession) -> String {

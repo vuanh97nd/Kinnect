@@ -11,6 +11,7 @@ struct ActiveCallSession: Identifiable, Equatable {
     var mode: String // "video" | "audio"
     var isIncoming: Bool
     var state: CallLifecycleState
+    var connectedAt: Date? = nil
 
     enum CallLifecycleState: String, Equatable {
         case ringingIncoming
@@ -762,19 +763,40 @@ extension NativeWebRTCManager: RTCPeerConnectionDelegate {
 
     func peerConnectionShouldNegotiate(_ peerConnection: RTCPeerConnection) {}
 
-    func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCIceConnectionState) {
+    private func markCallConnectedIfNeeded(for peerConnection: RTCPeerConnection) {
         DispatchQueue.main.async {
-            guard self.callPeerConnection === peerConnection else { return }
-            if newState == .connected || newState == .completed {
-                if var current = self.activeCall {
-                    CallAudioFeedback.shared.stop()
-                    if current.state != .connected && !current.isIncoming {
-                        CallKitManager.shared.reportCallConnected(callId: current.callId)
-                    }
-                    current.state = .connected
-                    self.activeCall = current
-                }
-            } else if newState == .failed || newState == .closed {
+            guard self.callPeerConnection === peerConnection,
+                  var current = self.activeCall else { return }
+            CallAudioFeedback.shared.stop()
+            let wasConnected = (current.state == .connected)
+            if !wasConnected && !current.isIncoming {
+                CallKitManager.shared.reportCallConnected(callId: current.callId)
+            }
+            if current.connectedAt == nil {
+                current.connectedAt = Date()
+            }
+            current.state = .connected
+            self.activeCall = current
+        }
+    }
+
+    func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCIceConnectionState) {
+        if newState == .connected || newState == .completed {
+            markCallConnectedIfNeeded(for: peerConnection)
+        } else if newState == .failed || newState == .closed {
+            DispatchQueue.main.async {
+                guard self.callPeerConnection === peerConnection else { return }
+                self.endOrRejectCurrentCall(sendSocket: false)
+            }
+        }
+    }
+
+    func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCPeerConnectionState) {
+        if newState == .connected {
+            markCallConnectedIfNeeded(for: peerConnection)
+        } else if newState == .failed || newState == .closed {
+            DispatchQueue.main.async {
+                guard self.callPeerConnection === peerConnection else { return }
                 self.endOrRejectCurrentCall(sendSocket: false)
             }
         }
@@ -819,6 +841,15 @@ extension NativeWebRTCManager: RTCPeerConnectionDelegate {
             DispatchQueue.main.async {
                 guard self.callPeerConnection === peerConnection else { return }
                 self.remoteVideoTrack = track
+            }
+        }
+        if rtpReceiver.track != nil {
+            DispatchQueue.main.async {
+                guard self.callPeerConnection === peerConnection,
+                      self.activeCall?.state == .connecting else { return }
+                if peerConnection.iceConnectionState == .connected || peerConnection.iceConnectionState == .completed || peerConnection.connectionState == .connected {
+                    self.markCallConnectedIfNeeded(for: peerConnection)
+                }
             }
         }
     }

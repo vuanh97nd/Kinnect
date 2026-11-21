@@ -596,45 +596,6 @@ struct PostCardView: View {
 
             Divider()
 
-            if showReactionDock {
-                HStack(spacing: 8) {
-                    ForEach(reactionOptions, id: \.key) { item in
-                        Button {
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            onReact(item.key)
-                            withAnimation(.spring(response: 0.25, dampingFraction: 0.6)) {
-                                showReactionDock = false
-                            }
-                        } label: {
-                            VStack(spacing: 2) {
-                                Text(item.emoji)
-                                    .font(.system(size: 26))
-                                Text(item.title)
-                                    .font(.system(size: 9, weight: .bold))
-                                    .foregroundColor(KinnectTheme.textPrimary)
-                            }
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 4)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule()
-                        .fill(Color(uiColor: .secondarySystemGroupedBackground))
-                        .shadow(color: Color.black.opacity(0.12), radius: 12, y: 4)
-                        .overlay(Capsule().stroke(KinnectTheme.borderSoft, lineWidth: 1))
-                )
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.8, anchor: .bottomLeading).combined(with: .opacity),
-                    removal: .scale(scale: 0.8, anchor: .bottomLeading).combined(with: .opacity)
-                ))
-                .padding(.leading, 8)
-                .zIndex(20)
-            }
-
             // Equal 3-Column Action Bar (Android parity: 33% Cảm xúc, 33% Bình luận, 33% Chia sẻ)
             HStack(spacing: 0) {
                 // Column 1: Cảm xúc (Reaction)
@@ -703,8 +664,50 @@ struct PostCardView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Chia sẻ bài viết")
             }
+            .overlay(alignment: .topLeading) {
+                if showReactionDock {
+                    HStack(spacing: 6) {
+                        ForEach(reactionOptions, id: \.key) { item in
+                            Button {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                onReact(item.key)
+                                withAnimation(.spring(response: 0.25, dampingFraction: 0.6)) {
+                                    showReactionDock = false
+                                }
+                            } label: {
+                                VStack(spacing: 2) {
+                                    Text(item.emoji)
+                                        .font(.system(size: 24))
+                                    Text(item.title)
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundColor(KinnectTheme.textPrimary)
+                                        .lineLimit(1)
+                                }
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 4)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(Color(uiColor: .secondarySystemGroupedBackground))
+                            .shadow(color: Color.black.opacity(0.18), radius: 12, y: 4)
+                            .overlay(Capsule().stroke(KinnectTheme.borderSoft, lineWidth: 1))
+                    )
+                    .offset(x: 0, y: -56)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.85, anchor: .bottomLeading).combined(with: .opacity),
+                        removal: .scale(scale: 0.85, anchor: .bottomLeading).combined(with: .opacity)
+                    ))
+                    .zIndex(30)
+                }
+            }
         }
         .modifier(FeedCardStyle())
+        .zIndex(showReactionDock ? 25 : 0)
     }
 
     private var postShareURL: URL {
@@ -1337,15 +1340,19 @@ struct PostCommentsSheet: View {
     @State private var comments: [CommentItem] = []
     @State private var newComment = ""
     @State private var pendingCommentReactions: Set<String> = []
+    @State private var reactionPickerCommentId: String? = nil
     @State private var replyingTo: CommentItem? = nil
     @State private var isLoading = false
 
     private let quickEmojis = ["😍", "😂", "🔥", "👏", "🥰", "😮", "😢", "💜"]
 
     private let commentReactionOptions: [(key: String, emoji: String, title: String)] = [
-        ("like", "??", "Th?ch"), ("love", "??", "Y?u th?ch"),
-        ("haha", "??", "Haha"), ("wow", "??", "Wow"),
-        ("sad", "??", "Bu?n"), ("angry", "??", "Ph?n n?")
+        ("like", "👍", "Thích"),
+        ("love", "❤️", "Yêu thích"),
+        ("haha", "😆", "Haha"),
+        ("wow", "😮", "Wow"),
+        ("sad", "😢", "Buồn"),
+        ("angry", "😡", "Phẫn nộ")
     ]
 
     private struct CommentRow: Identifiable {
@@ -1459,7 +1466,7 @@ struct PostCommentsSheet: View {
                     TextField(replyingTo != nil ? "Trả lời \(replyingTo!.author.name)..." : "Viết bình luận...", text: $newComment)
                         .padding(10)
                         .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                        .foregroundColor(.white)
+                        .foregroundColor(KinnectTheme.textPrimary)
 
                     KinnectIconButton(
                         glyph: .send,
@@ -1548,21 +1555,32 @@ struct PostCommentsSheet: View {
                     .buttonStyle(.plain)
 
                     Button {
-                        setCommentReaction(c, reaction: c.liked ? nil : "like")
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
+                            reactionPickerCommentId = (reactionPickerCommentId == c.id) ? nil : c.id
+                        }
                     } label: {
-                        HStack(spacing: 3) {
-                            Text(commentReactionOptions.first(where: { $0.key == c.myReaction })?.emoji ?? "?")
-                                .font(.caption2)
-                                .foregroundColor(c.liked ? KinnectTheme.danger : KinnectTheme.textSecondary)
+                        HStack(spacing: 4) {
+                            if let matched = commentReactionOptions.first(where: { $0.key == c.myReaction }) {
+                                Text(matched.emoji)
+                                    .font(.caption)
+                                Text(matched.title)
+                                    .font(.caption2.bold())
+                                    .foregroundColor(KinnectTheme.accentBright)
+                            } else {
+                                Text("👍")
+                                    .font(.caption)
+                                Text("Cảm xúc")
+                                    .font(.caption2.bold())
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                            }
                             if c.likesCount > 0 {
-                                Text("\(c.likesCount)")
-                                    .font(.caption2)
-                                    .foregroundColor(c.liked ? KinnectTheme.danger : KinnectTheme.textSecondary)
+                                Text("· \(c.likesCount)")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundColor(c.liked ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
                             }
                         }
                     }
                     .buttonStyle(.plain)
-
                     .disabled(pendingCommentReactions.contains(c.id))
                     .contextMenu {
                         ForEach(commentReactionOptions, id: \.key) { option in
@@ -1573,19 +1591,52 @@ struct PostCommentsSheet: View {
                             }
                         }
                         if c.liked {
-                            Button("G? c?m x?c", role: .destructive) {
+                            Button("Gỡ cảm xúc", role: .destructive) {
                                 setCommentReaction(c, reaction: nil)
                             }
                         }
                     }
-                    .accessibilityLabel("C?m x?c b?nh lu?n")
-                    .accessibilityHint("Nh?n gi? ?? ch?n m?t trong s?u c?m x?c")
+                    .accessibilityLabel("Cảm xúc bình luận")
+                    .accessibilityHint("Chạm để mở bảng cảm xúc cho bình luận này")
 
                     Text(formatRelativeDate(c.createdAt))
                         .font(.caption2)
                         .foregroundColor(KinnectTheme.textSecondary)
                 }
                 .padding(.top, 2)
+
+                if reactionPickerCommentId == c.id {
+                    HStack(spacing: 8) {
+                        ForEach(commentReactionOptions, id: \.key) { option in
+                            Button {
+                                let next: String? = (c.myReaction == option.key) ? nil : option.key
+                                setCommentReaction(c, reaction: next)
+                                withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+                                    reactionPickerCommentId = nil
+                                }
+                            } label: {
+                                Text(option.emoji)
+                                    .font(.system(size: 20))
+                                    .padding(4)
+                                    .background(
+                                        Circle()
+                                            .fill(c.myReaction == option.key ? KinnectTheme.accentBright.opacity(0.22) : Color.clear)
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(option.title)
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(KinnectTheme.surfaceElevated)
+                            .overlay(Capsule().stroke(KinnectTheme.borderSoft, lineWidth: 1))
+                    )
+                    .transition(.scale(scale: 0.9, anchor: .leading).combined(with: .opacity))
+                    .padding(.top, 2)
+                }
             }
         }
         .padding(.leading, CGFloat(depth * 24))
