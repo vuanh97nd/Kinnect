@@ -847,32 +847,13 @@ struct AuthView: View {
                             .font(.system(size: 17))
                             .foregroundColor(LoginChrome.ink)
                         Spacer()
-                        if loc.preference.rawValue == language.rawValue {
+                        if loc.currentLanguage == language {
                             Image(systemName: "checkmark")
                                 .foregroundColor(LoginChrome.purple)
                         }
                     }
                     .padding(.vertical, 8)
                 }
-            }
-
-            Button {
-                loc.setPreference(.system)
-                showLoginLanguageSheet = false
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "gearshape")
-                        .foregroundColor(LoginChrome.purple)
-                    Text(L10n.tr("Theo hệ thống"))
-                        .font(.system(size: 17))
-                        .foregroundColor(LoginChrome.ink)
-                    Spacer()
-                    if loc.preference == .system {
-                        Image(systemName: "checkmark")
-                            .foregroundColor(LoginChrome.purple)
-                    }
-                }
-                .padding(.vertical, 8)
             }
 
             Button {
@@ -1278,7 +1259,6 @@ struct AuthView: View {
                         Text("Google")
                             .font(.subheadline.weight(.semibold))
                             .foregroundColor(KinnectTheme.textPrimary)
-                            .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
@@ -1303,7 +1283,6 @@ struct AuthView: View {
                         Text("Facebook")
                             .font(.subheadline.weight(.semibold))
                             .foregroundColor(KinnectTheme.textPrimary)
-                            .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
