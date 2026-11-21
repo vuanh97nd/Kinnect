@@ -16,6 +16,8 @@ import org.json.JSONObject;
 public final class IncomingCallActivity extends Activity {
   private static IncomingCallActivity showing;
   private final java.util.List<Animator> animators = new java.util.ArrayList<>();
+  private android.media.MediaPlayer ringPlayer;
+  private android.os.Vibrator vibrator;
 
   static void finishIfShowing() { if (showing != null) showing.finish(); }
 
@@ -26,9 +28,10 @@ public final class IncomingCallActivity extends Activity {
   protected void onCreate(Bundle state) {
     super.onCreate(state);
     if (Build.VERSION.SDK_INT >= 27) { setShowWhenLocked(true); setTurnScreenOn(true); }
-    getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-    getWindow().setStatusBarColor(0xff11131a);
-    getWindow().setNavigationBarColor(0xff0d0e14);
+    getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON | WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+    getWindow().setStatusBarColor(Color.TRANSPARENT);
+    getWindow().setNavigationBarColor(Color.TRANSPARENT);
+    getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
     if (getIntent() != null && getIntent().getBooleanExtra("ui_review_fixture", false)) {
       NativeApi.enableFixture(this, true);
     }
@@ -43,6 +46,51 @@ public final class IncomingCallActivity extends Activity {
     if ("accept".equals(getIntent().getAction())) { accept(); return; }
     showing = this;
     build(m);
+    if (!NativeApi.isFixtureEnabled()) {
+      startRingtone();
+    }
+  }
+
+  private void startRingtone() {
+    stopRingtone();
+    try {
+      android.media.AudioAttributes attrs = new android.media.AudioAttributes.Builder()
+          .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+          .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+          .build();
+      android.net.Uri uri = KinnectService.sound(this, "kinnect_ring");
+      android.media.MediaPlayer mp = new android.media.MediaPlayer();
+      mp.setAudioAttributes(attrs);
+      try {
+        mp.setDataSource(this, uri);
+      } catch (Exception fallbackEx) {
+        android.net.Uri sysUri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE);
+        if (sysUri == null) sysUri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION);
+        mp.setDataSource(this, sysUri);
+      }
+      mp.setLooping(true);
+      mp.prepare();
+      mp.start();
+      ringPlayer = mp;
+    } catch (Exception ignored) {}
+    try {
+      vibrator = (android.os.Vibrator) getSystemService(VIBRATOR_SERVICE);
+      if (vibrator != null && vibrator.hasVibrator()) {
+        vibrator.vibrate(android.os.VibrationEffect.createWaveform(KinnectService.CALL_VIBRATE, 0));
+      }
+    } catch (Exception ignored) {}
+  }
+
+  private void stopRingtone() {
+    if (ringPlayer != null) {
+      try { ringPlayer.stop(); } catch (Exception ignored) {}
+      try { ringPlayer.release(); } catch (Exception ignored) {}
+      ringPlayer = null;
+    }
+    if (vibrator != null) {
+      try { vibrator.cancel(); } catch (Exception ignored) {}
+      vibrator = null;
+    }
   }
 
   @Override protected void onNewIntent(Intent i) { super.onNewIntent(i); if ("accept".equals(i.getAction())) accept(); }
@@ -219,6 +267,7 @@ public final class IncomingCallActivity extends Activity {
   private static android.content.res.ColorStateList ColorStateList() { return android.content.res.ColorStateList.valueOf(0x55ffffff); }
 
   private void decline() {
+    stopRingtone();
     JSONObject m = KinnectService.pendingIncoming;
     if (m != null) KinnectService.send(NativeSocket.json("type", "call-decline", "callId", m.optString("callId")));
     KinnectService.clearCall();
@@ -226,9 +275,18 @@ public final class IncomingCallActivity extends Activity {
   }
 
   private void accept() {
+    stopRingtone();
     if (KinnectService.pendingIncoming == null) { finish(); return; }
     KinnectService.pendingAccept = true;
     KinnectService.cancelCallNotification(this);
+    if (Build.VERSION.SDK_INT >= 26) {
+      try {
+        KeyguardManager km = (KeyguardManager) getSystemService(KEYGUARD_SERVICE);
+        if (km != null && km.isKeyguardLocked()) {
+          km.requestDismissKeyguard(this, null);
+        }
+      } catch (Exception ignored) {}
+    }
     startActivity(new Intent(this, MainActivity.class).putExtra("accept_call", true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
     finish();
   }
@@ -237,6 +295,7 @@ public final class IncomingCallActivity extends Activity {
 
   @Override
   protected void onDestroy() {
+    stopRingtone();
     for (Animator a : animators) a.cancel();
     animators.clear();
     if (showing == this) showing = null;
