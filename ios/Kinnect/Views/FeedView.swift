@@ -1665,6 +1665,7 @@ struct PostCommentsSheet: View {
                                 .shadow(color: Color.black.opacity(0.24), radius: 10, y: 4)
                                 .overlay(Capsule().stroke(KinnectTheme.borderSoft, lineWidth: 1))
                         )
+                        .fixedSize()
                         .offset(x: 0, y: -46)
                         .transition(.scale(scale: 0.9, anchor: .bottomLeading).combined(with: .opacity))
                         .zIndex(30)
