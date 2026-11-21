@@ -197,7 +197,13 @@ struct CameraStudioView: View {
                 cameraController.start()
             }
             cameraController.onCapturedImage = { uiImg in
-                let finalImg = self.activeSticker != "none" ? self.bakeFaceSticker(self.activeSticker, onto: uiImg) : uiImg
+                let styled = self.applyCameraFilterAndBeauty(
+                    filter: self.activeFilter,
+                    intensity: self.filterIntensity,
+                    beauty: self.beautyValues,
+                    to: uiImg
+                )
+                let finalImg = self.activeSticker != "none" ? self.bakeFaceSticker(self.activeSticker, onto: styled) : styled
                 self.originalImage = finalImg
                 self.photoProject.originalImage = finalImg
                 self.photoProject.resetAll()
@@ -301,11 +307,19 @@ struct CameraStudioView: View {
     // MARK: - Direct Camera Viewfinder Mode
     private var cameraViewfinderMode: some View {
         ZStack(alignment: .bottom) {
-            // Live Hardware Camera Viewport Layer with fallback
+            // Live Hardware Camera Viewport Layer with live filter tint preview
             LiveCameraPreviewView(
                 controller: cameraController,
                 isFlashOn: $isFlashOn,
                 isUsingFrontCamera: $isUsingFrontCamera
+            )
+            .saturation(activeFilter == "mono" || activeFilter == "noir" ? 0 : (activeFilter == "vivid" ? 1.25 : 1.0))
+            .contrast(activeFilter == "noir" || activeFilter == "drama" ? 1.18 : 1.0)
+            .overlay(
+                liveFilterTint(for: activeFilter)
+                    .opacity(filterIntensity * 0.24)
+                    .blendMode(.softLight)
+                    .allowsHitTesting(false)
             )
             .ignoresSafeArea()
 
@@ -807,6 +821,88 @@ struct CameraStudioView: View {
             ?? UIImage(named: "sticker_\(id)")
             ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "sticker_\(id)", ofType: "png") ?? "")
             ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "sticker_\(id)", ofType: "jpg") ?? "")
+    }
+
+    private func liveFilterTint(for id: String) -> Color {
+        switch id {
+        case "warm", "sunset", "golden": return Color.orange
+        case "cool", "ice", "teal": return Color.cyan
+        case "peach", "rose", "candy", "beauty_glow": return Color.pink
+        case "mint": return Color.mint
+        case "dream", "cyberpunk": return Color.purple
+        case "film", "retro", "vintage": return Color(red: 0.72, green: 0.56, blue: 0.36)
+        case "teal_orange", "cinema": return Color(red: 0.15, green: 0.55, blue: 0.65)
+        case "clear", "milk": return Color.white
+        default: return Color.clear
+        }
+    }
+
+    private func applyCameraFilterAndBeauty(filter: String, intensity: Double, beauty: [String: Double], to input: UIImage) -> UIImage {
+        let smooth = beauty["smooth"] ?? 0
+        let whiten = beauty["whiten"] ?? 0
+        let blemish = beauty["blemish"] ?? 0
+        let hasBeauty = smooth > 0.05 || whiten > 0.05 || blemish > 0.05
+        guard filter != "none" || hasBeauty else { return input }
+        // Normalize upright first
+        let size = input.size
+        let upright: UIImage
+        if input.imageOrientation == .up {
+            upright = input
+        } else {
+            let fmt = UIGraphicsImageRendererFormat()
+            fmt.scale = input.scale
+            upright = UIGraphicsImageRenderer(size: size, format: fmt).image { _ in
+                input.draw(in: CGRect(origin: .zero, size: size))
+            }
+        }
+        guard let cgIn = upright.cgImage else { return upright }
+        var ci = CIImage(cgImage: cgIn)
+        let extent = ci.extent
+        let amt = max(0.1, min(1.0, intensity))
+        if hasBeauty {
+            let skinAmt = max(smooth, blemish * 0.8)
+            if skinAmt > 0.05 {
+                ci = StudioMediaFilters.applySkinSmoothing(to: ci, intensity: skinAmt * 85)
+            }
+            if whiten > 0.05 {
+                ci = ci.applyingFilter("CIColorControls", parameters: [kCIInputBrightnessKey: whiten * 0.08])
+            }
+        }
+        switch filter {
+        case "mono": ci = ci.applyingFilter("CIPhotoEffectMono")
+        case "noir": ci = ci.applyingFilter("CIPhotoEffectNoir")
+        case "film", "retro", "vintage": ci = ci.applyingFilter("CIPhotoEffectInstant")
+        case "cinema", "drama": ci = ci.applyingFilter("CIPhotoEffectProcess")
+        case "warm", "sunset", "golden":
+            ci = ci.applyingFilter("CITemperatureAndTint", parameters: [
+                "inputNeutral": CIVector(x: 6500, y: 0),
+                "inputTargetNeutral": CIVector(x: 6500 - CGFloat(1300 * amt), y: 0)
+            ])
+        case "cool", "ice", "mint", "teal", "teal_orange":
+            ci = ci.applyingFilter("CITemperatureAndTint", parameters: [
+                "inputNeutral": CIVector(x: 6500, y: 0),
+                "inputTargetNeutral": CIVector(x: 6500 + CGFloat(1300 * amt), y: 0)
+            ])
+        case "peach", "rose", "candy", "dream", "cyberpunk", "beauty_glow":
+            ci = ci.applyingFilter("CITemperatureAndTint", parameters: [
+                "inputNeutral": CIVector(x: 6500, y: 0),
+                "inputTargetNeutral": CIVector(x: 6100, y: CGFloat(16 * amt))
+            ])
+        case "vivid":
+            ci = ci.applyingFilter("CIColorControls", parameters: [
+                kCIInputSaturationKey: 1.0 + 0.35 * amt,
+                kCIInputContrastKey: 1.0 + 0.08 * amt
+            ])
+        case "clear", "milk":
+            ci = ci.applyingFilter("CIColorControls", parameters: [
+                kCIInputBrightnessKey: 0.05 * amt,
+                kCIInputContrastKey: 0.96
+            ])
+        default: break
+        }
+        let ctx = CIContext(options: nil)
+        guard let cgOut = ctx.createCGImage(ci.cropped(to: extent), from: extent) else { return upright }
+        return UIImage(cgImage: cgOut, scale: upright.scale, orientation: .up)
     }
 
     private func stickerAnchor(for id: String) -> (yRatio: CGFloat, widthScale: CGFloat) {
@@ -2128,6 +2224,10 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
     func capturePhoto(flash: Bool) {
         #if !targetEnvironment(simulator)
         if session.isRunning && !photoOutput.connections.isEmpty {
+            if let conn = photoOutput.connection(with: .video) {
+                if conn.isVideoOrientationSupported { conn.videoOrientation = .portrait }
+                if conn.isVideoMirroringSupported { conn.isVideoMirrored = (currentPosition == .front) }
+            }
             let settings: AVCapturePhotoSettings
             if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
                 settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
@@ -2155,6 +2255,10 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
             return
         }
         if session.isRunning && !movieOutput.connections.isEmpty {
+            if let conn = movieOutput.connection(with: .video) {
+                if conn.isVideoOrientationSupported { conn.videoOrientation = .portrait }
+                if conn.isVideoMirroringSupported { conn.isVideoMirrored = (currentPosition == .front) }
+            }
             let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("kinnect_capture_\(UUID().uuidString).mp4")
             movieOutput.startRecording(to: tempURL, recordingDelegate: self)
             DispatchQueue.main.async { self.isRecordingVideo = true }
@@ -2385,10 +2489,13 @@ final class CameraPreviewViewController: UIViewController {
         #if !targetEnvironment(simulator)
         guard on != lastFlashState else { return }
         lastFlashState = on
+        // Chỉ bật đèn torch liên tục khi đang quay video bằng camera sau; chụp ảnh dùng flashMode khi bấm chụp.
         guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized,
-              let device = AVCaptureDevice.default(for: .video), device.hasTorch else { return }
+              let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+              device.hasTorch else { return }
+        let shouldTorch = on && lastConfiguredPosition != .front && (controller?.isRecordingVideo == true)
         try? device.lockForConfiguration()
-        device.torchMode = on ? .on : .off
+        device.torchMode = shouldTorch ? .on : .off
         device.unlockForConfiguration()
         #endif
     }
