@@ -694,8 +694,8 @@ struct PostCardView: View {
                     .background(
                         Capsule()
                             .fill(Color(uiColor: .secondarySystemGroupedBackground))
-                            .shadow(color: Color.black.opacity(0.18), radius: 12, y: 4)
-                            .overlay(Capsule().stroke(KinnectTheme.borderSoft, lineWidth: 1))
+                            .shadow(color: Color.black.opacity(0.28), radius: 14, y: 5)
+                            .overlay(Capsule().stroke(KinnectTheme.border, lineWidth: 1))
                     )
                     .offset(x: 0, y: -56)
                     .transition(.asymmetric(
@@ -707,6 +707,14 @@ struct PostCardView: View {
             }
         }
         .modifier(FeedCardStyle())
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if showReactionDock {
+                withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+                    showReactionDock = false
+                }
+            }
+        }
         .zIndex(showReactionDock ? 25 : 0)
     }
 
@@ -1432,6 +1440,13 @@ struct PostCommentsSheet: View {
                         .padding(.top, 4)
                     }
                     .background(KinnectTheme.background)
+                    .onTapGesture {
+                        if reactionPickerCommentId != nil {
+                            withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+                                reactionPickerCommentId = nil
+                            }
+                        }
+                    }
                 }
 
                 // Quick emoji reaction bar
@@ -1473,7 +1488,12 @@ struct PostCommentsSheet: View {
                 }
 
                 HStack(spacing: 8) {
-                    TextField(replyingTo != nil ? "Trả lời \(replyingTo!.author.name)..." : "Viết bình luận...", text: $newComment)
+                    TextField(
+                        "",
+                        text: $newComment,
+                        prompt: Text(replyingTo != nil ? "Trả lời \(replyingTo!.author.name)..." : "Viết bình luận...")
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    )
                         .padding(10)
                         .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
                         .foregroundColor(KinnectTheme.textPrimary)

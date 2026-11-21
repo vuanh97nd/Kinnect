@@ -103,21 +103,23 @@ struct CallOverlayView: View {
 
                         Spacer()
 
-                        VStack(spacing: 3) {
-                            Text(call.peerUser.name)
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(.white)
-                                .shadow(color: .black.opacity(0.6), radius: 4)
-                            if call.state == .connected, let start = call.connectedAt ?? connectedAt {
-                                callDurationText(since: start)
-                                    .font(.caption.monospacedDigit().weight(.semibold))
-                                    .foregroundColor(.white.opacity(0.95))
+                        if webrtc.remoteVideoTrack != nil {
+                            VStack(spacing: 3) {
+                                Text(call.peerUser.name)
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundColor(.white)
                                     .shadow(color: .black.opacity(0.6), radius: 4)
-                            } else {
-                                Text(status(call))
-                                    .font(.caption)
-                                    .foregroundColor(.white.opacity(0.8))
-                                    .shadow(color: .black.opacity(0.6), radius: 4)
+                                if call.state == .connected, let start = call.connectedAt ?? connectedAt {
+                                    callDurationText(since: start)
+                                        .font(.caption.monospacedDigit().weight(.semibold))
+                                        .foregroundColor(.white.opacity(0.95))
+                                        .shadow(color: .black.opacity(0.6), radius: 4)
+                                } else {
+                                    Text(status(call))
+                                        .font(.caption)
+                                        .foregroundColor(.white.opacity(0.8))
+                                        .shadow(color: .black.opacity(0.6), radius: 4)
+                                }
                             }
                         }
 

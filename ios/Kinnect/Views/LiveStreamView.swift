@@ -482,6 +482,35 @@ struct CreateLiveRoomSheet: View {
             }
             .scrollContentBackground(.hidden)
             .background(KinnectTheme.background)
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    Task { await startHostLive() }
+                } label: {
+                    HStack(spacing: 8) {
+                        if isStarting {
+                            ProgressView().tint(.white)
+                        } else {
+                            Image(systemName: liveMode == "game" ? "gamecontroller.fill" : "dot.radiowaves.left.and.right")
+                                .font(.headline)
+                        }
+                        Text(isStarting ? "Đang khởi tạo phòng Live…" : (liveMode == "game" ? "Bắt đầu Live Chơi game" : "Bắt đầu phát Live"))
+                            .font(.headline.weight(.bold))
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 15)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(KinnectTheme.primaryGradient)
+                            .shadow(color: KinnectTheme.accent.opacity(0.35), radius: 12, y: 4)
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isStarting)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(KinnectTheme.background.opacity(0.95))
+            }
             .navigationTitle("Bắt đầu phát Live")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
