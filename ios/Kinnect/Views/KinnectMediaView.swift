@@ -23,7 +23,8 @@ struct KinnectMediaTile: View {
                         .font(.system(size: 56)).foregroundColor(.white)
                         .shadow(color: .black.opacity(0.45), radius: 8)
                 }
-                .frame(maxWidth: .infinity, height: 260)
+                .frame(maxWidth: .infinity)
+                .frame(height: 260)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             } else {
                 KinnectRemoteImageView(rawURL: path, contentMode: .fill, cornerRadius: 14, maxHeight: 460)
