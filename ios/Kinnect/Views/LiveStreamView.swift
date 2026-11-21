@@ -509,19 +509,52 @@ struct CreateLiveRoomSheet: View {
 
     private var liveModeSection: some View {
         Section("Chế độ phát trực tiếp") {
-            Picker("Chế độ", selection: $liveMode) {
-                HStack {
-                    Image(systemName: "video.fill")
-                    Text("Trò chuyện")
-                }.tag("chat")
-
-                HStack {
-                    Image(systemName: "gamecontroller.fill")
-                    Text("Chơi game")
-                }.tag("game")
+            HStack(spacing: 6) {
+                liveModeOptionButton(
+                    mode: "chat",
+                    title: "Trò chuyện",
+                    systemImage: "video.fill"
+                )
+                liveModeOptionButton(
+                    mode: "game",
+                    title: "Chơi game",
+                    systemImage: "gamecontroller.fill"
+                )
             }
-            .pickerStyle(.segmented)
+            .padding(4)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(KinnectTheme.surfaceElevated)
+            )
+            .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
         }
+    }
+
+    private func liveModeOptionButton(mode: String, title: String, systemImage: String) -> some View {
+        let isSelected = (liveMode == mode)
+        return Button {
+            withAnimation(.spring(response: 0.22, dampingFraction: 0.8)) {
+                liveMode = mode
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: systemImage)
+                    .font(.subheadline.weight(.semibold))
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+            }
+            .foregroundColor(isSelected ? .white : KinnectTheme.textSecondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 9)
+            .background(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(isSelected ? AnyShapeStyle(KinnectTheme.primaryGradient) : AnyShapeStyle(Color.clear))
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var gameConfigSection: some View {
