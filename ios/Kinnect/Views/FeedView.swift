@@ -1415,13 +1415,23 @@ struct PostCommentsSheet: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    List {
-                        ForEach(commentRows) { row in
-                            commentRowView(row.comment, depth: min(row.depth, 1), parentAuthorName: row.parentAuthorName)
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(commentRows) { row in
+                                VStack(spacing: 0) {
+                                    commentRowView(row.comment, depth: min(row.depth, 1), parentAuthorName: row.parentAuthorName)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 12)
+                                        .background(KinnectTheme.surface)
+                                    Divider()
+                                        .background(KinnectTheme.borderSoft)
+                                }
+                                .zIndex(reactionPickerCommentId == row.comment.id ? 25 : 0)
+                            }
                         }
+                        .padding(.top, 4)
                     }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
+                    .background(KinnectTheme.background)
                 }
 
                 // Quick emoji reaction bar
@@ -1604,43 +1614,45 @@ struct PostCommentsSheet: View {
                         .foregroundColor(KinnectTheme.textSecondary)
                 }
                 .padding(.top, 2)
-
-                if reactionPickerCommentId == c.id {
-                    HStack(spacing: 8) {
-                        ForEach(commentReactionOptions, id: \.key) { option in
-                            Button {
-                                let next: String? = (c.myReaction == option.key) ? nil : option.key
-                                setCommentReaction(c, reaction: next)
-                                withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
-                                    reactionPickerCommentId = nil
+                .overlay(alignment: .topLeading) {
+                    if reactionPickerCommentId == c.id {
+                        HStack(spacing: 8) {
+                            ForEach(commentReactionOptions, id: \.key) { option in
+                                Button {
+                                    let next: String? = (c.myReaction == option.key) ? nil : option.key
+                                    setCommentReaction(c, reaction: next)
+                                    withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+                                        reactionPickerCommentId = nil
+                                    }
+                                } label: {
+                                    Text(option.emoji)
+                                        .font(.system(size: 20))
+                                        .padding(4)
+                                        .background(
+                                            Circle()
+                                                .fill(c.myReaction == option.key ? KinnectTheme.accentBright.opacity(0.22) : Color.clear)
+                                        )
                                 }
-                            } label: {
-                                Text(option.emoji)
-                                    .font(.system(size: 20))
-                                    .padding(4)
-                                    .background(
-                                        Circle()
-                                            .fill(c.myReaction == option.key ? KinnectTheme.accentBright.opacity(0.22) : Color.clear)
-                                    )
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(option.title)
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(option.title)
                         }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            Capsule()
+                                .fill(Color(uiColor: .secondarySystemGroupedBackground))
+                                .shadow(color: Color.black.opacity(0.24), radius: 10, y: 4)
+                                .overlay(Capsule().stroke(KinnectTheme.borderSoft, lineWidth: 1))
+                        )
+                        .offset(x: 0, y: -46)
+                        .transition(.scale(scale: 0.9, anchor: .bottomLeading).combined(with: .opacity))
+                        .zIndex(30)
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(
-                        Capsule()
-                            .fill(KinnectTheme.surfaceElevated)
-                            .overlay(Capsule().stroke(KinnectTheme.borderSoft, lineWidth: 1))
-                    )
-                    .transition(.scale(scale: 0.9, anchor: .leading).combined(with: .opacity))
-                    .padding(.top, 2)
                 }
             }
         }
         .padding(.leading, CGFloat(depth * 24))
-        .listRowBackground(KinnectTheme.surface)
     }
 
     private func setCommentReaction(_ item: CommentItem, reaction: String?) {
