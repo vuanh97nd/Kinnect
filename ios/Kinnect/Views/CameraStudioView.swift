@@ -2255,6 +2255,10 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
             return
         }
         if session.isRunning && !movieOutput.connections.isEmpty {
+            // Khôi phục AVAudioSession sang .playAndRecord phòng trường hợp người dùng vừa xem Shorts (.playback)
+            let audioSession = AVAudioSession.sharedInstance()
+            try? audioSession.setCategory(.playAndRecord, mode: .videoRecording, options: [.defaultToSpeaker, .allowBluetooth])
+            try? audioSession.setActive(true)
             if let conn = movieOutput.connection(with: .video) {
                 if conn.isVideoOrientationSupported { conn.videoOrientation = .portrait }
                 if conn.isVideoMirroringSupported { conn.isVideoMirrored = (currentPosition == .front) }

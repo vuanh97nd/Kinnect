@@ -1443,62 +1443,6 @@ struct LiveGiftBurstShowcaseView: View {
     }
 }
 
-// MARK: - AR Face Sticker Overlay in Live
-struct LiveStickerOverlayView: View {
-    let stickerId: String
-
-    var body: some View {
-        VStack {
-            Spacer().frame(height: 120)
-            stickerContentView
-                .transition(.scale.combined(with: .opacity))
-            Spacer()
-        }
-    }
-
-    @ViewBuilder
-    private var stickerContentView: some View {
-        if let img = UIImage(named: "sticker_\(stickerId)") {
-            Image(uiImage: img)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 140, height: 140)
-                .shadow(color: .black.opacity(0.4), radius: 6)
-        } else {
-            Text(emojiForSticker(stickerId))
-                .font(.system(size: 90))
-                .shadow(color: .black.opacity(0.4), radius: 6)
-        }
-    }
-
-    private func emojiForSticker(_ id: String) -> String {
-        switch id {
-        case "glasses": return "🕶️"
-        case "bunny": return "🐰"
-        case "cat": return "🐱"
-        case "dog": return "🐶"
-        case "crown": return "👑"
-        case "flowers": return "🌸"
-        case "bow": return "🎀"
-        case "freckles": return "🤎"
-        case "hearts": return "💕"
-        case "sparkle": return "✨"
-        case "stars": return "⭐"
-        case "round_glasses": return "👓"
-        case "heart_glasses": return "💗"
-        case "neon_glasses": return "⚡"
-        case "butterfly": return "🦋"
-        case "halo": return "😇"
-        case "devil": return "😈"
-        case "rainbow": return "🌈"
-        case "bubbles": return "🫧"
-        case "snow": return "❄️"
-        case "confetti": return "🎉"
-        default: return "✨"
-        }
-    }
-}
-
 // MARK: - Live Color Grading Filter Overlay
 struct LiveFilterColorOverlay: View {
     let filterId: String
