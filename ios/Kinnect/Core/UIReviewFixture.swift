@@ -1297,6 +1297,10 @@ enum UIReviewFixture {
             return AnyView(
                 LiveStreamView(onOpenWallet: {})
             )
+        case "live-setup":
+            return AnyView(CreateLiveRoomSheet(initialMode: "chat"))
+        case "live-setup-game":
+            return AnyView(CreateLiveRoomSheet(initialMode: "game"))
 
         // MARK: - Messages & Chats
         case "messages":
@@ -1327,7 +1331,8 @@ enum UIReviewFixture {
                 mode: "video",
                 isIncoming: screenName != "call-outgoing",
                 state: screenName == "call-connected" ? .connected
-                    : screenName == "call-outgoing" ? .dialingOutgoing : .ringingIncoming
+                    : screenName == "call-outgoing" ? .dialingOutgoing : .ringingIncoming,
+                connectedAt: screenName == "call-connected" ? Date().addingTimeInterval(-85) : nil
             )
             return AnyView(
                 CallOverlayView()
