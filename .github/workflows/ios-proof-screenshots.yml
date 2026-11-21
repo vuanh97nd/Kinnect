@@ -41,7 +41,7 @@ jobs:
             -derivedDataPath build/sim \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tail -n 60
 
-      - name: Boot Simulator and Capture Proof Screenshots
+      - name: Boot Simulator and Capture Full Detailed Audit Screenshots
         run: |
           set -e
           mkdir -p dist/ios-proof
@@ -65,16 +65,24 @@ jobs:
             local name="$1"; shift
             xcrun simctl terminate "$UDID" app.kinnect.live 2>/dev/null || true
             xcrun simctl launch "$UDID" app.kinnect.live -AppleLanguages "(vi)" "$@"
-            sleep 3
+            sleep 2.5
             xcrun simctl io "$UDID" screenshot "dist/ios-proof/${name}.png"
           }
 
-          capture "ios_01_live_setup_chat" --ui-review-screen live-setup
-          capture "ios_02_live_setup_game" --ui-review-screen live-setup-game
-          capture "ios_03_call_connected_timer" --ui-review-screen call-connected
-          capture "ios_04_feed_reaction_dock_no_shift" --ui-review-screen feed --ui-review-reaction-dock
-          capture "ios_05_feed_comments_reactions_utf8" --ui-review-screen feed-comments --ui-review-comment-reactions
-          capture "ios_06_chat_detail" --ui-review-screen chat-detail
+          capture "audit_01_auth_welcome" --ui-review-screen auth-welcome
+          capture "audit_02_auth_login" --ui-review-screen auth-login
+          capture "audit_03_discover" --ui-review-screen discover
+          capture "audit_04_shorts" --ui-review-screen shorts
+          capture "audit_05_messages_list" --ui-review-screen messages
+          capture "audit_06_group_chat" --ui-review-screen group-chat-detail
+          capture "audit_07_friends" --ui-review-screen friends
+          capture "audit_08_friends_requests" --ui-review-screen friends-requests
+          capture "audit_09_notifications" --ui-review-screen notifications
+          capture "audit_10_profile" --ui-review-screen profile
+          capture "audit_11_profile_edit" --ui-review-screen profile-edit
+          capture "audit_12_wallet" --ui-review-screen wallet
+          capture "audit_13_store_packages" --ui-review-screen store
+          capture "audit_14_privacy_settings" --ui-review-screen privacy-settings
 
           ls -lh dist/ios-proof/
 
