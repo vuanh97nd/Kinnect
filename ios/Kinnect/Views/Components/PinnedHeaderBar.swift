@@ -41,9 +41,6 @@ struct PinnedHeaderBar: View {
 				}
 				.buttonStyle(.plain)
 				.accessibilityLabel("Quay lại")
-			} else {
-				// Spacer to maintain alignment when no back button
-				Color.clear.frame(width: 44, height: 44)
 			}
 
 			// Title
@@ -51,6 +48,7 @@ struct PinnedHeaderBar: View {
 				.font(.system(size: 18, weight: .bold))
 				.foregroundColor(KinnectTheme.textPrimary)
 				.lineLimit(1)
+				.padding(.leading, onBack == nil ? 6 : 0)
 
 			Spacer()
 

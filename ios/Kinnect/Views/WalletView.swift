@@ -245,23 +245,6 @@ struct WalletView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-
-            Button {
-                withAnimation(.easeInOut(duration: 0.22)) {
-                    subScreen = .topUp
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "plus.circle.fill")
-                    Text("Nạp xu Kinnect")
-                        .font(.subheadline.bold())
-                }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 11)
-                .background(Capsule().fill(Color.white.opacity(0.22)))
-            }
-            .buttonStyle(.plain)
         }
         .padding(20)
         .background(

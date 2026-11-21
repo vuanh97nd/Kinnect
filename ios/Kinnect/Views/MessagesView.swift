@@ -1494,20 +1494,33 @@ struct GroupChatDetailView: View {
     private func formattedBubbleText(_ rawText: String, isMine: Bool) -> Text {
         let words = rawText.components(separatedBy: " ")
         var result = Text("")
-        for (idx, word) in words.enumerated() {
+        var idx = 0
+        while idx < words.count {
             let space = (idx == 0) ? Text("") : Text(" ")
-            if word.hasPrefix("@") {
+            let word = words[idx]
+            if (word.lowercased() == "@tất") && (idx + 1 < words.count) && words[idx + 1].lowercased().hasPrefix("cả") {
+                let phrase = "\(word) \(words[idx + 1])"
+                let styled = Text(phrase)
+                    .font(.subheadline)
+                    .bold()
+                    .foregroundColor(isMine ? Color.white : KinnectTheme.accentBright)
+                    .underline()
+                result = result + space + styled
+                idx += 2
+            } else if word.hasPrefix("@") {
                 let styled = Text(word)
                     .font(.subheadline)
                     .bold()
                     .foregroundColor(isMine ? Color.white : KinnectTheme.accentBright)
                     .underline()
                 result = result + space + styled
+                idx += 1
             } else {
                 let normal = Text(word)
                     .font(.subheadline)
                     .foregroundColor(isMine ? Color.white : KinnectTheme.textPrimary)
                 result = result + space + normal
+                idx += 1
             }
         }
         return result

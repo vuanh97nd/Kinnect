@@ -74,11 +74,33 @@ struct StoreView: View {
                     if let loadError {
                         Text(loadError).foregroundColor(KinnectTheme.danger)
                     }
-                    Picker("Nguồn xu", selection: $coinSource) {
-                        if trialPackagePurchases { Text("Xu tặng").tag("gifted") }
-                        Text("Xu mua").tag("purchased")
+                    if trialPackagePurchases {
+                        Picker("Nguồn xu", selection: $coinSource) {
+                            Text("Xu tặng").tag("gifted")
+                            Text("Xu mua").tag("purchased")
+                        }
+                        .pickerStyle(.segmented)
+                    } else {
+                        HStack(spacing: 6) {
+                            Image(systemName: "bitcoinsign.circle.fill")
+                                .foregroundColor(KinnectTheme.warning)
+                            Text("Thanh toán bằng Xu mua")
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(KinnectTheme.textSecondary)
+                            Spacer()
+                            if storeBalance > 0 {
+                                Text("\(storeBalance) xu")
+                                    .font(.caption.bold())
+                                    .foregroundColor(KinnectTheme.accentBright)
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(KinnectTheme.surfaceElevated)
+                        )
                     }
-                    .pickerStyle(.segmented)
                     packagesSection
                         .disabled(transactionInProgress)
                 }
