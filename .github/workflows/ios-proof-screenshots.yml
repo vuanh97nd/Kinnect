@@ -1,0 +1,87 @@
+name: iOS Proof Screenshots 20261121
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/ios-call-timer-reactions-20261121
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-proof-screenshots.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  capture-proof:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure XcodeGen
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build for iOS Simulator
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project ios/Kinnect.xcodeproj \
+            -scheme Kinnect \
+            -configuration Debug \
+            -destination "generic/platform=iOS Simulator" \
+            -derivedDataPath build/sim \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tail -n 60
+
+      - name: Boot Simulator and Capture Proof Screenshots
+        run: |
+          set -e
+          mkdir -p dist/ios-proof
+          UDID=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)['devices']
+          for rt, devs in sorted(data.items(), reverse=True):
+              if 'iOS' not in rt: continue
+              for d in devs:
+                  if 'iPhone 16' in d['name'] or 'iPhone 15' in d['name'] or 'iPhone' in d['name']:
+                      print(d['udid']); sys.exit(0)
+          ")
+          echo "Using simulator UDID: $UDID"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl ui "$UDID" appearance dark || true
+          APP_PATH=$(find build/sim/Build/Products/Debug-iphonesimulator -name "Kinnect.app" -maxdepth 2 | head -n 1)
+          xcrun simctl install "$UDID" "$APP_PATH"
+
+          capture() {
+            local name="$1"; shift
+            xcrun simctl terminate "$UDID" app.kinnect.live 2>/dev/null || true
+            xcrun simctl launch "$UDID" app.kinnect.live -AppleLanguages "(vi)" "$@"
+            sleep 3
+            xcrun simctl io "$UDID" screenshot "dist/ios-proof/${name}.png"
+          }
+
+          capture "ios_01_live_setup_chat" --ui-review-screen live-setup
+          capture "ios_02_live_setup_game" --ui-review-screen live-setup-game
+          capture "ios_03_call_connected_timer" --ui-review-screen call-connected
+          capture "ios_04_feed_reaction_dock_no_shift" --ui-review-screen feed --ui-review-reaction-dock
+          capture "ios_05_feed_comments_reactions_utf8" --ui-review-screen feed-comments --ui-review-comment-reactions
+          capture "ios_06_chat_detail" --ui-review-screen chat-detail
+
+          ls -lh dist/ios-proof/
+
+      - name: Upload Proof Screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-proof-screenshots
+          path: dist/ios-proof
+          if-no-files-found: warn

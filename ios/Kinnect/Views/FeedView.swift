@@ -472,7 +472,7 @@ struct PostCardView: View {
     ]
 
     @State private var isBouncing = false
-    @State private var showReactionDock = false
+    @State private var showReactionDock = ProcessInfo.processInfo.arguments.contains("--ui-review-reaction-dock")
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1673,6 +1673,10 @@ struct PostCommentsSheet: View {
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/posts/\(post.id)/comments") {
             let list = res["comments"] as? [[String: Any]] ?? []
             self.comments = list.map(CommentItem.from)
+            if ProcessInfo.processInfo.arguments.contains("--ui-review-comment-reactions"),
+               let firstId = self.comments.first?.id {
+                self.reactionPickerCommentId = firstId
+            }
         }
     }
 

@@ -435,7 +435,12 @@ struct CreateLiveRoomSheet: View {
 
     @State private var title = ""
     @State private var topic = "Giao lưu kết bạn"
-    @State private var liveMode = "chat" // "chat" | "game" (matches Android 1:1)
+    @State private var liveMode: String
+
+    init(initialMode: String = "chat", onStarted: (() -> Void)? = nil) {
+        self.onStarted = onStarted
+        _liveMode = State(initialValue: initialMode)
+    }
     @State private var gameTitle = "Liên Quân Mobile"
     @State private var customGameName = ""
     @State private var gameSound = true
