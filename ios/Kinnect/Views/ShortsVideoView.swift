@@ -30,7 +30,17 @@ struct ShortsVideoView: View {
         ZStack(alignment: .top) {
             Color.black.ignoresSafeArea()
 
-            if items.isEmpty && !isLoading {
+            if items.isEmpty && isLoading {
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .tint(.white)
+                        .scaleEffect(1.2)
+                    Text("Đang tải video ngắn…")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundColor(.white.opacity(0.75))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if items.isEmpty && !isLoading {
                 VStack(spacing: 12) {
                     KinnectIcon(glyph: .video, size: 48, tint: KinnectTheme.textSecondary)
                     Text("Chưa có video ngắn")

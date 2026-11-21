@@ -289,7 +289,7 @@ struct AuthView: View {
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 52)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(LoginChrome.purple))
+                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(KinnectTheme.primaryGradient))
             }
 
             Text(L10n.tr("Dành cho người từ 18 tuổi · Minh họa tính năng"))
@@ -773,7 +773,7 @@ struct AuthView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
-                .background(RoundedRectangle(cornerRadius: 14).fill(LoginChrome.purple))
+                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(KinnectTheme.primaryGradient))
                 .foregroundColor(.white)
             }
             .disabled(isLoading || loginUsername.isEmpty || loginPassword.isEmpty)
@@ -847,13 +847,32 @@ struct AuthView: View {
                             .font(.system(size: 17))
                             .foregroundColor(LoginChrome.ink)
                         Spacer()
-                        if loc.currentLanguage == language {
+                        if loc.preference.rawValue == language.rawValue {
                             Image(systemName: "checkmark")
                                 .foregroundColor(LoginChrome.purple)
                         }
                     }
                     .padding(.vertical, 8)
                 }
+            }
+
+            Button {
+                loc.setPreference(.system)
+                showLoginLanguageSheet = false
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "gearshape")
+                        .foregroundColor(LoginChrome.purple)
+                    Text(L10n.tr("Theo hệ thống"))
+                        .font(.system(size: 17))
+                        .foregroundColor(LoginChrome.ink)
+                    Spacer()
+                    if loc.preference == .system {
+                        Image(systemName: "checkmark")
+                            .foregroundColor(LoginChrome.purple)
+                    }
+                }
+                .padding(.vertical, 8)
             }
 
             Button {
@@ -1256,9 +1275,10 @@ struct AuthView: View {
                         Text("G")
                             .font(.headline.bold())
                             .foregroundColor(.red)
-                        Text(L10n.tr("Tiếp tục với Google"))
+                        Text("Google")
                             .font(.subheadline.weight(.semibold))
                             .foregroundColor(KinnectTheme.textPrimary)
+                            .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
@@ -1280,9 +1300,10 @@ struct AuthView: View {
                         Text("f")
                             .font(.headline.bold())
                             .foregroundColor(.blue)
-                        Text(L10n.tr("Tiếp tục với Facebook"))
+                        Text("Facebook")
                             .font(.subheadline.weight(.semibold))
                             .foregroundColor(KinnectTheme.textPrimary)
+                            .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)

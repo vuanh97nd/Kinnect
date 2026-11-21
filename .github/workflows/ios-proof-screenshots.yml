@@ -41,7 +41,7 @@ jobs:
             -derivedDataPath build/sim \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tail -n 60
 
-      - name: Boot Simulator and Capture Wave 3 (Light Mode + Deep Modals)
+      - name: Boot Simulator and Capture Pro Polish Verification Screenshots
         run: |
           set -e
           mkdir -p dist/ios-proof
@@ -69,27 +69,16 @@ jobs:
             xcrun simctl io "$UDID" screenshot "dist/ios-proof/${name}.png"
           }
 
-          # 6 Light Mode screens
           xcrun simctl ui "$UDID" appearance light || true
-          capture "light_01_feed" --ui-review-screen feed --ui-review-light
-          capture "light_02_discover" --ui-review-screen discover --ui-review-light
-          capture "light_03_messages" --ui-review-screen messages --ui-review-light
-          capture "light_04_profile" --ui-review-screen profile --ui-review-light
-          capture "light_05_wallet" --ui-review-screen wallet --ui-review-light
-          capture "light_06_store" --ui-review-screen store --ui-review-light
+          capture "pro_01_store_light" --ui-review-screen store --ui-review-light
 
-          # 10 Deep Dark Mode Modals & Settings
           xcrun simctl ui "$UDID" appearance dark || true
-          capture "deep_07_auth_register" --ui-review-screen auth-register
-          capture "deep_08_auth_reset" --ui-review-screen auth-reset
-          capture "deep_09_wallet_topup" --ui-review-screen wallet-topup
-          capture "deep_10_change_password" --ui-review-screen change-password
-          capture "deep_11_support" --ui-review-screen support
-          capture "deep_12_blocked_users" --ui-review-screen blocked-users
-          capture "deep_13_delete_account" --ui-review-screen delete-account
-          capture "deep_14_ugc_report" --ui-review-screen ugc-report
-          capture "deep_15_privacy_consent" --ui-review-screen privacy-consent
-          capture "deep_16_camera_studio_edit" --ui-review-screen camera-studio-edit
+          capture "pro_02_auth_register" --ui-review-screen auth-register
+          capture "pro_03_auth_welcome" --ui-review-screen auth-welcome
+          capture "pro_04_auth_login" --ui-review-screen auth-login
+          capture "pro_05_private_album_grid" --ui-review-screen profile-private-album
+          capture "pro_06_sessions_icons" --ui-review-screen profile-sessions
+          capture "pro_07_studio_pro_edit" --ui-review-screen camera-studio-edit
 
           ls -lh dist/ios-proof/
 

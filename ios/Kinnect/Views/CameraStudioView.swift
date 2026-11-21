@@ -849,9 +849,11 @@ struct CameraStudioView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "sparkles")
                         .font(.caption.bold())
-                    Text("Studio Pro")
+                    Text("Bộ lọc Pro")
                         .font(.caption2.bold())
+                        .lineLimit(1)
                 }
+                .fixedSize()
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(Capsule().fill(KinnectTheme.primaryGradient))

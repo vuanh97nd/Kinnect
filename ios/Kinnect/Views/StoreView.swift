@@ -534,7 +534,7 @@ struct StoreView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(pkg.title)
                     .font(.subheadline.bold())
-                    .foregroundColor(.white)
+                    .foregroundColor(KinnectTheme.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
 
