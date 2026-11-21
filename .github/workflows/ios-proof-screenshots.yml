@@ -41,7 +41,7 @@ jobs:
             -derivedDataPath build/sim \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tail -n 60
 
-      - name: Boot Simulator and Capture Fixed + Deep Audit Screenshots
+      - name: Boot Simulator and Capture Wave 3 (Light Mode + Deep Modals)
         run: |
           set -e
           mkdir -p dist/ios-proof
@@ -57,9 +57,9 @@ jobs:
           echo "Using simulator UDID: $UDID"
           xcrun simctl boot "$UDID" || true
           xcrun simctl bootstatus "$UDID" -b
-          xcrun simctl ui "$UDID" appearance dark || true
           APP_PATH=$(find build/sim/Build/Products/Debug-iphonesimulator -name "Kinnect.app" -maxdepth 2 | head -n 1)
           xcrun simctl install "$UDID" "$APP_PATH"
+          xcrun simctl privacy "$UDID" grant all app.kinnect.live || true
 
           capture() {
             local name="$1"; shift
@@ -69,23 +69,27 @@ jobs:
             xcrun simctl io "$UDID" screenshot "dist/ios-proof/${name}.png"
           }
 
-          # 7 Fixed screens (verify every fix)
-          capture "fix_01_discover" --ui-review-screen discover
-          capture "fix_02_messages_list" --ui-review-screen messages
-          capture "fix_03_group_chat" --ui-review-screen group-chat-detail
-          capture "fix_04_friends" --ui-review-screen friends
-          capture "fix_05_friends_requests" --ui-review-screen friends-requests
-          capture "fix_06_wallet" --ui-review-screen wallet
-          capture "fix_07_store_packages" --ui-review-screen store
+          # 6 Light Mode screens
+          xcrun simctl ui "$UDID" appearance light || true
+          capture "light_01_feed" --ui-review-screen feed --ui-review-light
+          capture "light_02_discover" --ui-review-screen discover --ui-review-light
+          capture "light_03_messages" --ui-review-screen messages --ui-review-light
+          capture "light_04_profile" --ui-review-screen profile --ui-review-light
+          capture "light_05_wallet" --ui-review-screen wallet --ui-review-light
+          capture "light_06_store" --ui-review-screen store --ui-review-light
 
-          # 7 New deep-detail screens (Pro UI audit wave 2)
-          capture "deep_08_profile_albums" --ui-review-screen profile-albums
-          capture "deep_09_profile_private_album" --ui-review-screen profile-private-album
-          capture "deep_10_profile_sessions" --ui-review-screen profile-sessions
-          capture "deep_11_camera_studio" --ui-review-screen camera-studio
-          capture "deep_12_wallet_topup" --ui-review-screen wallet-topup
-          capture "deep_13_change_password" --ui-review-screen change-password
-          capture "deep_14_support" --ui-review-screen support
+          # 10 Deep Dark Mode Modals & Settings
+          xcrun simctl ui "$UDID" appearance dark || true
+          capture "deep_07_auth_register" --ui-review-screen auth-register
+          capture "deep_08_auth_reset" --ui-review-screen auth-reset
+          capture "deep_09_wallet_topup" --ui-review-screen wallet-topup
+          capture "deep_10_change_password" --ui-review-screen change-password
+          capture "deep_11_support" --ui-review-screen support
+          capture "deep_12_blocked_users" --ui-review-screen blocked-users
+          capture "deep_13_delete_account" --ui-review-screen delete-account
+          capture "deep_14_ugc_report" --ui-review-screen ugc-report
+          capture "deep_15_privacy_consent" --ui-review-screen privacy-consent
+          capture "deep_16_camera_studio_edit" --ui-review-screen camera-studio-edit
 
           ls -lh dist/ios-proof/
 
