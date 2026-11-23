@@ -12,6 +12,9 @@ struct FeedView: View {
     @State private var stories: [StoryItem] = []
     @State private var posts: [PostItem] = []
     @State private var isLoading = false
+    @State private var hasMorePosts = false
+    @State private var nextPostsCursor: Int64? = nil
+    @State private var isLoadingMorePosts = false
 
     // Composer state
     @State private var showComposerSheet = false
@@ -83,8 +86,29 @@ struct FeedView: View {
                                     targetUserId: post.author.id,
                                     targetTitle: "Bài viết của \(post.author.name)"
                                 )
+                            },
+                            onBookmark: {
+                                Task { await toggleBookmark(post: post) }
+                            },
+                            onRepost: {
+                                Task { await repostToFeed(post: post) }
                             }
                         )
+                    }
+                    if hasMorePosts, nextPostsCursor != nil {
+                        Button {
+                            Task { await loadMorePosts() }
+                        } label: {
+                            HStack(spacing: 8) {
+                                if isLoadingMorePosts { ProgressView() }
+                                Text(isLoadingMorePosts ? "Đang tải…" : "Xem thêm bài viết")
+                                    .font(.subheadline.weight(.semibold))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated))
+                        }
+                        .disabled(isLoadingMorePosts)
                     }
                 }
             }
@@ -392,12 +416,14 @@ struct FeedView: View {
         isLoading = true
         defer { isLoading = false }
 
-        async let postsTask = KinnectAPIClient.shared.requestJSON("/api/posts")
+        async let postsTask = KinnectAPIClient.shared.requestJSON("/api/posts?limit=25")
         async let storiesTask = KinnectAPIClient.shared.requestJSON("/api/stories")
 
         if let postsRes = try? await postsTask {
             let rawList = postsRes["posts"] as? [[String: Any]] ?? []
             self.posts = rawList.map(PostItem.from)
+            self.hasMorePosts = (postsRes["hasMore"] as? Bool) ?? false
+            self.nextPostsCursor = (postsRes["nextCursor"] as? NSNumber)?.int64Value
             if let accountId = appState.currentUser?.id {
                 AccountCache.shared.saveJSONObject(rawList, forKey: "feed_posts", accountId: accountId)
             }
@@ -405,6 +431,50 @@ struct FeedView: View {
         if let storiesRes = try? await storiesTask {
             let rawStories = storiesRes["stories"] as? [[String: Any]] ?? []
             self.stories = rawStories.map(StoryItem.from)
+        }
+    }
+
+    private func loadMorePosts() async {
+        guard hasMorePosts, let cursor = nextPostsCursor, !isLoadingMorePosts else { return }
+        isLoadingMorePosts = true
+        defer { isLoadingMorePosts = false }
+        if let postsRes = try? await KinnectAPIClient.shared.requestJSON("/api/posts?limit=25&before=\(cursor)") {
+            let more = (postsRes["posts"] as? [[String: Any]] ?? []).map(PostItem.from)
+            let existing = Set(self.posts.map(\.id))
+            self.posts.append(contentsOf: more.filter { !existing.contains($0.id) })
+            self.hasMorePosts = (postsRes["hasMore"] as? Bool) ?? false
+            self.nextPostsCursor = (postsRes["nextCursor"] as? NSNumber)?.int64Value
+        }
+    }
+
+    private func toggleBookmark(post: PostItem) async {
+        do {
+            let res = try await KinnectAPIClient.shared.requestJSON(
+                "/api/posts/\(post.id)/bookmark",
+                method: post.bookmarked ? "DELETE" : "POST",
+                body: post.bookmarked ? nil : [:]
+            )
+            let saved = (res["bookmarked"] as? Bool) ?? !post.bookmarked
+            if let idx = posts.firstIndex(where: { $0.id == post.id }) {
+                posts[idx].bookmarked = saved
+            }
+            appState.showToast(saved ? "Đã lưu bài viết." : "Đã bỏ lưu bài viết.")
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+
+    private func repostToFeed(post: PostItem) async {
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/posts/\(post.id)/share",
+                method: "POST",
+                body: ["body": ""]
+            )
+            appState.showToast("Đã chia sẻ bài viết lên bảng tin.")
+            await loadFeedAndStories()
+        } catch {
+            appState.showToast(error.localizedDescription)
         }
     }
 
@@ -461,6 +531,8 @@ struct PostCardView: View {
     var onHide: (() -> Void)? = nil
     let onDelete: () -> Void
     let onReport: () -> Void
+    var onBookmark: (() -> Void)? = nil
+    var onRepost: (() -> Void)? = nil
 
     private let reactionOptions: [(key: String, emoji: String, title: String)] = [
         ("like", "👍", "Thích"),
@@ -472,7 +544,7 @@ struct PostCardView: View {
     ]
 
     @State private var isBouncing = false
-    @State private var showReactionDock = false
+    @State private var showReactionDock = ProcessInfo.processInfo.arguments.contains("--ui-review-reaction-dock")
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -565,8 +637,52 @@ struct PostCardView: View {
                     .kinnectMultiline()
             }
 
-            if !post.imageUrl.isEmpty {
+            if !post.hashtags.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(post.hashtags, id: \.self) { tag in
+                            Text("#\(tag)")
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(KinnectTheme.accentBright)
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 4)
+                                .background(Capsule().fill(KinnectTheme.accentBright.opacity(0.12)))
+                        }
+                    }
+                }
+            }
+
+            if post.mediaItems.count > 1 {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(post.mediaItems) { item in
+                            KinnectMediaTile(path: item.url, kind: item.kind)
+                                .frame(width: 240)
+                        }
+                    }
+                }
+            } else if !post.imageUrl.isEmpty {
                 KinnectMediaTile(path: post.imageUrl, kind: post.mediaKind)
+            }
+
+            if let shared = post.sharedPost {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(shared.author.name)
+                        .font(.caption.weight(.bold))
+                        .foregroundColor(KinnectTheme.textPrimary)
+                    if !shared.text.isEmpty {
+                        Text(shared.text)
+                            .font(.caption)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                            .kinnectMultiline()
+                    }
+                    if !shared.imageUrl.isEmpty {
+                        KinnectMediaTile(path: shared.imageUrl, kind: shared.mediaKind)
+                    }
+                }
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(KinnectTheme.borderSoft, lineWidth: 1))
             }
 
             // Statistics Summary Row (Android parity: ❤️ 2 cảm xúc ... 0 bình luận)
@@ -595,45 +711,6 @@ struct PostCardView: View {
             .padding(.bottom, 2)
 
             Divider()
-
-            if showReactionDock {
-                HStack(spacing: 8) {
-                    ForEach(reactionOptions, id: \.key) { item in
-                        Button {
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            onReact(item.key)
-                            withAnimation(.spring(response: 0.25, dampingFraction: 0.6)) {
-                                showReactionDock = false
-                            }
-                        } label: {
-                            VStack(spacing: 2) {
-                                Text(item.emoji)
-                                    .font(.system(size: 26))
-                                Text(item.title)
-                                    .font(.system(size: 9, weight: .bold))
-                                    .foregroundColor(KinnectTheme.textPrimary)
-                            }
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 4)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule()
-                        .fill(Color(uiColor: .secondarySystemGroupedBackground))
-                        .shadow(color: Color.black.opacity(0.12), radius: 12, y: 4)
-                        .overlay(Capsule().stroke(KinnectTheme.borderSoft, lineWidth: 1))
-                )
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.8, anchor: .bottomLeading).combined(with: .opacity),
-                    removal: .scale(scale: 0.8, anchor: .bottomLeading).combined(with: .opacity)
-                ))
-                .padding(.leading, 8)
-                .zIndex(20)
-            }
 
             // Equal 3-Column Action Bar (Android parity: 33% Cảm xúc, 33% Bình luận, 33% Chia sẻ)
             HStack(spacing: 0) {
@@ -685,15 +762,33 @@ struct PostCardView: View {
                 }
                 .accessibilityLabel("Bình luận")
 
-                // Column 3: Chia sẻ (Share) - Native SwiftUI ShareLink (safe on iPad popover & route permalink)
-                ShareLink(
-                    item: postShareURL,
-                    subject: Text(shareSubject),
-                    message: Text(post.text.isEmpty ? "Xem bài viết trên Kinnect" : post.text)
-                ) {
+                // Column 3: Chia sẻ (Share / Repost) & Bookmark
+                Menu {
+                    if let onRepost {
+                        Button {
+                            onRepost()
+                        } label: {
+                            Label("Chia sẻ lên bảng tin", systemImage: "arrow.2.squarepath")
+                        }
+                    }
+                    if let onBookmark {
+                        Button {
+                            onBookmark()
+                        } label: {
+                            Label(post.bookmarked ? "Bỏ lưu bài viết" : "Lưu bài viết", systemImage: post.bookmarked ? "bookmark.fill" : "bookmark")
+                        }
+                    }
+                    ShareLink(
+                        item: postShareURL,
+                        subject: Text(shareSubject),
+                        message: Text(post.text.isEmpty ? "Xem bài viết trên Kinnect" : post.text)
+                    ) {
+                        Label("Chia sẻ liên kết ngoài", systemImage: "square.and.arrow.up")
+                    }
+                } label: {
                     HStack(spacing: 6) {
                         KinnectIcon(glyph: .share, size: 18, tint: KinnectTheme.textSecondary)
-                        Text("Chia sẻ")
+                        Text(post.sharesCount > 0 ? "Chia sẻ (\(post.sharesCount))" : "Chia sẻ")
                             .font(.caption.weight(.semibold))
                             .foregroundColor(KinnectTheme.textSecondary)
                     }
@@ -703,8 +798,58 @@ struct PostCardView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Chia sẻ bài viết")
             }
+            .overlay(alignment: .topLeading) {
+                if showReactionDock {
+                    HStack(spacing: 6) {
+                        ForEach(reactionOptions, id: \.key) { item in
+                            Button {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                onReact(item.key)
+                                withAnimation(.spring(response: 0.25, dampingFraction: 0.6)) {
+                                    showReactionDock = false
+                                }
+                            } label: {
+                                VStack(spacing: 2) {
+                                    Text(item.emoji)
+                                        .font(.system(size: 24))
+                                    Text(item.title)
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundColor(KinnectTheme.textPrimary)
+                                        .lineLimit(1)
+                                }
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 4)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(Color(uiColor: .secondarySystemGroupedBackground))
+                            .shadow(color: Color.black.opacity(0.28), radius: 14, y: 5)
+                            .overlay(Capsule().stroke(KinnectTheme.border, lineWidth: 1))
+                    )
+                    .offset(x: 0, y: -56)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.85, anchor: .bottomLeading).combined(with: .opacity),
+                        removal: .scale(scale: 0.85, anchor: .bottomLeading).combined(with: .opacity)
+                    ))
+                    .zIndex(30)
+                }
+            }
         }
         .modifier(FeedCardStyle())
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if showReactionDock {
+                withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+                    showReactionDock = false
+                }
+            }
+        }
+        .zIndex(showReactionDock ? 25 : 0)
     }
 
     private var postShareURL: URL {
@@ -1337,15 +1482,19 @@ struct PostCommentsSheet: View {
     @State private var comments: [CommentItem] = []
     @State private var newComment = ""
     @State private var pendingCommentReactions: Set<String> = []
+    @State private var reactionPickerCommentId: String? = nil
     @State private var replyingTo: CommentItem? = nil
     @State private var isLoading = false
 
     private let quickEmojis = ["😍", "😂", "🔥", "👏", "🥰", "😮", "😢", "💜"]
 
     private let commentReactionOptions: [(key: String, emoji: String, title: String)] = [
-        ("like", "??", "Th?ch"), ("love", "??", "Y?u th?ch"),
-        ("haha", "??", "Haha"), ("wow", "??", "Wow"),
-        ("sad", "??", "Bu?n"), ("angry", "??", "Ph?n n?")
+        ("like", "👍", "Thích"),
+        ("love", "❤️", "Yêu thích"),
+        ("haha", "😆", "Haha"),
+        ("wow", "😮", "Wow"),
+        ("sad", "😢", "Buồn"),
+        ("angry", "😡", "Phẫn nộ")
     ]
 
     private struct CommentRow: Identifiable {
@@ -1408,13 +1557,30 @@ struct PostCommentsSheet: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    List {
-                        ForEach(commentRows) { row in
-                            commentRowView(row.comment, depth: min(row.depth, 1), parentAuthorName: row.parentAuthorName)
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(commentRows) { row in
+                                VStack(spacing: 0) {
+                                    commentRowView(row.comment, depth: min(row.depth, 1), parentAuthorName: row.parentAuthorName)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 12)
+                                        .background(KinnectTheme.surface)
+                                    Divider()
+                                        .background(KinnectTheme.borderSoft)
+                                }
+                                .zIndex(reactionPickerCommentId == row.comment.id ? 25 : 0)
+                            }
+                        }
+                        .padding(.top, 4)
+                    }
+                    .background(KinnectTheme.background)
+                    .onTapGesture {
+                        if reactionPickerCommentId != nil {
+                            withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+                                reactionPickerCommentId = nil
+                            }
                         }
                     }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
                 }
 
                 // Quick emoji reaction bar
@@ -1456,10 +1622,15 @@ struct PostCommentsSheet: View {
                 }
 
                 HStack(spacing: 8) {
-                    TextField(replyingTo != nil ? "Trả lời \(replyingTo!.author.name)..." : "Viết bình luận...", text: $newComment)
+                    TextField(
+                        "",
+                        text: $newComment,
+                        prompt: Text(replyingTo != nil ? "Trả lời \(replyingTo!.author.name)..." : "Viết bình luận...")
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    )
                         .padding(10)
                         .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                        .foregroundColor(.white)
+                        .foregroundColor(KinnectTheme.textPrimary)
 
                     KinnectIconButton(
                         glyph: .send,
@@ -1548,21 +1719,32 @@ struct PostCommentsSheet: View {
                     .buttonStyle(.plain)
 
                     Button {
-                        setCommentReaction(c, reaction: c.liked ? nil : "like")
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
+                            reactionPickerCommentId = (reactionPickerCommentId == c.id) ? nil : c.id
+                        }
                     } label: {
-                        HStack(spacing: 3) {
-                            Text(commentReactionOptions.first(where: { $0.key == c.myReaction })?.emoji ?? "?")
-                                .font(.caption2)
-                                .foregroundColor(c.liked ? KinnectTheme.danger : KinnectTheme.textSecondary)
+                        HStack(spacing: 4) {
+                            if let matched = commentReactionOptions.first(where: { $0.key == c.myReaction }) {
+                                Text(matched.emoji)
+                                    .font(.caption)
+                                Text(matched.title)
+                                    .font(.caption2.bold())
+                                    .foregroundColor(KinnectTheme.accentBright)
+                            } else {
+                                Text("👍")
+                                    .font(.caption)
+                                Text("Cảm xúc")
+                                    .font(.caption2.bold())
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                            }
                             if c.likesCount > 0 {
-                                Text("\(c.likesCount)")
-                                    .font(.caption2)
-                                    .foregroundColor(c.liked ? KinnectTheme.danger : KinnectTheme.textSecondary)
+                                Text("· \(c.likesCount)")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundColor(c.liked ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
                             }
                         }
                     }
                     .buttonStyle(.plain)
-
                     .disabled(pendingCommentReactions.contains(c.id))
                     .contextMenu {
                         ForEach(commentReactionOptions, id: \.key) { option in
@@ -1573,23 +1755,59 @@ struct PostCommentsSheet: View {
                             }
                         }
                         if c.liked {
-                            Button("G? c?m x?c", role: .destructive) {
+                            Button("Gỡ cảm xúc", role: .destructive) {
                                 setCommentReaction(c, reaction: nil)
                             }
                         }
                     }
-                    .accessibilityLabel("C?m x?c b?nh lu?n")
-                    .accessibilityHint("Nh?n gi? ?? ch?n m?t trong s?u c?m x?c")
+                    .accessibilityLabel("Cảm xúc bình luận")
+                    .accessibilityHint("Chạm để mở bảng cảm xúc cho bình luận này")
 
                     Text(formatRelativeDate(c.createdAt))
                         .font(.caption2)
                         .foregroundColor(KinnectTheme.textSecondary)
                 }
                 .padding(.top, 2)
+                .overlay(alignment: .topLeading) {
+                    if reactionPickerCommentId == c.id {
+                        HStack(spacing: 8) {
+                            ForEach(commentReactionOptions, id: \.key) { option in
+                                Button {
+                                    let next: String? = (c.myReaction == option.key) ? nil : option.key
+                                    setCommentReaction(c, reaction: next)
+                                    withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+                                        reactionPickerCommentId = nil
+                                    }
+                                } label: {
+                                    Text(option.emoji)
+                                        .font(.system(size: 20))
+                                        .padding(4)
+                                        .background(
+                                            Circle()
+                                                .fill(c.myReaction == option.key ? KinnectTheme.accentBright.opacity(0.22) : Color.clear)
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(option.title)
+                            }
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            Capsule()
+                                .fill(Color(uiColor: .secondarySystemGroupedBackground))
+                                .shadow(color: Color.black.opacity(0.24), radius: 10, y: 4)
+                                .overlay(Capsule().stroke(KinnectTheme.borderSoft, lineWidth: 1))
+                        )
+                        .fixedSize()
+                        .offset(x: 0, y: -46)
+                        .transition(.scale(scale: 0.9, anchor: .bottomLeading).combined(with: .opacity))
+                        .zIndex(30)
+                    }
+                }
             }
         }
         .padding(.leading, CGFloat(depth * 24))
-        .listRowBackground(KinnectTheme.surface)
     }
 
     private func setCommentReaction(_ item: CommentItem, reaction: String?) {
@@ -1622,6 +1840,10 @@ struct PostCommentsSheet: View {
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/posts/\(post.id)/comments") {
             let list = res["comments"] as? [[String: Any]] ?? []
             self.comments = list.map(CommentItem.from)
+            if ProcessInfo.processInfo.arguments.contains("--ui-review-comment-reactions"),
+               let firstId = self.comments.first?.id {
+                self.reactionPickerCommentId = firstId
+            }
         }
     }
 

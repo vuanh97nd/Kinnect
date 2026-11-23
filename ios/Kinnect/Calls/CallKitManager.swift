@@ -10,6 +10,7 @@ final class CallKitManager: NSObject, CXProviderDelegate {
 
     private let provider: CXProvider
     private let callController = CXCallController()
+    private let lock = NSLock()
     private var callUUIDs: [String: UUID] = [:]
     private var callIDs: [UUID: String] = [:]
 
@@ -40,7 +41,9 @@ final class CallKitManager: NSObject, CXProviderDelegate {
             completion?()
             return
         }
+        lock.lock()
         if callUUIDs[callId] != nil {
+            lock.unlock()
             completion?()
             return
         }
@@ -48,6 +51,7 @@ final class CallKitManager: NSObject, CXProviderDelegate {
         let uuid = UUID()
         callUUIDs[callId] = uuid
         callIDs[uuid] = callId
+        lock.unlock()
 
         let update = CXCallUpdate()
         update.remoteHandle = CXHandle(type: .generic, value: callerName)
@@ -61,11 +65,15 @@ final class CallKitManager: NSObject, CXProviderDelegate {
         provider.reportNewIncomingCall(with: uuid, update: update) { [weak self] error in
             if let error = error {
                 print("[KinnectCallKit] Failed to report incoming call: \(error)")
-                if self?.callUUIDs[callId] == uuid {
-                    self?.callUUIDs.removeValue(forKey: callId)
-                    self?.callIDs.removeValue(forKey: uuid)
+                if let self {
+                    self.lock.lock()
+                    if self.callUUIDs[callId] == uuid {
+                        self.callUUIDs.removeValue(forKey: callId)
+                        self.callIDs.removeValue(forKey: uuid)
+                    }
+                    self.lock.unlock()
+                    self.postFallbackCallNotification(callId: callId, callerName: callerName, isVideo: isVideo)
                 }
-                self?.postFallbackCallNotification(callId: callId, callerName: callerName, isVideo: isVideo)
             }
             completion?()
         }
@@ -73,21 +81,32 @@ final class CallKitManager: NSObject, CXProviderDelegate {
 
     func startOutgoingCall(callId: String, targetName: String, isVideo: Bool) {
         guard !callId.isEmpty else { return }
+        lock.lock()
         let uuid = callUUIDs[callId] ?? UUID()
         callUUIDs[callId] = uuid
         callIDs[uuid] = callId
+        lock.unlock()
 
         let handle = CXHandle(type: .generic, value: targetName)
         let startAction = CXStartCallAction(call: uuid, handle: handle)
         startAction.isVideo = isVideo
         let transaction = CXTransaction(action: startAction)
-        callController.request(transaction) { error in
+        callController.request(transaction) { [weak self] error in
+            guard let self else { return }
             if let error = error {
                 print("[KinnectCallKit] Start outgoing call transaction failed: \(error.localizedDescription)")
+                var shouldNotify = false
+                self.lock.lock()
                 if self.callUUIDs[callId] == uuid {
                     self.callUUIDs.removeValue(forKey: callId)
                     self.callIDs.removeValue(forKey: uuid)
-                    self.onEndCall?(callId)
+                    shouldNotify = true
+                }
+                self.lock.unlock()
+                if shouldNotify {
+                    DispatchQueue.main.async { [weak self] in
+                        self?.onEndCall?(callId)
+                    }
                 }
             } else {
                 self.provider.reportOutgoingCall(with: uuid, startedConnectingAt: Date())
@@ -96,25 +115,38 @@ final class CallKitManager: NSObject, CXProviderDelegate {
     }
 
     func remapCallId(from previous: String, to canonical: String) {
-        guard previous != canonical, let uuid = callUUIDs.removeValue(forKey: previous) else { return }
-        callUUIDs[canonical] = uuid
-        callIDs[uuid] = canonical
+        guard previous != canonical else { return }
+        lock.lock()
+        if let uuid = callUUIDs.removeValue(forKey: previous) {
+            callUUIDs[canonical] = uuid
+            callIDs[uuid] = canonical
+        }
+        lock.unlock()
     }
 
     func reportCallConnected(callId: String) {
-        guard let uuid = callUUIDs[callId] else { return }
+        lock.lock()
+        let uuid = callUUIDs[callId]
+        lock.unlock()
+        guard let uuid else { return }
         provider.reportOutgoingCall(with: uuid, connectedAt: Date())
     }
 
     func reportCallEnded(callId: String, reason: CXCallEndedReason = .remoteEnded) {
-        guard let uuid = callUUIDs.removeValue(forKey: callId) else { return }
-        callIDs.removeValue(forKey: uuid)
+        lock.lock()
+        let uuid = callUUIDs.removeValue(forKey: callId)
+        if let uuid { callIDs.removeValue(forKey: uuid) }
+        lock.unlock()
+        guard let uuid else { return }
         provider.reportCall(with: uuid, endedAt: Date(), reason: reason)
         UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["call-\(callId)"])
     }
 
     func requestEndCall(callId: String) {
-        guard let uuid = callUUIDs[callId] else { return }
+        lock.lock()
+        let uuid = callUUIDs[callId]
+        lock.unlock()
+        guard let uuid else { return }
         let endAction = CXEndCallAction(call: uuid)
         let transaction = CXTransaction(action: endAction)
         callController.request(transaction) { [weak self] error in
@@ -125,12 +157,15 @@ final class CallKitManager: NSObject, CXProviderDelegate {
     }
 
     func endAllCalls() {
-        for (callId, uuid) in callUUIDs {
+        lock.lock()
+        let snapshot = callUUIDs
+        callUUIDs.removeAll()
+        callIDs.removeAll()
+        lock.unlock()
+        for (callId, uuid) in snapshot {
             provider.reportCall(with: uuid, endedAt: Date(), reason: .remoteEnded)
             UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["call-\(callId)"])
         }
-        callUUIDs.removeAll()
-        callIDs.removeAll()
     }
 
     private func postFallbackCallNotification(callId: String, callerName: String, isVideo: Bool) {
@@ -147,22 +182,31 @@ final class CallKitManager: NSObject, CXProviderDelegate {
     // MARK: - CXProviderDelegate
 
     func providerDidReset(_ provider: CXProvider) {
+        lock.lock()
         let endedCallIDs = Array(callUUIDs.keys)
         callUUIDs.removeAll()
         callIDs.removeAll()
-        for callId in endedCallIDs {
-            onEndCall?(callId)
+        lock.unlock()
+        DispatchQueue.main.async { [weak self] in
+            for callId in endedCallIDs {
+                self?.onEndCall?(callId)
+            }
         }
     }
 
     func provider(_ provider: CXProvider, perform action: CXStartCallAction) {
-        MediaPermissionHandler.shared.configureAudioSessionForCall(speaker: NativeWebRTCManager.shared.isSpeakerOn)
+        DispatchQueue.main.async {
+            MediaPermissionHandler.shared.configureAudioSessionForCall(speaker: NativeWebRTCManager.shared.isSpeakerOn)
+        }
         action.fulfill()
     }
 
     func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
         MediaPermissionHandler.shared.configureAudioSessionForCall()
-        if let callId = callIDs[action.callUUID] {
+        lock.lock()
+        let callId = callIDs[action.callUUID]
+        lock.unlock()
+        if let callId {
             DispatchQueue.main.async { [weak self] in
                 self?.onAnswerCall?(callId)
             }
@@ -171,8 +215,11 @@ final class CallKitManager: NSObject, CXProviderDelegate {
     }
 
     func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
-        if let callId = callIDs.removeValue(forKey: action.callUUID) {
-            callUUIDs.removeValue(forKey: callId)
+        lock.lock()
+        let callId = callIDs.removeValue(forKey: action.callUUID)
+        if let callId { callUUIDs.removeValue(forKey: callId) }
+        lock.unlock()
+        if let callId {
             DispatchQueue.main.async { [weak self] in
                 self?.onEndCall?(callId)
             }
@@ -181,7 +228,10 @@ final class CallKitManager: NSObject, CXProviderDelegate {
     }
 
     func provider(_ provider: CXProvider, perform action: CXSetMutedCallAction) {
-        if let callId = callIDs[action.callUUID] {
+        lock.lock()
+        let callId = callIDs[action.callUUID]
+        lock.unlock()
+        if let callId {
             DispatchQueue.main.async { [weak self] in
                 self?.onSetMuted?(callId, action.isMuted)
             }
@@ -193,8 +243,10 @@ final class CallKitManager: NSObject, CXProviderDelegate {
         // Forward the external activation to WebRTC. Without this, a call
         // answered while locked can retain an interrupted audio device.
         RTCAudioSession.sharedInstance().audioSessionDidActivate(audioSession)
-        MediaPermissionHandler.shared.configureAudioSessionForCall(
-            speaker: NativeWebRTCManager.shared.isSpeakerOn)
+        DispatchQueue.main.async {
+            MediaPermissionHandler.shared.configureAudioSessionForCall(
+                speaker: NativeWebRTCManager.shared.isSpeakerOn)
+        }
     }
 
     func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {

@@ -434,9 +434,10 @@ private struct DiscoverSquareUserTile: View {
                                     name: person.name,
                                     avatarURL: "",
                                     colorHex: person.avatarColor,
-                                    size: min(geo.size.width * 0.5, 48),
+                                    size: min(geo.size.width * 0.42, 42),
                                     isOnline: isOnline
                                 )
+                                .padding(.bottom, 30)
                             )
                     }
 
@@ -507,11 +508,11 @@ private struct DiscoverSquareUserTile: View {
                         Text(person.name)
                             .font(.system(size: 12, weight: .bold))
                             .foregroundColor(.white)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.85)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                     }
                     .padding(.horizontal, 8)
-                    .padding(.bottom, 6)
+                    .padding(.bottom, 7)
                 }
                 .frame(width: geo.size.width, height: geo.size.width)
                 .clipShape(RoundedRectangle(cornerRadius: 14))

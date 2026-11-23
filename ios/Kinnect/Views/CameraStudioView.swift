@@ -6,6 +6,7 @@ import PhotosUI
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
+import Vision
 
 enum StudioEditTool: String, CaseIterable, Identifiable {
     case crop = "Cắt & xoay"
@@ -196,12 +197,19 @@ struct CameraStudioView: View {
                 cameraController.start()
             }
             cameraController.onCapturedImage = { uiImg in
-                self.originalImage = uiImg
-                self.photoProject.originalImage = uiImg
+                let styled = self.applyCameraFilterAndBeauty(
+                    filter: self.activeFilter,
+                    intensity: self.filterIntensity,
+                    beauty: self.beautyValues,
+                    to: uiImg
+                )
+                let finalImg = self.activeSticker != "none" ? self.bakeFaceSticker(self.activeSticker, onto: styled) : styled
+                self.originalImage = finalImg
+                self.photoProject.originalImage = finalImg
                 self.photoProject.resetAll()
                 self.previewImage = self.photoProject.render(maxDimension: 900)
                 self.target = .feedPost
-                if let jpeg = (self.previewImage ?? uiImg).jpegData(compressionQuality: 0.85) {
+                if let jpeg = (self.previewImage ?? finalImg).jpegData(compressionQuality: 0.85) {
                     self.imageDataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
                 }
             }
@@ -299,33 +307,66 @@ struct CameraStudioView: View {
     // MARK: - Direct Camera Viewfinder Mode
     private var cameraViewfinderMode: some View {
         ZStack(alignment: .bottom) {
-            // Live Hardware Camera Viewport Layer with fallback
+            // Live Hardware Camera Viewport Layer with live filter tint preview
             LiveCameraPreviewView(
                 controller: cameraController,
                 isFlashOn: $isFlashOn,
                 isUsingFrontCamera: $isUsingFrontCamera
             )
+            .saturation(activeFilter == "mono" || activeFilter == "noir" ? 0 : (activeFilter == "vivid" ? 1.25 : 1.0))
+            .contrast(activeFilter == "noir" || activeFilter == "drama" ? 1.18 : 1.0)
+            .overlay(
+                liveFilterTint(for: activeFilter)
+                    .opacity(filterIntensity * 0.24)
+                    .blendMode(.softLight)
+                    .allowsHitTesting(false)
+            )
             .ignoresSafeArea()
 
-            // AR Face Sticker Overlay on Camera Viewfinder (Web & Android Parity)
+            // Real-time 60fps Hardware Face-Tracked AR Sticker Overlay
             if activeSticker != "none", let s = Self.stickers.first(where: { $0.id == activeSticker }) {
-                if let img = stickerImage(for: s.id) {
-                    Image(uiImage: img)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 140, height: 140)
-                        .shadow(color: .black.opacity(0.4), radius: 8, x: 0, y: 4)
-                        .offset(y: stickerOffset(for: activeSticker))
-                        .transition(.scale.combined(with: .opacity))
-                        .allowsHitTesting(false)
-                } else {
-                    Text(s.emoji)
-                        .font(.system(size: 96))
-                        .shadow(color: .black.opacity(0.4), radius: 8, x: 0, y: 4)
-                        .offset(y: stickerOffset(for: activeSticker))
-                        .transition(.scale.combined(with: .opacity))
-                        .allowsHitTesting(false)
+                let anchor = stickerAnchor(for: s.id)
+                ZStack {
+                    ForEach(cameraController.trackedFaces) { face in
+                        let w = max(64, face.bounds.width * anchor.widthScale)
+                        let pos = CGPoint(
+                            x: face.bounds.midX,
+                            y: face.bounds.minY + face.bounds.height * anchor.yRatio
+                        )
+                        Group {
+                            if let img = stickerImage(for: s.id) {
+                                Image(uiImage: img)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: w, height: w)
+                            } else {
+                                Text(s.emoji)
+                                    .font(.system(size: w * 0.68))
+                            }
+                        }
+                        .shadow(color: .black.opacity(0.35), radius: 6, x: 0, y: 3)
+                        .rotationEffect(.degrees(Double(face.rollAngle)))
+                        .position(pos)
+                    }
+                    if cameraController.trackedFaces.isEmpty {
+                        VStack {
+                            HStack(spacing: 6) {
+                                Image(systemName: "faceid")
+                                    .font(.caption.bold())
+                                Text("Đưa khuôn mặt vào khung hình")
+                                    .font(.caption.weight(.semibold))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Capsule().fill(Color.black.opacity(0.55)))
+                            .padding(.top, 110)
+                            Spacer()
+                        }
+                    }
                 }
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
             }
 
             if cameraController.isPermissionDenied {
@@ -782,18 +823,153 @@ struct CameraStudioView: View {
             ?? UIImage(contentsOfFile: Bundle.main.path(forResource: "sticker_\(id)", ofType: "jpg") ?? "")
     }
 
-    private func stickerOffset(for id: String) -> CGFloat {
+    private func liveFilterTint(for id: String) -> Color {
         switch id {
-        case "crown", "golden_tiara", "bunny", "bunny_ears", "cat", "cat_whiskers", "dog", "dog_ears", "flowers", "flower_crown", "halo", "angel_halo", "party_hat":
-            return -140
-        case "glasses", "neon_glasses", "round_glasses", "heart_glasses", "pixel_glasses", "retro_shades", "freckles", "cyber_mask", "mask":
-            return -40
-        case "hearts", "cheek_hearts", "blush_cheeks", "blush", "sparkle", "sparkle_eyes", "rainbow", "rainbow_paint":
-            return -20
+        case "warm", "sunset", "golden": return Color.orange
+        case "cool", "ice", "teal": return Color.cyan
+        case "peach", "rose", "candy", "beauty_glow": return Color.pink
+        case "mint": return Color.mint
+        case "dream", "cyberpunk": return Color.purple
+        case "film", "retro", "vintage": return Color(red: 0.72, green: 0.56, blue: 0.36)
+        case "teal_orange", "cinema": return Color(red: 0.15, green: 0.55, blue: 0.65)
+        case "clear", "milk": return Color.white
+        default: return Color.clear
+        }
+    }
+
+    private func applyCameraFilterAndBeauty(filter: String, intensity: Double, beauty: [String: Double], to input: UIImage) -> UIImage {
+        let smooth = beauty["smooth"] ?? 0
+        let whiten = beauty["whiten"] ?? 0
+        let blemish = beauty["blemish"] ?? 0
+        let hasBeauty = smooth > 0.05 || whiten > 0.05 || blemish > 0.05
+        guard filter != "none" || hasBeauty else { return input }
+        // Normalize upright first
+        let size = input.size
+        let upright: UIImage
+        if input.imageOrientation == .up {
+            upright = input
+        } else {
+            let fmt = UIGraphicsImageRendererFormat()
+            fmt.scale = input.scale
+            upright = UIGraphicsImageRenderer(size: size, format: fmt).image { _ in
+                input.draw(in: CGRect(origin: .zero, size: size))
+            }
+        }
+        guard let cgIn = upright.cgImage else { return upright }
+        var ci = CIImage(cgImage: cgIn)
+        let extent = ci.extent
+        let amt = max(0.1, min(1.0, intensity))
+        if hasBeauty {
+            let skinAmt = max(smooth, blemish * 0.8)
+            if skinAmt > 0.05 {
+                ci = StudioMediaFilters.applySkinSmoothing(to: ci, intensity: skinAmt * 85)
+            }
+            if whiten > 0.05 {
+                ci = ci.applyingFilter("CIColorControls", parameters: [kCIInputBrightnessKey: whiten * 0.08])
+            }
+        }
+        switch filter {
+        case "mono": ci = ci.applyingFilter("CIPhotoEffectMono")
+        case "noir": ci = ci.applyingFilter("CIPhotoEffectNoir")
+        case "film", "retro", "vintage": ci = ci.applyingFilter("CIPhotoEffectInstant")
+        case "cinema", "drama": ci = ci.applyingFilter("CIPhotoEffectProcess")
+        case "warm", "sunset", "golden":
+            ci = ci.applyingFilter("CITemperatureAndTint", parameters: [
+                "inputNeutral": CIVector(x: 6500, y: 0),
+                "inputTargetNeutral": CIVector(x: 6500 - CGFloat(1300 * amt), y: 0)
+            ])
+        case "cool", "ice", "mint", "teal", "teal_orange":
+            ci = ci.applyingFilter("CITemperatureAndTint", parameters: [
+                "inputNeutral": CIVector(x: 6500, y: 0),
+                "inputTargetNeutral": CIVector(x: 6500 + CGFloat(1300 * amt), y: 0)
+            ])
+        case "peach", "rose", "candy", "dream", "cyberpunk", "beauty_glow":
+            ci = ci.applyingFilter("CITemperatureAndTint", parameters: [
+                "inputNeutral": CIVector(x: 6500, y: 0),
+                "inputTargetNeutral": CIVector(x: 6100, y: CGFloat(16 * amt))
+            ])
+        case "vivid":
+            ci = ci.applyingFilter("CIColorControls", parameters: [
+                kCIInputSaturationKey: 1.0 + 0.35 * amt,
+                kCIInputContrastKey: 1.0 + 0.08 * amt
+            ])
+        case "clear", "milk":
+            ci = ci.applyingFilter("CIColorControls", parameters: [
+                kCIInputBrightnessKey: 0.05 * amt,
+                kCIInputContrastKey: 0.96
+            ])
+        default: break
+        }
+        let ctx = CIContext(options: nil)
+        guard let cgOut = ctx.createCGImage(ci.cropped(to: extent), from: extent) else { return upright }
+        return UIImage(cgImage: cgOut, scale: upright.scale, orientation: .up)
+    }
+
+    private func stickerAnchor(for id: String) -> (yRatio: CGFloat, widthScale: CGFloat) {
+        switch id {
+        case "crown", "golden_tiara", "bunny", "bunny_ears", "cat", "cat_whiskers", "dog", "dog_ears", "flowers", "flower_crown", "halo", "angel_halo", "party_hat", "party", "devil", "butterfly":
+            return (-0.18, 1.15)
+        case "glasses", "neon_glasses", "round_glasses", "heart_glasses", "pixel_glasses", "pixel", "retro_shades", "retro", "cyber_mask", "mask":
+            return (0.36, 1.05)
+        case "hearts", "cheek_hearts", "blush_cheeks", "blush", "sparkle", "sparkle_eyes", "freckles", "rainbow", "rainbow_paint":
+            return (0.56, 0.95)
         case "lips", "bow":
-            return 60
+            return (0.78, 0.65)
         default:
-            return -70
+            return (0.10, 1.20)
+        }
+    }
+
+    private func bakeFaceSticker(_ stickerId: String, onto input: UIImage) -> UIImage {
+        guard let s = Self.stickers.first(where: { $0.id == stickerId }) else { return input }
+        // Normalize orientation to upright so Vision boundingBox aligns 1:1 with drawing coordinates
+        let size = input.size
+        let upright: UIImage
+        if input.imageOrientation == .up {
+            upright = input
+        } else {
+            let fmt = UIGraphicsImageRendererFormat()
+            fmt.scale = input.scale
+            upright = UIGraphicsImageRenderer(size: size, format: fmt).image { _ in
+                input.draw(in: CGRect(origin: .zero, size: size))
+            }
+        }
+        guard let cg = upright.cgImage else { return input }
+        let req = VNDetectFaceRectanglesRequest()
+        let handler = VNImageRequestHandler(cgImage: cg, orientation: .up, options: [:])
+        try? handler.perform([req])
+        guard let faces = req.results, !faces.isEmpty else { return upright }
+        let anchor = stickerAnchor(for: s.id)
+        let img = stickerImage(for: s.id)
+        let fmt = UIGraphicsImageRendererFormat()
+        fmt.scale = upright.scale
+        return UIGraphicsImageRenderer(size: size, format: fmt).image { ctx in
+            upright.draw(in: CGRect(origin: .zero, size: size))
+            for face in faces {
+                let bb = face.boundingBox
+                let faceRect = CGRect(
+                    x: bb.minX * size.width,
+                    y: (1.0 - bb.maxY) * size.height,
+                    width: bb.width * size.width,
+                    height: bb.height * size.height
+                )
+                let w = faceRect.width * anchor.widthScale
+                let center = CGPoint(x: faceRect.midX, y: faceRect.minY + faceRect.height * anchor.yRatio)
+                let roll = CGFloat(face.roll?.doubleValue ?? 0)
+                ctx.cgContext.saveGState()
+                ctx.cgContext.translateBy(x: center.x, y: center.y)
+                ctx.cgContext.rotate(by: -roll)
+                let drawRect = CGRect(x: -w / 2, y: -w / 2, width: w, height: w)
+                if let img {
+                    img.draw(in: drawRect)
+                } else {
+                    let attrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: w * 0.68)]
+                    let str = NSAttributedString(string: s.emoji, attributes: attrs)
+                    let sz = str.size()
+                    str.draw(at: CGPoint(x: -sz.width / 2, y: -sz.height / 2))
+                }
+                ctx.cgContext.restoreGState()
+            }
         }
     }
 
@@ -849,9 +1025,11 @@ struct CameraStudioView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "sparkles")
                         .font(.caption.bold())
-                    Text("Studio Pro")
+                    Text("Bộ lọc Pro")
                         .font(.caption2.bold())
+                        .lineLimit(1)
                 }
+                .fixedSize()
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(Capsule().fill(KinnectTheme.primaryGradient))
@@ -1796,10 +1974,21 @@ enum StudioLens: String, CaseIterable, Identifiable {
     }
 }
 
-final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutputRecordingDelegate {
+struct TrackedFace: Identifiable {
+    let id: Int
+    let bounds: CGRect
+    let rollAngle: CGFloat
+}
+
+final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutputRecordingDelegate, AVCaptureMetadataOutputObjectsDelegate {
     let session = AVCaptureSession()
     let photoOutput = AVCapturePhotoOutput()
     let movieOutput = AVCaptureMovieFileOutput()
+    let metadataOutput = AVCaptureMetadataOutput()
+    private let metadataQueue = DispatchQueue(label: "kinnect.camera.face.metadata")
+    weak var previewLayer: AVCaptureVideoPreviewLayer?
+    @Published var trackedFaces: [TrackedFace] = []
+    private var smoothedFaces: [Int: TrackedFace] = [:]
     @Published var isRecordingVideo: Bool = false
     @Published var availableLenses: [StudioLens] = []
     @Published var activeLens: StudioLens = .wide
@@ -1849,8 +2038,13 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
         if session.canAddOutput(movieOutput) {
             session.addOutput(movieOutput)
         }
+        if session.canAddOutput(metadataOutput) {
+            session.addOutput(metadataOutput)
+            metadataOutput.setMetadataObjectsDelegate(self, queue: metadataQueue)
+        }
         applyStabilization()
         session.commitConfiguration()
+        enableFaceMetadataIfSupported()
         refreshLenses(position: .back)
         NotificationCenter.default.addObserver(self, selector: #selector(stopForInterruption), name: UIApplication.willResignActiveNotification, object: nil)
         start()
@@ -1917,7 +2111,70 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
         }
         applyStabilization()
         session.commitConfiguration()
+        enableFaceMetadataIfSupported()
         #endif
+    }
+
+    func enableFaceMetadataIfSupported() {
+        #if !targetEnvironment(simulator)
+        if metadataOutput.availableMetadataObjectTypes.contains(.face) {
+            metadataOutput.metadataObjectTypes = [.face]
+        }
+        DispatchQueue.main.async {
+            self.smoothedFaces.removeAll()
+            self.trackedFaces = []
+        }
+        #endif
+    }
+
+    func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
+        let faceObjects = metadataObjects.compactMap { $0 as? AVMetadataFaceObject }
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            guard let layer = self.previewLayer else {
+                if !self.trackedFaces.isEmpty { self.trackedFaces = [] }
+                return
+            }
+            if faceObjects.isEmpty {
+                if !self.trackedFaces.isEmpty {
+                    self.smoothedFaces.removeAll()
+                    self.trackedFaces = []
+                }
+                return
+            }
+            var next: [TrackedFace] = []
+            var nextCache: [Int: TrackedFace] = [:]
+            let alpha: CGFloat = 0.45
+            let isFront = self.currentPosition == .front
+            for raw in faceObjects {
+                guard let transformed = layer.transformedMetadataObject(for: raw) as? AVMetadataFaceObject else { continue }
+                let id = transformed.faceID
+                let rect = transformed.bounds
+                guard rect.width > 12, rect.height > 12 else { continue }
+                var roll: CGFloat = 0
+                if transformed.hasRollAngle {
+                    var deg = transformed.rollAngle
+                    if deg > 180 { deg -= 360 }
+                    roll = isFront ? -deg : deg
+                }
+                if let prev = self.smoothedFaces[id] {
+                    let bx = prev.bounds.origin.x + (rect.origin.x - prev.bounds.origin.x) * alpha
+                    let by = prev.bounds.origin.y + (rect.origin.y - prev.bounds.origin.y) * alpha
+                    let bw = prev.bounds.width + (rect.width - prev.bounds.width) * alpha
+                    let bh = prev.bounds.height + (rect.height - prev.bounds.height) * alpha
+                    let br = prev.rollAngle + (roll - prev.rollAngle) * alpha
+                    let smoothed = TrackedFace(id: id, bounds: CGRect(x: bx, y: by, width: bw, height: bh), rollAngle: br)
+                    next.append(smoothed)
+                    nextCache[id] = smoothed
+                } else {
+                    let fresh = TrackedFace(id: id, bounds: rect, rollAngle: roll)
+                    next.append(fresh)
+                    nextCache[id] = fresh
+                }
+            }
+            self.smoothedFaces = nextCache
+            self.trackedFaces = next
+        }
     }
 
     func focus(at devicePoint: CGPoint) {
@@ -1967,6 +2224,10 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
     func capturePhoto(flash: Bool) {
         #if !targetEnvironment(simulator)
         if session.isRunning && !photoOutput.connections.isEmpty {
+            if let conn = photoOutput.connection(with: .video) {
+                if conn.isVideoOrientationSupported { conn.videoOrientation = .portrait }
+                if conn.isVideoMirroringSupported { conn.isVideoMirrored = (currentPosition == .front) }
+            }
             let settings: AVCapturePhotoSettings
             if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
                 settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
@@ -1994,6 +2255,14 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
             return
         }
         if session.isRunning && !movieOutput.connections.isEmpty {
+            // Khôi phục AVAudioSession sang .playAndRecord phòng trường hợp người dùng vừa xem Shorts (.playback)
+            let audioSession = AVAudioSession.sharedInstance()
+            try? audioSession.setCategory(.playAndRecord, mode: .videoRecording, options: [.defaultToSpeaker, .allowBluetooth])
+            try? audioSession.setActive(true)
+            if let conn = movieOutput.connection(with: .video) {
+                if conn.isVideoOrientationSupported { conn.videoOrientation = .portrait }
+                if conn.isVideoMirroringSupported { conn.isVideoMirrored = (currentPosition == .front) }
+            }
             let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("kinnect_capture_\(UUID().uuidString).mp4")
             movieOutput.startRecording(to: tempURL, recordingDelegate: self)
             DispatchQueue.main.async { self.isRecordingVideo = true }
@@ -2167,6 +2436,7 @@ final class CameraPreviewViewController: UIViewController {
             }
             view.layer.insertSublayer(layer, at: 0)
             previewLayer = layer
+            ctrl.previewLayer = layer
             backdropLayer.isHidden = true
             simulatedImageView?.removeFromSuperview()
             simulatedImageView = nil
@@ -2213,6 +2483,7 @@ final class CameraPreviewViewController: UIViewController {
         }
         controller?.applyStabilization()
         session.commitConfiguration()
+        controller?.enableFaceMetadataIfSupported()
         controller?.refreshLenses(position: pos)
         controller?.activeLens = .wide
         #endif
@@ -2222,10 +2493,13 @@ final class CameraPreviewViewController: UIViewController {
         #if !targetEnvironment(simulator)
         guard on != lastFlashState else { return }
         lastFlashState = on
+        // Chỉ bật đèn torch liên tục khi đang quay video bằng camera sau; chụp ảnh dùng flashMode khi bấm chụp.
         guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized,
-              let device = AVCaptureDevice.default(for: .video), device.hasTorch else { return }
+              let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+              device.hasTorch else { return }
+        let shouldTorch = on && lastConfiguredPosition != .front && (controller?.isRecordingVideo == true)
         try? device.lockForConfiguration()
-        device.torchMode = on ? .on : .off
+        device.torchMode = shouldTorch ? .on : .off
         device.unlockForConfiguration()
         #endif
     }

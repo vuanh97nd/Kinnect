@@ -15,7 +15,9 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // UI Review Fixture Mode: Activated with `--ui-review-screen <screenName>`
         if UIReviewFixture.isEnabled,
            let screenName = UIReviewFixture.activeScreen {
-            let fixtureView = UIReviewFixture.makeView(for: screenName).environmentObject(AppState.shared)
+            let fixtureView = UIReviewFixture.makeView(for: screenName)
+                .environmentObject(AppState.shared)
+                .preferredColorScheme(UIReviewFixture.forceLightMode ? .light : nil)
             let hostingController = UIHostingController(rootView: fixtureView)
             hostingController.view.backgroundColor = UIColor { trait in
                 trait.userInterfaceStyle == .light

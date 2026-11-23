@@ -280,6 +280,10 @@ struct RootMainView: View {
                 KinnectSplashScreen()
             } else if appState.currentUser == nil {
                 AuthView(initialStage: .welcome)
+            } else if UIReviewFixture.activeScreen == "live-setup" {
+                CreateLiveRoomSheet(initialMode: "chat")
+            } else if UIReviewFixture.activeScreen == "live-setup-game" {
+                CreateLiveRoomSheet(initialMode: "game")
             } else if UIReviewFixture.activeScreen == "chat-detail" || UIReviewFixture.activeScreen == "chat-menu" || UIReviewFixture.activeScreen == "message-menu" {
                 if horizontalSizeClass == .regular {
                     // iPad two-column layout: Conversation List on left + Chat Detail on right

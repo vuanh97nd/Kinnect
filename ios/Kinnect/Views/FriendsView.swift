@@ -305,71 +305,37 @@ struct FriendsView: View {
     }
 
     private func friendRow(user: KinnectUser) -> some View {
-        HStack(spacing: 10) {
-            Button {
-                selectedProfileUser = user
-            } label: {
-                HStack(spacing: 10) {
-                    KinnectAvatarView(
-                        name: user.name,
-                        avatarURL: user.avatarUrl,
-                        colorHex: user.avatarColor,
-                        size: 46,
-                        isOnline: (user.isActive && user.showActivity) || appState.onlineUserIds.contains(user.id)
-                    )
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(user.name)
-                            .font(.subheadline.bold())
-                            .foregroundColor(KinnectTheme.textPrimary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                        let active = (user.isActive && user.showActivity) || appState.onlineUserIds.contains(user.id)
-                        Text("@\(user.handle.isEmpty ? user.name : user.handle) • \(active ? "Đang hoạt động" : "Ngoại tuyến")")
-                            .font(.caption2)
-                            .foregroundColor(active ? Color(hex: "#2E9E66") : KinnectTheme.textSecondary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Button {
+                    selectedProfileUser = user
+                } label: {
+                    HStack(spacing: 10) {
+                        KinnectAvatarView(
+                            name: user.name,
+                            avatarURL: user.avatarUrl,
+                            colorHex: user.avatarColor,
+                            size: 46,
+                            isOnline: (user.isActive && user.showActivity) || appState.onlineUserIds.contains(user.id)
+                        )
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(user.name)
+                                .font(.subheadline.bold())
+                                .foregroundColor(KinnectTheme.textPrimary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                            let active = (user.isActive && user.showActivity) || appState.onlineUserIds.contains(user.id)
+                            Text("@\(user.handle.isEmpty ? user.name : user.handle) • \(active ? "Đang hoạt động" : "Ngoại tuyến")")
+                                .font(.caption)
+                                .foregroundColor(active ? Color(hex: "#2E9E66") : KinnectTheme.textSecondary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                        }
                     }
                 }
-            }
-            .buttonStyle(.plain)
+                .buttonStyle(.plain)
 
-            Spacer(minLength: 8)
-
-            // Friends action icons (Tin nhắn, Gọi thoại, Gọi video, Thêm) - matches Android roundAction layout
-            HStack(spacing: 6) {
-                Button {
-                    activeChatPeer = user
-                } label: {
-                    KinnectIcon(glyph: .messages, size: 18, tint: KinnectTheme.accentBright)
-                        .frame(width: 36, height: 36)
-                        .background(Circle().fill(KinnectTheme.surfaceElevated))
-                }
-                .accessibilityLabel("Nhắn tin")
-
-                Button {
-                    Task {
-                        dismiss()
-                        await NativeWebRTCManager.shared.startOutgoingCall(targetUser: user, mode: "audio")
-                    }
-                } label: {
-                    KinnectIcon(glyph: .phone, size: 19, tint: KinnectTheme.online)
-                        .frame(width: 36, height: 36)
-                        .background(Circle().fill(KinnectTheme.surfaceElevated))
-                }
-                .accessibilityLabel("Gọi thoại")
-
-                Button {
-                    Task {
-                        dismiss()
-                        await NativeWebRTCManager.shared.startOutgoingCall(targetUser: user, mode: "video")
-                    }
-                } label: {
-                    KinnectIcon(glyph: .videoCall, size: 19, tint: KinnectTheme.accentBright)
-                        .frame(width: 36, height: 36)
-                        .background(Circle().fill(KinnectTheme.surfaceElevated))
-                }
-                .accessibilityLabel("Gọi video")
+                Spacer(minLength: 4)
 
                 Menu {
                     Button(role: .destructive) {
@@ -387,10 +353,66 @@ struct FriendsView: View {
                     }
                 } label: {
                     KinnectIcon(glyph: .more, size: 20, tint: KinnectTheme.textSecondary)
-                        .frame(width: 32, height: 36)
+                        .frame(width: 34, height: 34)
                         .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Tùy chọn bạn bè")
+            }
+
+            HStack(spacing: 8) {
+                Button {
+                    activeChatPeer = user
+                } label: {
+                    HStack(spacing: 5) {
+                        KinnectIcon(glyph: .messages, size: 15, tint: .white)
+                        Text("Nhắn tin")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(.white)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(Capsule().fill(KinnectTheme.primaryGradient))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Nhắn tin")
+
+                Button {
+                    Task {
+                        dismiss()
+                        await NativeWebRTCManager.shared.startOutgoingCall(targetUser: user, mode: "audio")
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        KinnectIcon(glyph: .phone, size: 15, tint: KinnectTheme.online)
+                        Text("Gọi thoại")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(KinnectTheme.textPrimary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Gọi thoại")
+
+                Button {
+                    Task {
+                        dismiss()
+                        await NativeWebRTCManager.shared.startOutgoingCall(targetUser: user, mode: "video")
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        KinnectIcon(glyph: .videoCall, size: 15, tint: KinnectTheme.accentBright)
+                        Text("Video")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(KinnectTheme.textPrimary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Gọi video")
             }
         }
         .kinnectCard()
@@ -434,7 +456,7 @@ struct FriendsView: View {
     }
 
     private func incomingRequestRow(user: KinnectUser) -> some View {
-        HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             Button {
                 selectedProfileUser = user
             } label: {
@@ -444,33 +466,42 @@ struct FriendsView: View {
                         Text(user.name)
                             .font(.subheadline.bold())
                             .foregroundColor(KinnectTheme.textPrimary)
-                            .kinnectMultiline()
+                            .lineLimit(1)
                         Text("Muốn kết bạn với bạn")
                             .font(.caption)
                             .foregroundColor(KinnectTheme.textSecondary)
+                            .lineLimit(1)
                     }
+                    Spacer()
                 }
             }
             .buttonStyle(.plain)
 
-            Spacer()
-            Button("Đồng ý") {
-                Task { await respondRequest(user: user, action: "accept") }
-            }
-            .font(.caption.bold())
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(Capsule().fill(KinnectTheme.primaryGradient))
-            .foregroundColor(.white)
+            HStack(spacing: 10) {
+                Button {
+                    Task { await respondRequest(user: user, action: "accept") }
+                } label: {
+                    Text("Đồng ý")
+                        .font(.caption.bold())
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(Capsule().fill(KinnectTheme.primaryGradient))
+                        .foregroundColor(.white)
+                }
+                .buttonStyle(.plain)
 
-            Button("Từ chối") {
-                Task { await respondRequest(user: user, action: "reject") }
+                Button {
+                    Task { await respondRequest(user: user, action: "reject") }
+                } label: {
+                    Text("Từ chối")
+                        .font(.caption.bold())
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                        .foregroundColor(KinnectTheme.textSecondary)
+                }
+                .buttonStyle(.plain)
             }
-            .font(.caption.bold())
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(Capsule().fill(KinnectTheme.surfaceElevated))
-            .foregroundColor(KinnectTheme.textSecondary)
         }
         .kinnectCard()
     }

@@ -28,6 +28,8 @@ struct AuthView: View {
     // Login Form State
     @State private var loginUsername = ""
     @State private var loginPassword = ""
+    @State private var loginTotpCode = ""
+    @State private var needs2FA = false
     @State private var showLoginPassword = false
     @State private var rememberLogin = true
 
@@ -289,7 +291,7 @@ struct AuthView: View {
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 52)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(LoginChrome.purple))
+                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(KinnectTheme.primaryGradient))
             }
 
             Text(L10n.tr("Dành cho người từ 18 tuổi · Minh họa tính năng"))
@@ -753,6 +755,21 @@ struct AuthView: View {
                 }
             }
 
+            if needs2FA {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(L10n.tr("Mã xác thực 2 lớp (6 số / mã dự phòng)"))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(LoginChrome.ink)
+                    TextField(L10n.tr("Nhập mã 6 chữ số"), text: $loginTotpCode)
+                        .keyboardType(.asciiCapable)
+                        .textContentType(.oneTimeCode)
+                        .autocorrectionDisabled()
+                        .padding(.horizontal, 14)
+                        .frame(height: 48)
+                        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(LoginChrome.wash))
+                }
+            }
+
             if let err = errorMessage {
                 Text(err)
                     .font(.caption)
@@ -773,7 +790,7 @@ struct AuthView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
-                .background(RoundedRectangle(cornerRadius: 14).fill(LoginChrome.purple))
+                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(KinnectTheme.primaryGradient))
                 .foregroundColor(.white)
             }
             .disabled(isLoading || loginUsername.isEmpty || loginPassword.isEmpty)
@@ -847,13 +864,32 @@ struct AuthView: View {
                             .font(.system(size: 17))
                             .foregroundColor(LoginChrome.ink)
                         Spacer()
-                        if loc.currentLanguage == language {
+                        if loc.preference.rawValue == language.rawValue {
                             Image(systemName: "checkmark")
                                 .foregroundColor(LoginChrome.purple)
                         }
                     }
                     .padding(.vertical, 8)
                 }
+            }
+
+            Button {
+                loc.setPreference(.system)
+                showLoginLanguageSheet = false
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "gearshape")
+                        .foregroundColor(LoginChrome.purple)
+                    Text(L10n.tr("Theo hệ thống"))
+                        .font(.system(size: 17))
+                        .foregroundColor(LoginChrome.ink)
+                    Spacer()
+                    if loc.preference == .system {
+                        Image(systemName: "checkmark")
+                            .foregroundColor(LoginChrome.purple)
+                    }
+                }
+                .padding(.vertical, 8)
             }
 
             Button {
@@ -1256,9 +1292,10 @@ struct AuthView: View {
                         Text("G")
                             .font(.headline.bold())
                             .foregroundColor(.red)
-                        Text(L10n.tr("Tiếp tục với Google"))
+                        Text("Google")
                             .font(.subheadline.weight(.semibold))
                             .foregroundColor(KinnectTheme.textPrimary)
+                            .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
@@ -1280,9 +1317,10 @@ struct AuthView: View {
                         Text("f")
                             .font(.headline.bold())
                             .foregroundColor(.blue)
-                        Text(L10n.tr("Tiếp tục với Facebook"))
+                        Text("Facebook")
                             .font(.subheadline.weight(.semibold))
                             .foregroundColor(KinnectTheme.textPrimary)
+                            .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
@@ -1371,16 +1409,23 @@ struct AuthView: View {
         defer { isLoading = false }
 
         do {
+            var payload: [String: Any] = [
+                "username": loginUsername.trimmingCharacters(in: .whitespacesAndNewlines),
+                "password": loginPassword,
+                "remember": rememberLogin
+            ]
+            let cleanTotp = loginTotpCode.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !cleanTotp.isEmpty {
+                payload["totpCode"] = cleanTotp
+            }
             let res = try await KinnectAPIClient.shared.requestJSON(
                 "/api/login",
                 method: "POST",
-                body: [
-                    "username": loginUsername.trimmingCharacters(in: .whitespacesAndNewlines),
-                    "password": loginPassword,
-                    "remember": rememberLogin
-                ]
+                body: payload
             )
             if let userDict = res["user"] as? [String: Any] {
+                needs2FA = false
+                loginTotpCode = ""
                 let user = KinnectUser.from(userDict)
                 appState.applyAuthenticatedUser(user, rawDict: userDict, rememberMe: rememberLogin)
                 await appState.refreshGlobalBadges()
@@ -1389,6 +1434,9 @@ struct AuthView: View {
             if UIReviewFixture.isEnabled {
                 appState.applyAuthenticatedUser(KinnectUser.from(UIReviewFixture.currentUserDict), rawDict: UIReviewFixture.currentUserDict, rememberMe: true)
             } else {
+                if error.localizedDescription.localizedCaseInsensitiveContains("2 lớp") {
+                    needs2FA = true
+                }
                 errorMessage = error.localizedDescription
             }
         }

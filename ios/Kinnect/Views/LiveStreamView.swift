@@ -435,7 +435,12 @@ struct CreateLiveRoomSheet: View {
 
     @State private var title = ""
     @State private var topic = "Giao lưu kết bạn"
-    @State private var liveMode = "chat" // "chat" | "game" (matches Android 1:1)
+    @State private var liveMode: String
+
+    init(initialMode: String = "chat", onStarted: (() -> Void)? = nil) {
+        self.onStarted = onStarted
+        _liveMode = State(initialValue: initialMode)
+    }
     @State private var gameTitle = "Liên Quân Mobile"
     @State private var customGameName = ""
     @State private var gameSound = true
@@ -477,6 +482,35 @@ struct CreateLiveRoomSheet: View {
             }
             .scrollContentBackground(.hidden)
             .background(KinnectTheme.background)
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    Task { await startHostLive() }
+                } label: {
+                    HStack(spacing: 8) {
+                        if isStarting {
+                            ProgressView().tint(.white)
+                        } else {
+                            Image(systemName: liveMode == "game" ? "gamecontroller.fill" : "dot.radiowaves.left.and.right")
+                                .font(.headline)
+                        }
+                        Text(isStarting ? "Đang khởi tạo phòng Live…" : (liveMode == "game" ? "Bắt đầu Live Chơi game" : "Bắt đầu phát Live"))
+                            .font(.headline.weight(.bold))
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 15)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(KinnectTheme.primaryGradient)
+                            .shadow(color: KinnectTheme.accent.opacity(0.35), radius: 12, y: 4)
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isStarting)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(KinnectTheme.background.opacity(0.95))
+            }
             .navigationTitle("Bắt đầu phát Live")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -509,19 +543,52 @@ struct CreateLiveRoomSheet: View {
 
     private var liveModeSection: some View {
         Section("Chế độ phát trực tiếp") {
-            Picker("Chế độ", selection: $liveMode) {
-                HStack {
-                    Image(systemName: "video.fill")
-                    Text("Trò chuyện")
-                }.tag("chat")
-
-                HStack {
-                    Image(systemName: "gamecontroller.fill")
-                    Text("Chơi game")
-                }.tag("game")
+            HStack(spacing: 6) {
+                liveModeOptionButton(
+                    mode: "chat",
+                    title: "Trò chuyện",
+                    systemImage: "video.fill"
+                )
+                liveModeOptionButton(
+                    mode: "game",
+                    title: "Chơi game",
+                    systemImage: "gamecontroller.fill"
+                )
             }
-            .pickerStyle(.segmented)
+            .padding(4)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(KinnectTheme.surfaceElevated)
+            )
+            .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
         }
+    }
+
+    private func liveModeOptionButton(mode: String, title: String, systemImage: String) -> some View {
+        let isSelected = (liveMode == mode)
+        return Button {
+            withAnimation(.spring(response: 0.22, dampingFraction: 0.8)) {
+                liveMode = mode
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: systemImage)
+                    .font(.subheadline.weight(.semibold))
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+            }
+            .foregroundColor(isSelected ? .white : KinnectTheme.textSecondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 9)
+            .background(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(isSelected ? AnyShapeStyle(KinnectTheme.primaryGradient) : AnyShapeStyle(Color.clear))
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var gameConfigSection: some View {
@@ -1372,62 +1439,6 @@ struct LiveGiftBurstShowcaseView: View {
         case "yacht": return "yacht"
         case "castle": return "castle"
         default: return id
-        }
-    }
-}
-
-// MARK: - AR Face Sticker Overlay in Live
-struct LiveStickerOverlayView: View {
-    let stickerId: String
-
-    var body: some View {
-        VStack {
-            Spacer().frame(height: 120)
-            stickerContentView
-                .transition(.scale.combined(with: .opacity))
-            Spacer()
-        }
-    }
-
-    @ViewBuilder
-    private var stickerContentView: some View {
-        if let img = UIImage(named: "sticker_\(stickerId)") {
-            Image(uiImage: img)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 140, height: 140)
-                .shadow(color: .black.opacity(0.4), radius: 6)
-        } else {
-            Text(emojiForSticker(stickerId))
-                .font(.system(size: 90))
-                .shadow(color: .black.opacity(0.4), radius: 6)
-        }
-    }
-
-    private func emojiForSticker(_ id: String) -> String {
-        switch id {
-        case "glasses": return "🕶️"
-        case "bunny": return "🐰"
-        case "cat": return "🐱"
-        case "dog": return "🐶"
-        case "crown": return "👑"
-        case "flowers": return "🌸"
-        case "bow": return "🎀"
-        case "freckles": return "🤎"
-        case "hearts": return "💕"
-        case "sparkle": return "✨"
-        case "stars": return "⭐"
-        case "round_glasses": return "👓"
-        case "heart_glasses": return "💗"
-        case "neon_glasses": return "⚡"
-        case "butterfly": return "🦋"
-        case "halo": return "😇"
-        case "devil": return "😈"
-        case "rainbow": return "🌈"
-        case "bubbles": return "🫧"
-        case "snow": return "❄️"
-        case "confetti": return "🎉"
-        default: return "✨"
         }
     }
 }

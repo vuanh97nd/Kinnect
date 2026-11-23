@@ -11,16 +11,23 @@ struct KinnectMediaTile: View {
         Button { expanded = true } label: {
             if isVideo {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated)
+                    RoundedRectangle(cornerRadius: 14, style: .continuous).fill(KinnectTheme.surfaceElevated)
                     if let image = thumbnail.image {
-                        Image(uiImage: image).resizable().scaledToFit()
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(maxWidth: .infinity, maxHeight: 260)
+                            .clipped()
                     }
                     Image(systemName: "play.circle.fill")
                         .font(.system(size: 56)).foregroundColor(.white)
+                        .shadow(color: .black.opacity(0.45), radius: 8)
                 }
-                .frame(height: 240)
+                .frame(maxWidth: .infinity)
+                .frame(height: 260)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             } else {
-                KinnectRemoteImageView(rawURL: path, contentMode: .fit, cornerRadius: 14, maxHeight: 340)
+                KinnectRemoteImageView(rawURL: path, contentMode: .fill, cornerRadius: 14, maxHeight: 460)
             }
         }
         .buttonStyle(.plain)

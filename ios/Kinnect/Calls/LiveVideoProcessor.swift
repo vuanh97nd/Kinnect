@@ -22,7 +22,8 @@ final class LiveVideoProcessor: NSObject, RTCVideoCapturerDelegate {
     private let source: RTCVideoSource
     private let context = CIContext(options: [.cacheIntermediates: false])
     private let detector = CIDetector(ofType: CIDetectorTypeFace, context: nil,
-                                      options: [CIDetectorAccuracy: CIDetectorAccuracyLow])
+                                      options: [CIDetectorAccuracy: CIDetectorAccuracyHigh,
+                                                CIDetectorTracking: true])
     private let lock = NSLock()
     private var settings = LiveVideoSettings()
     private var stickerImage: CIImage?
@@ -38,17 +39,36 @@ final class LiveVideoProcessor: NSObject, RTCVideoCapturerDelegate {
                        "flowers":"🌸", "bow":"🎀", "freckles":"🤎", "hearts":"💕", "sparkle":"✨",
                        "stars":"⭐", "round_glasses":"👓", "heart_glasses":"💗", "neon_glasses":"⚡",
                        "butterfly":"🦋", "halo":"😇", "devil":"😈", "rainbow":"🌈",
-                       "bubbles":"🫧", "snow":"❄️", "confetti":"🎉"]
+                       "bubbles":"🫧", "snow":"❄️", "confetti":"🎉", "mask":"🎭", "party":"🥳",
+                       "blush":"🌸", "fire":"🔥", "music":"🎵"]
+        let assetMap = [
+            "bunny": "bunny_ears", "cat": "cat_whiskers", "dog": "dog_ears",
+            "glasses": "neon_glasses", "crown": "golden_tiara", "flowers": "flower_crown",
+            "hearts": "cheek_hearts", "sparkle": "sparkle_eyes", "halo": "angel_halo",
+            "rainbow": "rainbow_paint", "stars": "star_confetti", "confetti": "star_confetti",
+            "butterfly": "butterfly_clip", "devil": "cute_devil", "mask": "cyber_mask",
+            "fire": "fire_aura", "music": "music_notes", "party": "party_hat", "blush": "blush_cheeks"
+        ]
         lock.lock()
         let oldSticker = settings.sticker
         lock.unlock()
         var rendered: CIImage?
-        if oldSticker != value.sticker, let symbol = symbols[value.sticker] {
-            let image = UIGraphicsImageRenderer(size: CGSize(width: 160, height: 160)).image { _ in
-                (symbol as NSString).draw(at: CGPoint(x: 0, y: 0),
-                                          withAttributes: [.font: UIFont.systemFont(ofSize: 130)])
+        if oldSticker != value.sticker && value.sticker != "none" {
+            let key = assetMap[value.sticker] ?? value.sticker
+            if let assetImg = UIImage(named: "kg20261109_sticker_\(key)")
+                ?? UIImage(named: "kg20261109_sticker_\(value.sticker)")
+                ?? UIImage(named: "sticker_\(key)")
+                ?? UIImage(named: "sticker_\(value.sticker)") {
+                rendered = CIImage(image: assetImg)
+            } else if let symbol = symbols[value.sticker] {
+                let image = UIGraphicsImageRenderer(size: CGSize(width: 160, height: 160)).image { _ in
+                    let attrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 120)]
+                    let str = NSAttributedString(string: symbol, attributes: attrs)
+                    let sz = str.size()
+                    str.draw(at: CGPoint(x: (160 - sz.width) / 2, y: (160 - sz.height) / 2))
+                }
+                rendered = CIImage(image: image)
             }
-            rendered = CIImage(image: image)
         }
         lock.lock()
         settings = value
@@ -76,7 +96,9 @@ final class LiveVideoProcessor: NSObject, RTCVideoCapturerDelegate {
         image = image.transformed(by: CGAffineTransform(translationX: -image.extent.minX, y: -image.extent.minY))
         let extent = image.extent
         if config.beauty || sticker != nil {
-            if frameCount % 4 == 0 { face = detector?.features(in: image).first as? CIFaceFeature }
+            if frameCount % 2 == 0 {
+                face = detector?.features(in: image, options: [CIDetectorImageOrientation: 1]).first as? CIFaceFeature
+            }
             frameCount += 1
         }
         if config.beauty {
@@ -134,11 +156,36 @@ final class LiveVideoProcessor: NSObject, RTCVideoCapturerDelegate {
         default: break
         }
         if let sticker, let face {
-            let width = face.bounds.width * 0.9
-            let scaled = sticker.transformed(by: CGAffineTransform(scaleX: width / sticker.extent.width, y: width / sticker.extent.height))
-            let positioned = scaled.transformed(by: CGAffineTransform(
-                translationX: face.bounds.midX - width / 2, y: min(extent.height - width, face.bounds.maxY - width * 0.30)))
-            image = positioned.composited(over: image)
+            // CoreImage Y=0 ở đáy: minY là cằm, maxY là trán
+            let (yRatio, widthScale): (CGFloat, CGFloat) = {
+                switch config.sticker {
+                case "crown", "bunny", "cat", "dog", "flowers", "halo", "devil", "butterfly", "party":
+                    return (1.12, 1.15)
+                case "glasses", "round_glasses", "heart_glasses", "neon_glasses", "mask":
+                    return (0.62, 1.05)
+                case "hearts", "freckles", "blush", "sparkle", "rainbow":
+                    return (0.46, 0.95)
+                case "bow", "lips":
+                    return (0.22, 0.65)
+                default:
+                    return (0.85, 1.15)
+                }
+            }()
+            let width = face.bounds.width * widthScale
+            let height = width * (sticker.extent.height / max(1, sticker.extent.width))
+            let sx = width / max(1, sticker.extent.width)
+            let sy = height / max(1, sticker.extent.height)
+            let cx = face.bounds.midX
+            let cy = face.bounds.minY + face.bounds.height * yRatio
+            let angle = face.hasFaceAngle ? CGFloat(-face.faceAngle) * .pi / 180.0 : 0
+            let centered = sticker.transformed(by: CGAffineTransform(
+                translationX: -sticker.extent.midX, y: -sticker.extent.midY
+            ))
+            let placed = centered
+                .transformed(by: CGAffineTransform(scaleX: sx, y: sy))
+                .transformed(by: CGAffineTransform(rotationAngle: angle))
+                .transformed(by: CGAffineTransform(translationX: cx, y: cy))
+            image = placed.composited(over: image).cropped(to: extent)
         }
         if pool == nil || poolSize != extent.size {
             poolSize = extent.size

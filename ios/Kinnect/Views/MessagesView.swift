@@ -3,6 +3,20 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
+/// List refresh after the server mark-read on GET messages. Detail screens ignore this
+/// userInfo so they do not call loadMessages again and post the same notice forever.
+private func postMessagesMarkedRead(kind: String, id: String) {
+    guard !id.isEmpty else { return }
+    NotificationCenter.default.post(
+        name: .kinnectMessagesChanged,
+        object: nil,
+        userInfo: [
+            "markReadKind": kind,
+            "markReadId": id
+        ]
+    )
+}
+
 private func isoString(from anyVal: Any?) -> String {
     if let s = anyVal as? String, !s.isEmpty {
         return s
@@ -34,6 +48,7 @@ struct MessagesView: View {
     @State private var activeChatPeer: KinnectUser? = nil
     @State private var isLoading = false
     @State private var searchQuery: String = ""
+    @State private var chatsLoadGeneration = 0
 
     init(initialScope: ChatScope = .direct, onOpenFriends: @escaping () -> Void = {}, onBack: (() -> Void)? = nil) {
         self.onOpenFriends = onOpenFriends
@@ -65,14 +80,14 @@ struct MessagesView: View {
             // Search Bar
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
-                    .foregroundColor(Color(UIColor.tertiaryLabel))
+                    .foregroundColor(KinnectTheme.messageMeta)
                 TextField("Tìm cuộc trò chuyện…", text: $searchQuery)
                     .font(.system(size: 15))
                     .foregroundColor(KinnectTheme.textPrimary)
                 if !searchQuery.isEmpty {
                     Button { searchQuery = "" } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(Color(UIColor.tertiaryLabel))
+                            .foregroundColor(KinnectTheme.messageMeta)
                     }
                 }
             }
@@ -163,7 +178,13 @@ struct MessagesView: View {
         .task {
             await loadChats()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .kinnectMessagesChanged)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .kinnectMessagesChanged)) { note in
+            if let kind = note.userInfo?["markReadKind"] as? String,
+               let id = note.userInfo?["markReadId"] as? String {
+                // Drop an in-flight list fetch that started before this mark-read.
+                chatsLoadGeneration += 1
+                clearLocalUnread(kind: kind, id: id)
+            }
             Task { await loadChats() }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("kinnect_open_new_chat"))) { _ in
@@ -237,7 +258,7 @@ struct MessagesView: View {
         VStack(spacing: 12) {
             Image(systemName: unreadOnly ? "tray" : "bubble.left.and.bubble.right")
                 .font(.system(size: 40))
-                .foregroundColor(Color(UIColor.tertiaryLabel))
+                .foregroundColor(KinnectTheme.messageMeta)
             Text(unreadOnly ? "Không có tin nhắn chưa đọc." : "Chưa có cuộc trò chuyện riêng nào")
                 .font(.subheadline)
                 .foregroundColor(KinnectTheme.textSecondary)
@@ -257,7 +278,7 @@ struct MessagesView: View {
         VStack(spacing: 12) {
             Image(systemName: "person.3")
                 .font(.system(size: 40))
-                .foregroundColor(Color(UIColor.tertiaryLabel))
+                .foregroundColor(KinnectTheme.messageMeta)
             Text("Bạn chưa tham gia nhóm trò chuyện nào")
                 .font(.subheadline)
                 .foregroundColor(KinnectTheme.textSecondary)
@@ -307,7 +328,7 @@ struct MessagesView: View {
                     if !rawTime.isEmpty {
                         Text(formatRelativeDate(rawTime))
                             .font(.system(size: 13, weight: unread > 0 ? .semibold : .regular))
-                            .foregroundColor(unread > 0 ? KinnectTheme.accentBright : Color(UIColor.tertiaryLabel))
+                            .foregroundColor(unread > 0 ? KinnectTheme.accentBright : KinnectTheme.messageMeta)
                     }
                 }
 
@@ -362,7 +383,7 @@ struct MessagesView: View {
                             .lineLimit(1)
                         Text("(\(group.membersCount))")
                             .font(.system(size: 13))
-                            .foregroundColor(Color(UIColor.tertiaryLabel))
+                            .foregroundColor(KinnectTheme.messageMeta)
                     }
 
                     Spacer(minLength: 8)
@@ -370,7 +391,7 @@ struct MessagesView: View {
                     if !group.updatedAt.isEmpty {
                         Text(formatRelativeDate(group.updatedAt))
                             .font(.system(size: 13, weight: group.unreadCount > 0 ? .semibold : .regular))
-                            .foregroundColor(group.unreadCount > 0 ? KinnectTheme.accentBright : Color(UIColor.tertiaryLabel))
+                            .foregroundColor(group.unreadCount > 0 ? KinnectTheme.accentBright : KinnectTheme.messageMeta)
                     }
                 }
 
@@ -407,7 +428,30 @@ struct MessagesView: View {
         .contentShape(Rectangle())
     }
 
+    private func clearLocalUnread(kind: String, id: String) {
+        guard !id.isEmpty else { return }
+        if kind == "direct" {
+            conversations = conversations.map { conv in
+                guard extractPeer(from: conv).id == id else { return conv }
+                var next = conv
+                next["unread"] = 0
+                next["unreadCount"] = 0
+                return next
+            }
+        } else if kind == "group" {
+            groups = groups.map { group in
+                guard group.id == id else { return group }
+                var next = group
+                next.unreadCount = 0
+                return next
+            }
+        }
+    }
+
+    @MainActor
     private func loadChats() async {
+        chatsLoadGeneration += 1
+        let generation = chatsLoadGeneration
         if conversations.isEmpty,
            let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/conversations") {
             let list = (cached["users"] as? [[String: Any]]) ?? (cached["conversations"] as? [[String: Any]]) ?? []
@@ -419,17 +463,22 @@ struct MessagesView: View {
             self.groups = grps.map(ChatGroupItem.from)
         }
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            if generation == chatsLoadGeneration {
+                isLoading = false
+            }
+        }
         async let cTask = KinnectAPIClient.shared.requestJSON("/api/conversations")
         async let gTask = KinnectAPIClient.shared.requestJSON("/api/groups")
 
-        if let cRes = try? await cTask {
+        if let cRes = try? await cTask, generation == chatsLoadGeneration {
             let list = (cRes["users"] as? [[String: Any]]) ?? (cRes["conversations"] as? [[String: Any]]) ?? []
             self.conversations = list
         }
-        if let gRes = try? await gTask {
+        if let gRes = try? await gTask, generation == chatsLoadGeneration {
             self.groups = (gRes["groups"] as? [[String: Any]] ?? []).map(ChatGroupItem.from)
         }
+        guard generation == chatsLoadGeneration else { return }
         await appState.refreshGlobalBadges()
     }
 }
@@ -600,6 +649,10 @@ struct DirectChatDetailView: View {
     @State private var showReviewChatMenu = (UIReviewFixture.activeScreen == "chat-menu")
     @State private var showReviewMessageMenu = (UIReviewFixture.activeScreen == "message-menu")
     @State private var showPeerProfile = false
+    @State private var replyingToMessage: DirectMessageItem? = nil
+    @State private var hasMoreMessages = false
+    @State private var nextMessagesCursor: Int64? = nil
+    @State private var isLoadingOlder = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -640,7 +693,7 @@ struct DirectChatDetailView: View {
                                     .fill(
                                         (appState.onlineUserIds.contains(peer.id) || (peer.isActive && peer.showActivity))
                                             ? Color(hex: "#2E9E66")
-                                            : Color(UIColor.tertiaryLabel)
+                                            : KinnectTheme.messageMeta
                                     )
                                     .frame(width: 7, height: 7)
 
@@ -766,6 +819,19 @@ struct DirectChatDetailView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 10) {
+                        if hasMoreMessages, nextMessagesCursor != nil {
+                            Button {
+                                Task { await loadOlderMessages() }
+                            } label: {
+                                Text(isLoadingOlder ? "Đang tải…" : "Xem tin nhắn cũ hơn")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundColor(KinnectTheme.accentBright)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 7)
+                                    .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                            }
+                            .disabled(isLoadingOlder)
+                        }
                         ForEach(messages) { msg in
                             let isMine = (msg.fromUserId == appState.currentUser?.id)
                             directMessageBubble(msg: msg, isMine: isMine)
@@ -781,6 +847,34 @@ struct DirectChatDetailView: View {
                         }
                     }
                 }
+            }
+
+            if let reply = replyingToMessage {
+                HStack(spacing: 8) {
+                    Rectangle()
+                        .fill(KinnectTheme.accentBright)
+                        .frame(width: 3, height: 28)
+                        .cornerRadius(2)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Đang trả lời \(reply.fromUserId == appState.currentUser?.id ? "chính bạn" : peer.name)")
+                            .font(.caption.bold())
+                            .foregroundColor(KinnectTheme.accentBright)
+                        Text(reply.text.isEmpty ? "Tệp đính kèm" : reply.text)
+                            .font(.caption)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    Button {
+                        replyingToMessage = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(KinnectTheme.surfaceElevated)
             }
 
             if let editId = editingMessageId {
@@ -826,7 +920,7 @@ struct DirectChatDetailView: View {
                 } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(.system(size: 28))
-                        .foregroundColor(Color(UIColor.tertiaryLabel))
+                        .foregroundColor(KinnectTheme.messageMeta)
                         .frame(width: 34, height: 38)
                 }
                 .accessibilityLabel("Đính kèm tệp hoặc ảnh")
@@ -975,7 +1069,8 @@ struct DirectChatDetailView: View {
         .task {
             await loadMessages()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .kinnectMessagesChanged)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .kinnectMessagesChanged)) { note in
+            guard note.userInfo?["markReadKind"] == nil else { return }
             Task { await loadMessages() }
         }
     }
@@ -987,9 +1082,25 @@ struct DirectChatDetailView: View {
             VStack(alignment: isMine ? .trailing : .leading, spacing: 3) {
                 ZStack(alignment: isMine ? .topLeading : .topTrailing) {
                     VStack(alignment: isMine ? .trailing : .leading, spacing: 6) {
+                        if let q = msg.replyTo {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(q.senderName.isEmpty ? "Tin nhắn" : q.senderName)
+                                    .font(.caption2.bold())
+                                    .foregroundColor(isMine ? .white.opacity(0.9) : KinnectTheme.accentBright)
+                                Text(q.body.isEmpty ? "Tệp đính kèm" : q.body)
+                                    .font(.caption)
+                                    .foregroundColor(isMine ? .white.opacity(0.85) : KinnectTheme.textSecondary)
+                                    .lineLimit(2)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(RoundedRectangle(cornerRadius: 10).fill(isMine ? Color.white.opacity(0.18) : KinnectTheme.surfaceElevated))
+                        }
+
                         // Image preview if present
                         if !msg.imageUrl.isEmpty {
-                            KinnectRemoteImageView(rawURL: msg.imageUrl, cornerRadius: 16, maxHeight: 240)
+                            KinnectRemoteImageView(rawURL: msg.imageUrl, contentMode: .fill, cornerRadius: 16, maxHeight: 260)
+                                .frame(maxWidth: 260)
                                 .clipShape(MessageBubbleShape(isMine: isMine))
                         }
 
@@ -1047,7 +1158,7 @@ struct DirectChatDetailView: View {
                 HStack(spacing: 6) {
                     Text(formatRelativeDate(msg.createdAt))
                         .font(.system(size: 11))
-                        .foregroundColor(Color(UIColor.tertiaryLabel))
+                        .foregroundColor(KinnectTheme.messageMeta)
 
                     if isMine {
                         if msg.isSeen {
@@ -1061,11 +1172,11 @@ struct DirectChatDetailView: View {
                         } else if !msg.deliveredAt.isEmpty {
                             Text("· Đã nhận")
                                 .font(.system(size: 11))
-                                .foregroundColor(Color(UIColor.tertiaryLabel))
+                                .foregroundColor(KinnectTheme.messageMeta)
                         } else {
                             Text("· Đã gửi")
                                 .font(.system(size: 11))
-                                .foregroundColor(Color(UIColor.tertiaryLabel))
+                                .foregroundColor(KinnectTheme.messageMeta)
                         }
                     }
 
@@ -1076,7 +1187,7 @@ struct DirectChatDetailView: View {
                     } label: {
                         Image(systemName: "face.smiling")
                             .font(.system(size: 12))
-                            .foregroundColor(messageReactions[msg.id] != nil ? KinnectTheme.accentBright : Color(UIColor.tertiaryLabel))
+                            .foregroundColor(messageReactions[msg.id] != nil ? KinnectTheme.accentBright : KinnectTheme.messageMeta)
                             .frame(width: 32, height: 32)
                             .contentShape(Rectangle())
                     }
@@ -1090,6 +1201,12 @@ struct DirectChatDetailView: View {
                     )
 
                     Menu {
+                        Button {
+                            replyingToMessage = msg
+                        } label: {
+                            Label("Trả lời", systemImage: "arrowshape.turn.up.left")
+                        }
+
                         if isMine {
                             Button {
                                 editingMessageId = msg.id
@@ -1128,7 +1245,7 @@ struct DirectChatDetailView: View {
                     } label: {
                         Image(systemName: "ellipsis")
                             .font(.system(size: 12))
-                            .foregroundColor(Color(UIColor.tertiaryLabel))
+                            .foregroundColor(KinnectTheme.messageMeta)
                             .frame(width: 32, height: 32)
                             .contentShape(Rectangle())
                     }
@@ -1174,11 +1291,34 @@ struct DirectChatDetailView: View {
         // Fetching GET /api/users/:id/messages marks incoming messages as seen on backend
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/users/\(peer.id)/messages") {
             let list = res["messages"] as? [[String: Any]] ?? []
-            self.messages = list.map(DirectMessageItem.from)
+            let latest = list.map(DirectMessageItem.from)
+            if self.messages.isEmpty {
+                self.messages = latest
+                self.hasMoreMessages = (res["hasMore"] as? Bool) ?? false
+                self.nextMessagesCursor = (res["nextCursor"] as? NSNumber)?.int64Value
+            } else {
+                let latestIds = Set(latest.map(\.id))
+                let older = self.messages.filter { !latestIds.contains($0.id) && !$0.id.hasPrefix("opt_") }
+                self.messages = older + latest
+            }
             for m in self.messages where !m.reaction.isEmpty {
                 messageReactions[m.id] = m.reaction
             }
+            postMessagesMarkedRead(kind: "direct", id: peer.id)
             await appState.refreshGlobalBadges()
+        }
+    }
+
+    private func loadOlderMessages() async {
+        guard hasMoreMessages, let cursor = nextMessagesCursor, !isLoadingOlder else { return }
+        isLoadingOlder = true
+        defer { isLoadingOlder = false }
+        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/users/\(peer.id)/messages?limit=50&before=\(cursor)") {
+            let older = (res["messages"] as? [[String: Any]] ?? []).map(DirectMessageItem.from)
+            let existing = Set(self.messages.map(\.id))
+            self.messages = older.filter { !existing.contains($0.id) } + self.messages
+            self.hasMoreMessages = (res["hasMore"] as? Bool) ?? false
+            self.nextMessagesCursor = (res["nextCursor"] as? NSNumber)?.int64Value
         }
     }
 
@@ -1270,6 +1410,9 @@ struct DirectChatDetailView: View {
             "imageUrl": imageDataURL,
             "requestId": reqId
         ]
+        if let reply = replyingToMessage {
+            payload["replyToId"] = reply.id
+        }
         if !imageDataURL.isEmpty {
             payload["attachment"] = ["data": imageDataURL, "name": "photo.jpg"]
         }
@@ -1280,6 +1423,7 @@ struct DirectChatDetailView: View {
                 body: payload,
                 requestId: reqId
             )
+            self.replyingToMessage = nil
             await loadMessages()
             NotificationCenter.default.post(name: .kinnectMessagesChanged, object: nil)
         } catch {
@@ -1395,6 +1539,9 @@ struct GroupChatDetailView: View {
     @State private var reactionPickerMessageId: String = ""
     @State private var reactionPickerIsDirect = false
     @State private var reactionPickerFrame: CGRect = .zero
+    @State private var hasMoreMessages = false
+    @State private var nextMessagesCursor: Int64? = nil
+    @State private var isLoadingOlder = false
 
     private var currentMentionQuery: String? {
         guard let lastAt = text.lastIndex(of: "@") else { return nil }
@@ -1442,20 +1589,33 @@ struct GroupChatDetailView: View {
     private func formattedBubbleText(_ rawText: String, isMine: Bool) -> Text {
         let words = rawText.components(separatedBy: " ")
         var result = Text("")
-        for (idx, word) in words.enumerated() {
+        var idx = 0
+        while idx < words.count {
             let space = (idx == 0) ? Text("") : Text(" ")
-            if word.hasPrefix("@") {
+            let word = words[idx]
+            if (word.lowercased() == "@tất") && (idx + 1 < words.count) && words[idx + 1].lowercased().hasPrefix("cả") {
+                let phrase = "\(word) \(words[idx + 1])"
+                let styled = Text(phrase)
+                    .font(.subheadline)
+                    .bold()
+                    .foregroundColor(isMine ? Color.white : KinnectTheme.accentBright)
+                    .underline()
+                result = result + space + styled
+                idx += 2
+            } else if word.hasPrefix("@") {
                 let styled = Text(word)
                     .font(.subheadline)
                     .bold()
                     .foregroundColor(isMine ? Color.white : KinnectTheme.accentBright)
                     .underline()
                 result = result + space + styled
+                idx += 1
             } else {
                 let normal = Text(word)
                     .font(.subheadline)
                     .foregroundColor(isMine ? Color.white : KinnectTheme.textPrimary)
                 result = result + space + normal
+                idx += 1
             }
         }
         return result
@@ -1484,9 +1644,25 @@ struct GroupChatDetailView: View {
 
                 ZStack(alignment: isMine ? .topLeading : .topTrailing) {
                     VStack(alignment: isMine ? .trailing : .leading, spacing: 6) {
+                        if let q = msg.replyTo {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(q.senderName.isEmpty ? "Tin nhắn" : q.senderName)
+                                    .font(.caption2.bold())
+                                    .foregroundColor(isMine ? .white.opacity(0.9) : KinnectTheme.accentBright)
+                                Text(q.body.isEmpty ? "Tệp đính kèm" : q.body)
+                                    .font(.caption)
+                                    .foregroundColor(isMine ? .white.opacity(0.85) : KinnectTheme.textSecondary)
+                                    .lineLimit(2)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(RoundedRectangle(cornerRadius: 10).fill(isMine ? Color.white.opacity(0.18) : KinnectTheme.surfaceElevated))
+                        }
+
                         // Image preview if present
                         if !msg.imageUrl.isEmpty {
-                            KinnectRemoteImageView(rawURL: msg.imageUrl, cornerRadius: 16, maxHeight: 240)
+                            KinnectRemoteImageView(rawURL: msg.imageUrl, contentMode: .fill, cornerRadius: 16, maxHeight: 260)
+                                .frame(maxWidth: 260)
                                 .clipShape(MessageBubbleShape(isMine: isMine))
                         }
                         // File attachment card if present
@@ -1568,7 +1744,7 @@ struct GroupChatDetailView: View {
             HStack(spacing: 6) {
                 Text(formatRelativeDate(msg.createdAt))
                     .font(.system(size: 11))
-                    .foregroundColor(Color(UIColor.tertiaryLabel))
+                    .foregroundColor(KinnectTheme.messageMeta)
 
                 HStack(spacing: 2) {
                     Image(systemName: "checkmark")
@@ -1585,7 +1761,7 @@ struct GroupChatDetailView: View {
                 } label: {
                     Image(systemName: "face.smiling")
                         .font(.system(size: 12))
-                        .foregroundColor(groupReactions[msg.id] != nil ? KinnectTheme.accentBright : Color(UIColor.tertiaryLabel))
+                        .foregroundColor(groupReactions[msg.id] != nil ? KinnectTheme.accentBright : KinnectTheme.messageMeta)
                         .frame(width: 32, height: 32)
                         .contentShape(Rectangle())
                 }
@@ -1627,7 +1803,7 @@ struct GroupChatDetailView: View {
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 12))
-                        .foregroundColor(Color(UIColor.tertiaryLabel))
+                        .foregroundColor(KinnectTheme.messageMeta)
                         .frame(width: 32, height: 32)
                         .contentShape(Rectangle())
                 }
@@ -1740,7 +1916,7 @@ struct GroupChatDetailView: View {
             } label: {
                 Image(systemName: "plus.circle.fill")
                     .font(.system(size: 28))
-                    .foregroundColor(Color(UIColor.tertiaryLabel))
+                    .foregroundColor(KinnectTheme.messageMeta)
                     .frame(width: 34, height: 38)
             }
             .accessibilityLabel("Đính kèm tệp hoặc ảnh")
@@ -1883,7 +2059,7 @@ struct GroupChatDetailView: View {
 
                         Text("\(max(groupMembers.count, 1)) thành viên")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(Color(UIColor.tertiaryLabel))
+                            .foregroundColor(KinnectTheme.messageMeta)
                     }
                 }
 
@@ -1933,6 +2109,19 @@ struct GroupChatDetailView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 10) {
+                        if hasMoreMessages, nextMessagesCursor != nil {
+                            Button {
+                                Task { await loadOlderMessages() }
+                            } label: {
+                                Text(isLoadingOlder ? "Đang tải…" : "Xem tin nhắn cũ hơn")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundColor(KinnectTheme.accentBright)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 7)
+                                    .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                            }
+                            .disabled(isLoadingOlder)
+                        }
                         ForEach(messages) { msg in
                             groupMessageRow(msg: msg)
                                 .id(msg.id)
@@ -2002,7 +2191,8 @@ struct GroupChatDetailView: View {
             }
             await loadGroupMessages()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .kinnectMessagesChanged)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .kinnectMessagesChanged)) { note in
+            guard note.userInfo?["markReadKind"] == nil else { return }
             Task { await loadGroupMessages() }
         }
     }
@@ -2027,10 +2217,35 @@ struct GroupChatDetailView: View {
         }
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/groups/\(group.id)/messages") {
             let list = res["messages"] as? [[String: Any]] ?? []
-            self.messages = list.map(GroupMessageItem.from)
+            let latest = list.map(GroupMessageItem.from)
+            if self.messages.isEmpty {
+                self.messages = latest
+                self.hasMoreMessages = (res["hasMore"] as? Bool) ?? false
+                self.nextMessagesCursor = (res["nextCursor"] as? NSNumber)?.int64Value
+            } else {
+                let latestIds = Set(latest.map(\.id))
+                let older = self.messages.filter { !latestIds.contains($0.id) && !$0.id.hasPrefix("opt_") }
+                self.messages = older + latest
+            }
             for m in self.messages where !m.reaction.isEmpty {
                 groupReactions[m.id] = m.reaction
             }
+            syncGroupMembersFromMessages()
+            postMessagesMarkedRead(kind: "group", id: group.id)
+            await appState.refreshGlobalBadges()
+        }
+    }
+
+    private func loadOlderMessages() async {
+        guard hasMoreMessages, let cursor = nextMessagesCursor, !isLoadingOlder else { return }
+        isLoadingOlder = true
+        defer { isLoadingOlder = false }
+        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/groups/\(group.id)/messages?limit=50&before=\(cursor)") {
+            let older = (res["messages"] as? [[String: Any]] ?? []).map(GroupMessageItem.from)
+            let existing = Set(self.messages.map(\.id))
+            self.messages = older.filter { !existing.contains($0.id) } + self.messages
+            self.hasMoreMessages = (res["hasMore"] as? Bool) ?? false
+            self.nextMessagesCursor = (res["nextCursor"] as? NSNumber)?.int64Value
             syncGroupMembersFromMessages()
         }
     }

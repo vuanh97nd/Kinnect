@@ -1338,40 +1338,28 @@ struct PrivateAlbumManageSheet: View {
                             .font(.caption)
                             .foregroundColor(KinnectTheme.textSecondary)
                     } else {
-                        ForEach(photos) { photo in
-                            HStack(alignment: .center, spacing: 12) {
-                                // Fixed-size, clipped thumbnail so the image can never extend under the text column.
-                                KinnectRemoteImageView(rawURL: photo.url, contentMode: .fill, cornerRadius: KinnectTheme.radiusXS, maxHeight: 64)
-                                    .frame(width: 64, height: 64)
-                                    .clipShape(RoundedRectangle(cornerRadius: KinnectTheme.radiusXS, style: .continuous))
-                                    .contentShape(Rectangle())
-                                    .layoutPriority(0)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Ảnh bảo mật")
-                                        .font(.subheadline.bold())
-                                        .foregroundColor(KinnectTheme.textPrimary)
-                                        .lineLimit(1)
-                                    Text("Chỉ người được duyệt mới xem được")
-                                        .font(.caption2)
-                                        .foregroundColor(KinnectTheme.textSecondary)
-                                        .lineLimit(2)
-                                        .fixedSize(horizontal: false, vertical: true)
+                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                            ForEach(photos) { photo in
+                                ZStack(alignment: .topTrailing) {
+                                    KinnectRemoteImageView(rawURL: photo.url, contentMode: .fill, cornerRadius: KinnectTheme.radiusSM, maxHeight: 110)
+                                        .aspectRatio(1, contentMode: .fill)
+                                        .clipShape(RoundedRectangle(cornerRadius: KinnectTheme.radiusSM, style: .continuous))
+                                    Button(role: .destructive) {
+                                        Task { await deletePrivatePhoto(photo.id) }
+                                    } label: {
+                                        Image(systemName: "trash.fill")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundColor(.white)
+                                            .frame(width: 26, height: 26)
+                                            .background(Circle().fill(Color.black.opacity(0.65)))
+                                    }
+                                    .buttonStyle(.plain)
+                                    .padding(5)
+                                    .accessibilityLabel("Xóa ảnh bảo mật")
                                 }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .layoutPriority(1)
-                                Button(role: .destructive) {
-                                    Task { await deletePrivatePhoto(photo.id) }
-                                } label: {
-                                    Image(systemName: "trash")
-                                        .foregroundColor(KinnectTheme.danger)
-                                        .frame(width: 44, height: 44)
-                                        .contentShape(Rectangle())
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel("Xóa ảnh bảo mật")
                             }
-                            .padding(.vertical, 4)
                         }
+                        .padding(.vertical, 6)
                     }
                 }
             }
@@ -2069,15 +2057,27 @@ struct ActiveSessionsSheet: View {
             List {
                 ForEach(Array(sessions.enumerated()), id: \.offset) { _, s in
                     let sid = s["id"] as? String ?? ""
-                    let ua = s["userAgent"] as? String ?? "Thiết bị Kinnect"
+                    let label = (s["label"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Thiết bị Kinnect"
                     let current = s["current"] as? Bool ?? false
-                    HStack {
+                    let expires = (s["expires"] as? NSNumber)?.int64Value ?? (s["expires"] as? Int64) ?? Int64((s["expires"] as? Int) ?? 0)
+                    let deviceIcon: String = {
+                        let low = label.lowercased()
+                        if low.contains("ipad") { return "ipad" }
+                        if low.contains("mac") || low.contains("windows") || low.contains("linux") || low.contains("web") { return "desktopcomputer" }
+                        return "iphone"
+                    }()
+                    HStack(spacing: 12) {
+                        Image(systemName: deviceIcon)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(current ? KinnectTheme.online : KinnectTheme.accentBright)
+                            .frame(width: 38, height: 38)
+                            .background(Circle().fill(KinnectTheme.surfaceElevated))
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(ua)
+                            Text(label)
                                 .font(.subheadline.bold())
                                 .foregroundColor(KinnectTheme.textPrimary)
                                 .kinnectMultiline()
-                            Text(current ? "Phiên hiện tại trên thiết bị này" : "Phiên hoạt động")
+                            Text(current ? "Thiết bị hiện tại" : Self.sessionExpiry(expires))
                                 .font(.caption)
                                 .foregroundColor(current ? KinnectTheme.online : KinnectTheme.textSecondary)
                         }
@@ -2091,6 +2091,7 @@ struct ActiveSessionsSheet: View {
                             }
                         }
                     }
+                    .padding(.vertical, 4)
                     .listRowBackground(KinnectTheme.surface)
                 }
             }
@@ -2110,6 +2111,15 @@ struct ActiveSessionsSheet: View {
                 await loadSessions()
             }
         }
+    }
+
+    private static func sessionExpiry(_ expires: Int64) -> String {
+        guard expires > 0 else { return "Phiên hoạt động" }
+        let date = Date(timeIntervalSince1970: TimeInterval(expires) / 1000)
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "vi_VN")
+        formatter.dateFormat = "dd/MM/yyyy"
+        return "Hết hạn \(formatter.string(from: date))"
     }
 
     private func loadSessions() async {
@@ -2268,7 +2278,7 @@ struct ChangePasswordSheet: View {
             return
         }
         if UIReviewFixture.activeScreen != nil {
-            appState.showToast("Đã đổi mật khẩu thành công.")
+            appState.showToast("Đã đổi mật khẩu. Các thiết bị khác đã được đăng xuất.")
             dismiss()
             return
         }
@@ -2279,11 +2289,11 @@ struct ChangePasswordSheet: View {
                 "/api/me/password",
                 method: "POST",
                 body: [
-                    "currentPassword": currentPassword,
-                    "newPassword": newPassword
+                    "current": currentPassword,
+                    "next": newPassword
                 ]
             )
-            appState.showToast("Đã đổi mật khẩu thành công.")
+            appState.showToast("Đã đổi mật khẩu. Các thiết bị khác đã được đăng xuất.")
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
@@ -2607,28 +2617,33 @@ struct PrivacySettingsSheet: View {
                     }
                     .padding(16)
                     .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusXL).fill(KinnectTheme.surface))
-
-                    Button {
-                        Task { await saveSettings() }
-                    } label: {
-                        HStack(spacing: 8) {
-                            if isSaving {
-                                ProgressView().tint(.white)
-                            }
-                            Text("Lưu cài đặt")
-                                .font(.headline)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 48)
-                        .background(KinnectTheme.primaryGradient)
-                        .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD))
-                    }
-                    .disabled(isSaving)
-                    .padding(.top, 4)
                 }
                 .padding(20)
+                .padding(.bottom, 8)
             }
             .background(KinnectTheme.background)
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    Task { await saveSettings() }
+                } label: {
+                    HStack(spacing: 8) {
+                        if isSaving {
+                            ProgressView().tint(.white)
+                        }
+                        Text("Lưu cài đặt")
+                            .font(.headline)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .background(KinnectTheme.primaryGradient)
+                    .foregroundColor(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD))
+                }
+                .disabled(isSaving)
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 12)
+                .background(KinnectTheme.background)
+            }
             .navigationTitle("Quyền riêng tư")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -62,6 +62,8 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
     var showDistance: Bool
     var discoverable: Bool
     var hasLocation: Bool
+    var dmMode: String
+    var accountRole: String
 
     var avatarURL: String? { avatarUrl.isEmpty ? nil : avatarUrl }
 
@@ -106,7 +108,9 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         showActivity: Bool = true,
         showDistance: Bool = true,
         discoverable: Bool = true,
-        hasLocation: Bool = false
+        hasLocation: Bool = false,
+        dmMode: String = "everyone",
+        accountRole: String = ""
     ) {
         self.id = id
         self.name = name
@@ -149,6 +153,8 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         self.showDistance = showDistance
         self.discoverable = discoverable
         self.hasLocation = hasLocation
+        self.dmMode = dmMode
+        self.accountRole = accountRole
     }
 
     init(json: [String: Any]) {
@@ -230,7 +236,77 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
             showActivity: (dict["showActivity"] as? Bool) ?? ((dict["show_activity"] as? Int) == 1) ?? true,
             showDistance: (dict["showDistance"] as? Bool) ?? ((dict["show_distance"] as? Int) == 1) ?? true,
             discoverable: (dict["discoverable"] as? Bool) ?? ((dict["discoverable"] as? Int) == 1) ?? true,
-            hasLocation: (dict["hasLocation"] as? Bool) ?? false
+            hasLocation: (dict["hasLocation"] as? Bool) ?? false,
+            dmMode: {
+                let raw = (dict["dmMode"] as? String) ?? (dict["dm_mode"] as? String) ?? "everyone"
+                return raw == "friends" ? "friends" : "everyone"
+            }(),
+            accountRole: (dict["role"] as? String) ?? ""
+        )
+    }
+}
+
+struct PostMediaEntry: Identifiable, Equatable {
+    var id: String
+    var position: Int
+    var kind: String
+    var url: String
+    var thumbnail: String = ""
+
+    static func from(_ dict: [String: Any]) -> PostMediaEntry {
+        PostMediaEntry(
+            id: (dict["id"] as? String) ?? UUID().uuidString,
+            position: (dict["position"] as? Int) ?? 0,
+            kind: (dict["kind"] as? String) ?? "image",
+            url: (dict["url"] as? String) ?? "",
+            thumbnail: (dict["thumbnail"] as? String) ?? ""
+        )
+    }
+}
+
+struct SharedPostPreview: Identifiable, Equatable {
+    var id: String
+    var author: KinnectUser
+    var text: String
+    var createdAt: String
+    var imageUrl: String
+    var mediaKind: String
+    var mediaItems: [PostMediaEntry]
+
+    static func from(_ dict: [String: Any]) -> SharedPostPreview {
+        let authorDict = (dict["author"] as? [String: Any]) ?? dict
+        let mediaDict = dict["media"] as? [String: Any]
+        let items = (dict["mediaItems"] as? [[String: Any]])?.map(PostMediaEntry.from) ?? []
+        return SharedPostPreview(
+            id: (dict["id"] as? String) ?? UUID().uuidString,
+            author: KinnectUser.from(authorDict),
+            text: (dict["body"] as? String) ?? (dict["text"] as? String) ?? "",
+            createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
+            imageUrl: (mediaDict?["url"] as? String) ?? items.first?.url ?? "",
+            mediaKind: (mediaDict?["kind"] as? String) ?? items.first?.kind ?? "image",
+            mediaItems: items
+        )
+    }
+}
+
+struct ChatReplyPreview: Equatable {
+    var id: String
+    var sender: String
+    var senderName: String
+    var body: String
+    var recalled: Bool
+    var unavailable: Bool
+    var attachmentKind: String
+
+    static func from(_ dict: [String: Any]) -> ChatReplyPreview {
+        ChatReplyPreview(
+            id: (dict["id"] as? String) ?? "",
+            sender: (dict["sender"] as? String) ?? "",
+            senderName: (dict["senderName"] as? String) ?? "",
+            body: (dict["body"] as? String) ?? "",
+            recalled: (dict["recalled"] as? Bool) ?? false,
+            unavailable: (dict["unavailable"] as? Bool) ?? false,
+            attachmentKind: (dict["attachmentKind"] as? String) ?? ""
         )
     }
 }
@@ -247,11 +323,20 @@ struct PostItem: Identifiable, Equatable {
     var liked: Bool
     var userReaction: String
     var mediaKind: String = "image"
+    var thumbnailUrl: String = ""
+    var mediaItems: [PostMediaEntry] = []
+    var hashtags: [String] = []
+    var bookmarked: Bool = false
+    var sharesCount: Int = 0
+    var sharedPost: SharedPostPreview? = nil
 
     static func from(_ dict: [String: Any]) -> PostItem {
         let authorDict = (dict["author"] as? [String: Any]) ?? (dict["user"] as? [String: Any]) ?? dict
         let mediaDict = dict["media"] as? [String: Any]
         let img = (dict["imageUrl"] as? String) ?? (dict["image"] as? String) ?? (mediaDict?["url"] as? String) ?? ""
+        let items = (dict["mediaItems"] as? [[String: Any]])?.map(PostMediaEntry.from) ?? []
+        let tags = (dict["hashtags"] as? [String]) ?? []
+        let shared = (dict["sharedPost"] as? [String: Any]).map(SharedPostPreview.from)
         return PostItem(
             id: (dict["id"] as? String) ?? UUID().uuidString,
             author: KinnectUser.from(authorDict),
@@ -263,7 +348,13 @@ struct PostItem: Identifiable, Equatable {
             commentsCount: (dict["commentsCount"] as? Int) ?? (dict["comments"] as? Int) ?? 0,
             liked: (dict["liked"] as? Bool) ?? false,
             userReaction: (dict["userReaction"] as? String) ?? (dict["myReaction"] as? String) ?? "like",
-            mediaKind: (mediaDict?["kind"] as? String) ?? (dict["mediaKind"] as? String) ?? (img.lowercased().contains(".mp4") ? "video" : "image")
+            mediaKind: (mediaDict?["kind"] as? String) ?? (dict["mediaKind"] as? String) ?? (img.lowercased().contains(".mp4") ? "video" : "image"),
+            thumbnailUrl: (mediaDict?["thumbnail"] as? String) ?? "",
+            mediaItems: items,
+            hashtags: tags,
+            bookmarked: (dict["bookmarked"] as? Bool) ?? false,
+            sharesCount: (dict["shares"] as? Int) ?? 0,
+            sharedPost: shared
         )
     }
 }
@@ -370,6 +461,8 @@ struct DirectMessageItem: Identifiable, Equatable {
     var reaction: String = ""
     var reactions: [String: Int] = [:]
     var myReaction: String = ""
+    var replyTo: ChatReplyPreview? = nil
+    var editedAt: String = ""
 
     var isSeen: Bool { !seenAt.isEmpty }
 
@@ -430,7 +523,9 @@ struct DirectMessageItem: Identifiable, Equatable {
             seenAt: seen,
             reaction: effectiveRx,
             reactions: rxDict,
-            myReaction: myRx
+            myReaction: myRx,
+            replyTo: (dict["replyTo"] as? [String: Any]).map(ChatReplyPreview.from),
+            editedAt: dict["editedAt"] != nil && !(dict["editedAt"] is NSNull) ? isoString(from: dict["editedAt"]) : ""
         )
     }
 }
@@ -479,6 +574,8 @@ struct GroupMessageItem: Identifiable, Equatable {
     var reaction: String = ""
     var reactions: [String: Int] = [:]
     var myReaction: String = ""
+    var replyTo: ChatReplyPreview? = nil
+    var editedAt: String = ""
 
     static func from(_ dict: [String: Any]) -> GroupMessageItem {
         let senderDict = (dict["sender"] as? [String: Any]) ?? (dict["author"] as? [String: Any]) ?? (dict["user"] as? [String: Any]) ?? dict
@@ -512,7 +609,9 @@ struct GroupMessageItem: Identifiable, Equatable {
             seenCount: (dict["seenCount"] as? Int) ?? (receipt?["seenCount"] as? Int) ?? seenBy?.count ?? 0,
             reaction: effectiveRx,
             reactions: rxDict,
-            myReaction: myRx
+            myReaction: myRx,
+            replyTo: (dict["replyTo"] as? [String: Any]).map(ChatReplyPreview.from),
+            editedAt: dict["editedAt"] != nil && !(dict["editedAt"] is NSNull) ? isoString(from: dict["editedAt"]) : ""
         )
     }
 }

@@ -49,7 +49,14 @@ final class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationC
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        completionHandler([.banner, .sound, .badge])
+        let kind = (notification.request.content.userInfo["kind"] as? String)
+            ?? (notification.request.content.userInfo["type"] as? String)
+            ?? ""
+        if KinnectNotificationPrefs.allowsPresentation(kind: kind) {
+            completionHandler([.banner, .sound, .badge])
+        } else {
+            completionHandler([])
+        }
     }
 
     func userNotificationCenter(
