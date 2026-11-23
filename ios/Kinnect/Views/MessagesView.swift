@@ -309,10 +309,11 @@ struct MessagesView: View {
             ?? (conv["preview"] as? String)
             ?? "Nhấn để trò chuyện"
         let unread = (conv["unread"] as? Int) ?? (conv["unreadCount"] as? Int) ?? 0
-        let rawTime = (lastObj?["createdAt"] as? String)
-            ?? (conv["updatedAt"] as? String)
-            ?? (conv["lastTime"] as? String)
-            ?? ""
+        let rawTime = [
+            isoString(from: lastObj?["createdAt"] ?? lastObj?["created"]),
+            isoString(from: conv["updatedAt"]),
+            isoString(from: conv["lastTime"])
+        ].first(where: { !$0.isEmpty }) ?? ""
         let isOnline = appState.onlineUserIds.contains(peer.id) || (peer.isActive && peer.showActivity)
 
         return HStack(spacing: 14) {
@@ -616,17 +617,38 @@ struct ChatAttachmentBubbleView: View {
                 }
             }
         }
-        let fullURLStr = fileUrl.hasPrefix("http") ? fileUrl : "\(KinnectAPIClient.shared.baseURL)\(fileUrl)"
-        if let targetURL = URL(string: fullURLStr) {
-            UIApplication.shared.open(targetURL)
+        let rawExt = (fileName as NSString).pathExtension
+        let urlExt = (fileUrl as NSString).pathExtension
+        let ext = !rawExt.isEmpty ? rawExt : (!urlExt.isEmpty ? urlExt : "dat")
+        Task {
+            do {
+                let localURL = try await KinnectAuthenticatedFile.fetch(path: fileUrl, fileExtension: ext)
+                await MainActor.run {
+                    presentShareSheet(for: localURL)
+                }
+            } catch {
+                await MainActor.run {
+                    AppState.shared.showToast("Không mở được tệp: \(error.localizedDescription)")
+                }
+            }
         }
     }
 
     private func presentShareSheet(for fileURL: URL) {
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let rootVC = windowScene.windows.first?.rootViewController else { return }
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let activeScene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
+        let keyWindow = activeScene?.windows.first(where: { $0.isKeyWindow }) ?? activeScene?.windows.first
+        guard var topVC = keyWindow?.rootViewController else { return }
+        while let presented = topVC.presentedViewController {
+            topVC = presented
+        }
         let activityVC = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
-        rootVC.present(activityVC, animated: true)
+        if let popover = activityVC.popoverPresentationController {
+            popover.sourceView = topVC.view
+            popover.sourceRect = CGRect(x: topVC.view.bounds.midX, y: topVC.view.bounds.midY, width: 1, height: 1)
+            popover.permittedArrowDirections = []
+        }
+        topVC.present(activityVC, animated: true)
     }
 }
 
@@ -669,7 +691,7 @@ struct DirectChatDetailView: View {
             let initial = list.map(DirectMessageItem.from)
             _messages = State(initialValue: initial)
             var rx: [String: String] = [:]
-            for m in initial where !m.reaction.isEmpty { rx[m.id] = m.reaction }
+            for m in initial where !m.myReaction.isEmpty { rx[m.id] = m.myReaction }
             _messageReactions = State(initialValue: rx)
             _hasMoreMessages = State(initialValue: (cached["hasMore"] as? Bool) ?? false)
             _nextMessagesCursor = State(initialValue: (cached["nextCursor"] as? NSNumber)?.int64Value)
@@ -1078,15 +1100,41 @@ struct DirectChatDetailView: View {
         .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.item]) { result in
             switch result {
             case .success(let fileURL):
-                guard fileURL.startAccessingSecurityScopedResource() else { return }
-                defer { fileURL.stopAccessingSecurityScopedResource() }
+                guard fileURL.startAccessingSecurityScopedResource() else {
+                    appState.showToast("Không có quyền truy cập tệp đã chọn.")
+                    return
+                }
+                let maxBytes = 20 * 1024 * 1024
+                if let values = try? fileURL.resourceValues(forKeys: [.fileSizeKey]),
+                   let fileSize = values.fileSize,
+                   fileSize > maxBytes {
+                    fileURL.stopAccessingSecurityScopedResource()
+                    appState.showToast("Tệp vượt quá giới hạn 20 MB.")
+                    return
+                }
                 let fileName = fileURL.lastPathComponent
-                if let data = try? Data(contentsOf: fileURL) {
+                let ext = fileURL.pathExtension
+                Task.detached(priority: .userInitiated) {
+                    defer { fileURL.stopAccessingSecurityScopedResource() }
+                    guard let data = try? Data(contentsOf: fileURL) else {
+                        await MainActor.run {
+                            appState.showToast("Không thể đọc tệp đã chọn.")
+                        }
+                        return
+                    }
+                    if data.count > maxBytes {
+                        await MainActor.run {
+                            appState.showToast("Tệp vượt quá giới hạn 20 MB.")
+                        }
+                        return
+                    }
                     let base64 = data.base64EncodedString()
-                    let mime = mimeTypeForExt(fileURL.pathExtension)
+                    let mime = mimeTypeForExt(ext)
                     let dataURL = "data:\(mime);base64,\(base64)"
-                    Task {
-                        await sendFileMessage(name: fileName, dataURL: dataURL)
+                    await MainActor.run {
+                        Task {
+                            await sendFileMessage(name: fileName, dataURL: dataURL)
+                        }
                     }
                 }
             case .failure(let err):
@@ -1311,33 +1359,41 @@ struct DirectChatDetailView: View {
            let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/users/\(peer.id)/messages"),
            let list = cached["messages"] as? [[String: Any]] {
             self.messages = list.map(DirectMessageItem.from)
-            for m in self.messages where !m.reaction.isEmpty {
-                messageReactions[m.id] = m.reaction
+            var rx: [String: String] = [:]
+            for m in self.messages where !m.myReaction.isEmpty {
+                rx[m.id] = m.myReaction
             }
+            self.messageReactions = rx
         }
         // Fetching GET /api/users/:id/messages marks incoming messages as seen on backend
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/users/\(peer.id)/messages") {
             let list = res["messages"] as? [[String: Any]] ?? []
             let latest = list.map(DirectMessageItem.from)
             let merged: [DirectMessageItem]
-            if self.messages.isEmpty {
+            if self.messages.isEmpty || latest.isEmpty {
                 merged = latest
                 self.hasMoreMessages = (res["hasMore"] as? Bool) ?? false
                 self.nextMessagesCursor = (res["nextCursor"] as? NSNumber)?.int64Value
-            } else {
+            } else if let oldestLatestTime = latest.first?.createdAt, !oldestLatestTime.isEmpty {
                 let latestIds = Set(latest.map(\.id))
-                let older = self.messages.filter { !latestIds.contains($0.id) && !$0.id.hasPrefix("opt_") }
+                let older = self.messages.filter {
+                    !latestIds.contains($0.id) && !$0.id.hasPrefix("opt_") && !$0.createdAt.isEmpty && $0.createdAt < oldestLatestTime
+                }
                 merged = older + latest
+            } else {
+                merged = latest
             }
             let sig: ([DirectMessageItem]) -> [String] = { arr in
-                arr.map { "\($0.id)|\($0.text)|\($0.isSeen)|\($0.deliveredAt)|\($0.reaction)|\($0.reactions.count)|\($0.imageUrl)|\($0.attachmentUrl)" }
+                arr.map { "\($0.id)|\($0.text)|\($0.isSeen)|\($0.deliveredAt)|\($0.myReaction)|\($0.reactions.count)|\($0.imageUrl)|\($0.attachmentUrl)" }
             }
             if sig(merged) != sig(self.messages) {
                 self.messages = merged
             }
-            for m in self.messages where !m.reaction.isEmpty {
-                messageReactions[m.id] = m.reaction
+            var rx: [String: String] = [:]
+            for m in self.messages where !m.myReaction.isEmpty {
+                rx[m.id] = m.myReaction
             }
+            self.messageReactions = rx
             postMessagesMarkedRead(kind: "direct", id: peer.id)
             await appState.refreshGlobalBadges()
         }
@@ -1350,7 +1406,11 @@ struct DirectChatDetailView: View {
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/users/\(peer.id)/messages?limit=50&before=\(cursor)") {
             let older = (res["messages"] as? [[String: Any]] ?? []).map(DirectMessageItem.from)
             let existing = Set(self.messages.map(\.id))
-            self.messages = older.filter { !existing.contains($0.id) } + self.messages
+            let newlyAdded = older.filter { !existing.contains($0.id) }
+            self.messages = newlyAdded + self.messages
+            for m in newlyAdded where !m.myReaction.isEmpty {
+                self.messageReactions[m.id] = m.myReaction
+            }
             self.hasMoreMessages = (res["hasMore"] as? Bool) ?? false
             self.nextMessagesCursor = (res["nextCursor"] as? NSNumber)?.int64Value
         }
@@ -1459,7 +1519,6 @@ struct DirectChatDetailView: View {
             )
             self.replyingToMessage = nil
             await loadMessages()
-            NotificationCenter.default.post(name: .kinnectMessagesChanged, object: nil)
         } catch {
             self.messages.removeAll { $0.id == tempId }
             self.text = text
@@ -1503,7 +1562,6 @@ struct DirectChatDetailView: View {
                 requestId: reqId
             )
             await loadMessages()
-            NotificationCenter.default.post(name: .kinnectMessagesChanged, object: nil)
         } catch {
             self.messages.removeAll { $0.id == tempId }
             appState.showToast("Không gửi được tệp: \(error.localizedDescription)")
@@ -1511,11 +1569,11 @@ struct DirectChatDetailView: View {
     }
 
     private func deleteMessage(_ msg: DirectMessageItem) async {
-        let reqId = "del_dm_\(msg.id)"
+        let reqId = "recall_dm_\(msg.id)"
         do {
             _ = try await KinnectAPIClient.shared.requestJSON(
-                "/api/users/\(peer.id)/messages/\(msg.id)",
-                method: "DELETE",
+                "/api/chat-messages/direct/\(msg.id)/recall",
+                method: "POST",
                 body: [:],
                 requestId: reqId
             )
@@ -1560,6 +1618,8 @@ struct GroupChatDetailView: View {
     @State private var selectedPhoto: PhotosPickerItem? = nil
     @State private var showFileImporter = false
     @State private var isSending = false
+    @State private var editingMessageId: String?
+    @State private var editingMessageText: String = ""
     @State private var forwardText = ""
     @State private var forwardImageUrl = ""
     @State private var showForwardSheet = false
@@ -1585,7 +1645,7 @@ struct GroupChatDetailView: View {
             let initial = list.map(GroupMessageItem.from)
             _messages = State(initialValue: initial)
             var rx: [String: String] = [:]
-            for m in initial where !m.reaction.isEmpty { rx[m.id] = m.reaction }
+            for m in initial where !m.myReaction.isEmpty { rx[m.id] = m.myReaction }
             _groupReactions = State(initialValue: rx)
             _hasMoreMessages = State(initialValue: (cached["hasMore"] as? Bool) ?? false)
             _nextMessagesCursor = State(initialValue: (cached["nextCursor"] as? NSNumber)?.int64Value)
@@ -1824,6 +1884,15 @@ struct GroupChatDetailView: View {
                 )
 
                 Menu {
+                    if isMine {
+                        Button {
+                            editingMessageId = msg.id
+                            editingMessageText = msg.text
+                        } label: {
+                            Label("Sửa tin nhắn", systemImage: "pencil")
+                        }
+                    }
+
                     Button {
                         forwardText = msg.text
                         forwardImageUrl = msg.imageUrl
@@ -1832,7 +1901,13 @@ struct GroupChatDetailView: View {
                         Label("Chuyển tiếp", systemImage: "arrow.turn.up.right")
                     }
 
-                    if !isMine {
+                    if isMine {
+                        Button(role: .destructive) {
+                            Task { await recallGroupMessage(msg) }
+                        } label: {
+                            Label("Thu hồi tin nhắn", systemImage: "trash")
+                        }
+                    } else {
                         Button(role: .destructive) {
                             appState.activeReportContext = UGCReportContext(
                                 targetType: "group_message",
@@ -2006,58 +2081,75 @@ struct GroupChatDetailView: View {
             }
             .accessibilityLabel("Nhắc tên thành viên")
 
-            HStack(alignment: .bottom, spacing: 6) {
+            if editingMessageId != nil {
                 TextField(
                     "",
-                    text: $text,
-                    prompt: Text("Tin nhắn nhóm…").foregroundColor(KinnectTheme.textSecondary),
-                    axis: .vertical
+                    text: $editingMessageText,
+                    prompt: Text("Nội dung tin nhắn mới...").foregroundColor(KinnectTheme.textSecondary)
                 )
-                .lineLimit(1...5)
                 .font(.system(size: 16))
-                .foregroundColor(KinnectTheme.textPrimary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-
-                if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Button {
-                        Task { await sendGroupMessage(text: text, imageDataURL: "") }
-                    } label: {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 30))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [Color(hex: "#8E2DE2"), Color(hex: "#4A00E0")],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                    }
-                    .disabled(isSending)
-                    .padding(.trailing, 4)
-                    .padding(.bottom, 3)
-                    .transition(.scale.combined(with: .opacity))
-                }
-            }
-            .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(KinnectTheme.surfaceElevated)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .stroke(KinnectTheme.borderSoft.opacity(0.8), lineWidth: 0.8)
+                .background(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(KinnectTheme.surfaceElevated)
+                        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(KinnectTheme.borderSoft, lineWidth: 0.8))
+                )
+                .foregroundColor(KinnectTheme.textPrimary)
+            } else {
+                HStack(alignment: .bottom, spacing: 6) {
+                    TextField(
+                        "",
+                        text: $text,
+                        prompt: Text("Tin nhắn nhóm…").foregroundColor(KinnectTheme.textSecondary),
+                        axis: .vertical
                     )
-            )
+                    .lineLimit(1...5)
+                    .font(.system(size: 16))
+                    .foregroundColor(KinnectTheme.textPrimary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
 
-            if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Button {
-                    appState.showToast("Ghi âm tin nhắn thoại (Đang hoàn thiện)")
-                } label: {
-                    Image(systemName: "mic.fill")
-                        .font(.system(size: 18))
-                        .foregroundColor(KinnectTheme.textSecondary)
-                        .frame(width: 32, height: 38)
+                    if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Button {
+                            Task { await sendGroupMessage(text: text, imageDataURL: "") }
+                        } label: {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.system(size: 30))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [Color(hex: "#8E2DE2"), Color(hex: "#4A00E0")],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                        }
+                        .disabled(isSending)
+                        .padding(.trailing, 4)
+                        .padding(.bottom, 3)
+                        .transition(.scale.combined(with: .opacity))
+                    }
                 }
-                .buttonStyle(.plain)
+                .background(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(KinnectTheme.surfaceElevated)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .stroke(KinnectTheme.borderSoft.opacity(0.8), lineWidth: 0.8)
+                        )
+                )
+
+                if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Button {
+                        appState.showToast("Ghi âm tin nhắn thoại (Đang hoàn thiện)")
+                    } label: {
+                        Image(systemName: "mic.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(KinnectTheme.textSecondary)
+                            .frame(width: 32, height: 38)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
         .padding(.horizontal, 10)
@@ -2194,6 +2286,35 @@ struct GroupChatDetailView: View {
 
             mentionSuggestionBar
 
+            if let editId = editingMessageId {
+                HStack(spacing: 8) {
+                    Image(systemName: "pencil.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(KinnectTheme.accentBright)
+                    Text("Đang sửa tin nhắn")
+                        .font(.caption.bold())
+                        .foregroundColor(KinnectTheme.accentBright)
+                    Spacer()
+                    Button("Hủy") {
+                        editingMessageId = nil
+                        editingMessageText = ""
+                    }
+                    .font(.caption)
+                    .foregroundColor(KinnectTheme.textSecondary)
+                    Button("Lưu") {
+                        Task { await saveEditedGroupMessage(messageId: editId) }
+                    }
+                    .font(.caption.bold())
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Capsule().fill(KinnectTheme.primaryGradient))
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(KinnectTheme.surfaceElevated)
+            }
+
             groupChatInputBar
         }
         .background(KinnectTheme.background)
@@ -2224,15 +2345,41 @@ struct GroupChatDetailView: View {
         .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.item]) { result in
             switch result {
             case .success(let fileURL):
-                guard fileURL.startAccessingSecurityScopedResource() else { return }
-                defer { fileURL.stopAccessingSecurityScopedResource() }
+                guard fileURL.startAccessingSecurityScopedResource() else {
+                    appState.showToast("Không có quyền truy cập tệp đã chọn.")
+                    return
+                }
+                let maxBytes = 20 * 1024 * 1024
+                if let values = try? fileURL.resourceValues(forKeys: [.fileSizeKey]),
+                   let fileSize = values.fileSize,
+                   fileSize > maxBytes {
+                    fileURL.stopAccessingSecurityScopedResource()
+                    appState.showToast("Tệp vượt quá giới hạn 20 MB.")
+                    return
+                }
                 let fileName = fileURL.lastPathComponent
-                if let data = try? Data(contentsOf: fileURL) {
+                let ext = fileURL.pathExtension
+                Task.detached(priority: .userInitiated) {
+                    defer { fileURL.stopAccessingSecurityScopedResource() }
+                    guard let data = try? Data(contentsOf: fileURL) else {
+                        await MainActor.run {
+                            appState.showToast("Không thể đọc tệp đã chọn.")
+                        }
+                        return
+                    }
+                    if data.count > maxBytes {
+                        await MainActor.run {
+                            appState.showToast("Tệp vượt quá giới hạn 20 MB.")
+                        }
+                        return
+                    }
                     let base64 = data.base64EncodedString()
-                    let mime = mimeTypeForExt(fileURL.pathExtension)
+                    let mime = mimeTypeForExt(ext)
                     let dataURL = "data:\(mime);base64,\(base64)"
-                    Task {
-                        await sendGroupFileMessage(name: fileName, dataURL: dataURL)
+                    await MainActor.run {
+                        Task {
+                            await sendGroupFileMessage(name: fileName, dataURL: dataURL)
+                        }
                     }
                 }
             case .failure(let err):
@@ -2264,33 +2411,41 @@ struct GroupChatDetailView: View {
            let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/groups/\(group.id)/messages"),
            let list = cached["messages"] as? [[String: Any]] {
             self.messages = list.map(GroupMessageItem.from)
-            for m in self.messages where !m.reaction.isEmpty {
-                groupReactions[m.id] = m.reaction
+            var rx: [String: String] = [:]
+            for m in self.messages where !m.myReaction.isEmpty {
+                rx[m.id] = m.myReaction
             }
+            self.groupReactions = rx
             syncGroupMembersFromMessages()
         }
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/groups/\(group.id)/messages") {
             let list = res["messages"] as? [[String: Any]] ?? []
             let latest = list.map(GroupMessageItem.from)
             let merged: [GroupMessageItem]
-            if self.messages.isEmpty {
+            if self.messages.isEmpty || latest.isEmpty {
                 merged = latest
                 self.hasMoreMessages = (res["hasMore"] as? Bool) ?? false
                 self.nextMessagesCursor = (res["nextCursor"] as? NSNumber)?.int64Value
-            } else {
+            } else if let oldestLatestTime = latest.first?.createdAt, !oldestLatestTime.isEmpty {
                 let latestIds = Set(latest.map(\.id))
-                let older = self.messages.filter { !latestIds.contains($0.id) && !$0.id.hasPrefix("opt_") }
+                let older = self.messages.filter {
+                    !latestIds.contains($0.id) && !$0.id.hasPrefix("opt_") && !$0.createdAt.isEmpty && $0.createdAt < oldestLatestTime
+                }
                 merged = older + latest
+            } else {
+                merged = latest
             }
             let sig: ([GroupMessageItem]) -> [String] = { arr in
-                arr.map { "\($0.id)|\($0.text)|\($0.seenCount)|\($0.reaction)|\($0.reactions.count)|\($0.imageUrl)|\($0.attachmentUrl)" }
+                arr.map { "\($0.id)|\($0.text)|\($0.seenCount)|\($0.myReaction)|\($0.reactions.count)|\($0.imageUrl)|\($0.attachmentUrl)" }
             }
             if sig(merged) != sig(self.messages) {
                 self.messages = merged
             }
-            for m in self.messages where !m.reaction.isEmpty {
-                groupReactions[m.id] = m.reaction
+            var rx: [String: String] = [:]
+            for m in self.messages where !m.myReaction.isEmpty {
+                rx[m.id] = m.myReaction
             }
+            self.groupReactions = rx
             syncGroupMembersFromMessages()
             postMessagesMarkedRead(kind: "group", id: group.id)
             await appState.refreshGlobalBadges()
@@ -2304,7 +2459,11 @@ struct GroupChatDetailView: View {
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/groups/\(group.id)/messages?limit=50&before=\(cursor)") {
             let older = (res["messages"] as? [[String: Any]] ?? []).map(GroupMessageItem.from)
             let existing = Set(self.messages.map(\.id))
-            self.messages = older.filter { !existing.contains($0.id) } + self.messages
+            let newlyAdded = older.filter { !existing.contains($0.id) }
+            self.messages = newlyAdded + self.messages
+            for m in newlyAdded where !m.myReaction.isEmpty {
+                self.groupReactions[m.id] = m.myReaction
+            }
             self.hasMoreMessages = (res["hasMore"] as? Bool) ?? false
             self.nextMessagesCursor = (res["nextCursor"] as? NSNumber)?.int64Value
             syncGroupMembersFromMessages()
@@ -2408,7 +2567,6 @@ struct GroupChatDetailView: View {
                 requestId: reqId
             )
             await loadGroupMessages()
-            NotificationCenter.default.post(name: .kinnectMessagesChanged, object: nil)
         } catch {
             self.messages.removeAll { $0.id == tempId }
             self.text = draft
@@ -2452,10 +2610,46 @@ struct GroupChatDetailView: View {
                 requestId: reqId
             )
             await loadGroupMessages()
-            NotificationCenter.default.post(name: .kinnectMessagesChanged, object: nil)
         } catch {
             self.messages.removeAll { $0.id == tempId }
             appState.showToast("Không gửi được tệp: \(error.localizedDescription)")
+        }
+    }
+
+    private func recallGroupMessage(_ msg: GroupMessageItem) async {
+        let reqId = "recall_grp_\(msg.id)"
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/chat-messages/group/\(msg.id)/recall",
+                method: "POST",
+                body: [:],
+                requestId: reqId
+            )
+            await loadGroupMessages()
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+
+    private func saveEditedGroupMessage(messageId: String) async {
+        let clean = editingMessageText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return }
+        let draft = editingMessageText
+        editingMessageId = nil
+        editingMessageText = ""
+        let reqId = "edit_grp_\(messageId)_\(Int(Date().timeIntervalSince1970))"
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/groups/\(group.id)/messages/\(messageId)",
+                method: "PATCH",
+                body: ["body": clean],
+                requestId: reqId
+            )
+            await loadGroupMessages()
+        } catch {
+            editingMessageId = messageId
+            editingMessageText = draft
+            appState.showToast(error.localizedDescription)
         }
     }
 
@@ -2835,28 +3029,45 @@ struct ForwardMessageSheet: View {
         isLoading = true
         defer { isLoading = false }
         if let cRes = try? await KinnectAPIClient.shared.requestJSON("/api/conversations") {
-            self.conversations = cRes["conversations"] as? [[String: Any]] ?? []
+            self.conversations = (cRes["users"] as? [[String: Any]]) ?? (cRes["conversations"] as? [[String: Any]]) ?? []
         }
         if let gRes = try? await KinnectAPIClient.shared.requestJSON("/api/groups") {
             self.groups = (gRes["groups"] as? [[String: Any]] ?? []).map(ChatGroupItem.from)
         }
         if let fRes = try? await KinnectAPIClient.shared.requestJSON("/api/friends") {
-            self.friends = (fRes["friends"] as? [[String: Any]] ?? []).map(KinnectUser.from)
+            let list = (fRes["users"] as? [[String: Any]]) ?? (fRes["friends"] as? [[String: Any]]) ?? []
+            self.friends = list.map(KinnectUser.from)
         }
+    }
+
+    private func buildForwardPayload(reqId: String) async -> [String: Any] {
+        var payload: [String: Any] = [
+            "body": text,
+            "text": text,
+            "imageUrl": imageUrl,
+            "requestId": reqId
+        ]
+        if !imageUrl.isEmpty {
+            if imageUrl.hasPrefix("data:") {
+                payload["attachment"] = ["name": "photo.jpg", "data": imageUrl]
+            } else if let data = await KinnectAPIClient.shared.fetchBinaryData(path: imageUrl) {
+                let b64 = await Task.detached(priority: .userInitiated) {
+                    data.base64EncodedString()
+                }.value
+                payload["attachment"] = ["name": "photo.jpg", "data": "data:image/jpeg;base64,\(b64)"]
+            }
+        }
+        return payload
     }
 
     private func forwardToUser(_ userId: String, name: String) async {
         let reqId = "fwd_u_\(userId)_\(UUID().uuidString)"
+        let payload = await buildForwardPayload(reqId: reqId)
         do {
             _ = try await KinnectAPIClient.shared.requestJSON(
                 "/api/users/\(userId)/messages",
                 method: "POST",
-                body: [
-                    "body": text,
-                    "text": text,
-                    "imageUrl": imageUrl,
-                    "requestId": reqId
-                ],
+                body: payload,
                 requestId: reqId
             )
             appState.showToast("Đã chuyển tiếp tới \(name)!")
@@ -2868,16 +3079,12 @@ struct ForwardMessageSheet: View {
 
     private func forwardToGroup(_ groupId: String, name: String) async {
         let reqId = "fwd_g_\(groupId)_\(UUID().uuidString)"
+        let payload = await buildForwardPayload(reqId: reqId)
         do {
             _ = try await KinnectAPIClient.shared.requestJSON(
                 "/api/groups/\(groupId)/messages",
                 method: "POST",
-                body: [
-                    "body": text,
-                    "text": text,
-                    "imageUrl": imageUrl,
-                    "requestId": reqId
-                ],
+                body: payload,
                 requestId: reqId
             )
             appState.showToast("Đã chuyển tiếp tới nhóm \(name)!")

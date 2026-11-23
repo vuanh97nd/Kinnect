@@ -241,7 +241,6 @@ final class KeychainStore {
 
     func clearAll() {
         lock.lock()
-        defer { lock.unlock() }
         memorySessionCookie.removeAll()
         memoryDeviceCookie.removeAll()
         memoryAccountId.removeAll()
@@ -250,6 +249,13 @@ final class KeychainStore {
             kSecAttrService as String: service
         ]
         SecItemDelete(query as CFDictionary)
+        lock.unlock()
+
+        if let cookies = HTTPCookieStorage.shared.cookies {
+            for cookie in cookies where cookie.name == "kinnect_session" || cookie.name == "kinnect_device" {
+                HTTPCookieStorage.shared.deleteCookie(cookie)
+            }
+        }
     }
 
     private func originKey(_ origin: String) -> String {

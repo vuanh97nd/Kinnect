@@ -15,7 +15,7 @@ struct PrivacyConsentSheet: View {
             version: "2026.11",
             notice: "Chính sách quyền riêng tư và điều khoản dịch vụ Kinnect. Cam kết bảo mật theo tiêu chuẩn Apple và pháp luật Việt Nam."
         ),
-        recordOnServer: Bool = false,
+        recordOnServer: Bool = true,
         onAccepted: @escaping () -> Void = {}
     ) {
         self.request = request

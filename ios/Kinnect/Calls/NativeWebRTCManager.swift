@@ -76,6 +76,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
     private var localAudioTrack: RTCAudioTrack?
     private var videoCapturer: RTCCameraVideoCapturer?
     private var videoSource: RTCVideoSource?
+    private let stateLock = NSLock()
     private var cachedIceServers: [RTCIceServer] = [
         RTCIceServer(urlStrings: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"])
     ]
@@ -108,6 +109,18 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
 
     // MARK: - ICE Server Configuration
 
+    private func getIceServers() -> [RTCIceServer] {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return cachedIceServers
+    }
+
+    private func setIceServers(_ servers: [RTCIceServer]) {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        cachedIceServers = servers
+    }
+
     func refreshIceServers() async {
         do {
             let json = try await KinnectAPIClient.shared.requestJSON("/api/call-config")
@@ -130,7 +143,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
                 }
             }
             if !built.isEmpty {
-                self.cachedIceServers = built
+                self.setIceServers(built)
             }
         } catch {
             // Keep default STUN servers
@@ -416,7 +429,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
             if pc.remoteDescription != nil {
                 pc.add(ice) { _ in }
             } else {
-                pendingIceCandidates.append(ice)
+                enqueuePendingCandidate(ice)
             }
         }
     }
@@ -519,7 +532,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
     private func setupCallPeerConnection() {
         guard callPeerConnection == nil else { return }
         let config = RTCConfiguration()
-        config.iceServers = cachedIceServers
+        config.iceServers = getIceServers()
         config.sdpSemantics = .unifiedPlan
         config.continualGatheringPolicy = .gatherContinually
 
@@ -539,9 +552,23 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         }
     }
 
+    private func enqueuePendingCandidate(_ ice: RTCIceCandidate) {
+        stateLock.lock()
+        pendingIceCandidates.append(ice)
+        stateLock.unlock()
+    }
+
+    private func clearPendingCandidates() {
+        stateLock.lock()
+        pendingIceCandidates.removeAll()
+        stateLock.unlock()
+    }
+
     private func drainPendingCandidates(on pc: RTCPeerConnection) {
+        stateLock.lock()
         let queued = pendingIceCandidates
         pendingIceCandidates.removeAll()
+        stateLock.unlock()
         for candidate in queued {
             pc.add(candidate) { _ in }
         }
@@ -569,7 +596,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         localAudioTrack = nil
         localVideoTrack = nil
         remoteVideoTrack = nil
-        pendingIceCandidates.removeAll()
+        clearPendingCandidates()
         callPeerConnection?.close()
         callPeerConnection = nil
         MediaPermissionHandler.shared.configureAudioSessionForMedia()
@@ -605,16 +632,20 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
     @MainActor
     func handleLiveViewerJoined(peerId: String) {
         guard !peerId.isEmpty else { return }
-        let box = createLivePeerBox(peerId: peerId, isHost: true)
+        if let existing = liveViewerConnections.removeValue(forKey: peerId) {
+            existing.pc?.close()
+        }
+        guard let box = createLivePeerBox(peerId: peerId, isHost: true),
+              let pc = box.pc else { return }
         liveViewerConnections[peerId] = box
 
         let constraints = RTCMediaConstraints(
             mandatoryConstraints: ["OfferToReceiveAudio": "false", "OfferToReceiveVideo": "false"],
             optionalConstraints: nil
         )
-        box.pc.offer(for: constraints) { sdp, err in
+        pc.offer(for: constraints) { sdp, err in
             guard let sdp = sdp, err == nil else { return }
-            box.pc.setLocalDescription(sdp) { setErr in
+            pc.setLocalDescription(sdp) { setErr in
                 guard setErr == nil else { return }
                 let descPayload: [String: Any] = [
                     "type": Self.sdpTypeString(sdp.type),
@@ -631,13 +662,21 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
     }
 
     @MainActor
+    func handleLivePeerLeft(peerId: String) {
+        guard !peerId.isEmpty else { return }
+        if let existing = liveViewerConnections.removeValue(forKey: peerId) {
+            existing.pc?.close()
+        }
+    }
+
+    @MainActor
     func handleLiveSignal(from peerId: String, signal: [String: Any], isHost: Bool) {
         let box: PeerConnectionBox
         if isHost {
             if let existing = liveViewerConnections[peerId] {
                 box = existing
             } else {
-                let created = createLivePeerBox(peerId: peerId, isHost: true)
+                guard let created = createLivePeerBox(peerId: peerId, isHost: true) else { return }
                 liveViewerConnections[peerId] = created
                 box = created
             }
@@ -645,27 +684,28 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
             if let existing = liveHostConnection {
                 box = existing
             } else {
-                let created = createLivePeerBox(peerId: peerId, isHost: false)
+                guard let created = createLivePeerBox(peerId: peerId, isHost: false) else { return }
                 liveHostConnection = created
                 box = created
             }
         }
+        guard let pc = box.pc else { return }
 
         if let desc = signal["description"] as? [String: Any],
            let typeStr = desc["type"] as? String,
            let sdpText = desc["sdp"] as? String {
             let sdpType: RTCSdpType = (typeStr == "offer") ? .offer : .answer
             let remoteSDP = RTCSessionDescription(type: sdpType, sdp: sdpText)
-            box.pc.setRemoteDescription(remoteSDP) { err in
+            pc.setRemoteDescription(remoteSDP) { err in
                 guard err == nil else { return }
                 if sdpType == .offer {
                     let constraints = RTCMediaConstraints(
                         mandatoryConstraints: ["OfferToReceiveAudio": "true", "OfferToReceiveVideo": "true"],
                         optionalConstraints: nil
                     )
-                    box.pc.answer(for: constraints) { answer, ansErr in
+                    pc.answer(for: constraints) { answer, ansErr in
                         guard let answer = answer, ansErr == nil else { return }
-                        box.pc.setLocalDescription(answer) { setErr in
+                        pc.setLocalDescription(answer) { setErr in
                             guard setErr == nil else { return }
                             let descPayload: [String: Any] = [
                                 "type": Self.sdpTypeString(answer.type),
@@ -689,7 +729,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
                 ?? (cand["sdpMLineIndex"] as? String).flatMap(Int32.init)
                 ?? 0
             let ice = RTCIceCandidate(sdp: sdp, sdpMLineIndex: sdpMLineIndex, sdpMid: sdpMid)
-            box.pc.add(ice) { _ in }
+            pc.add(ice) { _ in }
         }
     }
 
@@ -703,17 +743,17 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         liveLocalVideoTrack = nil
         liveRemoteVideoTrack = nil
         for (_, box) in liveViewerConnections {
-            box.pc.close()
+            box.pc?.close()
         }
         liveViewerConnections.removeAll()
-        liveHostConnection?.pc.close()
+        liveHostConnection?.pc?.close()
         liveHostConnection = nil
         MediaPermissionHandler.shared.configureAudioSessionForMedia()
     }
 
-    private func createLivePeerBox(peerId: String, isHost: Bool) -> PeerConnectionBox {
+    private func createLivePeerBox(peerId: String, isHost: Bool) -> PeerConnectionBox? {
         let config = RTCConfiguration()
-        config.iceServers = cachedIceServers
+        config.iceServers = getIceServers()
         config.sdpSemantics = .unifiedPlan
         let constraints = RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: ["DtlsSrtpKeyAgreement": "true"])
         let box = PeerConnectionBox(peerId: peerId) { [weak self] videoTrack in
@@ -721,7 +761,9 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
                 self?.liveRemoteVideoTrack = videoTrack
             }
         }
-        let pc = factory.peerConnection(with: config, constraints: constraints, delegate: box)!
+        guard let pc = factory.peerConnection(with: config, constraints: constraints, delegate: box) else {
+            return nil
+        }
         box.pc = pc
         if isHost {
             if let aTrack = liveAudioTrack {
@@ -859,7 +901,7 @@ extension NativeWebRTCManager: RTCPeerConnectionDelegate {
 
 private final class PeerConnectionBox: NSObject, RTCPeerConnectionDelegate {
     let peerId: String
-    var pc: RTCPeerConnection!
+    var pc: RTCPeerConnection?
     let onRemoteVideo: (RTCVideoTrack) -> Void
 
     init(peerId: String, onRemoteVideo: @escaping (RTCVideoTrack) -> Void) {

@@ -233,9 +233,9 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
             joinedAt: joined,
             identityPublic: (dict["identityPublic"] as? Bool) ?? true,
             profileVisibility: visDict,
-            showActivity: (dict["showActivity"] as? Bool) ?? ((dict["show_activity"] as? Int) == 1) ?? true,
-            showDistance: (dict["showDistance"] as? Bool) ?? ((dict["show_distance"] as? Int) == 1) ?? true,
-            discoverable: (dict["discoverable"] as? Bool) ?? ((dict["discoverable"] as? Int) == 1) ?? true,
+            showActivity: (dict["showActivity"] as? Bool) ?? (dict["show_activity"] as? Int).map { $0 == 1 } ?? true,
+            showDistance: (dict["showDistance"] as? Bool) ?? (dict["show_distance"] as? Int).map { $0 == 1 } ?? true,
+            discoverable: (dict["discoverable"] as? Bool) ?? (dict["discoverable"] as? Int).map { $0 == 1 } ?? true,
             hasLocation: (dict["hasLocation"] as? Bool) ?? false,
             dmMode: {
                 let raw = (dict["dmMode"] as? String) ?? (dict["dm_mode"] as? String) ?? "everyone"
@@ -374,12 +374,25 @@ struct StoryItem: Identifiable, Equatable {
         let authorDict = (dict["author"] as? [String: Any]) ?? (dict["user"] as? [String: Any]) ?? dict
         let mediaDict = dict["media"] as? [String: Any]
         let img = (dict["imageUrl"] as? String) ?? (dict["image"] as? String) ?? (mediaDict?["url"] as? String) ?? ""
+        let bgHex: String = {
+            if let explicit = (dict["backgroundColor"] as? String) ?? (dict["bgColor"] as? String), !explicit.isEmpty {
+                return explicit
+            }
+            switch ((dict["background"] as? String) ?? "").lowercased() {
+            case "sunset": return "#F59E0B"
+            case "forest": return "#059669"
+            case "ocean": return "#0EA5E9"
+            case "purple": return "#7C3AED"
+            case let raw where raw.hasPrefix("#"): return raw
+            default: return "#7C3AED"
+            }
+        }()
         return StoryItem(
             id: (dict["id"] as? String) ?? UUID().uuidString,
             author: KinnectUser.from(authorDict),
             text: (dict["text"] as? String) ?? (dict["body"] as? String) ?? (dict["caption"] as? String) ?? "",
             imageUrl: img,
-            backgroundColor: (dict["backgroundColor"] as? String) ?? (dict["bgColor"] as? String) ?? "#7C3AED",
+            backgroundColor: bgHex,
             createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
             viewsCount: (dict["viewsCount"] as? Int) ?? (dict["viewCount"] as? Int) ?? 0,
             viewed: (dict["viewed"] as? Bool) ?? false,
@@ -497,19 +510,14 @@ struct DirectMessageItem: Identifiable, Equatable {
         let seen = isoString(from: dict["seenAt"] ?? dict["readAt"] ?? receipt?["seenAt"])
         let attName = (att?["name"] as? String) ?? (dict["attachmentName"] as? String) ?? ""
         let attData = (att?["data"] as? String) ?? (att?["url"] as? String) ?? (dict["attachmentUrl"] as? String) ?? ""
-        var img = (dict["imageUrl"] as? String) ?? (dict["attachmentUrl"] as? String) ?? (att?["url"] as? String) ?? ""
-        if img.isEmpty && attData.hasPrefix("data:image/") {
-            img = attData
-        }
-        let isImage = !img.isEmpty || (att?["kind"] as? String == "image") || attName.hasSuffix(".png") || attName.hasSuffix(".jpg") || attName.hasSuffix(".jpeg") || attName.hasSuffix(".webp")
+        let explicitImg = (dict["imageUrl"] as? String) ?? ""
+        let attKind = (att?["kind"] as? String) ?? ""
+        let isImage = (attKind == "image") || attData.hasPrefix("data:image/") || !explicitImg.isEmpty
+        let img = isImage ? (!explicitImg.isEmpty ? explicitImg : attData) : ""
         let finalAttName = isImage ? "" : attName
         let finalAttUrl = isImage ? "" : attData
-        if isImage && img.isEmpty {
-            img = attData
-        }
         let myRx = (dict["myReaction"] as? String) ?? (dict["reaction"] as? String) ?? (dict["rx"] as? String) ?? ""
         let rxDict = (dict["reactions"] as? [String: Int]) ?? [:]
-        let effectiveRx = !myRx.isEmpty ? myRx : (rxDict.keys.first ?? "")
         return DirectMessageItem(
             id: (dict["id"] as? String) ?? UUID().uuidString,
             fromUserId: (dict["fromUserId"] as? String) ?? (dict["senderId"] as? String) ?? (dict["sender"] as? String) ?? "",
@@ -521,7 +529,7 @@ struct DirectMessageItem: Identifiable, Equatable {
             createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
             deliveredAt: deliv,
             seenAt: seen,
-            reaction: effectiveRx,
+            reaction: myRx,
             reactions: rxDict,
             myReaction: myRx,
             replyTo: (dict["replyTo"] as? [String: Any]).map(ChatReplyPreview.from),
@@ -546,7 +554,7 @@ struct ChatGroupItem: Identifiable, Hashable, Equatable {
         let rawMembers = dict["members"] as? [Any]
         let lastObj = (dict["lastMessage"] as? [String: Any]) ?? (dict["last"] as? [String: Any])
         let lastText = (lastObj?["text"] as? String) ?? (lastObj?["body"] as? String) ?? (dict["lastMessageText"] as? String) ?? ""
-        let updated = (lastObj?["createdAt"] as? String) ?? (dict["updatedAt"] as? String) ?? ""
+        let updated = isoString(from: lastObj?["createdAt"] ?? lastObj?["created"] ?? dict["updatedAt"] ?? dict["created"])
         return ChatGroupItem(
             id: (dict["id"] as? String) ?? UUID().uuidString,
             name: (dict["name"] as? String) ?? "Nhóm Kinnect",
@@ -584,19 +592,14 @@ struct GroupMessageItem: Identifiable, Equatable {
         let att = dict["attachment"] as? [String: Any]
         let attName = (att?["name"] as? String) ?? (dict["attachmentName"] as? String) ?? ""
         let attData = (att?["data"] as? String) ?? (att?["url"] as? String) ?? (dict["attachmentUrl"] as? String) ?? ""
-        var img = (dict["imageUrl"] as? String) ?? (dict["attachmentUrl"] as? String) ?? (att?["url"] as? String) ?? ""
-        if img.isEmpty && attData.hasPrefix("data:image/") {
-            img = attData
-        }
-        let isImage = !img.isEmpty || (att?["kind"] as? String == "image") || attName.hasSuffix(".png") || attName.hasSuffix(".jpg") || attName.hasSuffix(".jpeg") || attName.hasSuffix(".webp")
+        let explicitImg = (dict["imageUrl"] as? String) ?? ""
+        let attKind = (att?["kind"] as? String) ?? ""
+        let isImage = (attKind == "image") || attData.hasPrefix("data:image/") || !explicitImg.isEmpty
+        let img = isImage ? (!explicitImg.isEmpty ? explicitImg : attData) : ""
         let finalAttName = isImage ? "" : attName
         let finalAttUrl = isImage ? "" : attData
-        if isImage && img.isEmpty {
-            img = attData
-        }
         let myRx = (dict["myReaction"] as? String) ?? (dict["reaction"] as? String) ?? (dict["rx"] as? String) ?? ""
         let rxDict = (dict["reactions"] as? [String: Int]) ?? [:]
-        let effectiveRx = !myRx.isEmpty ? myRx : (rxDict.keys.first ?? "")
         return GroupMessageItem(
             id: (dict["id"] as? String) ?? UUID().uuidString,
             groupId: (dict["groupId"] as? String) ?? (dict["group_id"] as? String) ?? "",
@@ -607,7 +610,7 @@ struct GroupMessageItem: Identifiable, Equatable {
             attachmentUrl: finalAttUrl,
             createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
             seenCount: (dict["seenCount"] as? Int) ?? (receipt?["seenCount"] as? Int) ?? seenBy?.count ?? 0,
-            reaction: effectiveRx,
+            reaction: myRx,
             reactions: rxDict,
             myReaction: myRx,
             replyTo: (dict["replyTo"] as? [String: Any]).map(ChatReplyPreview.from),

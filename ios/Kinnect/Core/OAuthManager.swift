@@ -138,12 +138,19 @@ final class OAuthManager: NSObject, ObservableObject, ASWebAuthenticationPresent
                     let user = KinnectUser.from(userDict)
                     AppState.shared.applyAuthenticatedUser(user, rawDict: userDict, rememberMe: true)
                     await AppState.shared.refreshGlobalBadges()
+                    await AppState.shared.refreshBlockedUsers()
                     completion(.success(user))
+                } else {
+                    throw NSError(domain: "KinnectOAuth", code: -7, userInfo: [NSLocalizedDescriptionKey: "Không hoàn tất được đăng ký tài khoản."])
                 }
             } catch {
                 self.oauthError = error.localizedDescription
                 completion(.failure(error))
             }
+        } else {
+            let err = NSError(domain: "KinnectOAuth", code: -8, userInfo: [NSLocalizedDescriptionKey: "Phản hồi xác thực không hợp lệ."])
+            self.oauthError = err.localizedDescription
+            completion(.failure(err))
         }
     }
 }

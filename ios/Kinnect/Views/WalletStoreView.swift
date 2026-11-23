@@ -846,17 +846,23 @@ struct WalletStoreView: View {
     }
 
     // MARK: - API Calls
+    private func applyWalletPayload(_ payload: [String: Any]) {
+        let wallet = payload["wallet"] as? [String: Any] ?? payload
+        let purchased = wallet["purchasedCoins"] as? Int ?? (wallet["paidCoins"] as? Int ?? 0)
+        let gifted = wallet["giftedCoins"] as? Int ?? (wallet["trialCoins"] as? Int ?? 0)
+        self.purchasedCoins = purchased
+        self.giftedCoins = gifted
+        self.availableBalance = wallet["totalUsableCoins"] as? Int ?? (wallet["availableBalance"] as? Int ?? (purchased + gifted))
+        self.earnedBalance = wallet["earningsVnd"] as? Int ?? (wallet["earnedBalance"] as? Int ?? 0)
+        self.spentBalance = wallet["spentCoins"] as? Int ?? (wallet["spentBalance"] as? Int ?? 0)
+        self.currencyLabel = wallet["currencyLabel"] as? String ?? "Xu Kinnect"
+        let rawEntries = (payload["entries"] as? [[String: Any]]) ?? (wallet["entries"] as? [[String: Any]]) ?? []
+        self.entries = rawEntries.map(WalletEntryItem.from)
+    }
+
     private func loadWalletAndStore() async {
-        if entries.isEmpty, let cachedW = KinnectAPIClient.shared.cachedJSON(for: "/api/wallet") {
-            if let wallet = cachedW["wallet"] as? [String: Any] {
-                self.availableBalance = wallet["availableBalance"] as? Int ?? 0
-                self.earnedBalance = wallet["earnedBalance"] as? Int ?? 0
-                self.spentBalance = wallet["spentBalance"] as? Int ?? 0
-                self.purchasedCoins = wallet["purchasedCoins"] as? Int ?? (wallet["paidCoins"] as? Int ?? self.earnedBalance)
-                self.giftedCoins = wallet["giftedCoins"] as? Int ?? (wallet["trialCoins"] as? Int ?? max(0, self.availableBalance - self.purchasedCoins))
-                self.currencyLabel = wallet["currencyLabel"] as? String ?? "Xu Kinnect"
-            }
-            self.entries = (cachedW["entries"] as? [[String: Any]] ?? []).map(WalletEntryItem.from)
+        if entries.isEmpty && availableBalance == 0, let cachedW = KinnectAPIClient.shared.cachedJSON(for: "/api/wallet") {
+            applyWalletPayload(cachedW)
         }
         if packages.isEmpty, let cachedS = KinnectAPIClient.shared.cachedJSON(for: "/api/store") {
             let rawPkgs = cachedS["packages"] as? [[String: Any]] ?? []
@@ -874,16 +880,7 @@ struct WalletStoreView: View {
         async let sTask = KinnectAPIClient.shared.requestJSON("/api/store")
 
         if let wRes = try? await wTask {
-            if let wallet = wRes["wallet"] as? [String: Any] {
-                self.availableBalance = wallet["availableBalance"] as? Int ?? 0
-                self.earnedBalance = wallet["earnedBalance"] as? Int ?? 0
-                self.spentBalance = wallet["spentBalance"] as? Int ?? 0
-                self.purchasedCoins = wallet["purchasedCoins"] as? Int ?? (wallet["paidCoins"] as? Int ?? self.earnedBalance)
-                self.giftedCoins = wallet["giftedCoins"] as? Int ?? (wallet["trialCoins"] as? Int ?? max(0, self.availableBalance - self.purchasedCoins))
-                self.currencyLabel = wallet["currencyLabel"] as? String ?? "Xu Kinnect"
-            }
-            let rawEntries = wRes["entries"] as? [[String: Any]] ?? []
-            self.entries = rawEntries.map(WalletEntryItem.from)
+            applyWalletPayload(wRes)
         }
 
         if let sRes = try? await sTask {
@@ -895,13 +892,17 @@ struct WalletStoreView: View {
             let expiries = sRes["packageExpiries"] as? [String: Any] ?? [:]
             let liveTheme = sRes["liveTheme"] as? String ?? ""
             let membership = sRes["membership"] as? String ?? ""
+            let activeStyle = (sRes["activeStyle"] as? String)
+                ?? (sRes["profileStyle"] as? String)
+                ?? (sRes["style"] as? String)
+                ?? ""
             self.packages = rawPkgs.map { dict in
                 var item = StorePackageItem.from(dict)
                 item.owned = ownedIds.contains(item.id)
                 if let raw = expiries[item.id] as? NSNumber {
                     item.expiresAt = raw.int64Value
                 }
-                item.equipped = !item.id.isEmpty && (item.id == liveTheme || item.id == membership)
+                item.equipped = !item.id.isEmpty && (item.id == liveTheme || item.id == membership || item.id == activeStyle)
                 return item
             }
             let rawProds = sRes["products"] as? [[String: Any]] ?? []
@@ -940,12 +941,21 @@ struct WalletStoreView: View {
 
     private func applyPackage(_ pkg: StorePackageItem) async {
         let productId = pkg.equipped ? "" : pkg.id
+        let isStylePackage = pkg.kind == "style" || pkg.id.hasPrefix("style_")
         do {
-            _ = try await KinnectAPIClient.shared.requestJSON(
-                "/api/store/packages/apply",
-                method: "POST",
-                body: KinnectWriteBody.packageApply(productId: productId)
-            )
+            if isStylePackage {
+                _ = try await KinnectAPIClient.shared.requestJSON(
+                    "/api/store/style",
+                    method: "POST",
+                    body: ["productId": productId]
+                )
+            } else {
+                _ = try await KinnectAPIClient.shared.requestJSON(
+                    "/api/store/packages/apply",
+                    method: "POST",
+                    body: KinnectWriteBody.packageApply(productId: productId)
+                )
+            }
             await loadWalletAndStore()
         } catch {
             appState.showToast(error.localizedDescription)

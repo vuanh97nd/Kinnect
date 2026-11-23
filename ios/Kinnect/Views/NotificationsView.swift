@@ -416,7 +416,7 @@ private struct NotificationPostDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
 
-    @State private var comments: [[String: Any]] = []
+    @State private var comments: [CommentItem] = []
     @State private var commentText = ""
     @State private var isSubmittingComment = false
     @State private var isLiked = false
@@ -527,20 +527,21 @@ private struct NotificationPostDetailView: View {
                             .padding(.vertical, 12)
                     } else {
                         VStack(spacing: 10) {
-                            ForEach(Array(comments.enumerated()), id: \.offset) { _, comment in
-                                let user = comment["user"] as? [String: Any] ?? [:]
-                                let name = user["name"] as? String ?? "Thành viên"
-                                let av = user["avatar"] as? String ?? ""
-                                let color = user["avatarColor"] as? String ?? "#7C3AED"
-                                let text = comment["text"] as? String ?? ""
+                            ForEach(comments) { comment in
+                                let name = comment.author.name.isEmpty ? "Thành viên" : comment.author.name
 
                                 HStack(alignment: .top, spacing: 10) {
-                                    KinnectAvatarView(name: name, avatarURL: av, colorHex: color, size: 32)
+                                    KinnectAvatarView(
+                                        name: name,
+                                        avatarURL: comment.author.avatarUrl,
+                                        colorHex: comment.author.avatarColor,
+                                        size: 32
+                                    )
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(name)
                                             .font(.caption.bold())
                                             .foregroundColor(KinnectTheme.textPrimary)
-                                        Text(text)
+                                        Text(comment.text)
                                             .font(.subheadline)
                                             .foregroundColor(KinnectTheme.textPrimary)
                                     }
@@ -590,37 +591,57 @@ private struct NotificationPostDetailView: View {
     }
 
     private func toggleLike() {
-        isLiked.toggle()
-        likesCount += isLiked ? 1 : -1
+        let willLike = !isLiked
+        isLiked = willLike
+        likesCount = max(0, likesCount + (willLike ? 1 : -1))
         Task {
-            _ = try? await KinnectAPIClient.shared.requestJSON(
-                "/api/posts/\(post.id)/react",
-                method: "POST",
-                body: ["reaction": isLiked ? "like" : "none"]
-            )
+            do {
+                if willLike {
+                    _ = try await KinnectAPIClient.shared.requestJSON(
+                        "/api/posts/\(post.id)/like",
+                        method: "POST",
+                        body: ["reaction": "like"]
+                    )
+                } else {
+                    _ = try await KinnectAPIClient.shared.requestJSON(
+                        "/api/posts/\(post.id)/like",
+                        method: "DELETE",
+                        body: [:]
+                    )
+                }
+            } catch {
+                isLiked = !willLike
+                likesCount = max(0, likesCount + (willLike ? -1 : 1))
+                appState.showToast(error.localizedDescription)
+            }
         }
     }
 
     private func loadComments() async {
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/posts/\(post.id)/comments") {
-            self.comments = res["comments"] as? [[String: Any]] ?? []
+            let list = res["comments"] as? [[String: Any]] ?? []
+            self.comments = list.map(CommentItem.from)
         }
     }
 
     private func submitComment() async {
-        let text = commentText.trimmingCharacters(in: .whitespaces)
+        let text = commentText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         isSubmittingComment = true
         defer { isSubmittingComment = false }
 
-        let res = try? await KinnectAPIClient.shared.requestJSON(
-            "/api/posts/\(post.id)/comments",
-            method: "POST",
-            body: ["text": text]
-        )
-        if res?["ok"] as? Bool == true || res?["comment"] != nil {
-            commentText = ""
-            await loadComments()
+        do {
+            let res = try await KinnectAPIClient.shared.requestJSON(
+                "/api/posts/\(post.id)/comments",
+                method: "POST",
+                body: ["body": text]
+            )
+            if res["id"] != nil || res["ok"] != nil || res["comment"] != nil {
+                commentText = ""
+                await loadComments()
+            }
+        } catch {
+            appState.showToast(error.localizedDescription)
         }
     }
 }

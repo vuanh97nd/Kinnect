@@ -553,7 +553,7 @@ struct RootMainView: View {
                                 UGCReportSheet(context: context)
                             }
                             .sheet(item: $appState.pendingPrivacyConsent) { req in
-                                PrivacyConsentSheet(request: req, onAccepted: {})
+                                PrivacyConsentSheet(request: req, recordOnServer: true, onAccepted: {})
                             }
                         }
 
@@ -1056,6 +1056,8 @@ struct RootMainView: View {
                             isSubmitting = true
                             defer { isSubmitting = false }
                             let reqId = "report_\(context.targetType)_\(context.targetId)_\(Int(Date().timeIntervalSince1970))"
+                            let trimmedDetails = details.trimmingCharacters(in: .whitespacesAndNewlines)
+                            let combinedReason = trimmedDetails.isEmpty ? selectedReason : "\(selectedReason): \(trimmedDetails)"
                             do {
                                 _ = try await KinnectAPIClient.shared.requestJSON(
                                     "/api/reports",
@@ -1063,8 +1065,8 @@ struct RootMainView: View {
                                     body: [
                                         "targetType": context.targetType,
                                         "targetId": context.targetId,
-                                        "reason": selectedReason,
-                                        "details": details
+                                        "reason": combinedReason,
+                                        "details": trimmedDetails
                                     ],
                                     requestId: reqId
                                 )

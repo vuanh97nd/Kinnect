@@ -523,6 +523,14 @@ struct FeedView: View {
                 requestId: reqId
             )
             posts.removeAll { $0.id == post.id }
+            let accountId = appState.currentUser?.id ?? KinnectAPIClient.shared.currentAccountId
+            if !accountId.isEmpty {
+                AccountCache.shared.evict(forKey: "feed_posts", origin: ServerConfig.currentOrigin, accountId: accountId)
+                AccountCache.shared.evict(forKey: "json:/api/posts?limit=25", origin: KinnectAPIClient.shared.baseURL, accountId: accountId)
+                if KinnectAPIClient.shared.baseURL != ServerConfig.currentOrigin {
+                    AccountCache.shared.evict(forKey: "json:/api/posts?limit=25", origin: ServerConfig.currentOrigin, accountId: accountId)
+                }
+            }
             appState.showToast("Đã xóa bài viết.")
         } catch {
             appState.showToast(error.localizedDescription)

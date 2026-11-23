@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 enum KinnectAPIError: LocalizedError {
@@ -340,7 +341,11 @@ final class KinnectAPIClient {
             throw KinnectAPIError.serverError(status: 428, message: noticeText)
         }
 
-        if http.statusCode == 401 && path != "/api/login" && path != "/api/me/password" {
+        let basePath = path.components(separatedBy: "?").first ?? path
+        if http.statusCode == 401
+            && basePath != "/api/login"
+            && basePath != "/api/me/password"
+            && basePath != "/api/recovery/email/start" {
             throw KinnectAPIError.unauthorized
         }
 
@@ -361,9 +366,65 @@ final class KinnectAPIClient {
             if !uid.isEmpty {
                 AccountCache.shared.store(data, forKey: "json:\(path)", origin: origin, accountId: uid)
             }
+        } else if method != "GET" && method != "HEAD" {
+            evictRelatedCaches(for: path, origin: origin)
         }
 
         return json
+    }
+
+    private func evictRelatedCaches(for path: String, origin: String) {
+        let uid = currentAccountId.isEmpty ? (AccountCache.shared.activeAccountId ?? "") : currentAccountId
+        guard !uid.isEmpty else { return }
+        let base = path.components(separatedBy: "?").first ?? path
+
+        func evictKeys(_ keys: [String]) {
+            for k in keys {
+                AccountCache.shared.evict(forKey: "json:\(k)", origin: origin, accountId: uid)
+                AccountCache.shared.evict(forKey: k, origin: origin, accountId: uid)
+            }
+        }
+
+        if base == "/api/posts" || base.hasPrefix("/api/posts/") {
+            evictKeys(["/api/posts?limit=25", "/api/posts", "/api/me", "/api/users/\(uid)/posts"])
+            if base.hasPrefix("/api/posts/") {
+                let parts = base.split(separator: "/")
+                if parts.count >= 3 {
+                    let postId = String(parts[2])
+                    evictKeys(["/api/posts/\(postId)", "/api/posts/\(postId)/comments"])
+                }
+            }
+        } else if base == "/api/stories" || base.hasPrefix("/api/stories/") {
+            evictKeys(["/api/stories"])
+        } else if base == "/api/shorts" || base.hasPrefix("/api/shorts/") {
+            evictKeys(["/api/shorts", "/api/shorts?feed=for", "/api/shorts?feed=following", "shorts_feed_for", "shorts_feed_following"])
+            if base.hasPrefix("/api/shorts/") {
+                let parts = base.split(separator: "/")
+                if parts.count >= 3 {
+                    let shortId = String(parts[2])
+                    evictKeys(["/api/shorts/\(shortId)", "/api/shorts/\(shortId)/comments"])
+                }
+            }
+        } else if base.hasPrefix("/api/users/") && base.hasSuffix("/block") {
+            evictKeys(["/api/blocks", "/api/conversations", "/api/friends", "/api/posts?limit=25", "/api/posts", "/api/discover"])
+        } else if base == "/api/me/avatar" || base == "/api/me/cover" {
+            evictKeys(["/api/me", "/api/users/\(uid)", "profile_me"])
+            AccountCache.shared.evict(forKey: "bin:/api/users/\(uid)/avatar", origin: origin, accountId: uid)
+            AccountCache.shared.evict(forKey: "bin:/api/users/\(uid)/cover", origin: origin, accountId: uid)
+            ImageMemoryCache.shared.clear()
+        } else if base == "/api/me" || base.hasPrefix("/api/me/") {
+            evictKeys(["/api/me", "profile_me"])
+        } else if base.hasPrefix("/api/notifications") {
+            evictKeys(["/api/notifications"])
+        } else if base.hasPrefix("/api/friends") || base.hasPrefix("/api/friend-requests") || base.hasSuffix("/follow") {
+            evictKeys(["/api/friends", "/api/friend-requests", "/api/friend-suggestions", "/api/discover", "/api/me"])
+        } else if base.hasPrefix("/api/groups") {
+            evictKeys(["/api/groups", "/api/conversations"])
+        } else if base.hasPrefix("/api/conversations") || base.hasPrefix("/api/chat-messages") || (base.hasPrefix("/api/users/") && base.contains("/messages")) {
+            evictKeys(["/api/conversations"])
+        } else if base.hasPrefix("/api/store") || base.hasPrefix("/api/wallet") {
+            evictKeys(["/api/store", "/api/wallet", "/api/me"])
+        }
     }
 
     func fetchBinaryData(path: String, maxAge: TimeInterval = 7 * 86400) async -> Data? {
@@ -410,7 +471,12 @@ enum KinnectAuthenticatedFile {
         }
         let safeExt = fileExtension.trimmingCharacters(in: CharacterSet(charactersIn: ".")).lowercased()
         let cleanExt = safeExt.isEmpty ? "mp4" : safeExt
-        let safeKey = "media_" + path.replacingOccurrences(of: "[^a-zA-Z0-9_-]", with: "_", options: .regularExpression).prefix(64) + ".\(cleanExt)"
+        let acct = KinnectAPIClient.shared.currentAccountId
+        let accountScope = acct.isEmpty ? (AccountCache.shared.activeAccountId ?? "anon") : acct
+        let digest = SHA256.hash(data: Data("\(accountScope)|\(path)".utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+        let safeKey = "media_\(digest).\(cleanExt)"
         let destination = FileManager.default.temporaryDirectory.appendingPathComponent(safeKey)
 
         if FileManager.default.fileExists(atPath: destination.path),

@@ -644,7 +644,7 @@ private struct ChangePasswordSheetView: View {
 }
 
 private struct AppearanceSettingsSheetView: View {
-    @AppStorage("kinnect_color_scheme") private var colorSchemeSetting: String = "system"
+    @AppStorage("app_appearance_mode") private var colorSchemeSetting: String = "system"
     @Environment(\.dismiss) private var dismiss
     var onBack: (() -> Void)? = nil
 

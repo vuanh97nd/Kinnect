@@ -124,6 +124,9 @@ struct LiveStreamView: View {
         .onChange(of: selectedIndex) { newIndex in
             guard newIndex < appState.liveRooms.count else { return }
             let room = appState.liveRooms[newIndex]
+            if scrolledRoomId != room.id {
+                scrolledRoomId = room.id
+            }
             appState.joinLiveRoom(room)
             likesCount = room.likesCount
         }
@@ -165,16 +168,19 @@ struct LiveStreamView: View {
         ZStack(alignment: .bottomLeading) {
             // WebRTC Video Canvas with Fallback connecting state
             ZStack {
-                if appState.isCurrentLiveHost, let localTrack = webrtc.liveLocalVideoTrack {
+                if room.id == appState.currentLiveRoom?.id,
+                   appState.isCurrentLiveHost,
+                   let localTrack = webrtc.liveLocalVideoTrack {
                     WebRTCVideoRendererView(track: localTrack, mirror: webrtc.usingFrontCamera)
-                } else if let remoteTrack = webrtc.liveRemoteVideoTrack {
+                } else if room.id == appState.currentLiveRoom?.id,
+                          let remoteTrack = webrtc.liveRemoteVideoTrack {
                     WebRTCVideoRendererView(track: remoteTrack, mirror: false)
-                } else {
-                    // Playable live video fallback with vignette overlay (Parity Android 1.2.12 build 118)
+                } else if UIReviewFixture.isEnabled && room.id == scrolledRoomId {
                     ZStack {
                         ShortClipPlayer(
-                            path: UIReviewFixture.samplePlayableVideoURL()?.absoluteString ?? "https://kinnect.io.vn/media/welcome-feed-demo.mp4",
-                            active: true
+                            path: UIReviewFixture.samplePlayableVideoURL()?.absoluteString ?? "",
+                            active: true,
+                            muted: true
                         )
                         LinearGradient(
                             colors: [
@@ -187,6 +193,32 @@ struct LiveStreamView: View {
                         )
                     }
                     .ignoresSafeArea()
+                } else {
+                    ZStack {
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.14, green: 0.08, blue: 0.28),
+                                Color(red: 0.05, green: 0.03, blue: 0.12)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        .ignoresSafeArea()
+                        VStack(spacing: 12) {
+                            KinnectAvatarView(
+                                name: room.hostName,
+                                avatarURL: room.hostAvatarUrl,
+                                colorHex: room.hostAvatarColor,
+                                size: 84
+                            )
+                            ProgressView().tint(.white)
+                            Text(room.gamePaused ? "Chủ phòng đang tạm dừng màn hình game" : "Đang kết nối luồng video Live...")
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.8))
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 24)
+                        }
+                    }
                 }
             }
 
@@ -279,9 +311,11 @@ struct LiveStreamView: View {
                         }
 
                         if appState.liveChatMessages.isEmpty {
-                            chatBubble(name: "kinnect_mod", text: "Chào mừng bạn đến với phòng Live của \(room.hostName)!", colorHex: "#A855F7")
-                            chatBubble(name: "Thanh Trúc", text: "Chào anh Nam nhé! Chúc anh buổi live vui vẻ ❤️", colorHex: "#EC4899")
-                            chatBubble(name: "kinnect_user", text: "Âm thanh và hình ảnh rất nét ạ!", colorHex: "#22C55E")
+                            if UIReviewFixture.isEnabled {
+                                chatBubble(name: "kinnect_mod", text: "Chào mừng bạn đến với phòng Live của \(room.hostName)!", colorHex: "#A855F7")
+                                chatBubble(name: "Thanh Trúc", text: "Chào anh Nam nhé! Chúc anh buổi live vui vẻ ❤️", colorHex: "#EC4899")
+                                chatBubble(name: "kinnect_user", text: "Âm thanh và hình ảnh rất nét ạ!", colorHex: "#22C55E")
+                            }
                         } else {
                             ForEach(appState.liveChatMessages.suffix(6)) { msg in
                                 chatBubble(name: msg.user.name, text: msg.text, colorHex: msg.user.avatarColor)
@@ -300,18 +334,21 @@ struct LiveStreamView: View {
                                 let clean = chatText.trimmingCharacters(in: .whitespacesAndNewlines)
                                 if !clean.isEmpty {
                                     chatText = ""
-                                    let localMsg = LiveChatMessage(
-                                        id: UUID().uuidString,
-                                        user: appState.currentUser ?? KinnectUser.from(["name": "Bạn"]),
-                                        text: clean,
-                                        createdAt: ""
-                                    )
-                                    appState.liveChatMessages.append(localMsg)
-                                    NativeSocketClient.shared.sendJSON([
-                                        "type": "chat",
-                                        "text": clean,
-                                        "room": room.id
-                                    ])
+                                    if UIReviewFixture.isEnabled {
+                                        let localMsg = LiveChatMessage(
+                                            id: UUID().uuidString,
+                                            user: appState.currentUser ?? KinnectUser.from(["name": "Bạn"]),
+                                            text: clean,
+                                            createdAt: ""
+                                        )
+                                        appState.liveChatMessages.append(localMsg)
+                                    } else {
+                                        NativeSocketClient.shared.sendJSON([
+                                            "type": "chat",
+                                            "text": clean,
+                                            "room": room.id
+                                        ])
+                                    }
                                 }
                             } label: {
                                 KinnectIcon(glyph: .send, size: 20, selected: true, tint: KinnectTheme.accentBright)
@@ -702,13 +739,19 @@ struct CreateLiveRoomSheet: View {
             ? (liveMode == "game" ? "Live Game: \(selectedGame)" : "Phòng Live của \(appState.currentUser?.name ?? "Kinnect")")
             : title.trimmingCharacters(in: .whitespacesAndNewlines)
 
+        guard await NativeSocketClient.shared.ensureConnected() else {
+            manager.stopLiveSession()
+            appState.showToast("Chưa kết nối được máy chủ Live. Vui lòng thử lại.")
+            return
+        }
+
         NativeSocketClient.shared.sendJSON([
             "type": "create",
             "title": roomTitle,
             "topic": topic,
             "liveMode": liveMode,
             "gameTitle": liveMode == "game" ? selectedGame : "",
-            "multiGuest": true,
+            "multiGuest": false,
             "liveModes": true,
             "comments": gameComments
         ])
@@ -816,10 +859,10 @@ struct LiveRoomFullScreenView: View {
                         if !appState.isCurrentLiveHost {
                             Button {
                                 appState.activeReportContext = UGCReportContext(
-                                    targetType: "live",
-                                    targetId: room.id,
+                                    targetType: "user",
+                                    targetId: room.hostUserId.isEmpty ? room.id : room.hostUserId,
                                     targetUserId: room.hostUserId,
-                                    targetTitle: room.title
+                                    targetTitle: room.title.isEmpty ? room.hostName : "\(room.hostName) — \(room.title)"
                                 )
                             } label: {
                                 Image(systemName: "flag.fill")
@@ -1137,6 +1180,7 @@ struct LiveGiftDrawerSheet: View {
                 .padding(.top, 12)
                 .padding(.bottom, 8)
                 }
+                .disabled(pendingRequestId != nil)
                 if let giftError { Text(giftError).foregroundColor(KinnectTheme.danger) }
 
                 ScrollView {
@@ -1174,9 +1218,9 @@ struct LiveGiftDrawerSheet: View {
                     }
                     .padding(16)
                 }
+                .disabled(pendingRequestId != nil)
             }
             .background(KinnectTheme.background)
-            .disabled(pendingRequestId != nil)
             .navigationTitle("Tặng quà phòng Live")
             .alert("Xác nhận tặng quà?", isPresented: Binding(
                 get: { confirmGift != nil }, set: { if !$0 { confirmGift = nil } }
@@ -1270,7 +1314,8 @@ struct LiveGiftDrawerSheet: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 12) {
             if pendingRequestId == reqId {
                 giftError = "Chưa nhận được xác nhận. Kiểm tra số dư và lịch sử quà trước khi gửi lại."
-                // Keep the drawer from sending a second transaction after an ambiguous timeout.
+                pendingRequestId = nil
+                // Preserve idempotency key in UserDefaults so a retry reuses the same requestId.
             }
         }
     }

@@ -62,7 +62,6 @@ final class AppState: ObservableObject {
                 NativeSocketClient.shared.sendJSON([
                     "type": "join",
                     "room": room.id,
-                    "liveMode": room.liveMode,
                     "multiGuest": false,
                     "liveModes": true
                 ])
@@ -192,6 +191,7 @@ final class AppState: ObservableObject {
         CallKitManager.shared.endAllCalls()
         NativeSocketClient.shared.disconnect()
         KeychainStore.shared.clearAll()
+        ImageMemoryCache.shared.clear()
         AccountCache.shared.wipeAllCaches()
         currentUser = nil
         unreadNotificationsCount = 0
@@ -212,7 +212,9 @@ final class AppState: ObservableObject {
 
         if let notifRes {
             let items = (notifRes["notifications"] as? [[String: Any]] ?? []).map(NotificationItem.from)
-            self.unreadNotificationsCount = items.filter { !$0.read }.count
+            self.unreadNotificationsCount = items.filter {
+                !$0.read && $0.type != "message" && $0.type != "group_message"
+            }.count
         }
         // Real API: { users: [{ unread }] } plus /api/groups { groups: [{ unread }] }.
         // UI review fixture: { conversations: [{ unreadCount }] } and groups[].unreadCount.
@@ -241,16 +243,25 @@ final class AppState: ObservableObject {
     func refreshBlockedUsers() async {
         guard currentUser != nil else { return }
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/blocks") {
-            let blocks = res["blocks"] as? [[String: Any]] ?? []
+            let blocks = (res["users"] as? [[String: Any]]) ?? (res["blocks"] as? [[String: Any]]) ?? []
             var ids = Set<String>()
             for b in blocks {
-                if let u = b["user"] as? [String: Any], let id = u["id"] as? String {
+                if let u = b["user"] as? [String: Any], let id = u["id"] as? String, !id.isEmpty {
                     ids.insert(id)
-                } else if let id = b["blockedUserId"] as? String {
+                } else if let id = b["id"] as? String, !id.isEmpty {
+                    ids.insert(id)
+                } else if let id = b["blockedUserId"] as? String, !id.isEmpty {
                     ids.insert(id)
                 }
             }
             self.blockedUserIds = ids
+        }
+    }
+
+    private func evictModerationCaches() {
+        guard let accountId = AccountCache.shared.activeAccountId, !accountId.isEmpty else { return }
+        for key in ["json:/api/blocks", "json:/api/conversations", "json:/api/friends", "json:/api/posts?limit=25", "json:/api/posts"] {
+            AccountCache.shared.evict(forKey: key, accountId: accountId)
         }
     }
 
@@ -265,6 +276,7 @@ final class AppState: ObservableObject {
                 requestId: reqId
             )
             blockedUserIds.insert(userId)
+            evictModerationCaches()
             showToast("Đã chặn \(userName). Nội dung của người này đã được ẩn.")
             NotificationCenter.default.post(name: .kinnectContentModerated, object: nil)
         } catch {
@@ -283,6 +295,7 @@ final class AppState: ObservableObject {
                 requestId: reqId
             )
             blockedUserIds.remove(userId)
+            evictModerationCaches()
             showToast("Đã bỏ chặn người dùng.")
         } catch {
             showToast(error.localizedDescription)
@@ -331,6 +344,10 @@ final class AppState: ObservableObject {
             if isCurrentLiveHost, let peerId = (json["id"] as? String) ?? (json["peerId"] as? String) {
                 NativeWebRTCManager.shared.handleLiveViewerJoined(peerId: peerId)
             }
+        case "peer-left":
+            if let peerId = (json["id"] as? String) ?? (json["peerId"] as? String) {
+                NativeWebRTCManager.shared.handleLivePeerLeft(peerId: peerId)
+            }
         case "signal":
             if let fromPeer = json["from"] as? String {
                 let signalPayload = (json["signal"] as? [String: Any]) ?? json
@@ -361,13 +378,16 @@ final class AppState: ObservableObject {
             NotificationCenter.default.post(name: Notification.Name("kinnectLiveGiftResult"), object: nil, userInfo: json)
             Task { await refreshGlobalBadges() }
         case "live-mode-error", "live-gift-error":
+            if currentLiveRoom == nil && NativeWebRTCManager.shared.liveLocalVideoTrack != nil {
+                NativeWebRTCManager.shared.stopLiveSession()
+            }
             NotificationCenter.default.post(name: Notification.Name("kinnectLiveGiftResult"), object: nil, userInfo: json)
             if let message = json["message"] as? String {
                 showToast(message)
             }
         case "live-mode-state":
             if var room = currentLiveRoom {
-                if let paused = json["gamePaused"] as? Bool {
+                if let paused = (json["screenPaused"] as? Bool) ?? (json["gamePaused"] as? Bool) {
                     room.gamePaused = paused
                 }
                 if let title = json["gameTitle"] as? String {
@@ -375,10 +395,15 @@ final class AppState: ObservableObject {
                 }
                 self.currentLiveRoom = room
             }
-        case "room-ended":
+        case "ended", "room-ended":
             if currentLiveRoom != nil {
                 NativeWebRTCManager.shared.stopLiveSession()
                 currentLiveRoom = nil
+                isCurrentLiveHost = false
+                liveChatMessages = []
+                liveGiftRanking = []
+                liveLastReactionBanner = nil
+                liveGiftCombo = 0
                 showToast("Phiên phát trực tiếp đã kết thúc.")
             }
         case "call-incoming":
@@ -398,6 +423,9 @@ final class AppState: ObservableObject {
             Task { await refreshGlobalBadges() }
             NotificationCenter.default.post(name: .kinnectMessagesChanged, object: json)
         case "error":
+            if currentLiveRoom == nil && NativeWebRTCManager.shared.liveLocalVideoTrack != nil {
+                NativeWebRTCManager.shared.stopLiveSession()
+            }
             let message = (json["message"] as? String) ?? (json["error"] as? String) ?? ""
             // server.js:626 rejects WS live "create"/"chat" without current consent; route to the explicit consent sheet.
             if message.localizedCaseInsensitiveContains("đồng ý thông báo dữ liệu") {

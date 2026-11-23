@@ -159,15 +159,20 @@ final class ImageMemoryCache {
         cache.totalCostLimit = 120 * 1024 * 1024 // 120 MB
     }
 
+    private func scopedKey(_ key: String) -> NSString {
+        let accountScope = AccountCache.shared.activeAccountId ?? "anon"
+        return "\(accountScope)|\(key)" as NSString
+    }
+
     func image(forKey key: String) -> UIImage? {
         guard !key.isEmpty else { return nil }
-        return cache.object(forKey: key as NSString)
+        return cache.object(forKey: scopedKey(key))
     }
 
     func store(_ image: UIImage, forKey key: String) {
         guard !key.isEmpty else { return }
         let cost = Int(image.size.width * image.size.height * 4)
-        cache.setObject(image, forKey: key as NSString, cost: cost)
+        cache.setObject(image, forKey: scopedKey(key), cost: cost)
     }
 
     func clear() {

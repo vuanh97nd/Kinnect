@@ -1654,6 +1654,44 @@ struct CameraStudioView: View {
         }
     }
 
+    private func encodeVideoFileOffMainThread(url: URL, maxBytes: Int = 44 * 1024 * 1024) async throws -> String {
+        try await Task.detached(priority: .userInitiated) {
+            let attrs = try FileManager.default.attributesOfItem(atPath: url.path)
+            let size = (attrs[.size] as? NSNumber)?.intValue ?? 0
+            if size > maxBytes {
+                throw NSError(
+                    domain: "KinnectStudio",
+                    code: -10,
+                    userInfo: [NSLocalizedDescriptionKey: "Video vượt quá giới hạn \(maxBytes / (1024 * 1024))MB."]
+                )
+            }
+            let data = try Data(contentsOf: url, options: .mappedIfSafe)
+            if data.count > maxBytes {
+                throw NSError(
+                    domain: "KinnectStudio",
+                    code: -10,
+                    userInfo: [NSLocalizedDescriptionKey: "Video vượt quá giới hạn \(maxBytes / (1024 * 1024))MB."]
+                )
+            }
+            return "data:video/mp4;base64," + data.base64EncodedString()
+        }.value
+    }
+
+    private func resolvePublishVideoDataURL() async throws -> String {
+        if let vp = videoProject ?? (capturedVideoTempURL.map { StudioVideoProject(sourceURL: $0) }) {
+            syncVideoProjectSliders(to: vp)
+            if vp.hasEdits {
+                appState.showToast("Đang áp dụng hiệu ứng và xuất video...")
+                let exportedURL = try await vp.exportVideo()
+                return try await encodeVideoFileOffMainThread(url: exportedURL)
+            }
+            if videoDataURL.isEmpty {
+                return try await encodeVideoFileOffMainThread(url: vp.sourceURL)
+            }
+        }
+        return videoDataURL
+    }
+
     private func publishContent() async {
         isUploading = true
         defer { isUploading = false }
@@ -1668,21 +1706,12 @@ struct CameraStudioView: View {
                     appState.showToast("Vui lòng quay hoặc chọn một video MP4 (< 8MB).")
                     return
                 }
-                var finalVideoDataURL = videoDataURL
-
-                if let vp = videoProject ?? (capturedVideoTempURL.map { StudioVideoProject(sourceURL: $0) }) {
-                    syncVideoProjectSliders(to: vp)
-                    if vp.hasEdits {
-                        do {
-                            appState.showToast("Đang áp dụng hiệu ứng và xuất video...")
-                            let exportedURL = try await vp.exportVideo()
-                            let data = try Data(contentsOf: exportedURL)
-                            finalVideoDataURL = "data:video/mp4;base64," + data.base64EncodedString()
-                        } catch {
-                            appState.showToast("Lỗi xuất video: \(error.localizedDescription)")
-                            return
-                        }
-                    }
+                let finalVideoDataURL: String
+                do {
+                    finalVideoDataURL = try await resolvePublishVideoDataURL()
+                } catch {
+                    appState.showToast("Lỗi xuất video: \(error.localizedDescription)")
+                    return
                 }
 
                 _ = try await KinnectAPIClient.shared.requestJSON(
@@ -1695,20 +1724,36 @@ struct CameraStudioView: View {
                 closeCameraView()
 
             case .feedPost:
+                let mediaURL: String
+                if !imageDataURL.isEmpty {
+                    mediaURL = imageDataURL
+                } else if !videoDataURL.isEmpty || capturedVideoTempURL != nil || videoProject != nil {
+                    mediaURL = try await resolvePublishVideoDataURL()
+                } else {
+                    mediaURL = ""
+                }
                 _ = try await KinnectAPIClient.shared.requestJSON(
                     "/api/posts",
                     method: "POST",
-                body: KinnectWriteBody.post(text: finalCaption, category: "community", mediaDataURL: imageDataURL),
+                body: KinnectWriteBody.post(text: finalCaption, category: "community", mediaDataURL: mediaURL),
                     requestId: reqId
                 )
                 appState.showToast("Đã đăng bài viết mới!")
                 closeCameraView()
 
             case .story:
+                let mediaURL: String
+                if !imageDataURL.isEmpty {
+                    mediaURL = imageDataURL
+                } else if !videoDataURL.isEmpty || capturedVideoTempURL != nil || videoProject != nil {
+                    mediaURL = try await resolvePublishVideoDataURL()
+                } else {
+                    mediaURL = ""
+                }
                 _ = try await KinnectAPIClient.shared.requestJSON(
                     "/api/stories",
                     method: "POST",
-                body: KinnectWriteBody.story(text: finalCaption, colorHex: "#7C3AED", mediaDataURL: imageDataURL),
+                body: KinnectWriteBody.story(text: finalCaption, colorHex: "#7C3AED", mediaDataURL: mediaURL),
                     requestId: reqId
                 )
                 appState.showToast("Đã đăng tin 24h!")

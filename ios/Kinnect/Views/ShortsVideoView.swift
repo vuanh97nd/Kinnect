@@ -397,6 +397,10 @@ struct ShortsVideoView: View {
                 method: "DELETE"
             )
             items.removeAll(where: { $0.id == item.id })
+            if let accountId = AccountCache.shared.activeAccountId, !accountId.isEmpty {
+                AccountCache.shared.evict(forKey: "shorts_feed_for", accountId: accountId)
+                AccountCache.shared.evict(forKey: "shorts_feed_following", accountId: accountId)
+            }
             appState.showToast("Đã xoá video ngắn.")
         } catch {
             appState.showToast(error.localizedDescription)
@@ -512,11 +516,14 @@ struct ShortClipPlayer: View {
 
         // 1. Try playing from authenticated media cache (fast, reliable, no AVURLAsset cookie dropping on iOS)
         if path.hasPrefix("/api/") || path.hasPrefix("/") || path.contains("app.kinnect.io.vn") {
-            if let cachedLocalURL = try? await KinnectAuthenticatedFile.fetch(path: path, fileExtension: "mp4") {
+            let cachedLocalURL = try? await KinnectAuthenticatedFile.fetch(path: path, fileExtension: "mp4")
+            guard !Task.isCancelled else { return }
+            if let cachedLocalURL {
                 setupPlayer(with: AVPlayerItem(url: cachedLocalURL))
                 return
             }
         }
+        guard !Task.isCancelled else { return }
 
         // 2. Direct streaming fallback with cookie jar
         let origin = KinnectAPIClient.shared.mediaOrigin
@@ -563,7 +570,8 @@ struct ShortClipPlayer: View {
             forName: .AVPlayerItemDidPlayToEndTime,
             object: item,
             queue: .main
-        ) { _ in
+        ) { [weak next] _ in
+            guard let next else { return }
             next.seek(to: .zero)
             if shouldPlay { next.play() }
         }
@@ -797,17 +805,27 @@ struct ShortCommentsSheet: View {
     }
 
     private func toggleCommentLike(_ item: CommentItem) {
-        if let idx = comments.firstIndex(where: { $0.id == item.id }) {
-            comments[idx].liked.toggle()
-            comments[idx].likesCount += comments[idx].liked ? 1 : -1
-            if comments[idx].likesCount < 0 { comments[idx].likesCount = 0 }
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            Task {
-                _ = try? await KinnectAPIClient.shared.requestJSON(
-                    "/api/shorts/\(short.id)/comments/\(item.id)/like",
+        guard let idx = comments.firstIndex(where: { $0.id == item.id }) else { return }
+        let previousLiked = comments[idx].liked
+        let previousCount = comments[idx].likesCount
+        let liked = !previousLiked
+        comments[idx].liked = liked
+        comments[idx].likesCount = max(0, previousCount + (liked ? 1 : -1))
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        Task {
+            do {
+                let body: [String: Any] = ["reaction": liked ? "like" : NSNull()]
+                _ = try await KinnectAPIClient.shared.requestJSON(
+                    "/api/shorts/\(short.id)/comments/\(item.id)/reaction",
                     method: "POST",
-                    body: [:]
+                    body: body
                 )
+            } catch {
+                if let revertIdx = comments.firstIndex(where: { $0.id == item.id }) {
+                    comments[revertIdx].liked = previousLiked
+                    comments[revertIdx].likesCount = previousCount
+                }
+                appState.showToast(error.localizedDescription)
             }
         }
     }

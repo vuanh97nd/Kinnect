@@ -655,20 +655,14 @@ struct AuthView: View {
             HStack(spacing: 10) {
                 loginProviderButton(title: "Google", asset: "BrandGoogle") {
                     oauth.startOAuth(provider: "google") { res in
-                        switch res {
-                        case .success(let user):
-                            appState.applyAuthenticatedUser(user, rawDict: [:], rememberMe: true)
-                        case .failure(let err):
+                        if case .failure(let err) = res {
                             errorMessage = err.localizedDescription
                         }
                     }
                 }
                 loginProviderButton(title: "Facebook", asset: "BrandFacebook") {
                     oauth.startOAuth(provider: "facebook") { res in
-                        switch res {
-                        case .success(let user):
-                            appState.applyAuthenticatedUser(user, rawDict: [:], rememberMe: true)
-                        case .failure(let err):
+                        if case .failure(let err) = res {
                             errorMessage = err.localizedDescription
                         }
                     }
@@ -1280,10 +1274,7 @@ struct AuthView: View {
             HStack(spacing: 12) {
                 Button {
                     oauth.startOAuth(provider: "google") { res in
-                        switch res {
-                        case .success(let user):
-                            appState.applyAuthenticatedUser(user, rawDict: [:], rememberMe: true)
-                        case .failure(let err):
+                        if case .failure(let err) = res {
                             errorMessage = err.localizedDescription
                         }
                     }
@@ -1305,10 +1296,7 @@ struct AuthView: View {
 
                 Button {
                     oauth.startOAuth(provider: "facebook") { res in
-                        switch res {
-                        case .success(let user):
-                            appState.applyAuthenticatedUser(user, rawDict: [:], rememberMe: true)
-                        case .failure(let err):
+                        if case .failure(let err) = res {
                             errorMessage = err.localizedDescription
                         }
                     }

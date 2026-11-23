@@ -4,6 +4,61 @@ import PhotosUI
 import SwiftUI
 import UIKit
 
+fileprivate func compressProfileImageToDataURL(
+    _ rawData: Data,
+    maxDimension: CGFloat = 1280,
+    maxBytes: Int = 920 * 1024
+) async -> String? {
+    await Task.detached(priority: .userInitiated) {
+        guard let original = UIImage(data: rawData) else { return nil }
+
+        func resized(_ image: UIImage, maxSide: CGFloat) -> UIImage {
+            let size = image.size
+            let longest = max(size.width, size.height)
+            guard longest > maxSide, longest > 0 else { return image }
+            let scale = maxSide / longest
+            let targetSize = CGSize(width: max(1, floor(size.width * scale)), height: max(1, floor(size.height * scale)))
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 1.0
+            let renderer = UIGraphicsImageRenderer(size: targetSize, format: format)
+            return renderer.image { _ in
+                image.draw(in: CGRect(origin: .zero, size: targetSize))
+            }
+        }
+
+        var currentImage = resized(original, maxSide: maxDimension)
+        let qualities: [CGFloat] = [0.82, 0.72, 0.62, 0.52, 0.42, 0.32, 0.22]
+        var bestData: Data? = nil
+
+        for pass in 0..<3 {
+            if pass > 0 {
+                let nextSide = max(480, max(currentImage.size.width, currentImage.size.height) * 0.75)
+                currentImage = resized(currentImage, maxSide: nextSide)
+            }
+            for q in qualities {
+                if let jpeg = currentImage.jpegData(compressionQuality: q) {
+                    bestData = jpeg
+                    if jpeg.count <= maxBytes {
+                        return "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
+                    }
+                }
+            }
+        }
+
+        guard let fallback = bestData, fallback.count <= maxBytes else { return nil }
+        return "data:image/jpeg;base64,\(fallback.base64EncodedString())"
+    }.value
+}
+
+fileprivate func evictProfileMeCache(accountId: String?) {
+    let uid = (accountId?.isEmpty == false ? accountId! : KinnectAPIClient.shared.currentAccountId)
+    guard !uid.isEmpty else { return }
+    AccountCache.shared.evict(forKey: "json:/api/me", origin: KinnectAPIClient.shared.baseURL, accountId: uid)
+    if KinnectAPIClient.shared.baseURL != ServerConfig.currentOrigin {
+        AccountCache.shared.evict(forKey: "json:/api/me", origin: ServerConfig.currentOrigin, accountId: uid)
+    }
+}
+
 struct ProfileView: View {
     var targetUser: KinnectUser? = nil
     var onBack: (() -> Void)? = nil
@@ -874,20 +929,26 @@ struct ProfileView: View {
     }
 
     private func uploadProfileImage(item: PhotosPickerItem, endpoint: String, field: String) async {
+        defer {
+            if endpoint.contains("cover") {
+                selectedCoverItem = nil
+            } else if endpoint.contains("avatar") {
+                selectedAvatarItem = nil
+            }
+        }
         guard let data = try? await item.loadTransferable(type: Data.self),
-              let uiImg = UIImage(data: data),
-              let jpeg = uiImg.jpegData(compressionQuality: 0.72) else {
-            appState.showToast("Không thể xử lý ảnh đã chọn.")
+              let dataURL = await compressProfileImageToDataURL(data) else {
+            appState.showToast("Không thể xử lý ảnh đã chọn (tối đa ~920 KB sau khi nén).")
             return
         }
-        let dataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
         do {
             let res = try await KinnectAPIClient.shared.requestJSON(
                 endpoint,
                 method: "POST",
-                body: [field: dataURL],
+                body: ["data": dataURL],
                 requestId: "upload_\(UUID().uuidString)"
             )
+            evictProfileMeCache(accountId: appState.currentUser?.id)
             if let userDict = res["user"] as? [String: Any] {
                 appState.applyAuthenticatedUser(KinnectUser.from(userDict), rawDict: userDict)
             }
@@ -2015,21 +2076,30 @@ struct EditProfileSheet: View {
     }
 
     private func uploadImage(item: PhotosPickerItem, endpoint: String, field: String) async {
+        defer {
+            if endpoint.contains("cover") {
+                selectedCoverItem = nil
+            } else if endpoint.contains("avatar") {
+                selectedAvatarItem = nil
+            }
+        }
         guard let data = try? await item.loadTransferable(type: Data.self),
-              let uiImg = UIImage(data: data),
-              let jpeg = uiImg.jpegData(compressionQuality: 0.72) else {
-            appState.showToast("Không thể xử lý ảnh đã chọn.")
+              let dataURL = await compressProfileImageToDataURL(data) else {
+            appState.showToast("Không thể xử lý ảnh đã chọn (tối đa ~920 KB sau khi nén).")
             return
         }
-        let dataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
         let reqId = "upload_\(field)_\(Int(Date().timeIntervalSince1970))"
         do {
-            _ = try await KinnectAPIClient.shared.requestJSON(
+            let res = try await KinnectAPIClient.shared.requestJSON(
                 endpoint,
                 method: "POST",
-                body: [field: dataURL],
+                body: ["data": dataURL],
                 requestId: reqId
             )
+            evictProfileMeCache(accountId: appState.currentUser?.id)
+            if let userDict = res["user"] as? [String: Any] {
+                appState.applyAuthenticatedUser(KinnectUser.from(userDict), rawDict: userDict)
+            }
             appState.showToast("Đã cập nhật hình ảnh hồ sơ.")
             onSaved()
         } catch {
@@ -2404,19 +2474,19 @@ struct BlockedUsersSheet: View {
             ]
             return
         }
-        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/me/blocks") {
-            let list = res["users"] as? [[String: Any]] ?? []
-            self.blockedUsers = list.map(KinnectUser.from)
+        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/blocks") {
+            let list = (res["users"] as? [[String: Any]]) ?? (res["blocks"] as? [[String: Any]]) ?? []
+            self.blockedUsers = list.map { entry in
+                if let userDict = entry["user"] as? [String: Any] {
+                    return KinnectUser.from(userDict)
+                }
+                return KinnectUser.from(entry)
+            }
         }
     }
 
     private func unblock(_ u: KinnectUser) async {
-        _ = try? await KinnectAPIClient.shared.requestJSON(
-            "/api/me/blocks/\(u.id)",
-            method: "DELETE",
-            body: [:],
-            requestId: "unblock_\(u.id)"
-        )
+        await appState.unblockUser(userId: u.id)
         await loadBlocks()
     }
 }
@@ -3284,18 +3354,24 @@ struct ProfilePostCard: View {
         isLiked = willLike
         likesCount = max(0, likesCount + (willLike ? 1 : -1))
         Task {
-            if willLike {
-                _ = try? await KinnectAPIClient.shared.requestJSON(
-                    "/api/posts/\(post.id)/react",
-                    method: "POST",
-                    body: ["reaction": "love"]
-                )
-            } else {
-                _ = try? await KinnectAPIClient.shared.requestJSON(
-                    "/api/posts/\(post.id)/like",
-                    method: "DELETE",
-                    body: [:]
-                )
+            do {
+                if willLike {
+                    _ = try await KinnectAPIClient.shared.requestJSON(
+                        "/api/posts/\(post.id)/like",
+                        method: "POST",
+                        body: ["reaction": "love"]
+                    )
+                } else {
+                    _ = try await KinnectAPIClient.shared.requestJSON(
+                        "/api/posts/\(post.id)/like",
+                        method: "DELETE",
+                        body: [:]
+                    )
+                }
+            } catch {
+                isLiked = !willLike
+                likesCount = max(0, likesCount + (willLike ? -1 : 1))
+                AppState.shared.showToast(error.localizedDescription)
             }
         }
     }
