@@ -10,6 +10,10 @@ final class NativeSocketClient: NSObject, URLSessionWebSocketDelegate {
     private var pingTimer: Timer?
     private(set) var isConnected = false
     private var shouldReconnect = false
+    private var activeSocketOrigin: String = ""
+    private var activeCookieHeader: String = ""
+    private var reconnectAttempt: Int = 0
+    private var blockedSessionSignature: String? = nil
 
     var onEvent: (([String: Any]) -> Void)?
 
@@ -30,12 +34,22 @@ final class NativeSocketClient: NSObject, URLSessionWebSocketDelegate {
             disconnect()
             return
         }
+        let signature = "\(origin)|\(cookieHeader)"
+        if blockedSessionSignature == signature {
+            return
+        }
+        blockedSessionSignature = nil
         shouldReconnect = true
-        if webSocketTask != nil && isConnected {
+        if let existing = webSocketTask,
+           existing.state == .running,
+           activeSocketOrigin == origin,
+           activeCookieHeader == cookieHeader {
             return
         }
         webSocketTask?.cancel(with: .goingAway, reason: nil)
         webSocketTask = nil
+        activeSocketOrigin = origin
+        activeCookieHeader = cookieHeader
 
         let wsScheme = origin.lowercased().hasPrefix("https://") ? "wss://" : "ws://"
         let cleanHost = origin
@@ -70,6 +84,10 @@ final class NativeSocketClient: NSObject, URLSessionWebSocketDelegate {
     func disconnect() {
         shouldReconnect = false
         isConnected = false
+        reconnectAttempt = 0
+        blockedSessionSignature = nil
+        activeSocketOrigin = ""
+        activeCookieHeader = ""
         pingTimer?.invalidate()
         pingTimer = nil
         webSocketTask?.cancel(with: .goingAway, reason: nil)
@@ -111,6 +129,7 @@ final class NativeSocketClient: NSObject, URLSessionWebSocketDelegate {
 
         if type == "welcome" {
             isConnected = true
+            reconnectAttempt = 0
         }
 
         DispatchQueue.main.async { [weak self] in
@@ -125,18 +144,36 @@ final class NativeSocketClient: NSObject, URLSessionWebSocketDelegate {
     private func startPingTimer() {
         pingTimer?.invalidate()
         pingTimer = Timer.scheduledTimer(withTimeInterval: 25.0, repeats: true) { [weak self] _ in
-            self?.webSocketTask?.sendPing { _ in }
+            guard let self, let task = self.webSocketTask else { return }
+            task.sendPing { [weak self] error in
+                if error != nil {
+                    Task { @MainActor [weak self] in
+                        guard let self, self.webSocketTask === task else { return }
+                        self.handleDisconnection()
+                    }
+                }
+            }
         }
     }
 
     private func handleDisconnection() {
+        let failedTask = webSocketTask
         isConnected = false
         pingTimer?.invalidate()
         pingTimer = nil
         webSocketTask = nil
+        if let http = failedTask?.response as? HTTPURLResponse,
+           http.statusCode == 401 || http.statusCode == 403 {
+            blockedSessionSignature = "\(activeSocketOrigin)|\(activeCookieHeader)"
+            shouldReconnect = false
+            return
+        }
         guard shouldReconnect,
               UIApplication.shared.applicationState == .active || NativeWebRTCManager.shared.activeCall != nil else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+        let schedule: [TimeInterval] = [2.5, 5.0, 10.0, 20.0, 30.0]
+        let delay = schedule[min(reconnectAttempt, schedule.count - 1)]
+        reconnectAttempt += 1
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self = self, self.shouldReconnect, self.webSocketTask == nil else { return }
             self.connectWithKeychainSession()
         }
@@ -149,6 +186,11 @@ final class NativeSocketClient: NSObject, URLSessionWebSocketDelegate {
 
     func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didCloseWith closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
         guard self.webSocketTask === webSocketTask else { return }
+        handleDisconnection()
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        guard self.webSocketTask === task, error != nil else { return }
         handleDisconnection()
     }
 }

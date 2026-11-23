@@ -265,7 +265,7 @@ struct FriendsView: View {
                 .background(Capsule().fill(KinnectTheme.primaryGradient))
 
                 Button("Từ chối") {
-                    Task { await respondRequest(user: user, action: "reject") }
+                    Task { await respondRequest(user: user, action: "decline") }
                 }
                 .font(.caption.weight(.semibold))
                 .foregroundColor(KinnectTheme.textSecondary)
@@ -491,7 +491,7 @@ struct FriendsView: View {
                 .buttonStyle(.plain)
 
                 Button {
-                    Task { await respondRequest(user: user, action: "reject") }
+                    Task { await respondRequest(user: user, action: "decline") }
                 } label: {
                     Text("Từ chối")
                         .font(.caption.bold())
@@ -593,46 +593,62 @@ struct FriendsView: View {
 
     private func sendRequest(_ user: KinnectUser) async {
         let reqId = "freq_\(user.id)"
-        _ = try? await KinnectAPIClient.shared.requestJSON(
-            "/api/users/\(user.id)/friend-request",
-            method: "POST",
-            body: [:],
-            requestId: reqId
-        )
-        await loadAll()
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/users/\(user.id)/friend-request",
+                method: "POST",
+                body: [:],
+                requestId: reqId
+            )
+            await loadAll()
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
     }
 
     private func cancelRequest(_ user: KinnectUser) async {
         let reqId = "fcancel_\(user.id)"
-        _ = try? await KinnectAPIClient.shared.requestJSON(
-            "/api/users/\(user.id)/friend-request",
-            method: "DELETE",
-            body: [:],
-            requestId: reqId
-        )
-        await loadAll()
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/users/\(user.id)/friend-request",
+                method: "DELETE",
+                body: [:],
+                requestId: reqId
+            )
+            await loadAll()
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
     }
 
     private func respondRequest(user: KinnectUser, action: String) async {
         let reqId = "fresp_\(user.id)_\(action)"
-        _ = try? await KinnectAPIClient.shared.requestJSON(
-            "/api/users/\(user.id)/friend-request/respond",
-            method: "POST",
-            body: ["action": action],
-            requestId: reqId
-        )
-        await loadAll()
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/users/\(user.id)/friend-request/respond",
+                method: "POST",
+                body: ["action": action],
+                requestId: reqId
+            )
+            await loadAll()
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
     }
 
     private func unfriend(_ user: KinnectUser) async {
         let reqId = "unfriend_\(user.id)"
-        _ = try? await KinnectAPIClient.shared.requestJSON(
-            "/api/users/\(user.id)/friendship",
-            method: "DELETE",
-            body: [:],
-            requestId: reqId
-        )
-        await loadAll()
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/users/\(user.id)/friendship",
+                method: "DELETE",
+                body: [:],
+                requestId: reqId
+            )
+            await loadAll()
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
     }
 }
 

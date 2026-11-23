@@ -101,6 +101,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
 
     private override init() {
         RTCInitializeSSL()
+        RTCAudioSession.sharedInstance().useManualAudio = true
         let encoderFactory = RTCDefaultVideoEncoderFactory()
         let decoderFactory = RTCDefaultVideoDecoderFactory()
         self.factory = RTCPeerConnectionFactory(encoderFactory: encoderFactory, decoderFactory: decoderFactory)
@@ -308,6 +309,12 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
             let msgType: String
             if current.isIncoming && current.state == .ringingIncoming {
                 msgType = "call-decline"
+                if !NativeSocketClient.shared.isConnected {
+                    Task {
+                        _ = try? await KinnectAPIClient.shared.requestJSON(
+                            "/api/push/decline", method: "POST", body: ["callId": callId])
+                    }
+                }
             } else if !current.isIncoming && current.state == .dialingOutgoing {
                 msgType = "call-cancel"
             } else {
@@ -450,7 +457,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         let reason = json["reason"] as? String ?? ""
         CallAudioFeedback.shared.ended(busy: reason == "busy" || reason == "declined")
         if reason == "busy" { AppState.shared.showToast("Người này đang bận.") }
-        if reason == "offline" { AppState.shared.showToast("Hiện chưa liên lạc được với người này.") }
+        if reason == "offline" || reason == "unavailable" { AppState.shared.showToast("Hiện chưa liên lạc được với người này.") }
     }
 
     // MARK: - Controls
@@ -611,7 +618,8 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         guard mic && camera else { return false }
         await refreshIceServers()
 
-        MediaPermissionHandler.shared.configureAudioSessionForCall()
+        MediaPermissionHandler.shared.configureAudioSessionForCall(speaker: true, activate: true)
+        RTCAudioSession.sharedInstance().isAudioEnabled = true
         let aSource = factory.audioSource(with: nil)
         let aTrack = factory.audioTrack(with: aSource, trackId: "live_audio0")
         self.liveAudioTrack = aTrack
@@ -748,7 +756,10 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         liveViewerConnections.removeAll()
         liveHostConnection?.pc?.close()
         liveHostConnection = nil
-        MediaPermissionHandler.shared.configureAudioSessionForMedia()
+        if activeCall == nil {
+            RTCAudioSession.sharedInstance().isAudioEnabled = false
+            MediaPermissionHandler.shared.configureAudioSessionForMedia()
+        }
     }
 
     private func createLivePeerBox(peerId: String, isHost: Bool) -> PeerConnectionBox? {

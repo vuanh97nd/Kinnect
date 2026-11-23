@@ -1372,8 +1372,6 @@ struct DirectChatDetailView: View {
             let merged: [DirectMessageItem]
             if self.messages.isEmpty || latest.isEmpty {
                 merged = latest
-                self.hasMoreMessages = (res["hasMore"] as? Bool) ?? false
-                self.nextMessagesCursor = (res["nextCursor"] as? NSNumber)?.int64Value
             } else if let oldestLatestTime = latest.first?.createdAt, !oldestLatestTime.isEmpty {
                 let latestIds = Set(latest.map(\.id))
                 let older = self.messages.filter {
@@ -1382,6 +1380,10 @@ struct DirectChatDetailView: View {
                 merged = older + latest
             } else {
                 merged = latest
+            }
+            self.hasMoreMessages = (res["hasMore"] as? Bool) ?? false
+            if self.nextMessagesCursor == nil {
+                self.nextMessagesCursor = (res["nextCursor"] as? NSNumber)?.int64Value
             }
             let sig: ([DirectMessageItem]) -> [String] = { arr in
                 arr.map { "\($0.id)|\($0.text)|\($0.isSeen)|\($0.deliveredAt)|\($0.myReaction)|\($0.reactions.count)|\($0.imageUrl)|\($0.attachmentUrl)" }
@@ -2424,8 +2426,6 @@ struct GroupChatDetailView: View {
             let merged: [GroupMessageItem]
             if self.messages.isEmpty || latest.isEmpty {
                 merged = latest
-                self.hasMoreMessages = (res["hasMore"] as? Bool) ?? false
-                self.nextMessagesCursor = (res["nextCursor"] as? NSNumber)?.int64Value
             } else if let oldestLatestTime = latest.first?.createdAt, !oldestLatestTime.isEmpty {
                 let latestIds = Set(latest.map(\.id))
                 let older = self.messages.filter {
@@ -2434,6 +2434,10 @@ struct GroupChatDetailView: View {
                 merged = older + latest
             } else {
                 merged = latest
+            }
+            self.hasMoreMessages = (res["hasMore"] as? Bool) ?? false
+            if self.nextMessagesCursor == nil {
+                self.nextMessagesCursor = (res["nextCursor"] as? NSNumber)?.int64Value
             }
             let sig: ([GroupMessageItem]) -> [String] = { arr in
                 arr.map { "\($0.id)|\($0.text)|\($0.seenCount)|\($0.myReaction)|\($0.reactions.count)|\($0.imageUrl)|\($0.attachmentUrl)" }

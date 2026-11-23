@@ -156,7 +156,7 @@ struct CameraStudioView: View {
     @State private var videoCompositionRevision = UUID().uuidString
 
     private var isVideoActive: Bool {
-        capturedVideoTempURL != nil || !videoDataURL.isEmpty || UIReviewFixture.activeScreen == "camera-studio-video-edit"
+        capturedVideoTempURL != nil || videoProject != nil || !videoDataURL.isEmpty || UIReviewFixture.activeScreen == "camera-studio-video-edit"
     }
 
     // Pickers
@@ -179,7 +179,7 @@ struct CameraStudioView: View {
 
     var body: some View {
         Group {
-            if previewImage == nil && videoDataURL.isEmpty && UIReviewFixture.activeScreen != "camera-studio-edit" {
+            if previewImage == nil && !isVideoActive && UIReviewFixture.activeScreen != "camera-studio-edit" {
                 // 1. Direct-to-Camera Viewfinder Mode (100% Android StudioActivity Parity)
                 cameraViewfinderMode
             } else {
@@ -213,8 +213,9 @@ struct CameraStudioView: View {
                     self.imageDataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
                 }
             }
-            cameraController.onCapturedVideoData = { data, tempURL in
+            cameraController.onCapturedVideoData = { _, tempURL in
                 self.capturedVideoTempURL = tempURL
+                self.videoDataURL = ""
                 self.previewImage = nil
                 self.originalImage = nil
                 self.target = .shortVideo
@@ -225,11 +226,6 @@ struct CameraStudioView: View {
                 }
                 self.videoProject = vp
                 self.syncVideoProjectSliders(to: vp)
-                if data.count > 8 * 1024 * 1024 {
-                    appState.showToast("Video vượt quá giới hạn 8MB của máy chủ.")
-                } else {
-                    self.videoDataURL = "data:video/mp4;base64,\(data.base64EncodedString())"
-                }
             }
             if UIReviewFixture.activeScreen == "camera-studio-video" {
                 captureMode = .video
@@ -1634,16 +1630,12 @@ struct CameraStudioView: View {
                     self.imageDataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
                 }
             } else {
-                if data.count > 8 * 1024 * 1024 {
-                    appState.showToast("Video vượt quá giới hạn 8MB.")
-                    return
-                }
-                // Save to persistent local temp file so AVPlayer can play real local media
+                // Save to persistent local temp file so AVPlayer can play real local media; size check happens off-main-thread at publish time
                 let tempDir = FileManager.default.temporaryDirectory
                 let destURL = tempDir.appendingPathComponent("picked_video_\(UUID().uuidString).mp4")
                 try? data.write(to: destURL)
                 self.capturedVideoTempURL = destURL
-                self.videoDataURL = "data:video/mp4;base64,\(data.base64EncodedString())"
+                self.videoDataURL = ""
                 self.previewImage = nil
                 self.originalImage = nil
                 self.target = .shortVideo
@@ -2123,6 +2115,9 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
         }
         NotificationCenter.default.removeObserver(self, name: UIApplication.willResignActiveNotification, object: nil)
         #endif
+        if NativeWebRTCManager.shared.activeCall == nil && NativeWebRTCManager.shared.liveLocalVideoTrack == nil {
+            MediaPermissionHandler.shared.configureAudioSessionForMedia()
+        }
     }
 
     deinit {
@@ -2309,9 +2304,11 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
         }
         if session.isRunning && !movieOutput.connections.isEmpty {
             // Khôi phục AVAudioSession sang .playAndRecord phòng trường hợp người dùng vừa xem Shorts (.playback)
-            let audioSession = AVAudioSession.sharedInstance()
-            try? audioSession.setCategory(.playAndRecord, mode: .videoRecording, options: [.defaultToSpeaker, .allowBluetooth])
-            try? audioSession.setActive(true)
+            if NativeWebRTCManager.shared.activeCall == nil && NativeWebRTCManager.shared.liveLocalVideoTrack == nil {
+                let audioSession = AVAudioSession.sharedInstance()
+                try? audioSession.setCategory(.playAndRecord, mode: .videoRecording, options: [.defaultToSpeaker, .allowBluetooth])
+                try? audioSession.setActive(true)
+            }
             if let conn = movieOutput.connection(with: .video) {
                 if conn.isVideoOrientationSupported { conn.videoOrientation = .portrait }
                 if conn.isVideoMirroringSupported { conn.isVideoMirrored = (currentPosition == .front) }
@@ -2343,8 +2340,8 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
     func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: Error?) {
         DispatchQueue.main.async { [weak self] in
             self?.isRecordingVideo = false
-            guard error == nil, let data = try? Data(contentsOf: outputFileURL) else { return }
-            self?.onCapturedVideoData?(data, outputFileURL)
+            guard error == nil else { return }
+            self?.onCapturedVideoData?(Data(), outputFileURL)
         }
     }
 }

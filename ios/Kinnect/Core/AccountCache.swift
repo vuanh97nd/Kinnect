@@ -87,16 +87,21 @@ final class AccountCache {
         if let cached = memoryCache.object(forKey: memKey) {
             return cached as Data
         }
-        guard let dir = scopeDirectory(origin: canon, accountId: accountId) else { return nil }
-        let target = dir.appendingPathComponent(fileKey(key))
-        guard let attrs = try? fileManager.attributesOfItem(atPath: target.path),
-              let modified = attrs[.modificationDate] as? Date,
-              Date().timeIntervalSince(modified) <= maxAge,
-              let data = try? Data(contentsOf: target) else {
-            return nil
+        return queue.sync {
+            if let cached = memoryCache.object(forKey: memKey) {
+                return cached as Data
+            }
+            guard let dir = scopeDirectory(origin: canon, accountId: accountId) else { return nil }
+            let target = dir.appendingPathComponent(fileKey(key))
+            guard let attrs = try? fileManager.attributesOfItem(atPath: target.path),
+                  let modified = attrs[.modificationDate] as? Date,
+                  Date().timeIntervalSince(modified) <= maxAge,
+                  let data = try? Data(contentsOf: target) else {
+                return nil
+            }
+            memoryCache.setObject(data as NSData, forKey: memKey, cost: data.count)
+            return data
         }
-        memoryCache.setObject(data as NSData, forKey: memKey, cost: data.count)
-        return data
     }
 
     func evict(forKey key: String, origin: String = ServerConfig.currentOrigin, accountId: String) {

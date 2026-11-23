@@ -153,14 +153,18 @@ struct LiveStreamView: View {
 
     private func loadGifts() async {
         if giftCatalog.isEmpty, let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/live/gifts") {
-            let items = cached["gifts"] as? [[String: Any]] ?? []
-            self.giftCatalog = items.map(LiveGiftCatalogItem.from)
-            self.giftPriceVersion = cached["priceVersion"] as? Int ?? 1
+            let items = (cached["items"] as? [[String: Any]]) ?? (cached["gifts"] as? [[String: Any]]) ?? []
+            if !items.isEmpty {
+                self.giftCatalog = items.map(LiveGiftCatalogItem.from)
+            }
+            self.giftPriceVersion = (cached["version"] as? Int) ?? (cached["priceVersion"] as? Int) ?? 1
         }
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/live/gifts") {
-            let items = res["gifts"] as? [[String: Any]] ?? []
-            self.giftCatalog = items.map(LiveGiftCatalogItem.from)
-            self.giftPriceVersion = res["priceVersion"] as? Int ?? 1
+            let items = (res["items"] as? [[String: Any]]) ?? (res["gifts"] as? [[String: Any]]) ?? []
+            if !items.isEmpty {
+                self.giftCatalog = items.map(LiveGiftCatalogItem.from)
+            }
+            self.giftPriceVersion = (res["version"] as? Int) ?? (res["priceVersion"] as? Int) ?? 1
         }
     }
 
@@ -1116,11 +1120,14 @@ struct LiveRoomFullScreenView: View {
     }
 
     private func loadGiftCatalog() async {
-        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/live/gifts"),
-           let items = res["gifts"] as? [[String: Any]], !items.isEmpty {
-            self.giftCatalog = items.map(LiveGiftCatalogItem.from)
-            self.giftPriceVersion = res["priceVersion"] as? Int ?? 1
-        } else if self.giftCatalog.isEmpty {
+        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/live/gifts") {
+            let items = (res["items"] as? [[String: Any]]) ?? (res["gifts"] as? [[String: Any]]) ?? []
+            if !items.isEmpty {
+                self.giftCatalog = items.map(LiveGiftCatalogItem.from)
+            }
+            self.giftPriceVersion = (res["version"] as? Int) ?? (res["priceVersion"] as? Int) ?? 1
+        }
+        if self.giftCatalog.isEmpty {
             self.giftCatalog = LiveGiftCatalogItem.defaultCatalog
         }
     }

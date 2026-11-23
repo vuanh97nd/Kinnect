@@ -45,13 +45,7 @@ struct WalletStoreView: View {
     @State private var showWalletInfoAlert: Bool = false
     @State private var showStoreMenuDialog: Bool = false
     @State private var showStoreInfoAlert: Bool = false
-    @State private var giftInventory: [GiftInventoryItem] = [
-        GiftInventoryItem(giftId: "rose", quantity: 12),
-        GiftInventoryItem(giftId: "coffee", quantity: 5),
-        GiftInventoryItem(giftId: "heart", quantity: 8),
-        GiftInventoryItem(giftId: "diamond", quantity: 3),
-        GiftInventoryItem(giftId: "crown", quantity: 1)
-    ]
+    @State private var giftInventory: [GiftInventoryItem] = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -340,9 +334,11 @@ struct WalletStoreView: View {
 
                             Spacer(minLength: 8)
 
-                            Text(entry.direction == "credit" ? "+\(entry.amount.formattedWithSeparator()) xu" : "-\(entry.amount.formattedWithSeparator()) xu")
+                            Text((entry.currency == "vnd" || entry.creatorVnd > 0)
+                                 ? "+\(entry.creatorVnd.formattedWithSeparator())đ"
+                                 : (entry.direction == "credit" ? "+\(entry.amount.formattedWithSeparator()) xu" : "-\(entry.amount.formattedWithSeparator()) xu"))
                                 .font(.subheadline.bold())
-                                .foregroundColor(entry.direction == "credit" ? KinnectTheme.online : KinnectTheme.textPrimary)
+                                .foregroundColor(entry.direction == "credit" || entry.creatorVnd > 0 ? KinnectTheme.online : KinnectTheme.textPrimary)
                                 .layoutPriority(1)
                                 .fixedSize(horizontal: true, vertical: false)
                         }
@@ -719,17 +715,40 @@ struct WalletStoreView: View {
                     Spacer()
 
                     if pkg.owned {
-                        Button {
-                            Task { await applyPackage(pkg) }
-                        } label: {
-                            Text(pkg.equipped ? "Đang sử dụng" : "Áp dụng")
-                                .font(.caption.bold())
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 18)
-                                .padding(.vertical, 9)
-                                .background(
-                                    Capsule().fill(pkg.equipped ? KinnectTheme.surfaceElevated : KinnectTheme.online)
-                                )
+                        if pkg.kind != "gifts" && pkg.kind != "gift" {
+                            Button {
+                                Task { await applyPackage(pkg) }
+                            } label: {
+                                Text(pkg.equipped ? "Đang sử dụng" : "Áp dụng")
+                                    .font(.caption.bold())
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 18)
+                                    .padding(.vertical, 9)
+                                    .background(
+                                        Capsule().fill(pkg.equipped ? KinnectTheme.surfaceElevated : KinnectTheme.online)
+                                    )
+                            }
+                        }
+
+                        if pkg.kind == "gifts" || pkg.kind == "gift" || pkg.kind == "studio" {
+                            Button {
+                                Task { await buyPackage(pkg) }
+                            } label: {
+                                Text(pkg.kind == "studio" ? "Gia hạn" : "Mua thêm")
+                                    .font(.caption.bold())
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 18)
+                                    .padding(.vertical, 9)
+                                    .background(
+                                        Capsule().fill(
+                                            LinearGradient(
+                                                colors: [Color(hex: pkg.accentColor), KinnectTheme.accentBright],
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            )
+                                        )
+                                    )
+                            }
                         }
                     } else {
                         Button {
@@ -787,7 +806,7 @@ struct WalletStoreView: View {
                             .foregroundColor(KinnectTheme.textSecondary)
                         HStack(spacing: 4) {
                             KinnectIcon(glyph: .coin, size: 14, selected: true, tint: KinnectTheme.warning)
-                            Text("Gói xu chính thức")
+                            Text(prod.coinsGranted > 0 ? "Gói xu chính thức" : "Gói nâng cấp Kinnect")
                                 .font(.caption2.bold())
                                 .foregroundColor(KinnectTheme.warning)
                         }
@@ -892,7 +911,8 @@ struct WalletStoreView: View {
             let expiries = sRes["packageExpiries"] as? [String: Any] ?? [:]
             let liveTheme = sRes["liveTheme"] as? String ?? ""
             let membership = sRes["membership"] as? String ?? ""
-            let activeStyle = (sRes["activeStyle"] as? String)
+            let activeStyle = (sRes["appearance"] as? String)
+                ?? (sRes["activeStyle"] as? String)
                 ?? (sRes["profileStyle"] as? String)
                 ?? (sRes["style"] as? String)
                 ?? ""
@@ -907,11 +927,19 @@ struct WalletStoreView: View {
             }
             let rawProds = sRes["products"] as? [[String: Any]] ?? []
             self.digitalProducts = rawProds.map(StoreDigitalProduct.from)
-            if let inv = sRes["giftInventory"] as? [[String: Any]], !inv.isEmpty {
-                self.giftInventory = inv.compactMap { d in
-                    guard let gid = d["giftId"] as? String, let qty = d["quantity"] as? Int, qty > 0 else { return nil }
-                    return GiftInventoryItem(giftId: gid, quantity: qty)
+            let invList = sRes["giftInventory"] as? [[String: Any]] ?? []
+            var mergedTotals: [String: Int] = [:]
+            var orderedIds: [String] = []
+            for d in invList {
+                guard let gid = d["giftId"] as? String, let qty = d["quantity"] as? Int, qty > 0 else { continue }
+                if mergedTotals[gid] == nil {
+                    orderedIds.append(gid)
                 }
+                mergedTotals[gid, default: 0] += qty
+            }
+            self.giftInventory = orderedIds.compactMap { gid in
+                guard let total = mergedTotals[gid], total > 0 else { return nil }
+                return GiftInventoryItem(giftId: gid, quantity: total)
             }
             await storeKit.loadProducts(productIds: self.digitalProducts.map(\.id))
         }

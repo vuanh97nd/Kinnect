@@ -28,7 +28,7 @@ final class MediaPermissionHandler: NSObject, ObservableObject, CLLocationManage
         locationAuthorized = (locStatus == .authorizedWhenInUse || locStatus == .authorizedAlways)
     }
 
-    func configureAudioSessionForCall(speaker: Bool = true) {
+    func configureAudioSessionForCall(speaker: Bool = true, activate: Bool = false) {
         let session = AVAudioSession.sharedInstance()
         do {
             var options: AVAudioSession.CategoryOptions = [.allowBluetooth, .allowBluetoothA2DP]
@@ -36,7 +36,10 @@ final class MediaPermissionHandler: NSObject, ObservableObject, CLLocationManage
                 options.insert(.defaultToSpeaker)
             }
             try session.setCategory(.playAndRecord, mode: .videoChat, options: options)
-            try session.setActive(true, options: .notifyOthersOnDeactivation)
+            if activate {
+                try session.setActive(true, options: .notifyOthersOnDeactivation)
+            }
+            try? session.overrideOutputAudioPort(speaker ? .speaker : .none)
         } catch {
             print("[KinnectAudio] Call AudioSession error: \(error)")
         }

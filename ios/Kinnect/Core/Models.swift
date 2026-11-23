@@ -707,28 +707,137 @@ struct LiveGiftCatalogItem: Identifiable, Equatable {
     var emoji: String
     var coins: Int
     var tier: String
+    var colorHex: String {
+        Self.defaultColorHex(for: id)
+    }
+
+    static func defaultEmoji(for id: String) -> String {
+        switch id {
+        case "rose": return "🌹"
+        case "heart": return "💖"
+        case "coffee": return "☕"
+        case "star": return "⭐"
+        case "love_gun": return "🔫"
+        case "fireworks": return "🎆"
+        case "crown": return "👑"
+        case "car", "sports_car": return "🏎️"
+        case "yacht": return "🛥️"
+        case "diamond": return "💎"
+        case "rocket": return "🚀"
+        case "castle": return "🏰"
+        case "aurora": return "🌌"
+        case "meteor": return "☄️"
+        case "butterfly": return "🦋"
+        case "lotus": return "🪷"
+        case "phoenix": return "🐦‍🔥"
+        case "universe": return "🪐"
+        default: return "🎁"
+        }
+    }
+
+    static func defaultName(for id: String) -> String {
+        switch id {
+        case "rose": return "Hoa hồng"
+        case "heart": return "Trái tim"
+        case "coffee": return "Cà phê"
+        case "star": return "Sao pha lê"
+        case "love_gun": return "Súng tình yêu"
+        case "fireworks": return "Pháo hoa"
+        case "crown": return "Vương miện"
+        case "car": return "Siêu xe"
+        case "sports_car": return "Siêu xe thể thao"
+        case "yacht": return "Du thuyền"
+        case "diamond": return "Kim cương"
+        case "rocket": return "Tên lửa"
+        case "castle": return "Lâu đài"
+        case "aurora": return "Cực quang"
+        case "meteor": return "Sao băng"
+        case "butterfly": return "Bướm mộng"
+        case "lotus": return "Sen ánh sáng"
+        case "phoenix": return "Phượng hoàng"
+        case "universe": return "Vũ trụ"
+        default: return "Quà tặng"
+        }
+    }
+
+    static func defaultColorHex(for id: String) -> String {
+        switch id {
+        case "rose": return "#F43F5E"
+        case "heart": return "#EC4899"
+        case "coffee": return "#D97706"
+        case "star": return "#FBBF24"
+        case "love_gun": return "#FB7185"
+        case "fireworks": return "#A855F7"
+        case "crown": return "#F59E0B"
+        case "car", "sports_car": return "#EF4444"
+        case "yacht": return "#0EA5E9"
+        case "diamond": return "#38BDF8"
+        case "rocket": return "#F97316"
+        case "castle": return "#8B5CF6"
+        case "aurora": return "#10B981"
+        case "meteor": return "#6366F1"
+        case "butterfly": return "#E879F9"
+        case "lotus": return "#F472B6"
+        case "phoenix": return "#EA580C"
+        case "universe": return "#7C3AED"
+        default: return "#7C3AED"
+        }
+    }
+
+    static func defaultCostCoins(for id: String) -> Int {
+        switch id {
+        case "rose": return 50
+        case "heart": return 50
+        case "coffee": return 100
+        case "star": return 100
+        case "love_gun": return 150
+        case "butterfly": return 150
+        case "fireworks": return 200
+        case "crown": return 200
+        case "lotus": return 250
+        case "aurora": return 300
+        case "meteor": return 400
+        case "diamond": return 500
+        case "car": return 800
+        case "sports_car": return 1000
+        case "rocket": return 1000
+        case "yacht": return 1200
+        case "phoenix": return 1500
+        case "castle": return 2000
+        case "universe": return 5000
+        default: return 50
+        }
+    }
 
     static func from(_ dict: [String: Any]) -> LiveGiftCatalogItem {
-        LiveGiftCatalogItem(
-            id: (dict["id"] as? String) ?? (dict["reaction"] as? String) ?? UUID().uuidString,
-            label: (dict["label"] as? String) ?? (dict["name"] as? String) ?? "Quà tặng",
-            emoji: (dict["emoji"] as? String) ?? (dict["icon"] as? String) ?? "🎁",
-            coins: (dict["coins"] as? Int) ?? (dict["priceCoins"] as? Int) ?? (dict["price"] as? Int) ?? 10,
+        let giftId = (dict["id"] as? String) ?? (dict["reaction"] as? String) ?? UUID().uuidString
+        let rawEmoji = (dict["emoji"] as? String) ?? (dict["icon"] as? String) ?? ""
+        return LiveGiftCatalogItem(
+            id: giftId,
+            label: (dict["label"] as? String) ?? (dict["name"] as? String) ?? defaultName(for: giftId),
+            emoji: rawEmoji.isEmpty ? defaultEmoji(for: giftId) : rawEmoji,
+            coins: (dict["costCoins"] as? Int) ?? (dict["coins"] as? Int) ?? (dict["priceCoins"] as? Int) ?? (dict["price"] as? Int) ?? defaultCostCoins(for: giftId),
             tier: (dict["tier"] as? String) ?? "standard"
         )
     }
 
     static let defaultCatalog: [LiveGiftCatalogItem] = [
-        LiveGiftCatalogItem(id: "rose", label: "Hoa hồng", emoji: "🌹", coins: 10, tier: "standard"),
-        LiveGiftCatalogItem(id: "heart", label: "Trái tim", emoji: "💖", coins: 20, tier: "standard"),
-        LiveGiftCatalogItem(id: "coffee", label: "Cà phê", emoji: "☕", coins: 50, tier: "standard"),
-        LiveGiftCatalogItem(id: "love_gun", label: "Súng tình yêu", emoji: "🔫", coins: 100, tier: "rare"),
-        LiveGiftCatalogItem(id: "fireworks", label: "Pháo hoa", emoji: "🎆", coins: 200, tier: "rare"),
-        LiveGiftCatalogItem(id: "yacht", label: "Du thuyền", emoji: "🛥️", coins: 500, tier: "rare"),
-        LiveGiftCatalogItem(id: "crown", label: "Vương miện", emoji: "👑", coins: 1000, tier: "epic"),
-        LiveGiftCatalogItem(id: "diamond", label: "Kim cương", emoji: "💎", coins: 2000, tier: "epic"),
-        LiveGiftCatalogItem(id: "sports_car", label: "Siêu xe", emoji: "🏎️", coins: 5000, tier: "legendary"),
-        LiveGiftCatalogItem(id: "castle", label: "Lâu đài", emoji: "🏰", coins: 10000, tier: "legendary")
+        LiveGiftCatalogItem(id: "rose", label: "Hoa hồng", emoji: "🌹", coins: 50, tier: "small"),
+        LiveGiftCatalogItem(id: "heart", label: "Trái tim", emoji: "💖", coins: 50, tier: "small"),
+        LiveGiftCatalogItem(id: "coffee", label: "Cà phê", emoji: "☕", coins: 100, tier: "small"),
+        LiveGiftCatalogItem(id: "star", label: "Sao pha lê", emoji: "⭐", coins: 100, tier: "small"),
+        LiveGiftCatalogItem(id: "love_gun", label: "Súng tình yêu", emoji: "🔫", coins: 150, tier: "medium"),
+        LiveGiftCatalogItem(id: "butterfly", label: "Bướm mộng", emoji: "🦋", coins: 150, tier: "small"),
+        LiveGiftCatalogItem(id: "fireworks", label: "Pháo hoa", emoji: "🎆", coins: 200, tier: "medium"),
+        LiveGiftCatalogItem(id: "crown", label: "Vương miện", emoji: "👑", coins: 200, tier: "medium"),
+        LiveGiftCatalogItem(id: "lotus", label: "Sen ánh sáng", emoji: "🪷", coins: 250, tier: "medium"),
+        LiveGiftCatalogItem(id: "aurora", label: "Cực quang", emoji: "🌌", coins: 300, tier: "medium"),
+        LiveGiftCatalogItem(id: "meteor", label: "Sao băng", emoji: "☄️", coins: 400, tier: "medium"),
+        LiveGiftCatalogItem(id: "diamond", label: "Kim cương", emoji: "💎", coins: 500, tier: "medium"),
+        LiveGiftCatalogItem(id: "car", label: "Siêu xe", emoji: "🏎️", coins: 800, tier: "large"),
+        LiveGiftCatalogItem(id: "sports_car", label: "Siêu xe thể thao", emoji: "🏎️", coins: 1000, tier: "large"),
+        LiveGiftCatalogItem(id: "yacht", label: "Du thuyền", emoji: "🛥️", coins: 1200, tier: "large"),
+        LiveGiftCatalogItem(id: "castle", label: "Lâu đài", emoji: "🏰", coins: 2000, tier: "legendary")
     ]
 }
 
@@ -740,6 +849,9 @@ struct WalletEntryItem: Identifiable, Equatable {
     var title: String
     var note: String
     var createdAt: String
+    var category: String = ""
+    var currency: String = "coins"
+    var creatorVnd: Int = 0
 
     static func from(_ dict: [String: Any]) -> WalletEntryItem {
         let rawAmount = (dict["amount"] as? Int) ?? (dict["coins"] as? Int) ?? 0
@@ -751,7 +863,10 @@ struct WalletEntryItem: Identifiable, Equatable {
             amount: abs(rawAmount),
             title: (dict["title"] as? String) ?? (dict["label"] as? String) ?? "Giao dịch ví",
             note: (dict["note"] as? String) ?? (dict["subtitle"] as? String) ?? "",
-            createdAt: isoString(from: dict["createdAt"] ?? dict["created"])
+            createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
+            category: (dict["category"] as? String) ?? "",
+            currency: (dict["currency"] as? String) ?? "coins",
+            creatorVnd: (dict["creatorVnd"] as? Int) ?? (dict["creator_vnd"] as? Int) ?? 0
         )
     }
 }
@@ -843,23 +958,44 @@ struct StoreDigitalProduct: Identifiable, Equatable {
 }
 
 struct GiftInventoryItem: Identifiable, Equatable {
-    var id: String { giftId }
+    var id: String { source.isEmpty ? giftId : "\(giftId)_\(source)" }
     let giftId: String
     var quantity: Int
+    var source: String = ""
     var name: String {
+        Self.vietnameseName(for: giftId)
+    }
+    var emoji: String {
+        Self.emoji(for: giftId)
+    }
+
+    static func vietnameseName(for giftId: String) -> String {
         switch giftId {
         case "rose": return "Hoa hồng"
         case "coffee": return "Cà phê"
         case "heart": return "Trái tim"
-        case "love_gun": return "Súng bắn tim"
-        case "diamond": return "Kim cương"
-        case "crown": return "Vương miện"
-        case "sports_car": return "Siêu xe"
-        case "yacht": return "Du thuyền"
-        case "castle": return "Lâu đài"
+        case "star": return "Sao pha lê"
+        case "love_gun": return "Súng tình yêu"
         case "fireworks": return "Pháo hoa"
+        case "crown": return "Vương miện"
+        case "car": return "Siêu xe"
+        case "sports_car": return "Siêu xe thể thao"
+        case "yacht": return "Du thuyền"
+        case "diamond": return "Kim cương"
+        case "rocket": return "Tên lửa"
+        case "castle": return "Lâu đài"
+        case "aurora": return "Cực quang"
+        case "meteor": return "Sao băng"
+        case "butterfly": return "Bướm mộng"
+        case "lotus": return "Sen ánh sáng"
+        case "phoenix": return "Phượng hoàng"
+        case "universe": return "Vũ trụ"
         default: return giftId
         }
+    }
+
+    static func emoji(for giftId: String) -> String {
+        LiveGiftCatalogItem.defaultEmoji(for: giftId)
     }
 }
 

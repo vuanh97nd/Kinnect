@@ -345,7 +345,8 @@ final class KinnectAPIClient {
         if http.statusCode == 401
             && basePath != "/api/login"
             && basePath != "/api/me/password"
-            && basePath != "/api/recovery/email/start" {
+            && basePath != "/api/recovery/email/start"
+            && !basePath.hasPrefix("/api/me/2fa/") {
             throw KinnectAPIError.unauthorized
         }
 
@@ -424,6 +425,18 @@ final class KinnectAPIClient {
             evictKeys(["/api/conversations"])
         } else if base.hasPrefix("/api/store") || base.hasPrefix("/api/wallet") {
             evictKeys(["/api/store", "/api/wallet", "/api/me"])
+        }
+        if base.contains("/private") {
+            var privKeys = ["/api/me/private/requests", "/api/users/\(uid)/private"]
+            if base.hasPrefix("/api/users/") {
+                let parts = base.split(separator: "/")
+                if parts.count >= 3 {
+                    let targetId = String(parts[2])
+                    privKeys.append("/api/users/\(targetId)/private")
+                    privKeys.append("/api/users/\(targetId)")
+                }
+            }
+            evictKeys(privKeys)
         }
     }
 

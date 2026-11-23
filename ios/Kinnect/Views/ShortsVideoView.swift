@@ -504,7 +504,7 @@ struct ShortClipPlayer: View {
         defer { loading = false }
 
         // Configure audio session for smooth video audio playback
-        if calls.activeCall == nil {
+        if calls.activeCall == nil && calls.liveLocalVideoTrack == nil {
             try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
             try? AVAudioSession.sharedInstance().setActive(true)
         }

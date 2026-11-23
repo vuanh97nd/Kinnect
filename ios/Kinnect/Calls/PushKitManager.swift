@@ -115,10 +115,14 @@ final class PushKitManager: NSObject, ObservableObject, PKPushRegistryDelegate {
             callId: callId,
             callerName: callerName,
             isVideo: isVideo,
+            fromVoIPPush: true,
             completion: completion
         )
         DispatchQueue.main.asyncAfter(deadline: .now() + 45) {
             let current = NativeWebRTCManager.shared.activeCall
+            if current?.callId == callId && current?.state == .ringingIncoming {
+                NativeWebRTCManager.shared.endOrRejectCurrentCall(sendSocket: false)
+            }
             if current == nil || (current?.callId == callId && current?.state == .ringingIncoming) {
                 CallKitManager.shared.reportCallEnded(callId: callId, reason: .unanswered)
             }

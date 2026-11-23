@@ -570,7 +570,7 @@ struct StoreView: View {
                         Button {
                             Task { await usePackage(pkg) }
                         } label: {
-                            Text(pkg.equipped ? "Gỡ" : "Dùng")
+                            Text(ownedActionTitle(pkg))
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
@@ -578,6 +578,28 @@ struct StoreView: View {
                                 .background(Capsule().fill(pkg.equipped ? KinnectTheme.surfaceElevated : KinnectTheme.online))
                         }
                         .buttonStyle(.plain)
+
+                        if pkg.kind == "gifts" || pkg.kind == "gift" || pkg.kind == "studio" {
+                            Button {
+                                confirmBuyPackage = pkg
+                            } label: {
+                                Text(pkg.kind == "studio" ? "Gia hạn" : "Mua thêm")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 5)
+                                    .background(
+                                        Capsule().fill(
+                                            LinearGradient(
+                                                colors: [Color(hex: pkg.accentColor), KinnectTheme.accentBright],
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            )
+                                        )
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
                     } else {
                         Button {
                             confirmBuyPackage = pkg

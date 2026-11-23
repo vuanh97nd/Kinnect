@@ -35,24 +35,9 @@ final class CallKitManager: NSObject, CXProviderDelegate {
         callId: String,
         callerName: String,
         isVideo: Bool,
+        fromVoIPPush: Bool = false,
         completion: (() -> Void)? = nil
     ) {
-        guard !callId.isEmpty else {
-            completion?()
-            return
-        }
-        lock.lock()
-        if callUUIDs[callId] != nil {
-            lock.unlock()
-            completion?()
-            return
-        }
-
-        let uuid = UUID()
-        callUUIDs[callId] = uuid
-        callIDs[uuid] = callId
-        lock.unlock()
-
         let update = CXCallUpdate()
         update.remoteHandle = CXHandle(type: .generic, value: callerName)
         update.localizedCallerName = callerName
@@ -61,6 +46,38 @@ final class CallKitManager: NSObject, CXProviderDelegate {
         update.supportsUngrouping = false
         update.supportsHolding = false
         update.supportsDTMF = false
+
+        guard !callId.isEmpty else {
+            if fromVoIPPush {
+                let tempUUID = UUID()
+                provider.reportNewIncomingCall(with: tempUUID, update: update) { [weak self] _ in
+                    self?.provider.reportCall(with: tempUUID, endedAt: Date(), reason: .answeredElsewhere)
+                    completion?()
+                }
+            } else {
+                completion?()
+            }
+            return
+        }
+        lock.lock()
+        if callUUIDs[callId] != nil {
+            lock.unlock()
+            if fromVoIPPush {
+                let tempUUID = UUID()
+                provider.reportNewIncomingCall(with: tempUUID, update: update) { [weak self] _ in
+                    self?.provider.reportCall(with: tempUUID, endedAt: Date(), reason: .answeredElsewhere)
+                    completion?()
+                }
+            } else {
+                completion?()
+            }
+            return
+        }
+
+        let uuid = UUID()
+        callUUIDs[callId] = uuid
+        callIDs[uuid] = callId
+        lock.unlock()
 
         provider.reportNewIncomingCall(with: uuid, update: update) { [weak self] error in
             if let error = error {
@@ -142,6 +159,27 @@ final class CallKitManager: NSObject, CXProviderDelegate {
         UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["call-\(callId)"])
     }
 
+    func requestAnswerCall(callId: String) {
+        lock.lock()
+        let uuid = callUUIDs[callId]
+        lock.unlock()
+        guard let uuid else {
+            Task { @MainActor in
+                await NativeWebRTCManager.shared.acceptIncomingCall(callId: callId)
+            }
+            return
+        }
+        let answerAction = CXAnswerCallAction(call: uuid)
+        let transaction = CXTransaction(action: answerAction)
+        callController.request(transaction) { error in
+            if error != nil {
+                Task { @MainActor in
+                    await NativeWebRTCManager.shared.acceptIncomingCall(callId: callId)
+                }
+            }
+        }
+    }
+
     func requestEndCall(callId: String) {
         lock.lock()
         let uuid = callUUIDs[callId]
@@ -195,14 +233,12 @@ final class CallKitManager: NSObject, CXProviderDelegate {
     }
 
     func provider(_ provider: CXProvider, perform action: CXStartCallAction) {
-        DispatchQueue.main.async {
-            MediaPermissionHandler.shared.configureAudioSessionForCall(speaker: NativeWebRTCManager.shared.isSpeakerOn)
-        }
+        try? AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth, .allowBluetoothA2DP])
         action.fulfill()
     }
 
     func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
-        MediaPermissionHandler.shared.configureAudioSessionForCall()
+        try? AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth, .allowBluetoothA2DP])
         lock.lock()
         let callId = callIDs[action.callUUID]
         lock.unlock()
@@ -243,6 +279,7 @@ final class CallKitManager: NSObject, CXProviderDelegate {
         // Forward the external activation to WebRTC. Without this, a call
         // answered while locked can retain an interrupted audio device.
         RTCAudioSession.sharedInstance().audioSessionDidActivate(audioSession)
+        RTCAudioSession.sharedInstance().isAudioEnabled = true
         DispatchQueue.main.async {
             MediaPermissionHandler.shared.configureAudioSessionForCall(
                 speaker: NativeWebRTCManager.shared.isSpeakerOn)
@@ -250,6 +287,7 @@ final class CallKitManager: NSObject, CXProviderDelegate {
     }
 
     func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {
+        RTCAudioSession.sharedInstance().isAudioEnabled = false
         RTCAudioSession.sharedInstance().audioSessionDidDeactivate(audioSession)
         // CallKit owns deactivation. Do not reactivate a media playback session
         // here while another system call or interruption is taking ownership.

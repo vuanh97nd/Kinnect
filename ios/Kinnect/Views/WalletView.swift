@@ -465,12 +465,16 @@ struct WalletView: View {
             case .all:
                 return true
             case .topup:
+                if !entry.category.isEmpty { return entry.category == "topup" }
                 return entry.title.contains("Nạp") || entry.title.contains("mua")
             case .spend:
+                if !entry.category.isEmpty { return entry.category == "spend" }
                 return entry.direction == "debit"
             case .grant:
+                if !entry.category.isEmpty { return entry.category == "grant" }
                 return entry.title.contains("tặng") || entry.title.contains("chào mừng") || entry.direction == "credit"
             case .income:
+                if !entry.category.isEmpty { return entry.category == "income" }
                 return entry.title.contains("Thu nhập") || entry.title.contains("Live")
             }
         }
@@ -525,9 +529,11 @@ struct WalletView: View {
 
                             Spacer(minLength: 8)
 
-                            Text(entry.direction == "credit" ? "+\(entry.amount.formattedWithSeparator()) xu" : "-\(entry.amount.formattedWithSeparator()) xu")
+                            Text((entry.currency == "vnd" || entry.creatorVnd > 0)
+                                 ? "+\(entry.creatorVnd.formattedWithSeparator())đ"
+                                 : (entry.direction == "credit" ? "+\(entry.amount.formattedWithSeparator()) xu" : "-\(entry.amount.formattedWithSeparator()) xu"))
                                 .font(.subheadline.bold())
-                                .foregroundColor(entry.direction == "credit" ? KinnectTheme.online : KinnectTheme.textPrimary)
+                                .foregroundColor(entry.direction == "credit" || entry.creatorVnd > 0 ? KinnectTheme.online : KinnectTheme.textPrimary)
                                 .layoutPriority(1)
                                 .fixedSize(horizontal: true, vertical: false)
                         }
@@ -649,11 +655,15 @@ struct WalletView: View {
             Spacer()
             Button {
                 Task {
-                    _ = try? await storeKit.purchaseDigitalProduct(productId: prod.id)
-                    await loadWalletData()
+                    do {
+                        _ = try await storeKit.purchaseDigitalProduct(productId: prod.id)
+                        await loadWalletData()
+                    } catch {
+                        appState.showToast(error.localizedDescription)
+                    }
                 }
             } label: {
-                Text(prod.priceLabel)
+                Text(storeKit.storeKitProducts[prod.id]?.displayPrice ?? prod.priceLabel)
                     .font(.caption.bold())
                     .foregroundColor(.white)
                     .padding(.horizontal, 14)
@@ -732,9 +742,11 @@ struct WalletView: View {
                                 )
                             )
 
-                        Text(entry.direction == "credit" ? "+\(entry.amount.formattedWithSeparator()) xu" : "-\(entry.amount.formattedWithSeparator()) xu")
+                        Text((entry.currency == "vnd" || entry.creatorVnd > 0)
+                             ? "+\(entry.creatorVnd.formattedWithSeparator())đ"
+                             : (entry.direction == "credit" ? "+\(entry.amount.formattedWithSeparator()) xu" : "-\(entry.amount.formattedWithSeparator()) xu"))
                             .font(.system(size: 32, weight: .bold, design: .rounded))
-                            .foregroundColor(entry.direction == "credit" ? KinnectTheme.online : KinnectTheme.textPrimary)
+                            .foregroundColor(entry.direction == "credit" || entry.creatorVnd > 0 ? KinnectTheme.online : KinnectTheme.textPrimary)
 
                         Text("Giao dịch thành công")
                             .font(.subheadline.bold())
@@ -789,18 +801,22 @@ struct WalletView: View {
     }
 
     private func giftIconEmoji(_ id: String) -> String {
-        switch id {
-        case "rose": return "🌹"
-        case "coffee": return "☕"
-        case "heart": return "❤️"
-        case "love_gun": return "🔫"
-        case "diamond": return "💎"
-        case "crown": return "👑"
-        case "sports_car": return "🏎️"
-        case "yacht": return "🛥️"
-        case "castle": return "🏰"
-        case "fireworks": return "🎆"
-        default: return "🎁"
+        GiftInventoryItem.emoji(for: id)
+    }
+
+    private static func parseMergedGiftInventory(_ rawList: [[String: Any]]) -> [GiftInventoryItem] {
+        var totals: [String: Int] = [:]
+        var orderedIds: [String] = []
+        for item in rawList {
+            guard let id = item["giftId"] as? String, let count = item["quantity"] as? Int, count > 0 else { continue }
+            if totals[id] == nil {
+                orderedIds.append(id)
+            }
+            totals[id, default: 0] += count
+        }
+        return orderedIds.compactMap { id in
+            guard let qty = totals[id], qty > 0 else { return nil }
+            return GiftInventoryItem(giftId: id, quantity: qty)
         }
     }
 
@@ -820,10 +836,8 @@ struct WalletView: View {
             hydrated = true
         }
         if giftInventory.isEmpty, let cachedStore = KinnectAPIClient.shared.cachedJSON(for: "/api/store") {
-            giftInventory = (cachedStore["giftInventory"] as? [[String: Any]] ?? []).compactMap { item in
-                guard let id = item["giftId"] as? String, let count = item["quantity"] as? Int, count > 0 else { return nil }
-                return GiftInventoryItem(giftId: id, quantity: count)
-            }
+            giftInventory = Self.parseMergedGiftInventory(cachedStore["giftInventory"] as? [[String: Any]] ?? [])
+            digitalProducts = (cachedStore["products"] as? [[String: Any]] ?? []).map(StoreDigitalProduct.from)
         }
         isLoading = !hydrated
         defer { isLoading = false }
@@ -840,10 +854,9 @@ struct WalletView: View {
             entries = (wallet["entries"] as? [[String: Any]] ?? []).map(WalletEntryItem.from)
             loadError = nil
             let store = try await KinnectAPIClient.shared.requestJSON("/api/store")
-            giftInventory = (store["giftInventory"] as? [[String: Any]] ?? []).compactMap { item in
-                guard let id = item["giftId"] as? String, let count = item["quantity"] as? Int, count > 0 else { return nil }
-                return GiftInventoryItem(giftId: id, quantity: count)
-            }
+            giftInventory = Self.parseMergedGiftInventory(store["giftInventory"] as? [[String: Any]] ?? [])
+            digitalProducts = (store["products"] as? [[String: Any]] ?? []).map(StoreDigitalProduct.from)
+            await storeKit.loadProducts(productIds: digitalProducts.map(\.id).filter { !$0.isEmpty })
         } catch {
             if !hydrated {
                 loadError = "Chưa tải được dữ liệu ví: \(error.localizedDescription)"

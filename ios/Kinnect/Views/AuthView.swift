@@ -43,6 +43,10 @@ struct AuthView: View {
 
     // Forgot Password State
     @State private var forgotUsername = ""
+    @State private var forgotChallengeId = ""
+    @State private var forgotOtpCode = ""
+    @State private var forgotNewPassword = ""
+    @State private var showForgotFallbackButton = false
 
     // UI Feedback
     @State private var isLoading = false
@@ -1165,6 +1169,10 @@ struct AuthView: View {
                 Button {
                     errorMessage = nil
                     infoMessage = nil
+                    forgotChallengeId = ""
+                    forgotOtpCode = ""
+                    forgotNewPassword = ""
+                    showForgotFallbackButton = false
                     withAnimation(.easeInOut(duration: 0.2)) {
                         stage = .login
                     }
@@ -1188,12 +1196,27 @@ struct AuthView: View {
                     .foregroundColor(KinnectTheme.textSecondary)
             }
 
-            TextField(L10n.tr("Tên đăng nhập hoặc email"), text: $forgotUsername)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .padding(14)
-                .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
-                .foregroundColor(KinnectTheme.textPrimary)
+            if forgotChallengeId.isEmpty {
+                TextField(L10n.tr("Tên đăng nhập hoặc email"), text: $forgotUsername)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .padding(14)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                    .foregroundColor(KinnectTheme.textPrimary)
+            } else {
+                TextField(L10n.tr("Mã xác minh 6 chữ số (OTP)"), text: $forgotOtpCode)
+                    .keyboardType(.numberPad)
+                    .textContentType(.oneTimeCode)
+                    .autocorrectionDisabled()
+                    .padding(14)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                    .foregroundColor(KinnectTheme.textPrimary)
+
+                SecureField(L10n.tr("Mật khẩu mới (ít nhất 6 ký tự)"), text: $forgotNewPassword)
+                    .padding(14)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                    .foregroundColor(KinnectTheme.textPrimary)
+            }
 
             if let err = errorMessage {
                 Text(err)
@@ -1206,31 +1229,79 @@ struct AuthView: View {
                     .foregroundColor(KinnectTheme.online)
             }
 
-            Button {
-                Task { await performForgot() }
-            } label: {
-                HStack {
-                    if isLoading {
-                        ProgressView().tint(.white).padding(.trailing, 6)
+            if forgotChallengeId.isEmpty {
+                Button {
+                    Task { await performForgot() }
+                } label: {
+                    HStack {
+                        if isLoading {
+                            ProgressView().tint(.white).padding(.trailing, 6)
+                        }
+                        Text(L10n.tr("Gửi mã qua email"))
+                            .font(.headline.bold())
                     }
-                    Text(L10n.tr("Gửi mã qua email"))
-                        .font(.headline.bold())
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(KinnectTheme.primaryGradient)
+                    .foregroundColor(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(KinnectTheme.primaryGradient)
-                .foregroundColor(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .disabled(isLoading || forgotUsername.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                if showForgotFallbackButton {
+                    Button {
+                        Task { await performForgotAdminFallback() }
+                    } label: {
+                        Text(L10n.tr("Gửi yêu cầu hỗ trợ quản trị viên"))
+                            .font(.subheadline.bold())
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+                            .foregroundColor(KinnectTheme.accentBright)
+                    }
+                    .disabled(isLoading || forgotUsername.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            } else {
+                Button {
+                    Task { await performForgotFinish() }
+                } label: {
+                    HStack {
+                        if isLoading {
+                            ProgressView().tint(.white).padding(.trailing, 6)
+                        }
+                        Text(L10n.tr("Đặt lại mật khẩu"))
+                            .font(.headline.bold())
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(KinnectTheme.primaryGradient)
+                    .foregroundColor(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .disabled(isLoading || forgotOtpCode.trimmingCharacters(in: .whitespacesAndNewlines).count < 6 || forgotNewPassword.count < 6)
+
+                Button {
+                    forgotChallengeId = ""
+                    forgotOtpCode = ""
+                    forgotNewPassword = ""
+                    showForgotFallbackButton = true
+                } label: {
+                    Text(L10n.tr("Không nhận được mã? Gửi yêu cầu hỗ trợ quản trị viên"))
+                        .font(.caption.bold())
+                        .foregroundColor(KinnectTheme.accentBright)
+                        .frame(maxWidth: .infinity)
+                }
             }
-            .disabled(isLoading || forgotUsername.isEmpty)
 
             HStack {
                 Spacer()
                 Text(L10n.tr("Chưa có email khôi phục?"))
                     .font(.caption)
                     .foregroundColor(KinnectTheme.textSecondary)
-                Link(destination: URL(string: "https://kinnect.io.vn/support")!) {
-                    Text(L10n.tr("Gửi yêu cầu hỗ trợ"))
+                Button {
+                    Task { await performForgotAdminFallback() }
+                } label: {
+                    Text(L10n.tr("Gửi yêu cầu hỗ trợ quản trị viên"))
                         .font(.caption.bold())
                         .foregroundColor(KinnectTheme.accentBright)
                 }
@@ -1462,6 +1533,78 @@ struct AuthView: View {
     }
 
     private func performForgot() async {
+        let trimmed = forgotUsername.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        isLoading = true
+        errorMessage = nil
+        infoMessage = nil
+        defer { isLoading = false }
+
+        do {
+            let res = try await KinnectAPIClient.shared.requestJSON(
+                "/api/recovery/reset/start",
+                method: "POST",
+                body: ["identifier": trimmed]
+            )
+            if let cid = res["challengeId"] as? String, !cid.isEmpty {
+                forgotChallengeId = cid
+                showForgotFallbackButton = false
+                infoMessage = (res["message"] as? String) ?? (loc.currentLanguage == .en
+                    ? "Verification code sent to your recovery email."
+                    : "Nếu tài khoản có email khôi phục đã xác minh, mã OTP đã được gửi tới email đó.")
+            } else {
+                showForgotFallbackButton = true
+                infoMessage = (res["message"] as? String) ?? "Tài khoản chưa có email khôi phục đã xác minh. Bạn có thể gửi yêu cầu hỗ trợ quản trị viên."
+            }
+        } catch {
+            if UIReviewFixture.isEnabled {
+                infoMessage = loc.currentLanguage == .en ? "Demo verification code dispatched." : "Đã gửi mã minh họa thành công."
+            } else {
+                showForgotFallbackButton = true
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func performForgotFinish() async {
+        let cleanCode = forgotOtpCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !forgotChallengeId.isEmpty, !cleanCode.isEmpty, forgotNewPassword.count >= 6 else { return }
+        isLoading = true
+        errorMessage = nil
+        infoMessage = nil
+        defer { isLoading = false }
+
+        do {
+            let res = try await KinnectAPIClient.shared.requestJSON(
+                "/api/recovery/reset/finish",
+                method: "POST",
+                body: [
+                    "challengeId": forgotChallengeId,
+                    "code": cleanCode,
+                    "password": forgotNewPassword
+                ]
+            )
+            let msg = (res["message"] as? String) ?? "Đã đổi mật khẩu. Hãy đăng nhập bằng mật khẩu mới."
+            appState.showToast(msg)
+            loginUsername = forgotUsername.trimmingCharacters(in: .whitespacesAndNewlines)
+            forgotChallengeId = ""
+            forgotOtpCode = ""
+            forgotNewPassword = ""
+            showForgotFallbackButton = false
+            withAnimation(.easeInOut(duration: 0.2)) {
+                stage = .login
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func performForgotAdminFallback() async {
+        let trimmed = forgotUsername.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            errorMessage = L10n.tr("Vui lòng nhập tên đăng nhập cần hỗ trợ.")
+            return
+        }
         isLoading = true
         errorMessage = nil
         infoMessage = nil
@@ -1472,20 +1615,17 @@ struct AuthView: View {
                 "/api/password-reset",
                 method: "POST",
                 body: [
-                    "username": forgotUsername.trimmingCharacters(in: .whitespacesAndNewlines),
-                    "contact": forgotUsername.trimmingCharacters(in: .whitespacesAndNewlines),
+                    "username": trimmed,
+                    "contact": trimmed,
                     "note": "iOS App password reset request"
                 ]
             )
+            forgotChallengeId = ""
             infoMessage = loc.currentLanguage == .en
-                ? "Password reset request sent. Check your recovery email."
-                : "Yêu cầu khôi phục mật khẩu đã được gửi. Vui lòng kiểm tra email của bạn."
+                ? "Admin support request sent."
+                : "Đã gửi yêu cầu hỗ trợ quản trị viên thành công."
         } catch {
-            if UIReviewFixture.isEnabled {
-                infoMessage = loc.currentLanguage == .en ? "Demo verification code dispatched." : "Đã gửi mã minh họa thành công."
-            } else {
-                errorMessage = error.localizedDescription
-            }
+            errorMessage = error.localizedDescription
         }
     }
 

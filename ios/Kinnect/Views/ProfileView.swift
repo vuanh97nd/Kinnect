@@ -126,6 +126,10 @@ struct ProfileView: View {
 
     @State private var detailedPeerUser: KinnectUser? = nil
     @State private var peerFriendship: String = "none"
+    @State private var peerPrivateStatus: String = "none"
+    @State private var peerPrivatePhotos: [PrivatePhotoItem] = []
+    @State private var peerPrivatePhotoCount: Int = 0
+    @State private var showPeerPrivateAlbumSheet = false
     @State private var showPeerChat = false
     @State private var isFriendActionLoading = false
 
@@ -142,7 +146,7 @@ struct ProfileView: View {
 
                         // 2. Profile Tabs (Android 1.2.12 Parity)
                         Picker("Mục hồ sơ", selection: $selectedTab) {
-                            ForEach(isSelf ? ProfileTab.allCases : [.about, .posts, .videos], id: \.self) { t in
+                            ForEach(ProfileTab.allCases, id: \.self) { t in
                                 Text(t.rawValue).tag(t)
                             }
                         }
@@ -156,11 +160,7 @@ struct ProfileView: View {
                         case .posts:
                             postsTabContent(user: user)
                         case .albums:
-                            if isSelf {
-                                albumsTabContent(user: user)
-                            } else {
-                                aboutTabContent(user: user)
-                            }
+                            albumsTabContent(user: user)
                         case .videos:
                             videosTabContent(user: user)
                         }
@@ -210,7 +210,13 @@ struct ProfileView: View {
         .fullScreenCover(isPresented: $showPublicAlbumSheet) {
             PublicAlbumManageSheet(
                 posts: userPosts,
-                onRefresh: { Task { await refreshMe() } }
+                isSelf: isSelf,
+                onRefresh: {
+                    Task {
+                        if isSelf { await refreshMe() }
+                        else if let target = targetUser { await refreshPeer(target: target) }
+                    }
+                }
             )
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
@@ -224,6 +230,19 @@ struct ProfileView: View {
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showPrivateAlbumSheet)
+        .fullScreenCover(isPresented: $showPeerPrivateAlbumSheet) {
+            if let u = activeUser {
+                PeerPrivateAlbumSheet(
+                    peer: u,
+                    status: $peerPrivateStatus,
+                    photos: $peerPrivatePhotos,
+                    photoCount: $peerPrivatePhotoCount,
+                    onRefresh: { Task { await refreshPeer(target: u) } }
+                )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showPeerPrivateAlbumSheet)
         .fullScreenCover(item: $activeShortItem) { short in
             ProfileShortDetailSheet(
                 short: short,
@@ -744,7 +763,7 @@ struct ProfileView: View {
                         Spacer()
                         KinnectIcon(glyph: .chevronRight, size: 14, tint: KinnectTheme.textSecondary)
                     }
-                    Text("Chạm để xem & tải ảnh mới")
+                    Text(isSelf ? "Chạm để xem & tải ảnh mới" : "Chạm để xem ảnh bài viết")
                         .font(.caption2)
                         .foregroundColor(KinnectTheme.textSecondary)
                 }
@@ -755,7 +774,11 @@ struct ProfileView: View {
 
             // Private Album Card (Interactive with real /api/users/:id/private & /api/me/private/requests)
             Button {
-                showPrivateAlbumSheet = true
+                if isSelf {
+                    showPrivateAlbumSheet = true
+                } else {
+                    showPeerPrivateAlbumSheet = true
+                }
             } label: {
                 VStack(alignment: .leading, spacing: 6) {
                     RoundedRectangle(cornerRadius: KinnectTheme.radiusMD)
@@ -764,9 +787,18 @@ struct ProfileView: View {
                         .overlay(
                             VStack(spacing: 6) {
                                 KinnectIcon(glyph: .lock, size: 30, tint: KinnectTheme.warning)
-                                Text("\(privatePhotos.count)/24 ảnh • \(pendingPrivateRequestsCount) chờ duyệt")
-                                    .font(.system(size: 9, weight: .bold))
-                                    .foregroundColor(KinnectTheme.warning)
+                                if isSelf {
+                                    Text("\(privatePhotos.count)/24 ảnh • \(pendingPrivateRequestsCount) chờ duyệt")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundColor(KinnectTheme.warning)
+                                } else {
+                                    let statusText = peerPrivateStatus == "granted" || peerPrivateStatus == "owner"
+                                        ? "Đã cấp quyền • \(peerPrivatePhotos.count) ảnh"
+                                        : (peerPrivateStatus == "pending" ? "Đang chờ duyệt" : "\(peerPrivatePhotoCount) ảnh riêng tư")
+                                    Text(statusText)
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundColor(peerPrivateStatus == "granted" ? KinnectTheme.online : KinnectTheme.warning)
+                                }
                             }
                         )
                     HStack {
@@ -776,7 +808,7 @@ struct ProfileView: View {
                         Spacer()
                         KinnectIcon(glyph: .chevronRight, size: 14, tint: KinnectTheme.textSecondary)
                     }
-                    Text("Quản lý ảnh & duyệt quyền xem")
+                    Text(isSelf ? "Quản lý ảnh & duyệt quyền xem" : (peerPrivateStatus == "granted" ? "Chạm để xem ảnh được chia sẻ" : "Chạm để yêu cầu quyền xem"))
                         .font(.caption2)
                         .foregroundColor(KinnectTheme.textSecondary)
                 }
@@ -1230,6 +1262,12 @@ struct ProfileView: View {
            let items = shortsRes["shorts"] as? [[String: Any]] {
             self.userShorts = items.map(ShortItem.from)
         }
+        if let privRes = try? await KinnectAPIClient.shared.requestJSON("/api/users/\(target.id)/private") {
+            self.peerPrivateStatus = (privRes["status"] as? String) ?? "none"
+            self.peerPrivatePhotoCount = (privRes["count"] as? Int) ?? 0
+            let list = privRes["photos"] as? [[String: Any]] ?? []
+            self.peerPrivatePhotos = list.map(PrivatePhotoItem.from)
+        }
     }
 }
 
@@ -1265,6 +1303,7 @@ struct PrivateAccessRequestItem: Identifiable, Equatable {
 
 struct PublicAlbumManageSheet: View {
     let posts: [PostItem]
+    var isSelf: Bool = true
     let onRefresh: () -> Void
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
@@ -1275,20 +1314,22 @@ struct PublicAlbumManageSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Đăng ảnh công khai mới") {
-                    TextField("Chú thích cho ảnh...", text: $captionText)
-                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                        HStack(spacing: 8) {
-                            KinnectIcon(glyph: .photo, size: 20, tint: KinnectTheme.accentBright)
-                            Text(isUploading ? "Đang tải ảnh lên..." : "Chọn ảnh từ thư viện & Đăng")
-                                .font(.subheadline.bold())
-                                .foregroundColor(KinnectTheme.accentBright)
+                if isSelf {
+                    Section("Đăng ảnh công khai mới") {
+                        TextField("Chú thích cho ảnh...", text: $captionText)
+                        PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                            HStack(spacing: 8) {
+                                KinnectIcon(glyph: .photo, size: 20, tint: KinnectTheme.accentBright)
+                                Text(isUploading ? "Đang tải ảnh lên..." : "Chọn ảnh từ thư viện & Đăng")
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(KinnectTheme.accentBright)
+                            }
                         }
-                    }
-                    .disabled(isUploading)
-                    .onChange(of: selectedPhotoItem) { item in
-                        guard let item else { return }
-                        Task { await uploadPublicPhoto(item) }
+                        .disabled(isUploading)
+                        .onChange(of: selectedPhotoItem) { item in
+                            guard let item else { return }
+                            Task { await uploadPublicPhoto(item) }
+                        }
                     }
                 }
 
@@ -1324,12 +1365,14 @@ struct PublicAlbumManageSheet: View {
     }
 
     private func uploadPublicPhoto(_ item: PhotosPickerItem) async {
-        guard let data = try? await item.loadTransferable(type: Data.self),
-              let uiImg = UIImage(data: data),
-              let jpeg = uiImg.jpegData(compressionQuality: 0.75) else { return }
+        defer { selectedPhotoItem = nil }
         isUploading = true
         defer { isUploading = false }
-        let dataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
+        guard let data = try? await item.loadTransferable(type: Data.self),
+              let dataURL = await compressProfileImageToDataURL(data, maxDimension: 1920, maxBytes: 3_500_000) else {
+            appState.showToast("Không thể xử lý ảnh đã chọn (tối đa ~3.5 MB sau khi nén).")
+            return
+        }
         do {
             _ = try await KinnectAPIClient.shared.requestJSON(
                 "/api/posts",
@@ -1342,6 +1385,148 @@ struct PublicAlbumManageSheet: View {
             )
             captionText = ""
             appState.showToast("Đã đăng ảnh công khai mới!")
+            onRefresh()
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+}
+
+struct PeerPrivateAlbumSheet: View {
+    let peer: KinnectUser
+    @Binding var status: String
+    @Binding var photos: [PrivatePhotoItem]
+    @Binding var photoCount: Int
+    let onRefresh: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
+    @State private var isLoading = false
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 16) {
+                    if status == "granted" || status == "owner" {
+                        if photos.isEmpty {
+                            VStack(spacing: 10) {
+                                KinnectIcon(glyph: .photo, size: 36, tint: KinnectTheme.textSecondary)
+                                Text("Album riêng tư hiện chưa có ảnh.")
+                                    .font(.subheadline)
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                            }
+                            .padding(.vertical, 40)
+                        } else {
+                            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                                ForEach(photos) { photo in
+                                    KinnectRemoteImageView(rawURL: photo.url, contentMode: .fill, cornerRadius: KinnectTheme.radiusSM, maxHeight: 120)
+                                        .aspectRatio(1, contentMode: .fill)
+                                        .clipShape(RoundedRectangle(cornerRadius: KinnectTheme.radiusSM, style: .continuous))
+                                }
+                            }
+                        }
+                    } else {
+                        VStack(spacing: 14) {
+                            KinnectIcon(glyph: .lock, size: 42, tint: KinnectTheme.warning)
+                            Text("Album riêng tư của \(peer.name)")
+                                .font(.headline.bold())
+                                .foregroundColor(KinnectTheme.textPrimary)
+                            Text(status == "pending"
+                                 ? "Bạn đã gửi yêu cầu xem Album riêng tư. Vui lòng chờ \(peer.name) phê duyệt."
+                                 : (photoCount > 0 ? "Album có \(photoCount) ảnh riêng tư. Gửi yêu cầu để được cấp quyền xem." : "Thành viên này chưa có ảnh riêng tư hoặc cần cấp quyền xem."))
+                                .font(.subheadline)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 20)
+
+                            if status == "pending" {
+                                Button(role: .destructive) {
+                                    Task { await cancelAccessRequest() }
+                                } label: {
+                                    Text(isLoading ? "Đang hủy..." : "Thu hồi yêu cầu xem")
+                                        .font(.subheadline.bold())
+                                        .padding(.horizontal, 20)
+                                        .padding(.vertical, 10)
+                                        .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                                        .foregroundColor(KinnectTheme.danger)
+                                }
+                                .disabled(isLoading)
+                            } else {
+                                Button {
+                                    Task { await requestAccess() }
+                                } label: {
+                                    Text(isLoading ? "Đang gửi..." : "Gửi yêu cầu xem Album")
+                                        .font(.subheadline.bold())
+                                        .padding(.horizontal, 24)
+                                        .padding(.vertical, 11)
+                                        .background(Capsule().fill(KinnectTheme.primaryGradient))
+                                        .foregroundColor(.white)
+                                }
+                                .disabled(isLoading)
+                            }
+                        }
+                        .padding(.vertical, 40)
+                        .frame(maxWidth: .infinity)
+                        .kinnectCard()
+                    }
+                }
+                .padding(16)
+            }
+            .background(KinnectTheme.background)
+            .navigationTitle("Album riêng tư")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Đóng") { dismiss() }
+                }
+            }
+            .task {
+                await reloadPeerAlbum()
+            }
+        }
+    }
+
+    private func reloadPeerAlbum() async {
+        if let privRes = try? await KinnectAPIClient.shared.requestJSON("/api/users/\(peer.id)/private") {
+            status = (privRes["status"] as? String) ?? "none"
+            photoCount = (privRes["count"] as? Int) ?? 0
+            let list = privRes["photos"] as? [[String: Any]] ?? []
+            photos = list.map(PrivatePhotoItem.from)
+        }
+    }
+
+    private func requestAccess() async {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let res = try await KinnectAPIClient.shared.requestJSON(
+                "/api/users/\(peer.id)/private/request",
+                method: "POST",
+                body: [:],
+                requestId: "priv_req_\(peer.id)_\(Int(Date().timeIntervalSince1970))"
+            )
+            status = (res["status"] as? String) ?? "pending"
+            appState.showToast("Đã gửi yêu cầu xem Album riêng tư.")
+            await reloadPeerAlbum()
+            onRefresh()
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+
+    private func cancelAccessRequest() async {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let res = try await KinnectAPIClient.shared.requestJSON(
+                "/api/users/\(peer.id)/private/request",
+                method: "DELETE",
+                body: [:],
+                requestId: "priv_cancel_\(peer.id)_\(Int(Date().timeIntervalSince1970))"
+            )
+            status = (res["status"] as? String) ?? "none"
+            appState.showToast("Đã thu hồi yêu cầu xem Album.")
+            await reloadPeerAlbum()
             onRefresh()
         } catch {
             appState.showToast(error.localizedDescription)
@@ -1488,12 +1673,14 @@ struct PrivateAlbumManageSheet: View {
     }
 
     private func uploadPrivatePhoto(_ item: PhotosPickerItem) async {
-        guard let data = try? await item.loadTransferable(type: Data.self),
-              let uiImg = UIImage(data: data),
-              let jpeg = uiImg.jpegData(compressionQuality: 0.72) else { return }
+        defer { selectedItem = nil }
         isUploading = true
         defer { isUploading = false }
-        let dataURL = "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
+        guard let data = try? await item.loadTransferable(type: Data.self),
+              let dataURL = await compressProfileImageToDataURL(data, maxDimension: 1920, maxBytes: 3_500_000) else {
+            appState.showToast("Không thể xử lý ảnh đã chọn (tối đa ~3.5 MB sau khi nén).")
+            return
+        }
         do {
             let res = try await KinnectAPIClient.shared.requestJSON(
                 "/api/me/private-photos",
@@ -1537,6 +1724,10 @@ struct PrivateAlbumManageSheet: View {
                 body: ["action": action],
                 requestId: "priv_act_\(viewerId)_\(action)"
             )
+            if let reqRes = try? await KinnectAPIClient.shared.requestJSON("/api/me/private/requests") {
+                let rList = reqRes["requests"] as? [[String: Any]] ?? []
+                requests = rList.map(PrivateAccessRequestItem.from)
+            }
             let msg = action == "grant" ? "Đã cấp quyền xem Album riêng tư." : (action == "deny" ? "Đã từ chối yêu cầu." : "Đã thu hồi quyền xem.")
             appState.showToast(msg)
             onRefresh()
@@ -2498,6 +2689,7 @@ struct DeleteAccountConfirmationSheet: View {
     @State private var confirmUsername = ""
     @State private var password = ""
     @State private var requiredUsername = ""
+    @State private var requiresPassword = true
     @State private var summaryInfo: String = "Xóa tài khoản là hành động không thể đảo ngược."
     @State private var isDeleting = false
 
@@ -2527,14 +2719,16 @@ struct DeleteAccountConfirmationSheet: View {
                             .foregroundColor(KinnectTheme.textPrimary)
                     }
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Nhập mật khẩu hiện tại")
-                            .font(.caption.bold())
-                            .foregroundColor(KinnectTheme.textPrimary)
-                        SecureField("Mật khẩu của bạn", text: $password)
-                            .padding(12)
-                            .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
-                            .foregroundColor(KinnectTheme.textPrimary)
+                    if requiresPassword {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Nhập mật khẩu hiện tại")
+                                .font(.caption.bold())
+                                .foregroundColor(KinnectTheme.textPrimary)
+                            SecureField("Mật khẩu của bạn", text: $password)
+                                .padding(12)
+                                .background(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD).fill(KinnectTheme.surfaceElevated))
+                                .foregroundColor(KinnectTheme.textPrimary)
+                        }
                     }
 
                     Button(role: .destructive) {
@@ -2555,7 +2749,7 @@ struct DeleteAccountConfirmationSheet: View {
                         .foregroundColor(.white)
                         .clipShape(RoundedRectangle(cornerRadius: KinnectTheme.radiusMD))
                     }
-                    .disabled(isDeleting || confirmUsername.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() != targetUsername.lowercased())
+                    .disabled(isDeleting || confirmUsername.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() != targetUsername.lowercased() || (requiresPassword && password.isEmpty))
                 }
                 .padding(16)
             }
@@ -2572,6 +2766,7 @@ struct DeleteAccountConfirmationSheet: View {
                     if let u = res["username"] as? String, !u.isEmpty {
                         self.requiredUsername = u
                     }
+                    self.requiresPassword = (res["requiresPassword"] as? Bool) ?? true
                 }
             }
         }
@@ -2585,15 +2780,18 @@ struct DeleteAccountConfirmationSheet: View {
     private func performAccountDeletion() async {
         isDeleting = true
         defer { isDeleting = false }
+        var body: [String: Any] = [
+            "confirmUsername": confirmUsername.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+            "confirmDelete": true
+        ]
+        if requiresPassword && !password.isEmpty {
+            body["password"] = password
+        }
         do {
             _ = try await KinnectAPIClient.shared.requestJSON(
                 "/api/me/account-deletion",
                 method: "DELETE",
-                body: [
-                    "confirmUsername": confirmUsername.trimmingCharacters(in: .whitespacesAndNewlines),
-                    "confirmDelete": true,
-                    "password": password
-                ]
+                body: body
             )
             dismiss()
             appState.clearSessionState()

@@ -535,6 +535,7 @@ private struct SecuritySettingsView: View {
     var onChangePassword: () -> Void
 
     @State private var showRecovery = false
+    @State private var showTwoFactor = false
     @State private var showSessions = false
 
     var body: some View {
@@ -547,17 +548,266 @@ private struct SecuritySettingsView: View {
 
             List {
                 Button("Đổi mật khẩu", action: onChangePassword)
+                Button("Xác thực 2 bước (2FA)") { showTwoFactor = true }
                 Button("Email khôi phục") { showRecovery = true }
                 Button("Thiết bị đăng nhập") { showSessions = true }
                 Link("Hỗ trợ tài khoản và khôi phục", destination: URL(string: "https://kinnect.io.vn/support")!)
             }
             .foregroundColor(KinnectTheme.textPrimary)
         }
+        .sheet(isPresented: $showTwoFactor) {
+            TwoFactorSettingsSheet()
+        }
         .sheet(isPresented: $showRecovery) {
             RecoveryEmailSheet()
         }
         .sheet(isPresented: $showSessions) {
             ActiveSessionsSheet()
+        }
+    }
+}
+
+private struct TwoFactorSettingsSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
+
+    @State private var isLoading = true
+    @State private var isBusy = false
+    @State private var enabled = false
+    @State private var pending = false
+    @State private var remainingBackupCodes = 0
+
+    // Setup flow state
+    @State private var currentPassword = ""
+    @State private var setupSecret = ""
+    @State private var setupOtpauthUrl = ""
+    @State private var setupBackupCodes: [String] = []
+    @State private var verificationCode = ""
+
+    // Enabled actions state
+    @State private var actionPassword = ""
+    @State private var actionCode = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Trạng thái bảo mật") {
+                    HStack {
+                        Text("Xác thực 2 bước (TOTP)")
+                            .font(.subheadline.bold())
+                        Spacer()
+                        Text(enabled ? "Đang bật" : "Đang tắt")
+                            .font(.caption.bold())
+                            .foregroundColor(enabled ? KinnectTheme.online : KinnectTheme.textSecondary)
+                    }
+                    if enabled {
+                        HStack {
+                            Text("Mã dự phòng còn lại")
+                                .font(.caption)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                            Spacer()
+                            Text("\(remainingBackupCodes) mã")
+                                .font(.caption.bold())
+                                .foregroundColor(remainingBackupCodes > 0 ? KinnectTheme.accentBright : KinnectTheme.danger)
+                        }
+                    }
+                }
+
+                if !setupBackupCodes.isEmpty {
+                    Section("Mã dự phòng khôi phục (Lưu giữ an toàn)") {
+                        Text("Mỗi mã dự phòng chỉ dùng được 1 lần khi bạn mất thiết bị xác thực.")
+                            .font(.caption2)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                        Text(setupBackupCodes.joined(separator: "\n"))
+                            .font(.system(.footnote, design: .monospaced))
+                            .foregroundColor(KinnectTheme.textPrimary)
+                            .textSelection(.enabled)
+                        Button {
+                            UIPasteboard.general.string = setupBackupCodes.joined(separator: "\n")
+                            appState.showToast("Đã sao chép danh sách mã dự phòng.")
+                        } label: {
+                            Label("Sao chép mã dự phòng", systemImage: "doc.on.doc")
+                        }
+                    }
+                }
+
+                if !enabled {
+                    if setupSecret.isEmpty {
+                        Section("Bước 1: Khởi tạo khóa 2FA") {
+                            SecureField("Mật khẩu hiện tại", text: $currentPassword)
+                            Button(isBusy ? "Đang tạo khóa..." : "Tạo khóa xác thực 2FA") {
+                                Task { await startSetup() }
+                            }
+                            .disabled(isBusy || currentPassword.isEmpty)
+                        }
+                    } else {
+                        Section("Bước 2: Liên kết ứng dụng Authenticator") {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Khóa bí mật (Secret):")
+                                    .font(.caption)
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                                Text(setupSecret)
+                                    .font(.system(.subheadline, design: .monospaced).bold())
+                                    .foregroundColor(KinnectTheme.accentBright)
+                                    .textSelection(.enabled)
+                            }
+                            Button {
+                                UIPasteboard.general.string = setupSecret
+                                appState.showToast("Đã sao chép khóa bí mật 2FA.")
+                            } label: {
+                                Label("Sao chép khóa Secret", systemImage: "doc.on.doc")
+                            }
+                            if !setupOtpauthUrl.isEmpty {
+                                Button {
+                                    UIPasteboard.general.string = setupOtpauthUrl
+                                    appState.showToast("Đã sao chép liên kết otpauth://")
+                                } label: {
+                                    Label("Sao chép URI otpauth://", systemImage: "link")
+                                }
+                            }
+                        }
+
+                        Section("Bước 3: Xác nhận mã 6 chữ số để bật") {
+                            TextField("Nhập mã 6 chữ số từ ứng dụng", text: $verificationCode)
+                                .keyboardType(.numberPad)
+                                .textContentType(.oneTimeCode)
+                            Button(isBusy ? "Đang kích hoạt..." : "Kích hoạt 2FA") {
+                                Task { await enableTwoFactor() }
+                            }
+                            .font(.body.bold())
+                            .foregroundColor(KinnectTheme.online)
+                            .disabled(isBusy || verificationCode.trimmingCharacters(in: .whitespacesAndNewlines).count < 6)
+                        }
+                    }
+                } else {
+                    Section("Quản lý & Tắt 2FA") {
+                        SecureField("Mật khẩu hiện tại", text: $actionPassword)
+                        TextField("Mã 2FA 6 số hoặc mã dự phòng", text: $actionCode)
+                            .keyboardType(.asciiCapable)
+                            .autocorrectionDisabled()
+
+                        Button(isBusy ? "Đang tạo lại..." : "Tạo lại 8 mã dự phòng mới") {
+                            Task { await regenerateRecoveryCodes() }
+                        }
+                        .disabled(isBusy || actionPassword.isEmpty || actionCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                        Button(isBusy ? "Đang tắt..." : "Tắt xác thực 2 bước", role: .destructive) {
+                            Task { await disableTwoFactor() }
+                        }
+                        .disabled(isBusy || actionPassword.isEmpty || actionCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                }
+            }
+            .navigationTitle("Xác thực 2 bước (2FA)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Đóng") { dismiss() }
+                }
+            }
+            .task {
+                await loadStatus()
+            }
+        }
+    }
+
+    private func loadStatus() async {
+        isLoading = true
+        defer { isLoading = false }
+        if UIReviewFixture.isEnabled { return }
+        do {
+            let res = try await KinnectAPIClient.shared.requestJSON("/api/me/2fa")
+            enabled = (res["enabled"] as? Bool) ?? false
+            pending = (res["pending"] as? Bool) ?? false
+            remainingBackupCodes = (res["remainingBackupCodes"] as? Int) ?? (res["recoveryRemaining"] as? Int) ?? 0
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+
+    private func startSetup() async {
+        isBusy = true
+        defer { isBusy = false }
+        do {
+            let res = try await KinnectAPIClient.shared.requestJSON(
+                "/api/me/2fa/setup",
+                method: "POST",
+                body: ["password": currentPassword]
+            )
+            setupSecret = (res["secret"] as? String) ?? ""
+            setupOtpauthUrl = (res["otpauthUrl"] as? String) ?? (res["otpauthUri"] as? String) ?? ""
+            setupBackupCodes = (res["backupCodes"] as? [String]) ?? []
+            currentPassword = ""
+            appState.showToast("Đã khởi tạo khóa 2FA. Hãy nhập mã 6 số để hoàn tất.")
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+
+    private func enableTwoFactor() async {
+        isBusy = true
+        defer { isBusy = false }
+        let cleanCode = verificationCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            let res = try await KinnectAPIClient.shared.requestJSON(
+                "/api/me/2fa/enable",
+                method: "POST",
+                body: ["code": cleanCode]
+            )
+            enabled = (res["enabled"] as? Bool) ?? true
+            if let codes = res["backupCodes"] as? [String], !codes.isEmpty {
+                setupBackupCodes = codes
+            }
+            remainingBackupCodes = (res["remainingBackupCodes"] as? Int) ?? (res["recoveryRemaining"] as? Int) ?? setupBackupCodes.count
+            verificationCode = ""
+            setupSecret = ""
+            appState.showToast("Đã bật xác thực 2 bước thành công!")
+            await loadStatus()
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+
+    private func regenerateRecoveryCodes() async {
+        isBusy = true
+        defer { isBusy = false }
+        let cleanCode = actionCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            let res = try await KinnectAPIClient.shared.requestJSON(
+                "/api/me/2fa/recovery",
+                method: "POST",
+                body: ["password": actionPassword, "code": cleanCode]
+            )
+            setupBackupCodes = (res["backupCodes"] as? [String]) ?? []
+            remainingBackupCodes = (res["remainingBackupCodes"] as? Int) ?? (res["recoveryRemaining"] as? Int) ?? setupBackupCodes.count
+            actionCode = ""
+            appState.showToast("Đã tạo mới mã dự phòng 2FA.")
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+
+    private func disableTwoFactor() async {
+        isBusy = true
+        defer { isBusy = false }
+        let cleanCode = actionCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/me/2fa/disable",
+                method: "POST",
+                body: ["password": actionPassword, "code": cleanCode]
+            )
+            enabled = false
+            pending = false
+            remainingBackupCodes = 0
+            setupSecret = ""
+            setupOtpauthUrl = ""
+            setupBackupCodes = []
+            actionPassword = ""
+            actionCode = ""
+            appState.showToast("Đã tắt xác thực 2 bước.")
+        } catch {
+            appState.showToast(error.localizedDescription)
         }
     }
 }

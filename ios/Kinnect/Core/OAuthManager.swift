@@ -36,7 +36,7 @@ final class OAuthManager: NSObject, ObservableObject, ASWebAuthenticationPresent
     }
 
     func startOAuth(provider: String, completion: @escaping (Result<KinnectUser, Error>) -> Void) {
-        guard let origin = URL(string: ServerConfig.currentOrigin) else {
+        guard let origin = URL(string: KinnectAPIClient.shared.baseURL) else {
             completion(.failure(NSError(domain: "KinnectOAuth", code: -1, userInfo: [NSLocalizedDescriptionKey: "Máy chủ chưa được cấu hình."])))
             return
         }
@@ -137,6 +137,11 @@ final class OAuthManager: NSObject, ObservableObject, ASWebAuthenticationPresent
                 if let userDict = completeRes["user"] as? [String: Any] {
                     let user = KinnectUser.from(userDict)
                     AppState.shared.applyAuthenticatedUser(user, rawDict: userDict, rememberMe: true)
+                    _ = try? await KinnectAPIClient.shared.requestJSON(
+                        "/api/me/privacy-consent",
+                        method: "POST",
+                        body: ["accepted": true, "version": "2026-04"]
+                    )
                     await AppState.shared.refreshGlobalBadges()
                     await AppState.shared.refreshBlockedUsers()
                     completion(.success(user))

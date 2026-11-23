@@ -215,6 +215,46 @@ struct DiscoverView: View {
         isOnlineOnly || isRecentOnly
     }
 
+    private static func canonicalGender(_ raw: String) -> String {
+        switch raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "nam", "male", "man":
+            return "male"
+        case "nữ", "nu", "female", "woman":
+            return "female"
+        case "nam chuyển giới", "transgender_male", "trans_male", "trans male":
+            return "transgender_male"
+        case "nữ chuyển giới", "nu chuyen gioi", "transgender_female", "trans_female", "trans female":
+            return "transgender_female"
+        case "phi nhị nguyên", "phi nhi nguyen", "non_binary", "nonbinary", "non-binary":
+            return "non_binary"
+        case "linh hoạt giới", "linh hoat gioi", "genderfluid":
+            return "genderfluid"
+        case "vô giới", "vo gioi", "agender":
+            return "agender"
+        case "đang tìm hiểu", "dang tim hieu", "questioning":
+            return "questioning"
+        case "khác", "khac", "other":
+            return "other"
+        default:
+            return raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        }
+    }
+
+    private static func canonicalOrientation(_ raw: String) -> String {
+        let low = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if low.contains("gay") || low.contains("đồng tính nam") { return "gay" }
+        if low.contains("lesbian") || low.contains("đồng tính nữ") { return "lesbian" }
+        if low.contains("bisexual") || low.contains("song tính") { return "bisexual" }
+        if low.contains("pansexual") || low.contains("toàn tính") { return "pansexual" }
+        if low.contains("asexual") || low.contains("vô tính") { return "asexual" }
+        if low.contains("dị tính") || low == "heterosexual" || low == "straight" { return "heterosexual" }
+        if low.contains("demisexual") || low.contains("á tính") { return "demisexual" }
+        if low.contains("queer") { return "queer" }
+        if low.contains("tìm hiểu") || low == "questioning" { return "questioning" }
+        if low.contains("khác") || low == "other" { return "other" }
+        return low
+    }
+
     private var visiblePeople: [KinnectUser] {
         people.filter { p in
             guard !appState.blockedUserIds.contains(p.id) && p.id != appState.currentUser?.id else { return false }
@@ -224,12 +264,17 @@ struct DiscoverView: View {
             if maxWeight > 0 && p.weight > maxWeight { return false }
             if minHeight > 0 && p.height < minHeight { return false }
             if maxHeight > 0 && p.height > maxHeight { return false }
-            if isOnlineOnly && !p.isActive { return false }
+            if isOnlineOnly && !(p.isActive || appState.onlineUserIds.contains(p.id)) { return false }
+            if isRecentOnly && !(p.isActive || appState.onlineUserIds.contains(p.id) || p.joinedAt > 0) { return false }
             if !selectedGender.isEmpty {
-                if !p.gender.localizedCaseInsensitiveContains(selectedGender) { return false }
+                let wanted = Self.canonicalGender(selectedGender)
+                let actual = Self.canonicalGender(p.gender)
+                if actual != wanted && !p.gender.localizedCaseInsensitiveContains(selectedGender) { return false }
             }
             if !selectedOrientation.isEmpty {
-                if !p.orientation.localizedCaseInsensitiveContains(selectedOrientation) { return false }
+                let wanted = Self.canonicalOrientation(selectedOrientation)
+                let actual = Self.canonicalOrientation(p.orientation)
+                if actual != wanted && !p.orientation.localizedCaseInsensitiveContains(selectedOrientation) { return false }
             }
             if !selectedRole.isEmpty {
                 if !p.communityRole.localizedCaseInsensitiveContains(selectedRole) { return false }
@@ -306,6 +351,9 @@ struct DiscoverView: View {
                 filterParams += "&gender=\(enc)"
             }
         }
+        if isRecentOnly {
+            filterParams += "&recent=1"
+        }
 
         let path: String
         switch segment {
@@ -339,18 +387,23 @@ struct DiscoverView: View {
                 "latitude": coord.latitude,
                 "longitude": coord.longitude
             ]
-            _ = try? await KinnectAPIClient.shared.requestJSON(
-                "/api/me/location",
-                method: "PATCH",
-                body: body,
-                requestId: "loc_\(Int(Date().timeIntervalSince1970))"
-            )
-            if var me = appState.currentUser {
-                me.hasLocation = true
-                appState.currentUser = me
+            do {
+                _ = try await KinnectAPIClient.shared.requestJSON(
+                    "/api/me/location",
+                    method: "PATCH",
+                    body: body,
+                    requestId: "loc_\(Int(Date().timeIntervalSince1970))"
+                )
+                if var me = appState.currentUser {
+                    me.hasLocation = true
+                    appState.currentUser = me
+                }
+                locationStatusText = "Đang tìm kiếm quanh đây trong bán kính 50 km"
+                await loadCurrentSegment()
+            } catch {
+                locationStatusText = error.localizedDescription
+                appState.showToast(error.localizedDescription)
             }
-            locationStatusText = "Đang tìm kiếm quanh đây trong bán kính 50 km"
-            await loadCurrentSegment()
         } else {
             locationStatusText = "Chưa cấp quyền vị trí. Bạn có thể bật vị trí trong Cài đặt máy."
         }
