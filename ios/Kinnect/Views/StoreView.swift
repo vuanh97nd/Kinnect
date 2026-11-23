@@ -683,14 +683,19 @@ struct StoreView: View {
     }
 
     private func loadStoreData() async {
-        isLoading = true
+        if packages.isEmpty, let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/store") {
+            applyStoreState(cached)
+        }
+        isLoading = packages.isEmpty
         defer { isLoading = false }
         do {
             let res = try await KinnectAPIClient.shared.requestJSON("/api/store")
             applyStoreState(res)
             loadError = nil
         } catch {
-            loadError = "Chưa tải được cửa hàng: \(error.localizedDescription)"
+            if packages.isEmpty {
+                loadError = "Chưa tải được cửa hàng: \(error.localizedDescription)"
+            }
         }
     }
 

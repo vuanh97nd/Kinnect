@@ -806,7 +806,26 @@ struct WalletView: View {
 
     // MARK: - API Calls
     private func loadWalletData() async {
-        isLoading = true
+        var hydrated = !entries.isEmpty || availableBalance > 0
+        if let cachedRes = KinnectAPIClient.shared.cachedJSON(for: "/api/wallet") {
+            let wallet = cachedRes["wallet"] as? [String: Any] ?? cachedRes
+            purchasedCoins = wallet["purchasedCoins"] as? Int ?? 0
+            giftedCoins = wallet["giftedCoins"] as? Int ?? wallet["trialCoins"] as? Int ?? 0
+            availableBalance = wallet["totalUsableCoins"] as? Int ?? (purchasedCoins + giftedCoins)
+            earnedBalance = wallet["earningsVnd"] as? Int ?? 0
+            spentBalance = wallet["spentCoins"] as? Int ?? 0
+            currencyLabel = "Xu Kinnect"
+            coinPacks = (wallet["coinPacks"] as? [[String: Any]] ?? []).map(StoreDigitalProduct.from)
+            entries = (wallet["entries"] as? [[String: Any]] ?? []).map(WalletEntryItem.from)
+            hydrated = true
+        }
+        if giftInventory.isEmpty, let cachedStore = KinnectAPIClient.shared.cachedJSON(for: "/api/store") {
+            giftInventory = (cachedStore["giftInventory"] as? [[String: Any]] ?? []).compactMap { item in
+                guard let id = item["giftId"] as? String, let count = item["quantity"] as? Int, count > 0 else { return nil }
+                return GiftInventoryItem(giftId: id, quantity: count)
+            }
+        }
+        isLoading = !hydrated
         defer { isLoading = false }
         do {
             let res = try await KinnectAPIClient.shared.requestJSON("/api/wallet")
@@ -826,7 +845,9 @@ struct WalletView: View {
                 return GiftInventoryItem(giftId: id, quantity: count)
             }
         } catch {
-            loadError = "Chưa tải được dữ liệu ví: \(error.localizedDescription)"
+            if !hydrated {
+                loadError = "Chưa tải được dữ liệu ví: \(error.localizedDescription)"
+            }
         }
     }
 }

@@ -813,6 +813,11 @@ struct ShortCommentsSheet: View {
     }
 
     private func load() async {
+        if comments.isEmpty,
+           let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/shorts/\(short.id)/comments"),
+           let list = cached["comments"] as? [[String: Any]] {
+            self.comments = list.map(CommentItem.from)
+        }
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/shorts/\(short.id)/comments") {
             self.comments = (res["comments"] as? [[String: Any]] ?? []).map(CommentItem.from)
         }

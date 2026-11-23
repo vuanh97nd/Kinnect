@@ -540,7 +540,25 @@ struct FriendsView: View {
            let list = (cached["users"] as? [[String: Any]]) ?? (cached["friends"] as? [[String: Any]]) {
             self.friends = list.map(KinnectUser.from)
         }
-        isLoading = true
+        if incoming.isEmpty && outgoing.isEmpty,
+           let cachedReq = KinnectAPIClient.shared.cachedJSON(for: "/api/friend-requests") {
+            let inc = cachedReq["incoming"] as? [[String: Any]] ?? []
+            let out = cachedReq["outgoing"] as? [[String: Any]] ?? []
+            self.incoming = inc.map { item in
+                if let u = item["fromUser"] as? [String: Any] ?? item["user"] as? [String: Any] { return KinnectUser.from(u) }
+                return KinnectUser.from(item)
+            }
+            self.outgoing = out.map { item in
+                if let u = item["toUser"] as? [String: Any] ?? item["user"] as? [String: Any] { return KinnectUser.from(u) }
+                return KinnectUser.from(item)
+            }
+        }
+        if suggestions.isEmpty,
+           let cachedSug = KinnectAPIClient.shared.cachedJSON(for: "/api/friend-suggestions"),
+           let list = (cachedSug["users"] as? [[String: Any]]) ?? (cachedSug["suggestions"] as? [[String: Any]]) {
+            self.suggestions = list.map(KinnectUser.from)
+        }
+        isLoading = friends.isEmpty && incoming.isEmpty && outgoing.isEmpty
         defer { isLoading = false }
 
         async let fTask = KinnectAPIClient.shared.requestJSON("/api/friends")

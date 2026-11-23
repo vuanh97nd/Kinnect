@@ -149,6 +149,11 @@ struct LiveStreamView: View {
     }
 
     private func loadGifts() async {
+        if giftCatalog.isEmpty, let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/live/gifts") {
+            let items = cached["gifts"] as? [[String: Any]] ?? []
+            self.giftCatalog = items.map(LiveGiftCatalogItem.from)
+            self.giftPriceVersion = cached["priceVersion"] as? Int ?? 1
+        }
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/live/gifts") {
             let items = res["gifts"] as? [[String: Any]] ?? []
             self.giftCatalog = items.map(LiveGiftCatalogItem.from)

@@ -847,7 +847,27 @@ struct WalletStoreView: View {
 
     // MARK: - API Calls
     private func loadWalletAndStore() async {
-        isLoading = true
+        if entries.isEmpty, let cachedW = KinnectAPIClient.shared.cachedJSON(for: "/api/wallet") {
+            if let wallet = cachedW["wallet"] as? [String: Any] {
+                self.availableBalance = wallet["availableBalance"] as? Int ?? 0
+                self.earnedBalance = wallet["earnedBalance"] as? Int ?? 0
+                self.spentBalance = wallet["spentBalance"] as? Int ?? 0
+                self.purchasedCoins = wallet["purchasedCoins"] as? Int ?? (wallet["paidCoins"] as? Int ?? self.earnedBalance)
+                self.giftedCoins = wallet["giftedCoins"] as? Int ?? (wallet["trialCoins"] as? Int ?? max(0, self.availableBalance - self.purchasedCoins))
+                self.currencyLabel = wallet["currencyLabel"] as? String ?? "Xu Kinnect"
+            }
+            self.entries = (cachedW["entries"] as? [[String: Any]] ?? []).map(WalletEntryItem.from)
+        }
+        if packages.isEmpty, let cachedS = KinnectAPIClient.shared.cachedJSON(for: "/api/store") {
+            let rawPkgs = cachedS["packages"] as? [[String: Any]] ?? []
+            let ownedIds = Set(cachedS["ownedPackages"] as? [String] ?? [])
+            self.packages = rawPkgs.map { dict in
+                var item = StorePackageItem.from(dict)
+                item.owned = ownedIds.contains(item.id)
+                return item
+            }
+        }
+        isLoading = entries.isEmpty && packages.isEmpty
         defer { isLoading = false }
 
         async let wTask = KinnectAPIClient.shared.requestJSON("/api/wallet")

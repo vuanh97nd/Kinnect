@@ -54,6 +54,14 @@ struct MessagesView: View {
         self.onOpenFriends = onOpenFriends
         self.onBack = onBack
         _scope = State(initialValue: initialScope)
+        if let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/conversations") {
+            let list = (cached["users"] as? [[String: Any]]) ?? (cached["conversations"] as? [[String: Any]]) ?? []
+            _conversations = State(initialValue: list)
+        }
+        if let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/groups"),
+           let grps = cached["groups"] as? [[String: Any]] {
+            _groups = State(initialValue: grps.map(ChatGroupItem.from))
+        }
     }
 
     var body: some View {
@@ -654,6 +662,20 @@ struct DirectChatDetailView: View {
     @State private var nextMessagesCursor: Int64? = nil
     @State private var isLoadingOlder = false
 
+    init(peer: KinnectUser) {
+        self.peer = peer
+        if let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/users/\(peer.id)/messages"),
+           let list = cached["messages"] as? [[String: Any]] {
+            let initial = list.map(DirectMessageItem.from)
+            _messages = State(initialValue: initial)
+            var rx: [String: String] = [:]
+            for m in initial where !m.reaction.isEmpty { rx[m.id] = m.reaction }
+            _messageReactions = State(initialValue: rx)
+            _hasMoreMessages = State(initialValue: (cached["hasMore"] as? Bool) ?? false)
+            _nextMessagesCursor = State(initialValue: (cached["nextCursor"] as? NSNumber)?.int64Value)
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Conversational Header Bar (iOS Native Style)
@@ -840,10 +862,15 @@ struct DirectChatDetailView: View {
                     }
                     .padding(14)
                 }
-                .onChange(of: messages.count) { _ in
+                .onAppear {
                     if let last = messages.last {
+                        proxy.scrollTo(last.id, anchor: .bottom)
+                    }
+                }
+                .onChange(of: messages.last?.id) { lastId in
+                    if let lastId {
                         withAnimation {
-                            proxy.scrollTo(last.id, anchor: .bottom)
+                            proxy.scrollTo(lastId, anchor: .bottom)
                         }
                     }
                 }
@@ -1292,14 +1319,21 @@ struct DirectChatDetailView: View {
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/users/\(peer.id)/messages") {
             let list = res["messages"] as? [[String: Any]] ?? []
             let latest = list.map(DirectMessageItem.from)
+            let merged: [DirectMessageItem]
             if self.messages.isEmpty {
-                self.messages = latest
+                merged = latest
                 self.hasMoreMessages = (res["hasMore"] as? Bool) ?? false
                 self.nextMessagesCursor = (res["nextCursor"] as? NSNumber)?.int64Value
             } else {
                 let latestIds = Set(latest.map(\.id))
                 let older = self.messages.filter { !latestIds.contains($0.id) && !$0.id.hasPrefix("opt_") }
-                self.messages = older + latest
+                merged = older + latest
+            }
+            let sig: ([DirectMessageItem]) -> [String] = { arr in
+                arr.map { "\($0.id)|\($0.text)|\($0.isSeen)|\($0.deliveredAt)|\($0.reaction)|\($0.reactions.count)|\($0.imageUrl)|\($0.attachmentUrl)" }
+            }
+            if sig(merged) != sig(self.messages) {
+                self.messages = merged
             }
             for m in self.messages where !m.reaction.isEmpty {
                 messageReactions[m.id] = m.reaction
@@ -1542,6 +1576,21 @@ struct GroupChatDetailView: View {
     @State private var hasMoreMessages = false
     @State private var nextMessagesCursor: Int64? = nil
     @State private var isLoadingOlder = false
+
+    init(group: ChatGroupItem, onLeftGroup: @escaping () -> Void) {
+        self.group = group
+        self.onLeftGroup = onLeftGroup
+        if let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/groups/\(group.id)/messages"),
+           let list = cached["messages"] as? [[String: Any]] {
+            let initial = list.map(GroupMessageItem.from)
+            _messages = State(initialValue: initial)
+            var rx: [String: String] = [:]
+            for m in initial where !m.reaction.isEmpty { rx[m.id] = m.reaction }
+            _groupReactions = State(initialValue: rx)
+            _hasMoreMessages = State(initialValue: (cached["hasMore"] as? Bool) ?? false)
+            _nextMessagesCursor = State(initialValue: (cached["nextCursor"] as? NSNumber)?.int64Value)
+        }
+    }
 
     private var currentMentionQuery: String? {
         guard let lastAt = text.lastIndex(of: "@") else { return nil }
@@ -2129,10 +2178,15 @@ struct GroupChatDetailView: View {
                     }
                     .padding(14)
                 }
-                .onChange(of: messages.count) { _ in
+                .onAppear {
                     if let last = messages.last {
+                        proxy.scrollTo(last.id, anchor: .bottom)
+                    }
+                }
+                .onChange(of: messages.last?.id) { lastId in
+                    if let lastId {
                         withAnimation {
-                            proxy.scrollTo(last.id, anchor: .bottom)
+                            proxy.scrollTo(lastId, anchor: .bottom)
                         }
                     }
                 }
@@ -2218,14 +2272,21 @@ struct GroupChatDetailView: View {
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/groups/\(group.id)/messages") {
             let list = res["messages"] as? [[String: Any]] ?? []
             let latest = list.map(GroupMessageItem.from)
+            let merged: [GroupMessageItem]
             if self.messages.isEmpty {
-                self.messages = latest
+                merged = latest
                 self.hasMoreMessages = (res["hasMore"] as? Bool) ?? false
                 self.nextMessagesCursor = (res["nextCursor"] as? NSNumber)?.int64Value
             } else {
                 let latestIds = Set(latest.map(\.id))
                 let older = self.messages.filter { !latestIds.contains($0.id) && !$0.id.hasPrefix("opt_") }
-                self.messages = older + latest
+                merged = older + latest
+            }
+            let sig: ([GroupMessageItem]) -> [String] = { arr in
+                arr.map { "\($0.id)|\($0.text)|\($0.seenCount)|\($0.reaction)|\($0.reactions.count)|\($0.imageUrl)|\($0.attachmentUrl)" }
+            }
+            if sig(merged) != sig(self.messages) {
+                self.messages = merged
             }
             for m in self.messages where !m.reaction.isEmpty {
                 groupReactions[m.id] = m.reaction

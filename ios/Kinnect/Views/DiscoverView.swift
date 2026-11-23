@@ -294,9 +294,6 @@ struct DiscoverView: View {
     }
 
     private func loadCurrentSegment() async {
-        isLoading = true
-        defer { isLoading = false }
-
         var filterParams = ""
         if minAge > 0 { filterParams += "&minAge=\(minAge)" }
         if maxAge > 0 { filterParams += "&maxAge=\(maxAge)" }
@@ -310,27 +307,27 @@ struct DiscoverView: View {
             }
         }
 
+        let path: String
         switch segment {
         case .forYou:
-            let path = "/api/discover?sort=interests\(filterParams)"
-            if let disc = try? await KinnectAPIClient.shared.requestJSON(path) {
-                self.people = (disc["people"] as? [[String: Any]] ?? disc["users"] as? [[String: Any]] ?? []).map(KinnectUser.from)
-                self.posts = (disc["posts"] as? [[String: Any]] ?? []).map(PostItem.from)
-            }
-
+            path = "/api/discover?sort=interests\(filterParams)"
         case .nearby:
-            let path = "/api/discover?nearby=1&radius=50&sort=new\(filterParams)"
-            if let res = try? await KinnectAPIClient.shared.requestJSON(path) {
-                self.people = (res["people"] as? [[String: Any]] ?? res["users"] as? [[String: Any]] ?? []).map(KinnectUser.from)
-                self.posts = (res["posts"] as? [[String: Any]] ?? []).map(PostItem.from)
-            }
-
+            path = "/api/discover?nearby=1&radius=50&sort=new\(filterParams)"
         case .following:
-            let path = "/api/discover?following=1\(filterParams)"
-            if let res = try? await KinnectAPIClient.shared.requestJSON(path) {
-                self.people = (res["people"] as? [[String: Any]] ?? res["users"] as? [[String: Any]] ?? []).map(KinnectUser.from)
-                self.posts = (res["posts"] as? [[String: Any]] ?? []).map(PostItem.from)
-            }
+            path = "/api/discover?following=1\(filterParams)"
+        }
+
+        if let cached = KinnectAPIClient.shared.cachedJSON(for: path) {
+            self.people = (cached["people"] as? [[String: Any]] ?? cached["users"] as? [[String: Any]] ?? []).map(KinnectUser.from)
+            self.posts = (cached["posts"] as? [[String: Any]] ?? []).map(PostItem.from)
+        }
+
+        isLoading = people.isEmpty && posts.isEmpty
+        defer { isLoading = false }
+
+        if let res = try? await KinnectAPIClient.shared.requestJSON(path) {
+            self.people = (res["people"] as? [[String: Any]] ?? res["users"] as? [[String: Any]] ?? []).map(KinnectUser.from)
+            self.posts = (res["posts"] as? [[String: Any]] ?? []).map(PostItem.from)
         }
     }
 

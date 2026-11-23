@@ -76,7 +76,7 @@ final class KinnectAPIClient {
             "/api/store", "/api/wallet", "/api/live/gifts", "/api/music"
         ]
         if allowedExact.contains(base) { return true }
-        if base.hasPrefix("/api/users/") || base.hasPrefix("/api/groups/") || base.hasPrefix("/api/chat-preferences/") {
+        if base.hasPrefix("/api/users/") || base.hasPrefix("/api/groups/") || base.hasPrefix("/api/chat-preferences/") || base.hasPrefix("/api/posts/") || base.hasPrefix("/api/shorts/") {
             return true
         }
         return false

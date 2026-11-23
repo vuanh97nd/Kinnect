@@ -406,14 +406,25 @@ struct FeedView: View {
     }
 
     private func restoreCachedFeed() {
-        guard let accountId = appState.currentUser?.id else { return }
-        if let cached: [[String: Any]] = AccountCache.shared.loadJSONObject(forKey: "feed_posts", accountId: accountId) {
+        if posts.isEmpty, let accountId = appState.currentUser?.id,
+           let cached: [[String: Any]] = AccountCache.shared.loadJSONObject(forKey: "feed_posts", accountId: accountId) {
             self.posts = cached.map(PostItem.from)
+        }
+        if posts.isEmpty,
+           let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/posts?limit=25"),
+           let rawList = cached["posts"] as? [[String: Any]] {
+            self.posts = rawList.map(PostItem.from)
+        }
+        if stories.isEmpty,
+           let cachedStories = KinnectAPIClient.shared.cachedJSON(for: "/api/stories"),
+           let rawStories = cachedStories["stories"] as? [[String: Any]] {
+            self.stories = rawStories.map(StoryItem.from)
         }
     }
 
     private func loadFeedAndStories() async {
-        isLoading = true
+        restoreCachedFeed()
+        isLoading = posts.isEmpty
         defer { isLoading = false }
 
         async let postsTask = KinnectAPIClient.shared.requestJSON("/api/posts?limit=25")
@@ -1835,7 +1846,12 @@ struct PostCommentsSheet: View {
     }
 
     private func loadComments() async {
-        isLoading = true
+        if comments.isEmpty,
+           let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/posts/\(post.id)/comments"),
+           let list = cached["comments"] as? [[String: Any]] {
+            self.comments = list.map(CommentItem.from)
+        }
+        isLoading = comments.isEmpty
         defer { isLoading = false }
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/posts/\(post.id)/comments") {
             let list = res["comments"] as? [[String: Any]] ?? []

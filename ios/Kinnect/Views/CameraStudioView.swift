@@ -1830,7 +1830,15 @@ struct StudioMusicPickerSheet: View {
     }
 
     private func loadCatalog() async {
-        loading = true
+        if tracks.isEmpty, let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/music") {
+            let parsed = (cached["tracks"] as? [[String: Any]] ?? []).compactMap { entry -> MusicTrack? in
+                guard let path = entry["url"] as? String, !path.isEmpty else { return nil }
+                let title = entry["title"] as? String ?? entry["file"] as? String ?? "Âm thanh"
+                return MusicTrack(id: path, title: title, artist: entry["artist"] as? String ?? "Kinnect Music", path: path)
+            }
+            if !parsed.isEmpty { self.tracks = parsed }
+        }
+        loading = tracks.isEmpty
         errorText = ""
         defer { loading = false }
         do {

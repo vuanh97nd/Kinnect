@@ -899,6 +899,25 @@ struct ProfileView: View {
     }
 
     private func refreshMe() async {
+        let initialId = appState.currentUser?.id ?? "fixture_user_me"
+        if userPosts.isEmpty,
+           let cachedPosts = KinnectAPIClient.shared.cachedJSON(for: "/api/posts?user=\(initialId)"),
+           let items = cachedPosts["posts"] as? [[String: Any]] {
+            self.userPosts = items.map(PostItem.from)
+        }
+        if userShorts.isEmpty,
+           let cachedShorts = KinnectAPIClient.shared.cachedJSON(for: "/api/shorts?user=\(initialId)"),
+           let items = cachedShorts["shorts"] as? [[String: Any]] {
+            self.userShorts = items.map(ShortItem.from)
+        }
+        if let cachedStats = KinnectAPIClient.shared.cachedJSON(for: "/api/users/\(initialId)/stats"),
+           var current = appState.currentUser {
+            if let p = cachedStats["posts"] as? Int { current.postsCount = p }
+            if let fo = cachedStats["followers"] as? Int { current.followersCount = fo }
+            if let fi = cachedStats["following"] as? Int { current.followingCount = fi }
+            appState.currentUser = current
+        }
+
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/me"),
            let userDict = res["user"] as? [String: Any] {
             let user = KinnectUser.from(userDict)
@@ -1121,6 +1140,22 @@ struct ProfileView: View {
     }
 
     private func refreshPeer(target: KinnectUser) async {
+        if detailedPeerUser == nil,
+           let cachedUser = KinnectAPIClient.shared.cachedJSON(for: "/api/users/\(target.id)"),
+           let userDict = (cachedUser["user"] as? [String: Any]) ?? (cachedUser as? [String: Any]) {
+            self.detailedPeerUser = KinnectUser.from(userDict)
+            self.peerFriendship = (userDict["friendship"] as? String) ?? "none"
+        }
+        if userPosts.isEmpty,
+           let cachedPosts = KinnectAPIClient.shared.cachedJSON(for: "/api/posts?user=\(target.id)"),
+           let items = cachedPosts["posts"] as? [[String: Any]] {
+            self.userPosts = items.map(PostItem.from)
+        }
+        if userShorts.isEmpty,
+           let cachedShorts = KinnectAPIClient.shared.cachedJSON(for: "/api/shorts?user=\(target.id)"),
+           let items = cachedShorts["shorts"] as? [[String: Any]] {
+            self.userShorts = items.map(ShortItem.from)
+        }
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/users/\(target.id)"),
            let userDict = (res["user"] as? [String: Any]) ?? (res as? [String: Any]) {
             self.detailedPeerUser = KinnectUser.from(userDict)
