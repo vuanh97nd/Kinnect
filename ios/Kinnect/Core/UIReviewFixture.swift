@@ -43,6 +43,33 @@ enum UIReviewFixture {
         activeScreen != nil
     }
 
+    private static let darkCanvasScreens: Set<String> = [
+        "feed-story",
+        "live-setup",
+        "live-setup-game",
+        "live-room",
+        "live-gifts",
+        "shorts",
+        "shorts-comments",
+        "camera-studio",
+        "camera-studio-edit",
+        "camera-studio-video-edit",
+        "camera-studio-video",
+        "studio-pro-sheet",
+        "studio-music-picker",
+        "call-overlay",
+        "call-incoming",
+        "call-outgoing",
+        "call-connected"
+    ]
+
+    static func requiresDarkAppearance(for screenName: String) -> Bool {
+        let normalized = screenName.hasSuffix("-en")
+            ? String(screenName.dropLast(3))
+            : screenName
+        return darkCanvasScreens.contains(normalized)
+    }
+
     /// Synchronizes AppState, WebRTC, Live, and Localization singletons before rendering a fixture screen
     /// so sequential deep-link switches in a single simulator session never leak transient state.
     @MainActor

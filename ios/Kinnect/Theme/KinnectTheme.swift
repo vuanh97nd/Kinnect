@@ -152,7 +152,11 @@ enum KinnectTheme {
     static func applyWindowAppearance(_ mode: String) {
         let style: UIUserInterfaceStyle
         #if DEBUG
-        if let overrideLight = UIReviewFixture.overrideLightMode {
+        if UIReviewFixture.isEnabled,
+           let screenName = UIReviewFixture.activeScreen,
+           UIReviewFixture.requiresDarkAppearance(for: screenName) {
+            style = .dark
+        } else if let overrideLight = UIReviewFixture.overrideLightMode {
             style = overrideLight ? .light : .dark
         } else if UIReviewFixture.forceLightMode {
             style = .light

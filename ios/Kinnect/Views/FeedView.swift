@@ -192,6 +192,7 @@ struct FeedView: View {
                     stories.removeAll { $0.id == deletedId }
                 }
             )
+            .preferredColorScheme(.dark)
         }
         .sheet(item: $activeCommentPost) { post in
             PostCommentsSheet(

@@ -2391,7 +2391,21 @@ struct StudioMusicPickerSheet: View {
         .navigationTitle(L10n.tr("Thêm nhạc nền"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) { Button(L10n.tr("Đóng")) { dismiss() } }
+            ToolbarItem(placement: .cancellationAction) {
+                Button {
+                    dismiss()
+                } label: {
+                    Text(L10n.tr("Đóng"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(KinnectTheme.textPrimary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
         }
         .task { await loadCatalog() }
         .refreshable { await loadCatalog() }

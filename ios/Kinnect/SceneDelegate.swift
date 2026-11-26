@@ -15,6 +15,12 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     private func applyAppearanceStyle() {
         guard let window else { return }
         #if DEBUG
+        if UIReviewFixture.isEnabled,
+           let screenName = UIReviewFixture.activeScreen,
+           UIReviewFixture.requiresDarkAppearance(for: screenName) {
+            window.overrideUserInterfaceStyle = .dark
+            return
+        }
         if let overrideLight = UIReviewFixture.overrideLightMode {
             window.overrideUserInterfaceStyle = overrideLight ? .light : .dark
             return
@@ -38,8 +44,11 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     #if DEBUG
     @MainActor
     private func makeFixtureHostingController(for screenName: String) -> UIHostingController<AnyView> {
+        let darkRequired = UIReviewFixture.requiresDarkAppearance(for: screenName)
         let colorScheme: ColorScheme?
-        if let overrideLight = UIReviewFixture.overrideLightMode {
+        if darkRequired {
+            colorScheme = .dark
+        } else if let overrideLight = UIReviewFixture.overrideLightMode {
             colorScheme = overrideLight ? .light : .dark
         } else {
             colorScheme = UIReviewFixture.forceLightMode ? .light : nil
@@ -52,6 +61,9 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                 .dynamicTypeSize(UIReviewFixture.forceMaxDynamicType ? .xxxLarge : .large)
         )
         let hostingController = UIHostingController(rootView: fixtureView)
+        if darkRequired {
+            hostingController.overrideUserInterfaceStyle = .dark
+        }
         hostingController.view.backgroundColor = UIColor { trait in
             trait.userInterfaceStyle == .light
                 ? UIColor(red: 0.96, green: 0.95, blue: 0.98, alpha: 1.0)

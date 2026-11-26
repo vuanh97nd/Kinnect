@@ -57,6 +57,14 @@ struct RootMainView: View {
 
     private var activeColorScheme: ColorScheme? {
         #if DEBUG
+        if UIReviewFixture.isEnabled,
+           let screenName = UIReviewFixture.activeScreen,
+           UIReviewFixture.requiresDarkAppearance(for: screenName) {
+            return .dark
+        }
+        if let overrideLight = UIReviewFixture.overrideLightMode {
+            return overrideLight ? .light : .dark
+        }
         if UIReviewFixture.forceLightMode { return .light }
         #endif
         switch appearanceMode {

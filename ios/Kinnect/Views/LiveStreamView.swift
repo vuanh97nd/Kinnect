@@ -1314,6 +1314,7 @@ private struct LiveSetupCameraPreviewLayer: UIViewRepresentable {
 
 struct CreateLiveRoomSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject private var appState = AppState.shared
     var onStarted: (() -> Void)? = nil
 
@@ -1358,8 +1359,6 @@ struct CreateLiveRoomSheet: View {
                 darkControlDeck
             }
             .background(Color(hex: "#0A0A0C").ignoresSafeArea())
-            .preferredColorScheme(.dark)
-            .tint(.white)
             .task {
                 let camOk = await MediaPermissionHandler.shared.requestCameraAccess()
                 previewCameraAuthorized = camOk
@@ -1375,6 +1374,12 @@ struct CreateLiveRoomSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(L10n.tr("Bắt đầu phát Live"))
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .accessibilityAddTraits(.isHeader)
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button {
                         dismiss()
@@ -1406,6 +1411,8 @@ struct CreateLiveRoomSheet: View {
                 )
             }
         }
+        .preferredColorScheme(.dark)
+        .tint(.white)
     }
 
     private var cameraPreviewStage: some View {
@@ -1524,45 +1531,49 @@ struct CreateLiveRoomSheet: View {
                     )
             )
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    setupChipButton(
-                        icon: previewMicEnabled ? "mic.fill" : "mic.slash.fill",
-                        label: L10n.tr("Micro"),
-                        active: previewMicEnabled,
-                        activeColor: KinnectTheme.accentBright
-                    ) {
-                        previewMicEnabled.toggle()
-                    }
+            LazyVGrid(
+                columns: Array(
+                    repeating: GridItem(.flexible(minimum: 0), spacing: 6),
+                    count: dynamicTypeSize.isAccessibilitySize ? 2 : 4
+                ),
+                spacing: 6
+            ) {
+                setupChipButton(
+                    icon: previewMicEnabled ? "mic.fill" : "mic.slash.fill",
+                    label: L10n.tr("Micro"),
+                    active: previewMicEnabled,
+                    activeColor: KinnectTheme.accentBright
+                ) {
+                    previewMicEnabled.toggle()
+                }
 
-                    setupChipButton(
-                        icon: "bubble.left.fill",
-                        label: L10n.tr("Bình luận"),
-                        active: gameComments,
-                        activeColor: KinnectTheme.accentBright
-                    ) {
-                        gameComments.toggle()
-                    }
+                setupChipButton(
+                    icon: "bubble.left.fill",
+                    label: L10n.tr("Bình luận"),
+                    active: gameComments,
+                    activeColor: KinnectTheme.accentBright
+                ) {
+                    gameComments.toggle()
+                }
 
-                    setupChipButton(
-                        icon: "camera.rotate.fill",
-                        label: L10n.tr("Lật cam"),
-                        active: false,
-                        activeColor: KinnectTheme.accentBright
-                    ) {
-                        previewFrontCamera.toggle()
-                        NativeWebRTCManager.shared.usingFrontCamera = previewFrontCamera
-                        setupCamera.setCamera(front: previewFrontCamera)
-                    }
+                setupChipButton(
+                    icon: "camera.rotate.fill",
+                    label: L10n.tr("Lật cam"),
+                    active: false,
+                    activeColor: KinnectTheme.accentBright
+                ) {
+                    previewFrontCamera.toggle()
+                    NativeWebRTCManager.shared.usingFrontCamera = previewFrontCamera
+                    setupCamera.setCamera(front: previewFrontCamera)
+                }
 
-                    setupChipButton(
-                        icon: "wand.and.stars",
-                        label: L10n.tr("Làm đẹp"),
-                        active: previewBeautyOn,
-                        activeColor: KinnectTheme.accentBright
-                    ) {
-                        showPreviewEffects = true
-                    }
+                setupChipButton(
+                    icon: "wand.and.stars",
+                    label: L10n.tr("Làm đẹp"),
+                    active: previewBeautyOn,
+                    activeColor: KinnectTheme.accentBright
+                ) {
+                    showPreviewEffects = true
                 }
             }
 
@@ -1614,16 +1625,19 @@ struct CreateLiveRoomSheet: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            HStack(spacing: 5) {
+            HStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                 Text(label)
-                    .font(.caption.weight(.semibold))
+                    .font(.caption2.weight(.semibold))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .allowsTightening(true)
             }
             .foregroundColor(active ? .white : Color.white.opacity(0.75))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity)
             .background(
                 Capsule()
                     .fill(active ? activeColor.opacity(0.26) : Color(hex: "#201E2B"))
@@ -2879,7 +2893,19 @@ struct LiveGiftDrawerSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Đóng") { dismiss() }
+                    Button {
+                        dismiss()
+                    } label: {
+                        Text(L10n.tr("Đóng"))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(KinnectTheme.textPrimary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
