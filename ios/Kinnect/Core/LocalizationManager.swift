@@ -4149,6 +4149,122 @@ final class LocalizationManager: ObservableObject {
         "Đã ghi nhận yêu cầu xác minh email.": [
             .vi: "Đã ghi nhận yêu cầu xác minh email.",
             .en: "Email verification request recorded."
+        ],
+        "Phong cách": [
+            .vi: "Phong cách",
+            .en: "Styles"
+        ],
+        "Studio": [
+            .vi: "Studio",
+            .en: "Studio"
+        ],
+        "Quà": [
+            .vi: "Quà",
+            .en: "Gifts"
+        ],
+        "Của tôi": [
+            .vi: "Của tôi",
+            .en: "Owned"
+        ],
+        "Camera trước": [
+            .vi: "Camera trước",
+            .en: "Front camera"
+        ],
+        "Camera sau": [
+            .vi: "Camera sau",
+            .en: "Back camera"
+        ],
+        "Tiếp tục Game": [
+            .vi: "Tiếp tục Game",
+            .en: "Resume Game"
+        ],
+        "Tạm ẩn Game": [
+            .vi: "Tạm ẩn Game",
+            .en: "Hide Game"
+        ],
+        "Rời phòng Live": [
+            .vi: "Rời phòng Live",
+            .en: "Leave Live"
+        ],
+        "Thích": [
+            .vi: "Thích",
+            .en: "Like"
+        ],
+        "Yêu thích": [
+            .vi: "Yêu thích",
+            .en: "Love"
+        ],
+        "Haha": [
+            .vi: "Haha",
+            .en: "Haha"
+        ],
+        "Wow": [
+            .vi: "Wow",
+            .en: "Wow"
+        ],
+        "Buồn": [
+            .vi: "Buồn",
+            .en: "Sad"
+        ],
+        "Phẫn nộ": [
+            .vi: "Phẫn nộ",
+            .en: "Angry"
+        ],
+        "Quấy rối hoặc bắt nạt": [
+            .vi: "Quấy rối hoặc bắt nạt",
+            .en: "Harassment or bullying"
+        ],
+        "Thù ghét hoặc phân biệt đối xử": [
+            .vi: "Thù ghét hoặc phân biệt đối xử",
+            .en: "Hate speech or discrimination"
+        ],
+        "Giả mạo tài khoản": [
+            .vi: "Giả mạo tài khoản",
+            .en: "Account impersonation"
+        ],
+        "Lừa đảo hoặc spam": [
+            .vi: "Lừa đảo hoặc spam",
+            .en: "Scam or spam"
+        ],
+        "Nội dung tình dục không phù hợp": [
+            .vi: "Nội dung tình dục không phù hợp",
+            .en: "Inappropriate sexual content"
+        ],
+        "Bạo lực hoặc nguy hiểm": [
+            .vi: "Bạo lực hoặc nguy hiểm",
+            .en: "Violence or dangerous content"
+        ],
+        "Vấn đề khác": [
+            .vi: "Vấn đề khác",
+            .en: "Other issue"
+        ],
+        "Ẩn video": [
+            .vi: "Ẩn video",
+            .en: "Hide video"
+        ],
+        "Ẩn bài": [
+            .vi: "Ẩn bài",
+            .en: "Hide post"
+        ],
+        "Khóa bí mật (Secret)": [
+            .vi: "Khóa bí mật (Secret)",
+            .en: "Secret key"
+        ],
+        "Tài khoản đăng nhập mạng xã hội chưa có mật khẩu (cần phiên đăng nhập gần đây trong 10 phút)": [
+            .vi: "Tài khoản đăng nhập mạng xã hội chưa có mật khẩu (cần phiên đăng nhập gần đây trong 10 phút)",
+            .en: "Social login accounts do not have a password yet (requires a recent login within 10 minutes)"
+        ],
+        "Tài khoản đăng nhập mạng xã hội chưa có mật khẩu. Bạn có thể đặt mật khẩu mới khi phiên đăng nhập còn mới (trong 10 phút)": [
+            .vi: "Tài khoản đăng nhập mạng xã hội chưa có mật khẩu. Bạn có thể đặt mật khẩu mới khi phiên đăng nhập còn mới (trong 10 phút)",
+            .en: "Social login accounts do not have a password yet. You can set a new password while your login session is recent (within 10 minutes)"
+        ],
+        "Tài khoản mạng xã hội chưa có mật khẩu (cần phiên đăng nhập trong 10 phút gần đây)": [
+            .vi: "Tài khoản mạng xã hội chưa có mật khẩu (cần phiên đăng nhập trong 10 phút gần đây)",
+            .en: "Social accounts do not have a password yet (requires a login within the last 10 minutes)"
+        ],
+        "Nói gì đó về bài viết này (tùy chọn)": [
+            .vi: "Nói gì đó về bài viết này (tùy chọn)",
+            .en: "Say something about this post (optional)"
         ]
     ]
 

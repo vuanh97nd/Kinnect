@@ -45,6 +45,8 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
     var orientation: String
     var communityRole: String
     var coins: Int
+    var giftedCoins: Int? = nil
+    var trialCoins: Int? = nil
     var height: Int
     var weight: Int
     var pronouns: String
@@ -94,6 +96,8 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         orientation: String = "",
         communityRole: String = "",
         coins: Int = 0,
+        giftedCoins: Int? = nil,
+        trialCoins: Int? = nil,
         height: Int = 0,
         weight: Int = 0,
         pronouns: String = "",
@@ -140,6 +144,8 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         self.orientation = orientation
         self.communityRole = communityRole
         self.coins = coins
+        self.giftedCoins = giftedCoins
+        self.trialCoins = trialCoins
         self.height = height
         self.weight = weight
         self.pronouns = pronouns
@@ -226,6 +232,8 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
             orientation: (dict["orientation"] as? String) ?? (dict["sexualOrientation"] as? String) ?? "",
             communityRole: (dict["communityRole"] as? String) ?? "",
             coins: (dict["coins"] as? Int) ?? (dict["coinBalance"] as? Int) ?? (dict["balance"] as? Int) ?? ((dict["coins"] as? NSNumber)?.intValue) ?? 0,
+            giftedCoins: (dict["giftedCoins"] as? Int) ?? (dict["giftedCoins"] as? NSNumber)?.intValue ?? (dict["trialCoins"] as? Int) ?? (dict["trialCoins"] as? NSNumber)?.intValue,
+            trialCoins: (dict["trialCoins"] as? Int) ?? (dict["trialCoins"] as? NSNumber)?.intValue ?? (dict["giftedCoins"] as? Int) ?? (dict["giftedCoins"] as? NSNumber)?.intValue,
             height: (dict["height"] as? Int) ?? Int((dict["height"] as? String) ?? "") ?? 0,
             weight: (dict["weight"] as? Int) ?? Int((dict["weight"] as? String) ?? "") ?? 0,
             pronouns: (dict["pronouns"] as? String) ?? "",

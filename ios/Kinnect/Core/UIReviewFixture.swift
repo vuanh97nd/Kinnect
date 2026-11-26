@@ -1119,15 +1119,12 @@ enum UIReviewFixture {
         case "/api/live/gifts":
             return [
                 "version": 1,
-                "balance": 12500,
+                "balance": 4000,
                 "purchasedCoins": 8500,
                 "giftedCoins": 4000,
                 "trialCoins": 4000,
                 "quantities": [1, 5, 10, 99],
-                "inventory": [
-                    ["giftId": "rose", "quantity": 3],
-                    ["giftId": "heart", "quantity": 2]
-                ],
+                "inventory": [],
                 "items": LiveGiftCatalogItem.defaultCatalog.map { gift in
                     [
                         "id": gift.id,

@@ -3560,7 +3560,7 @@ final class CameraPreviewViewController: UIViewController {
         view.addSubview(sim)
         simulatedImageView = sim
         #elseif targetEnvironment(simulator)
-        let sim = UIImageView(image: CameraSessionController.simulatorPreviewFallbackImage())
+        let sim = UIImageView(image: CameraCaptureController.simulatorPreviewFallbackImage())
         sim.contentMode = .scaleAspectFill
         sim.clipsToBounds = true
         sim.frame = view.bounds

@@ -2707,6 +2707,8 @@ struct PostCommentsSheet: View {
                             Label(L10n.tr("Báo cáo"), systemImage: "flag")
                                 .font(.caption2.weight(.semibold))
                                 .foregroundColor(KinnectTheme.danger)
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     }

@@ -2648,8 +2648,8 @@ struct LiveGiftDrawerSheet: View {
                 HStack(spacing: 10) {
                     HStack(spacing: 5) {
                         KinnectIcon(glyph: .coin, size: 14, selected: true, tint: KinnectTheme.warning)
-                        let displayBalance = coinBalance ?? appState.currentUser?.coins ?? 0
-                        Text("\(displayBalance.formattedWithSeparator()) xu")
+                        let displayBalance = coinBalance ?? appState.currentUser?.giftedCoins ?? appState.currentUser?.trialCoins ?? 0
+                        Text("\(L10n.tr("Xu tặng")) · \(displayBalance.formattedWithSeparator())")
                             .font(.caption.bold())
                             .foregroundColor(KinnectTheme.warning)
                     }
@@ -2988,7 +2988,7 @@ struct LiveGiftDrawerSheet: View {
             return
         }
         let invCount = giftInventoryCounts[gift.id] ?? 0
-        if invCount < selectedQuantity, let currentBal = coinBalance ?? appState.currentUser?.coins {
+        if invCount < selectedQuantity, let currentBal = coinBalance ?? appState.currentUser?.giftedCoins ?? appState.currentUser?.trialCoins {
             let totalCost = gift.coins * selectedQuantity
             if currentBal < totalCost {
                 giftError = "Chưa đủ xu."

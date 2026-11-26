@@ -620,7 +620,7 @@ struct NotificationPostDetailView: View {
                                                     Image(systemName: "ellipsis")
                                                         .font(.caption)
                                                         .foregroundColor(KinnectTheme.textSecondary)
-                                                        .frame(minWidth: 44, minHeight: 36)
+                                                        .frame(minWidth: 44, minHeight: 44)
                                                         .contentShape(Rectangle())
                                                 }
                                             }
@@ -641,7 +641,7 @@ struct NotificationPostDetailView: View {
                                                         Label(L10n.tr("Báo cáo"), systemImage: "flag")
                                                             .font(.caption.weight(.semibold))
                                                             .foregroundColor(KinnectTheme.danger)
-                                                            .frame(minHeight: 36)
+                                                            .frame(minHeight: 44)
                                                             .contentShape(Rectangle())
                                                     }
                                                     .buttonStyle(.plain)
