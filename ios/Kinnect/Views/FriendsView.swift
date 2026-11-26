@@ -16,9 +16,13 @@ struct FriendsView: View {
     @State private var incoming: [KinnectUser] = []
     @State private var outgoing: [KinnectUser] = []
     @State private var suggestions: [KinnectUser] = []
+    @State private var discoverSearchResults: [KinnectUser] = []
+    @State private var isSearchingDiscover = false
     @State private var isLoading = false
     @State private var selectedProfileUser: KinnectUser? = nil
     @State private var activeChatPeer: KinnectUser? = nil
+    @State private var pendingUnfriendUser: KinnectUser? = nil
+    @State private var pendingBlockUser: KinnectUser? = nil
 
     var onBack: (() -> Void)? = nil
 
@@ -27,22 +31,43 @@ struct FriendsView: View {
         self.onBack = onBack
     }
 
+    private func matchesSearch(_ user: KinnectUser) -> Bool {
+        let clean = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return true }
+        let q = (clean.hasPrefix("@") ? String(clean.dropFirst()) : clean)
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi_VN"))
+            .replacingOccurrences(of: "đ", with: "d")
+            .replacingOccurrences(of: "Đ", with: "d")
+        let nameKey = user.name
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi_VN"))
+            .replacingOccurrences(of: "đ", with: "d")
+            .replacingOccurrences(of: "Đ", with: "d")
+        let handleKey = user.handle
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi_VN"))
+            .replacingOccurrences(of: "đ", with: "d")
+            .replacingOccurrences(of: "Đ", with: "d")
+        return nameKey.contains(q) || handleKey.contains(q)
+    }
+
+    private func isUserOnline(_ user: KinnectUser) -> Bool {
+        user.showActivity && (user.isActive || appState.onlineUserIds.contains(user.id))
+    }
+
     private var filteredFriends: [KinnectUser] {
-        let clean = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if clean.isEmpty { return friends }
-        let q = clean.hasPrefix("@") ? String(clean.dropFirst()) : clean
-        return friends.filter { $0.name.lowercased().contains(q) || $0.handle.lowercased().contains(q) }
+        friends.filter(matchesSearch)
+    }
+
+    private var filteredIncoming: [KinnectUser] {
+        incoming.filter(matchesSearch)
+    }
+
+    private var filteredOutgoing: [KinnectUser] {
+        outgoing.filter(matchesSearch)
     }
 
     // Suggestions filtered by search, max 6 - matches Android discover integration
     private var filteredSuggestions: [KinnectUser] {
-        let clean = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        var filtered = suggestions
-        if !clean.isEmpty {
-            let q = clean.hasPrefix("@") ? String(clean.dropFirst()) : clean
-            filtered = filtered.filter { $0.name.lowercased().contains(q) || $0.handle.lowercased().contains(q) }
-        }
-        return Array(filtered.prefix(6))
+        Array(suggestions.filter(matchesSearch).prefix(6))
     }
 
     var body: some View {
@@ -88,14 +113,15 @@ struct FriendsView: View {
                 LazyVStack(spacing: 14) {
                     switch tab {
                     case .friends:
-                        if filteredFriends.isEmpty && !isLoading && filteredSuggestions.isEmpty {
+                        let hasQuery = !searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        if filteredFriends.isEmpty && !isLoading && filteredSuggestions.isEmpty && discoverSearchResults.isEmpty && !isSearchingDiscover {
                             emptyPlaceholder(searchQuery.isEmpty ? "Chưa có bạn bè nào trong danh sách" : "Không tìm thấy bạn bè phù hợp")
                         } else {
-                            let online = filteredFriends.filter { ($0.isActive && $0.showActivity) || appState.onlineUserIds.contains($0.id) }
-                            let offline = filteredFriends.filter { !(($0.isActive && $0.showActivity) || appState.onlineUserIds.contains($0.id)) }
+                            let online = filteredFriends.filter { isUserOnline($0) }
+                            let offline = filteredFriends.filter { !isUserOnline($0) }
 
                             if !online.isEmpty {
-                                sectionHeader("Đang trực tuyến", count: online.count, color: Color(hex: "#2E9E66"))
+                                sectionHeader("Đang trực tuyến", count: online.count, color: KinnectTheme.online)
                                 VStack(spacing: 0) {
                                     ForEach(online) { user in
                                         friendRow(user: user)
@@ -120,6 +146,29 @@ struct FriendsView: View {
                                 .background(groupedCardBackground)
                             }
 
+                            if hasQuery {
+                                if isSearchingDiscover && discoverSearchResults.isEmpty {
+                                    HStack(spacing: 8) {
+                                        ProgressView().tint(KinnectTheme.accentBright)
+                                        Text(L10n.tr("Đang tìm thành viên…"))
+                                            .font(.caption)
+                                            .foregroundColor(KinnectTheme.textSecondary)
+                                    }
+                                    .padding(.vertical, 10)
+                                } else if !discoverSearchResults.isEmpty {
+                                    sectionHeader(L10n.tr("Kết quả tìm kiếm"), count: discoverSearchResults.count, color: KinnectTheme.accentBright)
+                                    VStack(spacing: 0) {
+                                        ForEach(discoverSearchResults) { user in
+                                            suggestionRow(user: user)
+                                            if user.id != discoverSearchResults.last?.id {
+                                                Divider().background(KinnectTheme.borderSoft).padding(.leading, 64)
+                                            }
+                                        }
+                                    }
+                                    .background(groupedCardBackground)
+                                }
+                            }
+
                             // Suggestions integrated at bottom of friends tab (max 6, search-filtered) - matches Android
                             if !filteredSuggestions.isEmpty {
                                 sectionHeader("Gợi ý kết bạn", count: filteredSuggestions.count, color: KinnectTheme.accentBright)
@@ -136,13 +185,13 @@ struct FriendsView: View {
                         }
 
                     case .requests:
-                        if incoming.isEmpty && !isLoading {
-                            emptyPlaceholder("Không có lời mời kết bạn nào")
+                        if filteredIncoming.isEmpty && !isLoading {
+                            emptyPlaceholder(searchQuery.isEmpty ? "Không có lời mời kết bạn nào" : "Không tìm thấy lời mời phù hợp")
                         } else {
                             VStack(spacing: 0) {
-                                ForEach(incoming) { user in
+                                ForEach(filteredIncoming) { user in
                                     incomingRequestRow(user: user)
-                                    if user.id != incoming.last?.id {
+                                    if user.id != filteredIncoming.last?.id {
                                         Divider().background(KinnectTheme.borderSoft).padding(.leading, 64)
                                     }
                                 }
@@ -151,13 +200,13 @@ struct FriendsView: View {
                         }
 
                     case .outgoing:
-                        if outgoing.isEmpty && !isLoading {
-                            emptyPlaceholder("Không có lời mời nào đã gửi")
+                        if filteredOutgoing.isEmpty && !isLoading {
+                            emptyPlaceholder(searchQuery.isEmpty ? "Không có lời mời nào đã gửi" : "Không tìm thấy lời mời phù hợp")
                         } else {
                             VStack(spacing: 0) {
-                                ForEach(outgoing) { user in
+                                ForEach(filteredOutgoing) { user in
                                     outgoingRequestRow(user: user)
-                                    if user.id != outgoing.last?.id {
+                                    if user.id != filteredOutgoing.last?.id {
                                         Divider().background(KinnectTheme.borderSoft).padding(.leading, 64)
                                     }
                                 }
@@ -179,6 +228,9 @@ struct FriendsView: View {
         .task {
             await loadAll()
         }
+        .task(id: searchQuery) {
+            await searchDiscoverUsers()
+        }
         .onAppear {
             if UIReviewFixture.activeScreen == "friends-requests" {
                 tab = .requests
@@ -193,6 +245,45 @@ struct FriendsView: View {
             NavigationStack {
                 DirectChatDetailView(peer: peer)
             }
+        }
+        .alert(
+            "Hủy kết bạn?",
+            isPresented: Binding(
+                get: { pendingUnfriendUser != nil },
+                set: { if !$0 { pendingUnfriendUser = nil } }
+            ),
+            presenting: pendingUnfriendUser
+        ) { user in
+            Button("Hủy kết bạn", role: .destructive) {
+                pendingUnfriendUser = nil
+                Task { await unfriend(user) }
+            }
+            Button("Đóng", role: .cancel) {
+                pendingUnfriendUser = nil
+            }
+        } message: { user in
+            Text("Bạn có chắc muốn hủy kết bạn với \(user.name)?")
+        }
+        .alert(
+            "Chặn người dùng?",
+            isPresented: Binding(
+                get: { pendingBlockUser != nil },
+                set: { if !$0 { pendingBlockUser = nil } }
+            ),
+            presenting: pendingBlockUser
+        ) { user in
+            Button("Chặn người dùng", role: .destructive) {
+                pendingBlockUser = nil
+                Task {
+                    await appState.blockUser(userId: user.id, userName: user.name)
+                    await loadAll()
+                }
+            }
+            Button("Hủy", role: .cancel) {
+                pendingBlockUser = nil
+            }
+        } message: { user in
+            Text("\(user.name) sẽ không thể nhắn tin hoặc xem nội dung của bạn.")
         }
     }
 
@@ -316,7 +407,7 @@ struct FriendsView: View {
                             avatarURL: user.avatarUrl,
                             colorHex: user.avatarColor,
                             size: 46,
-                            isOnline: (user.isActive && user.showActivity) || appState.onlineUserIds.contains(user.id)
+                            isOnline: isUserOnline(user)
                         )
                         VStack(alignment: .leading, spacing: 2) {
                             Text(user.name)
@@ -324,10 +415,10 @@ struct FriendsView: View {
                                 .foregroundColor(KinnectTheme.textPrimary)
                                 .lineLimit(1)
                                 .truncationMode(.tail)
-                            let active = (user.isActive && user.showActivity) || appState.onlineUserIds.contains(user.id)
+                            let active = isUserOnline(user)
                             Text("@\(user.handle.isEmpty ? user.name : user.handle) • \(active ? "Đang hoạt động" : "Ngoại tuyến")")
                                 .font(.caption)
-                                .foregroundColor(active ? Color(hex: "#2E9E66") : KinnectTheme.textSecondary)
+                                .foregroundColor(active ? KinnectTheme.online : KinnectTheme.textSecondary)
                                 .lineLimit(1)
                                 .truncationMode(.tail)
                         }
@@ -339,12 +430,12 @@ struct FriendsView: View {
 
                 Menu {
                     Button(role: .destructive) {
-                        Task { await unfriend(user) }
+                        pendingUnfriendUser = user
                     } label: {
                         Label("Hủy kết bạn", systemImage: "person.badge.minus")
                     }
                     Button(role: .destructive) {
-                        Task { await appState.blockUser(userId: user.id, userName: user.name) }
+                        pendingBlockUser = user
                     } label: {
                         HStack {
                             Text("Chặn người dùng")
@@ -353,7 +444,7 @@ struct FriendsView: View {
                     }
                 } label: {
                     KinnectIcon(glyph: .more, size: 20, tint: KinnectTheme.textSecondary)
-                        .frame(width: 34, height: 34)
+                        .frame(minWidth: 44, minHeight: 44)
                         .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Tùy chọn bạn bè")
@@ -429,7 +520,7 @@ struct FriendsView: View {
                         avatarURL: user.avatarUrl,
                         colorHex: user.avatarColor,
                         size: 46,
-                        isOnline: (user.isActive && user.showActivity) || appState.onlineUserIds.contains(user.id)
+                        isOnline: isUserOnline(user)
                     )
                     VStack(alignment: .leading, spacing: 2) {
                         Text(user.name)
@@ -437,10 +528,10 @@ struct FriendsView: View {
                             .foregroundColor(KinnectTheme.textPrimary)
                             .lineLimit(1)
                             .truncationMode(.tail)
-                        let active = (user.isActive && user.showActivity) || appState.onlineUserIds.contains(user.id)
+                        let active = isUserOnline(user)
                         Text("@\(user.handle.isEmpty ? user.name : user.handle) • \(active ? "Đang hoạt động" : "Ngoại tuyến")")
                             .font(.caption2)
-                            .foregroundColor(active ? Color(hex: "#2E9E66") : KinnectTheme.textSecondary)
+                            .foregroundColor(active ? KinnectTheme.online : KinnectTheme.textSecondary)
                             .lineLimit(1)
                             .truncationMode(.tail)
                     }
@@ -584,10 +675,35 @@ struct FriendsView: View {
                 }
                 return KinnectUser.from(item)
             }
+            appState.pendingFriendRequestsCount = self.incoming.count
         }
         if let sRes = try? await sTask {
             let list = (sRes["users"] as? [[String: Any]]) ?? (sRes["suggestions"] as? [[String: Any]]) ?? []
             self.suggestions = list.map(KinnectUser.from)
+        }
+    }
+
+    private func searchDiscoverUsers() async {
+        let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            discoverSearchResults = []
+            isSearchingDiscover = false
+            return
+        }
+        isSearchingDiscover = true
+        defer { isSearchingDiscover = false }
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        guard !Task.isCancelled else { return }
+        let clean = trimmed.hasPrefix("@") ? String(trimmed.dropFirst()) : trimmed
+        let encoded = clean.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? clean
+        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/discover?q=\(encoded)") {
+            let list = (res["people"] as? [[String: Any]] ?? res["users"] as? [[String: Any]] ?? []).map(KinnectUser.from)
+            let existingFriendIds = Set(friends.map(\.id))
+            discoverSearchResults = list.filter {
+                $0.id != appState.currentUser?.id
+                    && !appState.blockedUserIds.contains($0.id)
+                    && !existingFriendIds.contains($0.id)
+            }
         }
     }
 

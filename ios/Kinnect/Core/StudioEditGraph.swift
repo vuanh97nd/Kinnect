@@ -218,9 +218,10 @@ enum StudioColorPipeline {
         let warmth = (on(.color) ? grade.warmth : 0) + pack.warmth
         let tint = on(.color) ? grade.tint : 0
         if warmth != 0 || tint != 0 {
+            let targetTemp = max(2000, min(12000, 6500 - warmth * 18))
             output = output.applyingFilter("CITemperatureAndTint", parameters: [
                 "inputNeutral": CIVector(x: 6500, y: 0),
-                "inputTargetNeutral": CIVector(x: 6500 + warmth * 18, y: tint * 8)
+                "inputTargetNeutral": CIVector(x: targetTemp, y: tint * 8)
             ])
         }
 
@@ -273,7 +274,28 @@ enum StudioColorPipeline {
         return true
     }
 
-    private static func applyCube(to image: CIImage, curve: Float, highlightWarmth: Float) -> CIImage {
+    private struct CubeCacheKey: Hashable {
+        let curveMilli: Int
+        let highlightWarmthMilli: Int
+    }
+
+    private static let cubeCacheLock = NSLock()
+    private static var cubeCache: [CubeCacheKey: Data] = [:]
+    private static var cubeCacheOrder: [CubeCacheKey] = []
+    private static let cubeCacheLimit = 24
+
+    private static func cachedCubeData(curve: Float, highlightWarmth: Float) -> Data {
+        let key = CubeCacheKey(
+            curveMilli: Int((curve * 1000).rounded()),
+            highlightWarmthMilli: Int((highlightWarmth * 1000).rounded())
+        )
+        cubeCacheLock.lock()
+        if let existing = cubeCache[key] {
+            cubeCacheLock.unlock()
+            return existing
+        }
+        cubeCacheLock.unlock()
+
         let data = StudioColorCube.data(dimension: 32) { r, g, b in
             var rr = StudioColorCube.sCurve(r, amount: curve)
             var gg = StudioColorCube.sCurve(g, amount: curve)
@@ -290,6 +312,22 @@ enum StudioColorPipeline {
             }
             return (rr, gg, bb)
         }
+
+        cubeCacheLock.lock()
+        if cubeCache[key] == nil {
+            cubeCache[key] = data
+            cubeCacheOrder.append(key)
+            if cubeCacheOrder.count > cubeCacheLimit {
+                let oldest = cubeCacheOrder.removeFirst()
+                cubeCache.removeValue(forKey: oldest)
+            }
+        }
+        cubeCacheLock.unlock()
+        return data
+    }
+
+    private static func applyCube(to image: CIImage, curve: Float, highlightWarmth: Float) -> CIImage {
+        let data = cachedCubeData(curve: curve, highlightWarmth: highlightWarmth)
         return image.applyingFilter("CIColorCube", parameters: [
             "inputCubeDimension": 32,
             "inputCubeData": data
@@ -320,8 +358,8 @@ enum StudioColorPipeline {
         filter.setValue(attributed, forKey: "inputText")
         guard var textImage = filter.outputImage else { return image }
         let dx = image.extent.minX + CGFloat(x) * image.extent.width - textImage.extent.width / 2
-        let dy = image.extent.minY + CGFloat(y) * image.extent.height
-        textImage = textImage.transformed(by: CGAffineTransform(translationX: dx - textImage.extent.minX, y: dy))
+        let dy = image.extent.minY + CGFloat(1.0 - y) * image.extent.height - textImage.extent.height / 2
+        textImage = textImage.transformed(by: CGAffineTransform(translationX: dx - textImage.extent.minX, y: dy - textImage.extent.minY))
         return textImage.applyingFilter("CISourceOverCompositing", parameters: [
             kCIInputBackgroundImageKey: image
         ]).cropped(to: image.extent)
@@ -331,14 +369,13 @@ enum StudioColorPipeline {
 enum StudioSkinSmoothing {
     static func apply(to input: CIImage, intensity: Double, faceMask: CIImage?) -> CIImage {
         let amount = min(1, max(0, intensity / 100.0))
-        if amount <= 0 { return input }
+        guard amount > 0, let mask = faceMask else {
+            return input
+        }
         let radius = 2.0 + amount * 7.0
         let low = input.clampedToExtent()
             .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: radius])
             .cropped(to: input.extent)
-        guard let mask = faceMask else {
-            return input
-        }
         let softened = low.applyingFilter("CIBlendWithMask", parameters: [
             kCIInputBackgroundImageKey: input,
             kCIInputMaskImageKey: mask

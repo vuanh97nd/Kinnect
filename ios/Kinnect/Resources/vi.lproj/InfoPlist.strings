@@ -1,0 +1,5 @@
+"NSCameraUsageDescription" = "Kinnect cần quyền truy cập Camera để gọi video, phát trực tiếp (Livestream) và chụp ảnh/quay video đăng bài.";
+"NSMicrophoneUsageDescription" = "Kinnect cần quyền truy cập Micro để truyền âm thanh trong cuộc gọi thoại, video call, livestream và quay video.";
+"NSLocationWhenInUseUsageDescription" = "Kinnect sử dụng vị trí khi bạn bật tính năng Quanh đây để tìm bạn bè ở gần.";
+"NSPhotoLibraryUsageDescription" = "Kinnect cần quyền truy cập Thư viện ảnh để bạn chọn ảnh đại diện, ảnh bài viết và video ngắn.";
+"NSPhotoLibraryAddUsageDescription" = "Kinnect cần quyền lưu ảnh và video vào Thư viện ảnh của bạn.";

@@ -1,16 +1,31 @@
+import AudioToolbox
 import AVFoundation
 import AVKit
 import SwiftUI
 import UIKit
+import WebRTC
+
+enum SocketEventBridge {
+    static let rawEventNotification = Notification.Name("kinnectRawSocketEvent")
+
+    @MainActor
+    static func installIfNeeded() {
+        _ = AppState.shared
+    }
+}
 
 struct LiveStreamView: View {
     let onOpenWallet: () -> Void
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var webrtc = NativeWebRTCManager.shared
+    @ObservedObject private var l10n = LocalizationManager.shared
+    @AppStorage("kinnect_live_gift_reduce_fx") private var reduceGiftEffects = false
+    @AppStorage("kinnect_live_gift_sound") private var giftSoundEnabled = true
 
     @State private var selectedIndex = 0
     @State private var scrolledRoomId: String?
     @State private var isLoading = false
+    @State private var loadError: String? = nil
     @State private var chatText = ""
     @State private var likesCount = 0
     @State private var isLiked = false
@@ -18,41 +33,68 @@ struct LiveStreamView: View {
     @State private var giftCatalog: [LiveGiftCatalogItem] = []
     @State private var giftPriceVersion = 1
     @State private var showCreateLiveSheet = false
+    @State private var pendingBlockLiveRoom: LiveRoomItem? = nil
+    @State private var pendingBlockChatUser: KinnectUser? = nil
+    @State private var activeGiftEffect: ActiveGiftEffect? = nil
+    @State private var floatingReactions: [LiveFloatingReaction] = []
+    @State private var isGuestMicMuted = false
+    @State private var isPlaybackMuted = false
+    @State private var followedHostIds: Set<String> = []
+    @State private var followLoadingHostIds: Set<String> = []
+    @State private var showViewersSheet = false
+    @State private var showGiftLeaderboardSheet = false
+    @State private var showCoHostSheet = false
+    @State private var lastSentGift: LiveGiftCatalogItem? = nil
+    @State private var lastSentGiftQuantity: Int = 1
+    @State private var liveLayout: String = "panel"
+    @StateObject private var giftComboTracker = LiveGiftComboTracker()
 
     var body: some View {
         ZStack(alignment: .top) {
-            Color.black.ignoresSafeArea()
+            if appState.liveRooms.isEmpty {
+                KinnectTheme.background.ignoresSafeArea()
+            } else {
+                Color.black.ignoresSafeArea()
+            }
 
-            if appState.liveRooms.isEmpty && !isLoading {
-                VStack(spacing: 16) {
-                    KinnectIcon(glyph: .live, size: 54, tint: KinnectTheme.textSecondary)
-                    Text("Hiện chưa có phòng Live nào đang phát")
+            if appState.liveRooms.isEmpty && isLoading {
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .tint(KinnectTheme.accentBright)
+                        .scaleEffect(1.2)
+                    Text(L10n.tr("Đang tải phòng Live…"))
+                        .font(.subheadline.weight(.medium))
+                        .foregroundColor(KinnectTheme.textSecondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let loadError, appState.liveRooms.isEmpty && !isLoading {
+                VStack(spacing: 14) {
+                    Image(systemName: "wifi.exclamationmark")
+                        .font(.system(size: 44))
+                        .foregroundColor(KinnectTheme.textSecondary)
+                    Text(L10n.tr("Không thể tải danh sách phòng Live"))
                         .font(.headline)
-                        .foregroundColor(.white)
-                    Text("Khi có người phát trực tiếp, luồng Live sẽ tự động xuất hiện tại đây để bạn vuốt xem.")
+                        .foregroundColor(KinnectTheme.textPrimary)
+                    Text(loadError)
                         .font(.subheadline)
                         .foregroundColor(KinnectTheme.textSecondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 32)
-
                     Button {
-                        showCreateLiveSheet = true
+                        Task { await fetchLiveRooms() }
                     } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "video.badge.plus")
-                                .font(.system(size: 16, weight: .bold))
-                            Text("Bắt đầu phát Live ngay")
-                                .font(.subheadline.bold())
-                        }
-                        .padding(.horizontal, 22)
-                        .padding(.vertical, 12)
-                        .background(Capsule().fill(KinnectTheme.primaryGradient))
-                        .foregroundColor(.white)
-                        .shadow(color: KinnectTheme.accent.opacity(0.4), radius: 10, y: 4)
+                        Text(L10n.tr("Thử lại"))
+                            .font(.subheadline.bold())
+                            .padding(.horizontal, 24)
+                            .frame(minHeight: 44)
+                            .background(Capsule().fill(Color(hex: "#EE2B2B")))
+                            .foregroundColor(.white)
                     }
-                    .padding(.top, 8)
+                    .buttonStyle(.plain)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if appState.liveRooms.isEmpty && !isLoading {
+                emptyLiveLobbyView
             } else if !appState.liveRooms.isEmpty {
                 // Unified native vertical swipe viewer for all Live streams (Parity Android 1.2.12 build 118)
                 GeometryReader { proxy in
@@ -60,7 +102,7 @@ struct LiveStreamView: View {
                         ScrollView(.vertical, showsIndicators: false) {
                             LazyVStack(spacing: 0) {
                                 ForEach(appState.liveRooms) { room in
-                                    liveStreamPage(room)
+                                    liveStreamPage(room, containerWidth: proxy.size.width)
                                         .frame(width: proxy.size.width, height: proxy.size.height)
                                         .clipped()
                                         .id(room.id)
@@ -82,7 +124,7 @@ struct LiveStreamView: View {
                             ScrollView(.vertical, showsIndicators: false) {
                                 LazyVStack(spacing: 0) {
                                     ForEach(Array(appState.liveRooms.enumerated()), id: \.element.id) { index, room in
-                                        liveStreamPage(room)
+                                        liveStreamPage(room, containerWidth: proxy.size.width)
                                             .frame(width: proxy.size.width, height: proxy.size.height)
                                             .id(index)
                                     }
@@ -108,13 +150,16 @@ struct LiveStreamView: View {
                         }
                     }
                 }
-                .ignoresSafeArea()
             }
         }
         .task {
+            SocketEventBridge.installIfNeeded()
             await fetchLiveRooms()
             await loadGifts()
-            if !appState.liveRooms.isEmpty && selectedIndex < appState.liveRooms.count {
+            if !appState.isCreatingLiveRoom
+                && appState.currentLiveRoom == nil
+                && !appState.liveRooms.isEmpty
+                && selectedIndex < appState.liveRooms.count {
                 let initialRoom = appState.liveRooms[selectedIndex]
                 scrolledRoomId = initialRoom.id
                 appState.joinLiveRoom(initialRoom)
@@ -122,16 +167,48 @@ struct LiveStreamView: View {
             }
         }
         .onChange(of: selectedIndex) { newIndex in
-            guard newIndex < appState.liveRooms.count else { return }
+            guard !appState.isCreatingLiveRoom,
+                  !(appState.currentLiveRoom != nil && appState.isCurrentLiveHost),
+                  newIndex < appState.liveRooms.count else { return }
             let room = appState.liveRooms[newIndex]
             if scrolledRoomId != room.id {
                 scrolledRoomId = room.id
             }
             appState.joinLiveRoom(room)
+            isLiked = false
             likesCount = room.likesCount
         }
+        .onChange(of: appState.liveRooms.first?.id) { _ in
+            guard !appState.isCreatingLiveRoom,
+                  appState.currentLiveRoom == nil,
+                  let first = appState.liveRooms.first else { return }
+            selectedIndex = 0
+            scrolledRoomId = first.id
+            isLiked = false
+            likesCount = first.likesCount
+            appState.joinLiveRoom(first)
+        }
         .onDisappear {
-            appState.leaveCurrentLiveRoom()
+            if !appState.isCreatingLiveRoom && !appState.isCurrentLiveHost {
+                appState.leaveCurrentLiveRoom()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .kinnectLiveReactionReceived)) { notif in
+            guard !appState.isCurrentLiveHost, let data = notif.userInfo as? [String: Any] else { return }
+            handleIncomingReactionEvent(data)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: SocketEventBridge.rawEventNotification)) { notif in
+            guard let json = notif.userInfo as? [String: Any],
+                  let type = json["type"] as? String else { return }
+            let expectedRoom = appState.currentLiveRoom?.id ?? scrolledRoomId
+            if let evtRoom = json["room"] as? String, !evtRoom.isEmpty,
+               let expectedRoom, !expectedRoom.isEmpty,
+               evtRoom != expectedRoom {
+                return
+            }
+            if type == "live-stage", let layout = json["layout"] as? String {
+                liveLayout = (layout == "grid") ? "grid" : "panel"
+            }
         }
         .sheet(isPresented: $showCreateLiveSheet) {
             CreateLiveRoomSheet(onStarted: {
@@ -145,10 +222,162 @@ struct LiveStreamView: View {
                 LiveGiftDrawerSheet(
                     roomId: appState.liveRooms[selectedIndex].id,
                     gifts: giftCatalog,
-                    priceVersion: giftPriceVersion
+                    priceVersion: giftPriceVersion,
+                    onGiftSent: { gift, qty in
+                        lastSentGift = gift
+                        lastSentGiftQuantity = qty
+                    },
+                    onCatalogUpdated: { items, version in
+                        giftCatalog = items
+                        giftPriceVersion = version
+                    },
+                    comboTracker: giftComboTracker
                 )
             }
         }
+        .sheet(isPresented: $showViewersSheet) {
+            if let room = activePageRoom {
+                LiveViewersSheet(
+                    roomId: room.id,
+                    viewerCount: room.viewerCount,
+                    isHost: room.id == appState.currentLiveRoom?.id && appState.isCurrentLiveHost
+                )
+            }
+        }
+        .sheet(isPresented: $showGiftLeaderboardSheet) {
+            if let room = activePageRoom {
+                LiveGiftLeaderboardSheet(
+                    roomId: room.id,
+                    isHost: room.id == appState.currentLiveRoom?.id && appState.isCurrentLiveHost
+                )
+            }
+        }
+        .sheet(isPresented: $showCoHostSheet) {
+            if let room = activePageRoom {
+                LiveCoHostManagerSheet(roomId: room.id)
+            }
+        }
+        .onChange(of: appState.isCurrentLivePublisher) { publishing in
+            if !publishing {
+                isGuestMicMuted = false
+            }
+        }
+        .alert(
+            "Lời mời lên sóng Live",
+            isPresented: Binding(
+                get: { appState.pendingLiveGuestInvitation != nil },
+                set: { if !$0 { appState.pendingLiveGuestInvitation = nil } }
+            ),
+            presenting: appState.pendingLiveGuestInvitation
+        ) { inv in
+            Button("Tham gia") {
+                appState.respondToLiveGuestInvitation(accept: true, invitation: inv)
+            }
+            Button("Từ chối", role: .cancel) {
+                appState.respondToLiveGuestInvitation(accept: false, invitation: inv)
+            }
+        } message: { inv in
+            Text("\(inv.fromName) mời bạn tham gia phát cùng phòng Live này.")
+        }
+        .alert(
+            "Chặn chủ phòng Live?",
+            isPresented: Binding(
+                get: { pendingBlockLiveRoom != nil },
+                set: { if !$0 { pendingBlockLiveRoom = nil } }
+            ),
+            presenting: pendingBlockLiveRoom
+        ) { room in
+            Button("Chặn chủ phòng", role: .destructive) {
+                pendingBlockLiveRoom = nil
+                Task { await blockLiveHostAndExit(room) }
+            }
+            Button("Hủy", role: .cancel) {
+                pendingBlockLiveRoom = nil
+            }
+        } message: { room in
+            Text("Bạn sẽ rời khỏi phòng Live và không còn thấy nội dung từ \(room.hostName).")
+        }
+        .alert(
+            "Chặn người bình luận?",
+            isPresented: Binding(
+                get: { pendingBlockChatUser != nil },
+                set: { if !$0 { pendingBlockChatUser = nil } }
+            ),
+            presenting: pendingBlockChatUser
+        ) { user in
+            Button("Chặn người dùng", role: .destructive) {
+                pendingBlockChatUser = nil
+                Task {
+                    await appState.blockUser(userId: user.id, userName: user.name)
+                    appState.liveChatMessages.removeAll { $0.user.id == user.id }
+                }
+            }
+            Button("Hủy", role: .cancel) {
+                pendingBlockChatUser = nil
+            }
+        } message: { user in
+            Text("Ẩn bình luận và chặn \(user.name) trên toàn bộ Kinnect.")
+        }
+    }
+
+    private var activePageRoom: LiveRoomItem? {
+        if let cur = appState.currentLiveRoom { return cur }
+        if !appState.liveRooms.isEmpty && selectedIndex < appState.liveRooms.count {
+            return appState.liveRooms[selectedIndex]
+        }
+        return nil
+    }
+
+    private func togglePlaybackMute() {
+        isPlaybackMuted.toggle()
+        RTCAudioSession.sharedInstance().isAudioEnabled = !isPlaybackMuted
+    }
+
+    private func toggleFollowHost(_ hostId: String) async {
+        guard !hostId.isEmpty, !followLoadingHostIds.contains(hostId) else { return }
+        followLoadingHostIds.insert(hostId)
+        defer { followLoadingHostIds.remove(hostId) }
+        let currentlyFollowed = followedHostIds.contains(hostId)
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/users/\(hostId)/follow",
+                method: currentlyFollowed ? "DELETE" : "POST"
+            )
+            if currentlyFollowed {
+                followedHostIds.remove(hostId)
+                appState.showToast("Đã bỏ theo dõi chủ phòng.")
+            } else {
+                followedHostIds.insert(hostId)
+                appState.showToast("Đã theo dõi chủ phòng!")
+            }
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+
+    private func sendQuickComboGift(_ gift: LiveGiftCatalogItem, quantity: Int, room: LiveRoomItem) {
+        guard NativeSocketClient.shared.isConnected else {
+            appState.showToast("Mất kết nối phòng Live.")
+            return
+        }
+        let targetUserId = room.hostUserId
+        let comboId = giftComboTracker.nextComboId(roomId: room.id, giftId: gift.id, targetUserId: targetUserId)
+        let reqId = "gift_" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        var payload: [String: Any] = [
+            "type": "live-reaction",
+            "room": room.id,
+            "kind": gift.id,
+            "giftId": gift.id,
+            "quantity": quantity,
+            "comboId": comboId,
+            "fundingSource": "gifted",
+            "requestId": reqId,
+            "priceVersion": giftPriceVersion
+        ]
+        if !targetUserId.isEmpty {
+            payload["targetUserId"] = targetUserId
+        }
+        NativeSocketClient.shared.sendJSON(payload)
     }
 
     private func loadGifts() async {
@@ -168,7 +397,107 @@ struct LiveStreamView: View {
         }
     }
 
-    private func liveStreamPage(_ room: LiveRoomItem) -> some View {
+    private var emptyLiveLobbyView: some View {
+        let liveRed = Color(hex: "#EE2B2B")
+        return VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Text(L10n.tr("Trực tiếp"))
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundColor(KinnectTheme.textPrimary)
+
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 5, height: 5)
+                    Text("LIVE")
+                        .font(.system(size: 11, weight: .black))
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(liveRed))
+
+                Spacer()
+
+                Button {
+                    Task { await fetchLiveRooms() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(KinnectTheme.textPrimary)
+                        .frame(width: 38, height: 38)
+                        .background(Circle().fill(KinnectTheme.surfaceElevated))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L10n.tr("Làm mới danh sách Live"))
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
+
+            Spacer()
+
+            VStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(liveRed.opacity(0.08))
+                        .frame(width: 78, height: 78)
+                    Circle()
+                        .fill(liveRed.opacity(0.16))
+                        .frame(width: 56, height: 56)
+                    Image(systemName: "dot.radiowaves.left.and.right")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(liveRed)
+                }
+                .padding(.bottom, 2)
+
+                Text(L10n.tr("Chưa có buổi live"))
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(KinnectTheme.textPrimary)
+                    .multilineTextAlignment(.center)
+
+                Text(L10n.tr("Hãy là người mở màn!"))
+                    .font(.subheadline)
+                    .foregroundColor(KinnectTheme.textSecondary)
+                    .multilineTextAlignment(.center)
+
+                Button {
+                    showCreateLiveSheet = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "dot.radiowaves.left.and.right")
+                            .font(.system(size: 15, weight: .bold))
+                        Text(L10n.tr("Phát live"))
+                            .font(.subheadline.bold())
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 26)
+                    .padding(.vertical, 13)
+                    .background(Capsule().fill(liveRed))
+                    .shadow(color: liveRed.opacity(0.32), radius: 10, y: 4)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 4)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 32)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(KinnectTheme.surface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 24, style: .continuous)
+                            .stroke(KinnectTheme.borderSoft, lineWidth: 1)
+                    )
+            )
+            .padding(.horizontal, 16)
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func liveStreamPage(_ room: LiveRoomItem, containerWidth: CGFloat) -> some View {
         ZStack(alignment: .bottomLeading) {
             // WebRTC Video Canvas with Fallback connecting state
             ZStack {
@@ -226,80 +555,244 @@ struct LiveStreamView: View {
                 }
             }
 
+            // Subtle top & bottom gradient scrim so white controls stay readable on bright scenes
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.55),
+                    Color.clear,
+                    Color.clear,
+                    Color.black.opacity(0.72)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .allowsHitTesting(false)
+
             // Overlays Container
-            VStack {
-                // Top Header Overlay
-                HStack(spacing: 10) {
-                    // Streamer Info Pill
+            VStack(spacing: 0) {
+                // Top Header Overlay (Row 1: Streamer Pill + Go Live + Safety Menu; Row 2: Gift Leaderboard + Room Title)
+                VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {
-                        KinnectAvatarView(
-                            name: room.hostName,
-                            avatarURL: room.hostAvatarUrl,
-                            colorHex: room.hostAvatarColor,
-                            size: 36
-                        )
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(room.hostName)
-                                .font(.caption.bold())
-                                .foregroundColor(.white)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.85)
-                            HStack(spacing: 4) {
-                                Text("LIVE")
-                                    .font(.system(size: 9, weight: .black))
-                                    .padding(.horizontal, 4)
-                                    .padding(.vertical, 1)
-                                    .background(Capsule().fill(KinnectTheme.danger))
+                        // Streamer Info Pill
+                        HStack(spacing: 7) {
+                            KinnectAvatarView(
+                                name: room.hostName,
+                                avatarURL: room.hostAvatarUrl,
+                                colorHex: room.hostAvatarColor,
+                                size: 34
+                            )
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(room.hostName)
+                                    .font(.caption.bold())
                                     .foregroundColor(.white)
-                                Text("• 👁 \(room.viewerCount)")
-                                    .font(.caption2)
-                                    .foregroundColor(.white.opacity(0.85))
+                                    .lineLimit(1)
+                                HStack(spacing: 4) {
+                                    Text("LIVE")
+                                        .font(.system(size: 8, weight: .black))
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 1)
+                                        .background(Capsule().fill(KinnectTheme.danger))
+                                        .foregroundColor(.white)
+                                        .fixedSize()
+                                    Button {
+                                        showViewersSheet = true
+                                    } label: {
+                                        Text("• 👁 \(room.viewerCount)")
+                                            .font(.caption2)
+                                            .foregroundColor(.white.opacity(0.9))
+                                            .fixedSize()
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel(L10n.tr("Xem danh sách người xem"))
+                                }
+                            }
+                            .layoutPriority(1)
+
+                            if !room.hostUserId.isEmpty && room.hostUserId != appState.currentUser?.id {
+                                let isFollowed = followedHostIds.contains(room.hostUserId)
+                                Button {
+                                    Task { await toggleFollowHost(room.hostUserId) }
+                                } label: {
+                                    Text(L10n.tr(isFollowed ? "Đang theo dõi" : "Theo dõi"))
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .lineLimit(1)
+                                        .fixedSize()
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Capsule().fill(isFollowed ? Color.white.opacity(0.22) : KinnectTheme.accentBright))
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(followLoadingHostIds.contains(room.hostUserId))
                             }
                         }
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Capsule().fill(Color.black.opacity(0.45)))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(Color.black.opacity(0.5)))
 
-                    // Topic / Game Badge
-                    HStack(spacing: 5) {
-                        KinnectIcon(
-                            glyph: room.liveMode == "game" ? .game : .messages,
-                            size: 14,
-                            tint: KinnectTheme.accentBright
-                        )
-                        Text(room.liveMode == "game" ? (room.gameTitle.isEmpty ? "Chơi game" : room.gameTitle) : "Trò chuyện")
-                            .font(.caption2.weight(.semibold))
+                        Spacer(minLength: 4)
+
+                        // Go Live Button
+                        Button {
+                            showCreateLiveSheet = true
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "video.fill")
+                                    .font(.system(size: 11, weight: .bold))
+                                Text(L10n.tr("Phát Live"))
+                                    .font(.caption2.bold())
+                                    .lineLimit(1)
+                                    .fixedSize()
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .frame(minHeight: 36)
+                            .background(Capsule().fill(KinnectTheme.primaryGradient))
                             .foregroundColor(.white)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Capsule().fill(Color.white.opacity(0.18)))
-
-                    Spacer()
-
-                    // Go Live Button
-                    Button {
-                        showCreateLiveSheet = true
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "video.fill")
-                                .font(.system(size: 11, weight: .bold))
-                            Text("Phát Live")
-                                .font(.caption2.bold())
+                            .shadow(color: Color.black.opacity(0.4), radius: 6, y: 2)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Capsule().fill(KinnectTheme.primaryGradient))
-                        .foregroundColor(.white)
-                        .shadow(color: Color.black.opacity(0.4), radius: 6, y: 2)
+                        .buttonStyle(.plain)
+                        .fixedSize()
+
+                        // Viewer UGC Safety Menu (Report / Block Host — Apple Guideline 1.2)
+                        Menu {
+                            Button(role: .destructive) {
+                                let hasPeerHost = !room.hostUserId.isEmpty && room.hostUserId != appState.currentUser?.id
+                                appState.activeReportContext = UGCReportContext(
+                                    targetType: hasPeerHost ? "user" : "app",
+                                    targetId: hasPeerHost ? room.hostUserId : (appState.currentUser?.id ?? room.id),
+                                    targetUserId: hasPeerHost ? room.hostUserId : nil,
+                                    targetTitle: room.title.isEmpty
+                                        ? "Phòng Live của \(room.hostName)"
+                                        : "Phòng Live: \(room.hostName) — \(room.title)"
+                                )
+                            } label: {
+                                Label("Báo cáo phòng Live", systemImage: "flag")
+                            }
+
+                            if !room.hostUserId.isEmpty && room.hostUserId != appState.currentUser?.id {
+                                Button(role: .destructive) {
+                                    pendingBlockLiveRoom = room
+                                } label: {
+                                    Label("Chặn chủ phòng", systemImage: "hand.raised.fill")
+                                }
+                            }
+                        } label: {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.black.opacity(0.5))
+                                    .frame(width: 36, height: 36)
+                                Image(systemName: "ellipsis")
+                                    .font(.system(size: 15, weight: .bold))
+                                    .foregroundColor(.white)
+                            }
+                            .frame(minWidth: 40, minHeight: 44)
+                            .contentShape(Rectangle())
+                        }
+                        .accessibilityLabel("Tùy chọn phòng Live")
                     }
-                    .buttonStyle(.plain)
+
+                    // Row 2: Gift Leaderboard Pill + Room Title (no horizontal collision on 375pt iPhones)
+                    HStack(spacing: 8) {
+                        Button {
+                            showGiftLeaderboardSheet = true
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "trophy.fill")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(KinnectTheme.warning)
+                                Text(L10n.tr("BXH Quà"))
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+                                    .fixedSize()
+                            }
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 5)
+                            .background(Capsule().fill(Color.black.opacity(0.45)))
+                        }
+                        .buttonStyle(.plain)
+                        .fixedSize()
+                        .accessibilityLabel(L10n.tr("Bảng xếp hạng quà Live"))
+
+                        if !room.title.isEmpty {
+                            Text(room.title)
+                                .font(.caption2.weight(.semibold))
+                                .foregroundColor(.white.opacity(0.92))
+                                .lineLimit(1)
+                                .shadow(color: .black.opacity(0.75), radius: 3, y: 1)
+                        }
+
+                        Spacer(minLength: 0)
+                    }
                 }
-                .padding(.horizontal, 14)
-                .padding(.top, 54)
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
 
                 Spacer()
+
+                if room.id == appState.currentLiveRoom?.id {
+                    VStack(alignment: .trailing, spacing: 8) {
+                        HStack {
+                            Spacer()
+                            LiveCoHostPiPStackView(isHostCanvas: appState.isCurrentLiveHost, layout: liveLayout)
+                        }
+                        if appState.isCurrentLivePublisher && !appState.isCurrentLiveHost {
+                            HStack(spacing: 10) {
+                                Button {
+                                    isGuestMicMuted.toggle()
+                                    NativeWebRTCManager.shared.setMicrophoneMuted(isGuestMicMuted)
+                                } label: {
+                                    Image(systemName: isGuestMicMuted ? "mic.slash.fill" : "mic.fill")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundColor(isGuestMicMuted ? KinnectTheme.danger : .white)
+                                        .frame(width: 36, height: 36)
+                                        .background(Circle().fill(Color.black.opacity(0.6)))
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(isGuestMicMuted ? "Bật micro" : "Tắt micro")
+
+                                Button {
+                                    NativeWebRTCManager.shared.flipCamera()
+                                } label: {
+                                    Image(systemName: "camera.rotate.fill")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .frame(width: 36, height: 36)
+                                        .background(Circle().fill(Color.black.opacity(0.6)))
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Lật camera")
+
+                                Button {
+                                    NativeSocketClient.shared.sendJSON(["type": "live-guest-leave"])
+                                    appState.isCurrentLivePublisher = false
+                                    isGuestMicMuted = false
+                                    NativeWebRTCManager.shared.setMicrophoneMuted(false)
+                                    NativeWebRTCManager.shared.stopLiveLocalMedia()
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "phone.down.fill")
+                                            .font(.system(size: 12, weight: .bold))
+                                        Text("Rời sóng")
+                                            .font(.caption2.bold())
+                                    }
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 10)
+                                    .frame(height: 36)
+                                    .background(Capsule().fill(KinnectTheme.danger))
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Rời vị trí khách mời")
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(Color.black.opacity(0.45)))
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 8)
+                }
 
                 // Bottom Content: Comments + Right Actions
                 HStack(alignment: .bottom, spacing: 12) {
@@ -321,20 +814,39 @@ struct LiveStreamView: View {
                                 chatBubble(name: "kinnect_user", text: "Âm thanh và hình ảnh rất nét ạ!", colorHex: "#22C55E")
                             }
                         } else {
-                            ForEach(appState.liveChatMessages.suffix(6)) { msg in
-                                chatBubble(name: msg.user.name, text: msg.text, colorHex: msg.user.avatarColor)
+                            ForEach(appState.liveChatMessages.filter { !appState.blockedUserIds.contains($0.user.id) }.suffix(6)) { msg in
+                                chatBubble(senderId: msg.user.id, name: msg.user.name, text: msg.text, colorHex: msg.user.avatarColor)
                             }
                         }
 
                         // Message input field
+                        let effectiveRoom = (room.id == appState.currentLiveRoom?.id) ? (appState.currentLiveRoom ?? room) : room
+                        let isHostOfRoom = (room.id == appState.currentLiveRoom?.id && appState.isCurrentLiveHost)
+                        let commentsDisabled = !effectiveRoom.comments && !isHostOfRoom
                         HStack(spacing: 8) {
-                            TextField("Bình luận phòng Live...", text: $chatText)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(Capsule().fill(Color.black.opacity(0.5)))
+                            TextField(
+                                "",
+                                text: $chatText,
+                                prompt: Text(L10n.tr(commentsDisabled ? "Chủ phòng đã tắt bình luận" : "Bình luận phòng Live..."))
+                                    .foregroundColor(.white.opacity(0.75))
+                            )
+                                .font(.subheadline)
                                 .foregroundColor(.white)
+                                .tint(.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.white.opacity(commentsDisabled ? 0.08 : 0.14))
+                                        .overlay(
+                                            Capsule()
+                                                .stroke(Color.white.opacity(0.22), lineWidth: 1)
+                                        )
+                                )
+                                .disabled(commentsDisabled)
 
                             Button {
+                                guard !commentsDisabled else { return }
                                 let clean = chatText.trimmingCharacters(in: .whitespacesAndNewlines)
                                 if !clean.isEmpty {
                                     chatText = ""
@@ -355,34 +867,125 @@ struct LiveStreamView: View {
                                     }
                                 }
                             } label: {
-                                KinnectIcon(glyph: .send, size: 20, selected: true, tint: KinnectTheme.accentBright)
-                                    .frame(width: 36, height: 36)
-                                    .background(Circle().fill(Color.black.opacity(0.5)))
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.black.opacity(commentsDisabled ? 0.3 : 0.5))
+                                        .frame(width: 38, height: 38)
+                                    KinnectIcon(glyph: .send, size: 20, selected: !commentsDisabled, tint: commentsDisabled ? KinnectTheme.textSecondary : KinnectTheme.accentBright)
+                                }
+                                .frame(minWidth: 44, minHeight: 44)
+                                .contentShape(Rectangle())
                             }
+                            .disabled(commentsDisabled)
+                            .accessibilityLabel("Gửi bình luận")
                         }
                         .padding(.top, 4)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                     // Right Floating Action Sidebar
-                    VStack(spacing: 16) {
-                        // Gift Drawer button
-                        Button {
-                            showGiftDrawer = true
-                        } label: {
-                            VStack(spacing: 4) {
-                                ZStack {
-                                    Circle()
-                                        .fill(KinnectTheme.primaryGradient)
-                                        .frame(width: 44, height: 44)
-                                    KinnectIcon(glyph: .gift, size: 22, selected: true, tint: .white)
+                    VStack(spacing: 14) {
+                        // Quick Combo Button
+                        if !(room.id == appState.currentLiveRoom?.id && appState.isCurrentLiveHost),
+                           let comboGift = lastSentGift {
+                            Button {
+                                sendQuickComboGift(comboGift, quantity: lastSentGiftQuantity, room: room)
+                            } label: {
+                                VStack(spacing: 2) {
+                                    Text(comboGift.emoji)
+                                        .font(.system(size: 20))
+                                    Text("Combo")
+                                        .font(.system(size: 10, weight: .black))
+                                        .foregroundColor(.white)
+                                    if appState.liveGiftCombo > 0 {
+                                        Text("x\(appState.liveGiftCombo)")
+                                            .font(.system(size: 9, weight: .heavy))
+                                            .foregroundColor(KinnectTheme.warning)
+                                    }
                                 }
-                                Text("Tặng quà")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.white)
+                                .frame(width: 50, height: 50)
+                                .background(Circle().fill(KinnectTheme.danger))
+                                .shadow(color: KinnectTheme.danger.opacity(0.55), radius: 8)
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Gửi nhanh combo \(comboGift.label)")
                         }
-                        .accessibilityLabel("Tặng quà cho streamer")
+
+                        // Co-Host Request Button (for viewers)
+                        if room.id == appState.currentLiveRoom?.id && !appState.isCurrentLiveHost && !appState.isCurrentLivePublisher {
+                            Button {
+                                if appState.hasPendingLiveGuestRequest {
+                                    NativeSocketClient.shared.sendJSON(["type": "live-guest-cancel"])
+                                } else {
+                                    NativeSocketClient.shared.sendJSON(["type": "live-guest-request", "mode": "video"])
+                                }
+                            } label: {
+                                VStack(spacing: 4) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(appState.hasPendingLiveGuestRequest ? KinnectTheme.warning : Color.black.opacity(0.45))
+                                            .frame(width: 44, height: 44)
+                                        Image(systemName: appState.hasPendingLiveGuestRequest ? "person.crop.circle.badge.clock" : "person.badge.plus")
+                                            .font(.system(size: 19, weight: .semibold))
+                                            .foregroundColor(appState.hasPendingLiveGuestRequest ? .black : .white)
+                                    }
+                                    Text(appState.hasPendingLiveGuestRequest ? L10n.tr("Đang chờ") : L10n.tr("Lên sóng"))
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.85)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(appState.hasPendingLiveGuestRequest ? "Hủy yêu cầu lên sóng" : "Xin lên sóng cùng")
+                        }
+
+                        // Playback Mute Button
+                        if !(room.id == appState.currentLiveRoom?.id && appState.isCurrentLiveHost) {
+                            Button {
+                                togglePlaybackMute()
+                            } label: {
+                                VStack(spacing: 4) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color.black.opacity(0.45))
+                                            .frame(width: 44, height: 44)
+                                        Image(systemName: isPlaybackMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                                            .font(.system(size: 18, weight: .semibold))
+                                            .foregroundColor(isPlaybackMuted ? KinnectTheme.danger : .white)
+                                    }
+                                    Text(isPlaybackMuted ? L10n.tr("Đang tắt") : L10n.tr("Âm thanh"))
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.85)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(isPlaybackMuted ? "Bật âm thanh Live" : "Tắt tiếng Live")
+                        }
+
+                        // Gift Drawer button (hidden for host broadcasting their own room)
+                        if !(room.id == appState.currentLiveRoom?.id && appState.isCurrentLiveHost) {
+                            Button {
+                                showGiftDrawer = true
+                            } label: {
+                                VStack(spacing: 4) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(KinnectTheme.primaryGradient)
+                                            .frame(width: 44, height: 44)
+                                        KinnectIcon(glyph: .gift, size: 22, selected: true, tint: .white)
+                                    }
+                                    Text(L10n.tr("Tặng quà"))
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.85)
+                                }
+                            }
+                            .accessibilityLabel("Tặng quà cho streamer")
+                        }
 
                         // Like button
                         Button {
@@ -409,21 +1012,18 @@ struct LiveStreamView: View {
                                 Text("\(likesCount)")
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundColor(.white)
+                                    .lineLimit(1)
                             }
                         }
                         .accessibilityLabel(isLiked ? "Bỏ thích" : "Thả tim")
 
-                        // Share button (Real permalink copy + UIActivityViewController presentation)
+                        // Share button (Real permalink copy + iPad-safe share sheet)
                         Button {
-                            let permalink = "https://kinnect.io.vn/live/\(room.id)"
+                            let permalink = "https://app.kinnect.io.vn/share/live/\(room.id)"
                             UIPasteboard.general.string = permalink
                             appState.showToast("Đã sao chép liên kết phòng Live!")
-                            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                               let rootVC = windowScene.windows.first?.rootViewController {
-                                let items: [Any] = [URL(string: permalink) ?? permalink]
-                                let av = UIActivityViewController(activityItems: items, applicationActivities: nil)
-                                rootVC.present(av, animated: true)
-                            }
+                            let shareItems: [Any] = [URL(string: permalink) ?? permalink]
+                            KinnectShareSheet.present(items: shareItems)
                         } label: {
                             VStack(spacing: 4) {
                                 ZStack {
@@ -432,24 +1032,100 @@ struct LiveStreamView: View {
                                         .frame(width: 44, height: 44)
                                     KinnectIcon(glyph: .share, size: 22, tint: .white)
                                 }
-                                Text("Chia sẻ")
+                                Text(L10n.tr("Chia sẻ"))
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundColor(.white)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.85)
                             }
                         }
                         .accessibilityLabel("Chia sẻ phòng Live")
                     }
+                    .frame(width: 58)
                     .padding(.bottom, 6)
                 }
-                .padding(.horizontal, 14)
-                .padding(.bottom, 38)
+                .padding(.leading, 12)
+                .padding(.trailing, 12)
+                .padding(.bottom, 14)
+            }
+            .frame(width: containerWidth)
+
+            if room.id == appState.currentLiveRoom?.id {
+                if let giftEffect = activeGiftEffect {
+                    LiveGiftBurstShowcaseView(effect: giftEffect)
+                        .transition(.scale.combined(with: .opacity))
+                        .zIndex(60)
+                }
+                ForEach(floatingReactions) { reaction in
+                    LiveFloatingReactionView(symbol: reaction.symbol)
+                        .position(x: reaction.x, y: reaction.y)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
     }
 
-    private func chatBubble(name: String, text: String, colorHex: String) -> some View {
+    private func handleIncomingReactionEvent(_ data: [String: Any]) {
+        let isGift = (data["experience"] as? Bool) ?? (data["isGift"] as? Bool) ?? (data["giftId"] != nil)
+        if isGift {
+            let giftId = (data["giftId"] as? String) ?? (data["kind"] as? String) ?? "rose"
+            let giftName = (data["giftName"] as? String) ?? LiveGiftCatalogItem.defaultName(for: giftId)
+            let emoji = LiveGiftCatalogItem.defaultEmoji(for: giftId)
+            let senderName = (data["name"] as? String) ?? "Khán giả"
+            let qty = (data["quantity"] as? Int) ?? (data["quantity"] as? NSNumber)?.intValue ?? 1
+            let combo = (data["comboCount"] as? Int) ?? (data["comboCount"] as? NSNumber)?.intValue ?? 1
+            let recipient = (data["recipientName"] as? String) ?? ""
+            let tier = (data["tier"] as? String) ?? "standard"
+            if giftSoundEnabled {
+                AudioServicesPlaySystemSound(1104)
+            }
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            let effect = ActiveGiftEffect(
+                giftId: giftId,
+                giftName: giftName,
+                giftEmoji: emoji,
+                senderName: senderName,
+                recipientName: recipient,
+                quantity: qty,
+                comboCount: combo,
+                tier: tier
+            )
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.65)) {
+                activeGiftEffect = effect
+            }
+            spawnFloatingSymbol(giftId)
+            let burstNanos = Self.burstDurationNanoseconds(for: tier, reduceEffects: reduceGiftEffects)
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: burstNanos)
+                if activeGiftEffect?.id == effect.id {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        activeGiftEffect = nil
+                    }
+                }
+            }
+        } else {
+            let senderId = (data["senderId"] as? String) ?? ""
+            if senderId != appState.currentUser?.id {
+                likesCount += 1
+            }
+            spawnFloatingSymbol("❤️")
+        }
+    }
+
+    private func spawnFloatingSymbol(_ symbol: String) {
+        let screenWidth = UIScreen.main.bounds.width
+        let startX = screenWidth * CGFloat.random(in: 0.68...0.88)
+        let startY = UIScreen.main.bounds.height * 0.76
+        let item = LiveFloatingReaction(symbol: symbol, x: startX, y: startY)
+        floatingReactions.append(item)
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            floatingReactions.removeAll { $0.id == item.id }
+        }
+    }
+
+    private func chatBubble(senderId: String? = nil, name: String, text: String, colorHex: String) -> some View {
         HStack(alignment: .top, spacing: 6) {
             Text(name + ":")
                 .font(.caption2.bold())
@@ -462,14 +1138,166 @@ struct LiveStreamView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
         .background(Capsule().fill(Color.black.opacity(0.55)))
+        .contextMenu {
+            Button(role: .destructive) {
+                let hasPeerSender = (senderId?.isEmpty == false) && senderId != appState.currentUser?.id
+                appState.activeReportContext = UGCReportContext(
+                    targetType: hasPeerSender ? "user" : "app",
+                    targetId: hasPeerSender ? (senderId ?? "") : (appState.currentUser?.id ?? "live_comment"),
+                    targetUserId: hasPeerSender ? senderId : nil,
+                    targetTitle: "Bình luận Live của \(name): \"\(String(text.prefix(40)))\""
+                )
+            } label: {
+                Label("Báo cáo bình luận", systemImage: "flag")
+            }
+
+            if let uid = senderId, !uid.isEmpty, uid != appState.currentUser?.id {
+                Button(role: .destructive) {
+                    pendingBlockChatUser = KinnectUser(id: uid, name: name)
+                } label: {
+                    Label("Chặn \(name)", systemImage: "hand.raised.fill")
+                }
+            }
+        }
+    }
+
+    private func blockLiveHostAndExit(_ room: LiveRoomItem) async {
+        appState.leaveCurrentLiveRoom()
+        await appState.blockUser(userId: room.hostUserId, userName: room.hostName)
+        appState.liveRooms.removeAll { $0.hostUserId == room.hostUserId }
+        if !appState.liveRooms.isEmpty {
+            selectedIndex = min(selectedIndex, appState.liveRooms.count - 1)
+            let nextRoom = appState.liveRooms[selectedIndex]
+            scrolledRoomId = nextRoom.id
+            appState.joinLiveRoom(nextRoom)
+            likesCount = nextRoom.likesCount
+        } else {
+            scrolledRoomId = nil
+        }
     }
 
     private func fetchLiveRooms() async {
         isLoading = true
         defer { isLoading = false }
-        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/live/rooms") {
+        do {
+            let res = try await KinnectAPIClient.shared.requestJSON("/api/live/rooms")
             let list = res["rooms"] as? [[String: Any]] ?? []
-            appState.liveRooms = list.map(LiveRoomItem.from)
+            appState.liveRooms = list.map(LiveRoomItem.from).filter {
+                $0.hostUserId.isEmpty || !appState.blockedUserIds.contains($0.hostUserId)
+            }
+            loadError = nil
+        } catch {
+            if appState.liveRooms.isEmpty {
+                loadError = error.localizedDescription
+            }
+        }
+    }
+    static func burstDurationNanoseconds(for tier: String, reduceEffects: Bool) -> UInt64 {
+        if reduceEffects { return 1_400_000_000 }
+        switch tier.lowercased() {
+        case "legendary": return 4_500_000_000
+        case "large": return 3_500_000_000
+        case "medium": return 2_600_000_000
+        default: return 2_000_000_000
+        }
+    }
+}
+
+// MARK: - Setup Camera Preview Controller (Releases cleanly before WebRTC takes camera)
+private final class LiveSetupCameraController: ObservableObject {
+    let session = AVCaptureSession()
+    private let sessionQueue = DispatchQueue(label: "kinnect.live.setup.camera")
+    private var configured = false
+    private var currentFront = true
+
+    func start(front: Bool) {
+        currentFront = front
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            if !self.configured {
+                self.configureSessionLocked(front: self.currentFront)
+            }
+            if self.configured && !self.session.isRunning {
+                self.session.startRunning()
+            }
+        }
+    }
+
+    func setCamera(front: Bool) {
+        currentFront = front
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            if !self.configured {
+                self.configureSessionLocked(front: front)
+                if self.configured && !self.session.isRunning {
+                    self.session.startRunning()
+                }
+                return
+            }
+            self.session.beginConfiguration()
+            for input in self.session.inputs {
+                self.session.removeInput(input)
+            }
+            if let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: front ? .front : .back),
+               let input = try? AVCaptureDeviceInput(device: device),
+               self.session.canAddInput(input) {
+                self.session.addInput(input)
+            }
+            self.session.commitConfiguration()
+        }
+    }
+
+    func stopAndRelease() {
+        sessionQueue.sync {
+            if self.session.isRunning {
+                self.session.stopRunning()
+            }
+            self.session.beginConfiguration()
+            for input in self.session.inputs {
+                self.session.removeInput(input)
+            }
+            self.session.commitConfiguration()
+            self.configured = false
+        }
+    }
+
+    private func configureSessionLocked(front: Bool) {
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        guard status == .authorized else { return }
+        session.beginConfiguration()
+        session.sessionPreset = .high
+        for input in session.inputs {
+            session.removeInput(input)
+        }
+        if let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: front ? .front : .back),
+           let input = try? AVCaptureDeviceInput(device: device),
+           session.canAddInput(input) {
+            session.addInput(input)
+            configured = true
+        }
+        session.commitConfiguration()
+    }
+}
+
+private struct LiveSetupCameraPreviewLayer: UIViewRepresentable {
+    let session: AVCaptureSession
+
+    final class PreviewHostView: UIView {
+        override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
+        var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
+    }
+
+    func makeUIView(context: Context) -> PreviewHostView {
+        let v = PreviewHostView()
+        v.backgroundColor = .black
+        v.previewLayer.session = session
+        v.previewLayer.videoGravity = .resizeAspectFill
+        return v
+    }
+
+    func updateUIView(_ uiView: PreviewHostView, context: Context) {
+        if uiView.previewLayer.session !== session {
+            uiView.previewLayer.session = session
         }
     }
 }
@@ -485,14 +1313,15 @@ struct CreateLiveRoomSheet: View {
 
     init(initialMode: String = "chat", onStarted: (() -> Void)? = nil) {
         self.onStarted = onStarted
-        _liveMode = State(initialValue: initialMode)
+        // Screen-broadcast game mode is unavailable on iOS; always normalize to camera chat mode.
+        _liveMode = State(initialValue: "chat")
     }
-    @State private var gameTitle = "Liên Quân Mobile"
-    @State private var customGameName = ""
-    @State private var gameSound = true
     @State private var gameComments = true
     @State private var isStarting = false
     @State private var showPreviewEffects = false
+    @State private var previewFrontCamera = true
+    @State private var previewCameraAuthorized = false
+    @StateObject private var setupCamera = LiveSetupCameraController()
     @State private var previewSticker = "none"
     @State private var previewFilter = "none"
     @State private var previewBeautyOn = true
@@ -504,30 +1333,33 @@ struct CreateLiveRoomSheet: View {
     @State private var previewBlemish = 0.4
     @State private var previewBlush = 0.0
     @State private var previewMicEnabled = true
-
-    private let popularGames = [
-        "Liên Quân Mobile",
-        "Free Fire",
-        "PUBG Mobile",
-        "Genshin Impact",
-        "Roblox",
-        "Minecraft",
-        "Tốc Chiến",
-        "Khác…"
+    private let availableLiveModes: [(mode: String, title: String, systemImage: String)] = [
+        ("chat", "Trò chuyện", "video.fill")
     ]
 
     var body: some View {
         NavigationStack {
             Form {
-                liveModeSection
-                if liveMode == "game" {
-                    gameConfigSection
+                cameraPreviewSection
+                if availableLiveModes.count > 1 {
+                    liveModeSection
                 }
                 roomInfoSection
                 deviceSection
             }
             .scrollContentBackground(.hidden)
             .background(KinnectTheme.background)
+            .task {
+                let camOk = await MediaPermissionHandler.shared.requestCameraAccess()
+                previewCameraAuthorized = camOk
+                previewFrontCamera = NativeWebRTCManager.shared.usingFrontCamera
+                if camOk && !isStarting {
+                    setupCamera.start(front: previewFrontCamera)
+                }
+            }
+            .onDisappear {
+                setupCamera.stopAndRelease()
+            }
             .safeAreaInset(edge: .bottom) {
                 Button {
                     Task { await startHostLive() }
@@ -536,10 +1368,10 @@ struct CreateLiveRoomSheet: View {
                         if isStarting {
                             ProgressView().tint(.white)
                         } else {
-                            Image(systemName: liveMode == "game" ? "gamecontroller.fill" : "dot.radiowaves.left.and.right")
+                            Image(systemName: "dot.radiowaves.left.and.right")
                                 .font(.headline)
                         }
-                        Text(isStarting ? "Đang khởi tạo phòng Live…" : (liveMode == "game" ? "Bắt đầu Live Chơi game" : "Bắt đầu phát Live"))
+                        Text(isStarting ? L10n.tr("Đang khởi tạo phòng Live…") : L10n.tr("Bắt đầu phát Live"))
                             .font(.headline.weight(.bold))
                     }
                     .foregroundColor(.white)
@@ -547,8 +1379,8 @@ struct CreateLiveRoomSheet: View {
                     .padding(.vertical, 15)
                     .background(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(KinnectTheme.primaryGradient)
-                            .shadow(color: KinnectTheme.accent.opacity(0.35), radius: 12, y: 4)
+                            .fill(Color(hex: "#EE2B2B"))
+                            .shadow(color: Color(hex: "#EE2B2B").opacity(0.35), radius: 12, y: 4)
                     )
                 }
                 .buttonStyle(.plain)
@@ -557,17 +1389,11 @@ struct CreateLiveRoomSheet: View {
                 .padding(.vertical, 12)
                 .background(KinnectTheme.background.opacity(0.95))
             }
-            .navigationTitle("Bắt đầu phát Live")
+            .navigationTitle(L10n.tr("Bắt đầu phát Live"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Hủy") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Bắt đầu Live") {
-                        Task { await startHostLive() }
-                    }
-                    .disabled(isStarting)
+                    Button(L10n.tr("Hủy")) { dismiss() }
                 }
             }
             .sheet(isPresented: $showPreviewEffects) {
@@ -587,6 +1413,56 @@ struct CreateLiveRoomSheet: View {
         }
     }
 
+    private var cameraPreviewSection: some View {
+        Section("Xem trước camera") {
+            ZStack(alignment: .bottomLeading) {
+                if previewCameraAuthorized {
+                    LiveSetupCameraPreviewLayer(session: setupCamera.session)
+                        .frame(height: 220)
+                        .overlay(
+                            LiveFilterColorOverlay(filterId: previewFilter)
+                                .allowsHitTesting(false)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                } else {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(KinnectTheme.surfaceElevated)
+                            .frame(height: 220)
+                        VStack(spacing: 8) {
+                            Image(systemName: "video.slash.fill")
+                                .font(.title2)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                            Text("Cấp quyền camera để xem trước trực tiếp")
+                                .font(.caption)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        }
+                    }
+                }
+
+                HStack(spacing: 6) {
+                    Text(previewFrontCamera ? "Camera trước" : "Camera sau")
+                        .font(.caption2.bold())
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(Color.black.opacity(0.55)))
+                    if previewFilter != "none" {
+                        Text("Bộ lọc: \(previewFilter)")
+                            .font(.caption2.bold())
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Capsule().fill(KinnectTheme.accentBright.opacity(0.85)))
+                    }
+                }
+                .padding(10)
+            }
+            .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+            .listRowBackground(Color.clear)
+        }
+    }
+
     private var liveModeSection: some View {
         Section("Chế độ phát trực tiếp") {
             HStack(spacing: 6) {
@@ -594,11 +1470,6 @@ struct CreateLiveRoomSheet: View {
                     mode: "chat",
                     title: "Trò chuyện",
                     systemImage: "video.fill"
-                )
-                liveModeOptionButton(
-                    mode: "game",
-                    title: "Chơi game",
-                    systemImage: "gamecontroller.fill"
                 )
             }
             .padding(4)
@@ -637,31 +1508,26 @@ struct CreateLiveRoomSheet: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
-    private var gameConfigSection: some View {
-        Section("Cài đặt Chơi game trực tiếp") {
-            Picker("Chọn game", selection: $gameTitle) {
-                ForEach(popularGames, id: \.self) { game in
-                    Text(game).tag(game)
-                }
-            }
-
-            if gameTitle == "Khác…" {
-                TextField("Nhập tên game của bạn", text: $customGameName)
-            }
-
-            Toggle("Âm thanh game", isOn: $gameSound)
-            Toggle("Bình luận nổi trên màn hình", isOn: $gameComments)
-
-            Text("Chế độ Chơi game hiển thị huy hiệu Game trên luồng Live và đồng bộ bảng xếp hạng quà tặng 3D tương tác cùng Android.")
-                .font(.caption2)
-                .foregroundColor(KinnectTheme.textSecondary)
-        }
-    }
-
     private var roomInfoSection: some View {
-        Section("Thông tin phòng Live") {
-            TextField("Tiêu đề buổi Live", text: $title)
-            TextField("Chủ đề", text: $topic)
+        Section(L10n.tr("Thông tin phòng Live")) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L10n.tr("Tiêu đề"))
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(KinnectTheme.textSecondary)
+                TextField(L10n.tr("Tiêu đề buổi Live"), text: $title)
+            }
+            .padding(.vertical, 2)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L10n.tr("Chủ đề"))
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(KinnectTheme.textSecondary)
+                TextField(L10n.tr("Nhập chủ đề buổi Live"), text: $topic)
+            }
+            .padding(.vertical, 2)
+
+            Toggle(L10n.tr("Cho phép khán giả bình luận"), isOn: $gameComments)
+                .tint(KinnectTheme.accentBright)
         }
     }
 
@@ -669,7 +1535,9 @@ struct CreateLiveRoomSheet: View {
         Section("Thiết bị & Hiệu ứng") {
             HStack(spacing: 12) {
                 Button {
-                    NativeWebRTCManager.shared.flipCamera()
+                    previewFrontCamera.toggle()
+                    NativeWebRTCManager.shared.usingFrontCamera = previewFrontCamera
+                    setupCamera.setCamera(front: previewFrontCamera)
                 } label: {
                     VStack(spacing: 4) {
                         Image(systemName: "camera.rotate.fill")
@@ -724,26 +1592,31 @@ struct CreateLiveRoomSheet: View {
     private func startHostLive() async {
         isStarting = true
         defer { isStarting = false }
+        setupCamera.stopAndRelease()
+        if appState.currentLiveRoom != nil {
+            appState.leaveCurrentLiveRoom()
+        }
+        appState.isCreatingLiveRoom = true
         let manager = NativeWebRTCManager.shared
+        manager.usingFrontCamera = previewFrontCamera
         manager.updateLiveEffects(LiveVideoSettings(
             filter: previewFilter, sticker: previewSticker, beauty: previewBeautyOn,
             smooth: previewSmooth, whiten: previewWhiten, slim: previewSlim, eyes: previewEyes,
             lips: previewLips, blemish: previewBlemish, blush: previewBlush))
         guard await manager.startLiveHostBroadcast() else {
+            appState.isCreatingLiveRoom = false
+            setupCamera.start(front: previewFrontCamera)
             appState.showToast("Cần quyền camera và micro để bắt đầu Live.")
             return
         }
         manager.setMicrophoneMuted(!previewMicEnabled)
 
-        let selectedGame = (gameTitle == "Khác…" && !customGameName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            ? customGameName.trimmingCharacters(in: .whitespacesAndNewlines)
-            : (gameTitle == "Khác…" ? "Trò chơi" : gameTitle)
-
         let roomTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? (liveMode == "game" ? "Live Game: \(selectedGame)" : "Phòng Live của \(appState.currentUser?.name ?? "Kinnect")")
+            ? "Phòng Live của \(appState.currentUser?.name ?? "Kinnect")"
             : title.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard await NativeSocketClient.shared.ensureConnected() else {
+            appState.isCreatingLiveRoom = false
             manager.stopLiveSession()
             appState.showToast("Chưa kết nối được máy chủ Live. Vui lòng thử lại.")
             return
@@ -753,9 +1626,9 @@ struct CreateLiveRoomSheet: View {
             "type": "create",
             "title": roomTitle,
             "topic": topic,
-            "liveMode": liveMode,
-            "gameTitle": liveMode == "game" ? selectedGame : "",
-            "multiGuest": false,
+            "liveMode": "chat",
+            "gameTitle": "",
+            "multiGuest": true,
             "liveModes": true,
             "comments": gameComments
         ])
@@ -767,12 +1640,19 @@ struct CreateLiveRoomSheet: View {
 struct LiveRoomFullScreenView: View {
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var webrtc = NativeWebRTCManager.shared
+    @ObservedObject private var l10n = LocalizationManager.shared
+    @AppStorage("kinnect_live_gift_reduce_fx") private var reduceGiftEffects = false
+    @AppStorage("kinnect_live_gift_sound") private var giftSoundEnabled = true
 
     @State private var chatInput = ""
     @State private var giftCatalog: [LiveGiftCatalogItem] = LiveGiftCatalogItem.defaultCatalog
     @State private var giftPriceVersion: Int = 1
     @State private var showGiftSheet = false
     @State private var showEffectsSheet = false
+    @State private var showEndLiveConfirm = false
+    @State private var showViewersSheet = false
+    @State private var showCoHostSheet = false
+    @State private var showGiftLeaderboardSheet = false
     @State private var activeLiveSticker: String = "none"
     @State private var activeLiveFilter: String = "none"
     @State private var beautyEnabled: Bool = true
@@ -784,8 +1664,15 @@ struct LiveRoomFullScreenView: View {
     @State private var beautyBlemish: Double = 0.4
     @State private var beautyBlush: Double = 0.0
     @State private var hostMicMuted: Bool = false
+    @State private var isPlaybackMuted: Bool = false
+    @State private var isHostFollowed: Bool = false
+    @State private var isFollowLoading: Bool = false
+    @State private var liveLayout: String = "panel"
+    @State private var lastSentGift: LiveGiftCatalogItem? = nil
+    @State private var lastSentGiftQuantity: Int = 1
     @State private var activeGiftEffect: ActiveGiftEffect? = nil
     @State private var floatingReactions: [LiveFloatingReaction] = []
+    @StateObject private var giftComboTracker = LiveGiftComboTracker()
 
     var body: some View {
         if let room = appState.currentLiveRoom {
@@ -793,9 +1680,21 @@ struct LiveRoomFullScreenView: View {
                 KinnectTheme.background.ignoresSafeArea()
 
                 // Video Canvas
-                if appState.isCurrentLiveHost, let localTrack = webrtc.liveLocalVideoTrack {
+                if appState.isCurrentLiveHost, let localTrack = webrtc.liveLocalVideoTrack, !webrtc.isCameraOff {
                     WebRTCVideoRendererView(track: localTrack, mirror: webrtc.usingFrontCamera)
                         .ignoresSafeArea()
+                } else if appState.isCurrentLiveHost && webrtc.isCameraOff {
+                    VStack(spacing: 12) {
+                        KinnectAvatarView(
+                            name: room.hostName,
+                            avatarURL: room.hostAvatarUrl,
+                            colorHex: room.hostAvatarColor,
+                            size: 92
+                        )
+                        Text("Camera đang tắt")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
                 } else if let remoteTrack = webrtc.liveRemoteVideoTrack {
                     WebRTCVideoRendererView(track: remoteTrack, mirror: false)
                         .ignoresSafeArea()
@@ -814,11 +1713,25 @@ struct LiveRoomFullScreenView: View {
                     }
                 }
 
+                // Subtle top & bottom gradient scrim so Host controls remain legible over bright video
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(0.55),
+                        Color.clear,
+                        Color.clear,
+                        Color.black.opacity(0.75)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+
                 // Filters are baked into RTCVideoSource, not painted over the viewer UI.
 
                 VStack {
                     // Top bar
-                    HStack(spacing: 10) {
+                    HStack(spacing: 8) {
                         KinnectAvatarView(
                             name: room.hostName,
                             avatarURL: room.hostAvatarUrl,
@@ -834,13 +1747,54 @@ struct LiveRoomFullScreenView: View {
                                 Text(room.liveMode == "game" ? "🎮 \(room.gameTitle)" : "💬 Trò chuyện")
                                     .font(.caption2)
                                     .foregroundColor(KinnectTheme.accentBright)
-                                Text("• 👁 \(room.viewerCount)")
-                                    .font(.caption2)
-                                    .foregroundColor(.white)
+                                Button {
+                                    showViewersSheet = true
+                                } label: {
+                                    Text("• 👁 \(room.viewerCount)")
+                                        .font(.caption2)
+                                        .foregroundColor(.white)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(L10n.tr("Xem danh sách người xem"))
                             }
                         }
 
-                        Spacer()
+                        if !appState.isCurrentLiveHost && !room.hostUserId.isEmpty && room.hostUserId != appState.currentUser?.id {
+                            Button {
+                                Task { await toggleFollowRoomHost(room.hostUserId) }
+                            } label: {
+                                Text(isHostFollowed ? "Đang theo dõi" : "Theo dõi")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Capsule().fill(isHostFollowed ? Color.white.opacity(0.22) : KinnectTheme.accentBright))
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(isFollowLoading)
+                        }
+
+                        Spacer(minLength: 4)
+
+                        Button {
+                            showGiftLeaderboardSheet = true
+                        } label: {
+                            HStack(spacing: 3) {
+                                Image(systemName: "trophy.fill")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(KinnectTheme.warning)
+                                if !appState.liveGiftRanking.isEmpty {
+                                    Text("\(appState.liveGiftRanking.count)")
+                                        .font(.caption2.bold())
+                                        .foregroundColor(.white)
+                                }
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(Color.black.opacity(0.45)))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(L10n.tr("Bảng xếp hạng quà"))
 
                         if appState.isCurrentLiveHost && room.liveMode == "game" {
                             Button {
@@ -877,7 +1831,11 @@ struct LiveRoomFullScreenView: View {
                         }
 
                         Button {
-                            leaveLiveRoom()
+                            if appState.isCurrentLiveHost {
+                                showEndLiveConfirm = true
+                            } else {
+                                leaveLiveRoom()
+                            }
                         } label: {
                             Image(systemName: "xmark")
                                 .font(.headline)
@@ -885,6 +1843,7 @@ struct LiveRoomFullScreenView: View {
                                 .padding(10)
                                 .background(Circle().fill(KinnectTheme.danger))
                         }
+                        .accessibilityLabel(appState.isCurrentLiveHost ? "Kết thúc Live" : "Rời phòng Live")
                     }
                     .padding(.horizontal, 14)
                     .padding(.top, 12)
@@ -901,102 +1860,262 @@ struct LiveRoomFullScreenView: View {
 
                     Spacer()
 
-                    // Chat list
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 6) {
-                            ForEach(appState.liveChatMessages.suffix(30)) { msg in
-                                HStack(alignment: .top, spacing: 6) {
-                                    Text("\(msg.user.name):")
-                                        .font(.caption.bold())
-                                        .foregroundColor(KinnectTheme.accentBright)
-                                    Text(msg.text)
-                                        .font(.caption)
+                    HStack {
+                        Spacer()
+                        LiveCoHostPiPStackView(isHostCanvas: appState.isCurrentLiveHost, layout: liveLayout)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 6)
+
+                    if !appState.isCurrentLiveHost, let comboGift = lastSentGift {
+                        HStack {
+                            Spacer()
+                            Button {
+                                sendQuickComboGift(comboGift, quantity: lastSentGiftQuantity, room: room)
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Text(comboGift.emoji)
+                                        .font(.system(size: 16))
+                                    Text(appState.liveGiftCombo > 0 ? "Combo x\(appState.liveGiftCombo)" : "Combo")
+                                        .font(.caption.weight(.black))
                                         .foregroundColor(.white)
-                                        .kinnectMultiline()
                                 }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .fill(Color.black.opacity(0.5))
-                                )
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(Capsule().fill(KinnectTheme.danger))
+                                .shadow(color: KinnectTheme.danger.opacity(0.45), radius: 6)
                             }
+                            .buttonStyle(.plain)
                         }
                         .padding(.horizontal, 14)
+                        .padding(.bottom, 4)
                     }
-                    .frame(maxHeight: 190)
 
-                    // Bottom controls
+                    // Chat list + Floating Right Tool Rail (prevents horizontal crowding in bottom bar)
+                    HStack(alignment: .bottom, spacing: 10) {
+                        ScrollView {
+                            LazyVStack(alignment: .leading, spacing: 6) {
+                                ForEach(appState.liveChatMessages.filter { !appState.blockedUserIds.contains($0.user.id) }.suffix(30)) { msg in
+                                    HStack(alignment: .top, spacing: 6) {
+                                        Text("\(msg.user.name):")
+                                            .font(.caption.bold())
+                                            .foregroundColor(KinnectTheme.accentBright)
+                                        Text(msg.text)
+                                            .font(.caption)
+                                            .foregroundColor(.white)
+                                            .kinnectMultiline()
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .fill(Color.black.opacity(0.5))
+                                    )
+                                    .contextMenu {
+                                        Button(role: .destructive) {
+                                            let hasPeerSender = !msg.user.id.isEmpty && msg.user.id != appState.currentUser?.id
+                                            appState.activeReportContext = UGCReportContext(
+                                                targetType: hasPeerSender ? "user" : "app",
+                                                targetId: hasPeerSender ? msg.user.id : (appState.currentUser?.id ?? "live_comment"),
+                                                targetUserId: hasPeerSender ? msg.user.id : nil,
+                                                targetTitle: "Bình luận Live của \(msg.user.name): \"\(String(msg.text.prefix(40)))\""
+                                            )
+                                        } label: {
+                                            Label("Báo cáo bình luận", systemImage: "flag")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: 190, alignment: .leading)
+
+                        // Vertical Right Tool Rail (1-tap access to Camera, Mic, Layout, Effects / Viewer Audio & Co-Host)
+                        VStack(spacing: 10) {
+                            if appState.isCurrentLiveHost {
+                                liveRailButton(
+                                    icon: "camera.rotate.fill",
+                                    label: L10n.tr("Lật"),
+                                    tint: .white,
+                                    accessibility: L10n.tr("Lật camera")
+                                ) {
+                                    NativeWebRTCManager.shared.flipCamera()
+                                }
+
+                                liveRailButton(
+                                    icon: webrtc.isCameraOff ? "video.slash.fill" : "video.fill",
+                                    label: L10n.tr("Camera"),
+                                    tint: webrtc.isCameraOff ? KinnectTheme.danger : .white,
+                                    accessibility: L10n.tr(webrtc.isCameraOff ? "Bật camera" : "Tắt camera")
+                                ) {
+                                    NativeWebRTCManager.shared.toggleCamera()
+                                }
+
+                                liveRailButton(
+                                    icon: hostMicMuted ? "mic.slash.fill" : "mic.fill",
+                                    label: L10n.tr("Mic"),
+                                    tint: hostMicMuted ? KinnectTheme.danger : .white,
+                                    accessibility: L10n.tr(hostMicMuted ? "Bật micro" : "Tắt micro")
+                                ) {
+                                    hostMicMuted.toggle()
+                                    NativeWebRTCManager.shared.setMicrophoneMuted(hostMicMuted)
+                                }
+
+                                liveRailButton(
+                                    icon: liveLayout == "grid" ? "rectangle.grid.2x2.fill" : "rectangle.inset.bottomright.fill",
+                                    label: L10n.tr(liveLayout == "grid" ? "Lưới" : "Bố cục"),
+                                    tint: .white,
+                                    accessibility: L10n.tr("Đổi bố cục khung hình")
+                                ) {
+                                    let nextLayout = (liveLayout == "grid") ? "panel" : "grid"
+                                    liveLayout = nextLayout
+                                    NativeSocketClient.shared.sendJSON(["type": "live-layout", "layout": nextLayout])
+                                }
+
+                                liveRailButton(
+                                    icon: "sparkles",
+                                    label: L10n.tr("Hiệu ứng"),
+                                    tint: .white,
+                                    accessibility: L10n.tr("Hiệu ứng Live")
+                                ) {
+                                    showEffectsSheet = true
+                                }
+                            } else {
+                                liveRailButton(
+                                    icon: isPlaybackMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                                    label: L10n.tr("Âm thanh"),
+                                    tint: isPlaybackMuted ? KinnectTheme.danger : .white,
+                                    accessibility: L10n.tr(isPlaybackMuted ? "Bật âm thanh" : "Tắt tiếng")
+                                ) {
+                                    isPlaybackMuted.toggle()
+                                    RTCAudioSession.sharedInstance().isAudioEnabled = !isPlaybackMuted
+                                }
+
+                                if !appState.isCurrentLivePublisher {
+                                    liveRailButton(
+                                        icon: appState.hasPendingLiveGuestRequest ? "person.crop.circle.badge.clock" : "person.badge.plus",
+                                        label: L10n.tr(appState.hasPendingLiveGuestRequest ? "Đang chờ" : "Lên sóng"),
+                                        tint: appState.hasPendingLiveGuestRequest ? KinnectTheme.warning : .white,
+                                        accessibility: L10n.tr(appState.hasPendingLiveGuestRequest ? "Hủy yêu cầu lên sóng" : "Xin lên sóng")
+                                    ) {
+                                        if appState.hasPendingLiveGuestRequest {
+                                            NativeSocketClient.shared.sendJSON(["type": "live-guest-cancel"])
+                                        } else {
+                                            NativeSocketClient.shared.sendJSON(["type": "live-guest-request", "mode": "video"])
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 12)
+
+                    // Compact Bottom Chat Bar (TextField + at most 3 compact circular buttons so input always stays wide)
+                    let commentsDisabledForViewer = !room.comments && !appState.isCurrentLiveHost
                     HStack(spacing: 8) {
-                        TextField("Trò chuyện...", text: $chatInput)
-                            .padding(10)
-                            .background(Capsule().fill(Color.black.opacity(0.55)))
+                        TextField(
+                            "",
+                            text: $chatInput,
+                            prompt: Text(L10n.tr(commentsDisabledForViewer ? "Chủ phòng đã tắt bình luận" : "Bình luận phòng Live..."))
+                                .foregroundColor(.white.opacity(0.75))
+                        )
+                            .font(.subheadline)
                             .foregroundColor(.white)
+                            .tint(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .frame(minWidth: 0, maxWidth: .infinity)
+                            .background(
+                                Capsule()
+                                    .fill(Color.white.opacity(commentsDisabledForViewer ? 0.08 : 0.14))
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(Color.white.opacity(0.22), lineWidth: 1)
+                                    )
+                            )
+                            .disabled(commentsDisabledForViewer)
 
                         Button {
                             sendLiveChat()
                         } label: {
-                            Image(systemName: "paperplane.fill")
-                                .foregroundColor(.white)
-                                .padding(10)
-                                .background(Circle().fill(KinnectTheme.accent))
+                            ZStack {
+                                Circle()
+                                    .fill(commentsDisabledForViewer ? KinnectTheme.surfaceElevated : KinnectTheme.accent)
+                                    .frame(width: 38, height: 38)
+                                Image(systemName: "paperplane.fill")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundColor(.white)
+                            }
+                            .frame(minWidth: 40, minHeight: 44)
+                            .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
+                        .disabled(commentsDisabledForViewer)
+                        .accessibilityLabel(L10n.tr("Gửi bình luận"))
 
                         if appState.isCurrentLiveHost {
                             Button {
-                                NativeWebRTCManager.shared.flipCamera()
+                                showCoHostSheet = true
                             } label: {
-                                Image(systemName: "camera.rotate.fill")
-                                    .foregroundColor(.white)
-                                    .padding(10)
-                                    .background(Circle().fill(Color.black.opacity(0.55)))
+                                ZStack(alignment: .topTrailing) {
+                                    Circle()
+                                        .fill(Color.black.opacity(0.55))
+                                        .frame(width: 38, height: 38)
+                                        .overlay(
+                                            Image(systemName: "person.2.fill")
+                                                .font(.system(size: 15, weight: .semibold))
+                                                .foregroundColor(.white)
+                                        )
+                                    if !appState.liveGuestRequests.isEmpty {
+                                        Text("\(appState.liveGuestRequests.count)")
+                                            .font(.system(size: 9, weight: .bold))
+                                            .foregroundColor(.white)
+                                            .padding(4)
+                                            .background(Circle().fill(KinnectTheme.danger))
+                                            .offset(x: 4, y: -4)
+                                    }
+                                }
+                                .frame(minWidth: 40, minHeight: 44)
+                                .contentShape(Rectangle())
                             }
-                            .accessibilityLabel("Lật camera")
-
-                            Button {
-                                hostMicMuted.toggle()
-                                NativeWebRTCManager.shared.setMicrophoneMuted(hostMicMuted)
-                            } label: {
-                                Image(systemName: hostMicMuted ? "mic.slash.fill" : "mic.fill")
-                                    .foregroundColor(hostMicMuted ? KinnectTheme.danger : .white)
-                                    .padding(10)
-                                    .background(Circle().fill(Color.black.opacity(0.55)))
-                            }
-                            .accessibilityLabel(hostMicMuted ? "Bật micro" : "Tắt micro")
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(L10n.tr("Quản lý khách mời lên sóng"))
                         }
-
-                        // Hiệu ứng Live (Làm đẹp, Sticker AR, Bộ lọc màu)
-                        Button {
-                            showEffectsSheet = true
-                        } label: {
-                            Image(systemName: "sparkles")
-                                .foregroundColor(.white)
-                                .padding(10)
-                                .background(Circle().fill(Color.black.opacity(0.55)))
-                        }
-                        .accessibilityLabel("Hiệu ứng Live")
-                        .disabled(!appState.isCurrentLiveHost)
 
                         Button {
                             triggerLiveReaction(symbol: "💜", kind: "heart", room: room.id)
                         } label: {
-                            Text("💜")
-                                .font(.title3)
-                                .padding(8)
-                                .background(Circle().fill(Color.black.opacity(0.55)))
+                            ZStack {
+                                Circle()
+                                    .fill(Color.black.opacity(0.55))
+                                    .frame(width: 38, height: 38)
+                                Text("💜")
+                                    .font(.system(size: 17))
+                            }
+                            .frame(minWidth: 40, minHeight: 44)
+                            .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
 
-                        Button {
-                            showGiftSheet = true
-                        } label: {
-                            Image(systemName: "gift.fill")
-                                .foregroundColor(KinnectTheme.warning)
-                                .padding(10)
-                                .background(Circle().fill(Color.black.opacity(0.55)))
+                        if !appState.isCurrentLiveHost {
+                            Button {
+                                showGiftSheet = true
+                            } label: {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.black.opacity(0.55))
+                                        .frame(width: 38, height: 38)
+                                    Image(systemName: "gift.fill")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundColor(KinnectTheme.warning)
+                                }
+                                .frame(minWidth: 40, minHeight: 44)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 20)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 16)
                 }
 
                 // Face stickers travel in the encoded video stream.
@@ -1015,7 +2134,16 @@ struct LiveRoomFullScreenView: View {
                 }
             }
             .task {
+                SocketEventBridge.installIfNeeded()
                 await loadGiftCatalog()
+            }
+            .alert("Kết thúc Live?", isPresented: $showEndLiveConfirm) {
+                Button("Tiếp tục phát", role: .cancel) {}
+                Button("Kết thúc Live", role: .destructive) {
+                    leaveLiveRoom()
+                }
+            } message: {
+                Text("Buổi phát trực tiếp sẽ dừng ngay với tất cả người xem.")
             }
             .sheet(isPresented: $showGiftSheet) {
                 LiveGiftDrawerSheet(
@@ -1023,11 +2151,42 @@ struct LiveRoomFullScreenView: View {
                     gifts: giftCatalog,
                     priceVersion: giftPriceVersion,
                     onGiftSent: { gift, qty in
-                        triggerGiftEffect(gift: gift, qty: qty, senderName: appState.currentUser?.name ?? "Bạn")
-                    }
+                        lastSentGift = gift
+                        lastSentGiftQuantity = qty
+                    },
+                    onCatalogUpdated: { items, version in
+                        giftCatalog = items
+                        giftPriceVersion = version
+                    },
+                    comboTracker: giftComboTracker
                 )
             }
+            .sheet(isPresented: $showViewersSheet) {
+                LiveViewersSheet(roomId: room.id, viewerCount: room.viewerCount, isHost: appState.isCurrentLiveHost)
+            }
+            .sheet(isPresented: $showCoHostSheet) {
+                LiveCoHostManagerSheet(roomId: room.id)
+            }
+            .sheet(isPresented: $showGiftLeaderboardSheet) {
+                LiveGiftLeaderboardSheet(roomId: room.id, isHost: appState.isCurrentLiveHost)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .kinnectLiveReactionReceived)) { notif in
+                guard let data = notif.userInfo as? [String: Any] else { return }
+                handleIncomingFullScreenReaction(data)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: SocketEventBridge.rawEventNotification)) { notif in
+                guard let json = notif.userInfo as? [String: Any],
+                      let type = json["type"] as? String else { return }
+                let expectedRoom = appState.currentLiveRoom?.id ?? room.id
+                if let evtRoom = json["room"] as? String, !evtRoom.isEmpty, evtRoom != expectedRoom {
+                    return
+                }
+                if type == "live-stage", let layout = json["layout"] as? String {
+                    liveLayout = (layout == "grid") ? "grid" : "panel"
+                }
+            }
             .onAppear {
+                hostMicMuted = webrtc.isMicMuted
                 let value = webrtc.liveEffects
                 activeLiveFilter = value.filter
                 activeLiveSticker = value.sticker
@@ -1060,6 +2219,36 @@ struct LiveRoomFullScreenView: View {
         }
     }
 
+    private func liveRailButton(
+        icon: String,
+        label: String,
+        tint: Color,
+        accessibility: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 3) {
+                ZStack {
+                    Circle()
+                        .fill(Color.black.opacity(0.55))
+                        .frame(width: 40, height: 40)
+                    Image(systemName: icon)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(tint)
+                }
+                Text(label)
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .shadow(color: .black.opacity(0.75), radius: 2, y: 1)
+            }
+            .frame(minWidth: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibility)
+    }
+
     private var liveVideoSettings: LiveVideoSettings {
         LiveVideoSettings(filter: activeLiveFilter, sticker: activeLiveSticker, beauty: beautyEnabled,
                           smooth: beautySmooth, whiten: beautyWhiten, slim: beautySlim, eyes: beautyEyes,
@@ -1082,19 +2271,36 @@ struct LiveRoomFullScreenView: View {
         ])
     }
 
-    private func triggerGiftEffect(gift: LiveGiftCatalogItem, qty: Int, senderName: String) {
+    private func triggerGiftEffect(
+        giftId: String,
+        giftName: String,
+        giftEmoji: String,
+        qty: Int,
+        comboCount: Int,
+        senderName: String,
+        recipientName: String = "",
+        tier: String = "standard"
+    ) {
+        if giftSoundEnabled {
+            AudioServicesPlaySystemSound(1104)
+        }
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
         let effect = ActiveGiftEffect(
-            giftId: gift.id,
-            giftName: gift.label,
-            giftEmoji: gift.emoji,
+            giftId: giftId,
+            giftName: giftName,
+            giftEmoji: emojiOrDefault(giftEmoji, id: giftId),
             senderName: senderName,
-            quantity: qty
+            recipientName: recipientName,
+            quantity: qty,
+            comboCount: comboCount,
+            tier: tier
         )
         withAnimation(.spring(response: 0.35, dampingFraction: 0.65)) {
             activeGiftEffect = effect
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+        let burstNanos = LiveStreamView.burstDurationNanoseconds(for: tier, reduceEffects: reduceGiftEffects)
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: burstNanos)
             if activeGiftEffect?.id == effect.id {
                 withAnimation(.easeOut(duration: 0.3)) {
                     activeGiftEffect = nil
@@ -1103,7 +2309,97 @@ struct LiveRoomFullScreenView: View {
         }
     }
 
+    private func emojiOrDefault(_ emoji: String, id: String) -> String {
+        emoji.isEmpty ? LiveGiftCatalogItem.defaultEmoji(for: id) : emoji
+    }
+
+    private func handleIncomingFullScreenReaction(_ data: [String: Any]) {
+        let isGift = (data["experience"] as? Bool) ?? (data["isGift"] as? Bool) ?? (data["giftId"] != nil)
+        if isGift {
+            let giftId = (data["giftId"] as? String) ?? (data["kind"] as? String) ?? "rose"
+            let giftName = (data["giftName"] as? String) ?? LiveGiftCatalogItem.defaultName(for: giftId)
+            let emoji = LiveGiftCatalogItem.defaultEmoji(for: giftId)
+            let senderName = (data["name"] as? String) ?? "Khán giả"
+            let recipientName = (data["recipientName"] as? String) ?? ""
+            let qty = (data["quantity"] as? Int) ?? (data["quantity"] as? NSNumber)?.intValue ?? 1
+            let combo = (data["comboCount"] as? Int) ?? (data["comboCount"] as? NSNumber)?.intValue ?? 1
+            let tier = (data["tier"] as? String) ?? "standard"
+            triggerGiftEffect(
+                giftId: giftId,
+                giftName: giftName,
+                giftEmoji: emoji,
+                qty: qty,
+                comboCount: combo,
+                senderName: senderName,
+                recipientName: recipientName,
+                tier: tier
+            )
+            spawnFullScreenFloatingReaction(symbol: giftId)
+        } else {
+            let senderId = (data["senderId"] as? String) ?? ""
+            if senderId != appState.currentUser?.id {
+                spawnFullScreenFloatingReaction(symbol: "💜")
+            }
+        }
+    }
+
+    private func toggleFollowRoomHost(_ hostId: String) async {
+        guard !hostId.isEmpty, !isFollowLoading else { return }
+        isFollowLoading = true
+        defer { isFollowLoading = false }
+        let next = !isHostFollowed
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/users/\(hostId)/follow",
+                method: next ? "POST" : "DELETE"
+            )
+            isHostFollowed = next
+            appState.showToast(next ? "Đã theo dõi chủ phòng!" : "Đã bỏ theo dõi chủ phòng.")
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+
+    private func sendQuickComboGift(_ gift: LiveGiftCatalogItem, quantity: Int, room: LiveRoomItem) {
+        guard NativeSocketClient.shared.isConnected else {
+            appState.showToast("Mất kết nối phòng Live.")
+            return
+        }
+        let targetUserId = room.hostUserId
+        let comboId = giftComboTracker.nextComboId(roomId: room.id, giftId: gift.id, targetUserId: targetUserId)
+        let reqId = "gift_" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        var payload: [String: Any] = [
+            "type": "live-reaction",
+            "room": room.id,
+            "kind": gift.id,
+            "giftId": gift.id,
+            "quantity": quantity,
+            "comboId": comboId,
+            "fundingSource": "gifted",
+            "requestId": reqId,
+            "priceVersion": giftPriceVersion
+        ]
+        if !targetUserId.isEmpty {
+            payload["targetUserId"] = targetUserId
+        }
+        NativeSocketClient.shared.sendJSON(payload)
+    }
+
+    private func spawnFullScreenFloatingReaction(symbol: String) {
+        let screenWidth = UIScreen.main.bounds.width
+        let startX = screenWidth * CGFloat.random(in: 0.68...0.88)
+        let startY = UIScreen.main.bounds.height * 0.78
+        let r = LiveFloatingReaction(symbol: symbol, x: startX, y: startY)
+        floatingReactions.append(r)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            floatingReactions.removeAll(where: { $0.id == r.id })
+        }
+    }
+
     private func sendLiveChat() {
+        if let room = appState.currentLiveRoom, !room.comments && !appState.isCurrentLiveHost {
+            return
+        }
         let clean = chatInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty else { return }
         chatInput = ""
@@ -1114,9 +2410,7 @@ struct LiveRoomFullScreenView: View {
     }
 
     private func leaveLiveRoom() {
-        NativeSocketClient.shared.sendJSON(["type": "leave"])
-        webrtc.stopLiveSession()
-        appState.currentLiveRoom = nil
+        appState.leaveCurrentLiveRoom()
     }
 
     private func loadGiftCatalog() async {
@@ -1133,116 +2427,318 @@ struct LiveRoomFullScreenView: View {
     }
 }
 
+final class LiveGiftComboTracker: ObservableObject {
+    static let shared = LiveGiftComboTracker()
+    private let lock = NSLock()
+    private var activeComboId: String = ""
+    private var activeComboKey: String = ""
+    private var activeComboAt: Date = .distantPast
+
+    func nextComboId(roomId: String, giftId: String, targetUserId: String) -> String {
+        let comboKey = "\(roomId):\(giftId):\(targetUserId)"
+        let now = Date()
+        lock.lock()
+        defer { lock.unlock() }
+        let comboId: String
+        if comboKey == activeComboKey && now.timeIntervalSince(activeComboAt) < 4.5 && !activeComboId.isEmpty {
+            comboId = activeComboId
+        } else {
+            comboId = "combo_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(20)
+            activeComboKey = comboKey
+            activeComboId = comboId
+        }
+        activeComboAt = now
+        return comboId
+    }
+
+    func reset() {
+        lock.lock()
+        activeComboId = ""
+        activeComboKey = ""
+        activeComboAt = .distantPast
+        lock.unlock()
+    }
+}
+
 struct LiveGiftDrawerSheet: View {
     let roomId: String
     let gifts: [LiveGiftCatalogItem]
     let priceVersion: Int
     var onGiftSent: ((LiveGiftCatalogItem, Int) -> Void)? = nil
+    var onCatalogUpdated: (([LiveGiftCatalogItem], Int) -> Void)? = nil
+    @ObservedObject var comboTracker: LiveGiftComboTracker = .shared
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
+    @AppStorage("kinnect_live_gift_sound") private var giftSoundEnabled = true
+    @AppStorage("kinnect_live_gift_reduce_fx") private var reduceGiftEffects = false
+    @State private var loadedGifts: [LiveGiftCatalogItem] = []
+    @State private var currentPriceVersion: Int? = nil
+    @State private var coinBalance: Int? = nil
+    @State private var giftInventoryCounts: [String: Int] = [:]
     @State private var selectedQuantity: Int = 1
+    @State private var selectedGiftId: String = ""
+    @State private var selectedTargetUserId: String = ""
     @State private var pendingGift: LiveGiftCatalogItem?
     @State private var pendingRequestId: String?
     @State private var pendingQuantity = 1
     @State private var confirmGift: LiveGiftCatalogItem?
     @State private var giftError: String?
 
-    private let quantities = [1, 2, 5, 10, 50]
+    private let quantities = [1, 5, 10, 99]
+
+    private var activeGifts: [LiveGiftCatalogItem] {
+        loadedGifts.isEmpty ? gifts : loadedGifts
+    }
+
+    private var selectedGift: LiveGiftCatalogItem? {
+        if !selectedGiftId.isEmpty, let match = activeGifts.first(where: { $0.id == selectedGiftId }) {
+            return match
+        }
+        return activeGifts.first
+    }
+
+    private var activePriceVersion: Int {
+        currentPriceVersion ?? priceVersion
+    }
+
+    private var recipientOptions: [(userId: String, name: String)] {
+        let meId = appState.currentUser?.id ?? ""
+        var seen = Set<String>()
+        var options: [(userId: String, name: String)] = []
+        if let room = appState.currentLiveRoom ?? appState.liveRooms.first(where: { $0.id == roomId }),
+           !room.hostUserId.isEmpty, room.hostUserId != meId {
+            seen.insert(room.hostUserId)
+            options.append((room.hostUserId, room.hostName))
+        }
+        for p in appState.liveStageParticipants {
+            guard let uid = p["userId"] as? String, !uid.isEmpty, uid != meId, !seen.contains(uid) else { continue }
+            seen.insert(uid)
+            let name = (p["name"] as? String) ?? "Khách mời"
+            options.append((uid, name))
+        }
+        return options
+    }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Quantity / Combo Multiplier Pills matching Android & Web
-                ScrollView(.horizontal, showsIndicators: false) {
+                // Balance + Sound / Reduce-Effects Controls
                 HStack(spacing: 10) {
-                    Text("Số lượng:")
-                        .font(.caption.bold())
-                        .foregroundColor(KinnectTheme.textSecondary)
-
-                    ForEach(quantities, id: \.self) { qty in
-                        Button {
-                            selectedQuantity = qty
-                        } label: {
-                            HStack(spacing: 4) {
-                                if let img = UIImage(named: "kg20261109_combo_x\(qty)") {
-                                    Image(uiImage: img)
-                                        .resizable()
-                                        .scaledToFit()
-                                        .frame(height: 18)
-                                } else {
-                                    Text("x\(qty)")
-                                        .font(.caption.bold())
-                                }
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(
-                                Capsule().fill(selectedQuantity == qty ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
-                            )
-                            .foregroundColor(selectedQuantity == qty ? .white : KinnectTheme.textSecondary)
-                        }
+                    HStack(spacing: 5) {
+                        KinnectIcon(glyph: .coin, size: 14, selected: true, tint: KinnectTheme.warning)
+                        let displayBalance = coinBalance ?? appState.currentUser?.coins ?? 0
+                        Text("\(displayBalance.formattedWithSeparator()) xu")
+                            .font(.caption.bold())
+                            .foregroundColor(KinnectTheme.warning)
                     }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Capsule().fill(KinnectTheme.surfaceElevated))
+
                     Spacer()
+
+                    Button {
+                        giftSoundEnabled.toggle()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: giftSoundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                                .font(.caption2)
+                            Text("Âm thanh")
+                                .font(.caption2.bold())
+                        }
+                        .foregroundColor(giftSoundEnabled ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        reduceGiftEffects.toggle()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: reduceGiftEffects ? "sparkles.slash" : "sparkles")
+                                .font(.caption2)
+                            Text("Giảm hiệu ứng")
+                                .font(.caption2.bold())
+                        }
+                        .foregroundColor(reduceGiftEffects ? KinnectTheme.warning : KinnectTheme.textSecondary)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                    }
+                    .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, 8)
+                .padding(.top, 10)
+
+                if recipientOptions.count > 1 {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            Text("Người nhận:")
+                                .font(.caption.bold())
+                                .foregroundColor(KinnectTheme.textSecondary)
+                            ForEach(recipientOptions, id: \.userId) { target in
+                                let chosen = (selectedTargetUserId.isEmpty ? recipientOptions.first?.userId : selectedTargetUserId) == target.userId
+                                Button {
+                                    selectedTargetUserId = target.userId
+                                } label: {
+                                    Text(target.name)
+                                        .font(.caption.bold())
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 5)
+                                        .background(Capsule().fill(chosen ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated))
+                                        .foregroundColor(chosen ? .white : KinnectTheme.textSecondary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 10)
+                    }
+                    .disabled(pendingRequestId != nil)
+                }
+
+                // Quantity / Combo Multiplier Pills matching Android & Web
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        Text(L10n.tr("Số lượng:"))
+                            .font(.caption.bold())
+                            .foregroundColor(KinnectTheme.textSecondary)
+
+                        ForEach(quantities, id: \.self) { qty in
+                            Button {
+                                selectedQuantity = qty
+                            } label: {
+                                Text("x\(qty)")
+                                    .font(.caption.bold())
+                                    .lineLimit(1)
+                                    .fixedSize()
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(
+                                        Capsule().fill(selectedQuantity == qty ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
+                                    )
+                                    .foregroundColor(selectedQuantity == qty ? .white : KinnectTheme.textSecondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, 8)
                 }
                 .disabled(pendingRequestId != nil)
-                if let giftError { Text(giftError).foregroundColor(KinnectTheme.danger) }
+                if let giftError {
+                    Text(giftError)
+                        .font(.caption)
+                        .foregroundColor(KinnectTheme.danger)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 4)
+                }
 
                 ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 12)], spacing: 12) {
-                        ForEach(gifts) { gift in
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.flexible(), spacing: 10, alignment: .top),
+                            GridItem(.flexible(), spacing: 10, alignment: .top),
+                            GridItem(.flexible(), spacing: 10, alignment: .top)
+                        ],
+                        spacing: 10
+                    ) {
+                        ForEach(activeGifts) { gift in
+                            let isChosen = selectedGift?.id == gift.id
                             Button {
-                                if gift.coins * selectedQuantity >= 1000 { confirmGift = gift }
-                                else { sendGift(gift) }
+                                selectedGiftId = gift.id
+                                giftError = nil
                             } label: {
                                 VStack(spacing: 6) {
                                     giftIconView(gift)
                                     Text(gift.label)
                                         .font(.caption.bold())
                                         .foregroundColor(KinnectTheme.textPrimary)
-                                        .lineLimit(1)
-                                    HStack(spacing: 3) {
-                                        KinnectIcon(glyph: .coin, size: 12, selected: true, tint: KinnectTheme.warning)
-                                        Text("\(gift.coins * selectedQuantity) xu")
-                                            .font(.caption2.bold())
-                                            .foregroundColor(KinnectTheme.warning)
+                                        .multilineTextAlignment(.center)
+                                        .lineLimit(2)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                    let invCount = giftInventoryCounts[gift.id] ?? 0
+                                    if invCount > 0 {
+                                        Text("\(L10n.tr("Trong kho")) · \(invCount)")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(KinnectTheme.online)
+                                            .lineLimit(1)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(Capsule().fill(KinnectTheme.online.opacity(0.15)))
+                                    } else {
+                                        HStack(spacing: 3) {
+                                            KinnectIcon(glyph: .coin, size: 12, selected: true, tint: KinnectTheme.warning)
+                                            Text("\((gift.coins * selectedQuantity).formattedWithSeparator()) \(L10n.tr("xu"))")
+                                                .font(.caption2.bold())
+                                                .foregroundColor(KinnectTheme.warning)
+                                                .lineLimit(1)
+                                                .minimumScaleFactor(0.85)
+                                        }
                                     }
+                                    Spacer(minLength: 0)
                                 }
-                                .frame(maxWidth: .infinity)
-                                .padding(12)
+                                .frame(maxWidth: .infinity, minHeight: 112, alignment: .top)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 10)
                                 .background(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .fill(KinnectTheme.surfaceElevated)
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .fill(isChosen ? KinnectTheme.accentBright.opacity(0.16) : KinnectTheme.surfaceElevated)
                                         .overlay(
-                                            RoundedRectangle(cornerRadius: 16)
-                                                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+                                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                                .strokeBorder(
+                                                    isChosen ? KinnectTheme.accentBright : Color.white.opacity(0.08),
+                                                    lineWidth: isChosen ? 2 : 1
+                                                )
                                         )
                                 )
                             }
+                            .buttonStyle(.plain)
                         }
                     }
-                    .padding(16)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                 }
                 .disabled(pendingRequestId != nil)
+
+                giftDrawerFooter
             }
             .background(KinnectTheme.background)
             .navigationTitle("Tặng quà phòng Live")
-            .alert("Xác nhận tặng quà?", isPresented: Binding(
-                get: { confirmGift != nil }, set: { if !$0 { confirmGift = nil } }
-            )) {
+            .alert(
+                "Xác nhận tặng quà?",
+                isPresented: Binding(
+                    get: { confirmGift != nil },
+                    set: { if !$0 { confirmGift = nil } }
+                ),
+                presenting: confirmGift
+            ) { gift in
                 Button("Hủy", role: .cancel) { confirmGift = nil }
                 Button("Tặng quà") {
-                    if let gift = confirmGift { sendGift(gift) }
                     confirmGift = nil
+                    sendGift(gift)
                 }
-            } message: {
-                Text("\(confirmGift?.label ?? "") · \((confirmGift?.coins ?? 0) * selectedQuantity) xu")
+            } message: { gift in
+                Text("\(gift.label) · \(gift.coins * selectedQuantity) xu")
+            }
+            .task {
+                await refreshGiftCatalog()
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("kinnectLiveGiftResult"))) { event in
-                guard let pendingRequestId, let data = event.userInfo else { return }
-                if data["type"] as? String == "live-gift-receipt",
+                guard let data = event.userInfo else { return }
+                let eventType = data["type"] as? String
+                if let catalogDict = data["catalog"] as? [String: Any] {
+                    applyCatalogPayload(catalogDict)
+                }
+                if let bal = (data["balance"] as? Int) ?? (data["balance"] as? NSNumber)?.intValue {
+                    coinBalance = bal
+                }
+                guard let pendingRequestId else { return }
+                if eventType == "live-gift-receipt",
                    data["requestId"] as? String == pendingRequestId {
                     if let gift = pendingGift {
                         UserDefaults.standard.removeObject(forKey: giftRequestKey(gift.id, quantity: pendingQuantity))
@@ -1250,9 +2746,12 @@ struct LiveGiftDrawerSheet: View {
                     }
                     self.pendingRequestId = nil
                     dismiss()
-                } else if data["type"] as? String == "live-gift-error" || data["type"] as? String == "live-mode-error" {
+                } else if eventType == "live-gift-error" || eventType == "live-mode-error" {
                     giftError = data["message"] as? String ?? "Chưa gửi được quà."
                     self.pendingRequestId = nil
+                    if eventType == "live-gift-error" && data["catalog"] == nil {
+                        Task { await refreshGiftCatalog() }
+                    }
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -1266,6 +2765,55 @@ struct LiveGiftDrawerSheet: View {
         .presentationDragIndicator(.visible)
     }
 
+    private var giftDrawerFooter: some View {
+        VStack(spacing: 8) {
+            Divider().background(KinnectTheme.borderSoft)
+
+            Text(L10n.tr("Quà từ xu tặng không tạo tiền rút"))
+                .font(.caption2)
+                .foregroundColor(KinnectTheme.textSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+
+            if let gift = selectedGift {
+                let invCount = giftInventoryCounts[gift.id] ?? 0
+                let totalCoins = gift.coins * selectedQuantity
+                let useInventory = invCount >= selectedQuantity
+                Button {
+                    if !useInventory && totalCoins >= 1000 {
+                        confirmGift = gift
+                    } else {
+                        sendGift(gift)
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        if pendingRequestId != nil {
+                            ProgressView().tint(.white)
+                        } else {
+                            KinnectIcon(glyph: .gift, size: 18, selected: true, tint: .white)
+                        }
+                        Text(
+                            useInventory
+                                ? "\(L10n.tr("Tặng từ kho")) · x\(selectedQuantity)"
+                                : "\(L10n.tr("Tặng")) · \(totalCoins.formattedWithSeparator()) \(L10n.tr("xu"))"
+                        )
+                        .font(.subheadline.bold())
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(Capsule().fill(KinnectTheme.primaryGradient))
+                }
+                .buttonStyle(.plain)
+                .disabled(pendingRequestId != nil)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
+        .padding(.bottom, 14)
+        .background(KinnectTheme.background)
+    }
+
     private func giftAssetName(for id: String) -> String {
         return (id == "car") ? "sports_car" : id
     }
@@ -1273,7 +2821,22 @@ struct LiveGiftDrawerSheet: View {
     @ViewBuilder
     private func giftIconView(_ gift: LiveGiftCatalogItem) -> some View {
         let key = giftAssetName(for: gift.id)
-        if let img = UIImage(named: "kg20261109_gift_\(key)")
+        if gift.id == "aurora" {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(hex: "#0D9488"), Color(hex: "#38BDF8"), Color(hex: "#8B5CF6")],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 44, height: 44)
+                Image(systemName: "sparkles")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.white)
+            }
+        } else if let img = UIImage(named: "kg20261109_gift_\(key)")
             ?? UIImage(named: "kg20261109_gift_\(gift.id)")
             ?? UIImage(named: "gift_\(key)")
             ?? UIImage(named: "gift_\(gift.id)")
@@ -1286,7 +2849,8 @@ struct LiveGiftDrawerSheet: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10))
         } else {
             Text(gift.emoji)
-                .font(.system(size: 38))
+                .font(.system(size: 36))
+                .frame(width: 44, height: 44)
         }
     }
 
@@ -1301,6 +2865,14 @@ struct LiveGiftDrawerSheet: View {
             giftError = "Mất kết nối phòng Live. Hãy kết nối lại trước khi tặng quà."
             return
         }
+        let invCount = giftInventoryCounts[gift.id] ?? 0
+        if invCount < selectedQuantity, let currentBal = coinBalance ?? appState.currentUser?.coins {
+            let totalCost = gift.coins * selectedQuantity
+            if currentBal < totalCost {
+                giftError = "Chưa đủ xu."
+                return
+            }
+        }
         let key = giftRequestKey(gift.id, quantity: selectedQuantity)
         let reqId = UserDefaults.standard.string(forKey: key)
             ?? "gift_" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
@@ -1309,21 +2881,75 @@ struct LiveGiftDrawerSheet: View {
         pendingRequestId = reqId
         pendingQuantity = selectedQuantity
         giftError = nil
-        NativeSocketClient.shared.sendJSON([
+        let resolvedTarget = selectedTargetUserId.isEmpty
+            ? (recipientOptions.first?.userId ?? appState.currentLiveRoom?.hostUserId ?? "")
+            : selectedTargetUserId
+        let comboId = comboTracker.nextComboId(roomId: roomId, giftId: gift.id, targetUserId: resolvedTarget)
+
+        var payload: [String: Any] = [
             "type": "live-reaction",
             "room": roomId,
             "kind": gift.id,
+            "giftId": gift.id,
             "quantity": selectedQuantity,
+            "comboId": comboId,
             "fundingSource": "gifted",
             "requestId": reqId,
-            "priceVersion": priceVersion
-        ])
-        DispatchQueue.main.asyncAfter(deadline: .now() + 12) {
+            "priceVersion": activePriceVersion
+        ]
+        if !resolvedTarget.isEmpty {
+            payload["targetUserId"] = resolvedTarget
+        }
+        NativeSocketClient.shared.sendJSON(payload)
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 12_000_000_000)
             if pendingRequestId == reqId {
                 giftError = "Chưa nhận được xác nhận. Kiểm tra số dư và lịch sử quà trước khi gửi lại."
                 pendingRequestId = nil
                 // Preserve idempotency key in UserDefaults so a retry reuses the same requestId.
             }
+        }
+    }
+
+    @MainActor
+    private func applyCatalogPayload(_ payload: [String: Any]) {
+        let items = (payload["items"] as? [[String: Any]]) ?? (payload["gifts"] as? [[String: Any]]) ?? []
+        let parsed = items.map(LiveGiftCatalogItem.from)
+        let version = (payload["version"] as? Int)
+            ?? (payload["priceVersion"] as? Int)
+            ?? (payload["version"] as? NSNumber)?.intValue
+            ?? (payload["priceVersion"] as? NSNumber)?.intValue
+        if !parsed.isEmpty {
+            loadedGifts = parsed
+        }
+        if let version, version > 0 {
+            currentPriceVersion = version
+        }
+        if let bal = (payload["balance"] as? Int) ?? (payload["balance"] as? NSNumber)?.intValue {
+            coinBalance = bal
+        }
+        if let inv = payload["inventory"] as? [[String: Any]] {
+            var counts: [String: Int] = [:]
+            for item in inv {
+                guard let gid = item["giftId"] as? String, !gid.isEmpty else { continue }
+                let qty = (item["quantity"] as? Int) ?? (item["quantity"] as? NSNumber)?.intValue ?? 0
+                if qty > 0 {
+                    counts[gid, default: 0] += qty
+                }
+            }
+            giftInventoryCounts = counts
+        }
+        let syncedGifts = loadedGifts.isEmpty ? gifts : loadedGifts
+        let syncedVersion = currentPriceVersion ?? priceVersion
+        if !syncedGifts.isEmpty {
+            onCatalogUpdated?(syncedGifts, syncedVersion)
+        }
+    }
+
+    @MainActor
+    private func refreshGiftCatalog() async {
+        if let res = try? await KinnectAPIClient.shared.requestJSON("/api/live/gifts") {
+            applyCatalogPayload(res)
         }
     }
 }
@@ -1373,6 +2999,96 @@ struct LiveFloatingReactionView: View {
     }
 }
 
+// MARK: - Multi-Guest Co-Host / Guest PiP Tiles
+private struct LiveCoHostPiPStackView: View {
+    let isHostCanvas: Bool
+    var layout: String = "panel"
+    @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var webrtc = NativeWebRTCManager.shared
+
+    private struct GuestTileItem: Identifiable {
+        let id: String
+        let name: String
+        let track: RTCVideoTrack
+        let mirror: Bool
+    }
+
+    private var tiles: [GuestTileItem] {
+        var result: [GuestTileItem] = []
+        let participantNames: [String: String] = Dictionary(
+            appState.liveStageParticipants.compactMap { p -> (String, String)? in
+                guard let id = p["id"] as? String, !id.isEmpty else { return nil }
+                return (id, (p["name"] as? String) ?? "Khách mời")
+            },
+            uniquingKeysWith: { first, _ in first }
+        )
+        let orderedIds = appState.liveStageParticipants.compactMap { $0["id"] as? String }
+            + webrtc.liveRemoteVideoTracks.keys.sorted()
+        var visited = Set<String>()
+        for peerId in orderedIds {
+            guard !visited.contains(peerId) else { continue }
+            visited.insert(peerId)
+            if !isHostCanvas && peerId == webrtc.livePrimaryRemotePeerId {
+                continue
+            }
+            if let track = webrtc.liveRemoteVideoTracks[peerId] {
+                let label = participantNames[peerId] ?? "Khách mời"
+                result.append(GuestTileItem(id: peerId, name: label, track: track, mirror: false))
+            }
+        }
+        if !isHostCanvas, let localGuestTrack = webrtc.liveLocalVideoTrack {
+            result.append(GuestTileItem(
+                id: "local_guest",
+                name: appState.currentUser?.name ?? "Bạn",
+                track: localGuestTrack,
+                mirror: webrtc.usingFrontCamera
+            ))
+        }
+        return result
+    }
+
+    var body: some View {
+        let items = tiles
+        if !items.isEmpty {
+            if layout == "grid" {
+                LazyVGrid(columns: [GridItem(.fixed(96), spacing: 8), GridItem(.fixed(96), spacing: 8)], spacing: 8) {
+                    ForEach(items) { tile in
+                        tileView(tile, width: 96, height: 120)
+                    }
+                }
+            } else {
+                VStack(alignment: .trailing, spacing: 8) {
+                    ForEach(items) { tile in
+                        tileView(tile, width: 92, height: 128)
+                    }
+                }
+            }
+        }
+    }
+
+    private func tileView(_ tile: GuestTileItem, width: CGFloat, height: CGFloat) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            WebRTCVideoRendererView(track: tile.track, mirror: tile.mirror)
+                .frame(width: width, height: height)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color.white.opacity(0.35), lineWidth: 1.5)
+                )
+                .shadow(color: .black.opacity(0.45), radius: 6, y: 3)
+
+            Text(tile.name)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Capsule().fill(Color.black.opacity(0.6)))
+                .padding(5)
+        }
+    }
+}
+
 // MARK: - Active Gift Effect Model
 struct ActiveGiftEffect: Identifiable {
     let id = UUID()
@@ -1380,12 +3096,16 @@ struct ActiveGiftEffect: Identifiable {
     let giftName: String
     let giftEmoji: String
     let senderName: String
+    var recipientName: String = ""
     let quantity: Int
+    var comboCount: Int = 1
+    var tier: String = "standard"
 }
 
 // MARK: - Live Gift Burst Showcase View (Big 3D Animation Overlay)
 struct LiveGiftBurstShowcaseView: View {
     let effect: ActiveGiftEffect
+    @AppStorage("kinnect_live_gift_reduce_fx") private var reduceGiftEffects = false
     @State private var rotation: Double = 0
     @State private var scale: CGFloat = 0.2
     @State private var bannerOffset: CGFloat = -60
@@ -1403,19 +3123,22 @@ struct LiveGiftBurstShowcaseView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(effect.senderName)
                             .font(.caption.bold())
-                            .foregroundColor(.white)
-                        Text("đã gửi tặng \(effect.giftName)")
+                            .foregroundColor(KinnectTheme.textPrimary)
+                        Text(effect.recipientName.isEmpty
+                             ? "đã gửi tặng \(effect.giftName)"
+                             : "tặng \(effect.giftName) cho \(effect.recipientName)")
                             .font(.caption2)
                             .foregroundColor(KinnectTheme.warning)
+                            .lineLimit(1)
                     }
                     Spacer()
-                    Text("x\(effect.quantity)")
-                        .font(.title2.bold())
+                    Text(effect.comboCount > 1 ? "Combo x\(effect.comboCount)" : "x\(effect.quantity)")
+                        .font(.subheadline.bold())
                         .foregroundStyle(KinnectTheme.primaryGradient)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
-                .frame(maxWidth: 320)
+                .frame(maxWidth: 340)
                 .background(
                     Capsule()
                         .fill(KinnectTheme.surface.opacity(0.95))
@@ -1445,8 +3168,16 @@ struct LiveGiftBurstShowcaseView: View {
                         .font(.title3.bold())
                         .foregroundColor(.white)
                     Text("x\(effect.quantity)")
-                        .font(.system(size: 32, weight: .heavy))
+                        .font(.system(size: 30, weight: .heavy))
                         .foregroundColor(KinnectTheme.warning)
+                    if effect.comboCount > 1 {
+                        Text("COMBO x\(effect.comboCount)")
+                            .font(.caption.weight(.black))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Capsule().fill(KinnectTheme.danger))
+                            .foregroundColor(.white)
+                    }
                 }
                 .shadow(color: .black.opacity(0.8), radius: 4, y: 2)
 
@@ -1455,6 +3186,11 @@ struct LiveGiftBurstShowcaseView: View {
             .padding(.top, 40)
         }
         .onAppear {
+            if reduceGiftEffects {
+                bannerOffset = 0
+                scale = 0.95
+                return
+            }
             withAnimation(.easeOut(duration: 0.35)) {
                 bannerOffset = 0
             }
@@ -1750,7 +3486,7 @@ struct LiveEffectsSheet: View {
                             }
                             Text(s.name)
                                 .font(.caption2)
-                                .foregroundColor(activeSticker == s.id ? KinnectTheme.accentBright : .white)
+                                .foregroundColor(activeSticker == s.id ? KinnectTheme.accentBright : KinnectTheme.textPrimary)
                                 .lineLimit(1)
                         }
                     }
@@ -1781,7 +3517,7 @@ struct LiveEffectsSheet: View {
                                 if f.id == "none" {
                                     Image(systemName: "circle.slash")
                                         .font(.title3)
-                                        .foregroundColor(.white)
+                                        .foregroundColor(KinnectTheme.textPrimary)
                                 } else {
                                     Circle()
                                         .fill(f.color)
@@ -1790,7 +3526,7 @@ struct LiveEffectsSheet: View {
                             }
                             Text(f.name)
                                 .font(.caption2)
-                                .foregroundColor(activeFilter == f.id ? KinnectTheme.accentBright : .white)
+                                .foregroundColor(activeFilter == f.id ? KinnectTheme.accentBright : KinnectTheme.textPrimary)
                                 .lineLimit(1)
                         }
                     }
@@ -1813,7 +3549,7 @@ struct LiveEffectsSheet: View {
                     .clipShape(Circle())
                 Text(name)
                     .font(.caption2)
-                    .foregroundColor(.white)
+                    .foregroundColor(KinnectTheme.textPrimary)
             }
         }
         .buttonStyle(.plain)
@@ -1824,7 +3560,7 @@ struct LiveEffectsSheet: View {
             HStack {
                 Text(label)
                     .font(.caption.bold())
-                    .foregroundColor(.white)
+                    .foregroundColor(KinnectTheme.textPrimary)
                 Spacer()
                 Text("\(Int(value.wrappedValue * 100))%")
                     .font(.caption2)
@@ -1833,5 +3569,361 @@ struct LiveEffectsSheet: View {
             Slider(value: value, in: 0...1)
                 .tint(KinnectTheme.accentBright)
         }
+    }
+}
+
+// MARK: - Live Viewer List Sheet
+private struct LiveViewersSheet: View {
+    let roomId: String
+    let viewerCount: Int
+    let isHost: Bool
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var l10n = LocalizationManager.shared
+    @State private var viewers: [KinnectUser] = []
+    @State private var guestCandidates: [[String: Any]] = []
+    @State private var isLoading = true
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if isLoading && viewers.isEmpty {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                        Text(L10n.tr("Đang tải danh sách người xem…"))
+                            .font(.subheadline)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                } else if viewers.isEmpty {
+                    Text(L10n.tr("Chưa có người xem nào trong phòng."))
+                        .font(.subheadline)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                } else {
+                    ForEach(viewers) { viewer in
+                        HStack(spacing: 12) {
+                            KinnectAvatarView(
+                                name: viewer.name,
+                                avatarURL: viewer.avatarUrl,
+                                colorHex: viewer.avatarColor,
+                                size: 40
+                            )
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(viewer.name)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundColor(KinnectTheme.textPrimary)
+                                if !viewer.handle.isEmpty {
+                                    Text("@\(viewer.handle)")
+                                        .font(.caption)
+                                        .foregroundColor(KinnectTheme.textSecondary)
+                                }
+                            }
+                            Spacer()
+                            if isHost,
+                               let candidate = guestCandidates.first(where: { ($0["userId"] as? String) == viewer.id }),
+                               let peerId = candidate["id"] as? String,
+                               (candidate["onStage"] as? Bool) != true {
+                                Button(L10n.tr("Mời lên sóng")) {
+                                    NativeSocketClient.shared.sendJSON([
+                                        "type": "live-guest-invite",
+                                        "to": peerId
+                                    ])
+                                    AppState.shared.showToast(String(format: L10n.tr("Đã gửi lời mời tới %@."), viewer.name))
+                                }
+                                .font(.caption.bold())
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Capsule().fill(KinnectTheme.accentBright))
+                            }
+                        }
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(KinnectTheme.background)
+            .navigationTitle(String(format: L10n.tr("Người xem (%d)"), max(viewerCount, viewers.count)))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.tr("Đóng")) { dismiss() }
+                }
+            }
+            .onAppear {
+                SocketEventBridge.installIfNeeded()
+                NativeSocketClient.shared.sendJSON(["type": "viewers"])
+                if isHost {
+                    NativeSocketClient.shared.sendJSON(["type": "live-guest-list"])
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: SocketEventBridge.rawEventNotification)) { notif in
+                guard let json = notif.userInfo as? [String: Any],
+                      let type = json["type"] as? String else { return }
+                if let evtRoom = json["room"] as? String, !evtRoom.isEmpty, evtRoom != roomId { return }
+                if type == "viewers" {
+                    let raw = json["users"] as? [[String: Any]] ?? []
+                    viewers = raw.map(KinnectUser.from)
+                    isLoading = false
+                } else if type == "live-guest-list" {
+                    guestCandidates = json["users"] as? [[String: Any]] ?? []
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+}
+
+// MARK: - Live Co-Host / Guest Manager Sheet
+private struct LiveCoHostManagerSheet: View {
+    let roomId: String
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var l10n = LocalizationManager.shared
+    @State private var candidates: [[String: Any]] = []
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section(String(format: L10n.tr("Yêu cầu xin lên sóng (%d)"), appState.liveGuestRequests.count)) {
+                    if appState.liveGuestRequests.isEmpty {
+                        Text(L10n.tr("Chưa có yêu cầu nào."))
+                            .font(.caption)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    } else {
+                        ForEach(Array(appState.liveGuestRequests.enumerated()), id: \.offset) { _, req in
+                            let peerId = (req["id"] as? String) ?? ""
+                            let name = (req["name"] as? String) ?? L10n.tr("Khán giả")
+                            HStack {
+                                Text(name)
+                                    .font(.subheadline.weight(.semibold))
+                                Spacer()
+                                Button(L10n.tr("Từ chối")) {
+                                    NativeSocketClient.shared.sendJSON(["type": "live-guest-decline", "to": peerId])
+                                }
+                                .font(.caption.bold())
+                                .foregroundColor(KinnectTheme.danger)
+                                Button(L10n.tr("Duyệt")) {
+                                    NativeSocketClient.shared.sendJSON(["type": "live-guest-approve", "to": peerId])
+                                }
+                                .font(.caption.bold())
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Capsule().fill(KinnectTheme.online))
+                            }
+                        }
+                    }
+                }
+
+                let activeGuests = appState.liveStageParticipants.filter { ($0["role"] as? String) == "guest" }
+                Section(String(format: L10n.tr("Khách đang trên sóng (%d/3)"), activeGuests.count)) {
+                    if activeGuests.isEmpty {
+                        Text(L10n.tr("Chưa có khách mời nào trên sóng."))
+                            .font(.caption)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    } else {
+                        ForEach(Array(activeGuests.enumerated()), id: \.offset) { _, guest in
+                            let peerId = (guest["id"] as? String) ?? ""
+                            let name = (guest["name"] as? String) ?? L10n.tr("Khách mời")
+                            HStack {
+                                Text(name)
+                                    .font(.subheadline.weight(.semibold))
+                                Spacer()
+                                Button(L10n.tr("Gỡ khỏi sóng"), role: .destructive) {
+                                    NativeSocketClient.shared.sendJSON(["type": "live-guest-remove", "to": peerId])
+                                }
+                                .font(.caption.bold())
+                            }
+                        }
+                    }
+                }
+
+                let invitable = candidates.filter { ($0["onStage"] as? Bool) != true }
+                Section(L10n.tr("Mời khán giả lên sóng")) {
+                    if invitable.isEmpty {
+                        Text(L10n.tr("Chưa có khán giả khả dụng."))
+                            .font(.caption)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    } else {
+                        ForEach(Array(invitable.enumerated()), id: \.offset) { _, user in
+                            let peerId = (user["id"] as? String) ?? ""
+                            let name = (user["name"] as? String) ?? L10n.tr("Khán giả")
+                            HStack {
+                                Text(name)
+                                    .font(.subheadline)
+                                Spacer()
+                                Button(L10n.tr("Mời")) {
+                                    NativeSocketClient.shared.sendJSON(["type": "live-guest-invite", "to": peerId])
+                                    appState.showToast(String(format: L10n.tr("Đã gửi lời mời tới %@."), name))
+                                }
+                                .font(.caption.bold())
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Capsule().fill(KinnectTheme.accentBright))
+                            }
+                        }
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(KinnectTheme.background)
+            .navigationTitle(L10n.tr("Khách mời lên sóng"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.tr("Đóng")) { dismiss() }
+                }
+            }
+            .onAppear {
+                SocketEventBridge.installIfNeeded()
+                NativeSocketClient.shared.sendJSON(["type": "live-guest-list"])
+            }
+            .onReceive(NotificationCenter.default.publisher(for: SocketEventBridge.rawEventNotification)) { notif in
+                guard let json = notif.userInfo as? [String: Any],
+                      (json["type"] as? String) == "live-guest-list" else { return }
+                if let evtRoom = json["room"] as? String, !evtRoom.isEmpty, evtRoom != roomId { return }
+                candidates = json["users"] as? [[String: Any]] ?? []
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+}
+
+// MARK: - Live Gift Leaderboard & Goal Sheet
+private struct LiveGiftLeaderboardSheet: View {
+    let roomId: String
+    let isHost: Bool
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var l10n = LocalizationManager.shared
+    @State private var totalCoins: Int = 0
+    @State private var totalGifts: Int = 0
+    @State private var goalTitle: String = ""
+    @State private var goalTargetCoins: Int = 0
+    @State private var goalProgressCoins: Int = 0
+    @State private var newGoalTitle: String = ""
+    @State private var newGoalCoins: String = ""
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if goalTargetCoins > 0 {
+                    Section(L10n.tr("Mục tiêu quà Live")) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text(goalTitle.isEmpty ? L10n.tr("Mục tiêu quà Live") : goalTitle)
+                                    .font(.subheadline.bold())
+                                Spacer()
+                                Text(String(format: L10n.tr("%@ / %@ xu"), goalProgressCoins.formattedWithSeparator(), goalTargetCoins.formattedWithSeparator()))
+                                    .font(.caption.bold())
+                                    .foregroundColor(KinnectTheme.warning)
+                            }
+                            ProgressView(value: min(1.0, Double(goalProgressCoins) / Double(max(1, goalTargetCoins))))
+                                .tint(KinnectTheme.accentBright)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+
+                if isHost {
+                    Section(L10n.tr("Cài đặt mục tiêu quà")) {
+                        TextField(L10n.tr("Tên mục tiêu (vd: Mục tiêu 500 xu)"), text: $newGoalTitle)
+                        TextField(L10n.tr("Số xu mục tiêu (50 - 1.000.000)"), text: $newGoalCoins)
+                            .keyboardType(.numberPad)
+                        HStack {
+                            Button(L10n.tr("Đặt mục tiêu")) {
+                                let target = Int(newGoalCoins.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+                                guard target >= 50 else {
+                                    appState.showToast(L10n.tr("Mục tiêu tối thiểu 50 xu."))
+                                    return
+                                }
+                                NativeSocketClient.shared.sendJSON([
+                                    "type": "live-gift-goal",
+                                    "title": newGoalTitle.trimmingCharacters(in: .whitespacesAndNewlines),
+                                    "targetCoins": target
+                                ])
+                            }
+                            .font(.subheadline.bold())
+                            .foregroundColor(KinnectTheme.accentBright)
+
+                            if goalTargetCoins > 0 {
+                                Spacer()
+                                Button(L10n.tr("Xóa mục tiêu"), role: .destructive) {
+                                    NativeSocketClient.shared.sendJSON([
+                                        "type": "live-gift-goal",
+                                        "targetCoins": 0
+                                    ])
+                                }
+                                .font(.subheadline)
+                            }
+                        }
+                    }
+                }
+
+                Section(String(format: L10n.tr("Xếp hạng tặng quà (%d quà · %@ xu)"), totalGifts, totalCoins.formattedWithSeparator())) {
+                    if appState.liveGiftRanking.isEmpty {
+                        Text(L10n.tr("Chưa có lượt tặng quà nào trong phiên Live này."))
+                            .font(.caption)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    } else {
+                        ForEach(Array(appState.liveGiftRanking.enumerated()), id: \.offset) { index, row in
+                            let name = (row["name"] as? String) ?? L10n.tr("Khán giả")
+                            let coins = (row["coins"] as? Int) ?? (row["coins"] as? NSNumber)?.intValue ?? 0
+                            let giftsCount = (row["gifts"] as? Int) ?? (row["gifts"] as? NSNumber)?.intValue ?? 0
+                            HStack(spacing: 10) {
+                                Text("#\(index + 1)")
+                                    .font(.caption.weight(.black))
+                                    .foregroundColor(index == 0 ? KinnectTheme.warning : KinnectTheme.textSecondary)
+                                    .frame(width: 28, alignment: .leading)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(name)
+                                        .font(.subheadline.weight(.semibold))
+                                    Text(String(format: L10n.tr("%d món quà"), giftsCount))
+                                        .font(.caption2)
+                                        .foregroundColor(KinnectTheme.textSecondary)
+                                }
+                                Spacer()
+                                Text(String(format: L10n.tr("%@ xu"), coins.formattedWithSeparator()))
+                                    .font(.subheadline.bold())
+                                    .foregroundColor(KinnectTheme.warning)
+                            }
+                        }
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(KinnectTheme.background)
+            .navigationTitle(L10n.tr("Bảng xếp hạng quà"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.tr("Đóng")) { dismiss() }
+                }
+            }
+            .onAppear {
+                SocketEventBridge.installIfNeeded()
+                NativeSocketClient.shared.sendJSON(["type": "live-gift-ranking"])
+            }
+            .onReceive(NotificationCenter.default.publisher(for: SocketEventBridge.rawEventNotification)) { notif in
+                guard let json = notif.userInfo as? [String: Any],
+                      let type = json["type"] as? String,
+                      type == "live-gift-ranking" || type == "live-gift-goal" else { return }
+                if let evtRoom = json["room"] as? String, !evtRoom.isEmpty, evtRoom != roomId { return }
+                totalCoins = (json["totalCoins"] as? Int) ?? (json["totalCoins"] as? NSNumber)?.intValue ?? totalCoins
+                totalGifts = (json["totalGifts"] as? Int) ?? (json["totalGifts"] as? NSNumber)?.intValue ?? totalGifts
+                if let top = json["topSenders"] as? [[String: Any]] {
+                    appState.liveGiftRanking = top
+                }
+                if let goal = json["goal"] as? [String: Any] {
+                    goalTitle = (goal["title"] as? String) ?? ""
+                    goalTargetCoins = (goal["targetCoins"] as? Int) ?? (goal["targetCoins"] as? NSNumber)?.intValue ?? 0
+                    goalProgressCoins = (goal["progressCoins"] as? Int) ?? (goal["progressCoins"] as? NSNumber)?.intValue ?? 0
+                } else if json["goal"] is NSNull {
+                    goalTitle = ""
+                    goalTargetCoins = 0
+                    goalProgressCoins = 0
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }

@@ -171,28 +171,35 @@ final class StudioPhotoProject: ObservableObject {
         )
     }
 
-    /// Renders the image with all geometric transforms and CoreImage filters applied.
+    /// Renders the image with EXIF orientation normalized, geometric transforms, and CoreImage filters applied.
     func render(maxDimension: CGFloat? = nil) -> UIImage {
+        // 0. Normalize EXIF orientation to .up before cropping or CoreImage rendering
+        var processed = normalizedUpImage(originalImage)
+
         // 1. Geometric transforms: rotate and flip
-        var processed = applyGeometry(to: originalImage)
+        processed = applyGeometry(to: processed)
 
         // 2. Crop ratio
         if let ratio = cropRatio.ratioValue {
             processed = cropToRatio(processed, ratio: ratio)
         }
 
-        // 3. Downscale for preview if requested
-        if let maxDim = maxDimension {
+        // 3. Downscale for preview/export if requested (thread-safe UIGraphicsImageRenderer)
+        if let maxDim = maxDimension, processed.size.width > 0, processed.size.height > 0 {
             let currentMax = max(processed.size.width, processed.size.height)
             if currentMax > maxDim {
                 let scale = maxDim / currentMax
-                let newSize = CGSize(width: processed.size.width * scale, height: processed.size.height * scale)
-                UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
-                processed.draw(in: CGRect(origin: .zero, size: newSize))
-                if let scaled = UIGraphicsGetImageFromCurrentImageContext() {
-                    processed = scaled
+                let newSize = CGSize(
+                    width: max(1, (processed.size.width * scale).rounded()),
+                    height: max(1, (processed.size.height * scale).rounded())
+                )
+                let format = UIGraphicsImageRendererFormat()
+                format.scale = 1.0
+                format.opaque = false
+                let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
+                processed = renderer.image { _ in
+                    processed.draw(in: CGRect(origin: .zero, size: newSize))
                 }
-                UIGraphicsEndImageContext()
             }
         }
 
@@ -209,8 +216,21 @@ final class StudioPhotoProject: ObservableObject {
     }
 
     // MARK: - Geometry Helpers
+    private func normalizedUpImage(_ img: UIImage) -> UIImage {
+        guard img.size.width > 0, img.size.height > 0 else { return img }
+        if img.imageOrientation == .up { return img }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = img.scale
+        format.opaque = false
+        let renderer = UIGraphicsImageRenderer(size: img.size, format: format)
+        return renderer.image { _ in
+            img.draw(in: CGRect(origin: .zero, size: img.size))
+        }
+    }
+
     private func applyGeometry(to img: UIImage) -> UIImage {
         if rotation == 0 && !flipHorizontal { return img }
+        guard img.size.width > 0, img.size.height > 0 else { return img }
         var radians: CGFloat = 0
         switch rotation % 360 {
         case 90: radians = .pi / 2
@@ -219,25 +239,23 @@ final class StudioPhotoProject: ObservableObject {
         default: radians = 0
         }
 
-        var newSize = CGRect(origin: .zero, size: img.size)
+        let newSize = CGRect(origin: .zero, size: img.size)
             .applying(CGAffineTransform(rotationAngle: radians)).integral.size
+        guard newSize.width > 0, newSize.height > 0 else { return img }
 
-        UIGraphicsBeginImageContextWithOptions(newSize, false, img.scale)
-        guard let ctx = UIGraphicsGetCurrentContext() else {
-            UIGraphicsEndImageContext()
-            return img
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = img.scale
+        format.opaque = false
+        let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
+        return renderer.image { rendererContext in
+            let ctx = rendererContext.cgContext
+            ctx.translateBy(x: newSize.width / 2, y: newSize.height / 2)
+            ctx.rotate(by: radians)
+            if flipHorizontal {
+                ctx.scaleBy(x: -1.0, y: 1.0)
+            }
+            img.draw(in: CGRect(x: -img.size.width / 2, y: -img.size.height / 2, width: img.size.width, height: img.size.height))
         }
-
-        ctx.translateBy(x: newSize.width / 2, y: newSize.height / 2)
-        ctx.rotate(by: radians)
-        if flipHorizontal {
-            ctx.scaleBy(x: -1.0, y: 1.0)
-        }
-        img.draw(in: CGRect(x: -img.size.width / 2, y: -img.size.height / 2, width: img.size.width, height: img.size.height))
-
-        let rotated = UIGraphicsGetImageFromCurrentImageContext() ?? img
-        UIGraphicsEndImageContext()
-        return rotated
     }
 
     private func cropToRatio(_ img: UIImage, ratio: CGFloat) -> UIImage {
@@ -289,6 +307,7 @@ final class StudioVideoProject: ObservableObject {
     @Published var curveAmount: Double = 0
     @Published var grain: Double = 0
     @Published var rotation: Int = 0
+    @Published var cropRatio: StudioCropRatio = .original
     @Published var proTemplate: StudioProTemplate = .none
     @Published var proPack: StudioProPack = .original
     @Published var playbackRate: Double = 1
@@ -311,8 +330,8 @@ final class StudioVideoProject: ObservableObject {
 
     var hasEdits: Bool {
         trimIn > 0.05 || (duration > 0 && trimOut < duration - 0.05) ||
-        abs(playbackRate - 1) > 0.01 || rotation != 0 || !makeGrade().isNeutral ||
-        musicURL != nil || !musicTitle.isEmpty
+        abs(playbackRate - 1) > 0.01 || rotation != 0 || cropRatio != .original || !makeGrade().isNeutral ||
+        musicURL != nil || !musicTitle.isEmpty || abs(originalAudioVolume - 1.0) > 0.01
     }
 
     func makeGrade() -> StudioGradeState {
@@ -344,6 +363,7 @@ final class StudioVideoProject: ObservableObject {
         let graph = StudioEditGraph.make(grade: makeGrade())
         let grade = graph.grade
         let rot = rotation % 360
+        let targetAspect = cropRatio.ratioValue
         let sampleMask: CIImage? = {
             guard grade.smooth + grade.pack.definition.smooth > 0 else { return nil }
             let generator = AVAssetImageGenerator(asset: asset)
@@ -379,6 +399,23 @@ final class StudioVideoProject: ObservableObject {
                 default:
                     break
                 }
+                output = output.transformed(by: CGAffineTransform(translationX: -output.extent.origin.x, y: -output.extent.origin.y))
+            }
+            if let aspect = targetAspect, output.extent.width > 0, output.extent.height > 0 {
+                let ext = output.extent
+                let curAspect = ext.width / ext.height
+                let cropRect: CGRect
+                if curAspect > aspect {
+                    let newW = ext.height * aspect
+                    let dx = (ext.width - newW) / 2.0
+                    cropRect = CGRect(x: ext.minX + dx, y: ext.minY, width: newW, height: ext.height)
+                } else {
+                    let newH = ext.width / aspect
+                    let dy = (ext.height - newH) / 2.0
+                    cropRect = CGRect(x: ext.minX, y: ext.minY + dy, width: ext.width, height: newH)
+                }
+                output = output.cropped(to: cropRect)
+                    .transformed(by: CGAffineTransform(translationX: -cropRect.origin.x, y: -cropRect.origin.y))
             }
             request.finish(with: output.cropped(to: output.extent), context: nil)
         })
@@ -387,72 +424,142 @@ final class StudioVideoProject: ObservableObject {
             return baseComposition
         }
 
-        if rot == 90 || rot == 270 {
-            let baseSize = baseComposition.renderSize
-            mutableComposition.renderSize = CGSize(width: baseSize.height, height: baseSize.width)
+        var renderSize = (rot == 90 || rot == 270)
+            ? CGSize(width: baseComposition.renderSize.height, height: baseComposition.renderSize.width)
+            : baseComposition.renderSize
+        if let aspect = targetAspect, renderSize.width > 0, renderSize.height > 0 {
+            let curAspect = renderSize.width / renderSize.height
+            if curAspect > aspect {
+                renderSize.width = renderSize.height * aspect
+            } else {
+                renderSize.height = renderSize.width / aspect
+            }
+            let evenW = max(2, floor(renderSize.width / 2.0) * 2.0)
+            let evenH = max(2, floor(renderSize.height / 2.0) * 2.0)
+            renderSize = CGSize(width: evenW, height: evenH)
         }
+        mutableComposition.renderSize = renderSize
 
         return mutableComposition
     }
 
-    /// Exports one clip. Speed other than 1x changes pitch. HEVC is used when the preset exists.
-    func exportVideo() async throws -> URL {
+    /// Exports one clip as H.264 MP4 optimized for network streaming and cross-platform playback.
+    /// When `maxBytes` is provided, automatically retries at lower presets (720p / MediumQuality) if the output exceeds budget.
+    func exportVideo(maxBytes: Int? = nil) async throws -> URL {
         let source = AVURLAsset(url: sourceURL)
         let (exportAsset, audioMix) = try await prepareAssetAndAudioMix(from: source)
-        let composition = makeVideoComposition(for: exportAsset)
-        let outputURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("Kinnect-Video-\(UUID().uuidString).mp4")
-        let preset = AVAssetExportPresetHighestQuality
-        guard let exportSession = AVAssetExportSession(asset: exportAsset, presetName: preset) else {
-            throw NSError(domain: "KinnectStudio", code: -1, userInfo: [NSLocalizedDescriptionKey: "Không khởi tạo được bộ xuất video."])
+        let needsVisualComposition = !makeGrade().isNeutral || (rotation % 360) != 0 || cropRatio != .original
+        let composition: AVVideoComposition? = needsVisualComposition ? makeVideoComposition(for: exportAsset) : nil
+        let compatiblePresets = AVAssetExportSession.exportPresets(compatibleWith: exportAsset)
+        var candidatePresets: [String] = []
+        for preferred in [AVAssetExportPreset1920x1080, AVAssetExportPreset1280x720, AVAssetExportPresetMediumQuality] {
+            if compatiblePresets.contains(preferred) {
+                candidatePresets.append(preferred)
+            }
+        }
+        if candidatePresets.isEmpty {
+            candidatePresets.append(AVAssetExportPresetHighestQuality)
         }
 
-        exportSession.videoComposition = composition
-        if let audioMix {
-            exportSession.audioMix = audioMix
+        await MainActor.run {
+            self.isExporting = true
+            self.exportProgress = 0
         }
-        exportSession.outputURL = outputURL
-        exportSession.outputFileType = .mp4
-        exportSession.shouldOptimizeForNetworkUse = true
-        if abs(playbackRate - 1) < 0.05 && musicURL == nil && trimIn <= 0.05 && (duration <= 0 || trimOut >= duration - 0.05) {
-            let startTime = CMTime(seconds: max(0, trimIn), preferredTimescale: 600)
-            let endTime = CMTime(seconds: min(duration, trimOut > trimIn ? trimOut : duration), preferredTimescale: 600)
-            exportSession.timeRange = CMTimeRange(start: startTime, end: endTime)
-        }
-        activeExport = exportSession
-        isExporting = true
-        exportProgress = 0
-        let progressTask = Task { @MainActor in
-            while !Task.isCancelled {
-                self.exportProgress = exportSession.progress
-                let status = exportSession.status
-                if status == .completed || status == .failed || status == .cancelled { break }
-                try? await Task.sleep(nanoseconds: 200_000_000)
+        defer {
+            activeExport = nil
+            Task { @MainActor in
+                self.isExporting = false
             }
         }
 
-        await withCheckedContinuation { continuation in
-            exportSession.exportAsynchronously {
-                continuation.resume()
+        var lastError: Error? = nil
+        for (index, preset) in candidatePresets.enumerated() {
+            try Task.checkCancellation()
+            let outputURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("Kinnect-Video-\(UUID().uuidString).mp4")
+            guard let exportSession = AVAssetExportSession(asset: exportAsset, presetName: preset) else {
+                lastError = NSError(domain: "KinnectStudio", code: -1, userInfo: [NSLocalizedDescriptionKey: "Không khởi tạo được bộ xuất video."])
+                continue
             }
-        }
-        progressTask.cancel()
-        isExporting = false
-        exportProgress = exportSession.status == .completed ? 1 : exportSession.progress
-        activeExport = nil
 
-        if exportSession.status == .completed {
-            return outputURL
+            if let composition {
+                exportSession.videoComposition = composition
+            }
+            if let audioMix {
+                exportSession.audioMix = audioMix
+            }
+            exportSession.outputURL = outputURL
+            exportSession.outputFileType = .mp4
+            exportSession.shouldOptimizeForNetworkUse = true
+            if duration > 0.05 && abs(playbackRate - 1) < 0.05 && musicURL == nil && abs(originalAudioVolume - 1.0) <= 0.01 && trimIn <= 0.05 && trimOut >= duration - 0.05 {
+                let startTime = CMTime(seconds: max(0, trimIn), preferredTimescale: 600)
+                let endTime = CMTime(seconds: min(duration, trimOut > trimIn ? trimOut : duration), preferredTimescale: 600)
+                if CMTimeCompare(endTime, startTime) > 0 {
+                    exportSession.timeRange = CMTimeRange(start: startTime, end: endTime)
+                }
+            }
+            activeExport = exportSession
+            let progressTask = Task { @MainActor in
+                while !Task.isCancelled {
+                    self.exportProgress = exportSession.progress
+                    let status = exportSession.status
+                    if status == .completed || status == .failed || status == .cancelled { break }
+                    try? await Task.sleep(nanoseconds: 200_000_000)
+                }
+            }
+
+            await withCheckedContinuation { continuation in
+                exportSession.exportAsynchronously {
+                    continuation.resume()
+                }
+            }
+            progressTask.cancel()
+            let finalStatus = exportSession.status
+            let finalProgress = finalStatus == .completed ? Float(1) : exportSession.progress
+            await MainActor.run {
+                self.exportProgress = finalProgress
+            }
+
+            if finalStatus == .completed {
+                if let maxBytes {
+                    let attrs = try? FileManager.default.attributesOfItem(atPath: outputURL.path)
+                    let size = (attrs?[.size] as? NSNumber)?.intValue ?? 0
+                    if size > maxBytes {
+                        try? FileManager.default.removeItem(at: outputURL)
+                        if index + 1 < candidatePresets.count {
+                            continue
+                        }
+                        throw NSError(
+                            domain: "KinnectStudio",
+                            code: -10,
+                            userInfo: [NSLocalizedDescriptionKey: "Video vượt quá giới hạn \(maxBytes / (1024 * 1024))MB sau khi nén. Hãy cắt ngắn video."]
+                        )
+                    }
+                }
+                await MainActor.run {
+                    self.isExporting = false
+                    self.exportProgress = 1
+                }
+                return outputURL
+            }
+
+            try? FileManager.default.removeItem(at: outputURL)
+            if finalStatus == .cancelled {
+                throw CancellationError()
+            }
+            lastError = exportSession.error ?? NSError(domain: "KinnectStudio", code: -2, userInfo: [NSLocalizedDescriptionKey: "Xuất video không thành công."])
         }
-        throw exportSession.error ?? NSError(domain: "KinnectStudio", code: -2, userInfo: [NSLocalizedDescriptionKey: "Xuất video không thành công."])
+
+        throw lastError ?? NSError(domain: "KinnectStudio", code: -2, userInfo: [NSLocalizedDescriptionKey: "Xuất video không thành công."])
     }
 
     private func prepareAssetAndAudioMix(from source: AVURLAsset) async throws -> (AVAsset, AVAudioMix?) {
         let hasCustomAudio = (musicURL != nil)
+        let hasVolumeChange = abs(originalAudioVolume - 1.0) > 0.01
         let hasRateChange = abs(playbackRate - 1) >= 0.05
         let hasTrim = trimIn > 0.05 || (duration > 0 && trimOut < duration - 0.05)
 
-        guard hasCustomAudio || hasRateChange || hasTrim else {
+        guard hasCustomAudio || hasVolumeChange || hasRateChange || hasTrim else {
             return (source, nil)
         }
 

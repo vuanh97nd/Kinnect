@@ -6,6 +6,7 @@ private func isoString(from anyVal: Any?) -> String {
     }
     if let n = anyVal as? NSNumber {
         let ms = n.doubleValue
+        guard ms > 0 else { return "" }
         let sec = ms > 10_000_000_000 ? (ms / 1000.0) : ms
         return ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: sec))
     }
@@ -64,6 +65,8 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
     var hasLocation: Bool
     var dmMode: String
     var accountRole: String
+    var groupRole: String = ""
+    var hasPassword: Bool = true
 
     var avatarURL: String? { avatarUrl.isEmpty ? nil : avatarUrl }
 
@@ -110,7 +113,9 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         discoverable: Bool = true,
         hasLocation: Bool = false,
         dmMode: String = "everyone",
-        accountRole: String = ""
+        accountRole: String = "",
+        groupRole: String = "",
+        hasPassword: Bool = true
     ) {
         self.id = id
         self.name = name
@@ -155,6 +160,8 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
         self.hasLocation = hasLocation
         self.dmMode = dmMode
         self.accountRole = accountRole
+        self.groupRole = groupRole
+        self.hasPassword = hasPassword
     }
 
     init(json: [String: Any]) {
@@ -217,7 +224,7 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
             age: (dict["age"] as? Int) ?? (dict["userAge"] as? Int) ?? 0,
             gender: (dict["gender"] as? String) ?? "",
             orientation: (dict["orientation"] as? String) ?? (dict["sexualOrientation"] as? String) ?? "",
-            communityRole: (dict["communityRole"] as? String) ?? (dict["role"] as? String) ?? "",
+            communityRole: (dict["communityRole"] as? String) ?? "",
             coins: (dict["coins"] as? Int) ?? (dict["coinBalance"] as? Int) ?? (dict["balance"] as? Int) ?? ((dict["coins"] as? NSNumber)?.intValue) ?? 0,
             height: (dict["height"] as? Int) ?? Int((dict["height"] as? String) ?? "") ?? 0,
             weight: (dict["weight"] as? Int) ?? Int((dict["weight"] as? String) ?? "") ?? 0,
@@ -233,7 +240,11 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
             joinedAt: joined,
             identityPublic: (dict["identityPublic"] as? Bool) ?? true,
             profileVisibility: visDict,
-            showActivity: (dict["showActivity"] as? Bool) ?? (dict["show_activity"] as? Int).map { $0 == 1 } ?? true,
+            showActivity: (dict["showActivity"] as? Bool)
+                ?? (dict["show_activity"] as? Int).map { $0 == 1 }
+                ?? (dict["activityShared"] as? Bool)
+                ?? (dict["activity_shared"] as? Int).map { $0 == 1 }
+                ?? false,
             showDistance: (dict["showDistance"] as? Bool) ?? (dict["show_distance"] as? Int).map { $0 == 1 } ?? true,
             discoverable: (dict["discoverable"] as? Bool) ?? (dict["discoverable"] as? Int).map { $0 == 1 } ?? true,
             hasLocation: (dict["hasLocation"] as? Bool) ?? false,
@@ -241,7 +252,9 @@ struct KinnectUser: Identifiable, Hashable, Equatable {
                 let raw = (dict["dmMode"] as? String) ?? (dict["dm_mode"] as? String) ?? "everyone"
                 return raw == "friends" ? "friends" : "everyone"
             }(),
-            accountRole: (dict["role"] as? String) ?? ""
+            accountRole: (dict["role"] as? String) ?? "",
+            groupRole: (dict["groupRole"] as? String) ?? (dict["group_role"] as? String) ?? "",
+            hasPassword: (dict["hasPassword"] as? Bool) ?? true
         )
     }
 }
@@ -271,6 +284,7 @@ struct SharedPostPreview: Identifiable, Equatable {
     var createdAt: String
     var imageUrl: String
     var mediaKind: String
+    var thumbnailUrl: String = ""
     var mediaItems: [PostMediaEntry]
 
     static func from(_ dict: [String: Any]) -> SharedPostPreview {
@@ -284,6 +298,7 @@ struct SharedPostPreview: Identifiable, Equatable {
             createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
             imageUrl: (mediaDict?["url"] as? String) ?? items.first?.url ?? "",
             mediaKind: (mediaDict?["kind"] as? String) ?? items.first?.kind ?? "image",
+            thumbnailUrl: (mediaDict?["thumbnail"] as? String) ?? (dict["thumbnailUrl"] as? String) ?? items.first?.thumbnail ?? "",
             mediaItems: items
         )
     }
@@ -322,6 +337,7 @@ struct PostItem: Identifiable, Equatable {
     var commentsCount: Int
     var liked: Bool
     var userReaction: String
+    var reactions: [String: Int] = [:]
     var mediaKind: String = "image"
     var thumbnailUrl: String = ""
     var mediaItems: [PostMediaEntry] = []
@@ -329,6 +345,7 @@ struct PostItem: Identifiable, Equatable {
     var bookmarked: Bool = false
     var sharesCount: Int = 0
     var sharedPost: SharedPostPreview? = nil
+    var visibility: String = "public"
 
     static func from(_ dict: [String: Any]) -> PostItem {
         let authorDict = (dict["author"] as? [String: Any]) ?? (dict["user"] as? [String: Any]) ?? dict
@@ -337,6 +354,16 @@ struct PostItem: Identifiable, Equatable {
         let items = (dict["mediaItems"] as? [[String: Any]])?.map(PostMediaEntry.from) ?? []
         let tags = (dict["hashtags"] as? [String]) ?? []
         let shared = (dict["sharedPost"] as? [String: Any]).map(SharedPostPreview.from)
+        let isLiked = (dict["liked"] as? Bool) ?? false
+        let rawReaction = (dict["userReaction"] as? String) ?? (dict["myReaction"] as? String)
+        let resolvedReaction = (rawReaction?.isEmpty == false) ? rawReaction! : (isLiked ? "like" : "")
+        var rxCounts: [String: Int] = [:]
+        if let rawRx = dict["reactions"] as? [String: Any] {
+            for (k, v) in rawRx {
+                if let n = v as? Int, n > 0 { rxCounts[k] = n }
+                else if let n = (v as? NSNumber)?.intValue, n > 0 { rxCounts[k] = n }
+            }
+        }
         return PostItem(
             id: (dict["id"] as? String) ?? UUID().uuidString,
             author: KinnectUser.from(authorDict),
@@ -346,15 +373,17 @@ struct PostItem: Identifiable, Equatable {
             createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
             likesCount: (dict["likesCount"] as? Int) ?? (dict["likes"] as? Int) ?? 0,
             commentsCount: (dict["commentsCount"] as? Int) ?? (dict["comments"] as? Int) ?? 0,
-            liked: (dict["liked"] as? Bool) ?? false,
-            userReaction: (dict["userReaction"] as? String) ?? (dict["myReaction"] as? String) ?? "like",
+            liked: isLiked,
+            userReaction: resolvedReaction,
+            reactions: rxCounts,
             mediaKind: (mediaDict?["kind"] as? String) ?? (dict["mediaKind"] as? String) ?? (img.lowercased().contains(".mp4") ? "video" : "image"),
-            thumbnailUrl: (mediaDict?["thumbnail"] as? String) ?? "",
+            thumbnailUrl: (mediaDict?["thumbnail"] as? String) ?? (dict["thumbnailUrl"] as? String) ?? items.first?.thumbnail ?? "",
             mediaItems: items,
             hashtags: tags,
             bookmarked: (dict["bookmarked"] as? Bool) ?? false,
             sharesCount: (dict["shares"] as? Int) ?? 0,
-            sharedPost: shared
+            sharedPost: shared,
+            visibility: (dict["visibility"] as? String) ?? "public"
         )
     }
 }
@@ -369,6 +398,7 @@ struct StoryItem: Identifiable, Equatable {
     var viewsCount: Int
     var viewed: Bool
     var mediaKind: String = "image"
+    var thumbnailUrl: String = ""
 
     static func from(_ dict: [String: Any]) -> StoryItem {
         let authorDict = (dict["author"] as? [String: Any]) ?? (dict["user"] as? [String: Any]) ?? dict
@@ -396,7 +426,8 @@ struct StoryItem: Identifiable, Equatable {
             createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
             viewsCount: (dict["viewsCount"] as? Int) ?? (dict["viewCount"] as? Int) ?? 0,
             viewed: (dict["viewed"] as? Bool) ?? false,
-            mediaKind: (mediaDict?["kind"] as? String) ?? (img.lowercased().contains(".mp4") ? "video" : "image")
+            mediaKind: (mediaDict?["kind"] as? String) ?? (img.lowercased().contains(".mp4") ? "video" : "image"),
+            thumbnailUrl: (mediaDict?["thumbnail"] as? String) ?? (dict["thumbnailUrl"] as? String) ?? (dict["thumbnail"] as? String) ?? ""
         )
     }
 }
@@ -439,11 +470,13 @@ struct ShortItem: Identifiable, Equatable {
     var viewsCount: Int
     var liked: Bool
     var createdAt: String
+    var thumbnailUrl: String = ""
 
     static func from(_ dict: [String: Any]) -> ShortItem {
         let sid = (dict["id"] as? String) ?? UUID().uuidString
         let authorDict = (dict["author"] as? [String: Any]) ?? (dict["user"] as? [String: Any]) ?? dict
         let vUrl = (dict["videoUrl"] as? String) ?? (dict["video"] as? String) ?? "/api/shorts/\(sid)/video"
+        let thumb = (dict["thumbnail"] as? String) ?? (dict["thumbnailUrl"] as? String) ?? ""
         return ShortItem(
             id: sid,
             author: KinnectUser.from(authorDict),
@@ -455,7 +488,8 @@ struct ShortItem: Identifiable, Equatable {
             commentsCount: (dict["commentsCount"] as? Int) ?? (dict["comments"] as? Int) ?? 0,
             viewsCount: (dict["viewsCount"] as? Int) ?? (dict["views"] as? Int) ?? 0,
             liked: (dict["liked"] as? Bool) ?? false,
-            createdAt: isoString(from: dict["createdAt"] ?? dict["created"])
+            createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
+            thumbnailUrl: thumb
         )
     }
 }
@@ -476,6 +510,7 @@ struct DirectMessageItem: Identifiable, Equatable {
     var myReaction: String = ""
     var replyTo: ChatReplyPreview? = nil
     var editedAt: String = ""
+    var recalled: Bool = false
 
     var isSeen: Bool { !seenAt.isEmpty }
 
@@ -533,7 +568,8 @@ struct DirectMessageItem: Identifiable, Equatable {
             reactions: rxDict,
             myReaction: myRx,
             replyTo: (dict["replyTo"] as? [String: Any]).map(ChatReplyPreview.from),
-            editedAt: dict["editedAt"] != nil && !(dict["editedAt"] is NSNull) ? isoString(from: dict["editedAt"]) : ""
+            editedAt: dict["editedAt"] != nil && !(dict["editedAt"] is NSNull) ? isoString(from: dict["editedAt"]) : "",
+            recalled: (dict["recalled"] as? Bool) ?? ((dict["recalled"] as? Int) == 1)
         )
     }
 }
@@ -548,6 +584,8 @@ struct ChatGroupItem: Identifiable, Hashable, Equatable {
     var unreadCount: Int
     var updatedAt: String
     var members: [KinnectUser] = []
+    var avatarUrl: String = ""
+    var ownerId: String = ""
 
     static func from(_ dict: [String: Any]) -> ChatGroupItem {
         let membersArray = (dict["members"] as? [[String: Any]])?.map(KinnectUser.from) ?? []
@@ -555,6 +593,8 @@ struct ChatGroupItem: Identifiable, Hashable, Equatable {
         let lastObj = (dict["lastMessage"] as? [String: Any]) ?? (dict["last"] as? [String: Any])
         let lastText = (lastObj?["text"] as? String) ?? (lastObj?["body"] as? String) ?? (dict["lastMessageText"] as? String) ?? ""
         let updated = isoString(from: lastObj?["createdAt"] ?? lastObj?["created"] ?? dict["updatedAt"] ?? dict["created"])
+        let av = (dict["avatarUrl"] as? String) ?? (dict["avatar"] as? String) ?? ""
+        let owner = (dict["owner"] as? String) ?? (dict["ownerId"] as? String) ?? ""
         return ChatGroupItem(
             id: (dict["id"] as? String) ?? UUID().uuidString,
             name: (dict["name"] as? String) ?? "Nhóm Kinnect",
@@ -564,7 +604,9 @@ struct ChatGroupItem: Identifiable, Hashable, Equatable {
             lastMessageText: lastText,
             unreadCount: (dict["unreadCount"] as? Int) ?? (dict["unread"] as? Int) ?? 0,
             updatedAt: updated,
-            members: membersArray
+            members: membersArray,
+            avatarUrl: av,
+            ownerId: owner
         )
     }
 }
@@ -584,6 +626,7 @@ struct GroupMessageItem: Identifiable, Equatable {
     var myReaction: String = ""
     var replyTo: ChatReplyPreview? = nil
     var editedAt: String = ""
+    var recalled: Bool = false
 
     static func from(_ dict: [String: Any]) -> GroupMessageItem {
         let senderDict = (dict["sender"] as? [String: Any]) ?? (dict["author"] as? [String: Any]) ?? (dict["user"] as? [String: Any]) ?? dict
@@ -614,7 +657,8 @@ struct GroupMessageItem: Identifiable, Equatable {
             reactions: rxDict,
             myReaction: myRx,
             replyTo: (dict["replyTo"] as? [String: Any]).map(ChatReplyPreview.from),
-            editedAt: dict["editedAt"] != nil && !(dict["editedAt"] is NSNull) ? isoString(from: dict["editedAt"]) : ""
+            editedAt: dict["editedAt"] != nil && !(dict["editedAt"] is NSNull) ? isoString(from: dict["editedAt"]) : "",
+            recalled: (dict["recalled"] as? Bool) ?? ((dict["recalled"] as? Int) == 1)
         )
     }
 }
@@ -628,6 +672,7 @@ struct NotificationItem: Identifiable, Equatable {
     var actor: KinnectUser
     var ref: String = ""
     var commentId: String = ""
+    var targetKind: String = ""
 
     static func from(_ dict: [String: Any]) -> NotificationItem {
         let actorDict = (dict["actor"] as? [String: Any]) ?? [:]
@@ -640,7 +685,8 @@ struct NotificationItem: Identifiable, Equatable {
             createdAt: isoString(from: dict["createdAt"] ?? dict["created"]),
             actor: KinnectUser.from(actorDict),
             ref: (dict["ref"] as? String) ?? (dict["targetId"] as? String) ?? "",
-            commentId: (dict["commentId"] as? String) ?? ""
+            commentId: (dict["commentId"] as? String) ?? "",
+            targetKind: (dict["targetKind"] as? String) ?? (dict["target_kind"] as? String) ?? ""
         )
     }
 }
@@ -652,6 +698,7 @@ struct LiveRoomItem: Identifiable, Hashable, Equatable {
     var liveMode: String // "chat" | "game" (no karaoke)
     var gameTitle: String
     var gamePaused: Bool
+    var comments: Bool = true
     var viewerCount: Int
     var likesCount: Int = 0
     var hostUserId: String
@@ -673,7 +720,8 @@ struct LiveRoomItem: Identifiable, Hashable, Equatable {
             topic: (dict["topic"] as? String) ?? "",
             liveMode: normalizedMode,
             gameTitle: (dict["gameTitle"] as? String) ?? "",
-            gamePaused: (dict["gamePaused"] as? Bool) ?? false,
+            gamePaused: (dict["gamePaused"] as? Bool) ?? (dict["screenPaused"] as? Bool) ?? false,
+            comments: (dict["comments"] as? Bool) ?? true,
             viewerCount: viewers,
             likesCount: likes,
             hostUserId: (dict["hostUserId"] as? String) ?? (dict["hostId"] as? String) ?? (hostDict["id"] as? String) ?? "",
@@ -691,10 +739,29 @@ struct LiveChatMessage: Identifiable, Equatable {
     var createdAt: String
 
     static func from(_ dict: [String: Any]) -> LiveChatMessage {
-        let uDict = (dict["user"] as? [String: Any]) ?? dict
+        let parsedUser: KinnectUser
+        if let userDict = dict["user"] as? [String: Any] {
+            parsedUser = KinnectUser.from(userDict)
+        } else {
+            let senderId = (dict["senderId"] as? String) ?? (dict["userId"] as? String) ?? ""
+            var synthDict: [String: Any] = [
+                "id": senderId,
+                "name": (dict["name"] as? String) ?? (dict["senderName"] as? String) ?? "Người dùng Kinnect"
+            ]
+            if let av = (dict["avatarUrl"] as? String) ?? (dict["avatar"] as? String) {
+                synthDict["avatarUrl"] = av
+            }
+            if let col = (dict["avatarColor"] as? String) ?? (dict["color"] as? String) {
+                synthDict["avatarColor"] = col
+            }
+            if let handle = (dict["username"] as? String) ?? (dict["handle"] as? String) {
+                synthDict["username"] = handle
+            }
+            parsedUser = KinnectUser.from(synthDict)
+        }
         return LiveChatMessage(
             id: (dict["id"] as? String) ?? UUID().uuidString,
-            user: KinnectUser.from(uDict),
+            user: parsedUser,
             text: (dict["text"] as? String) ?? (dict["message"] as? String) ?? "",
             createdAt: isoString(from: dict["createdAt"] ?? dict["created"])
         )
@@ -939,20 +1006,46 @@ struct StorePackageItem: Identifiable, Equatable {
 
 struct StoreDigitalProduct: Identifiable, Equatable {
     var id: String
+    var kind: String = "style"
     var title: String
     var description: String
     var priceLabel: String
     var coinsGranted: Int
+    var accentColor: String = "#7C3AED"
+    var secondaryColor: String = "#EC4899"
+    var owned: Bool = false
+    var equipped: Bool = false
 
     static func from(_ dict: [String: Any]) -> StoreDigitalProduct {
+        let prodId = (dict["id"] as? String) ?? (dict["productId"] as? String) ?? ""
         let vnd = (dict["referenceVnd"] as? Int) ?? 0
-        let fallbackPrice = vnd > 0 ? "\(vnd)đ" : "StoreKit 2"
+        let fallbackPrice = vnd > 0 ? "\(vnd.formattedWithSeparator())đ" : "App Store"
+        let colors = dict["colors"] as? [String] ?? []
+        let coinsGranted = (dict["coinsGranted"] as? Int) ?? (dict["coins"] as? Int) ?? 0
+        let explicitKind = ((dict["kind"] as? String) ?? (dict["category"] as? String) ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowerId = prodId.lowercased()
+        let resolvedKind: String
+        if !explicitKind.isEmpty {
+            resolvedKind = explicitKind
+        } else if coinsGranted > 0 || lowerId.contains(".coins.") || lowerId.hasPrefix("coins_") {
+            resolvedKind = "coins"
+        } else if lowerId.contains("studio") {
+            resolvedKind = "studio"
+        } else {
+            resolvedKind = "style"
+        }
         return StoreDigitalProduct(
-            id: (dict["id"] as? String) ?? (dict["productId"] as? String) ?? "",
-            title: (dict["title"] as? String) ?? (dict["name"] as? String) ?? "Gói nạp",
+            id: prodId,
+            kind: resolvedKind,
+            title: (dict["title"] as? String) ?? (dict["name"] as? String) ?? "Gói Kinnect",
             description: (dict["description"] as? String) ?? "",
             priceLabel: (dict["priceLabel"] as? String) ?? fallbackPrice,
-            coinsGranted: (dict["coinsGranted"] as? Int) ?? (dict["coins"] as? Int) ?? 0
+            coinsGranted: coinsGranted,
+            accentColor: colors.first ?? "#7C3AED",
+            secondaryColor: colors.count > 1 ? colors[1] : (colors.first ?? "#C026D3"),
+            owned: (dict["owned"] as? Bool) ?? false,
+            equipped: (dict["equipped"] as? Bool) ?? false
         )
     }
 }

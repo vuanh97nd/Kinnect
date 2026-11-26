@@ -3,6 +3,7 @@ import SwiftUI
 /// Startup Splash Screen matching Android 1.2.12 MainActivity.splash() (lines 134-152)
 /// Centered 96dp Logo K, Kinnect title, and animated interlocking dual rings.
 struct KinnectSplashScreen: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var ringOffset: CGFloat = 16
     @State private var pulse: CGFloat = 1.0
 
@@ -38,6 +39,11 @@ struct KinnectSplashScreen: View {
             }
         }
         .onAppear {
+            guard !reduceMotion else {
+                ringOffset = 10
+                pulse = 1.0
+                return
+            }
             withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
                 ringOffset = 5
                 pulse = 1.05

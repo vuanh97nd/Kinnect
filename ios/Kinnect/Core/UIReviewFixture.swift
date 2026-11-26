@@ -6,7 +6,20 @@ import UIKit
 /// Isolated UI review fixture mode activated ONLY when launched with `--ui-review-screen <name>`.
 /// Clearly labeled as fixture data, never touches production servers, tokens, passwords, or real users.
 enum UIReviewFixture {
+    #if DEBUG
+    /// Runtime overrides driven solely by `#if DEBUG` deep-link (`kinnect://ui-review?...`)
+    /// so a single simulator session (such as run.cloud) can switch screens/themes/Dynamic Type live.
+    static var overrideScreen: String? = nil
+    static var overrideLightMode: Bool? = nil
+    static var overrideMaxDynamicType: Bool? = nil
+    #endif
+
     static var activeScreen: String? {
+        #if DEBUG
+        if let override = overrideScreen, !override.isEmpty {
+            return override
+        }
+        #endif
         let args = CommandLine.arguments
         if let idx = args.firstIndex(of: "--ui-review-screen"), idx + 1 < args.count {
             return args[idx + 1]
@@ -15,15 +28,64 @@ enum UIReviewFixture {
     }
 
     static var forceLightMode: Bool {
-        CommandLine.arguments.contains("--ui-review-light")
+        #if DEBUG
+        if let override = overrideLightMode {
+            return override
+        }
+        #endif
+        return CommandLine.arguments.contains("--ui-review-light")
     }
 
     static var forceMaxDynamicType: Bool {
-        CommandLine.arguments.contains("--ui-review-dynamictype-max")
+        #if DEBUG
+        if let override = overrideMaxDynamicType {
+            return override
+        }
+        #endif
+        return CommandLine.arguments.contains("--ui-review-dynamictype-max")
     }
 
     static var isEnabled: Bool {
         activeScreen != nil
+    }
+
+    /// Synchronizes AppState, WebRTC, Live, and Localization singletons before rendering a fixture screen
+    /// so sequential deep-link switches in a single simulator session never leak transient state.
+    @MainActor
+    static func prepareRuntimeState(for screenName: String) {
+        let appState = AppState.shared
+        NativeWebRTCManager.shared.activeCall = nil
+        appState.leaveCurrentLiveRoom()
+        appState.liveRooms = []
+        appState.activeReportContext = nil
+        appState.pendingPrivacyConsent = nil
+        appState.toastMessage = nil
+        appState.isRestoringSession = false
+
+        let targetLang: AppLanguage = screenName.hasSuffix("-en") ? .en : .vi
+        if LocalizationManager.shared.currentLanguage != targetLang {
+            LocalizationManager.shared.setLanguage(targetLang)
+        }
+
+        let isUnauthenticated =
+            screenName == "splash"
+            || screenName == "auth"
+            || screenName.hasPrefix("auth-")
+            || screenName == "forgot-password"
+
+        if isUnauthenticated {
+            appState.currentUser = nil
+            appState.onlineUserIds = []
+            appState.unreadNotificationsCount = 0
+            appState.unreadMessagesCount = 0
+            appState.pendingFriendRequestsCount = 0
+        } else {
+            appState.currentUser = KinnectUser.from(currentUserDict)
+            appState.onlineUserIds = ["fixture_user_peer"]
+            appState.unreadNotificationsCount = 1
+            appState.unreadMessagesCount = 2
+            appState.pendingFriendRequestsCount = 1
+        }
     }
 
     /// Camera and microphone prompts belong only to capture, live, and call screens.
@@ -62,6 +124,7 @@ enum UIReviewFixture {
         "followingCount": 95,
         "postsCount": 24,
         "joinedAt": 1704067200000,
+        "coins": 12500,
         "identityPublic": true,
         "isPrivate": false
     ]
@@ -150,7 +213,7 @@ enum UIReviewFixture {
 
         switch cleanPath {
         case "/api/me":
-            if let act = activeScreen, act.hasPrefix("auth") || act == "forgot-password" {
+            if let act = activeScreen, act == "splash" || act.hasPrefix("auth") || act == "forgot-password" {
                 return [:]
             }
             return ["user": currentUserDict]
@@ -168,6 +231,7 @@ enum UIReviewFixture {
                         "commentsCount": 8,
                         "liked": true,
                         "userReaction": "love",
+                        "reactions": ["love": 26, "like": 12, "haha": 4],
                         "createdAt": "2026-11-07T01:30:00.000Z"
                     ],
                     [
@@ -210,6 +274,13 @@ enum UIReviewFixture {
             ]
 
         case "/api/discover":
+            if activeScreen == "discover-empty" {
+                return [
+                    "people": [],
+                    "users": [],
+                    "posts": []
+                ]
+            }
             let users: [[String: Any]] = [
                 [
                     "id": "fixture_user_1",
@@ -232,7 +303,7 @@ enum UIReviewFixture {
                     "id": "fixture_user_2",
                     "name": "Nguyễn Thị Thanh Trúc",
                     "handle": "thanhtruc_hn",
-                    "bio": "Âm nhạc, du lịch & công nghệ",
+                    "bio": "Âm nhạc, cà phê & du lịch",
                     "locationName": "Hà Nội",
                     "avatarColor": "#EC4899",
                     "age": 22,
@@ -355,9 +426,39 @@ enum UIReviewFixture {
                     "isFriend": true
                 ]
             ]
+            let queryParam = URLComponents(string: "https://fixture.local" + path)?
+                .queryItems?
+                .first(where: { $0.name == "q" })?
+                .value?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let effectiveQuery: String
+            if !queryParam.isEmpty {
+                effectiveQuery = queryParam
+            } else if activeScreen == "discover-results" || activeScreen == "discover-search" {
+                effectiveQuery = "cà phê"
+            } else {
+                effectiveQuery = ""
+            }
+            let filteredUsers: [[String: Any]]
+            if effectiveQuery.isEmpty {
+                filteredUsers = users
+            } else {
+                let viLocale = Locale(identifier: "vi_VN")
+                let needle = effectiveQuery.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: viLocale)
+                filteredUsers = users.filter { u in
+                    let haystack = [
+                        u["name"] as? String ?? "",
+                        u["handle"] as? String ?? "",
+                        u["bio"] as? String ?? "",
+                        u["locationName"] as? String ?? ""
+                    ].joined(separator: " ")
+                        .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: viLocale)
+                    return haystack.contains(needle)
+                }
+            }
             return [
-                "people": users,
-                "users": users
+                "people": filteredUsers,
+                "users": filteredUsers
             ]
 
         case "/api/shorts":
@@ -396,17 +497,24 @@ enum UIReviewFixture {
             ]
 
         case "/api/conversations":
+            let iso = ISO8601DateFormatter()
+            let t1 = iso.string(from: Date().addingTimeInterval(-5 * 60))
+            let t2 = iso.string(from: Date().addingTimeInterval(-95 * 60))
             return [
                 "conversations": [
                     [
                         "user": peerUserDict,
                         "preview": "[Fixture UI] Hẹn gặp lúc 19h tối nay nhé!",
-                        "unreadCount": 2
+                        "unreadCount": 2,
+                        "updatedAt": t1,
+                        "lastTime": t1
                     ],
                     [
                         "user": secondPeerDict,
                         "preview": "[Fixture UI] Đã gửi bộ icon mới cho iOS.",
-                        "unreadCount": 0
+                        "unreadCount": 0,
+                        "updatedAt": t2,
+                        "lastTime": t2
                     ]
                 ]
             ]
@@ -494,6 +602,19 @@ enum UIReviewFixture {
                 ]
             ]
 
+        case _ where cleanPath.hasSuffix("/reactions"):
+            var r1 = peerUserDict
+            r1["reaction"] = "love"
+            var r2 = secondPeerDict
+            r2["reaction"] = "love"
+            var r3 = thirdPeerDict
+            r3["reaction"] = "like"
+            var r4 = currentUserDict
+            r4["reaction"] = "haha"
+            return [
+                "users": [r1, r2, r3, r4]
+            ]
+
         case _ where cleanPath.hasSuffix("/comments"):
             return [
                 "comments": [
@@ -576,8 +697,13 @@ enum UIReviewFixture {
         case "/api/store":
             return [
                 "ownedPackages": ["style_aurora"],
+                "appearance": "style_aurora",
                 "liveTheme": "",
                 "membership": "",
+                "trialPackagePurchases": true,
+                "purchasedCoins": 800,
+                "giftedCoins": 400,
+                "trialCoins": 400,
                 "packages": [
                     [
                         "id": "style_aurora",
@@ -792,6 +918,7 @@ enum UIReviewFixture {
                 "products": [
                     [
                         "id": "vn.kinnect.coins.100",
+                        "kind": "coins",
                         "title": "Gói 100 Xu Kinnect",
                         "description": "Nạp 100 xu vào số dư tài khoản Kinnect",
                         "priceLabel": "10.000 ₫",
@@ -799,6 +926,7 @@ enum UIReviewFixture {
                     ],
                     [
                         "id": "vn.kinnect.coins.500",
+                        "kind": "coins",
                         "title": "Gói 500 Xu Kinnect",
                         "description": "Nạp 500 xu vào số dư tài khoản Kinnect",
                         "priceLabel": "50.000 ₫",
@@ -806,6 +934,7 @@ enum UIReviewFixture {
                     ],
                     [
                         "id": "vn.kinnect.coins.1000",
+                        "kind": "coins",
                         "title": "Gói 1.000 Xu Kinnect",
                         "description": "Nạp 1.000 xu vào số dư tài khoản Kinnect",
                         "priceLabel": "100.000 ₫",
@@ -813,6 +942,7 @@ enum UIReviewFixture {
                     ],
                     [
                         "id": "vn.kinnect.coins.2000",
+                        "kind": "coins",
                         "title": "Gói 2.000 Xu Kinnect",
                         "description": "Nạp 2.000 xu vào số dư tài khoản Kinnect",
                         "priceLabel": "200.000 ₫",
@@ -820,6 +950,7 @@ enum UIReviewFixture {
                     ],
                     [
                         "id": "vn.kinnect.coins.5000",
+                        "kind": "coins",
                         "title": "Gói 5.000 Xu Kinnect",
                         "description": "Nạp 5.000 xu vào số dư tài khoản Kinnect",
                         "priceLabel": "500.000 ₫",
@@ -827,6 +958,7 @@ enum UIReviewFixture {
                     ],
                     [
                         "id": "vn.kinnect.coins.10000",
+                        "kind": "coins",
                         "title": "Gói 10.000 Xu Kinnect",
                         "description": "Nạp 10.000 xu vào số dư tài khoản Kinnect",
                         "priceLabel": "1.000.000 ₫",
@@ -836,6 +968,9 @@ enum UIReviewFixture {
             ]
 
         case "/api/live/rooms":
+            if activeScreen == "live-empty" {
+                return ["rooms": []]
+            }
             return [
                 "rooms": [
                     [
@@ -863,6 +998,25 @@ enum UIReviewFixture {
                 ]
             ]
 
+        case "/api/live/gifts":
+            return [
+                "version": 1,
+                "balance": 12500,
+                "inventory": [
+                    ["giftId": "rose", "quantity": 3],
+                    ["giftId": "heart", "quantity": 2]
+                ],
+                "items": LiveGiftCatalogItem.defaultCatalog.map { gift in
+                    [
+                        "id": gift.id,
+                        "label": gift.label,
+                        "emoji": gift.emoji,
+                        "coins": gift.coins,
+                        "tier": gift.tier
+                    ] as [String: Any]
+                }
+            ]
+
         case "/api/me/private/requests":
             return [
                 "requests": [
@@ -884,18 +1038,22 @@ enum UIReviewFixture {
                 "sessions": [
                     [
                         "id": "fixture_sess_1",
-                        "userAgent": "iPhone 16 Pro • iOS 18.2 (Thiết bị hiện tại)",
-                        "deviceName": "iPhone 16 Pro (Thiết bị này)",
+                        "label": "iPhone 17e • iOS 26.5",
+                        "userAgent": "iPhone 17e • iOS 26.5 (Thiết bị hiện tại)",
+                        "deviceName": "iPhone 17e (Thiết bị này)",
                         "ip": "127.0.0.1",
                         "current": true,
+                        "expires": Int64(Date().addingTimeInterval(86400 * 14).timeIntervalSince1970 * 1000),
                         "lastActive": "Vừa xong"
                     ],
                     [
                         "id": "fixture_sess_2",
-                        "userAgent": "iPad Pro 11-inch • iPadOS 18.2",
-                        "deviceName": "iPad Pro 11-inch",
+                        "label": "iPad (A16) • iPadOS 26.5",
+                        "userAgent": "iPad (A16) • iPadOS 26.5",
+                        "deviceName": "iPad (A16)",
                         "ip": "192.168.1.15",
                         "current": false,
+                        "expires": Int64(Date().addingTimeInterval(86400 * 7).timeIntervalSince1970 * 1000),
                         "lastActive": "2 giờ trước"
                     ]
                 ]
@@ -1263,12 +1421,38 @@ enum UIReviewFixture {
         return fileURL
     }
 
+    static func mockStories() -> [StoryItem] {
+        return [
+            StoryItem.from([
+                "id": "fixture_story_1",
+                "author": peerUserDict,
+                "text": "Hoàng hôn trên cầu Rồng cuối tuần 🌅",
+                "imageUrl": sampleImageDataURL,
+                "backgroundColor": "#7C3AED",
+                "viewed": false,
+                "viewsCount": 15,
+                "createdAt": "2026-11-07T01:20:00.000Z"
+            ]),
+            StoryItem.from([
+                "id": "fixture_story_2",
+                "author": secondPeerDict,
+                "text": "Cuối tuần cà phê Sài Gòn cùng bạn bè ☕",
+                "backgroundColor": "#EC4899",
+                "viewed": true,
+                "viewsCount": 9,
+                "createdAt": "2026-11-07T00:50:00.000Z"
+            ])
+        ]
+    }
+
     /// Creates the appropriate SwiftUI view for the given screen name.
-    /// Used by SceneDelegate when --ui-review-screen argument is provided.
+    /// Used by SceneDelegate when --ui-review-screen or `#if DEBUG` deep-link is active.
     @MainActor
     static func makeView(for screenName: String) -> AnyView {
         switch screenName {
-        // MARK: - Auth Screens
+        // MARK: - Splash & Auth Screens
+        case "splash":
+            return AnyView(KinnectSplashScreen())
         case "auth-welcome", "auth":
             return AnyView(AuthView(initialStage: .welcome))
         case "auth-login", "auth-login-populated", "auth-login-error", "auth-login-keyboard", "auth-login-password-keyboard", "auth-login-en":
@@ -1278,42 +1462,38 @@ enum UIReviewFixture {
         case "auth-reset", "auth-forgot", "forgot-password":
             return AnyView(AuthView(initialStage: .forgotPassword))
 
-        // MARK: - Main Tabs (5 tabs)
+        // MARK: - Main Tabs (Real KinnectTopBar + KinnectBottomBar shell)
         case "feed":
             return AnyView(
-                NavigationStack {
+                UIReviewMainShell(selectedTab: .feed, activeTopSection: nil) {
                     FeedView(onOpenCamera: {}, onOpenFriends: {})
-                        .toolbar {
-                            RootMainView.headerLeadingLogoStatic()
-                            RootMainView.headerTrailingButtonsStatic()
-                        }
-                        .navigationTitle("")
-                        .navigationBarTitleDisplayMode(.inline)
                 }
             )
-        case "discover":
+        case "feed-story":
             return AnyView(
-                NavigationStack {
+                StoryDetailSheet(stories: UIReviewFixture.mockStories(), initialIndex: 0)
+            )
+        case "feed-post-detail":
+            return AnyView(
+                NotificationPostDetailView(post: UIReviewFixture.mockPosts()[0])
+            )
+        case "feed-comments":
+            return AnyView(
+                PostCommentsSheet(post: UIReviewFixture.mockPosts()[0], onChanged: {})
+            )
+        case "feed-reactions":
+            return AnyView(
+                PostReactorsSheet(postId: "fixture_post_1")
+            )
+        case "discover", "discover-empty", "discover-results", "discover-search":
+            return AnyView(
+                UIReviewMainShell(selectedTab: .discover, activeTopSection: nil) {
                     DiscoverView(onOpenCamera: {})
-                        .toolbar {
-                            RootMainView.headerLeadingLogoStatic()
-                            RootMainView.headerTrailingButtonsStatic()
-                        }
-                        .navigationTitle("")
-                        .navigationBarTitleDisplayMode(.inline)
                 }
             )
         case "create", "camera-studio":
             return AnyView(
-                NavigationStack {
-                    CameraStudioView()
-                        .toolbar {
-                            RootMainView.headerLeadingLogoStatic()
-                            RootMainView.headerTrailingButtonsStatic()
-                        }
-                        .navigationTitle("")
-                        .navigationBarTitleDisplayMode(.inline)
-                }
+                CameraStudioView(initialMode: .photo)
             )
         case "camera-studio-edit", "camera-studio-video-edit":
             return AnyView(
@@ -1321,23 +1501,35 @@ enum UIReviewFixture {
             )
         case "camera-studio-video":
             return AnyView(
-                NavigationStack {
-                    CameraStudioView(initialMode: .video)
-                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                        .navigationTitle("Video")
-                        .navigationBarTitleDisplayMode(.large)
-                }
+                CameraStudioView(initialMode: .video)
             )
         case "studio-pro-sheet":
             return AnyView(
                 NavigationStack {
-                    StudioProSheet(appliedEffect: .constant("Cinematic Teal & Orange"), onApply: { _ in })
+                    StudioProSheet(appliedEffect: .constant(StudioProPack.cinema.rawValue), onApply: { _ in })
                 }
             )
-        case "video", "shorts", "live":
-            // Exercise the real main container so header/safe-area regressions
-            // are visible in simulator captures.
-            return AnyView(RootMainView())
+        case "studio-music-picker":
+            return AnyView(
+                NavigationStack {
+                    StudioMusicPickerSheet(
+                        selectedTrack: .constant("LIỆU RẰNG · Remix DEMO"),
+                        onSelectTrack: { _, _ in }
+                    )
+                }
+            )
+        case "video", "shorts":
+            return AnyView(
+                UIReviewMainShell(selectedTab: .video, activeTopSection: nil) {
+                    ShortsVideoView()
+                }
+            )
+        case "live", "live-empty":
+            return AnyView(
+                UIReviewMainShell(selectedTab: .live, activeTopSection: nil) {
+                    LiveStreamView(onOpenWallet: {})
+                }
+            )
         case "live-room":
             return AnyView(
                 LiveStreamView(onOpenWallet: {})
@@ -1346,15 +1538,35 @@ enum UIReviewFixture {
             return AnyView(CreateLiveRoomSheet(initialMode: "chat"))
         case "live-setup-game":
             return AnyView(CreateLiveRoomSheet(initialMode: "game"))
+        case "live-gifts":
+            let fixtureRoom = LiveRoomItem.from([
+                "id": "fixture_live_1",
+                "title": "Giao lưu âm nhạc tối cuối tuần",
+                "topic": "Trò chuyện & kết nối bạn mới",
+                "liveMode": "chat",
+                "gameTitle": "",
+                "hostUserId": "fixture_user_peer",
+                "hostName": "Lê Hoàng Nam",
+                "hostAvatarColor": "#2563EB",
+                "viewerCount": 64
+            ])
+            AppState.shared.liveRooms = [fixtureRoom]
+            AppState.shared.currentLiveRoom = fixtureRoom
+            return AnyView(
+                LiveGiftDrawerSheet(
+                    roomId: fixtureRoom.id,
+                    gifts: LiveGiftCatalogItem.defaultCatalog,
+                    priceVersion: 1
+                )
+            )
 
         // MARK: - Messages & Chats
         case "messages":
             return AnyView(
-                NavigationStack {
-                    MessagesView(initialScope: .direct, onOpenFriends: {})
-                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                        .navigationTitle("Tin nhắn")
-                        .navigationBarTitleDisplayMode(.large)
+                UIReviewMainShell(selectedTab: .feed, activeTopSection: .messages) {
+                    NavigationStack {
+                        MessagesView(initialScope: .direct, onOpenFriends: {}, onBack: {})
+                    }
                 }
             )
         case "chat-detail", "chat-menu", "message-menu":
@@ -1382,10 +1594,6 @@ enum UIReviewFixture {
             return AnyView(
                 CallOverlayView()
             )
-        case "feed-comments":
-            return AnyView(
-                PostCommentsSheet(post: UIReviewFixture.mockPosts()[0], onChanged: {})
-            )
         case "shorts-comments":
             return AnyView(
                 ShortCommentsSheet(short: ShortItem.from([
@@ -1408,45 +1616,31 @@ enum UIReviewFixture {
         // MARK: - Profile & Settings
         case "profile":
             return AnyView(
-                NavigationStack {
-                    ProfileView(onOpenWallet: {}, onOpenFriends: {})
-                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                        .navigationTitle("Hồ sơ")
-                        .navigationBarTitleDisplayMode(.large)
+                UIReviewMainShell(selectedTab: .feed, activeTopSection: .profile) {
+                    ProfileView(onBack: {}, onOpenWallet: {}, onOpenFriends: {}, onOpenStore: {})
                 }
             )
         case "profile-posts":
             return AnyView(
-                NavigationStack {
-                    ProfileView(onOpenWallet: {}, onOpenFriends: {}, initialTab: .posts)
-                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                        .navigationTitle("Bài viết")
-                        .navigationBarTitleDisplayMode(.large)
+                UIReviewMainShell(selectedTab: .feed, activeTopSection: .profile) {
+                    ProfileView(onBack: {}, onOpenWallet: {}, onOpenFriends: {}, onOpenStore: {}, initialTab: .posts)
                 }
             )
         case "profile-albums":
             return AnyView(
-                NavigationStack {
-                    ProfileView(onOpenWallet: {}, onOpenFriends: {}, initialTab: .albums)
-                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                        .navigationTitle("Album ảnh")
-                        .navigationBarTitleDisplayMode(.large)
+                UIReviewMainShell(selectedTab: .feed, activeTopSection: .profile) {
+                    ProfileView(onBack: {}, onOpenWallet: {}, onOpenFriends: {}, onOpenStore: {}, initialTab: .albums)
                 }
             )
         case "profile-videos":
             return AnyView(
-                NavigationStack {
-                    ProfileView(onOpenWallet: {}, onOpenFriends: {}, initialTab: .videos)
-                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                        .navigationTitle("Video")
-                        .navigationBarTitleDisplayMode(.large)
+                UIReviewMainShell(selectedTab: .feed, activeTopSection: .profile) {
+                    ProfileView(onBack: {}, onOpenWallet: {}, onOpenFriends: {}, onOpenStore: {}, initialTab: .videos)
                 }
             )
         case "profile-edit":
             return AnyView(
-                NavigationStack {
-                    EditProfileSheet(onSaved: {})
-                }
+                EditProfileSheet(onSaved: {})
             )
         case "profile-public-album":
             return AnyView(
@@ -1466,83 +1660,54 @@ enum UIReviewFixture {
             )
         case "profile-sessions":
             return AnyView(
-                NavigationStack {
-                    ActiveSessionsSheet()
-                }
+                ActiveSessionsSheet()
             )
         case "account-menu", "me-menu":
             return AnyView(
-                NavigationStack {
-                    AccountMenuView(onOpenProfile: {}, onOpenWallet: {}, onOpenFriends: {})
+                UIReviewMainShell(selectedTab: .feed, activeTopSection: .profile) {
+                    AccountMenuView(onOpenProfile: {}, onOpenStore: {}, onOpenWallet: {}, onOpenFriends: {}, onBack: {})
                 }
             )
 
         // MARK: - Friends
         case "friends":
             return AnyView(
-                NavigationStack {
-                    FriendsView(initialTab: .friends)
-                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                        .navigationTitle("Bạn bè")
-                        .navigationBarTitleDisplayMode(.large)
+                UIReviewMainShell(selectedTab: .feed, activeTopSection: .friends) {
+                    FriendsView(initialTab: .friends, onBack: {})
                 }
             )
         case "friends-requests":
             return AnyView(
-                NavigationStack {
-                    FriendsView(initialTab: .requests)
-                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                        .navigationTitle("Lời mời kết bạn")
-                        .navigationBarTitleDisplayMode(.large)
+                UIReviewMainShell(selectedTab: .feed, activeTopSection: .friends) {
+                    FriendsView(initialTab: .requests, onBack: {})
                 }
             )
         case "friends-suggestions":
             return AnyView(
-                NavigationStack {
-                    FriendsView(initialTab: .friends)
-                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                        .navigationTitle("Gợi ý kết bạn")
-                        .navigationBarTitleDisplayMode(.large)
+                UIReviewMainShell(selectedTab: .feed, activeTopSection: .friends) {
+                    FriendsView(initialTab: .friends, onBack: {})
                 }
             )
 
         // MARK: - Notifications
         case "notifications":
             return AnyView(
-                NavigationStack {
-                    NotificationsView()
-                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                        .navigationTitle("Thông báo")
-                        .navigationBarTitleDisplayMode(.large)
+                UIReviewMainShell(selectedTab: .feed, activeTopSection: .notifications) {
+                    NotificationsView(onBack: {}, onOpenFriends: {}, onOpenMessages: {})
                 }
             )
 
         // MARK: - Wallet & Store
-        case "wallet":
+        case "wallet", "wallet-topup":
             return AnyView(
-                NavigationStack {
-                    WalletView()
-                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                        .navigationTitle("Ví Kinnect")
-                        .navigationBarTitleDisplayMode(.large)
+                UIReviewMainShell(selectedTab: .feed, activeTopSection: .wallet) {
+                    WalletView(onBack: {}, onOpenStore: {})
                 }
             )
         case "store", "wallet-packages", "store-packages":
             return AnyView(
-                NavigationStack {
-                    StoreView()
-                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                        .navigationTitle("Cửa hàng Kinnect")
-                        .navigationBarTitleDisplayMode(.large)
-                }
-            )
-        case "wallet-topup":
-            return AnyView(
-                NavigationStack {
-                    WalletView()
-                        .toolbar { RootMainView.headerTrailingButtonsStatic() }
-                        .navigationTitle("Nạp xu Kinnect")
-                        .navigationBarTitleDisplayMode(.large)
+                UIReviewMainShell(selectedTab: .feed, activeTopSection: .store) {
+                    StoreView(onBack: {}, onOpenWallet: {})
                 }
             )
 
@@ -1587,5 +1752,33 @@ enum UIReviewFixture {
         default:
             return AnyView(RootMainView())
         }
+    }
+}
+
+/// Real app chrome (`KinnectTopBar` + Content + `KinnectBottomBar`) for UI Review parity captures
+/// so iOS main screens match Android's 1:1 shell layout without splash delay or NavigationStack drift.
+private struct UIReviewMainShell<Content: View>: View {
+    let selectedTab: KinnectNavTab
+    let activeTopSection: KinnectTopSection?
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            KinnectTopBar(
+                appState: AppState.shared,
+                activeTopSection: .constant(activeTopSection),
+                onLogoTap: {}
+            )
+
+            content()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            KinnectBottomBar(
+                selectedTab: .constant(selectedTab),
+                isTopSectionActive: activeTopSection != nil,
+                onCreateTap: {}
+            )
+        }
+        .background(KinnectTheme.background.ignoresSafeArea())
     }
 }

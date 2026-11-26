@@ -18,9 +18,13 @@ struct DiscoverView: View {
     }
 
     @State private var segment: DiscoverSegment = .forYou
+    @State private var searchQuery: String = ""
+    @State private var hasExecutedSearch: Bool = false
+    @State private var selectedRadiusKm: Int = 50
     @State private var people: [KinnectUser] = []
     @State private var posts: [PostItem] = []
     @State private var isLoading = false
+    @State private var loadError: String? = nil
     @State private var locationStatusText: String?
     @State private var selectedUserForDetail: KinnectUser?
     @State private var activeFilterType: FilterSheetType?
@@ -58,8 +62,37 @@ struct DiscoverView: View {
             .padding(.horizontal, 14)
             .padding(.top, 6)
             .onChange(of: segment) { _ in
+                people = []
+                loadError = nil
                 Task { await loadCurrentSegment() }
             }
+
+            // Search bar (q)
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(KinnectTheme.textSecondary)
+                TextField(L10n.tr("Tìm tên, @username hoặc sở thích…"), text: $searchQuery)
+                    .font(.subheadline)
+                    .foregroundColor(KinnectTheme.textPrimary)
+                    .submitLabel(.search)
+                    .onSubmit {
+                        Task { await loadCurrentSegment() }
+                    }
+                if !searchQuery.isEmpty {
+                    Button {
+                        searchQuery = ""
+                        Task { await loadCurrentSegment() }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                    .accessibilityLabel(L10n.tr("Xóa tìm kiếm"))
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
+            .padding(.horizontal, 14)
 
             // 2. Quick Filter Chips Row (Android parity: Tuổi, Cân nặng, Chiều cao, Giới tính, Sliders)
             HStack(spacing: 6) {
@@ -91,17 +124,49 @@ struct DiscoverView: View {
             }
             .padding(.horizontal, 14)
 
-            // Location banner if Nearby segment
-            if let locationStatusText, segment == .nearby {
-                HStack(spacing: 6) {
-                    KinnectIcon(glyph: .nearby, size: 16, selected: true, tint: KinnectTheme.accentBright)
-                    Text(locationStatusText)
-                        .font(.caption2)
-                        .foregroundColor(KinnectTheme.textSecondary)
-                        .kinnectMultiline()
+            // Radius selector & location banner for Nearby segment
+            if segment == .nearby {
+                HStack(spacing: 8) {
+                    KinnectIcon(glyph: .nearby, size: 15, selected: true, tint: KinnectTheme.accentBright)
+                    if let locationStatusText {
+                        Text(locationStatusText)
+                            .font(.caption2)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                            .lineLimit(2)
+                    } else {
+                        Text(L10n.tr("Bán kính tìm quanh đây"))
+                            .font(.caption2.weight(.medium))
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
                     Spacer()
+                    Menu {
+                        ForEach([1, 5, 10, 25, 50], id: \.self) { km in
+                            Button {
+                                selectedRadiusKm = km
+                                Task { await loadCurrentSegment() }
+                            } label: {
+                                if selectedRadiusKm == km {
+                                    Label("\(km) km", systemImage: "checkmark")
+                                } else {
+                                    Text("\(km) km")
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("\(selectedRadiusKm) km")
+                                .font(.caption.bold())
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .foregroundColor(KinnectTheme.accentBright)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                    }
+                    .accessibilityLabel(L10n.tr("Chọn bán kính"))
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 14)
             }
 
             // 3. Main Content: 3-Column Adaptive Grid (Android AdaptivePeopleGrid)
@@ -138,6 +203,34 @@ struct DiscoverView: View {
                         .kinnectCard()
                     } else if isLoading && visiblePeople.isEmpty {
                         ProgressView().tint(KinnectTheme.accentBright).padding(.vertical, 40)
+                    } else if let loadError, visiblePeople.isEmpty {
+                        VStack(spacing: 12) {
+                            Image(systemName: "wifi.exclamationmark")
+                                .font(.largeTitle)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                            Text(L10n.tr("Không thể tải danh sách khám phá"))
+                                .font(.headline)
+                                .foregroundColor(KinnectTheme.textPrimary)
+                            Text(loadError)
+                                .font(.caption)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 24)
+                            Button {
+                                Task { await loadCurrentSegment() }
+                            } label: {
+                                Text(L10n.tr("Thử lại"))
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 22)
+                                    .frame(minHeight: 44)
+                                    .background(Capsule().fill(KinnectTheme.primaryGradient))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.vertical, 36)
+                        .frame(maxWidth: .infinity)
+                        .kinnectCard()
                     } else if visiblePeople.isEmpty {
                         emptyDiscoveryView
                     } else {
@@ -145,7 +238,7 @@ struct DiscoverView: View {
                             ForEach(visiblePeople) { person in
                                 DiscoverSquareUserTile(
                                     person: person,
-                                    isOnline: (person.isActive && person.showActivity) || appState.onlineUserIds.contains(person.id),
+                                    isOnline: person.showActivity && (person.isActive || appState.onlineUserIds.contains(person.id)),
                                     onTap: { selectedUserForDetail = person }
                                 )
                             }
@@ -163,6 +256,25 @@ struct DiscoverView: View {
         .navigationTitle("")
         .toolbar(.hidden, for: .navigationBar)
         .task {
+            if UIReviewFixture.activeScreen == "discover-results" || UIReviewFixture.activeScreen == "discover-search" {
+                if searchQuery.isEmpty {
+                    searchQuery = "cà phê"
+                    hasExecutedSearch = true
+                }
+            }
+            await loadCurrentSegment()
+        }
+        .task(id: searchQuery) {
+            let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                guard hasExecutedSearch else { return }
+                hasExecutedSearch = false
+                await loadCurrentSegment()
+                return
+            }
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            guard !Task.isCancelled else { return }
+            hasExecutedSearch = true
             await loadCurrentSegment()
         }
         .sheet(item: $activeFilterType) { filterType in
@@ -184,15 +296,7 @@ struct DiscoverView: View {
                     Task { await loadCurrentSegment() }
                 },
                 onReset: {
-                    minAge = 0; maxAge = 0
-                    minWeight = 0; maxWeight = 0
-                    minHeight = 0; maxHeight = 0
-                    selectedGender = ""
-                    selectedOrientation = ""
-                    selectedRole = ""
-                    selectedIntent = ""
-                    isOnlineOnly = false
-                    isRecentOnly = false
+                    resetAllFilters()
                     Task { await loadCurrentSegment() }
                 }
             )
@@ -257,32 +361,7 @@ struct DiscoverView: View {
 
     private var visiblePeople: [KinnectUser] {
         people.filter { p in
-            guard !appState.blockedUserIds.contains(p.id) && p.id != appState.currentUser?.id else { return false }
-            if minAge > 0 && p.age < minAge { return false }
-            if maxAge > 0 && p.age > maxAge { return false }
-            if minWeight > 0 && p.weight < minWeight { return false }
-            if maxWeight > 0 && p.weight > maxWeight { return false }
-            if minHeight > 0 && p.height < minHeight { return false }
-            if maxHeight > 0 && p.height > maxHeight { return false }
-            if isOnlineOnly && !(p.isActive || appState.onlineUserIds.contains(p.id)) { return false }
-            if isRecentOnly && !(p.isActive || appState.onlineUserIds.contains(p.id) || p.joinedAt > 0) { return false }
-            if !selectedGender.isEmpty {
-                let wanted = Self.canonicalGender(selectedGender)
-                let actual = Self.canonicalGender(p.gender)
-                if actual != wanted && !p.gender.localizedCaseInsensitiveContains(selectedGender) { return false }
-            }
-            if !selectedOrientation.isEmpty {
-                let wanted = Self.canonicalOrientation(selectedOrientation)
-                let actual = Self.canonicalOrientation(p.orientation)
-                if actual != wanted && !p.orientation.localizedCaseInsensitiveContains(selectedOrientation) { return false }
-            }
-            if !selectedRole.isEmpty {
-                if !p.communityRole.localizedCaseInsensitiveContains(selectedRole) { return false }
-            }
-            if !selectedIntent.isEmpty {
-                if !p.lookingFor.localizedCaseInsensitiveContains(selectedIntent) { return false }
-            }
-            return true
+            !appState.blockedUserIds.contains(p.id) && p.id != appState.currentUser?.id
         }
     }
 
@@ -316,6 +395,7 @@ struct DiscoverView: View {
                 .padding(.horizontal, 24)
 
             Button {
+                resetAllFilters()
                 segment = .forYou
                 Task { await loadCurrentSegment() }
             } label: {
@@ -338,32 +418,67 @@ struct DiscoverView: View {
         .padding(.vertical, 16)
     }
 
-    private func loadCurrentSegment() async {
-        var filterParams = ""
-        if minAge > 0 { filterParams += "&minAge=\(minAge)" }
-        if maxAge > 0 { filterParams += "&maxAge=\(maxAge)" }
-        if minWeight > 0 { filterParams += "&minWeight=\(minWeight)" }
-        if maxWeight > 0 { filterParams += "&maxWeight=\(maxWeight)" }
-        if minHeight > 0 { filterParams += "&minHeight=\(minHeight)" }
-        if maxHeight > 0 { filterParams += "&maxHeight=\(maxHeight)" }
-        if !selectedGender.isEmpty {
-            if let enc = selectedGender.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
-                filterParams += "&gender=\(enc)"
-            }
-        }
-        if isRecentOnly {
-            filterParams += "&recent=1"
-        }
+    private func resetAllFilters() {
+        searchQuery = ""
+        selectedRadiusKm = 50
+        minAge = 0; maxAge = 0
+        minWeight = 0; maxWeight = 0
+        minHeight = 0; maxHeight = 0
+        selectedGender = ""
+        selectedOrientation = ""
+        selectedRole = ""
+        selectedIntent = ""
+        isOnlineOnly = false
+        isRecentOnly = false
+    }
 
-        let path: String
+    private func loadCurrentSegment() async {
+        var components = URLComponents()
+        components.path = "/api/discover"
+        var queryItems: [URLQueryItem] = []
+
         switch segment {
         case .forYou:
-            path = "/api/discover?sort=interests\(filterParams)"
+            queryItems.append(URLQueryItem(name: "sort", value: isOnlineOnly ? "active" : "interests"))
         case .nearby:
-            path = "/api/discover?nearby=1&radius=50&sort=new\(filterParams)"
+            queryItems.append(URLQueryItem(name: "nearby", value: "1"))
+            queryItems.append(URLQueryItem(name: "radius", value: "\(selectedRadiusKm)"))
+            queryItems.append(URLQueryItem(name: "sort", value: isOnlineOnly ? "active" : "new"))
         case .following:
-            path = "/api/discover?following=1\(filterParams)"
+            queryItems.append(URLQueryItem(name: "following", value: "1"))
+            if isOnlineOnly {
+                queryItems.append(URLQueryItem(name: "sort", value: "active"))
+            }
         }
+
+        let cleanQ = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !cleanQ.isEmpty {
+            queryItems.append(URLQueryItem(name: "q", value: cleanQ))
+        }
+        if minAge > 0 { queryItems.append(URLQueryItem(name: "minAge", value: "\(minAge)")) }
+        if maxAge > 0 { queryItems.append(URLQueryItem(name: "maxAge", value: "\(maxAge)")) }
+        if minWeight > 0 { queryItems.append(URLQueryItem(name: "minWeight", value: "\(minWeight)")) }
+        if maxWeight > 0 { queryItems.append(URLQueryItem(name: "maxWeight", value: "\(maxWeight)")) }
+        if minHeight > 0 { queryItems.append(URLQueryItem(name: "minHeight", value: "\(minHeight)")) }
+        if maxHeight > 0 { queryItems.append(URLQueryItem(name: "maxHeight", value: "\(maxHeight)")) }
+        if !selectedGender.isEmpty {
+            queryItems.append(URLQueryItem(name: "gender", value: selectedGender))
+        }
+        if !selectedOrientation.isEmpty {
+            queryItems.append(URLQueryItem(name: "orientation", value: selectedOrientation))
+        }
+        if !selectedRole.isEmpty {
+            queryItems.append(URLQueryItem(name: "communityRole", value: selectedRole))
+        }
+        if !selectedIntent.isEmpty {
+            queryItems.append(URLQueryItem(name: "intent", value: selectedIntent))
+        }
+        if isRecentOnly {
+            queryItems.append(URLQueryItem(name: "recent", value: "1"))
+        }
+
+        components.queryItems = queryItems
+        let path = components.string ?? "/api/discover?sort=interests"
 
         if let cached = KinnectAPIClient.shared.cachedJSON(for: path) {
             self.people = (cached["people"] as? [[String: Any]] ?? cached["users"] as? [[String: Any]] ?? []).map(KinnectUser.from)
@@ -371,11 +486,20 @@ struct DiscoverView: View {
         }
 
         isLoading = people.isEmpty && posts.isEmpty
+        loadError = nil
         defer { isLoading = false }
 
-        if let res = try? await KinnectAPIClient.shared.requestJSON(path) {
+        do {
+            let res = try await KinnectAPIClient.shared.requestJSON(path)
             self.people = (res["people"] as? [[String: Any]] ?? res["users"] as? [[String: Any]] ?? []).map(KinnectUser.from)
             self.posts = (res["posts"] as? [[String: Any]] ?? []).map(PostItem.from)
+            self.loadError = nil
+        } catch {
+            if self.people.isEmpty {
+                self.loadError = error.localizedDescription
+            } else {
+                appState.showToast(error.localizedDescription)
+            }
         }
     }
 
@@ -492,11 +616,11 @@ private struct DiscoverSquareUserTile: View {
                     }
 
                     // Top-Left Online Dot (Android parity lines 1639: 10dp ONLINE dot with 2dp CARD stroke)
-                    if isOnline || person.isActive {
+                    if isOnline {
                         VStack {
                             HStack {
                                 Circle()
-                                    .fill(KinnectTheme.online)
+                                    .fill(KinnectTheme.onlineDot)
                                     .frame(width: 10, height: 10)
                                     .overlay(Circle().stroke(KinnectTheme.surface, lineWidth: 2))
                                     .padding(7)
@@ -676,7 +800,7 @@ private struct DiscoverFilterSheet: View {
 
     private let genders = [
         "", "Nam", "Nữ", "Nam chuyển giới", "Nữ chuyển giới",
-        "Phi nhị nguyên", "Linh hoạt giới", "Vô giới", "Khác"
+        "Phi nhị nguyên", "Linh hoạt giới", "Vô giới", "Đang tìm hiểu", "Khác"
     ]
 
     private let orientations = [

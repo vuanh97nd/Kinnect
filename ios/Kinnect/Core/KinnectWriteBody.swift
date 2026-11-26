@@ -26,11 +26,15 @@ enum KinnectWriteBody {
         return payload
     }
 
-    static func shortVideo(caption: String, dataURL: String) -> [String: Any] {
-        [
+    static func shortVideo(caption: String, dataURL: String, title: String = "") -> [String: Any] {
+        var payload: [String: Any] = [
             "caption": caption,
             "data": dataURL
         ]
+        if !title.isEmpty {
+            payload["title"] = title
+        }
+        return payload
     }
 
     static func comment(_ text: String) -> [String: Any] {

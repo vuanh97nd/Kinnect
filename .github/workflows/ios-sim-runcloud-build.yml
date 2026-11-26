@@ -1,0 +1,88 @@
+name: iOS Simulator Build for run.cloud (arm64 Debug)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'qa/ui-parity-*'
+
+permissions:
+  contents: read
+
+jobs:
+  build-sim-arm64:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Show Xcode and macOS environment
+        run: |
+          xcodebuild -version
+          uname -m
+
+      - name: Ensure XcodeGen is installed
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+          xcodegen --version
+
+      - name: Generate Xcode project from ios/project.yml
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build arm64 Debug iOS Simulator app (no release signing)
+        run: |
+          set -euo pipefail
+          mkdir -p logs dist
+          xcodebuild build \
+            -project ios/Kinnect.xcodeproj \
+            -scheme Kinnect \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "generic/platform=iOS Simulator" \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=NO \
+            -derivedDataPath build/sim \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee logs/ios-sim-runcloud-build.log
+
+      - name: Verify arm64 binary and package Kinnect.app
+        run: |
+          set -euo pipefail
+          APP_DIR="$(find build/sim/Build/Products/Debug-iphonesimulator -maxdepth 2 -name "Kinnect.app" -type d | head -n 1)"
+          if [ -z "$APP_DIR" ] || [ ! -d "$APP_DIR" ]; then
+            echo "ERROR: Kinnect.app not found in build/sim/Build/Products/Debug-iphonesimulator" >&2
+            exit 1
+          fi
+          echo "Found app bundle: $APP_DIR"
+          file "$APP_DIR/Kinnect"
+          lipo -info "$APP_DIR/Kinnect"
+          lipo -archs "$APP_DIR/Kinnect" | grep -qw "arm64"
+
+          APP_PARENT="$(dirname "$APP_DIR")"
+          APP_NAME="$(basename "$APP_DIR")"
+          COPYFILE_DISABLE=1 tar -C "$APP_PARENT" -czf dist/Kinnect-Simulator-arm64.tar.gz "$APP_NAME"
+
+          ls -lh dist/Kinnect-Simulator-arm64.tar.gz
+          shasum -a 256 dist/Kinnect-Simulator-arm64.tar.gz
+          echo "Archive top entries:"
+          tar -tzf dist/Kinnect-Simulator-arm64.tar.gz | head -n 20
+
+      - name: Upload Apple Silicon Simulator artifact for run.cloud
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-sim-runcloud-app
+          path: dist/Kinnect-Simulator-arm64.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-sim-runcloud-build-log
+          path: logs/ios-sim-runcloud-build.log
+          if-no-files-found: warn
+          retention-days: 7

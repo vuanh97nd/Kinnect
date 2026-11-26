@@ -2,7 +2,11 @@ import AVFoundation
 import UIKit
 
 enum KinnectStillVideo {
-    static func make(image: UIImage) async throws -> URL {
+    static func make(image: UIImage, durationSeconds: Double = 6.0) async throws -> URL {
+        guard image.size.width > 0, image.size.height > 0 else {
+            throw KinnectAPIError.serverMessage("Kích thước ảnh không hợp lệ.")
+        }
+        let frameCount = max(1, Int((max(0.2, durationSeconds) * 30.0).rounded()))
         let size = CGSize(width: 720, height: 1280)
         let rendered = UIGraphicsImageRenderer(size: size).image { context in
             UIColor.black.setFill()
@@ -14,7 +18,18 @@ enum KinnectStillVideo {
         guard let cgImage = rendered.cgImage else { throw KinnectAPIError.serverMessage("Không đọc được ảnh.") }
         return try await Task.detached(priority: .userInitiated) {
             let url = FileManager.default.temporaryDirectory.appendingPathComponent("Kinnect-PhotoMusic-\(UUID().uuidString).mp4")
+            var completed = false
+            var activeWriter: AVAssetWriter?
+            defer {
+                if !completed {
+                    if activeWriter?.status == .writing {
+                        activeWriter?.cancelWriting()
+                    }
+                    try? FileManager.default.removeItem(at: url)
+                }
+            }
             let writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
+            activeWriter = writer
             let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
                 AVVideoCodecKey: AVVideoCodecType.h264,
                 AVVideoWidthKey: 720,
@@ -43,9 +58,11 @@ enum KinnectStillVideo {
             }
             context.draw(cgImage, in: CGRect(x: 0, y: 0, width: 720, height: 1280))
             CVPixelBufferUnlockBaseAddress(buffer, [])
-            for frame in 0..<180 {
+            for frame in 0..<frameCount {
+                try Task.checkCancellation()
                 let deadline = Date().addingTimeInterval(10)
                 while !input.isReadyForMoreMediaData {
+                    try Task.checkCancellation()
                     guard writer.status == .writing, Date() < deadline else {
                         writer.cancelWriting()
                         throw KinnectAPIError.serverMessage("Xuất video ảnh quá thời gian.")
@@ -57,9 +74,11 @@ enum KinnectStillVideo {
                     throw writer.error ?? KinnectAPIError.serverMessage("Không ghi được video ảnh.")
                 }
             }
+            try Task.checkCancellation()
             input.markAsFinished()
             await writer.finishWriting()
             guard writer.status == .completed else { throw writer.error ?? KinnectAPIError.serverMessage("Xuất video ảnh thất bại.") }
+            completed = true
             return url
         }.value
     }

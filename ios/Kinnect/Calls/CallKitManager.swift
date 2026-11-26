@@ -13,10 +13,24 @@ final class CallKitManager: NSObject, CXProviderDelegate {
     private let lock = NSLock()
     private var callUUIDs: [String: UUID] = [:]
     private var callIDs: [UUID: String] = [:]
+    private var callKitAudioActive: Bool = false
 
     var onAnswerCall: ((String) -> Void)?
     var onEndCall: ((String) -> Void)?
     var onSetMuted: ((String, Bool) -> Void)?
+
+    var isAudioSessionActive: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return callKitAudioActive
+    }
+
+    func hasCallKitSession(callId: String) -> Bool {
+        guard !callId.isEmpty else { return false }
+        lock.lock()
+        defer { lock.unlock() }
+        return callUUIDs[callId] != nil
+    }
 
     private override init() {
         let config = CXProviderConfiguration()
@@ -121,7 +135,7 @@ final class CallKitManager: NSObject, CXProviderDelegate {
                 }
                 self.lock.unlock()
                 if shouldNotify {
-                    DispatchQueue.main.async { [weak self] in
+                    Task { @MainActor [weak self] in
                         self?.onEndCall?(callId)
                     }
                 }
@@ -165,7 +179,7 @@ final class CallKitManager: NSObject, CXProviderDelegate {
         lock.unlock()
         guard let uuid else {
             Task { @MainActor in
-                await NativeWebRTCManager.shared.acceptIncomingCall(callId: callId)
+                await NativeWebRTCManager.shared.acceptIncomingCall(callId: callId, activateAudioDirectly: true)
             }
             return
         }
@@ -174,7 +188,7 @@ final class CallKitManager: NSObject, CXProviderDelegate {
         callController.request(transaction) { error in
             if error != nil {
                 Task { @MainActor in
-                    await NativeWebRTCManager.shared.acceptIncomingCall(callId: callId)
+                    await NativeWebRTCManager.shared.acceptIncomingCall(callId: callId, activateAudioDirectly: true)
                 }
             }
         }
@@ -225,7 +239,7 @@ final class CallKitManager: NSObject, CXProviderDelegate {
         callUUIDs.removeAll()
         callIDs.removeAll()
         lock.unlock()
-        DispatchQueue.main.async { [weak self] in
+        Task { @MainActor [weak self] in
             for callId in endedCallIDs {
                 self?.onEndCall?(callId)
             }
@@ -243,7 +257,7 @@ final class CallKitManager: NSObject, CXProviderDelegate {
         let callId = callIDs[action.callUUID]
         lock.unlock()
         if let callId {
-            DispatchQueue.main.async { [weak self] in
+            Task { @MainActor [weak self] in
                 self?.onAnswerCall?(callId)
             }
         }
@@ -256,7 +270,7 @@ final class CallKitManager: NSObject, CXProviderDelegate {
         if let callId { callUUIDs.removeValue(forKey: callId) }
         lock.unlock()
         if let callId {
-            DispatchQueue.main.async { [weak self] in
+            Task { @MainActor [weak self] in
                 self?.onEndCall?(callId)
             }
         }
@@ -268,7 +282,7 @@ final class CallKitManager: NSObject, CXProviderDelegate {
         let callId = callIDs[action.callUUID]
         lock.unlock()
         if let callId {
-            DispatchQueue.main.async { [weak self] in
+            Task { @MainActor [weak self] in
                 self?.onSetMuted?(callId, action.isMuted)
             }
         }
@@ -276,17 +290,23 @@ final class CallKitManager: NSObject, CXProviderDelegate {
     }
 
     func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
+        lock.lock()
+        callKitAudioActive = true
+        lock.unlock()
         // Forward the external activation to WebRTC. Without this, a call
         // answered while locked can retain an interrupted audio device.
         RTCAudioSession.sharedInstance().audioSessionDidActivate(audioSession)
         RTCAudioSession.sharedInstance().isAudioEnabled = true
-        DispatchQueue.main.async {
-            MediaPermissionHandler.shared.configureAudioSessionForCall(
+        Task { @MainActor in
+            MediaPermissionHandler.configureAudioSessionForCall(
                 speaker: NativeWebRTCManager.shared.isSpeakerOn)
         }
     }
 
     func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {
+        lock.lock()
+        callKitAudioActive = false
+        lock.unlock()
         RTCAudioSession.sharedInstance().isAudioEnabled = false
         RTCAudioSession.sharedInstance().audioSessionDidDeactivate(audioSession)
         // CallKit owns deactivation. Do not reactivate a media playback session

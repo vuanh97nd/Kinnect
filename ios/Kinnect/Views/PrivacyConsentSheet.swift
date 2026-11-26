@@ -8,12 +8,13 @@ struct PrivacyConsentSheet: View {
     let onAccepted: () -> Void
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var loc = LocalizationManager.shared
     @State private var isSubmitting = false
 
     init(
         request: PrivacyConsentRequest = PrivacyConsentRequest(
-            version: "2026.11",
-            notice: "Chính sách quyền riêng tư và điều khoản dịch vụ Kinnect. Cam kết bảo mật theo tiêu chuẩn Apple và pháp luật Việt Nam."
+            version: "2026-10-29",
+            notice: L10n.tr("Chính sách quyền riêng tư và điều khoản dịch vụ Kinnect. Cam kết bảo mật theo tiêu chuẩn Apple và pháp luật Việt Nam.")
         ),
         recordOnServer: Bool = true,
         onAccepted: @escaping () -> Void = {}
@@ -35,36 +36,36 @@ struct PrivacyConsentSheet: View {
                             KinnectIcon(glyph: .shield, size: 26, selected: true, tint: KinnectTheme.accentBright)
                         }
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Bảo vệ dữ liệu & Quyền riêng tư")
+                            Text(L10n.tr("Bảo vệ dữ liệu & Quyền riêng tư"))
                                 .font(.headline.bold())
                                 .foregroundColor(KinnectTheme.textPrimary)
-                            Text(request.version.isEmpty ? "Thông báo dữ liệu hiện hành" : "Phiên bản quy định: \(request.version)")
+                            Text(request.version.isEmpty ? L10n.tr("Thông báo dữ liệu hiện hành") : "\(L10n.tr("Phiên bản quy định")): \(request.version)")
                                 .font(.caption)
                                 .foregroundColor(KinnectTheme.textSecondary)
                         }
                     }
 
-                    Text(request.notice)
+                    Text(L10n.tr(request.notice))
                         .font(.subheadline)
                         .foregroundColor(KinnectTheme.textPrimary)
                         .lineSpacing(4)
                         .kinnectCard()
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Quyền kiểm soát của bạn:")
+                        Text(L10n.tr("Quyền kiểm soát của bạn:"))
                             .font(.caption.bold())
                             .foregroundColor(KinnectTheme.textSecondary)
 
-                        bulletPoint("Quản lý bài viết, ảnh, video và thu hồi bất kỳ lúc nào.")
-                        bulletPoint("Chặn người dùng và báo cáo nội dung vi phạm ngay trong ứng dụng.")
-                        bulletPoint("Yêu cầu xóa vĩnh viễn tài khoản và toàn bộ dữ liệu trong Hồ sơ cá nhân.")
+                        bulletPoint(L10n.tr("Quản lý bài viết, ảnh, video và thu hồi bất kỳ lúc nào."))
+                        bulletPoint(L10n.tr("Chặn người dùng và báo cáo nội dung vi phạm ngay trong ứng dụng."))
+                        bulletPoint(L10n.tr("Yêu cầu xóa vĩnh viễn tài khoản và toàn bộ dữ liệu trong Hồ sơ cá nhân."))
                     }
                     .padding(.horizontal, 4)
 
                     if let privacyUrl = URL(string: "https://kinnect.io.vn/privacy") {
                         Link(destination: privacyUrl) {
                             HStack(spacing: 6) {
-                                Text("Xem chính sách quyền riêng tư đầy đủ")
+                                Text(L10n.tr("Xem chính sách quyền riêng tư đầy đủ"))
                                     .font(.caption.bold())
                                 KinnectIcon(glyph: .chevronRight, size: 14)
                             }
@@ -82,7 +83,7 @@ struct PrivacyConsentSheet: View {
                                 if isSubmitting {
                                     ProgressView().tint(.white)
                                 } else {
-                                    Text("Tôi đồng ý & Tiếp tục")
+                                    Text(L10n.tr("Tôi đồng ý & Tiếp tục"))
                                         .font(.subheadline.bold())
                                 }
                                 Spacer()
@@ -93,7 +94,7 @@ struct PrivacyConsentSheet: View {
                         }
                         .disabled(isSubmitting)
 
-                        Button("Để sau") {
+                        Button(L10n.tr("Để sau")) {
                             dismiss()
                         }
                         .font(.footnote)
@@ -108,7 +109,7 @@ struct PrivacyConsentSheet: View {
             .navigationTitle("")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    KinnectIconButton(glyph: .close, label: "Đóng", tint: KinnectTheme.textPrimary) {
+                    KinnectIconButton(glyph: .close, label: L10n.tr("Đóng"), tint: KinnectTheme.textPrimary) {
                         dismiss()
                     }
                 }
@@ -144,11 +145,11 @@ struct PrivacyConsentSheet: View {
                 body: ["accepted": true, "version": request.version]
             )
             appState.pendingPrivacyConsent = nil
-            appState.showToast("Đã ghi nhận sự đồng ý của bạn.")
+            appState.showToast(L10n.tr("Đã ghi nhận sự đồng ý của bạn."))
             onAccepted()
             dismiss()
         } catch {
-            appState.showToast("Không thể lưu: \(error.localizedDescription)")
+            appState.showToast("\(L10n.tr("Không thể lưu:")) \(error.localizedDescription)")
         }
     }
 }

@@ -28,6 +28,7 @@ enum KinnectNotificationPrefs {
 /// Features user profile header card, store, wallet, friends, privacy, security, theme, support, password, logout.
 struct AccountMenuView: View {
     @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var loc = LocalizationManager.shared
     @Environment(\.dismiss) private var dismiss
 
     var onOpenProfile: () -> Void
@@ -48,6 +49,7 @@ struct AccountMenuView: View {
     }
 
     @State private var activeSubScreen: AccountSubScreen? = nil
+    @State private var showBookmarksSheet = false
     @State private var showLogoutConfirm = false
 
     var body: some View {
@@ -77,7 +79,7 @@ struct AccountMenuView: View {
             } else {
                 // Pinned Header Bar (matching Android accountHeader pattern)
                 PinnedHeaderBar(
-                    title: "Tài khoản",
+                    title: L10n.tr("Tài khoản"),
                     onBack: onBack ?? { dismiss() },
                     trailingActions: []
                 )
@@ -99,8 +101,8 @@ struct AccountMenuView: View {
         }
         .background(KinnectTheme.background.ignoresSafeArea())
         .navigationBarHidden(true)
-        .confirmationDialog("Đăng xuất khỏi Kinnect?", isPresented: $showLogoutConfirm, titleVisibility: .visible) {
-            Button("Đăng xuất", role: .destructive) {
+        .confirmationDialog(L10n.tr("Đăng xuất khỏi Kinnect?"), isPresented: $showLogoutConfirm, titleVisibility: .visible) {
+            Button(L10n.tr("Đăng xuất"), role: .destructive) {
                 if let onBack = onBack {
                     onBack()
                 } else {
@@ -110,9 +112,12 @@ struct AccountMenuView: View {
                     await appState.logout()
                 }
             }
-            Button("Hủy", role: .cancel) { }
+            Button(L10n.tr("Hủy"), role: .cancel) { }
         } message: {
-            Text("Bạn có thể đăng nhập lại bất kỳ lúc nào.")
+            Text(L10n.tr("Bạn có thể đăng nhập lại bất kỳ lúc nào."))
+        }
+        .sheet(isPresented: $showBookmarksSheet) {
+            SavedBookmarksSheet()
         }
     }
 
@@ -141,7 +146,7 @@ struct AccountMenuView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(appState.currentUser?.name ?? "Người dùng Kinnect")
+                    Text(appState.currentUser?.name ?? L10n.tr("Người dùng Kinnect"))
                         .font(.title3.weight(.bold))
                         .foregroundColor(KinnectTheme.textPrimary)
 
@@ -167,14 +172,14 @@ struct AccountMenuView: View {
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Trang cá nhân")
+        .accessibilityLabel(L10n.tr("Trang cá nhân"))
     }
 
     @ViewBuilder
     private var adminMenuGroup: some View {
         if appState.currentUser?.accountRole == "admin" {
             VStack(spacing: 0) {
-                menuRow(systemName: "checkmark.shield", title: "Bảng quản trị") {
+                menuRow(systemName: "checkmark.shield", title: L10n.tr("Bảng quản trị")) {
                     withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = .admin }
                 }
             }
@@ -184,31 +189,35 @@ struct AccountMenuView: View {
 
     private var mainMenuGroup: some View {
         VStack(spacing: 0) {
-            menuRow(systemName: "bag", title: "Cửa hàng Kinnect") { onOpenStore?() }
+            menuRow(systemName: "bag", title: L10n.tr("Cửa hàng Kinnect")) { onOpenStore?() }
             menuDivider
-            menuRow(systemName: "creditcard", title: "Ví Kinnect") { onOpenWallet() }
+            menuRow(systemName: "creditcard", title: L10n.tr("Ví Kinnect")) { onOpenWallet() }
             menuDivider
-            menuRow(systemName: "hand.raised", title: "Cài đặt và quyền riêng tư") {
+            menuRow(systemName: "bookmark", title: L10n.tr("Bài viết đã lưu")) {
+                showBookmarksSheet = true
+            }
+            menuDivider
+            menuRow(systemName: "hand.raised", title: L10n.tr("Cài đặt và quyền riêng tư")) {
                 withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = .privacy }
             }
             menuDivider
-            menuRow(systemName: "lock.shield", title: "Bảo mật và đăng nhập") {
+            menuRow(systemName: "lock.shield", title: L10n.tr("Bảo mật và đăng nhập")) {
                 withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = .security }
             }
             menuDivider
-            menuRow(systemName: "bell", title: "Cài đặt thông báo") {
+            menuRow(systemName: "bell", title: L10n.tr("Cài đặt thông báo")) {
                 withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = .notifications }
             }
             menuDivider
-            menuRow(systemName: "circle.lefthalf.filled", title: "Giao diện") {
+            menuRow(systemName: "circle.lefthalf.filled", title: L10n.tr("Giao diện")) {
                 withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = .appearance }
             }
             menuDivider
-            menuRow(systemName: "questionmark.circle", title: "Trợ giúp và hỗ trợ") {
+            menuRow(systemName: "questionmark.circle", title: L10n.tr("Trợ giúp và hỗ trợ")) {
                 withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = .support }
             }
             menuDivider
-            menuRow(systemName: "info.circle", title: "Giới thiệu Kinnect") {
+            menuRow(systemName: "info.circle", title: L10n.tr("Giới thiệu Kinnect")) {
                 withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = .about }
             }
         }
@@ -217,11 +226,11 @@ struct AccountMenuView: View {
 
     private var endMenuGroup: some View {
         VStack(spacing: 0) {
-            menuRow(systemName: "key", title: "Đổi mật khẩu") {
+            menuRow(systemName: "key", title: L10n.tr((appState.currentUser?.hasPassword ?? true) ? "Đổi mật khẩu" : "Đặt mật khẩu")) {
                 withAnimation(.easeInOut(duration: 0.2)) { activeSubScreen = .password }
             }
             menuDivider
-            menuRow(systemName: "rectangle.portrait.and.arrow.right", title: "Đăng xuất", isDestructive: true) {
+            menuRow(systemName: "rectangle.portrait.and.arrow.right", title: L10n.tr("Đăng xuất"), isDestructive: true) {
                 showLogoutConfirm = true
             }
         }
@@ -229,10 +238,9 @@ struct AccountMenuView: View {
     }
 
     private var menuDivider: some View {
-        HStack {
-            Spacer().frame(width: 64)
-            Divider().background(KinnectTheme.borderSoft.opacity(0.8))
-        }
+        Divider()
+            .background(KinnectTheme.borderSoft.opacity(0.8))
+            .padding(.leading, 64)
     }
 
     private var settingsGroupBackground: some View {
@@ -245,7 +253,7 @@ struct AccountMenuView: View {
     }
 
     private var footerLabel: some View {
-        Text("Kinnect · Kết nối theo cách của bạn.")
+        Text(L10n.tr("Kinnect · Kết nối theo cách của bạn."))
             .font(.caption)
             .foregroundColor(KinnectTheme.textSecondary)
             .padding(.top, 4)
@@ -298,6 +306,7 @@ struct AccountMenuView: View {
 private struct PrivacySettingsView: View {
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var language = LocalizationManager.shared
+    @AppStorage("app_appearance_mode") private var appearanceMode: String = "system"
     @Environment(\.dismiss) private var dismiss
     var onBack: (() -> Void)? = nil
 
@@ -305,6 +314,7 @@ private struct PrivacySettingsView: View {
     @State private var showDistance: Bool = true
     @State private var showActivity: Bool = true
     @State private var dmFriendsOnly: Bool = false
+    @State private var cloudChatSync: Bool = true
     @State private var showEditProfile = false
     @State private var showPrivateAlbum = false
     @State private var showBlockedUsers = false
@@ -315,13 +325,13 @@ private struct PrivacySettingsView: View {
     var body: some View {
         VStack(spacing: 0) {
             PinnedHeaderBar(
-                title: "Cài đặt & riêng tư",
+                title: L10n.tr("Cài đặt & riêng tư"),
                 onBack: onBack ?? { dismiss() },
                 trailingActions: []
             )
 
             Form {
-                Section("Ngôn ngữ") {
+                Section(L10n.tr("Ngôn ngữ")) {
                     Button {
                         language.setLanguage(.vi)
                     } label: {
@@ -335,17 +345,29 @@ private struct PrivacySettingsView: View {
                     Button {
                         language.setPreference(.system)
                     } label: {
-                        languageRow("Theo hệ thống", selected: language.preference == .system)
+                        languageRow(L10n.tr("Theo hệ thống"), selected: language.preference == .system)
                     }
                 }
 
-                Section("Thông tin cá nhân") {
+                Section(L10n.tr("Giao diện ứng dụng")) {
+                    Picker(L10n.tr("Chế độ hiển thị"), selection: $appearanceMode) {
+                        Text(L10n.tr("Theo hệ thống")).tag("system")
+                        Text(L10n.tr("Tối")).tag("dark")
+                        Text(L10n.tr("Sáng")).tag("light")
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: appearanceMode) { newMode in
+                        KinnectTheme.applyWindowAppearance(newMode)
+                    }
+                }
+
+                Section(L10n.tr("Thông tin cá nhân")) {
                     Button {
                         showEditProfile = true
                     } label: {
                         HStack {
-                            Text(appState.currentUser?.name ?? "Người dùng Kinnect")
-                            Text("· chỉnh sửa hồ sơ")
+                            Text(appState.currentUser?.name ?? L10n.tr("Người dùng Kinnect"))
+                            Text(L10n.tr("· chỉnh sửa hồ sơ"))
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .font(.caption.weight(.semibold))
@@ -356,7 +378,7 @@ private struct PrivacySettingsView: View {
                     }
                 }
 
-                Section("Quyền riêng tư") {
+                Section(L10n.tr("Quyền riêng tư")) {
                     Toggle(isOn: Binding(
                         get: { showActivity },
                         set: { val in
@@ -365,9 +387,9 @@ private struct PrivacySettingsView: View {
                         }
                     )) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Trạng thái hoạt động")
+                            Text(L10n.tr("Trạng thái hoạt động"))
                                 .font(.subheadline.bold())
-                            Text("Cho người khác biết khi bạn đang online")
+                            Text(L10n.tr("Cho người khác biết khi bạn đang online"))
                                 .font(.caption)
                                 .foregroundColor(KinnectTheme.textSecondary)
                         }
@@ -382,9 +404,9 @@ private struct PrivacySettingsView: View {
                         }
                     )) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Cho phép tìm thấy tôi")
+                            Text(L10n.tr("Cho phép tìm thấy tôi"))
                                 .font(.subheadline.bold())
-                            Text("Xuất hiện trong Khám phá và Quanh đây")
+                            Text(L10n.tr("Xuất hiện trong Khám phá và Quanh đây"))
                                 .font(.caption)
                                 .foregroundColor(KinnectTheme.textSecondary)
                         }
@@ -399,9 +421,26 @@ private struct PrivacySettingsView: View {
                         }
                     )) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Hiển thị khoảng cách")
+                            Text(L10n.tr("Hiển thị khoảng cách"))
                                 .font(.subheadline.bold())
-                            Text("Chỉ hiện khoảng cách gần đúng")
+                            Text(L10n.tr("Chỉ hiện khoảng cách gần đúng"))
+                                .font(.caption)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        }
+                    }
+                    .tint(KinnectTheme.accentBright)
+
+                    Toggle(isOn: Binding(
+                        get: { cloudChatSync },
+                        set: { val in
+                            cloudChatSync = val
+                            updatePrivacySetting("cloudChatSync", value: val)
+                        }
+                    )) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L10n.tr("Đồng bộ tin nhắn đám mây"))
+                                .font(.subheadline.bold())
+                            Text(L10n.tr("Lưu trữ và đồng bộ lịch sử hội thoại an toàn qua máy chủ Kinnect."))
                                 .font(.caption)
                                 .foregroundColor(KinnectTheme.textSecondary)
                         }
@@ -409,36 +448,36 @@ private struct PrivacySettingsView: View {
                     .tint(KinnectTheme.accentBright)
                 }
 
-                Section("Ai có thể nhắn tin") {
-                    Picker("Ai có thể nhắn tin", selection: Binding(
+                Section(L10n.tr("Ai có thể nhắn tin")) {
+                    Picker(L10n.tr("Ai có thể nhắn tin"), selection: Binding(
                         get: { dmFriendsOnly ? "friends" : "everyone" },
                         set: { updateDmMode($0) }
                     )) {
-                        Text("Mọi thành viên").tag("everyone")
-                        Text("Bạn bè").tag("friends")
+                        Text(L10n.tr("Mọi thành viên")).tag("everyone")
+                        Text(L10n.tr("Bạn bè")).tag("friends")
                     }
                     .pickerStyle(.inline)
                     .labelsHidden()
                 }
 
-                Section("Quyền truy cập") {
-                    Button("Ảnh riêng tư") { showPrivateAlbum = true }
-                    Button("Tài khoản đã chặn") { showBlockedUsers = true }
+                Section(L10n.tr("Quyền truy cập")) {
+                    Button(L10n.tr("Ảnh riêng tư")) { showPrivateAlbum = true }
+                    Button(L10n.tr("Tài khoản đã chặn")) { showBlockedUsers = true }
                 }
 
-                Section("Quản lý tài khoản") {
-                    Button("Xóa tài khoản và dữ liệu", role: .destructive) {
+                Section(L10n.tr("Quản lý tài khoản")) {
+                    Button(L10n.tr("Xóa tài khoản và dữ liệu"), role: .destructive) {
                         showDeleteAccount = true
                     }
                 }
 
-                Section("Vị trí và quanh đây") {
+                Section(L10n.tr("Vị trí và quanh đây")) {
                     Button(role: .destructive) {
                         Task { await turnOffLocation() }
                     } label: {
                         HStack {
                             Image(systemName: "location.slash")
-                            Text("Tắt tìm quanh đây")
+                            Text(L10n.tr("Tắt tìm quanh đây"))
                         }
                     }
                 }
@@ -449,6 +488,7 @@ private struct PrivacySettingsView: View {
                     self.showDistance = user.showDistance
                     self.showActivity = user.showActivity
                     self.dmFriendsOnly = user.dmMode == "friends"
+                    self.cloudChatSync = user.cloudChatSync
                 }
             }
             .sheet(isPresented: $showEditProfile) {
@@ -481,6 +521,7 @@ private struct PrivacySettingsView: View {
             if key == "showActivity" { user.showActivity = value }
             if key == "discoverable" { user.discoverable = value }
             if key == "showDistance" { user.showDistance = value }
+            if key == "cloudChatSync" { user.cloudChatSync = value }
             appState.currentUser = user
         }
         Task {
@@ -525,12 +566,14 @@ private struct PrivacySettingsView: View {
             user.hasLocation = false
             appState.currentUser = user
         }
-        appState.showToast("Đã tắt tìm quanh đây")
+        appState.showToast(L10n.tr("Đã tắt tìm quanh đây"))
     }
 }
 
 private struct SecuritySettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var loc = LocalizationManager.shared
     var onBack: (() -> Void)? = nil
     var onChangePassword: () -> Void
 
@@ -541,17 +584,17 @@ private struct SecuritySettingsView: View {
     var body: some View {
         VStack(spacing: 0) {
             PinnedHeaderBar(
-                title: "Bảo mật và đăng nhập",
+                title: L10n.tr("Bảo mật và đăng nhập"),
                 onBack: onBack ?? { dismiss() },
                 trailingActions: []
             )
 
             List {
-                Button("Đổi mật khẩu", action: onChangePassword)
-                Button("Xác thực 2 bước (2FA)") { showTwoFactor = true }
-                Button("Email khôi phục") { showRecovery = true }
-                Button("Thiết bị đăng nhập") { showSessions = true }
-                Link("Hỗ trợ tài khoản và khôi phục", destination: URL(string: "https://kinnect.io.vn/support")!)
+                Button(L10n.tr((appState.currentUser?.hasPassword ?? true) ? "Đổi mật khẩu" : "Đặt mật khẩu"), action: onChangePassword)
+                Button(L10n.tr("Xác thực 2 bước (2FA)")) { showTwoFactor = true }
+                Button(L10n.tr("Email khôi phục")) { showRecovery = true }
+                Button(L10n.tr("Thiết bị đăng nhập")) { showSessions = true }
+                Link(L10n.tr("Hỗ trợ tài khoản và khôi phục"), destination: URL(string: "https://kinnect.io.vn/support")!)
             }
             .foregroundColor(KinnectTheme.textPrimary)
         }
@@ -570,6 +613,7 @@ private struct SecuritySettingsView: View {
 private struct TwoFactorSettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var loc = LocalizationManager.shared
 
     @State private var isLoading = true
     @State private var isBusy = false
@@ -588,25 +632,33 @@ private struct TwoFactorSettingsSheet: View {
     @State private var actionPassword = ""
     @State private var actionCode = ""
 
+    private var hasPassword: Bool {
+        appState.currentUser?.hasPassword ?? true
+    }
+
+    private var hasPendingSetup: Bool {
+        pending && !enabled
+    }
+
     var body: some View {
         NavigationStack {
             Form {
-                Section("Trạng thái bảo mật") {
+                Section(L10n.tr("Trạng thái bảo mật")) {
                     HStack {
-                        Text("Xác thực 2 bước (TOTP)")
+                        Text(L10n.tr("Xác thực 2 bước (TOTP)"))
                             .font(.subheadline.bold())
                         Spacer()
-                        Text(enabled ? "Đang bật" : "Đang tắt")
+                        Text(enabled ? L10n.tr("Đang bật") : (hasPendingSetup ? L10n.tr("Chờ xác nhận") : L10n.tr("Đang tắt")))
                             .font(.caption.bold())
-                            .foregroundColor(enabled ? KinnectTheme.online : KinnectTheme.textSecondary)
+                            .foregroundColor(enabled ? KinnectTheme.online : (hasPendingSetup ? KinnectTheme.warning : KinnectTheme.textSecondary))
                     }
                     if enabled {
                         HStack {
-                            Text("Mã dự phòng còn lại")
+                            Text(L10n.tr("Mã dự phòng còn lại"))
                                 .font(.caption)
                                 .foregroundColor(KinnectTheme.textSecondary)
                             Spacer()
-                            Text("\(remainingBackupCodes) mã")
+                            Text(String(format: L10n.tr("%d mã"), remainingBackupCodes))
                                 .font(.caption.bold())
                                 .foregroundColor(remainingBackupCodes > 0 ? KinnectTheme.accentBright : KinnectTheme.danger)
                         }
@@ -614,8 +666,8 @@ private struct TwoFactorSettingsSheet: View {
                 }
 
                 if !setupBackupCodes.isEmpty {
-                    Section("Mã dự phòng khôi phục (Lưu giữ an toàn)") {
-                        Text("Mỗi mã dự phòng chỉ dùng được 1 lần khi bạn mất thiết bị xác thực.")
+                    Section(L10n.tr("Mã dự phòng khôi phục (Lưu giữ an toàn)")) {
+                        Text(L10n.tr("Mỗi mã dự phòng chỉ dùng được 1 lần khi bạn mất thiết bị xác thực."))
                             .font(.caption2)
                             .foregroundColor(KinnectTheme.textSecondary)
                         Text(setupBackupCodes.joined(separator: "\n"))
@@ -624,54 +676,54 @@ private struct TwoFactorSettingsSheet: View {
                             .textSelection(.enabled)
                         Button {
                             UIPasteboard.general.string = setupBackupCodes.joined(separator: "\n")
-                            appState.showToast("Đã sao chép danh sách mã dự phòng.")
+                            appState.showToast(L10n.tr("Đã sao chép danh sách mã dự phòng."))
                         } label: {
-                            Label("Sao chép mã dự phòng", systemImage: "doc.on.doc")
+                            Label(L10n.tr("Sao chép mã dự phòng"), systemImage: "doc.on.doc")
                         }
                     }
                 }
 
                 if !enabled {
-                    if setupSecret.isEmpty {
-                        Section("Bước 1: Khởi tạo khóa 2FA") {
-                            SecureField("Mật khẩu hiện tại", text: $currentPassword)
-                            Button(isBusy ? "Đang tạo khóa..." : "Tạo khóa xác thực 2FA") {
-                                Task { await startSetup() }
+                    if !setupSecret.isEmpty || hasPendingSetup {
+                        if !setupSecret.isEmpty {
+                            Section(L10n.tr("Bước 2: Liên kết ứng dụng Authenticator")) {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(L10n.tr("Khóa bí mật (Secret):"))
+                                        .font(.caption)
+                                        .foregroundColor(KinnectTheme.textSecondary)
+                                    Text(setupSecret)
+                                        .font(.system(.subheadline, design: .monospaced).bold())
+                                        .foregroundColor(KinnectTheme.accentBright)
+                                        .textSelection(.enabled)
+                                }
+                                Button {
+                                    UIPasteboard.general.string = setupSecret
+                                    appState.showToast(L10n.tr("Đã sao chép khóa bí mật 2FA."))
+                                } label: {
+                                    Label(L10n.tr("Sao chép khóa Secret"), systemImage: "doc.on.doc")
+                                }
+                                if !setupOtpauthUrl.isEmpty {
+                                    Button {
+                                        UIPasteboard.general.string = setupOtpauthUrl
+                                        appState.showToast(L10n.tr("Đã sao chép liên kết otpauth://"))
+                                    } label: {
+                                        Label(L10n.tr("Sao chép URI otpauth://"), systemImage: "link")
+                                    }
+                                }
                             }
-                            .disabled(isBusy || currentPassword.isEmpty)
-                        }
-                    } else {
-                        Section("Bước 2: Liên kết ứng dụng Authenticator") {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Khóa bí mật (Secret):")
+                        } else {
+                            Section(L10n.tr("Thiết lập đang chờ xác nhận")) {
+                                Text(L10n.tr("Bạn đã khởi tạo khóa 2FA trước đó. Hãy nhập mã 6 chữ số từ ứng dụng Authenticator để kích hoạt, hoặc tạo lại khóa mới bên dưới."))
                                     .font(.caption)
                                     .foregroundColor(KinnectTheme.textSecondary)
-                                Text(setupSecret)
-                                    .font(.system(.subheadline, design: .monospaced).bold())
-                                    .foregroundColor(KinnectTheme.accentBright)
-                                    .textSelection(.enabled)
-                            }
-                            Button {
-                                UIPasteboard.general.string = setupSecret
-                                appState.showToast("Đã sao chép khóa bí mật 2FA.")
-                            } label: {
-                                Label("Sao chép khóa Secret", systemImage: "doc.on.doc")
-                            }
-                            if !setupOtpauthUrl.isEmpty {
-                                Button {
-                                    UIPasteboard.general.string = setupOtpauthUrl
-                                    appState.showToast("Đã sao chép liên kết otpauth://")
-                                } label: {
-                                    Label("Sao chép URI otpauth://", systemImage: "link")
-                                }
                             }
                         }
 
-                        Section("Bước 3: Xác nhận mã 6 chữ số để bật") {
-                            TextField("Nhập mã 6 chữ số từ ứng dụng", text: $verificationCode)
+                        Section(L10n.tr("Bước 3: Xác nhận mã 6 chữ số để bật")) {
+                            TextField(L10n.tr("Nhập mã 6 chữ số từ ứng dụng"), text: $verificationCode)
                                 .keyboardType(.numberPad)
                                 .textContentType(.oneTimeCode)
-                            Button(isBusy ? "Đang kích hoạt..." : "Kích hoạt 2FA") {
+                            Button(isBusy ? L10n.tr("Đang kích hoạt...") : L10n.tr("Kích hoạt 2FA")) {
                                 Task { await enableTwoFactor() }
                             }
                             .font(.body.bold())
@@ -679,30 +731,52 @@ private struct TwoFactorSettingsSheet: View {
                             .disabled(isBusy || verificationCode.trimmingCharacters(in: .whitespacesAndNewlines).count < 6)
                         }
                     }
+
+                    if setupSecret.isEmpty {
+                        Section(hasPendingSetup ? L10n.tr("Hoặc tạo lại khóa 2FA mới") : L10n.tr("Bước 1: Khởi tạo khóa 2FA")) {
+                            if hasPassword {
+                                SecureField(L10n.tr("Mật khẩu hiện tại"), text: $currentPassword)
+                            } else {
+                                Text(L10n.tr("Tài khoản đăng nhập mạng xã hội chưa có mật khẩu. Cần phiên đăng nhập trong 10 phút gần đây."))
+                                    .font(.caption)
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                            }
+                            Button(isBusy ? L10n.tr("Đang tạo khóa...") : L10n.tr("Tạo khóa xác thực 2FA")) {
+                                Task { await startSetup() }
+                            }
+                            .disabled(isBusy || (hasPassword && currentPassword.isEmpty))
+                        }
+                    }
                 } else {
-                    Section("Quản lý & Tắt 2FA") {
-                        SecureField("Mật khẩu hiện tại", text: $actionPassword)
-                        TextField("Mã 2FA 6 số hoặc mã dự phòng", text: $actionCode)
+                    Section(L10n.tr("Quản lý & Tắt 2FA")) {
+                        if hasPassword {
+                            SecureField(L10n.tr("Mật khẩu hiện tại"), text: $actionPassword)
+                        } else {
+                            Text(L10n.tr("Tài khoản đăng nhập mạng xã hội chưa có mật khẩu (cần phiên đăng nhập gần đây trong 10 phút)."))
+                                .font(.caption)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        }
+                        TextField(L10n.tr("Mã 2FA 6 số hoặc mã dự phòng"), text: $actionCode)
                             .keyboardType(.asciiCapable)
                             .autocorrectionDisabled()
 
-                        Button(isBusy ? "Đang tạo lại..." : "Tạo lại 8 mã dự phòng mới") {
+                        Button(isBusy ? L10n.tr("Đang tạo lại...") : L10n.tr("Tạo lại 8 mã dự phòng mới")) {
                             Task { await regenerateRecoveryCodes() }
                         }
-                        .disabled(isBusy || actionPassword.isEmpty || actionCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .disabled(isBusy || (hasPassword && actionPassword.isEmpty) || actionCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
-                        Button(isBusy ? "Đang tắt..." : "Tắt xác thực 2 bước", role: .destructive) {
+                        Button(isBusy ? L10n.tr("Đang tắt...") : L10n.tr("Tắt xác thực 2 bước"), role: .destructive) {
                             Task { await disableTwoFactor() }
                         }
-                        .disabled(isBusy || actionPassword.isEmpty || actionCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .disabled(isBusy || (hasPassword && actionPassword.isEmpty) || actionCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                 }
             }
-            .navigationTitle("Xác thực 2 bước (2FA)")
+            .navigationTitle(L10n.tr("Xác thực 2 bước (2FA)"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Đóng") { dismiss() }
+                    Button(L10n.tr("Đóng")) { dismiss() }
                 }
             }
             .task {
@@ -738,7 +812,7 @@ private struct TwoFactorSettingsSheet: View {
             setupOtpauthUrl = (res["otpauthUrl"] as? String) ?? (res["otpauthUri"] as? String) ?? ""
             setupBackupCodes = (res["backupCodes"] as? [String]) ?? []
             currentPassword = ""
-            appState.showToast("Đã khởi tạo khóa 2FA. Hãy nhập mã 6 số để hoàn tất.")
+            appState.showToast(L10n.tr("Đã khởi tạo khóa 2FA. Hãy nhập mã 6 số để hoàn tất."))
         } catch {
             appState.showToast(error.localizedDescription)
         }
@@ -761,7 +835,7 @@ private struct TwoFactorSettingsSheet: View {
             remainingBackupCodes = (res["remainingBackupCodes"] as? Int) ?? (res["recoveryRemaining"] as? Int) ?? setupBackupCodes.count
             verificationCode = ""
             setupSecret = ""
-            appState.showToast("Đã bật xác thực 2 bước thành công!")
+            appState.showToast(L10n.tr("Đã bật xác thực 2 bước thành công!"))
             await loadStatus()
         } catch {
             appState.showToast(error.localizedDescription)
@@ -781,7 +855,7 @@ private struct TwoFactorSettingsSheet: View {
             setupBackupCodes = (res["backupCodes"] as? [String]) ?? []
             remainingBackupCodes = (res["remainingBackupCodes"] as? Int) ?? (res["recoveryRemaining"] as? Int) ?? setupBackupCodes.count
             actionCode = ""
-            appState.showToast("Đã tạo mới mã dự phòng 2FA.")
+            appState.showToast(L10n.tr("Đã tạo mới mã dự phòng 2FA."))
         } catch {
             appState.showToast(error.localizedDescription)
         }
@@ -805,7 +879,7 @@ private struct TwoFactorSettingsSheet: View {
             setupBackupCodes = []
             actionPassword = ""
             actionCode = ""
-            appState.showToast("Đã tắt xác thực 2 bước.")
+            appState.showToast(L10n.tr("Đã tắt xác thực 2 bước."))
         } catch {
             appState.showToast(error.localizedDescription)
         }
@@ -814,26 +888,81 @@ private struct TwoFactorSettingsSheet: View {
 
 private struct ChangePasswordSheetView: View {
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var loc = LocalizationManager.shared
     var onBack: (() -> Void)? = nil
 
     @State private var oldPassword = ""
     @State private var newPassword = ""
     @State private var confirmPassword = ""
+    @State private var showOldPassword = false
+    @State private var showNewPassword = false
+    @State private var showConfirmPassword = false
     @State private var errorMessage = ""
+    @State private var isSubmitting = false
+
+    private var hasPassword: Bool {
+        appState.currentUser?.hasPassword ?? true
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             PinnedHeaderBar(
-                title: "Đổi mật khẩu",
+                title: hasPassword ? L10n.tr("Đổi mật khẩu") : L10n.tr("Đặt mật khẩu"),
                 onBack: onBack ?? { dismiss() },
                 trailingActions: []
             )
 
             Form {
                 Section {
-                    SecureField("Mật khẩu hiện tại", text: $oldPassword)
-                    SecureField("Mật khẩu mới", text: $newPassword)
-                    SecureField("Nhập lại mật khẩu mới", text: $confirmPassword)
+                    if hasPassword {
+                        HStack {
+                            if showOldPassword {
+                                TextField(L10n.tr("Mật khẩu hiện tại"), text: $oldPassword)
+                            } else {
+                                SecureField(L10n.tr("Mật khẩu hiện tại"), text: $oldPassword)
+                            }
+                            KinnectIconButton(
+                                glyph: showOldPassword ? .eyeOff : .eye,
+                                label: L10n.tr(showOldPassword ? "Ẩn" : "Hiện"),
+                                tint: KinnectTheme.textSecondary
+                            ) {
+                                showOldPassword.toggle()
+                            }
+                        }
+                    } else {
+                        Text(L10n.tr("Tài khoản đăng nhập mạng xã hội chưa có mật khẩu. Bạn có thể đặt mật khẩu mới khi phiên đăng nhập còn mới (trong 10 phút)."))
+                            .font(.caption)
+                            .foregroundColor(KinnectTheme.textSecondary)
+                    }
+                    HStack {
+                        if showNewPassword {
+                            TextField(L10n.tr("Mật khẩu mới"), text: $newPassword)
+                        } else {
+                            SecureField(L10n.tr("Mật khẩu mới"), text: $newPassword)
+                        }
+                        KinnectIconButton(
+                            glyph: showNewPassword ? .eyeOff : .eye,
+                            label: L10n.tr(showNewPassword ? "Ẩn" : "Hiện"),
+                            tint: KinnectTheme.textSecondary
+                        ) {
+                            showNewPassword.toggle()
+                        }
+                    }
+                    HStack {
+                        if showConfirmPassword {
+                            TextField(L10n.tr("Nhập lại mật khẩu mới"), text: $confirmPassword)
+                        } else {
+                            SecureField(L10n.tr("Nhập lại mật khẩu mới"), text: $confirmPassword)
+                        }
+                        KinnectIconButton(
+                            glyph: showConfirmPassword ? .eyeOff : .eye,
+                            label: L10n.tr(showConfirmPassword ? "Ẩn" : "Hiện"),
+                            tint: KinnectTheme.textSecondary
+                        ) {
+                            showConfirmPassword.toggle()
+                        }
+                    }
                 }
                 if !errorMessage.isEmpty {
                     Section {
@@ -841,32 +970,37 @@ private struct ChangePasswordSheetView: View {
                     }
                 }
                 Section {
-                    Button("Lưu") {
+                    Button(L10n.tr(isSubmitting ? "Đang lưu…" : "Lưu")) {
                         Task { await submit() }
                     }
                     .font(.body.weight(.semibold))
                     .foregroundColor(KinnectTheme.accentBright)
+                    .disabled(isSubmitting)
                 }
             }
         }
     }
 
     private func submit() async {
+        guard !isSubmitting else { return }
         errorMessage = ""
-        if oldPassword.isEmpty {
-            errorMessage = "Vui lòng nhập mật khẩu hiện tại."
+        if hasPassword && oldPassword.isEmpty {
+            errorMessage = L10n.tr("Vui lòng nhập mật khẩu hiện tại.")
             return
         }
         if newPassword.count < 6 {
-            errorMessage = "Mật khẩu mới phải có ít nhất 6 ký tự."
+            errorMessage = L10n.tr("Mật khẩu mới phải có ít nhất 6 ký tự.")
             return
         }
         if newPassword != confirmPassword {
-            errorMessage = "Mật khẩu nhập lại không khớp."
+            errorMessage = L10n.tr("Mật khẩu nhập lại không khớp.")
             return
         }
+        isSubmitting = true
+        defer { isSubmitting = false }
         if UIReviewFixture.activeScreen != nil {
-            AppState.shared.showToast("Đã đổi mật khẩu. Các thiết bị khác đã được đăng xuất.")
+            appState.currentUser?.hasPassword = true
+            appState.showToast(L10n.tr("Đã lưu mật khẩu. Các thiết bị khác đã được đăng xuất."))
             close()
             return
         }
@@ -874,13 +1008,14 @@ private struct ChangePasswordSheetView: View {
             _ = try await KinnectAPIClient.shared.requestJSON(
                 "/api/me/password",
                 method: "POST",
-                body: ["current": oldPassword, "next": newPassword]
+                body: ["current": hasPassword ? oldPassword : "", "next": newPassword]
             )
-            AppState.shared.showToast("Đã đổi mật khẩu. Các thiết bị khác đã được đăng xuất.")
+            appState.currentUser?.hasPassword = true
+            appState.showToast(L10n.tr("Đã lưu mật khẩu. Các thiết bị khác đã được đăng xuất."))
             close()
         } catch {
             errorMessage = error.localizedDescription
-            AppState.shared.showToast(error.localizedDescription)
+            appState.showToast(error.localizedDescription)
         }
     }
 
@@ -895,24 +1030,26 @@ private struct ChangePasswordSheetView: View {
 
 private struct AppearanceSettingsSheetView: View {
     @AppStorage("app_appearance_mode") private var colorSchemeSetting: String = "system"
+    @ObservedObject private var loc = LocalizationManager.shared
     @Environment(\.dismiss) private var dismiss
     var onBack: (() -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 0) {
             PinnedHeaderBar(
-                title: "Giao diện",
+                title: L10n.tr("Giao diện"),
                 onBack: onBack ?? { dismiss() },
                 trailingActions: []
             )
 
             Form {
-                Section("Giao diện ứng dụng") {
+                Section(L10n.tr("Giao diện ứng dụng")) {
                     Button {
                         colorSchemeSetting = "light"
+                        KinnectTheme.applyWindowAppearance("light")
                     } label: {
                         HStack {
-                            Text("Sáng")
+                            Text(L10n.tr("Sáng"))
                                 .foregroundColor(KinnectTheme.textPrimary)
                             Spacer()
                             if colorSchemeSetting == "light" {
@@ -922,9 +1059,10 @@ private struct AppearanceSettingsSheetView: View {
                     }
                     Button {
                         colorSchemeSetting = "dark"
+                        KinnectTheme.applyWindowAppearance("dark")
                     } label: {
                         HStack {
-                            Text("Tối")
+                            Text(L10n.tr("Tối"))
                                 .foregroundColor(KinnectTheme.textPrimary)
                             Spacer()
                             if colorSchemeSetting == "dark" {
@@ -934,9 +1072,10 @@ private struct AppearanceSettingsSheetView: View {
                     }
                     Button {
                         colorSchemeSetting = "system"
+                        KinnectTheme.applyWindowAppearance("system")
                     } label: {
                         HStack {
-                            Text("Theo hệ thống")
+                            Text(L10n.tr("Theo hệ thống"))
                                 .foregroundColor(KinnectTheme.textPrimary)
                             Spacer()
                             if colorSchemeSetting == "system" {
@@ -946,12 +1085,16 @@ private struct AppearanceSettingsSheetView: View {
                     }
                 }
             }
+            .onChange(of: colorSchemeSetting) { newMode in
+                KinnectTheme.applyWindowAppearance(newMode)
+            }
         }
     }
 }
 
 private struct HelpSupportSheetView: View {
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var loc = LocalizationManager.shared
     var onBack: (() -> Void)? = nil
     @State private var showReport = false
     @State private var supportPeer: KinnectUser?
@@ -960,19 +1103,19 @@ private struct HelpSupportSheetView: View {
     var body: some View {
         VStack(spacing: 0) {
             PinnedHeaderBar(
-                title: "Trợ giúp và hỗ trợ",
+                title: L10n.tr("Trợ giúp và hỗ trợ"),
                 onBack: onBack ?? { dismiss() },
                 trailingActions: []
             )
 
             List {
-                Button("Báo sự cố") { showReport = true }
-                Button("Trung tâm hỗ trợ") { Task { await openSupport() } }
-                Link("Chính sách quyền riêng tư", destination: URL(string: "https://kinnect.io.vn/privacy")!)
-                Link("Quy tắc cộng đồng", destination: URL(string: "https://kinnect.io.vn/community")!)
-                Link("An toàn trẻ em", destination: URL(string: "https://kinnect.io.vn/child-safety")!)
-                Link("Giấy phép phần mềm", destination: URL(string: "https://app.kinnect.io.vn/third-party-notices.txt")!)
-                Text("Mr Ánh · Hỗ trợ và quyền riêng tư: anhvn53@wru.vn")
+                Button(L10n.tr("Báo sự cố")) { showReport = true }
+                Button(L10n.tr("Trung tâm hỗ trợ")) { Task { await openSupport() } }
+                Link(L10n.tr("Chính sách quyền riêng tư"), destination: URL(string: "https://kinnect.io.vn/privacy")!)
+                Link(L10n.tr("Quy tắc cộng đồng"), destination: URL(string: "https://kinnect.io.vn/community")!)
+                Link(L10n.tr("An toàn trẻ em"), destination: URL(string: "https://kinnect.io.vn/child-safety")!)
+                Link(L10n.tr("Giấy phép phần mềm"), destination: URL(string: "https://app.kinnect.io.vn/third-party-notices.txt")!)
+                Text(L10n.tr("Mr Ánh · Hỗ trợ và quyền riêng tư: anhvn53@wru.vn"))
                     .font(.caption)
                     .foregroundColor(KinnectTheme.textSecondary)
             }
@@ -984,10 +1127,10 @@ private struct HelpSupportSheetView: View {
         .sheet(item: $supportPeer) { peer in
             DirectChatDetailView(peer: peer)
         }
-        .alert("Hỗ trợ Kinnect", isPresented: $showSupportFallback) {
-            Button("Đóng", role: .cancel) {}
+        .alert(L10n.tr("Hỗ trợ Kinnect"), isPresented: $showSupportFallback) {
+            Button(L10n.tr("Đóng"), role: .cancel) {}
         } message: {
-            Text("Liên hệ riêng Mr Ánh: anhvn53@wru.vn. Không gửi mật khẩu hoặc OTP.")
+            Text(L10n.tr("Liên hệ riêng Mr Ánh: anhvn53@wru.vn. Không gửi mật khẩu hoặc OTP."))
         }
     }
 
@@ -1014,6 +1157,7 @@ struct AdminConsoleView: View {
     var onBack: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var loc = LocalizationManager.shared
     @State private var reports: [[String: Any]] = []
     @State private var users: [[String: Any]] = []
     @State private var status = ""
@@ -1027,7 +1171,7 @@ struct AdminConsoleView: View {
     var body: some View {
         VStack(spacing: 0) {
             PinnedHeaderBar(
-                title: "Bảng quản trị",
+                title: L10n.tr("Bảng quản trị"),
                 onBack: onBack ?? { dismiss() },
                 trailingActions: []
             )
@@ -1038,26 +1182,26 @@ struct AdminConsoleView: View {
                             .font(.footnote)
                             .foregroundColor(KinnectTheme.textSecondary)
                     }
-                    Section("Báo cáo") {
+                    Section(L10n.tr("Báo cáo")) {
                         if reports.isEmpty {
-                            Text("Chưa có báo cáo.")
+                            Text(L10n.tr("Chưa có báo cáo."))
                                 .foregroundColor(KinnectTheme.textSecondary)
                         }
                         ForEach(Array(reports.enumerated()), id: \.offset) { _, report in
                             reportRow(report)
                         }
                     }
-                    Section("Thành viên gần đây") {
+                    Section(L10n.tr("Thành viên gần đây")) {
                         ForEach(Array(users.enumerated()), id: \.offset) { _, user in
                             userRow(user)
                         }
                     }
-                    Text("Kinh tế, trợ lý AI và thư viện nhạc chưa có trên màn này.")
+                    Text(L10n.tr("Kinh tế, trợ lý AI và thư viện nhạc chưa có trên màn này."))
                         .font(.caption)
                         .foregroundColor(KinnectTheme.textSecondary)
                 }
             } else {
-                Text("Chỉ quản trị viên được vào bảng quản trị.")
+                Text(L10n.tr("Chỉ quản trị viên được vào bảng quản trị."))
                     .font(.subheadline)
                     .foregroundColor(KinnectTheme.textSecondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1065,13 +1209,13 @@ struct AdminConsoleView: View {
         }
         .background(KinnectTheme.background)
         .task { await reload() }
-        .confirmationDialog("Xác nhận thao tác quản trị?", isPresented: $confirm, titleVisibility: .visible) {
-            Button("Xác nhận", role: .destructive) {
+        .confirmationDialog(L10n.tr("Xác nhận thao tác quản trị?"), isPresented: $confirm, titleVisibility: .visible) {
+            Button(L10n.tr("Xác nhận"), role: .destructive) {
                 if let pending {
                     Task { await moderate(pending.action, pending.target) }
                 }
             }
-            Button("Hủy", role: .cancel) { pending = nil }
+            Button(L10n.tr("Hủy"), role: .cancel) { pending = nil }
         }
     }
 
@@ -1093,19 +1237,19 @@ struct AdminConsoleView: View {
                     .foregroundColor(KinnectTheme.textSecondary)
                 if kind == "short" || kind == "post" {
                     let hidden = Self.flag(subject["hidden"])
-                    Button(hidden ? (kind == "short" ? "Hiện video" : "Hiện bài") : (kind == "short" ? "Ẩn video" : "Ẩn bài")) {
+                    Button(L10n.tr(hidden ? (kind == "short" ? "Hiện video" : "Hiện bài") : (kind == "short" ? "Ẩn video" : "Ẩn bài"))) {
                         ask(hidden ? "show-\(kind)" : "hide-\(kind)", target)
                     }
                 }
                 if kind == "message" || kind == "group_message" {
-                    Button("Gỡ nội dung tin nhắn") { ask("hide-\(kind)", target) }
+                    Button(L10n.tr("Gỡ nội dung tin nhắn")) { ask("hide-\(kind)", target) }
                 }
                 if let userId = subject["userId"] as? String, !userId.isEmpty {
-                    Button("Đình chỉ tài khoản") { ask("suspend-user", userId) }
+                    Button(L10n.tr("Đình chỉ tài khoản")) { ask("suspend-user", userId) }
                 }
             }
             if (report["status"] as? String) == "open", let id = report["id"] as? String {
-                Button("Đóng báo cáo") { ask("close-report", id) }
+                Button(L10n.tr("Đóng báo cáo")) { ask("close-report", id) }
             }
         }
         .padding(.vertical, 4)
@@ -1120,7 +1264,7 @@ struct AdminConsoleView: View {
                 .foregroundColor(KinnectTheme.textPrimary)
             if role != "admin", let id = user["id"] as? String, !id.isEmpty {
                 let suspended = Self.flag(user["suspended"])
-                Button(suspended ? "Khôi phục" : "Đình chỉ") {
+                Button(L10n.tr(suspended ? "Khôi phục" : "Đình chỉ")) {
                     ask(suspended ? "restore-user" : "suspend-user", id)
                 }
             }
@@ -1149,7 +1293,7 @@ struct AdminConsoleView: View {
             users = userData["users"] as? [[String: Any]] ?? []
             status = ""
         } catch {
-            status = "Chưa tải được dữ liệu quản trị."
+            status = L10n.tr("Chưa tải được dữ liệu quản trị.")
         }
     }
 
@@ -1161,7 +1305,7 @@ struct AdminConsoleView: View {
                 method: "POST",
                 body: ["action": action, "target": target]
             )
-            appState.showToast("Đã gửi thao tác quản trị.")
+            appState.showToast(L10n.tr("Đã gửi thao tác quản trị."))
             await reload()
         } catch {
             appState.showToast(error.localizedDescription)
@@ -1171,12 +1315,22 @@ struct AdminConsoleView: View {
 
 private struct AboutKinnectSheetView: View {
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var loc = LocalizationManager.shared
     var onBack: (() -> Void)? = nil
+
+    private var appVersionLabel: String {
+        let info = Bundle.main.infoDictionary
+        let rawVersion = (info?["CFBundleShortVersionString"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let rawBuild = (info?["CFBundleVersion"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let version = (rawVersion?.isEmpty == false) ? rawVersion! : ServerConfig.appVersion
+        let build = (rawBuild?.isEmpty == false) ? rawBuild! : ServerConfig.buildNumber
+        return "\(L10n.tr("Phiên bản")) \(version) (Build \(build))"
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             PinnedHeaderBar(
-                title: "Giới thiệu",
+                title: L10n.tr("Giới thiệu"),
                 onBack: onBack ?? { dismiss() },
                 trailingActions: []
             )
@@ -1187,10 +1341,10 @@ private struct AboutKinnectSheetView: View {
                 Text("Kinnect")
                     .font(.title.weight(.bold))
                     .foregroundColor(KinnectTheme.textPrimary)
-                Text("Phiên bản 1.2.12 (Build 122)")
+                Text(appVersionLabel)
                     .font(.subheadline)
                     .foregroundColor(KinnectTheme.textSecondary)
-                Text("Nền tảng mạng xã hội kết nối trực tiếp, livestream thời gian thực và tương tác đa phương tiện.")
+                Text(L10n.tr("Nền tảng mạng xã hội kết nối trực tiếp, livestream thời gian thực và tương tác đa phương tiện."))
                     .font(.body)
                     .multilineTextAlignment(.center)
                     .foregroundColor(KinnectTheme.textPrimary)
@@ -1201,8 +1355,257 @@ private struct AboutKinnectSheetView: View {
     }
 }
 
+private struct SavedBookmarksSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var loc = LocalizationManager.shared
+
+    @State private var posts: [PostItem] = []
+    @State private var isLoading = false
+    @State private var hasMore = false
+    @State private var nextCursor: Int64? = nil
+    @State private var isLoadingMore = false
+    @State private var activeCommentPost: PostItem? = nil
+    @State private var selectedAuthorProfile: KinnectUser? = nil
+    @State private var pendingDeletePost: PostItem? = nil
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVStack(spacing: 16) {
+                    if isLoading && posts.isEmpty {
+                        ProgressView(L10n.tr("Đang tải bài viết đã lưu…"))
+                            .padding(.top, 48)
+                    } else if posts.isEmpty {
+                        VStack(spacing: 12) {
+                            Image(systemName: "bookmark")
+                                .font(.system(size: 38, weight: .semibold))
+                                .foregroundColor(KinnectTheme.textSecondary)
+                            Text(L10n.tr("Chưa có bài viết đã lưu"))
+                                .font(.headline)
+                                .foregroundColor(KinnectTheme.textPrimary)
+                            Text(L10n.tr("Các bài viết bạn lưu từ Bảng tin sẽ xuất hiện tại đây để xem lại bất kỳ lúc nào."))
+                                .font(.subheadline)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 28)
+                        }
+                        .padding(.top, 60)
+                    } else {
+                        ForEach(posts) { post in
+                            VStack(alignment: .trailing, spacing: 6) {
+                                Button {
+                                    Task { await unbookmark(post) }
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "bookmark.slash")
+                                            .font(.caption.weight(.semibold))
+                                        Text(L10n.tr("Bỏ lưu"))
+                                            .font(.caption.weight(.semibold))
+                                    }
+                                    .foregroundColor(KinnectTheme.accentBright)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                                }
+                                .buttonStyle(.plain)
+
+                                PostCardView(
+                                    post: post,
+                                    currentUserId: appState.currentUser?.id ?? "",
+                                    isAuthorOnline: post.author.showActivity && (post.author.isActive || appState.onlineUserIds.contains(post.author.id)),
+                                    onOpenAuthorProfile: {
+                                        selectedAuthorProfile = post.author
+                                    },
+                                    onReact: { reaction in
+                                        Task { await toggleReaction(post: post, reaction: reaction) }
+                                    },
+                                    onOpenComments: {
+                                        activeCommentPost = post
+                                    },
+                                    onDelete: {
+                                        pendingDeletePost = post
+                                    },
+                                    onReport: {
+                                        appState.activeReportContext = UGCReportContext(
+                                            targetType: "post",
+                                            targetId: post.id,
+                                            targetUserId: post.author.id,
+                                            targetTitle: "\(L10n.tr("Bài viết của")) \(post.author.name)"
+                                        )
+                                    },
+                                    onBookmark: {
+                                        Task { await unbookmark(post) }
+                                    }
+                                )
+                            }
+                        }
+
+                        if hasMore, nextCursor != nil {
+                            Button {
+                                Task { await loadMoreBookmarks() }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    if isLoadingMore { ProgressView() }
+                                    Text(isLoadingMore ? L10n.tr("Đang tải…") : L10n.tr("Xem thêm bài viết đã lưu"))
+                                        .font(.subheadline.weight(.semibold))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(RoundedRectangle(cornerRadius: 14).fill(KinnectTheme.surfaceElevated))
+                            }
+                            .disabled(isLoadingMore)
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+            }
+            .background(KinnectTheme.background)
+            .refreshable {
+                await loadBookmarks()
+            }
+            .navigationTitle(L10n.tr("Bài viết đã lưu"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.tr("Đóng")) { dismiss() }
+                }
+            }
+            .task {
+                await loadBookmarks()
+            }
+            .sheet(item: $activeCommentPost) { post in
+                PostCommentsSheet(post: post) {
+                    Task { await loadBookmarks() }
+                }
+            }
+            .fullScreenCover(item: $selectedAuthorProfile) { user in
+                ProfileView(targetUser: user)
+            }
+            .alert(
+                L10n.tr("Xóa bài viết?"),
+                isPresented: Binding(
+                    get: { pendingDeletePost != nil },
+                    set: { if !$0 { pendingDeletePost = nil } }
+                ),
+                presenting: pendingDeletePost
+            ) { post in
+                Button(L10n.tr("Xóa bài viết"), role: .destructive) {
+                    pendingDeletePost = nil
+                    Task { await deletePost(post) }
+                }
+                Button(L10n.tr("Hủy"), role: .cancel) {
+                    pendingDeletePost = nil
+                }
+            } message: { _ in
+                Text(L10n.tr("Bài viết đã xóa sẽ không thể khôi phục."))
+            }
+        }
+    }
+
+    private func loadBookmarks() async {
+        isLoading = posts.isEmpty
+        defer { isLoading = false }
+        do {
+            let res = try await KinnectAPIClient.shared.requestJSON("/api/bookmarks")
+            let rawList = res["posts"] as? [[String: Any]] ?? []
+            self.posts = rawList.map { dict in
+                var item = PostItem.from(dict)
+                item.bookmarked = (dict["bookmarked"] as? Bool) ?? true
+                return item
+            }
+            self.hasMore = (res["hasMore"] as? Bool) ?? false
+            self.nextCursor = (res["nextCursor"] as? NSNumber)?.int64Value
+        } catch {
+            if posts.isEmpty {
+                appState.showToast(error.localizedDescription)
+            }
+        }
+    }
+
+    private func loadMoreBookmarks() async {
+        guard hasMore, let cursor = nextCursor, !isLoadingMore else { return }
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+        do {
+            let res = try await KinnectAPIClient.shared.requestJSON("/api/bookmarks?before=\(cursor)")
+            let more = (res["posts"] as? [[String: Any]] ?? []).map { dict -> PostItem in
+                var item = PostItem.from(dict)
+                item.bookmarked = (dict["bookmarked"] as? Bool) ?? true
+                return item
+            }
+            let existing = Set(self.posts.map(\.id))
+            self.posts.append(contentsOf: more.filter { !existing.contains($0.id) })
+            self.hasMore = (res["hasMore"] as? Bool) ?? false
+            self.nextCursor = (res["nextCursor"] as? NSNumber)?.int64Value
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+
+    private func unbookmark(_ post: PostItem) async {
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/posts/\(post.id)/bookmark",
+                method: "DELETE"
+            )
+            withAnimation(.easeInOut(duration: 0.2)) {
+                posts.removeAll { $0.id == post.id }
+            }
+            if let uid = appState.currentUser?.id, !uid.isEmpty {
+                AccountCache.shared.evict(forKey: "feed_posts", accountId: uid)
+                AccountCache.shared.evict(forKey: "json:/api/posts?limit=25", accountId: uid)
+            }
+            appState.showToast(L10n.tr("Đã bỏ lưu bài viết."))
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+
+    private func toggleReaction(post: PostItem, reaction: String) async {
+        let reqId = "react_bm_\(post.id)_\(Int(Date().timeIntervalSince1970))"
+        do {
+            if post.liked && post.userReaction == reaction {
+                _ = try await KinnectAPIClient.shared.requestJSON(
+                    "/api/posts/\(post.id)/like",
+                    method: "DELETE",
+                    body: [:],
+                    requestId: reqId
+                )
+            } else {
+                _ = try await KinnectAPIClient.shared.requestJSON(
+                    "/api/posts/\(post.id)/like",
+                    method: "POST",
+                    body: ["reaction": reaction],
+                    requestId: reqId
+                )
+            }
+            await loadBookmarks()
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+
+    private func deletePost(_ post: PostItem) async {
+        do {
+            _ = try await KinnectAPIClient.shared.requestJSON(
+                "/api/posts/\(post.id)",
+                method: "DELETE",
+                body: [:],
+                requestId: "del_post_\(post.id)"
+            )
+            posts.removeAll { $0.id == post.id }
+            appState.showToast(L10n.tr("Đã xóa bài viết."))
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+}
+
 private struct NotificationSettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var loc = LocalizationManager.shared
     var onBack: (() -> Void)? = nil
     @State private var enabled = true
     @State private var messages = true
@@ -1212,19 +1615,19 @@ private struct NotificationSettingsView: View {
     var body: some View {
         VStack(spacing: 0) {
             PinnedHeaderBar(
-                title: "Cài đặt thông báo",
+                title: L10n.tr("Cài đặt thông báo"),
                 onBack: onBack ?? { dismiss() },
                 trailingActions: []
             )
             Form {
                 Section {
-                    toggle("Hiện thông báo", key: "enabled", value: $enabled)
-                    toggle("Tin nhắn", key: "messages", value: $messages)
-                    toggle("Lời mời kết bạn", key: "friends", value: $friends)
-                    toggle("Bài viết và tương tác", key: "posts", value: $posts)
+                    toggle(L10n.tr("Hiện thông báo"), key: "enabled", value: $enabled)
+                    toggle(L10n.tr("Tin nhắn"), key: "messages", value: $messages)
+                    toggle(L10n.tr("Lời mời kết bạn"), key: "friends", value: $friends)
+                    toggle(L10n.tr("Bài viết và tương tác"), key: "posts", value: $posts)
                 }
                 Section {
-                    Button("Cài đặt thông báo của iOS") {
+                    Button(L10n.tr("Cài đặt thông báo của iOS")) {
                         if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
                             UIApplication.shared.open(url)
                         }
@@ -1254,12 +1657,18 @@ private struct NotificationSettingsView: View {
 
 private struct RecoveryEmailSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var status = "Đang đọc email khôi phục..."
+    @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var loc = LocalizationManager.shared
+    @State private var status = L10n.tr("Đang đọc email khôi phục...")
     @State private var email = ""
     @State private var password = ""
     @State private var code = ""
     @State private var challengeId = ""
     @State private var busy = false
+
+    private var hasPassword: Bool {
+        appState.currentUser?.hasPassword ?? true
+    }
 
     var body: some View {
         NavigationStack {
@@ -1275,33 +1684,39 @@ private struct RecoveryEmailSheet: View {
                             .textInputAutocapitalization(.never)
                             .keyboardType(.emailAddress)
                             .autocorrectionDisabled()
-                        SecureField("Mật khẩu hiện tại", text: $password)
+                        if hasPassword {
+                            SecureField(L10n.tr("Mật khẩu hiện tại"), text: $password)
+                        } else {
+                            Text(L10n.tr("Tài khoản mạng xã hội chưa có mật khẩu (cần phiên đăng nhập trong 10 phút gần đây)."))
+                                .font(.caption)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        }
                     }
                     Section {
-                        Button(busy ? "Đang gửi..." : "Gửi mã xác minh") {
+                        Button(busy ? L10n.tr("Đang gửi...") : L10n.tr("Gửi mã xác minh")) {
                             Task { await start() }
                         }
                         .disabled(busy)
                     }
                 } else {
                     Section {
-                        Text("Nhập mã xác minh trong email của bạn.")
-                        TextField("Mã xác minh", text: $code)
+                        Text(L10n.tr("Nhập mã xác minh trong email của bạn."))
+                        TextField(L10n.tr("Mã xác minh"), text: $code)
                             .keyboardType(.numberPad)
                     }
                     Section {
-                        Button(busy ? "Đang xác minh..." : "Xác minh") {
+                        Button(busy ? L10n.tr("Đang xác minh...") : L10n.tr("Xác minh")) {
                             Task { await verify() }
                         }
                         .disabled(busy)
                     }
                 }
             }
-            .navigationTitle("Email khôi phục")
+            .navigationTitle(L10n.tr("Email khôi phục"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Đóng") { dismiss() }
+                    Button(L10n.tr("Đóng")) { dismiss() }
                 }
             }
             .task { await load() }
@@ -1310,15 +1725,15 @@ private struct RecoveryEmailSheet: View {
 
     private func load() async {
         if UIReviewFixture.isEnabled {
-            status = "Chưa xác minh email khôi phục."
+            status = L10n.tr("Chưa xác minh email khôi phục.")
             return
         }
         do {
             let data = try await KinnectAPIClient.shared.requestJSON("/api/recovery/email")
             if let saved = data["email"] as? String, !saved.isEmpty {
-                status = "Email đã xác minh: \(saved)"
+                status = "\(L10n.tr("Email đã xác minh:")) \(saved)"
             } else {
-                status = "Chưa xác minh email khôi phục."
+                status = L10n.tr("Chưa xác minh email khôi phục.")
             }
         } catch {
             status = error.localizedDescription
@@ -1329,7 +1744,7 @@ private struct RecoveryEmailSheet: View {
         busy = true
         defer { busy = false }
         if UIReviewFixture.isEnabled {
-            AppState.shared.showToast("Bản xem giao diện không gửi email.")
+            AppState.shared.showToast(L10n.tr("Bản xem giao diện không gửi email."))
             return
         }
         do {
@@ -1339,7 +1754,7 @@ private struct RecoveryEmailSheet: View {
                 body: ["email": email, "password": password]
             )
             challengeId = (data["challengeId"] as? String) ?? ""
-            AppState.shared.showToast((data["message"] as? String) ?? "Đã gửi mã xác minh tới email của bạn.")
+            AppState.shared.showToast((data["message"] as? String) ?? L10n.tr("Đã gửi mã xác minh tới email của bạn."))
         } catch {
             AppState.shared.showToast(error.localizedDescription)
         }
@@ -1354,9 +1769,9 @@ private struct RecoveryEmailSheet: View {
                 method: "POST",
                 body: ["challengeId": challengeId, "code": code]
             )
-            AppState.shared.showToast("Đã xác minh email.")
+            AppState.shared.showToast(L10n.tr("Đã xác minh email."))
             if let saved = data["email"] as? String, !saved.isEmpty {
-                status = "Email đã xác minh: \(saved)"
+                status = "\(L10n.tr("Email đã xác minh:")) \(saved)"
             }
             challengeId = ""
             code = ""
@@ -1370,6 +1785,7 @@ private struct RecoveryEmailSheet: View {
 private struct AppReportSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var loc = LocalizationManager.shared
     private let reasons = [
         "An toàn trẻ em · CSAE/CSAM",
         "Quấy rối hoặc bắt nạt",
@@ -1387,20 +1803,20 @@ private struct AppReportSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Picker("Lý do", selection: $reason) {
-                    ForEach(reasons, id: \.self) { Text($0).tag($0) }
+                Picker(L10n.tr("Lý do"), selection: $reason) {
+                    ForEach(reasons, id: \.self) { Text(L10n.tr($0)).tag($0) }
                 }
-                TextField("Bổ sung chi tiết (tùy chọn)", text: $detail)
-                Button(sending ? "Đang gửi..." : "Gửi") {
+                TextField(L10n.tr("Bổ sung chi tiết (tùy chọn)"), text: $detail)
+                Button(sending ? L10n.tr("Đang gửi...") : L10n.tr("Gửi")) {
                     Task { await submit() }
                 }
                 .disabled(sending)
             }
-            .navigationTitle("Báo cáo")
+            .navigationTitle(L10n.tr("Báo cáo"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Hủy") { dismiss() }
+                    Button(L10n.tr("Hủy")) { dismiss() }
                 }
             }
         }
@@ -1409,7 +1825,7 @@ private struct AppReportSheet: View {
     private func submit() async {
         let target = appState.currentUser?.id ?? ""
         guard !target.isEmpty else {
-            appState.showToast("Cần đăng nhập để gửi báo cáo.")
+            appState.showToast(L10n.tr("Cần đăng nhập để gửi báo cáo."))
             return
         }
         sending = true
@@ -1422,7 +1838,7 @@ private struct AppReportSheet: View {
                 body: ["targetType": "app", "targetId": target, "reason": composed],
                 requestId: "report_app_\(target)"
             )
-            appState.showToast("Đã gửi báo cáo để quản trị viên xem xét.")
+            appState.showToast(L10n.tr("Đã gửi báo cáo để quản trị viên xem xét."))
             dismiss()
         } catch {
             appState.showToast(error.localizedDescription)

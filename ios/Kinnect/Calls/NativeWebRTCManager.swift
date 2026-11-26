@@ -12,6 +12,7 @@ struct ActiveCallSession: Identifiable, Equatable {
     var isIncoming: Bool
     var state: CallLifecycleState
     var connectedAt: Date? = nil
+    var isReconnecting: Bool = false
 
     enum CallLifecycleState: String, Equatable {
         case ringingIncoming
@@ -59,7 +60,13 @@ struct WebRTCVideoRendererView: UIViewRepresentable {
 final class NativeWebRTCManager: NSObject, ObservableObject {
     static let shared = NativeWebRTCManager()
 
-    @Published var activeCall: ActiveCallSession?
+    @Published var activeCall: ActiveCallSession? {
+        didSet {
+            Task { @MainActor in
+                AppState.shared.syncSocketRealtimeSessionFlag()
+            }
+        }
+    }
     @Published var localVideoTrack: RTCVideoTrack?
     @Published var remoteVideoTrack: RTCVideoTrack?
     @Published var isMicMuted: Bool = false
@@ -70,6 +77,8 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
     // Live stream WebRTC state
     @Published var liveLocalVideoTrack: RTCVideoTrack?
     @Published var liveRemoteVideoTrack: RTCVideoTrack?
+    @Published var liveRemoteVideoTracks: [String: RTCVideoTrack] = [:]
+    @Published private(set) var livePrimaryRemotePeerId: String? = nil
 
     private let factory: RTCPeerConnectionFactory
     private var callPeerConnection: RTCPeerConnection?
@@ -82,16 +91,22 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
     ]
     private var pendingIceCandidates: [RTCIceCandidate] = []
 
-    // Live broadcast peer connections (host -> viewers, or viewer -> host)
-    private var liveViewerConnections: [String: PeerConnectionBox] = [:]
-    private var liveHostConnection: PeerConnectionBox?
+    // Live broadcast peer connections (SFU uplink/downlink & mesh peers)
+    private var livePeerConnections: [String: PeerConnectionBox] = [:]
+    private var liveHostPeerId: String? = nil
+    private var liveStageRevision: Int = 0
+    private var liveTransport: String = "mesh"
+    private var liveStageRole: String = "viewer"
+    private var liveStageActive: Bool = false
     private var liveAudioTrack: RTCAudioTrack?
     private var liveCapturer: RTCCameraVideoCapturer?
     private var liveVideoSource: RTCVideoSource?
     private var liveProcessor: LiveVideoProcessor?
     @Published private(set) var liveEffects = LiveVideoSettings()
     private var pendingAnswerCallId: String?
+    private var pendingIncomingCallSignals: [[String: Any]] = []
     private var isStartingCall = false
+    private var callReconnectGraceTask: Task<Void, Never>? = nil
 
     @MainActor
     func updateLiveEffects(_ value: LiveVideoSettings) {
@@ -234,6 +249,9 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         let caller = KinnectUser.from(fromDict)
         let isVideo = (mode != "audio")
 
+        if self.activeCall?.callId != callId {
+            self.pendingIncomingCallSignals.removeAll()
+        }
         self.activeCall = ActiveCallSession(
             callId: callId,
             peerUser: caller,
@@ -249,7 +267,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
     }
 
     @MainActor
-    func acceptIncomingCall(callId: String? = nil) async {
+    func acceptIncomingCall(callId: String? = nil, activateAudioDirectly: Bool = false) async {
         guard var current = activeCall else {
             pendingAnswerCallId = callId
             NativeSocketClient.shared.connectWithKeychainSession()
@@ -279,7 +297,16 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         CallAudioFeedback.shared.stop()
         current.state = .connecting
         self.activeCall = current
-        MediaPermissionHandler.shared.configureAudioSessionForCall(speaker: isVideo)
+        let needsManualAudioActivation = activateAudioDirectly || !CallKitManager.shared.hasCallKitSession(callId: current.callId)
+        MediaPermissionHandler.shared.configureAudioSessionForCall(
+            speaker: isVideo,
+            activate: needsManualAudioActivation
+        )
+        if needsManualAudioActivation {
+            let rtcAudio = RTCAudioSession.sharedInstance()
+            rtcAudio.audioSessionDidActivate(AVAudioSession.sharedInstance())
+            rtcAudio.isAudioEnabled = true
+        }
         prepareLocalCallMedia(isVideo: isVideo)
         setupCallPeerConnection()
 
@@ -287,6 +314,14 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
             "type": "call-accept",
             "callId": current.callId
         ])
+
+        if !pendingIncomingCallSignals.isEmpty {
+            let buffered = pendingIncomingCallSignals
+            pendingIncomingCallSignals.removeAll()
+            for signalMsg in buffered {
+                handleCallSignalSocket(signalMsg)
+            }
+        }
     }
 
     @MainActor
@@ -325,8 +360,9 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
                 "callId": callId
             ])
         }
+        let hadCallKit = CallKitManager.shared.hasCallKitSession(callId: callId) || CallKitManager.shared.isAudioSessionActive
         CallKitManager.shared.reportCallEnded(callId: callId, reason: .remoteEnded)
-        cleanupCallMedia()
+        cleanupCallMedia(callKitManaged: hadCallKit)
         self.activeCall = nil
         if sendSocket { CallAudioFeedback.shared.ended() }
     }
@@ -377,6 +413,12 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         guard let current = activeCall else { return }
         let callId = json["callId"] as? String ?? ""
         guard callId.isEmpty || callId == current.callId else { return }
+
+        // Buffer early incoming call-signal packets until the user accepts and local media tracks are prepared.
+        if current.isIncoming && (current.state == .ringingIncoming || (localAudioTrack == nil && callPeerConnection == nil)) {
+            pendingIncomingCallSignals.append(json)
+            return
+        }
 
         if callPeerConnection == nil {
             setupCallPeerConnection()
@@ -451,13 +493,97 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         }
         guard current.callId == callId || current.callId == requestId else { return }
         CallAudioFeedback.shared.stop()
+        let hadCallKit = CallKitManager.shared.hasCallKitSession(callId: current.callId) || CallKitManager.shared.isAudioSessionActive
         CallKitManager.shared.reportCallEnded(callId: current.callId, reason: .remoteEnded)
-        cleanupCallMedia()
+        cleanupCallMedia(callKitManaged: hadCallKit)
         activeCall = nil
         let reason = json["reason"] as? String ?? ""
         CallAudioFeedback.shared.ended(busy: reason == "busy" || reason == "declined")
         if reason == "busy" { AppState.shared.showToast("Người này đang bận.") }
         if reason == "offline" || reason == "unavailable" { AppState.shared.showToast("Hiện chưa liên lạc được với người này.") }
+        if reason == "disconnected" { AppState.shared.showToast("Cuộc gọi đã kết thúc do mất kết nối.") }
+    }
+
+    @MainActor
+    func handleCallReconnectingSocket(_ json: [String: Any]) {
+        guard let current = activeCall else { return }
+        let callId = json["callId"] as? String ?? ""
+        guard callId.isEmpty || callId == current.callId else { return }
+        beginCallReconnectGrace(for: current.callId)
+    }
+
+    @MainActor
+    func handleCallResumedSocket(_ json: [String: Any]) {
+        guard let current = activeCall else { return }
+        let callId = json["callId"] as? String ?? ""
+        guard callId.isEmpty || callId == current.callId else { return }
+        Task { @MainActor [weak self] in
+            guard let self, self.activeCall?.callId == current.callId else { return }
+            await self.refreshIceServers()
+            self.restartCallIceIfNeeded()
+        }
+    }
+
+    @MainActor
+    private func beginCallReconnectGrace(for callId: String) {
+        guard var current = activeCall, current.callId == callId,
+              current.state == .connecting || current.state == .connected else { return }
+        if !current.isReconnecting {
+            current.isReconnecting = true
+            self.activeCall = current
+        }
+        if !NativeSocketClient.shared.isConnected {
+            NativeSocketClient.shared.connectWithKeychainSession()
+        }
+        callReconnectGraceTask?.cancel()
+        callReconnectGraceTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 45_000_000_000)
+            guard !Task.isCancelled, let self,
+                  let liveCall = self.activeCall,
+                  liveCall.callId == callId,
+                  liveCall.isReconnecting else { return }
+            self.endOrRejectCurrentCall(sendSocket: false)
+        }
+    }
+
+    @MainActor
+    private func restartCallIceIfNeeded() {
+        guard let current = activeCall else { return }
+        if callPeerConnection == nil {
+            setupCallPeerConnection()
+        }
+        guard let pc = callPeerConnection else { return }
+        let updatedConfig = pc.configuration
+        updatedConfig.iceServers = getIceServers()
+        _ = pc.setConfiguration(updatedConfig)
+        pc.restartIce()
+        // Offer from the active caller side to prevent SDP glare when both peers receive `call-resumed`.
+        guard !current.isIncoming else { return }
+        let callId = current.callId
+        let constraints = RTCMediaConstraints(
+            mandatoryConstraints: [
+                "OfferToReceiveAudio": "true",
+                "OfferToReceiveVideo": "true",
+                "IceRestart": "true"
+            ],
+            optionalConstraints: nil
+        )
+        pc.offer(for: constraints) { sdp, error in
+            guard let sdp = sdp, error == nil else { return }
+            pc.setLocalDescription(sdp) { err in
+                guard err == nil else { return }
+                let descPayload: [String: Any] = [
+                    "type": Self.sdpTypeString(sdp.type),
+                    "sdp": sdp.sdp
+                ]
+                NativeSocketClient.shared.sendJSON([
+                    "type": "call-signal",
+                    "callId": callId,
+                    "description": descPayload,
+                    "signal": ["description": descPayload]
+                ])
+            }
+        }
     }
 
     // MARK: - Controls
@@ -466,6 +592,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
     func toggleMute() {
         isMicMuted.toggle()
         localAudioTrack?.isEnabled = !isMicMuted
+        liveAudioTrack?.isEnabled = !isMicMuted
     }
 
     @MainActor
@@ -484,13 +611,17 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
     func toggleCamera() {
         isCameraOff.toggle()
         localVideoTrack?.isEnabled = !isCameraOff
+        liveLocalVideoTrack?.isEnabled = !isCameraOff
     }
 
     @MainActor
     func toggleSpeaker() {
         isSpeakerOn.toggle()
-        let session = AVAudioSession.sharedInstance()
-        try? session.overrideOutputAudioPort(isSpeakerOn ? .speaker : .none)
+        MediaPermissionHandler.shared.configureAudioSessionForCall(
+            speaker: isSpeakerOn,
+            activate: false,
+            explicitRouteToggle: true
+        )
     }
 
     @MainActor
@@ -596,20 +727,39 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         capturer.startCapture(with: device, format: format, fps: fps)
     }
 
-    private func cleanupCallMedia() {
+    @MainActor
+    private func cleanupCallMedia(callKitManaged: Bool = false) {
+        callReconnectGraceTask?.cancel()
+        callReconnectGraceTask = nil
         videoCapturer?.stopCapture()
         videoCapturer = nil
         videoSource = nil
         localAudioTrack = nil
         localVideoTrack = nil
         remoteVideoTrack = nil
+        pendingIncomingCallSignals.removeAll()
         clearPendingCandidates()
         callPeerConnection?.close()
         callPeerConnection = nil
-        MediaPermissionHandler.shared.configureAudioSessionForMedia()
+        if !callKitManaged && !CallKitManager.shared.isAudioSessionActive {
+            let rtcAudio = RTCAudioSession.sharedInstance()
+            rtcAudio.isAudioEnabled = false
+            rtcAudio.audioSessionDidDeactivate(AVAudioSession.sharedInstance())
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            MediaPermissionHandler.shared.configureAudioSessionForMedia()
+        }
     }
 
-    // MARK: - Live Stream WebRTC (Host & Viewer)
+    // MARK: - Live Stream WebRTC (Host, SFU & Viewer)
+
+    @MainActor
+    func prepareLiveViewerAudio() {
+        guard activeCall == nil else { return }
+        MediaPermissionHandler.shared.configureAudioSessionForLiveViewer()
+        let rtcAudio = RTCAudioSession.sharedInstance()
+        rtcAudio.audioSessionDidActivate(AVAudioSession.sharedInstance())
+        rtcAudio.isAudioEnabled = true
+    }
 
     @MainActor
     func startLiveHostBroadcast() async -> Bool {
@@ -619,7 +769,9 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         await refreshIceServers()
 
         MediaPermissionHandler.shared.configureAudioSessionForCall(speaker: true, activate: true)
-        RTCAudioSession.sharedInstance().isAudioEnabled = true
+        let rtcAudio = RTCAudioSession.sharedInstance()
+        rtcAudio.audioSessionDidActivate(AVAudioSession.sharedInstance())
+        rtcAudio.isAudioEnabled = true
         let aSource = factory.audioSource(with: nil)
         let aTrack = factory.audioTrack(with: aSource, trackId: "live_audio0")
         self.liveAudioTrack = aTrack
@@ -638,14 +790,160 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
     }
 
     @MainActor
+    func setLiveHostPeerId(_ peerId: String?) {
+        liveHostPeerId = peerId
+        syncPrimaryLiveRemoteVideoTrack()
+    }
+
+    @MainActor
+    private func syncPrimaryLiveRemoteVideoTrack() {
+        if let hostPid = liveHostPeerId, !hostPid.isEmpty,
+           let hostTrack = liveRemoteVideoTracks[hostPid] {
+            liveRemoteVideoTrack = hostTrack
+            livePrimaryRemotePeerId = hostPid
+            return
+        }
+        if let firstKey = liveRemoteVideoTracks.keys.sorted().first,
+           let firstTrack = liveRemoteVideoTracks[firstKey] {
+            liveRemoteVideoTrack = firstTrack
+            livePrimaryRemotePeerId = firstKey
+        } else {
+            liveRemoteVideoTrack = nil
+            livePrimaryRemotePeerId = nil
+        }
+    }
+
+    @MainActor
+    func stopLiveLocalMedia() {
+        liveCapturer?.stopCapture()
+        liveCapturer = nil
+        liveVideoSource = nil
+        liveProcessor = nil
+        liveAudioTrack = nil
+        liveLocalVideoTrack = nil
+        if activeCall == nil {
+            prepareLiveViewerAudio()
+        }
+    }
+
+    @MainActor
+    private func attachLiveStagePeer(
+        _ peer: [String: Any],
+        isPublisher: Bool,
+        transport: String,
+        revision: Int
+    ) {
+        guard let peerId = peer["id"] as? String, !peerId.isEmpty else { return }
+        let shouldOffer = (peer["offer"] as? Bool) == true
+        let peerPublishes = (peer["publishes"] as? Bool) == true
+        let attachLocalMedia = isPublisher && (transport != "sfu" || peerId == "@sfu")
+        guard let box = createLivePeerBox(peerId: peerId, isPublisher: attachLocalMedia, stageRevision: revision),
+              let pc = box.pc else { return }
+        livePeerConnections[peerId] = box
+
+        if shouldOffer {
+            let constraints = RTCMediaConstraints(
+                mandatoryConstraints: [
+                    "OfferToReceiveAudio": peerPublishes ? "true" : "false",
+                    "OfferToReceiveVideo": peerPublishes ? "true" : "false"
+                ],
+                optionalConstraints: nil
+            )
+            pc.offer(for: constraints) { sdp, err in
+                guard let sdp = sdp, err == nil else { return }
+                pc.setLocalDescription(sdp) { setErr in
+                    guard setErr == nil else { return }
+                    let descPayload: [String: Any] = [
+                        "type": Self.sdpTypeString(sdp.type),
+                        "sdp": sdp.sdp
+                    ]
+                    var payload: [String: Any] = [
+                        "type": "signal",
+                        "to": peerId,
+                        "description": descPayload,
+                        "signal": ["description": descPayload]
+                    ]
+                    if revision > 0 {
+                        payload["revision"] = revision
+                    }
+                    NativeSocketClient.shared.sendJSON(payload)
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func applyLiveStage(
+        revision: Int,
+        transport: String,
+        role: String,
+        peers: [[String: Any]],
+        participants: [[String: Any]] = []
+    ) {
+        if let hostParticipant = participants.first(where: { ($0["role"] as? String) == "host" }),
+           let hostPid = hostParticipant["id"] as? String, !hostPid.isEmpty {
+            liveHostPeerId = hostPid
+        }
+        let isPublisher = (role == "host" || role == "guest")
+        if !isPublisher && (liveCapturer != nil || liveLocalVideoTrack != nil || liveAudioTrack != nil) {
+            stopLiveLocalMedia()
+        }
+
+        if liveStageActive && liveStageRevision == revision && liveTransport == transport && liveStageRole == role {
+            let desiredIds = Set(peers.compactMap { $0["id"] as? String }.filter { !$0.isEmpty })
+            let validIds: Set<String>
+            if transport == "sfu" {
+                let participantIds = Set(participants.compactMap { $0["id"] as? String }.filter { !$0.isEmpty })
+                validIds = desiredIds.union(participantIds)
+            } else {
+                validIds = desiredIds
+            }
+            for existingId in Array(livePeerConnections.keys) where !validIds.contains(existingId) {
+                if let existing = livePeerConnections.removeValue(forKey: existingId) {
+                    existing.pc?.close()
+                }
+                liveRemoteVideoTracks.removeValue(forKey: existingId)
+            }
+            for peer in peers {
+                guard let peerId = peer["id"] as? String, !peerId.isEmpty else { continue }
+                if livePeerConnections[peerId] == nil {
+                    attachLiveStagePeer(peer, isPublisher: isPublisher, transport: transport, revision: revision)
+                }
+            }
+            syncPrimaryLiveRemoteVideoTrack()
+            return
+        }
+        liveStageRevision = revision
+        liveTransport = transport
+        liveStageRole = role
+        liveStageActive = true
+
+        for (_, box) in livePeerConnections {
+            box.pc?.close()
+        }
+        livePeerConnections.removeAll()
+        liveRemoteVideoTracks.removeAll()
+        syncPrimaryLiveRemoteVideoTrack()
+
+        if !isPublisher {
+            prepareLiveViewerAudio()
+        }
+
+        for peer in peers {
+            attachLiveStagePeer(peer, isPublisher: isPublisher, transport: transport, revision: revision)
+        }
+    }
+
+    @MainActor
     func handleLiveViewerJoined(peerId: String) {
         guard !peerId.isEmpty else { return }
-        if let existing = liveViewerConnections.removeValue(forKey: peerId) {
+        if let existing = livePeerConnections.removeValue(forKey: peerId) {
             existing.pc?.close()
         }
-        guard let box = createLivePeerBox(peerId: peerId, isHost: true),
+        let rev = liveStageActive ? liveStageRevision : 0
+        guard let box = createLivePeerBox(peerId: peerId, isPublisher: true, stageRevision: rev),
               let pc = box.pc else { return }
-        liveViewerConnections[peerId] = box
+        livePeerConnections[peerId] = box
 
         let constraints = RTCMediaConstraints(
             mandatoryConstraints: ["OfferToReceiveAudio": "false", "OfferToReceiveVideo": "false"],
@@ -659,12 +957,16 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
                     "type": Self.sdpTypeString(sdp.type),
                     "sdp": sdp.sdp
                 ]
-                NativeSocketClient.shared.sendJSON([
+                var payload: [String: Any] = [
                     "type": "signal",
                     "to": peerId,
                     "description": descPayload,
                     "signal": ["description": descPayload]
-                ])
+                ]
+                if rev > 0 {
+                    payload["revision"] = rev
+                }
+                NativeSocketClient.shared.sendJSON(payload)
             }
         }
     }
@@ -672,30 +974,41 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
     @MainActor
     func handleLivePeerLeft(peerId: String) {
         guard !peerId.isEmpty else { return }
-        if let existing = liveViewerConnections.removeValue(forKey: peerId) {
+        if let existing = livePeerConnections.removeValue(forKey: peerId) {
             existing.pc?.close()
+        }
+        if liveRemoteVideoTracks.removeValue(forKey: peerId) != nil {
+            syncPrimaryLiveRemoteVideoTrack()
         }
     }
 
     @MainActor
-    func handleLiveSignal(from peerId: String, signal: [String: Any], isHost: Bool) {
+    func handleLiveSignal(from peerId: String, signal: [String: Any], revision: Int? = nil, isPublisher: Bool) {
+        guard !peerId.isEmpty else { return }
+        if liveStageActive,
+           let rev = revision,
+           rev > 0,
+           liveStageRevision > 0,
+           rev != liveStageRevision {
+            return
+        }
+        let effectiveRevision: Int = {
+            if let rev = revision, rev > 0 { return rev }
+            return liveStageActive ? liveStageRevision : 0
+        }()
+
         let box: PeerConnectionBox
-        if isHost {
-            if let existing = liveViewerConnections[peerId] {
-                box = existing
-            } else {
-                guard let created = createLivePeerBox(peerId: peerId, isHost: true) else { return }
-                liveViewerConnections[peerId] = created
-                box = created
-            }
+        if let existing = livePeerConnections[peerId] {
+            box = existing
         } else {
-            if let existing = liveHostConnection {
-                box = existing
-            } else {
-                guard let created = createLivePeerBox(peerId: peerId, isHost: false) else { return }
-                liveHostConnection = created
-                box = created
-            }
+            let attachLocalMedia = isPublisher && (liveTransport != "sfu" || peerId == "@sfu")
+            guard let created = createLivePeerBox(
+                peerId: peerId,
+                isPublisher: attachLocalMedia,
+                stageRevision: effectiveRevision
+            ) else { return }
+            livePeerConnections[peerId] = created
+            box = created
         }
         guard let pc = box.pc else { return }
 
@@ -706,6 +1019,7 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
             let remoteSDP = RTCSessionDescription(type: sdpType, sdp: sdpText)
             pc.setRemoteDescription(remoteSDP) { err in
                 guard err == nil else { return }
+                box.drainPendingCandidates()
                 if sdpType == .offer {
                     let constraints = RTCMediaConstraints(
                         mandatoryConstraints: ["OfferToReceiveAudio": "true", "OfferToReceiveVideo": "true"],
@@ -719,12 +1033,16 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
                                 "type": Self.sdpTypeString(answer.type),
                                 "sdp": answer.sdp
                             ]
-                            NativeSocketClient.shared.sendJSON([
+                            var payload: [String: Any] = [
                                 "type": "signal",
                                 "to": peerId,
                                 "description": descPayload,
                                 "signal": ["description": descPayload]
-                            ])
+                            ]
+                            if effectiveRevision > 0 {
+                                payload["revision"] = effectiveRevision
+                            }
+                            NativeSocketClient.shared.sendJSON(payload)
                         }
                     }
                 }
@@ -737,7 +1055,11 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
                 ?? (cand["sdpMLineIndex"] as? String).flatMap(Int32.init)
                 ?? 0
             let ice = RTCIceCandidate(sdp: sdp, sdpMLineIndex: sdpMLineIndex, sdpMid: sdpMid)
-            pc.add(ice) { _ in }
+            if pc.remoteDescription != nil {
+                pc.add(ice) { _ in }
+            } else {
+                box.enqueueCandidate(ice)
+            }
         }
     }
 
@@ -749,34 +1071,48 @@ final class NativeWebRTCManager: NSObject, ObservableObject {
         liveProcessor = nil
         liveAudioTrack = nil
         liveLocalVideoTrack = nil
+        liveRemoteVideoTracks.removeAll()
         liveRemoteVideoTrack = nil
-        for (_, box) in liveViewerConnections {
+        livePrimaryRemotePeerId = nil
+        liveHostPeerId = nil
+        liveStageRevision = 0
+        liveTransport = "mesh"
+        liveStageRole = "viewer"
+        liveStageActive = false
+        for (_, box) in livePeerConnections {
             box.pc?.close()
         }
-        liveViewerConnections.removeAll()
-        liveHostConnection?.pc?.close()
-        liveHostConnection = nil
+        livePeerConnections.removeAll()
         if activeCall == nil {
-            RTCAudioSession.sharedInstance().isAudioEnabled = false
+            let rtcAudio = RTCAudioSession.sharedInstance()
+            rtcAudio.isAudioEnabled = false
+            rtcAudio.audioSessionDidDeactivate(AVAudioSession.sharedInstance())
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             MediaPermissionHandler.shared.configureAudioSessionForMedia()
         }
     }
 
-    private func createLivePeerBox(peerId: String, isHost: Bool) -> PeerConnectionBox? {
+    @MainActor
+    private func createLivePeerBox(peerId: String, isPublisher: Bool, stageRevision: Int) -> PeerConnectionBox? {
+        if !isPublisher {
+            prepareLiveViewerAudio()
+        }
         let config = RTCConfiguration()
         config.iceServers = getIceServers()
         config.sdpSemantics = .unifiedPlan
         let constraints = RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: ["DtlsSrtpKeyAgreement": "true"])
-        let box = PeerConnectionBox(peerId: peerId) { [weak self] videoTrack in
-            DispatchQueue.main.async {
-                self?.liveRemoteVideoTrack = videoTrack
+        let box = PeerConnectionBox(peerId: peerId, stageRevision: stageRevision) { [weak self] videoTrack in
+            Task { @MainActor [weak self] in
+                guard let self, self.livePeerConnections[peerId] != nil else { return }
+                self.liveRemoteVideoTracks[peerId] = videoTrack
+                self.syncPrimaryLiveRemoteVideoTrack()
             }
         }
         guard let pc = factory.peerConnection(with: config, constraints: constraints, delegate: box) else {
             return nil
         }
         box.pc = pc
-        if isHost {
+        if isPublisher {
             if let aTrack = liveAudioTrack {
                 pc.add(aTrack, streamIds: ["kinnect_live"])
             }
@@ -805,8 +1141,8 @@ extension NativeWebRTCManager: RTCPeerConnectionDelegate {
 
     func peerConnection(_ peerConnection: RTCPeerConnection, didAdd stream: RTCMediaStream) {
         if let videoTrack = stream.videoTracks.first {
-            DispatchQueue.main.async {
-                guard self.callPeerConnection === peerConnection else { return }
+            Task { @MainActor [weak self] in
+                guard let self, self.callPeerConnection === peerConnection else { return }
                 self.remoteVideoTrack = videoTrack
             }
         }
@@ -817,9 +1153,12 @@ extension NativeWebRTCManager: RTCPeerConnectionDelegate {
     func peerConnectionShouldNegotiate(_ peerConnection: RTCPeerConnection) {}
 
     private func markCallConnectedIfNeeded(for peerConnection: RTCPeerConnection) {
-        DispatchQueue.main.async {
-            guard self.callPeerConnection === peerConnection,
+        Task { @MainActor [weak self] in
+            guard let self,
+                  self.callPeerConnection === peerConnection,
                   var current = self.activeCall else { return }
+            self.callReconnectGraceTask?.cancel()
+            self.callReconnectGraceTask = nil
             CallAudioFeedback.shared.stop()
             let wasConnected = (current.state == .connected)
             if !wasConnected && !current.isIncoming {
@@ -829,6 +1168,7 @@ extension NativeWebRTCManager: RTCPeerConnectionDelegate {
                 current.connectedAt = Date()
             }
             current.state = .connected
+            current.isReconnecting = false
             self.activeCall = current
         }
     }
@@ -836,9 +1176,23 @@ extension NativeWebRTCManager: RTCPeerConnectionDelegate {
     func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCIceConnectionState) {
         if newState == .connected || newState == .completed {
             markCallConnectedIfNeeded(for: peerConnection)
-        } else if newState == .failed || newState == .closed {
-            DispatchQueue.main.async {
-                guard self.callPeerConnection === peerConnection else { return }
+        } else if newState == .disconnected || newState == .failed {
+            Task { @MainActor [weak self] in
+                guard let self,
+                      self.callPeerConnection === peerConnection,
+                      let current = self.activeCall else { return }
+                if current.state == .connecting || current.state == .connected || current.isReconnecting {
+                    self.beginCallReconnectGrace(for: current.callId)
+                    if newState == .failed && NativeSocketClient.shared.isConnected && !current.isIncoming {
+                        self.restartCallIceIfNeeded()
+                    }
+                } else {
+                    self.endOrRejectCurrentCall(sendSocket: false)
+                }
+            }
+        } else if newState == .closed {
+            Task { @MainActor [weak self] in
+                guard let self, self.callPeerConnection === peerConnection else { return }
                 self.endOrRejectCurrentCall(sendSocket: false)
             }
         }
@@ -847,9 +1201,23 @@ extension NativeWebRTCManager: RTCPeerConnectionDelegate {
     func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCPeerConnectionState) {
         if newState == .connected {
             markCallConnectedIfNeeded(for: peerConnection)
-        } else if newState == .failed || newState == .closed {
-            DispatchQueue.main.async {
-                guard self.callPeerConnection === peerConnection else { return }
+        } else if newState == .disconnected || newState == .failed {
+            Task { @MainActor [weak self] in
+                guard let self,
+                      self.callPeerConnection === peerConnection,
+                      let current = self.activeCall else { return }
+                if current.state == .connecting || current.state == .connected || current.isReconnecting {
+                    self.beginCallReconnectGrace(for: current.callId)
+                    if newState == .failed && NativeSocketClient.shared.isConnected && !current.isIncoming {
+                        self.restartCallIceIfNeeded()
+                    }
+                } else {
+                    self.endOrRejectCurrentCall(sendSocket: false)
+                }
+            }
+        } else if newState == .closed {
+            Task { @MainActor [weak self] in
+                guard let self, self.callPeerConnection === peerConnection else { return }
                 self.endOrRejectCurrentCall(sendSocket: false)
             }
         }
@@ -858,22 +1226,26 @@ extension NativeWebRTCManager: RTCPeerConnectionDelegate {
     func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCIceGatheringState) {}
 
     func peerConnection(_ peerConnection: RTCPeerConnection, didGenerate candidate: RTCIceCandidate) {
-        DispatchQueue.main.async {
-            guard self.callPeerConnection === peerConnection,
+        let sdp = candidate.sdp
+        let sdpMid = candidate.sdpMid ?? "0"
+        let sdpMLineIndex = candidate.sdpMLineIndex
+        Task { @MainActor [weak self] in
+            guard let self,
+                  self.callPeerConnection === peerConnection,
                   let callId = self.activeCall?.callId else { return }
             NativeSocketClient.shared.sendJSON([
                 "type": "call-signal",
                 "callId": callId,
                 "candidate": [
-                    "candidate": candidate.sdp,
-                    "sdpMid": candidate.sdpMid ?? "0",
-                    "sdpMLineIndex": candidate.sdpMLineIndex
+                    "candidate": sdp,
+                    "sdpMid": sdpMid,
+                    "sdpMLineIndex": sdpMLineIndex
                 ],
                 "signal": [
                     "candidate": [
-                        "candidate": candidate.sdp,
-                        "sdpMid": candidate.sdpMid ?? "0",
-                        "sdpMLineIndex": candidate.sdpMLineIndex
+                        "candidate": sdp,
+                        "sdpMid": sdpMid,
+                        "sdpMLineIndex": sdpMLineIndex
                     ]
                 ]
             ])
@@ -886,20 +1258,21 @@ extension NativeWebRTCManager: RTCPeerConnectionDelegate {
 
     func peerConnection(_ peerConnection: RTCPeerConnection, didAdd rtpReceiver: RTCRtpReceiver, streams mediaStreams: [RTCMediaStream]) {
         if let track = rtpReceiver.track as? RTCVideoTrack {
-            DispatchQueue.main.async {
-                guard self.callPeerConnection === peerConnection else { return }
+            Task { @MainActor [weak self] in
+                guard let self, self.callPeerConnection === peerConnection else { return }
                 self.remoteVideoTrack = track
             }
         } else if let track = mediaStreams.first?.videoTracks.first {
-            DispatchQueue.main.async {
-                guard self.callPeerConnection === peerConnection else { return }
+            Task { @MainActor [weak self] in
+                guard let self, self.callPeerConnection === peerConnection else { return }
                 self.remoteVideoTrack = track
             }
         }
         if rtpReceiver.track != nil {
-            DispatchQueue.main.async {
-                guard self.callPeerConnection === peerConnection,
-                      self.activeCall?.state == .connecting else { return }
+            Task { @MainActor [weak self] in
+                guard let self,
+                      self.callPeerConnection === peerConnection,
+                      self.activeCall?.state == .connecting || self.activeCall?.isReconnecting == true else { return }
                 if peerConnection.iceConnectionState == .connected || peerConnection.iceConnectionState == .completed || peerConnection.connectionState == .connected {
                     self.markCallConnectedIfNeeded(for: peerConnection)
                 }
@@ -912,12 +1285,33 @@ extension NativeWebRTCManager: RTCPeerConnectionDelegate {
 
 private final class PeerConnectionBox: NSObject, RTCPeerConnectionDelegate {
     let peerId: String
+    let stageRevision: Int
     var pc: RTCPeerConnection?
     let onRemoteVideo: (RTCVideoTrack) -> Void
+    private let candidateLock = NSLock()
+    private var pendingCandidates: [RTCIceCandidate] = []
 
-    init(peerId: String, onRemoteVideo: @escaping (RTCVideoTrack) -> Void) {
+    init(peerId: String, stageRevision: Int = 0, onRemoteVideo: @escaping (RTCVideoTrack) -> Void) {
         self.peerId = peerId
+        self.stageRevision = stageRevision
         self.onRemoteVideo = onRemoteVideo
+    }
+
+    func enqueueCandidate(_ ice: RTCIceCandidate) {
+        candidateLock.lock()
+        pendingCandidates.append(ice)
+        candidateLock.unlock()
+    }
+
+    func drainPendingCandidates() {
+        candidateLock.lock()
+        let queued = pendingCandidates
+        pendingCandidates.removeAll()
+        candidateLock.unlock()
+        guard let pc else { return }
+        for ice in queued {
+            pc.add(ice) { _ in }
+        }
     }
 
     func peerConnection(_ peerConnection: RTCPeerConnection, didChange stateChanged: RTCSignalingState) {}
@@ -936,12 +1330,16 @@ private final class PeerConnectionBox: NSObject, RTCPeerConnectionDelegate {
             "sdpMid": candidate.sdpMid ?? "0",
             "sdpMLineIndex": candidate.sdpMLineIndex
         ]
-        NativeSocketClient.shared.sendJSON([
+        var payload: [String: Any] = [
             "type": "signal",
             "to": peerId,
             "candidate": candPayload,
             "signal": ["candidate": candPayload]
-        ])
+        ]
+        if stageRevision > 0 {
+            payload["revision"] = stageRevision
+        }
+        NativeSocketClient.shared.sendJSON(payload)
     }
     func peerConnection(_ peerConnection: RTCPeerConnection, didRemove candidates: [RTCIceCandidate]) {}
     func peerConnection(_ peerConnection: RTCPeerConnection, didOpen dataChannel: RTCDataChannel) {}

@@ -4,11 +4,13 @@ import Photos
 import UIKit
 import UserNotifications
 
+@MainActor
 final class MediaPermissionHandler: NSObject, ObservableObject, CLLocationManagerDelegate {
     static let shared = MediaPermissionHandler()
 
     private let locationManager = CLLocationManager()
     private var locationContinuation: CheckedContinuation<CLLocationCoordinate2D?, Never>?
+    private var authContinuation: CheckedContinuation<CLAuthorizationStatus, Never>?
 
     @Published var cameraAuthorized: Bool = false
     @Published var microphoneAuthorized: Bool = false
@@ -28,31 +30,100 @@ final class MediaPermissionHandler: NSObject, ObservableObject, CLLocationManage
         locationAuthorized = (locStatus == .authorizedWhenInUse || locStatus == .authorizedAlways)
     }
 
-    func configureAudioSessionForCall(speaker: Bool = true, activate: Bool = false) {
+    private nonisolated static func hasExternalAudioOutputRoute(_ session: AVAudioSession) -> Bool {
+        session.currentRoute.outputs.contains { output in
+            switch output.portType {
+            case .bluetoothA2DP, .bluetoothHFP, .bluetoothLE, .headphones, .carAudio, .airPlay, .usbAudio:
+                return true
+            default:
+                return false
+            }
+        }
+    }
+
+    nonisolated static func configureAudioSessionForCall(
+        speaker: Bool = true,
+        activate: Bool = false,
+        explicitRouteToggle: Bool = false
+    ) {
         let session = AVAudioSession.sharedInstance()
         do {
             var options: AVAudioSession.CategoryOptions = [.allowBluetooth, .allowBluetoothA2DP]
             if speaker {
                 options.insert(.defaultToSpeaker)
             }
-            try session.setCategory(.playAndRecord, mode: .videoChat, options: options)
+            try session.setCategory(
+                .playAndRecord,
+                mode: speaker ? .videoChat : .voiceChat,
+                options: options
+            )
             if activate {
                 try session.setActive(true, options: .notifyOthersOnDeactivation)
             }
-            try? session.overrideOutputAudioPort(speaker ? .speaker : .none)
+            if explicitRouteToggle {
+                try? session.overrideOutputAudioPort(speaker ? .speaker : .none)
+            } else if !hasExternalAudioOutputRoute(session) {
+                try? session.overrideOutputAudioPort(speaker ? .speaker : .none)
+            }
         } catch {
             print("[KinnectAudio] Call AudioSession error: \(error)")
         }
     }
 
-    func configureAudioSessionForMedia() {
+    nonisolated func configureAudioSessionForCall(
+        speaker: Bool = true,
+        activate: Bool = false,
+        explicitRouteToggle: Bool = false
+    ) {
+        Self.configureAudioSessionForCall(
+            speaker: speaker,
+            activate: activate,
+            explicitRouteToggle: explicitRouteToggle
+        )
+    }
+
+    nonisolated static func configureAudioSessionForLiveViewer() {
         let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(.playback, mode: .moviePlayback, options: [.mixWithOthers, .allowBluetooth, .allowBluetoothA2DP])
+            try session.setCategory(
+                .playAndRecord,
+                mode: .videoChat,
+                options: [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP]
+            )
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
+            if !hasExternalAudioOutputRoute(session) {
+                try? session.overrideOutputAudioPort(.speaker)
+            }
+        } catch {
+            do {
+                try session.setCategory(
+                    .playback,
+                    mode: .moviePlayback,
+                    options: []
+                )
+                try session.setActive(true, options: .notifyOthersOnDeactivation)
+            } catch {
+                print("[KinnectAudio] Live viewer AudioSession error: \(error)")
+            }
+        }
+    }
+
+    nonisolated func configureAudioSessionForLiveViewer() {
+        Self.configureAudioSessionForLiveViewer()
+    }
+
+    nonisolated static func configureAudioSessionForMedia() {
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.playback, mode: .moviePlayback, options: [.mixWithOthers])
             try session.setActive(true)
         } catch {
             print("[KinnectAudio] Media AudioSession error: \(error)")
         }
+    }
+
+    nonisolated func configureAudioSessionForMedia() {
+        Self.configureAudioSessionForMedia()
     }
 
     func requestMicrophoneAccess() async -> Bool {
@@ -69,7 +140,7 @@ final class MediaPermissionHandler: NSObject, ObservableObject, CLLocationManage
         default:
             granted = false
         }
-        await MainActor.run { self.microphoneAuthorized = granted }
+        self.microphoneAuthorized = granted
         return granted
     }
 
@@ -87,7 +158,7 @@ final class MediaPermissionHandler: NSObject, ObservableObject, CLLocationManage
         default:
             granted = false
         }
-        await MainActor.run { self.cameraAuthorized = granted }
+        self.cameraAuthorized = granted
         return granted
     }
 
@@ -102,7 +173,7 @@ final class MediaPermissionHandler: NSObject, ObservableObject, CLLocationManage
     func requestNotificationPermission() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
             if granted {
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     UIApplication.shared.registerForRemoteNotifications()
                 }
             }
@@ -114,45 +185,69 @@ final class MediaPermissionHandler: NSObject, ObservableObject, CLLocationManage
     }
 
     func requestCurrentCoordinates() async -> CLLocationCoordinate2D? {
-        let status = locationManager.authorizationStatus
+        var status = locationManager.authorizationStatus
         if status == .denied || status == .restricted {
+            self.locationAuthorized = false
             return nil
         }
         if status == .notDetermined {
-            locationManager.requestWhenInUseAuthorization()
-            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            status = await withCheckedContinuation { continuation in
+                if let existing = self.authContinuation {
+                    self.authContinuation = nil
+                    existing.resume(returning: self.locationManager.authorizationStatus)
+                }
+                self.authContinuation = continuation
+                self.locationManager.requestWhenInUseAuthorization()
+            }
         }
-        let updated = locationManager.authorizationStatus
-        guard updated == .authorizedWhenInUse || updated == .authorizedAlways else {
-            await MainActor.run { self.locationAuthorized = false }
+        guard status == .authorizedWhenInUse || status == .authorizedAlways else {
+            self.locationAuthorized = false
             return nil
         }
-        await MainActor.run { self.locationAuthorized = true }
+        self.locationAuthorized = true
         if let loc = locationManager.location {
             return loc.coordinate
         }
         return await withCheckedContinuation { continuation in
+            if let existing = self.locationContinuation {
+                self.locationContinuation = nil
+                existing.resume(returning: nil)
+            }
             self.locationContinuation = continuation
             self.locationManager.requestLocation()
         }
     }
 
-    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         let status = manager.authorizationStatus
-        locationAuthorized = (status == .authorizedWhenInUse || status == .authorizedAlways)
-    }
-
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        if let cont = locationContinuation {
-            locationContinuation = nil
-            cont.resume(returning: locations.last?.coordinate)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.locationAuthorized = (status == .authorizedWhenInUse || status == .authorizedAlways)
+            if status != .notDetermined, let cont = self.authContinuation {
+                self.authContinuation = nil
+                cont.resume(returning: status)
+            }
         }
     }
 
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        if let cont = locationContinuation {
-            locationContinuation = nil
-            cont.resume(returning: nil)
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        let coord = locations.last?.coordinate
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            if let cont = self.locationContinuation {
+                self.locationContinuation = nil
+                cont.resume(returning: coord)
+            }
+        }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            if let cont = self.locationContinuation {
+                self.locationContinuation = nil
+                cont.resume(returning: nil)
+            }
         }
     }
 }

@@ -6,7 +6,17 @@ import Foundation
 final class AccountCache {
     static let shared = AccountCache()
 
-    private let memoryCache = NSCache<NSString, NSData>()
+    private final class MemoryCacheEntry: NSObject {
+        let data: Data
+        let storedAt: Date
+
+        init(data: Data, storedAt: Date = Date()) {
+            self.data = data
+            self.storedAt = storedAt
+        }
+    }
+
+    private let memoryCache = NSCache<NSString, MemoryCacheEntry>()
     private let fileManager = FileManager.default
     private let queue = DispatchQueue(label: "app.kinnect.live.cache", qos: .utility)
     private let activeAccountDefaultsKey = "kinnect.active.account.id"
@@ -70,7 +80,7 @@ final class AccountCache {
         guard !accountId.isEmpty else { return }
         let canon = canonicalOrigin(origin)
         let memKey = "\(canon)|\(accountId)|\(key)" as NSString
-        memoryCache.setObject(data as NSData, forKey: memKey, cost: data.count)
+        memoryCache.setObject(MemoryCacheEntry(data: data), forKey: memKey, cost: data.count)
 
         queue.async { [weak self] in
             guard let self = self,
@@ -85,11 +95,17 @@ final class AccountCache {
         let canon = canonicalOrigin(origin)
         let memKey = "\(canon)|\(accountId)|\(key)" as NSString
         if let cached = memoryCache.object(forKey: memKey) {
-            return cached as Data
+            if Date().timeIntervalSince(cached.storedAt) <= maxAge {
+                return cached.data
+            }
+            memoryCache.removeObject(forKey: memKey)
         }
         return queue.sync {
             if let cached = memoryCache.object(forKey: memKey) {
-                return cached as Data
+                if Date().timeIntervalSince(cached.storedAt) <= maxAge {
+                    return cached.data
+                }
+                memoryCache.removeObject(forKey: memKey)
             }
             guard let dir = scopeDirectory(origin: canon, accountId: accountId) else { return nil }
             let target = dir.appendingPathComponent(fileKey(key))
@@ -99,7 +115,7 @@ final class AccountCache {
                   let data = try? Data(contentsOf: target) else {
                 return nil
             }
-            memoryCache.setObject(data as NSData, forKey: memKey, cost: data.count)
+            memoryCache.setObject(MemoryCacheEntry(data: data, storedAt: modified), forKey: memKey, cost: data.count)
             return data
         }
     }

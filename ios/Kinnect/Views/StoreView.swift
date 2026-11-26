@@ -1,3 +1,4 @@
+import StoreKit
 import SwiftUI
 import UIKit
 
@@ -25,37 +26,33 @@ struct StoreView: View {
     @State private var previewPackage: StorePackageItem? = nil
     @State private var packages: [StorePackageItem] = []
     @State private var digitalProducts: [StoreDigitalProduct] = []
+    @State private var ownedDigitalIds: Set<String> = []
+    @State private var activeAppearance: String = ""
     @State private var accountUuid: UUID? = nil
+    @State private var showStudioProCamera = false
+    @State private var previewDigitalProduct: StoreDigitalProduct? = nil
     @State private var isLoading = false
     @State private var transactionInProgress = false
     @State private var coinSource = "gifted"
     @State private var trialPackagePurchases = true
+    @State private var appleBillingReady = false
     @State private var storeBalance = 0
+    @State private var purchasedCoinsBalance = 0
+    @State private var giftedCoinsBalance = 0
+    @State private var studioVideoUntilMs: Int64 = 0
+    @State private var studioPhotoUntilMs: Int64 = 0
+    @State private var activeMembershipId: String = ""
     @State private var loadError: String?
     @State private var studioPackage: StorePackageItem?
+    @State private var giftInventory: [GiftInventoryItem] = []
     @State private var showStoreMenuDialog = false
     @State private var showStoreInfoAlert = false
     @State private var confirmBuyPackage: StorePackageItem? = nil
 
     var body: some View {
         VStack(spacing: 0) {
-            // Pinned Dedicated Header Bar matching Android StoreActivity - using PinnedHeaderBar component
-            PinnedHeaderBar(
-                title: "Cửa hàng",
-                onBack: onBack ?? { dismiss() },
-                trailingActions: [
-                    PinnedHeaderBar.TrailingAction(
-                        systemImage: "ellipsis",
-                        accessibilityLabel: "Tùy chọn cửa hàng",
-                        action: { showStoreMenuDialog = true }
-                    ),
-                    PinnedHeaderBar.TrailingAction(
-                        systemImage: "bitcoinsign.circle.fill",
-                        accessibilityLabel: "Xem ví Kinnect",
-                        action: { onOpenWallet?() }
-                    )
-                ]
-            )
+            // Pinned Dedicated Header Bar with Coin Balance Chip
+            storeHeaderBar
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
@@ -65,42 +62,84 @@ struct StoreView: View {
                     // 6 Category Tabs
                     categoryFilterStrip
 
+                    if isLoading {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                            Text("Đang tải cửa hàng…")
+                                .font(.subheadline)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .kinnectCard()
+                    }
+
                     // Interactive Live Preview (when "Xem thử" tapped)
                     if let preview = previewPackage {
                         interactivePreviewBanner(preview)
+                    } else if let digitalPreview = previewDigitalProduct {
+                        interactiveDigitalPreviewBanner(digitalPreview)
+                    }
+
+                    // StoreKit 2 Direct In-App Purchase Section (STORE_PRODUCTS)
+                    if !filteredDigitalProducts.isEmpty {
+                        storeKitProductsSection
+                            .disabled(transactionInProgress || storeKit.isPurchasing)
                     }
 
                     // Package Cards List
                     if let loadError {
-                        Text(loadError).foregroundColor(KinnectTheme.danger)
-                    }
-                    if trialPackagePurchases {
-                        Picker("Nguồn xu", selection: $coinSource) {
-                            Text("Xu tặng").tag("gifted")
-                            Text("Xu mua").tag("purchased")
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(loadError)
+                                .foregroundColor(KinnectTheme.danger)
+                                .font(.subheadline)
+                            Button("Thử lại") {
+                                Task { await loadStoreData() }
+                            }
+                            .font(.caption.bold())
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Capsule().fill(KinnectTheme.primaryGradient))
                         }
-                        .pickerStyle(.segmented)
-                    } else {
-                        HStack(spacing: 6) {
-                            Image(systemName: "bitcoinsign.circle.fill")
-                                .foregroundColor(KinnectTheme.warning)
-                            Text("Thanh toán bằng Xu mua")
-                                .font(.caption.weight(.semibold))
-                                .foregroundColor(KinnectTheme.textSecondary)
-                            Spacer()
-                            if storeBalance > 0 {
-                                Text("\(storeBalance) xu")
+                    }
+
+                    if storeFilter != .owned {
+                        if trialPackagePurchases {
+                            Picker("Nguồn xu", selection: $coinSource) {
+                                Text("Xu tặng").tag("gifted")
+                                Text("Xu mua").tag("purchased")
+                            }
+                            .pickerStyle(.segmented)
+                        } else {
+                            HStack(spacing: 6) {
+                                Image(systemName: "bitcoinsign.circle.fill")
+                                    .foregroundColor(KinnectTheme.warning)
+                                Text("Thanh toán bằng Xu mua")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundColor(KinnectTheme.textSecondary)
+                                Spacer()
+                                Text("\(purchasedCoinsBalance.formattedWithSeparator()) xu mua")
                                     .font(.caption.bold())
                                     .foregroundColor(KinnectTheme.accentBright)
                             }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(KinnectTheme.surfaceElevated)
+                            )
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(KinnectTheme.surfaceElevated)
-                        )
                     }
+
+                    if storeFilter == .live {
+                        liveChatFreeCard
+                    }
+
+                    if storeFilter == .owned {
+                        ownedGiftInventorySection
+                    }
+
                     packagesSection
                         .disabled(transactionInProgress)
                 }
@@ -148,28 +187,36 @@ struct StoreView: View {
         } message: {
             Text("Quyền lợi gắn với tài khoản Kinnect. Xem thử không thay đổi hồ sơ của bạn. Giá hiển thị quy đổi theo xu hoặc App Store.")
         }
-        .alert("Xác nhận đổi gói?", isPresented: Binding(
-            get: { confirmBuyPackage != nil },
-            set: { if !$0 { confirmBuyPackage = nil } }
-        )) {
+        .alert(
+            "Xác nhận đổi gói?",
+            isPresented: Binding(
+                get: { confirmBuyPackage != nil },
+                set: { if !$0 { confirmBuyPackage = nil } }
+            ),
+            presenting: confirmBuyPackage
+        ) { pkg in
             Button("Hủy", role: .cancel) { confirmBuyPackage = nil }
-            Button("Đổi ngay (\(confirmBuyPackage?.priceCoins ?? 0) xu)") {
-                if let p = confirmBuyPackage {
-                    Task { await buyPackage(p) }
-                }
+            Button("Đổi ngay (\(pkg.priceCoins) xu)") {
                 confirmBuyPackage = nil
+                Task { await buyPackage(pkg) }
             }
-        } message: {
-            if let p = confirmBuyPackage {
-                Text("Gói: \(p.title)\nChi phí: \(p.priceCoins) xu Kinnect.")
-            }
+        } message: { pkg in
+            let effectiveSource = trialPackagePurchases ? coinSource : "purchased"
+            let sourceLabel = effectiveSource == "purchased" ? "Xu mua" : "Xu tặng"
+            Text("Gói: \(pkg.title)\nChi phí: \(pkg.priceCoins.formattedWithSeparator()) xu (\(sourceLabel)).")
         }
         .fullScreenCover(item: $studioPackage) { pkg in
             CameraStudioView(initialMode: pkg.id.hasPrefix("studio_video_") ? .video : .photo,
                              onClose: { studioPackage = nil })
         }
+        .fullScreenCover(isPresented: $showStudioProCamera) {
+            CameraStudioView(initialMode: .photo, onClose: { showStudioProCamera = false })
+        }
         .task {
             await loadStoreData()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .kinnectStoreUpdated)) { _ in
+            Task { await loadStoreData() }
         }
     }
 
@@ -206,9 +253,8 @@ struct StoreView: View {
                 onOpenWallet?()
             } label: {
                 HStack(spacing: 5) {
-                    Text("🪙")
-                        .font(.system(size: 13))
-                    Text("\(storeBalance) xu")
+                    KinnectIcon(glyph: .wallet, size: 15, selected: true, tint: KinnectTheme.accentBright)
+                    Text("\(storeBalance.formattedWithSeparator()) \(L10n.tr("xu"))")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundColor(KinnectTheme.warning)
                 }
@@ -390,6 +436,336 @@ struct StoreView: View {
     }
 
     // MARK: - Packages List
+    private var filteredDigitalProducts: [StoreDigitalProduct] {
+        let storeItems = digitalProducts.filter {
+            $0.kind != "coins" && $0.coinsGranted <= 0 && !$0.id.lowercased().contains(".coins.")
+        }
+        switch storeFilter {
+        case .style:
+            return storeItems.filter { $0.kind == "style" }
+        case .studio:
+            return storeItems.filter { $0.kind == "studio" }
+        case .owned:
+            return storeItems.filter { $0.owned }
+        case .live, .gifts, .member:
+            return []
+        }
+    }
+
+    private func interactiveDigitalPreviewBanner(_ prod: StoreDigitalProduct) -> some View {
+        VStack(spacing: 12) {
+            HStack {
+                Text("Xem thử · \(prod.title)")
+                    .font(.subheadline.bold())
+                    .foregroundColor(.white)
+                Spacer()
+                Button {
+                    previewDigitalProduct = nil
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title3)
+                        .foregroundColor(.white.opacity(0.7))
+                }
+            }
+
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(hex: prod.accentColor), Color(hex: prod.secondaryColor)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 72, height: 72)
+                Image(systemName: prod.kind == "studio" ? "wand.and.stars" : "paintpalette.fill")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundColor(.white)
+            }
+            .shadow(color: Color(hex: prod.accentColor).opacity(0.6), radius: 10)
+
+            Text(prod.description.isEmpty ? "Mở khóa vĩnh viễn trên tài khoản Kinnect qua Apple ID." : prod.description)
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.92))
+                .multilineTextAlignment(.center)
+
+            Text("Xem thử không thay đổi hồ sơ thực tế của bạn.")
+                .font(.caption2)
+                .foregroundColor(.white.opacity(0.75))
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Color(hex: "#1A102E"))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18)
+                        .strokeBorder(Color(hex: prod.accentColor).opacity(0.55), lineWidth: 1.5)
+                )
+        )
+    }
+
+    private var storeKitProductsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                HStack(spacing: 6) {
+                    Image(systemName: "apple.logo")
+                        .font(.caption.bold())
+                        .foregroundColor(KinnectTheme.accentBright)
+                    Text("Mở khóa qua App Store")
+                        .font(.subheadline.bold())
+                        .foregroundColor(KinnectTheme.textPrimary)
+                }
+                Spacer()
+                Button {
+                    Task {
+                        do {
+                            let outcome = try await storeKit.restorePurchases()
+                            await loadStoreData()
+                            appState.showToast(outcome.failed.isEmpty
+                                ? "Đã kiểm tra và khôi phục các giao dịch hợp lệ."
+                                : "Một số giao dịch chưa xác minh được. Hãy thử lại.")
+                        } catch {
+                            appState.showToast("Chưa khôi phục được: \(error.localizedDescription)")
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.caption2.bold())
+                        Text("Khôi phục")
+                            .font(.caption.bold())
+                    }
+                    .foregroundColor(KinnectTheme.accentBright)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                }
+                .buttonStyle(.plain)
+            }
+
+            ForEach(filteredDigitalProducts) { prod in
+                storeDigitalProductCard(prod)
+            }
+        }
+    }
+
+    private func storeDigitalProductCard(_ prod: StoreDigitalProduct) -> some View {
+        let skProduct = storeKit.storeKitProducts[prod.id]
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color(hex: prod.accentColor), Color(hex: prod.secondaryColor)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 48, height: 48)
+                    Image(systemName: prod.kind == "studio" ? "wand.and.stars" : "sparkles")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(.white)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(prod.title)
+                            .font(.subheadline.bold())
+                            .foregroundColor(KinnectTheme.textPrimary)
+                        if prod.equipped {
+                            Text("Đang dùng")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(KinnectTheme.online))
+                        } else if prod.owned {
+                            Text("Đã sở hữu")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(KinnectTheme.online)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(KinnectTheme.online.opacity(0.16)))
+                        }
+                    }
+                    Text(prod.description)
+                        .font(.caption)
+                        .foregroundColor(KinnectTheme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 8) {
+                if prod.kind != "coins" && prod.coinsGranted <= 0 {
+                    Button {
+                        withAnimation {
+                            previewPackage = nil
+                            previewDigitalProduct = prod
+                        }
+                    } label: {
+                        Text(L10n.tr("Xem thử"))
+                            .font(.caption.bold())
+                            .foregroundColor(KinnectTheme.accentBright)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Spacer()
+
+                if prod.owned {
+                    if prod.kind == "studio" {
+                        Button {
+                            showStudioProCamera = true
+                        } label: {
+                            Text("Mở Studio Pro")
+                                .font(.caption.bold())
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 7)
+                                .background(Capsule().fill(KinnectTheme.primaryGradient))
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Button {
+                            Task { await toggleDigitalStyle(prod) }
+                        } label: {
+                            Text(prod.equipped ? "Gỡ trang trí" : "Dùng")
+                                .font(.caption.bold())
+                                .foregroundColor(prod.equipped ? KinnectTheme.textPrimary : .white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 7)
+                                .background(
+                                    Capsule().fill(
+                                        prod.equipped ? KinnectTheme.surfaceElevated : KinnectTheme.online
+                                    )
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } else {
+                    let canBuyApple = appleBillingReady && skProduct != nil
+                    Button {
+                        Task { await buyDigitalProduct(prod) }
+                    } label: {
+                        Text(canBuyApple ? "Mua · \(skProduct!.displayPrice)" : "Chưa mở App Store")
+                            .font(.caption.bold())
+                            .foregroundColor(canBuyApple ? .white : KinnectTheme.textSecondary)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                            .background(
+                                Capsule().fill(canBuyApple ? AnyShapeStyle(KinnectTheme.primaryGradient) : AnyShapeStyle(KinnectTheme.surfaceElevated))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canBuyApple || storeKit.isPurchasing)
+                }
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(KinnectTheme.surface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(Color(hex: prod.accentColor).opacity(0.28), lineWidth: 1)
+                )
+        )
+    }
+
+    private var liveChatFreeCard: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(KinnectTheme.primaryGradient)
+                    .frame(width: 48, height: 48)
+                Image(systemName: "video.fill")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.white)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text("Trò chuyện · Miễn phí")
+                        .font(.subheadline.bold())
+                        .foregroundColor(KinnectTheme.textPrimary)
+                    Text("MIỄN PHÍ")
+                        .font(.system(size: 9, weight: .black))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(KinnectTheme.online))
+                }
+                Text("Phát trực tiếp trò chuyện với bạn bè, bộ lọc làm đẹp và nhận quà tặng hoàn toàn miễn phí.")
+                    .font(.caption)
+                    .foregroundColor(KinnectTheme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(KinnectTheme.surface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(KinnectTheme.online.opacity(0.3), lineWidth: 1)
+                )
+        )
+    }
+
+    @ViewBuilder
+    private var ownedGiftInventorySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Kho quà Live")
+                    .font(.subheadline.bold())
+                    .foregroundColor(KinnectTheme.textPrimary)
+                Spacer()
+                Text("\(giftInventory.map(\.quantity).reduce(0, +)) món quà")
+                    .font(.caption.bold())
+                    .foregroundColor(KinnectTheme.accentBright)
+            }
+
+            if giftInventory.isEmpty {
+                Text("Chưa có quà dự trữ trong kho.")
+                    .font(.caption)
+                    .foregroundColor(KinnectTheme.textSecondary)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(giftInventory) { item in
+                            VStack(spacing: 4) {
+                                Text(item.emoji)
+                                    .font(.system(size: 26))
+                                Text(item.name)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundColor(KinnectTheme.textPrimary)
+                                    .lineLimit(1)
+                                Text("x\(item.quantity)")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(KinnectTheme.warning)
+                            }
+                            .frame(width: 78, height: 80)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(KinnectTheme.surface)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .stroke(KinnectTheme.borderSoft, lineWidth: 1)
+                                    )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        .kinnectCard()
+    }
+
     private var filteredPackages: [StorePackageItem] {
         switch storeFilter {
         case .style:
@@ -549,6 +925,18 @@ struct StoreView: View {
                     Text("\(pkg.priceCoins) xu")
                         .font(.caption.bold())
                         .foregroundColor(KinnectTheme.warning)
+                    if pkg.owned, let expMs = pkg.expiresAt {
+                        let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+                        let remMs = expMs - nowMs
+                        if remMs > 0 {
+                            let days = max(1, Int(ceil(Double(remMs) / 86_400_000.0)))
+                            Spacer(minLength: 4)
+                            Text("Còn \(days) ngày")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(KinnectTheme.online)
+                                .lineLimit(1)
+                        }
+                    }
                 }
 
                 HStack(spacing: 6) {
@@ -572,7 +960,7 @@ struct StoreView: View {
                         } label: {
                             Text(ownedActionTitle(pkg))
                                 .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(.white)
+                                .foregroundColor(pkg.equipped ? KinnectTheme.textPrimary : .white)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 5)
                                 .background(Capsule().fill(pkg.equipped ? KinnectTheme.surfaceElevated : KinnectTheme.online))
@@ -581,7 +969,7 @@ struct StoreView: View {
 
                         if pkg.kind == "gifts" || pkg.kind == "gift" || pkg.kind == "studio" {
                             Button {
-                                confirmBuyPackage = pkg
+                                requestPurchaseConfirmation(for: pkg)
                             } label: {
                                 Text(pkg.kind == "studio" ? "Gia hạn" : "Mua thêm")
                                     .font(.system(size: 11, weight: .bold))
@@ -601,25 +989,33 @@ struct StoreView: View {
                             .buttonStyle(.plain)
                         }
                     } else {
+                        let isAlternateMembershipBlocked = (pkg.category == "member" || pkg.category == "membership")
+                            && !activeMembershipId.isEmpty
+                            && activeMembershipId != pkg.id
                         Button {
-                            confirmBuyPackage = pkg
+                            requestPurchaseConfirmation(for: pkg)
                         } label: {
-                            Text("Đổi")
+                            Text(isAlternateMembershipBlocked ? "Đang có gói" : "Đổi")
                                 .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(.white)
+                                .foregroundColor(isAlternateMembershipBlocked ? KinnectTheme.textSecondary : .white)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 5)
                                 .background(
                                     Capsule().fill(
-                                        LinearGradient(
-                                            colors: [Color(hex: pkg.accentColor), KinnectTheme.accentBright],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
+                                        isAlternateMembershipBlocked
+                                            ? AnyShapeStyle(KinnectTheme.surfaceElevated)
+                                            : AnyShapeStyle(
+                                                LinearGradient(
+                                                    colors: [Color(hex: pkg.accentColor), KinnectTheme.accentBright],
+                                                    startPoint: .leading,
+                                                    endPoint: .trailing
+                                                )
+                                            )
                                     )
                                 )
                         }
                         .buttonStyle(.plain)
+                        .disabled(isAlternateMembershipBlocked)
                     }
                 }
             }
@@ -686,38 +1082,148 @@ struct StoreView: View {
     }
 
     private func applyStoreState(_ res: [String: Any]) {
+        if let uuidStr = res["accountUuid"] as? String, let parsed = UUID(uuidString: uuidStr) {
+            accountUuid = parsed
+        }
+        appleBillingReady = (res["appleBillingReady"] as? Bool) == true
         let ownedIds = Set(res["ownedPackages"] as? [String] ?? [])
+        let isStudioProPermanent = (res["studioProPermanent"] as? Bool) == true
+        var directOwned = Set(res["owned"] as? [String] ?? [])
+        if isStudioProPermanent {
+            directOwned.insert("kinnect_studio_pro")
+        } else {
+            directOwned.remove("kinnect_studio_pro")
+        }
+        ownedDigitalIds = directOwned
         let expiries = res["packageExpiries"] as? [String: Any] ?? [:]
-        let appearance = res["appearance"] as? String ?? ""
+        let appearance = (res["appearance"] as? String) ?? (res["activeStyle"] as? String) ?? ""
+        activeAppearance = appearance
         let liveTheme = res["liveTheme"] as? String ?? ""
         let membership = res["membership"] as? String ?? ""
-        packages = (res["packages"] as? [[String: Any]] ?? []).map { dict in
+        activeMembershipId = membership
+        studioVideoUntilMs = (res["studioVideoUntil"] as? NSNumber)?.int64Value ?? 0
+        studioPhotoUntilMs = (res["studioPhotoUntil"] as? NSNumber)?.int64Value ?? 0
+        let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+        digitalProducts = (res["products"] as? [[String: Any]] ?? []).compactMap { dict in
+            var item = StoreDigitalProduct.from(dict)
+            if item.kind == "coins" || item.coinsGranted > 0 || item.id.lowercased().contains(".coins.") {
+                return nil
+            }
+            item.owned = (item.id == "kinnect_studio_pro") ? isStudioProPermanent : directOwned.contains(item.id)
+            item.equipped = !item.id.isEmpty && item.kind == "style" && item.id == appearance
+            return item
+        }
+        packages = (res["packages"] as? [[String: Any]] ?? []).compactMap { dict in
             var item = StorePackageItem.from(dict)
-            item.owned = ownedIds.contains(item.id)
-            item.expiresAt = (expiries[item.id] as? NSNumber)?.int64Value
+            guard item.id != "live_game_30" else { return nil }
+            if item.category == "studio" {
+                let lineUntil: Int64 = item.id.hasPrefix("studio_video_") ? studioVideoUntilMs
+                    : (item.id.hasPrefix("studio_photo_") ? studioPhotoUntilMs : max(studioVideoUntilMs, studioPhotoUntilMs))
+                item.owned = ownedIds.contains(item.id) || lineUntil > nowMs
+                item.expiresAt = (expiries[item.id] as? NSNumber)?.int64Value ?? (lineUntil > nowMs ? lineUntil : nil)
+            } else {
+                item.owned = ownedIds.contains(item.id)
+                item.expiresAt = (expiries[item.id] as? NSNumber)?.int64Value
+            }
             item.equipped = [appearance, liveTheme, membership].contains(item.id)
             return item
         }
         trialPackagePurchases = res["trialPackagePurchases"] as? Bool ?? false
         if !trialPackagePurchases { coinSource = "purchased" }
-        storeBalance = (res["purchasedCoins"] as? Int ?? 0)
-            + (res["giftedCoins"] as? Int ?? res["trialCoins"] as? Int ?? 0)
+        purchasedCoinsBalance = (res["purchasedCoins"] as? Int) ?? (res["purchasedCoins"] as? NSNumber)?.intValue ?? 0
+        giftedCoinsBalance = (res["giftedCoins"] as? Int) ?? (res["trialCoins"] as? Int) ?? (res["trialCoins"] as? NSNumber)?.intValue ?? 0
+        storeBalance = purchasedCoinsBalance + giftedCoinsBalance
+        let rawInv = res["giftInventory"] as? [[String: Any]] ?? []
+        var totals: [String: Int] = [:]
+        var orderedIds: [String] = []
+        for entry in rawInv {
+            guard let gid = entry["giftId"] as? String, !gid.isEmpty else { continue }
+            let qty = (entry["quantity"] as? Int) ?? (entry["quantity"] as? NSNumber)?.intValue ?? 0
+            guard qty > 0 else { continue }
+            if totals[gid] == nil { orderedIds.append(gid) }
+            totals[gid, default: 0] += qty
+        }
+        giftInventory = orderedIds.compactMap { gid in
+            guard let qty = totals[gid], qty > 0 else { return nil }
+            return GiftInventoryItem(giftId: gid, quantity: qty)
+        }
+    }
+
+    private func requestPurchaseConfirmation(for pkg: StorePackageItem) {
+        let effectiveSource = trialPackagePurchases ? coinSource : "purchased"
+        let availableBalance = effectiveSource == "purchased" ? purchasedCoinsBalance : giftedCoinsBalance
+        if pkg.priceCoins > availableBalance {
+            let sourceName = effectiveSource == "purchased" ? "xu mua" : "xu tặng"
+            appState.showToast("Chưa đủ \(sourceName). Cần \(pkg.priceCoins.formattedWithSeparator()) xu (hiện có \(availableBalance.formattedWithSeparator()) xu).")
+            return
+        }
+        confirmBuyPackage = pkg
     }
 
     private func loadStoreData() async {
-        if packages.isEmpty, let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/store") {
+        if packages.isEmpty && digitalProducts.isEmpty, let cached = KinnectAPIClient.shared.cachedJSON(for: "/api/store") {
             applyStoreState(cached)
         }
-        isLoading = packages.isEmpty
+        isLoading = packages.isEmpty && digitalProducts.isEmpty
         defer { isLoading = false }
         do {
             let res = try await KinnectAPIClient.shared.requestJSON("/api/store")
             applyStoreState(res)
             loadError = nil
+            await storeKit.loadProducts(productIds: digitalProducts.map(\.id).filter { !$0.isEmpty })
         } catch {
-            if packages.isEmpty {
+            if packages.isEmpty && digitalProducts.isEmpty {
                 loadError = "Chưa tải được cửa hàng: \(error.localizedDescription)"
             }
+        }
+    }
+
+    @MainActor
+    private func buyDigitalProduct(_ prod: StoreDigitalProduct) async {
+        guard !transactionInProgress && !storeKit.isPurchasing else { return }
+        transactionInProgress = true
+        defer { transactionInProgress = false }
+        do {
+            guard let verifyRes = try await storeKit.purchaseDigitalProduct(productId: prod.id, accountUuid: accountUuid) else {
+                return
+            }
+            if let serverOwned = verifyRes["owned"] as? [String],
+               (verifyRes["state"] as? String) == "PURCHASED" {
+                if prod.id == "kinnect_studio_pro" {
+                    ownedDigitalIds.insert("kinnect_studio_pro")
+                } else {
+                    for id in serverOwned where id != "kinnect_studio_pro" {
+                        ownedDigitalIds.insert(id)
+                    }
+                }
+            }
+            appState.showToast("Đã mở khóa \(prod.title) trên tài khoản của bạn!")
+            await loadStoreData()
+        } catch {
+            appState.showToast(error.localizedDescription)
+        }
+    }
+
+    @MainActor
+    private func toggleDigitalStyle(_ prod: StoreDigitalProduct) async {
+        guard !transactionInProgress else { return }
+        transactionInProgress = true
+        defer { transactionInProgress = false }
+        let targetId = prod.equipped ? "" : prod.id
+        do {
+            let res = try await KinnectAPIClient.shared.requestJSON(
+                "/api/store/style",
+                method: "POST",
+                body: ["productId": targetId]
+            )
+            let applied = (res["appearance"] as? String) ?? ""
+            guard applied == targetId else {
+                throw KinnectAPIError.serverMessage("Máy chủ chưa xác nhận trang trí.")
+            }
+            appState.showToast(targetId.isEmpty ? "Đã gỡ trang trí." : "Đã áp dụng \(prod.title)!")
+            await loadStoreData()
+        } catch {
+            appState.showToast("Chưa đổi được phong cách: \(error.localizedDescription)")
         }
     }
 
@@ -727,22 +1233,29 @@ struct StoreView: View {
         transactionInProgress = true
         defer { transactionInProgress = false }
         // Retain this ID after a transport failure so retry cannot debit twice.
+        let effectiveSource = trialPackagePurchases ? coinSource : "purchased"
         let key = "kinnect-package-request:" + ServerConfig.currentOrigin + ":"
-            + (appState.currentUser?.id ?? "") + ":" + pkg.id + ":" + coinSource
+            + (appState.currentUser?.id ?? "") + ":" + pkg.id + ":" + effectiveSource
         let requestId = UserDefaults.standard.string(forKey: key) ?? KinnectWriteBody.packageRequestId()
         UserDefaults.standard.set(requestId, forKey: key)
         do {
             let res = try await KinnectAPIClient.shared.requestJSON(
                 "/api/store/packages/buy", method: "POST",
                 body: KinnectWriteBody.packageBuy(productId: pkg.id, priceCoins: pkg.priceCoins,
-                                                  requestId: requestId, coinSource: coinSource),
+                                                  requestId: requestId, coinSource: effectiveSource),
                 requestId: requestId)
-            guard (res["ownedPackages"] as? [String] ?? []).contains(pkg.id) else {
+            let isDuplicate = (res["duplicate"] as? Bool) == true
+            let isGiftPack = pkg.id.hasPrefix("gift_") || pkg.category == "gifts" || pkg.category == "gift"
+            let ownedList = res["ownedPackages"] as? [String] ?? []
+            if isGiftPack || isDuplicate {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
+            guard isGiftPack || isDuplicate || ownedList.contains(pkg.id) else {
                 throw KinnectAPIError.serverMessage("Máy chủ chưa xác nhận quyền sử dụng gói.")
             }
             UserDefaults.standard.removeObject(forKey: key)
             applyStoreState(res)
-            appState.showToast("Đã sở hữu \(pkg.title)!")
+            appState.showToast(isDuplicate ? "Giao dịch đã được ghi nhận trước đó cho \(pkg.title)." : "Đã sở hữu \(pkg.title)!")
             await loadStoreData()
             await appState.refreshGlobalBadges()
         } catch {

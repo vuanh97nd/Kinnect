@@ -53,7 +53,7 @@ struct PinnedHeaderBar: View {
 			Spacer()
 
 			// Trailing Actions
-			HStack(spacing: 8) {
+			HStack(spacing: 4) {
 				ForEach(Array(trailingActions.enumerated()), id: \.offset) { _, action in
 					Button(action: action.action) {
 						ZStack {
@@ -73,6 +73,8 @@ struct PinnedHeaderBar: View {
 									.offset(x: 12, y: -12)
 							}
 						}
+						.frame(minWidth: 44, minHeight: 44)
+						.contentShape(Rectangle())
 					}
 					.buttonStyle(.plain)
 					.accessibilityLabel(action.accessibilityLabel)
