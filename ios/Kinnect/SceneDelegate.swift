@@ -19,11 +19,11 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             window.overrideUserInterfaceStyle = overrideLight ? .light : .dark
             return
         }
-        #endif
         if UIReviewFixture.forceLightMode {
             window.overrideUserInterfaceStyle = .light
             return
         }
+        #endif
         let mode = UserDefaults.standard.string(forKey: "app_appearance_mode") ?? "system"
         switch mode {
         case "light":
@@ -35,18 +35,15 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
     }
 
+    #if DEBUG
     @MainActor
     private func makeFixtureHostingController(for screenName: String) -> UIHostingController<AnyView> {
         let colorScheme: ColorScheme?
-        #if DEBUG
         if let overrideLight = UIReviewFixture.overrideLightMode {
             colorScheme = overrideLight ? .light : .dark
         } else {
             colorScheme = UIReviewFixture.forceLightMode ? .light : nil
         }
-        #else
-        colorScheme = UIReviewFixture.forceLightMode ? .light : nil
-        #endif
 
         let fixtureView = AnyView(
             UIReviewFixture.makeView(for: screenName)
@@ -62,6 +59,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
         return hostingController
     }
+    #endif
 
     #if DEBUG
     /// `#if DEBUG` deep-link router for single-session cloud simulator captures (`run.cloud`):
@@ -133,6 +131,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         #endif
 
         if !handledDebugUIReview {
+            #if DEBUG
             // UI Review Fixture Mode: Activated with `--ui-review-screen <screenName>`
             if UIReviewFixture.isEnabled,
                let screenName = UIReviewFixture.activeScreen {
@@ -148,6 +147,16 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                 }
                 window.rootViewController = hostingController
             }
+            #else
+            let rootView = RootMainView().environmentObject(AppState.shared)
+            let hostingController = UIHostingController(rootView: rootView)
+            hostingController.view.backgroundColor = UIColor { trait in
+                trait.userInterfaceStyle == .light
+                    ? UIColor(red: 0.96, green: 0.95, blue: 0.98, alpha: 1.0)
+                    : UIColor(red: 0.05, green: 0.04, blue: 0.11, alpha: 1.0)
+            }
+            window.rootViewController = hostingController
+            #endif
         }
 
         applyAppearanceStyle()
@@ -199,15 +208,21 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func sceneWillEnterForeground(_ scene: UIScene) {
         applyAppearanceStyle()
+        #if DEBUG
         if !UIReviewFixture.isEnabled {
             NativeSocketClient.shared.setAppForeground(true)
         }
+        #else
+        NativeSocketClient.shared.setAppForeground(true)
+        #endif
     }
 
     func sceneDidBecomeActive(_ scene: UIScene) {
         applyAppearanceStyle()
         UIApplication.shared.applicationIconBadgeNumber = 0
+        #if DEBUG
         guard !UIReviewFixture.isEnabled else { return }
+        #endif
         NativeSocketClient.shared.setAppForeground(true)
         NativeSocketClient.shared.connectWithKeychainSession()
         Task { @MainActor in

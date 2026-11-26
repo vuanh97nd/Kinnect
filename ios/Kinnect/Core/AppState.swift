@@ -116,7 +116,12 @@ final class AppState: ObservableObject {
         liveStageParticipants = []
         liveStagePeers = []
 
-        if !UIReviewFixture.isEnabled && !isHost {
+        #if DEBUG
+        let fixtureEnabled = UIReviewFixture.isEnabled
+        #else
+        let fixtureEnabled = false
+        #endif
+        if !fixtureEnabled && !isHost {
             NativeWebRTCManager.shared.prepareLiveViewerAudio()
             Task { @MainActor in
                 guard await NativeSocketClient.shared.ensureConnected() else { return }
@@ -135,7 +140,12 @@ final class AppState: ObservableObject {
     func leaveCurrentLiveRoom() {
         hostRoomGraceTask?.cancel()
         hostRoomGraceTask = nil
-        if (currentLiveRoom != nil || isCreatingLiveRoom) && !UIReviewFixture.isEnabled {
+        #if DEBUG
+        let fixtureEnabled = UIReviewFixture.isEnabled
+        #else
+        let fixtureEnabled = false
+        #endif
+        if (currentLiveRoom != nil || isCreatingLiveRoom) && !fixtureEnabled {
             NativeSocketClient.shared.sendJSON(["type": "leave"])
         }
         NativeWebRTCManager.shared.stopLiveSession()
@@ -191,17 +201,19 @@ final class AppState: ObservableObject {
         isRestoringSession = true
         defer { isRestoringSession = false }
 
+        #if DEBUG
         if let reviewScreen = UIReviewFixture.activeScreen {
             if reviewScreen == "auth" {
                 self.currentUser = nil
             } else {
                 self.currentUser = KinnectUser.from(UIReviewFixture.currentUserDict)
-                self.onlineUserIds = ["fixture_user_peer"]
+                self.onlineUserIds = ["u2"]
                 self.unreadNotificationsCount = 1
                 self.unreadMessagesCount = 2
             }
             return
         }
+        #endif
 
         // Check if user chose to remember session on this device
         let isRemembered = UserDefaults.standard.object(forKey: "kinnect_session_remembered") as? Bool ?? true

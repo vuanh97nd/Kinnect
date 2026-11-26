@@ -51,11 +51,7 @@ struct LiveStreamView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            if appState.liveRooms.isEmpty {
-                KinnectTheme.background.ignoresSafeArea()
-            } else {
-                Color.black.ignoresSafeArea()
-            }
+            KinnectTheme.background.ignoresSafeArea()
 
             if appState.liveRooms.isEmpty && isLoading {
                 VStack(spacing: 12) {
@@ -95,98 +91,14 @@ struct LiveStreamView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if appState.liveRooms.isEmpty && !isLoading {
                 emptyLiveLobbyView
-            } else if !appState.liveRooms.isEmpty {
-                // Unified native vertical swipe viewer for all Live streams (Parity Android 1.2.12 build 118)
-                GeometryReader { proxy in
-                    if #available(iOS 17.0, *) {
-                        ScrollView(.vertical, showsIndicators: false) {
-                            LazyVStack(spacing: 0) {
-                                ForEach(appState.liveRooms) { room in
-                                    liveStreamPage(room, containerWidth: proxy.size.width)
-                                        .frame(width: proxy.size.width, height: proxy.size.height)
-                                        .clipped()
-                                        .id(room.id)
-                                }
-                            }
-                            .scrollTargetLayout()
-                        }
-                        .scrollTargetBehavior(.paging)
-                        .scrollPosition(id: $scrolledRoomId)
-                        .onChange(of: scrolledRoomId) { newId in
-                            guard let newId,
-                                  let idx = appState.liveRooms.firstIndex(where: { $0.id == newId }) else { return }
-                            if selectedIndex != idx {
-                                selectedIndex = idx
-                            }
-                        }
-                    } else {
-                        ScrollViewReader { scrollProxy in
-                            ScrollView(.vertical, showsIndicators: false) {
-                                LazyVStack(spacing: 0) {
-                                    ForEach(Array(appState.liveRooms.enumerated()), id: \.element.id) { index, room in
-                                        liveStreamPage(room, containerWidth: proxy.size.width)
-                                            .frame(width: proxy.size.width, height: proxy.size.height)
-                                            .id(index)
-                                    }
-                                }
-                            }
-                            .gesture(
-                                DragGesture(minimumDistance: 24)
-                                    .onEnded { value in
-                                        let dy = value.translation.height
-                                        if dy < -50 && selectedIndex + 1 < appState.liveRooms.count {
-                                            selectedIndex += 1
-                                            withAnimation(.easeOut(duration: 0.25)) {
-                                                scrollProxy.scrollTo(selectedIndex, anchor: .top)
-                                            }
-                                        } else if dy > 50 && selectedIndex > 0 {
-                                            selectedIndex -= 1
-                                            withAnimation(.easeOut(duration: 0.25)) {
-                                                scrollProxy.scrollTo(selectedIndex, anchor: .top)
-                                            }
-                                        }
-                                    }
-                            )
-                        }
-                    }
-                }
+            } else {
+                liveRoomsLobbyView
             }
         }
         .task {
             SocketEventBridge.installIfNeeded()
             await fetchLiveRooms()
             await loadGifts()
-            if !appState.isCreatingLiveRoom
-                && appState.currentLiveRoom == nil
-                && !appState.liveRooms.isEmpty
-                && selectedIndex < appState.liveRooms.count {
-                let initialRoom = appState.liveRooms[selectedIndex]
-                scrolledRoomId = initialRoom.id
-                appState.joinLiveRoom(initialRoom)
-                likesCount = initialRoom.likesCount
-            }
-        }
-        .onChange(of: selectedIndex) { newIndex in
-            guard !appState.isCreatingLiveRoom,
-                  !(appState.currentLiveRoom != nil && appState.isCurrentLiveHost),
-                  newIndex < appState.liveRooms.count else { return }
-            let room = appState.liveRooms[newIndex]
-            if scrolledRoomId != room.id {
-                scrolledRoomId = room.id
-            }
-            appState.joinLiveRoom(room)
-            isLiked = false
-            likesCount = room.likesCount
-        }
-        .onChange(of: appState.liveRooms.first?.id) { _ in
-            guard !appState.isCreatingLiveRoom,
-                  appState.currentLiveRoom == nil,
-                  let first = appState.liveRooms.first else { return }
-            selectedIndex = 0
-            scrolledRoomId = first.id
-            isLiked = false
-            likesCount = first.likesCount
-            appState.joinLiveRoom(first)
         }
         .onDisappear {
             if !appState.isCreatingLiveRoom && !appState.isCurrentLiveHost {
@@ -397,43 +309,143 @@ struct LiveStreamView: View {
         }
     }
 
+    private var liveLobbyHeader: some View {
+        let liveRed = Color(hex: "#EE2B2B")
+        return HStack(spacing: 10) {
+            Text(L10n.tr("Trực tiếp"))
+                .font(.system(size: 22, weight: .bold))
+                .foregroundColor(KinnectTheme.textPrimary)
+
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 5, height: 5)
+                Text("LIVE")
+                    .font(.system(size: 11, weight: .black))
+                    .foregroundColor(.white)
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(liveRed))
+
+            Spacer()
+
+            Button {
+                Task { await fetchLiveRooms() }
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(KinnectTheme.textPrimary)
+                    .frame(width: 38, height: 38)
+                    .background(Circle().fill(KinnectTheme.surfaceElevated))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L10n.tr("Làm mới danh sách Live"))
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+    }
+
+    private var liveRoomsLobbyView: some View {
+        let liveRed = Color(hex: "#EE2B2B")
+        return VStack(spacing: 0) {
+            liveLobbyHeader
+
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    ForEach(appState.liveRooms) { room in
+                        Button {
+                            appState.joinLiveRoom(room)
+                        } label: {
+                            HStack(spacing: 14) {
+                                ZStack {
+                                    Circle()
+                                        .fill(liveRed.opacity(0.14))
+                                        .frame(width: 48, height: 48)
+                                    Image(systemName: room.liveMode == "game" ? "gamecontroller.fill" : "dot.radiowaves.left.and.right")
+                                        .font(.system(size: 20, weight: .bold))
+                                        .foregroundColor(liveRed)
+                                }
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(room.title.isEmpty ? room.hostName : room.title)
+                                        .font(.subheadline.weight(.bold))
+                                        .foregroundColor(KinnectTheme.textPrimary)
+                                        .lineLimit(2)
+                                        .multilineTextAlignment(.leading)
+
+                                    let modeTitle = room.liveMode == "game" ? L10n.tr("Chơi game") : L10n.tr("Trò chuyện")
+                                    Text("\(modeTitle) · \(room.hostName) · \(room.viewerCount) \(L10n.tr("người xem"))")
+                                        .font(.caption)
+                                        .foregroundColor(KinnectTheme.textSecondary)
+                                        .lineLimit(1)
+                                }
+
+                                Spacer(minLength: 8)
+
+                                Text("LIVE")
+                                    .font(.system(size: 10, weight: .black))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Capsule().fill(liveRed))
+                            }
+                            .padding(14)
+                            .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                    .fill(KinnectTheme.surface)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                            .stroke(KinnectTheme.borderSoft, lineWidth: 1)
+                                    )
+                            )
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+            }
+            .refreshable {
+                await fetchLiveRooms()
+            }
+
+            HStack {
+                Spacer()
+                Button {
+                    showCreateLiveSheet = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "dot.radiowaves.left.and.right")
+                            .font(.system(size: 15, weight: .bold))
+                        Text(L10n.tr("Phát live"))
+                            .font(.subheadline.bold())
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 24)
+                    .frame(minHeight: 44)
+                    .background(Capsule().fill(liveRed))
+                    .shadow(color: liveRed.opacity(0.32), radius: 10, y: 4)
+                }
+                .buttonStyle(.plain)
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(KinnectTheme.background)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     private var emptyLiveLobbyView: some View {
         let liveRed = Color(hex: "#EE2B2B")
         return VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Text(L10n.tr("Trực tiếp"))
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(KinnectTheme.textPrimary)
-
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Color.white)
-                        .frame(width: 5, height: 5)
-                    Text("LIVE")
-                        .font(.system(size: 11, weight: .black))
-                        .foregroundColor(.white)
-                }
-                .padding(.horizontal, 9)
-                .padding(.vertical, 4)
-                .background(Capsule().fill(liveRed))
-
-                Spacer()
-
-                Button {
-                    Task { await fetchLiveRooms() }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(KinnectTheme.textPrimary)
-                        .frame(width: 38, height: 38)
-                        .background(Circle().fill(KinnectTheme.surfaceElevated))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(L10n.tr("Làm mới danh sách Live"))
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 8)
+            liveLobbyHeader
 
             Spacer()
 
@@ -472,7 +484,7 @@ struct LiveStreamView: View {
                     }
                     .foregroundColor(.white)
                     .padding(.horizontal, 26)
-                    .padding(.vertical, 13)
+                    .frame(minHeight: 44)
                     .background(Capsule().fill(liveRed))
                     .shadow(color: liveRed.opacity(0.32), radius: 10, y: 4)
                 }
@@ -497,6 +509,34 @@ struct LiveStreamView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    private func liveConnectingBackdrop(room: LiveRoomItem) -> some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(red: 0.14, green: 0.08, blue: 0.28),
+                    Color(red: 0.05, green: 0.03, blue: 0.12)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+            VStack(spacing: 12) {
+                KinnectAvatarView(
+                    name: room.hostName,
+                    avatarURL: room.hostAvatarUrl,
+                    colorHex: room.hostAvatarColor,
+                    size: 84
+                )
+                ProgressView().tint(.white)
+                Text(room.gamePaused ? L10n.tr("Chủ phòng đang tạm dừng màn hình game") : L10n.tr("Đang kết nối luồng video Live..."))
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.8))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+            }
+        }
+    }
+
     private func liveStreamPage(_ room: LiveRoomItem, containerWidth: CGFloat) -> some View {
         ZStack(alignment: .bottomLeading) {
             // WebRTC Video Canvas with Fallback connecting state
@@ -508,50 +548,32 @@ struct LiveStreamView: View {
                 } else if room.id == appState.currentLiveRoom?.id,
                           let remoteTrack = webrtc.liveRemoteVideoTrack {
                     WebRTCVideoRendererView(track: remoteTrack, mirror: false)
-                } else if UIReviewFixture.isEnabled && room.id == scrolledRoomId {
-                    ZStack {
-                        ShortClipPlayer(
-                            path: UIReviewFixture.samplePlayableVideoURL()?.absoluteString ?? "",
-                            active: true,
-                            muted: true
-                        )
-                        LinearGradient(
-                            colors: [
-                                Color.black.opacity(0.4),
-                                Color.clear,
-                                Color.black.opacity(0.7)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    }
-                    .ignoresSafeArea()
                 } else {
-                    ZStack {
-                        LinearGradient(
-                            colors: [
-                                Color(red: 0.14, green: 0.08, blue: 0.28),
-                                Color(red: 0.05, green: 0.03, blue: 0.12)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                        .ignoresSafeArea()
-                        VStack(spacing: 12) {
-                            KinnectAvatarView(
-                                name: room.hostName,
-                                avatarURL: room.hostAvatarUrl,
-                                colorHex: room.hostAvatarColor,
-                                size: 84
+                    #if DEBUG
+                    if UIReviewFixture.isEnabled && room.id == scrolledRoomId {
+                        ZStack {
+                            ShortClipPlayer(
+                                path: UIReviewFixture.samplePlayableVideoURL()?.absoluteString ?? "",
+                                active: true,
+                                muted: true
                             )
-                            ProgressView().tint(.white)
-                            Text(room.gamePaused ? "Chủ phòng đang tạm dừng màn hình game" : "Đang kết nối luồng video Live...")
-                                .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.8))
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 24)
+                            LinearGradient(
+                                colors: [
+                                    Color.black.opacity(0.4),
+                                    Color.clear,
+                                    Color.black.opacity(0.7)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
                         }
+                        .ignoresSafeArea()
+                    } else {
+                        liveConnectingBackdrop(room: room)
                     }
+                    #else
+                    liveConnectingBackdrop(room: room)
+                    #endif
                 }
             }
 
@@ -631,28 +653,6 @@ struct LiveStreamView: View {
                         .background(Capsule().fill(Color.black.opacity(0.5)))
 
                         Spacer(minLength: 4)
-
-                        // Go Live Button
-                        Button {
-                            showCreateLiveSheet = true
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "video.fill")
-                                    .font(.system(size: 11, weight: .bold))
-                                Text(L10n.tr("Phát Live"))
-                                    .font(.caption2.bold())
-                                    .lineLimit(1)
-                                    .fixedSize()
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 7)
-                            .frame(minHeight: 36)
-                            .background(Capsule().fill(KinnectTheme.primaryGradient))
-                            .foregroundColor(.white)
-                            .shadow(color: Color.black.opacity(0.4), radius: 6, y: 2)
-                        }
-                        .buttonStyle(.plain)
-                        .fixedSize()
 
                         // Viewer UGC Safety Menu (Report / Block Host — Apple Guideline 1.2)
                         Menu {
@@ -808,11 +808,13 @@ struct LiveStreamView: View {
                         }
 
                         if appState.liveChatMessages.isEmpty {
+                            #if DEBUG
                             if UIReviewFixture.isEnabled {
-                                chatBubble(name: "kinnect_mod", text: "Chào mừng bạn đến với phòng Live của \(room.hostName)!", colorHex: "#A855F7")
-                                chatBubble(name: "Thanh Trúc", text: "Chào anh Nam nhé! Chúc anh buổi live vui vẻ ❤️", colorHex: "#EC4899")
-                                chatBubble(name: "kinnect_user", text: "Âm thanh và hình ảnh rất nét ạ!", colorHex: "#22C55E")
+                                chatBubble(name: "Linh Nhi", text: "\(L10n.tr("Chào mừng bạn đến với phòng Live của")) \(room.hostName)!", colorHex: "#A855F7")
+                                chatBubble(name: "Trần Thanh Trúc", text: "Chào anh Nam nhé! Chúc anh buổi live vui vẻ ❤️", colorHex: "#EC4899")
+                                chatBubble(name: "Lê Hoàng Nam", text: "Âm thanh và hình ảnh rất nét ạ!", colorHex: "#22C55E")
                             }
+                            #endif
                         } else {
                             ForEach(appState.liveChatMessages.filter { !appState.blockedUserIds.contains($0.user.id) }.suffix(6)) { msg in
                                 chatBubble(senderId: msg.user.id, name: msg.user.name, text: msg.text, colorHex: msg.user.avatarColor)
@@ -850,6 +852,7 @@ struct LiveStreamView: View {
                                 let clean = chatText.trimmingCharacters(in: .whitespacesAndNewlines)
                                 if !clean.isEmpty {
                                     chatText = ""
+                                    #if DEBUG
                                     if UIReviewFixture.isEnabled {
                                         let localMsg = LiveChatMessage(
                                             id: UUID().uuidString,
@@ -865,6 +868,13 @@ struct LiveStreamView: View {
                                             "room": room.id
                                         ])
                                     }
+                                    #else
+                                    NativeSocketClient.shared.sendJSON([
+                                        "type": "chat",
+                                        "text": clean,
+                                        "room": room.id
+                                    ])
+                                    #endif
                                 }
                             } label: {
                                 ZStack {
@@ -1339,16 +1349,17 @@ struct CreateLiveRoomSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                cameraPreviewSection
-                if availableLiveModes.count > 1 {
-                    liveModeSection
-                }
-                roomInfoSection
-                deviceSection
+            VStack(spacing: 0) {
+                cameraPreviewStage
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
+                    .padding(.bottom, 10)
+
+                darkControlDeck
             }
-            .scrollContentBackground(.hidden)
-            .background(KinnectTheme.background)
+            .background(Color(hex: "#0A0A0C").ignoresSafeArea())
+            .preferredColorScheme(.dark)
+            .tint(.white)
             .task {
                 let camOk = await MediaPermissionHandler.shared.requestCameraAccess()
                 previewCameraAuthorized = camOk
@@ -1360,40 +1371,24 @@ struct CreateLiveRoomSheet: View {
             .onDisappear {
                 setupCamera.stopAndRelease()
             }
-            .safeAreaInset(edge: .bottom) {
-                Button {
-                    Task { await startHostLive() }
-                } label: {
-                    HStack(spacing: 8) {
-                        if isStarting {
-                            ProgressView().tint(.white)
-                        } else {
-                            Image(systemName: "dot.radiowaves.left.and.right")
-                                .font(.headline)
-                        }
-                        Text(isStarting ? L10n.tr("Đang khởi tạo phòng Live…") : L10n.tr("Bắt đầu phát Live"))
-                            .font(.headline.weight(.bold))
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 15)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(Color(hex: "#EE2B2B"))
-                            .shadow(color: Color(hex: "#EE2B2B").opacity(0.35), radius: 12, y: 4)
-                    )
-                }
-                .buttonStyle(.plain)
-                .disabled(isStarting)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(KinnectTheme.background.opacity(0.95))
-            }
             .navigationTitle(L10n.tr("Bắt đầu phát Live"))
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(L10n.tr("Hủy")) { dismiss() }
+                    Button {
+                        dismiss()
+                    } label: {
+                        Text(L10n.tr("Hủy"))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                            .background(Capsule().fill(Color.white.opacity(0.14)))
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .sheet(isPresented: $showPreviewEffects) {
@@ -1413,180 +1408,233 @@ struct CreateLiveRoomSheet: View {
         }
     }
 
-    private var cameraPreviewSection: some View {
-        Section("Xem trước camera") {
-            ZStack(alignment: .bottomLeading) {
-                if previewCameraAuthorized {
-                    LiveSetupCameraPreviewLayer(session: setupCamera.session)
-                        .frame(height: 220)
-                        .overlay(
-                            LiveFilterColorOverlay(filterId: previewFilter)
-                                .allowsHitTesting(false)
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                } else {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(KinnectTheme.surfaceElevated)
-                            .frame(height: 220)
-                        VStack(spacing: 8) {
-                            Image(systemName: "video.slash.fill")
-                                .font(.title2)
-                                .foregroundColor(KinnectTheme.textSecondary)
-                            Text("Cấp quyền camera để xem trước trực tiếp")
-                                .font(.caption)
-                                .foregroundColor(KinnectTheme.textSecondary)
-                        }
-                    }
+    private var cameraPreviewStage: some View {
+        ZStack {
+            if previewCameraAuthorized {
+                LiveSetupCameraPreviewLayer(session: setupCamera.session)
+                    .overlay(
+                        LiveFilterColorOverlay(filterId: previewFilter)
+                            .allowsHitTesting(false)
+                    )
+            } else {
+                LinearGradient(
+                    colors: [Color(hex: "#1A102E"), Color(hex: "#0A0A0C")],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                VStack(spacing: 10) {
+                    Image(systemName: "video.fill")
+                        .font(.system(size: 34, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.75))
+                    Text(L10n.tr("Cấp quyền camera để xem trước trực tiếp"))
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.78))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
                 }
+            }
 
-                HStack(spacing: 6) {
-                    Text(previewFrontCamera ? "Camera trước" : "Camera sau")
+            VStack {
+                HStack {
+                    Spacer()
+                    Text("●  \(L10n.tr("Xem trước · Chưa phát sóng"))")
+                        .font(.caption.weight(.bold))
+                        .foregroundColor(Color(hex: "#FDD663"))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .background(
+                            Capsule()
+                                .fill(Color.black.opacity(0.58))
+                                .overlay(Capsule().stroke(Color(hex: "#FDD663").opacity(0.32), lineWidth: 1))
+                        )
+                    Spacer()
+                }
+                .padding(.top, 14)
+
+                Spacer()
+
+                HStack(spacing: 8) {
+                    Text(L10n.tr(previewFrontCamera ? "Camera trước" : "Camera sau"))
                         .font(.caption2.bold())
                         .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(Color.black.opacity(0.55)))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(Color.black.opacity(0.58)))
                     if previewFilter != "none" {
-                        Text("Bộ lọc: \(previewFilter)")
+                        Text("\(L10n.tr("Bộ lọc:")) \(previewFilter)")
                             .font(.caption2.bold())
                             .foregroundColor(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
                             .background(Capsule().fill(KinnectTheme.accentBright.opacity(0.85)))
                     }
+                    Spacer()
                 }
-                .padding(10)
+                .padding(12)
             }
-            .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
-            .listRowBackground(Color.clear)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(hex: "#0F0D18"))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Color.white.opacity(0.10), lineWidth: 1)
+        )
     }
 
-    private var liveModeSection: some View {
-        Section("Chế độ phát trực tiếp") {
-            HStack(spacing: 6) {
-                liveModeOptionButton(
-                    mode: "chat",
-                    title: "Trò chuyện",
-                    systemImage: "video.fill"
-                )
-            }
-            .padding(4)
+    private var darkControlDeck: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            TextField(
+                "",
+                text: $title,
+                prompt: Text(L10n.tr("Tiêu đề buổi Live"))
+                    .foregroundColor(.white.opacity(0.55))
+            )
+            .font(.subheadline)
+            .foregroundColor(.white)
+            .tint(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(KinnectTheme.surfaceElevated)
+                    .fill(Color(hex: "#201E2B"))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                    )
             )
-            .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+
+            TextField(
+                "",
+                text: $topic,
+                prompt: Text(L10n.tr("Nhập chủ đề buổi Live"))
+                    .foregroundColor(.white.opacity(0.55))
+            )
+            .font(.footnote)
+            .foregroundColor(.white)
+            .tint(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color(hex: "#201E2B"))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                    )
+            )
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    setupChipButton(
+                        icon: previewMicEnabled ? "mic.fill" : "mic.slash.fill",
+                        label: L10n.tr("Micro"),
+                        active: previewMicEnabled,
+                        activeColor: KinnectTheme.accentBright
+                    ) {
+                        previewMicEnabled.toggle()
+                    }
+
+                    setupChipButton(
+                        icon: "bubble.left.fill",
+                        label: L10n.tr("Bình luận"),
+                        active: gameComments,
+                        activeColor: KinnectTheme.accentBright
+                    ) {
+                        gameComments.toggle()
+                    }
+
+                    setupChipButton(
+                        icon: "camera.rotate.fill",
+                        label: L10n.tr("Lật cam"),
+                        active: false,
+                        activeColor: KinnectTheme.accentBright
+                    ) {
+                        previewFrontCamera.toggle()
+                        NativeWebRTCManager.shared.usingFrontCamera = previewFrontCamera
+                        setupCamera.setCamera(front: previewFrontCamera)
+                    }
+
+                    setupChipButton(
+                        icon: "wand.and.stars",
+                        label: L10n.tr("Làm đẹp"),
+                        active: previewBeautyOn,
+                        activeColor: KinnectTheme.accentBright
+                    ) {
+                        showPreviewEffects = true
+                    }
+                }
+            }
+
+            Button {
+                Task { await startHostLive() }
+            } label: {
+                HStack(spacing: 8) {
+                    if isStarting {
+                        ProgressView().tint(.white)
+                    } else {
+                        Image(systemName: "dot.radiowaves.left.and.right")
+                            .font(.headline)
+                    }
+                    Text(isStarting ? L10n.tr("Đang khởi tạo phòng Live…") : L10n.tr("Bắt đầu phát Live"))
+                        .font(.headline.weight(.bold))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .background(
+                    Capsule()
+                        .fill(Color(hex: "#EE2B2B"))
+                        .shadow(color: Color(hex: "#EE2B2B").opacity(0.35), radius: 12, y: 4)
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(isStarting)
         }
+        .padding(.horizontal, 16)
+        .padding(.top, 14)
+        .padding(.bottom, 16)
+        .background(
+            UnevenRoundedRectangle(
+                topLeadingRadius: 24,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: 24,
+                style: .continuous
+            )
+            .fill(Color(hex: "#141418"))
+            .ignoresSafeArea(edges: .bottom)
+        )
     }
 
-    private func liveModeOptionButton(mode: String, title: String, systemImage: String) -> some View {
-        let isSelected = (liveMode == mode)
-        return Button {
-            withAnimation(.spring(response: 0.22, dampingFraction: 0.8)) {
-                liveMode = mode
-            }
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: systemImage)
-                    .font(.subheadline.weight(.semibold))
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
+    private func setupChipButton(
+        icon: String,
+        label: String,
+        active: Bool,
+        activeColor: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                Text(label)
+                    .font(.caption.weight(.semibold))
                     .lineLimit(1)
             }
-            .foregroundColor(isSelected ? .white : KinnectTheme.textSecondary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 9)
+            .foregroundColor(active ? .white : Color.white.opacity(0.75))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
             .background(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(isSelected ? AnyShapeStyle(KinnectTheme.primaryGradient) : AnyShapeStyle(Color.clear))
+                Capsule()
+                    .fill(active ? activeColor.opacity(0.26) : Color(hex: "#201E2B"))
+                    .overlay(
+                        Capsule().stroke(active ? activeColor : Color.white.opacity(0.14), lineWidth: 1)
+                    )
             )
+            .frame(minHeight: 44)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-
-    private var roomInfoSection: some View {
-        Section(L10n.tr("Thông tin phòng Live")) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(L10n.tr("Tiêu đề"))
-                    .font(.caption.weight(.semibold))
-                    .foregroundColor(KinnectTheme.textSecondary)
-                TextField(L10n.tr("Tiêu đề buổi Live"), text: $title)
-            }
-            .padding(.vertical, 2)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(L10n.tr("Chủ đề"))
-                    .font(.caption.weight(.semibold))
-                    .foregroundColor(KinnectTheme.textSecondary)
-                TextField(L10n.tr("Nhập chủ đề buổi Live"), text: $topic)
-            }
-            .padding(.vertical, 2)
-
-            Toggle(L10n.tr("Cho phép khán giả bình luận"), isOn: $gameComments)
-                .tint(KinnectTheme.accentBright)
-        }
-    }
-
-    private var deviceSection: some View {
-        Section("Thiết bị & Hiệu ứng") {
-            HStack(spacing: 12) {
-                Button {
-                    previewFrontCamera.toggle()
-                    NativeWebRTCManager.shared.usingFrontCamera = previewFrontCamera
-                    setupCamera.setCamera(front: previewFrontCamera)
-                } label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: "camera.rotate.fill")
-                            .font(.title3)
-                        Text("Lật camera")
-                            .font(.caption2)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(KinnectTheme.surfaceElevated)
-                    .cornerRadius(10)
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    showPreviewEffects = true
-                } label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: "wand.and.stars")
-                            .font(.title3)
-                            .foregroundColor(KinnectTheme.accentBright)
-                        Text("Làm đẹp")
-                            .font(.caption2)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(KinnectTheme.surfaceElevated)
-                    .cornerRadius(10)
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    previewMicEnabled.toggle()
-                } label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: previewMicEnabled ? "mic.fill" : "mic.slash.fill")
-                            .font(.title3)
-                            .foregroundColor(previewMicEnabled ? KinnectTheme.success : KinnectTheme.danger)
-                        Text("Micro")
-                            .font(.caption2)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(KinnectTheme.surfaceElevated)
-                    .cornerRadius(10)
-                }
-                .buttonStyle(.plain)
-            }
-        }
     }
 
     private func startHostLive() async {
@@ -1606,19 +1654,19 @@ struct CreateLiveRoomSheet: View {
         guard await manager.startLiveHostBroadcast() else {
             appState.isCreatingLiveRoom = false
             setupCamera.start(front: previewFrontCamera)
-            appState.showToast("Cần quyền camera và micro để bắt đầu Live.")
+            appState.showToast(L10n.tr("Cần quyền camera và micro để bắt đầu Live."))
             return
         }
         manager.setMicrophoneMuted(!previewMicEnabled)
 
         let roomTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? "Phòng Live của \(appState.currentUser?.name ?? "Kinnect")"
+            ? "\(L10n.tr("Phòng Live của")) \(appState.currentUser?.name ?? "Kinnect")"
             : title.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard await NativeSocketClient.shared.ensureConnected() else {
             appState.isCreatingLiveRoom = false
             manager.stopLiveSession()
-            appState.showToast("Chưa kết nối được máy chủ Live. Vui lòng thử lại.")
+            appState.showToast(L10n.tr("Chưa kết nối được máy chủ Live. Vui lòng thử lại."))
             return
         }
 
@@ -1691,7 +1739,7 @@ struct LiveRoomFullScreenView: View {
                             colorHex: room.hostAvatarColor,
                             size: 92
                         )
-                        Text("Camera đang tắt")
+                        Text(L10n.tr("Camera đang tắt"))
                             .font(.subheadline.weight(.semibold))
                             .foregroundColor(KinnectTheme.textSecondary)
                     }
@@ -1699,6 +1747,29 @@ struct LiveRoomFullScreenView: View {
                     WebRTCVideoRendererView(track: remoteTrack, mirror: false)
                         .ignoresSafeArea()
                 } else {
+                    #if DEBUG
+                    if UIReviewFixture.isEnabled {
+                        ShortClipPlayer(
+                            path: UIReviewFixture.samplePlayableVideoURL()?.absoluteString ?? "",
+                            active: true,
+                            muted: true
+                        )
+                        .ignoresSafeArea()
+                    } else {
+                        VStack(spacing: 12) {
+                            KinnectAvatarView(
+                                name: room.hostName,
+                                avatarURL: room.hostAvatarUrl,
+                                colorHex: room.hostAvatarColor,
+                                size: 92
+                            )
+                            Text(room.gamePaused ? L10n.tr("Chủ phòng đang tạm dừng màn hình game") : L10n.tr("Đang kết nối luồng video Live..."))
+                                .font(.subheadline)
+                                .foregroundColor(KinnectTheme.textSecondary)
+                                .kinnectMultiline()
+                        }
+                    }
+                    #else
                     VStack(spacing: 12) {
                         KinnectAvatarView(
                             name: room.hostName,
@@ -1706,11 +1777,12 @@ struct LiveRoomFullScreenView: View {
                             colorHex: room.hostAvatarColor,
                             size: 92
                         )
-                        Text(room.gamePaused ? "Chủ phòng đang tạm dừng màn hình game" : "Đang kết nối luồng video Live...")
+                        Text(room.gamePaused ? L10n.tr("Chủ phòng đang tạm dừng màn hình game") : L10n.tr("Đang kết nối luồng video Live..."))
                             .font(.subheadline)
                             .foregroundColor(KinnectTheme.textSecondary)
                             .kinnectMultiline()
                     }
+                    #endif
                 }
 
                 // Subtle top & bottom gradient scrim so Host controls remain legible over bright video
@@ -1744,7 +1816,7 @@ struct LiveRoomFullScreenView: View {
                                 .foregroundColor(.white)
                                 .lineLimit(1)
                             HStack(spacing: 6) {
-                                Text(room.liveMode == "game" ? "🎮 \(room.gameTitle)" : "💬 Trò chuyện")
+                                Text(room.liveMode == "game" ? "🎮 \(room.gameTitle)" : "💬 \(L10n.tr("Trò chuyện"))")
                                     .font(.caption2)
                                     .foregroundColor(KinnectTheme.accentBright)
                                 Button {
@@ -1763,12 +1835,14 @@ struct LiveRoomFullScreenView: View {
                             Button {
                                 Task { await toggleFollowRoomHost(room.hostUserId) }
                             } label: {
-                                Text(isHostFollowed ? "Đang theo dõi" : "Theo dõi")
+                                Text(L10n.tr(isHostFollowed ? "Đang theo dõi" : "Theo dõi"))
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundColor(.white)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)
                                     .background(Capsule().fill(isHostFollowed ? Color.white.opacity(0.22) : KinnectTheme.accentBright))
+                                    .frame(minHeight: 44)
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                             .disabled(isFollowLoading)
@@ -1792,6 +1866,8 @@ struct LiveRoomFullScreenView: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 6)
                             .background(Capsule().fill(Color.black.opacity(0.45)))
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(L10n.tr("Bảng xếp hạng quà"))
@@ -1805,7 +1881,7 @@ struct LiveRoomFullScreenView: View {
                                     "gameTitle": room.gameTitle
                                 ])
                             } label: {
-                                Text(room.gamePaused ? "Tiếp tục Game" : "Tạm ẩn Game")
+                                Text(L10n.tr(room.gamePaused ? "Tiếp tục Game" : "Tạm ẩn Game"))
                                     .font(.caption2.bold())
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 6)
@@ -1827,7 +1903,11 @@ struct LiveRoomFullScreenView: View {
                                     .foregroundColor(.white)
                                     .padding(8)
                                     .background(Circle().fill(Color.black.opacity(0.45)))
+                                    .frame(minWidth: 44, minHeight: 44)
+                                    .contentShape(Rectangle())
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(L10n.tr("Báo cáo phòng Live"))
                         }
 
                         Button {
@@ -1842,8 +1922,11 @@ struct LiveRoomFullScreenView: View {
                                 .foregroundColor(.white)
                                 .padding(10)
                                 .background(Circle().fill(KinnectTheme.danger))
+                                .frame(minWidth: 44, minHeight: 44)
+                                .contentShape(Rectangle())
                         }
-                        .accessibilityLabel(appState.isCurrentLiveHost ? "Kết thúc Live" : "Rời phòng Live")
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(L10n.tr(appState.isCurrentLiveHost ? "Kết thúc Live" : "Rời phòng Live"))
                     }
                     .padding(.horizontal, 14)
                     .padding(.top, 12)
@@ -1895,6 +1978,13 @@ struct LiveRoomFullScreenView: View {
                     HStack(alignment: .bottom, spacing: 10) {
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 6) {
+                                #if DEBUG
+                                if appState.liveChatMessages.isEmpty && UIReviewFixture.isEnabled {
+                                    liveFullScreenChatRow(name: "Linh Nhi", text: "Chào mừng mọi người đến với buổi tối cuối tuần!")
+                                    liveFullScreenChatRow(name: "Trần Thanh Trúc", text: "Chúc buổi phát trực tiếp thật nhiều niềm vui nha ❤️")
+                                    liveFullScreenChatRow(name: "Lê Hoàng Nam", text: "Cảm ơn cả nhà đã ghé xem!")
+                                }
+                                #endif
                                 ForEach(appState.liveChatMessages.filter { !appState.blockedUserIds.contains($0.user.id) }.suffix(30)) { msg in
                                     HStack(alignment: .top, spacing: 6) {
                                         Text("\(msg.user.name):")
@@ -1918,10 +2008,10 @@ struct LiveRoomFullScreenView: View {
                                                 targetType: hasPeerSender ? "user" : "app",
                                                 targetId: hasPeerSender ? msg.user.id : (appState.currentUser?.id ?? "live_comment"),
                                                 targetUserId: hasPeerSender ? msg.user.id : nil,
-                                                targetTitle: "Bình luận Live của \(msg.user.name): \"\(String(msg.text.prefix(40)))\""
+                                                targetTitle: "\(L10n.tr("Bình luận Live của")) \(msg.user.name): \"\(String(msg.text.prefix(40)))\""
                                             )
                                         } label: {
-                                            Label("Báo cáo bình luận", systemImage: "flag")
+                                            Label(L10n.tr("Báo cáo bình luận"), systemImage: "flag")
                                         }
                                     }
                                 }
@@ -2137,13 +2227,13 @@ struct LiveRoomFullScreenView: View {
                 SocketEventBridge.installIfNeeded()
                 await loadGiftCatalog()
             }
-            .alert("Kết thúc Live?", isPresented: $showEndLiveConfirm) {
-                Button("Tiếp tục phát", role: .cancel) {}
-                Button("Kết thúc Live", role: .destructive) {
+            .alert(L10n.tr("Kết thúc Live?"), isPresented: $showEndLiveConfirm) {
+                Button(L10n.tr("Tiếp tục phát"), role: .cancel) {}
+                Button(L10n.tr("Kết thúc Live"), role: .destructive) {
                     leaveLiveRoom()
                 }
             } message: {
-                Text("Buổi phát trực tiếp sẽ dừng ngay với tất cả người xem.")
+                Text(L10n.tr("Buổi phát trực tiếp sẽ dừng ngay với tất cả người xem."))
             }
             .sheet(isPresented: $showGiftSheet) {
                 LiveGiftDrawerSheet(
@@ -2396,6 +2486,26 @@ struct LiveRoomFullScreenView: View {
         }
     }
 
+    #if DEBUG
+    private func liveFullScreenChatRow(name: String, text: String) -> some View {
+        HStack(alignment: .top, spacing: 6) {
+            Text("\(name):")
+                .font(.caption.bold())
+                .foregroundColor(KinnectTheme.accentBright)
+            Text(text)
+                .font(.caption)
+                .foregroundColor(.white)
+                .kinnectMultiline()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.black.opacity(0.5))
+        )
+    }
+    #endif
+
     private func sendLiveChat() {
         if let room = appState.currentLiveRoom, !room.comments && !appState.isCurrentLiveHost {
             return
@@ -2403,6 +2513,18 @@ struct LiveRoomFullScreenView: View {
         let clean = chatInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty else { return }
         chatInput = ""
+        #if DEBUG
+        if UIReviewFixture.isEnabled {
+            let localMsg = LiveChatMessage(
+                id: UUID().uuidString,
+                user: appState.currentUser ?? KinnectUser.from(["name": "Bạn"]),
+                text: clean,
+                createdAt: ""
+            )
+            appState.liveChatMessages.append(localMsg)
+            return
+        }
+        #endif
         NativeSocketClient.shared.sendJSON([
             "type": "chat",
             "text": clean

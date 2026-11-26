@@ -360,7 +360,12 @@ struct CameraStudioView: View {
     @State private var videoCompositionRevision = UUID().uuidString
 
     private var isVideoActive: Bool {
-        capturedVideoTempURL != nil || videoProject != nil || !videoDataURL.isEmpty || UIReviewFixture.activeScreen == "camera-studio-video-edit"
+        #if DEBUG
+        if UIReviewFixture.activeScreen == "camera-studio-video-edit" {
+            return true
+        }
+        #endif
+        return capturedVideoTempURL != nil || videoProject != nil || !videoDataURL.isEmpty
     }
 
     // Pickers
@@ -404,9 +409,17 @@ struct CameraStudioView: View {
         }
     }
 
+    private var isFixtureEditMode: Bool {
+        #if DEBUG
+        return UIReviewFixture.activeScreen == "camera-studio-edit"
+        #else
+        return false
+        #endif
+    }
+
     var body: some View {
         Group {
-            if previewImage == nil && !isVideoActive && UIReviewFixture.activeScreen != "camera-studio-edit" {
+            if previewImage == nil && !isVideoActive && !isFixtureEditMode {
                 // 1. Direct-to-Camera Viewfinder Mode (100% Android StudioActivity Parity)
                 cameraViewfinderMode
             } else {
@@ -482,13 +495,14 @@ struct CameraStudioView: View {
                 self.syncVideoProjectSliders(to: vp)
                 self.videoCompositionRevision = UUID().uuidString
             }
+            #if DEBUG
             if UIReviewFixture.activeScreen == "camera-studio-video" {
                 captureMode = .video
             }
             if UIReviewFixture.activeScreen == "camera-studio-video-edit" {
                 target = .shortVideo
                 title = "Video ngắn Kinnect Shorts"
-                caption = "Video ngắn quay bằng Camera Studio và phát qua AVPlayer native."
+                caption = "Video ngắn quay bằng Camera Studio."
                 selectedMusicTrack = "Lofi Chill Sài Gòn"
                 if let movieURL = UIReviewFixture.samplePlayableVideoURL() {
                     self.capturedVideoTempURL = movieURL
@@ -508,8 +522,9 @@ struct CameraStudioView: View {
                 photoProject.originalImage = sample
                 photoProject.resetAll()
                 previewImage = photoProject.render(maxDimension: 900)
-                caption = "[Fixture UI] Kiểm thử bảng chỉnh sửa Kinnect Studio với nút Lưu tách riêng."
+                caption = "Khoảnh khắc chiều cuối tuần cùng Kinnect Studio."
             }
+            #endif
         }
         .onDisappear {
             cancelCaptureTimers()
@@ -1269,14 +1284,21 @@ struct CameraStudioView: View {
     @ViewBuilder
     private var mediaEditStage: some View {
         ZStack(alignment: .bottom) {
-            if let vURL = capturedVideoTempURL ?? (UIReviewFixture.activeScreen == "camera-studio-video-edit" ? UIReviewFixture.samplePlayableVideoURL() : nil) {
+            #if DEBUG
+            let fixtureVideoURL = UIReviewFixture.activeScreen == "camera-studio-video-edit" ? UIReviewFixture.samplePlayableVideoURL() : nil
+            let fixturePreviewFallback = UIReviewFixture.samplePreviewImage()
+            #else
+            let fixtureVideoURL: URL? = nil
+            let fixturePreviewFallback = UIImage()
+            #endif
+            if let vURL = capturedVideoTempURL ?? fixtureVideoURL {
                 StudioVideoPlayerView(videoURL: vURL, videoProject: videoProject ?? StudioVideoProject(sourceURL: vURL), revisionId: videoCompositionRevision)
                     .frame(maxWidth: .infinity, minHeight: 280, maxHeight: 340)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
             } else {
                 let displayImg = isComparingOriginal
-                    ? (originalImage ?? UIReviewFixture.samplePreviewImage())
-                    : (previewImage ?? UIReviewFixture.samplePreviewImage())
+                    ? (originalImage ?? fixturePreviewFallback)
+                    : (previewImage ?? fixturePreviewFallback)
                 Image(uiImage: displayImg)
                     .resizable()
                     .scaledToFit()
@@ -1833,14 +1855,18 @@ struct CameraStudioView: View {
     }
 
     private var isStudioProEntitledLocally: Bool {
+        #if DEBUG
         if UIReviewFixture.isEnabled { return true }
+        #endif
         let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
         if studioProPermanent || studioProFree || studioAdminAccess { return true }
         return isVideoActive ? (studioVideoUntilMs > nowMs) : (studioPhotoUntilMs > nowMs)
     }
 
     private func hasActiveStudioProEntitlement() async -> Bool {
+        #if DEBUG
         if UIReviewFixture.isEnabled { return true }
+        #endif
         if !hasLoadedStoreEntitlements {
             await refreshStudioEntitlements()
         }
@@ -2297,7 +2323,7 @@ struct StudioMusicPickerSheet: View {
         let path: String
 
         static let defaultServerTracks: [MusicTrack] = [
-            MusicTrack(id: "/music/tiktok-01.mp3", title: "LIỆU RẰNG · Remix DEMO", artist: "Huy PT Remix", path: "/music/tiktok-01.mp3"),
+            MusicTrack(id: "/music/tiktok-01.mp3", title: "LIỆU RẰNG · Remix", artist: "Huy PT Remix", path: "/music/tiktok-01.mp3"),
             MusicTrack(id: "/music/tiktok-02.mp3", title: "Xin lỗi vì đã…", artist: "Huy PT Remix", path: "/music/tiktok-02.mp3"),
             MusicTrack(id: "/music/tiktok-03.mp3", title: "EM ĐAU LẮM ANH À · Remix", artist: "Huy PT Remix", path: "/music/tiktok-03.mp3"),
             MusicTrack(id: "/music/tiktok-04.mp3", title: "Nghe có vẻ mọi người không chuộng mixtape", artist: "Huy PT Remix", path: "/music/tiktok-04.mp3"),
@@ -2315,21 +2341,21 @@ struct StudioMusicPickerSheet: View {
     var body: some View {
         List {
             Section {
-                Button("Chọn tệp âm thanh từ thiết bị") { showAudioFilePicker = true }
-                Button("Không dùng nhạc nền") {
+                Button(L10n.tr("Chọn tệp âm thanh từ thiết bị")) { showAudioFilePicker = true }
+                Button(L10n.tr("Không dùng nhạc nền")) {
                     stopPreview()
                     selectedTrack = ""
                     onSelectTrack?("", nil)
                     dismiss()
                 }
             }
-            Section("Thư viện âm thanh Kinnect") {
-                if loading { ProgressView("Đang tải danh sách nhạc…") }
+            Section(L10n.tr("Thư viện âm thanh Kinnect")) {
+                if loading { ProgressView(L10n.tr("Đang tải danh sách nhạc…")) }
                 if !errorText.isEmpty {
                     Text(errorText).foregroundColor(.secondary)
-                    Button("Thử lại") { Task { await loadCatalog() } }
+                    Button(L10n.tr("Thử lại")) { Task { await loadCatalog() } }
                 } else if !loading && tracks.isEmpty {
-                    Text("Chưa có âm thanh trong thư viện.")
+                    Text(L10n.tr("Chưa có âm thanh trong thư viện."))
                 }
                 ForEach(tracks.filter { query.isEmpty || ($0.title + " " + $0.artist).localizedCaseInsensitiveContains(query) }) { track in
                     HStack(spacing: 12) {
@@ -2341,7 +2367,7 @@ struct StudioMusicPickerSheet: View {
                                 .frame(width: 44, height: 44)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Nghe thử \(track.title)")
+                        .accessibilityLabel("\(L10n.tr("Nghe thử")) \(track.title)")
                         Button {
                             Task { await select(track) }
                         } label: {
@@ -2361,11 +2387,11 @@ struct StudioMusicPickerSheet: View {
                 }
             }
         }
-        .searchable(text: $query, prompt: "Tìm nhạc, nghệ sĩ")
-        .navigationTitle("Thêm nhạc nền")
+        .searchable(text: $query, prompt: Text(L10n.tr("Tìm nhạc, nghệ sĩ")))
+        .navigationTitle(L10n.tr("Thêm nhạc nền"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) { Button("Đóng") { dismiss() } }
+            ToolbarItem(placement: .cancellationAction) { Button(L10n.tr("Đóng")) { dismiss() } }
         }
         .task { await loadCatalog() }
         .refreshable { await loadCatalog() }
@@ -2411,11 +2437,15 @@ struct StudioMusicPickerSheet: View {
             }
         } catch {
             if tracks.isEmpty {
+                #if DEBUG
                 if UIReviewFixture.isEnabled {
                     self.tracks = MusicTrack.defaultServerTracks
                 } else {
-                    errorText = "Không tải được thư viện nhạc: \(error.localizedDescription)"
+                    errorText = "\(L10n.tr("Không tải được thư viện nhạc:")) \(error.localizedDescription)"
                 }
+                #else
+                errorText = "\(L10n.tr("Không tải được thư viện nhạc:")) \(error.localizedDescription)"
+                #endif
             }
         }
     }
@@ -2425,9 +2455,11 @@ struct StudioMusicPickerSheet: View {
         do {
             return try await KinnectAuthenticatedFile.fetch(path: track.path, fileExtension: ext.isEmpty ? "mp3" : ext)
         } catch {
+            #if DEBUG
             if UIReviewFixture.isEnabled {
                 return UIReviewFixture.sampleAudioURL()
             }
+            #endif
             throw error
         }
     }
@@ -3285,9 +3317,27 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
         connection.preferredVideoStabilizationMode = .cinematic
     }
 
+    static func simulatorPreviewFallbackImage() -> UIImage {
+        let size = CGSize(width: 720, height: 1280)
+        return UIGraphicsImageRenderer(size: size).image { ctx in
+            let colors = [
+                UIColor(red: 0.11, green: 0.09, blue: 0.18, alpha: 1).cgColor,
+                UIColor(red: 0.04, green: 0.03, blue: 0.08, alpha: 1).cgColor
+            ] as CFArray
+            if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1]) {
+                ctx.cgContext.drawLinearGradient(gradient, start: .zero, end: CGPoint(x: size.width, y: size.height), options: [])
+            }
+        }
+    }
+
     func capturePhoto(flash: Bool) {
-        #if targetEnvironment(simulator)
+        #if DEBUG && targetEnvironment(simulator)
         let fallback = UIReviewFixture.samplePreviewImage()
+        DispatchQueue.main.async { [weak self] in
+            self?.onCapturedImage?(fallback)
+        }
+        #elseif targetEnvironment(simulator)
+        let fallback = Self.simulatorPreviewFallbackImage()
         DispatchQueue.main.async { [weak self] in
             self?.onCapturedImage?(fallback)
         }
@@ -3323,10 +3373,26 @@ final class CameraCaptureController: NSObject, ObservableObject, AVCapturePhotoC
     }
 
     func toggleVideoRecording() {
-        #if targetEnvironment(simulator)
+        #if DEBUG && targetEnvironment(simulator)
         if isRecordingVideo {
             isRecordingVideo = false
             let sampleImg = UIReviewFixture.samplePreviewImage()
+            Task { @MainActor [weak self] in
+                do {
+                    let validURL = try await KinnectStillVideo.make(image: sampleImg, durationSeconds: 1.0)
+                    let videoBytes = (try? Data(contentsOf: validURL)) ?? Data()
+                    self?.onCapturedVideoData?(videoBytes, validURL)
+                } catch {
+                    AppState.shared.showToast("Không tạo được video mô phỏng: \(error.localizedDescription)")
+                }
+            }
+        } else {
+            isRecordingVideo = true
+        }
+        #elseif targetEnvironment(simulator)
+        if isRecordingVideo {
+            isRecordingVideo = false
+            let sampleImg = Self.simulatorPreviewFallbackImage()
             Task { @MainActor [weak self] in
                 do {
                     let validURL = try await KinnectStillVideo.make(image: sampleImg, durationSeconds: 1.0)
@@ -3486,8 +3552,15 @@ final class CameraPreviewViewController: UIViewController {
         backdropLayer.locations = [0.0, 0.55, 1.0]
         view.layer.addSublayer(backdropLayer)
 
-        #if targetEnvironment(simulator)
+        #if DEBUG && targetEnvironment(simulator)
         let sim = UIImageView(image: UIReviewFixture.samplePreviewImage())
+        sim.contentMode = .scaleAspectFill
+        sim.clipsToBounds = true
+        sim.frame = view.bounds
+        view.addSubview(sim)
+        simulatedImageView = sim
+        #elseif targetEnvironment(simulator)
+        let sim = UIImageView(image: CameraSessionController.simulatorPreviewFallbackImage())
         sim.contentMode = .scaleAspectFill
         sim.clipsToBounds = true
         sim.frame = view.bounds
@@ -3556,11 +3629,18 @@ final class CameraPreviewViewController: UIViewController {
             if previewLayer == nil {
                 attachHardwarePreview()
             }
-        } else if status == .notDetermined && !UIReviewFixture.isEnabled {
-            AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
-                guard granted else { return }
-                DispatchQueue.main.async {
-                    self?.attachHardwarePreview()
+        } else {
+            #if DEBUG
+            let isFixture = UIReviewFixture.isEnabled
+            #else
+            let isFixture = false
+            #endif
+            if status == .notDetermined && !isFixture {
+                AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+                    guard granted else { return }
+                    DispatchQueue.main.async {
+                        self?.attachHardwarePreview()
+                    }
                 }
             }
         }

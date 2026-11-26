@@ -698,7 +698,11 @@ struct PostCardView: View {
     ]
 
     @State private var isBouncing = false
+    #if DEBUG
     @State private var showReactionDock = ProcessInfo.processInfo.arguments.contains("--ui-review-reaction-dock")
+    #else
+    @State private var showReactionDock = false
+    #endif
     @State private var showReactorsSheet = false
     @State private var showShareSheet = false
 
@@ -774,7 +778,7 @@ struct PostCardView: View {
                         }
                         Button(role: .destructive, action: onReport) {
                             HStack {
-                                Text("Báo cáo / Chặn UGC")
+                                Text(L10n.tr("Báo cáo / Chặn"))
                                 KinnectIcon(glyph: .report, size: 18, tint: KinnectTheme.danger)
                             }
                         }
@@ -2690,6 +2694,22 @@ struct PostCommentsSheet: View {
                     Text(formatRelativeDate(c.createdAt))
                         .font(.caption2)
                         .foregroundColor(KinnectTheme.textSecondary)
+
+                    if c.author.id != (appState.currentUser?.id ?? "") {
+                        Button {
+                            appState.activeReportContext = UGCReportContext(
+                                targetType: "comment",
+                                targetId: c.id,
+                                targetUserId: c.author.id,
+                                targetTitle: "\(L10n.tr("Bình luận của")) \(c.author.name)"
+                            )
+                        } label: {
+                            Label(L10n.tr("Báo cáo"), systemImage: "flag")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundColor(KinnectTheme.danger)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
                 .padding(.top, 2)
                 .overlay(alignment: .topLeading) {
@@ -2769,10 +2789,12 @@ struct PostCommentsSheet: View {
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/posts/\(post.id)/comments") {
             let list = res["comments"] as? [[String: Any]] ?? []
             self.comments = list.map(CommentItem.from)
+            #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--ui-review-comment-reactions"),
                let firstId = self.comments.first?.id {
                 self.reactionPickerCommentId = firstId
             }
+            #endif
         }
     }
 

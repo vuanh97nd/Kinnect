@@ -15,10 +15,10 @@ struct StoreView: View {
 
     enum StoreCategoryFilter: String, CaseIterable {
         case style = "Phong cách"
-        case live = "Gói Live"
-        case studio = "Gói Studio"
-        case gifts = "Quà tặng"
-        case member = "Hội viên"
+        case studio = "Studio"
+        case live = "Live"
+        case gifts = "Quà"
+        case member = "Thành viên"
         case owned = "Của tôi"
     }
 
@@ -56,16 +56,18 @@ struct StoreView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    // Hero Shop Banner
-                    storeHeroBanner
-
                     // 6 Category Tabs
                     categoryFilterStrip
+
+                    // Hero Shop Banner (only on Style tab, matching Android StoreActivity)
+                    if storeFilter == .style {
+                        storeHeroBanner
+                    }
 
                     if isLoading {
                         HStack(spacing: 10) {
                             ProgressView()
-                            Text("Đang tải cửa hàng…")
+                            Text(L10n.tr("Đang tải cửa hàng…"))
                                 .font(.subheadline)
                                 .foregroundColor(KinnectTheme.textSecondary)
                         }
@@ -93,33 +95,38 @@ struct StoreView: View {
                             Text(loadError)
                                 .foregroundColor(KinnectTheme.danger)
                                 .font(.subheadline)
-                            Button("Thử lại") {
+                            Button {
                                 Task { await loadStoreData() }
+                            } label: {
+                                Text(L10n.tr("Thử lại"))
+                                    .font(.caption.bold())
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 8)
+                                    .background(Capsule().fill(KinnectTheme.primaryGradient))
+                                    .frame(minHeight: 44)
+                                    .contentShape(Rectangle())
                             }
-                            .font(.caption.bold())
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(Capsule().fill(KinnectTheme.primaryGradient))
+                            .buttonStyle(.plain)
                         }
                     }
 
                     if storeFilter != .owned {
                         if trialPackagePurchases {
-                            Picker("Nguồn xu", selection: $coinSource) {
-                                Text("Xu tặng").tag("gifted")
-                                Text("Xu mua").tag("purchased")
+                            Picker(L10n.tr("Nguồn xu"), selection: $coinSource) {
+                                Text(L10n.tr("Xu tặng")).tag("gifted")
+                                Text(L10n.tr("Xu mua")).tag("purchased")
                             }
                             .pickerStyle(.segmented)
                         } else {
                             HStack(spacing: 6) {
                                 Image(systemName: "bitcoinsign.circle.fill")
                                     .foregroundColor(KinnectTheme.warning)
-                                Text("Thanh toán bằng Xu mua")
+                                Text(L10n.tr("Thanh toán bằng Xu mua"))
                                     .font(.caption.weight(.semibold))
                                     .foregroundColor(KinnectTheme.textSecondary)
                                 Spacer()
-                                Text("\(purchasedCoinsBalance.formattedWithSeparator()) xu mua")
+                                Text("\(purchasedCoinsBalance.formattedWithSeparator()) \(L10n.tr("xu mua"))")
                                     .font(.caption.bold())
                                     .foregroundColor(KinnectTheme.accentBright)
                             }
@@ -144,6 +151,7 @@ struct StoreView: View {
                         .disabled(transactionInProgress)
                 }
                 .padding(.horizontal, 16)
+                .padding(.top, 12)
                 .padding(.bottom, 80)
             }
             .refreshable {
@@ -152,58 +160,58 @@ struct StoreView: View {
         }
         .background(KinnectTheme.background.ignoresSafeArea())
         .navigationBarHidden(true)
-        .confirmationDialog("Cửa hàng Kinnect", isPresented: $showStoreMenuDialog, titleVisibility: .visible) {
-            Button("Khôi phục giao dịch") {
+        .confirmationDialog(L10n.tr("Cửa hàng Kinnect"), isPresented: $showStoreMenuDialog, titleVisibility: .visible) {
+            Button(L10n.tr("Khôi phục giao dịch")) {
                 Task {
                     do {
                         let outcome = try await storeKit.restorePurchases()
                         appState.showToast(outcome.failed.isEmpty
-                            ? "Đã kiểm tra và khôi phục các giao dịch hợp lệ."
-                            : "Một số giao dịch chưa xác minh được. Hãy thử lại.")
+                            ? L10n.tr("Đã kiểm tra và khôi phục các giao dịch hợp lệ.")
+                            : L10n.tr("Một số giao dịch chưa xác minh được. Hãy thử lại."))
                         await loadStoreData()
                     } catch {
-                        appState.showToast("Chưa khôi phục được: \(error.localizedDescription)")
+                        appState.showToast("\(L10n.tr("Chưa khôi phục được:")) \(error.localizedDescription)")
                     }
                 }
             }
-            Button("Phong cách mặc định") {
+            Button(L10n.tr("Phong cách mặc định")) {
                 Task {
                     do {
                         _ = try await KinnectAPIClient.shared.requestJSON("/api/store/style", method: "POST", body: ["productId": ""])
-                        appState.showToast("Đã chuyển về phong cách mặc định")
+                        appState.showToast(L10n.tr("Đã chuyển về phong cách mặc định"))
                         await loadStoreData()
                     } catch {
-                        appState.showToast("Chưa đổi được phong cách: \(error.localizedDescription)")
+                        appState.showToast("\(L10n.tr("Chưa đổi được phong cách:")) \(error.localizedDescription)")
                     }
                 }
             }
-            Button("Thông tin cửa hàng") {
+            Button(L10n.tr("Thông tin cửa hàng")) {
                 showStoreInfoAlert = true
             }
-            Button("Đóng", role: .cancel) { }
+            Button(L10n.tr("Đóng"), role: .cancel) { }
         }
-        .alert("Cửa hàng Kinnect", isPresented: $showStoreInfoAlert) {
-            Button("Đóng", role: .cancel) { }
+        .alert(L10n.tr("Cửa hàng Kinnect"), isPresented: $showStoreInfoAlert) {
+            Button(L10n.tr("Đóng"), role: .cancel) { }
         } message: {
-            Text("Quyền lợi gắn với tài khoản Kinnect. Xem thử không thay đổi hồ sơ của bạn. Giá hiển thị quy đổi theo xu hoặc App Store.")
+            Text(L10n.tr("Quyền lợi gắn với tài khoản Kinnect. Xem thử không thay đổi hồ sơ của bạn. Giá hiển thị quy đổi theo xu hoặc App Store."))
         }
         .alert(
-            "Xác nhận đổi gói?",
+            L10n.tr("Xác nhận đổi gói?"),
             isPresented: Binding(
                 get: { confirmBuyPackage != nil },
                 set: { if !$0 { confirmBuyPackage = nil } }
             ),
             presenting: confirmBuyPackage
         ) { pkg in
-            Button("Hủy", role: .cancel) { confirmBuyPackage = nil }
-            Button("Đổi ngay (\(pkg.priceCoins) xu)") {
+            Button(L10n.tr("Hủy"), role: .cancel) { confirmBuyPackage = nil }
+            Button("\(L10n.tr("Đổi ngay")) (\(pkg.priceCoins.formattedWithSeparator()) \(L10n.tr("xu")))") {
                 confirmBuyPackage = nil
                 Task { await buyPackage(pkg) }
             }
         } message: { pkg in
             let effectiveSource = trialPackagePurchases ? coinSource : "purchased"
-            let sourceLabel = effectiveSource == "purchased" ? "Xu mua" : "Xu tặng"
-            Text("Gói: \(pkg.title)\nChi phí: \(pkg.priceCoins.formattedWithSeparator()) xu (\(sourceLabel)).")
+            let sourceLabel = effectiveSource == "purchased" ? L10n.tr("Xu mua") : L10n.tr("Xu tặng")
+            Text("\(L10n.tr("Gói:")) \(pkg.title)\n\(L10n.tr("Chi phí:")) \(pkg.priceCoins.formattedWithSeparator()) \(L10n.tr("xu")) (\(sourceLabel)).")
         }
         .fullScreenCover(item: $studioPackage) { pkg in
             CameraStudioView(initialMode: pkg.id.hasPrefix("studio_video_") ? .video : .photo,
@@ -237,11 +245,11 @@ struct StoreView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Quay lại")
+            .accessibilityLabel(L10n.tr("Quay lại"))
 
             HStack(spacing: 8) {
                 KinnectIcon(glyph: .store, size: 20, selected: true, tint: KinnectTheme.accentBright)
-                Text("Cửa hàng")
+                Text(L10n.tr("Cửa hàng"))
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(KinnectTheme.textPrimary)
             }
@@ -261,9 +269,11 @@ struct StoreView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Xem ví Kinnect")
+            .accessibilityLabel(L10n.tr("Xem ví Kinnect"))
 
             // Store Menu Button
             Button {
@@ -274,9 +284,11 @@ struct StoreView: View {
                     .foregroundColor(KinnectTheme.textPrimary)
                     .frame(width: 38, height: 38)
                     .background(Circle().fill(KinnectTheme.surfaceElevated))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Tùy chọn cửa hàng")
+            .accessibilityLabel(L10n.tr("Tùy chọn cửa hàng"))
         }
         .padding(.horizontal, 12)
         .frame(height: 52)
@@ -299,7 +311,7 @@ struct StoreView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "sparkles")
                         .font(.caption2)
-                    Text("Xem thử miễn phí")
+                    Text(L10n.tr("Xem thử miễn phí"))
                         .font(.caption2.bold())
                 }
                 .foregroundColor(.white)
@@ -308,7 +320,7 @@ struct StoreView: View {
                 .background(Capsule().fill(Color.white.opacity(0.18)))
             }
 
-            Text("Thêm sắc màu.\nThêm chất riêng.")
+            Text(L10n.tr("Thêm sắc màu.\nThêm chất riêng."))
                 .font(.system(size: 22, weight: .bold))
                 .foregroundColor(.white)
                 .lineSpacing(4)
@@ -337,7 +349,7 @@ struct StoreView: View {
                     } label: {
                         HStack(spacing: 6) {
                             categoryIcon(for: cat, isSelected: isSelected)
-                            Text(cat.rawValue)
+                            Text(L10n.tr(cat.rawValue))
                                 .font(.caption.bold())
                                 .lineLimit(1)
                                 .fixedSize(horizontal: true, vertical: false)
@@ -348,6 +360,8 @@ struct StoreView: View {
                         .background(
                             Capsule().fill(isSelected ? KinnectTheme.accentBright : KinnectTheme.surfaceElevated)
                         )
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
@@ -360,7 +374,7 @@ struct StoreView: View {
     private func interactivePreviewBanner(_ preview: StorePackageItem) -> some View {
         VStack(spacing: 12) {
             HStack {
-                Text("Xem thử · \(preview.title)")
+                Text("\(L10n.tr("Xem thử")) · \(preview.title)")
                     .font(.subheadline.bold())
                     .foregroundColor(.white)
                 Spacer()
@@ -370,7 +384,10 @@ struct StoreView: View {
                     Image(systemName: "xmark.circle.fill")
                         .font(.title3)
                         .foregroundColor(.white.opacity(0.7))
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
             }
 
             ZStack {
@@ -404,7 +421,7 @@ struct StoreView: View {
             }
             .shadow(color: Color(hex: preview.accentColor).opacity(0.6), radius: 10)
 
-            Text("Xin chào! Đây là bản xem thử.")
+            Text(L10n.tr("Xin chào! Đây là bản xem thử."))
                 .font(.subheadline.weight(.medium))
                 .foregroundColor(.white)
                 .padding(.horizontal, 20)
@@ -420,7 +437,7 @@ struct StoreView: View {
                         )
                 )
 
-            Text("Xem thử không thay đổi hồ sơ thực tế của bạn.")
+            Text(L10n.tr("Xem thử không thay đổi hồ sơ thực tế của bạn."))
                 .font(.caption2)
                 .foregroundColor(.white.opacity(0.8))
         }
@@ -455,7 +472,7 @@ struct StoreView: View {
     private func interactiveDigitalPreviewBanner(_ prod: StoreDigitalProduct) -> some View {
         VStack(spacing: 12) {
             HStack {
-                Text("Xem thử · \(prod.title)")
+                Text("\(L10n.tr("Xem thử")) · \(prod.title)")
                     .font(.subheadline.bold())
                     .foregroundColor(.white)
                 Spacer()
@@ -465,7 +482,10 @@ struct StoreView: View {
                     Image(systemName: "xmark.circle.fill")
                         .font(.title3)
                         .foregroundColor(.white.opacity(0.7))
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
             }
 
             ZStack {
@@ -484,12 +504,12 @@ struct StoreView: View {
             }
             .shadow(color: Color(hex: prod.accentColor).opacity(0.6), radius: 10)
 
-            Text(prod.description.isEmpty ? "Mở khóa vĩnh viễn trên tài khoản Kinnect qua Apple ID." : prod.description)
+            Text(prod.description.isEmpty ? L10n.tr("Mở khóa vĩnh viễn trên tài khoản Kinnect qua Apple ID.") : prod.description)
                 .font(.caption)
                 .foregroundColor(.white.opacity(0.92))
                 .multilineTextAlignment(.center)
 
-            Text("Xem thử không thay đổi hồ sơ thực tế của bạn.")
+            Text(L10n.tr("Xem thử không thay đổi hồ sơ thực tế của bạn."))
                 .font(.caption2)
                 .foregroundColor(.white.opacity(0.75))
         }
@@ -511,7 +531,7 @@ struct StoreView: View {
                     Image(systemName: "apple.logo")
                         .font(.caption.bold())
                         .foregroundColor(KinnectTheme.accentBright)
-                    Text("Mở khóa qua App Store")
+                    Text(L10n.tr("Mở khóa qua App Store"))
                         .font(.subheadline.bold())
                         .foregroundColor(KinnectTheme.textPrimary)
                 }
@@ -522,23 +542,25 @@ struct StoreView: View {
                             let outcome = try await storeKit.restorePurchases()
                             await loadStoreData()
                             appState.showToast(outcome.failed.isEmpty
-                                ? "Đã kiểm tra và khôi phục các giao dịch hợp lệ."
-                                : "Một số giao dịch chưa xác minh được. Hãy thử lại.")
+                                ? L10n.tr("Đã kiểm tra và khôi phục các giao dịch hợp lệ.")
+                                : L10n.tr("Một số giao dịch chưa xác minh được. Hãy thử lại."))
                         } catch {
-                            appState.showToast("Chưa khôi phục được: \(error.localizedDescription)")
+                            appState.showToast("\(L10n.tr("Chưa khôi phục được:")) \(error.localizedDescription)")
                         }
                     }
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.clockwise")
                             .font(.caption2.bold())
-                        Text("Khôi phục")
+                        Text(L10n.tr("Khôi phục"))
                             .font(.caption.bold())
                     }
                     .foregroundColor(KinnectTheme.accentBright)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
@@ -574,14 +596,14 @@ struct StoreView: View {
                             .font(.subheadline.bold())
                             .foregroundColor(KinnectTheme.textPrimary)
                         if prod.equipped {
-                            Text("Đang dùng")
+                            Text(L10n.tr("Đang dùng"))
                                 .font(.system(size: 10, weight: .bold))
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 2)
                                 .background(Capsule().fill(KinnectTheme.online))
                         } else if prod.owned {
-                            Text("Đã sở hữu")
+                            Text(L10n.tr("Đã sở hữu"))
                                 .font(.system(size: 10, weight: .bold))
                                 .foregroundColor(KinnectTheme.online)
                                 .padding(.horizontal, 7)
@@ -611,6 +633,8 @@ struct StoreView: View {
                             .padding(.horizontal, 12)
                             .padding(.vertical, 7)
                             .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
@@ -622,19 +646,21 @@ struct StoreView: View {
                         Button {
                             showStudioProCamera = true
                         } label: {
-                            Text("Mở Studio Pro")
+                            Text(L10n.tr("Mở Studio Pro"))
                                 .font(.caption.bold())
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 7)
                                 .background(Capsule().fill(KinnectTheme.primaryGradient))
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     } else {
                         Button {
                             Task { await toggleDigitalStyle(prod) }
                         } label: {
-                            Text(prod.equipped ? "Gỡ trang trí" : "Dùng")
+                            Text(prod.equipped ? L10n.tr("Gỡ trang trí") : L10n.tr("Dùng"))
                                 .font(.caption.bold())
                                 .foregroundColor(prod.equipped ? KinnectTheme.textPrimary : .white)
                                 .padding(.horizontal, 14)
@@ -644,6 +670,8 @@ struct StoreView: View {
                                         prod.equipped ? KinnectTheme.surfaceElevated : KinnectTheme.online
                                     )
                                 )
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     }
@@ -652,7 +680,7 @@ struct StoreView: View {
                     Button {
                         Task { await buyDigitalProduct(prod) }
                     } label: {
-                        Text(canBuyApple ? "Mua · \(skProduct!.displayPrice)" : "Chưa mở App Store")
+                        Text(canBuyApple ? "\(L10n.tr("Mua")) · \(skProduct!.displayPrice)" : L10n.tr("Chưa mở App Store"))
                             .font(.caption.bold())
                             .foregroundColor(canBuyApple ? .white : KinnectTheme.textSecondary)
                             .padding(.horizontal, 14)
@@ -660,6 +688,8 @@ struct StoreView: View {
                             .background(
                                 Capsule().fill(canBuyApple ? AnyShapeStyle(KinnectTheme.primaryGradient) : AnyShapeStyle(KinnectTheme.surfaceElevated))
                             )
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .disabled(!canBuyApple || storeKit.isPurchasing)
@@ -689,17 +719,17 @@ struct StoreView: View {
             }
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    Text("Trò chuyện · Miễn phí")
+                    Text(L10n.tr("Trò chuyện · Miễn phí"))
                         .font(.subheadline.bold())
                         .foregroundColor(KinnectTheme.textPrimary)
-                    Text("MIỄN PHÍ")
+                    Text(L10n.tr("MIỄN PHÍ"))
                         .font(.system(size: 9, weight: .black))
                         .foregroundColor(.white)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(Capsule().fill(KinnectTheme.online))
                 }
-                Text("Phát trực tiếp trò chuyện với bạn bè, bộ lọc làm đẹp và nhận quà tặng hoàn toàn miễn phí.")
+                Text(L10n.tr("Phát trực tiếp trò chuyện với bạn bè, bộ lọc làm đẹp và nhận quà tặng hoàn toàn miễn phí."))
                     .font(.caption)
                     .foregroundColor(KinnectTheme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -721,17 +751,17 @@ struct StoreView: View {
     private var ownedGiftInventorySection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Kho quà Live")
+                Text(L10n.tr("Kho quà Live"))
                     .font(.subheadline.bold())
                     .foregroundColor(KinnectTheme.textPrimary)
                 Spacer()
-                Text("\(giftInventory.map(\.quantity).reduce(0, +)) món quà")
+                Text("\(giftInventory.map(\.quantity).reduce(0, +)) \(L10n.tr("món quà"))")
                     .font(.caption.bold())
                     .foregroundColor(KinnectTheme.accentBright)
             }
 
             if giftInventory.isEmpty {
-                Text("Chưa có quà dự trữ trong kho.")
+                Text(L10n.tr("Chưa có quà dự trữ trong kho."))
                     .font(.caption)
                     .foregroundColor(KinnectTheme.textSecondary)
             } else {
@@ -789,7 +819,7 @@ struct StoreView: View {
             if list.isEmpty {
                 VStack(spacing: 8) {
                     KinnectIcon(glyph: .store, size: 36, tint: KinnectTheme.textSecondary)
-                    Text("Chưa có gói trong mục này")
+                    Text(L10n.tr("Chưa có gói trong mục này"))
                         .font(.subheadline)
                         .foregroundColor(KinnectTheme.textSecondary)
                 }
@@ -884,7 +914,7 @@ struct StoreView: View {
                 // Top badges
                 HStack {
                     if pkg.equipped {
-                        Text("Đang dùng")
+                        Text(L10n.tr("Đang dùng"))
                             .font(.system(size: 8, weight: .bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 6)
@@ -922,7 +952,7 @@ struct StoreView: View {
 
                 HStack(spacing: 3) {
                     KinnectIcon(glyph: .coin, size: 12, selected: true, tint: KinnectTheme.warning)
-                    Text("\(pkg.priceCoins) xu")
+                    Text("\(pkg.priceCoins.formattedWithSeparator()) \(L10n.tr("xu"))")
                         .font(.caption.bold())
                         .foregroundColor(KinnectTheme.warning)
                     if pkg.owned, let expMs = pkg.expiresAt {
@@ -931,7 +961,7 @@ struct StoreView: View {
                         if remMs > 0 {
                             let days = max(1, Int(ceil(Double(remMs) / 86_400_000.0)))
                             Spacer(minLength: 4)
-                            Text("Còn \(days) ngày")
+                            Text("\(L10n.tr("Còn")) \(days) \(L10n.tr("ngày"))")
                                 .font(.system(size: 10, weight: .semibold))
                                 .foregroundColor(KinnectTheme.online)
                                 .lineLimit(1)
@@ -945,12 +975,14 @@ struct StoreView: View {
                             previewPackage = pkg
                         }
                     } label: {
-                        Text("Xem thử")
+                        Text(L10n.tr("Xem thử"))
                             .font(.system(size: 11, weight: .bold))
                             .foregroundColor(KinnectTheme.accentBright)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 5)
+                            .padding(.vertical, 6)
                             .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
 
@@ -962,8 +994,10 @@ struct StoreView: View {
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(pkg.equipped ? KinnectTheme.textPrimary : .white)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 5)
+                                .padding(.vertical, 6)
                                 .background(Capsule().fill(pkg.equipped ? KinnectTheme.surfaceElevated : KinnectTheme.online))
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
 
@@ -971,11 +1005,11 @@ struct StoreView: View {
                             Button {
                                 requestPurchaseConfirmation(for: pkg)
                             } label: {
-                                Text(pkg.kind == "studio" ? "Gia hạn" : "Mua thêm")
+                                Text(pkg.kind == "studio" ? L10n.tr("Gia hạn") : L10n.tr("Mua thêm"))
                                     .font(.system(size: 11, weight: .bold))
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 5)
+                                    .padding(.vertical, 6)
                                     .background(
                                         Capsule().fill(
                                             LinearGradient(
@@ -985,6 +1019,8 @@ struct StoreView: View {
                                             )
                                         )
                                     )
+                                    .frame(minHeight: 44)
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                         }
@@ -995,11 +1031,11 @@ struct StoreView: View {
                         Button {
                             requestPurchaseConfirmation(for: pkg)
                         } label: {
-                            Text(isAlternateMembershipBlocked ? "Đang có gói" : "Đổi")
+                            Text(isAlternateMembershipBlocked ? L10n.tr("Đang có gói") : L10n.tr("Đổi"))
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(isAlternateMembershipBlocked ? KinnectTheme.textSecondary : .white)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 5)
+                                .padding(.vertical, 6)
                                 .background(
                                     Capsule().fill(
                                         isAlternateMembershipBlocked
@@ -1013,6 +1049,8 @@ struct StoreView: View {
                                             )
                                     )
                                 )
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .disabled(isAlternateMembershipBlocked)
@@ -1072,12 +1110,12 @@ struct StoreView: View {
 
     private func ownedActionTitle(_ pkg: StorePackageItem) -> String {
         switch pkg.category {
-        case "studio": return "Mở Studio"
-        case "gift", "gifts": return "Xem kho quà"
-        case "member", "membership": return "Đang sử dụng"
+        case "studio": return L10n.tr("Mở Studio")
+        case "gift", "gifts": return L10n.tr("Xem kho quà")
+        case "member", "membership": return L10n.tr("Đang sử dụng")
         default:
-            if pkg.id == "live_game_30" { return "Quyền Live Game" }
-            return pkg.equipped ? "Gỡ trang bị" : "Áp dụng"
+            if pkg.id == "live_game_30" { return L10n.tr("Quyền Live Game") }
+            return pkg.equipped ? L10n.tr("Gỡ trang bị") : L10n.tr("Áp dụng")
         }
     }
 
@@ -1153,8 +1191,8 @@ struct StoreView: View {
         let effectiveSource = trialPackagePurchases ? coinSource : "purchased"
         let availableBalance = effectiveSource == "purchased" ? purchasedCoinsBalance : giftedCoinsBalance
         if pkg.priceCoins > availableBalance {
-            let sourceName = effectiveSource == "purchased" ? "xu mua" : "xu tặng"
-            appState.showToast("Chưa đủ \(sourceName). Cần \(pkg.priceCoins.formattedWithSeparator()) xu (hiện có \(availableBalance.formattedWithSeparator()) xu).")
+            let sourceName = effectiveSource == "purchased" ? L10n.tr("xu mua") : L10n.tr("xu tặng")
+            appState.showToast("\(L10n.tr("Chưa đủ")) \(sourceName). \(L10n.tr("Cần")) \(pkg.priceCoins.formattedWithSeparator()) \(L10n.tr("xu")) (\(L10n.tr("hiện có")) \(availableBalance.formattedWithSeparator()) \(L10n.tr("xu"))).")
             return
         }
         confirmBuyPackage = pkg
@@ -1173,7 +1211,7 @@ struct StoreView: View {
             await storeKit.loadProducts(productIds: digitalProducts.map(\.id).filter { !$0.isEmpty })
         } catch {
             if packages.isEmpty && digitalProducts.isEmpty {
-                loadError = "Chưa tải được cửa hàng: \(error.localizedDescription)"
+                loadError = "\(L10n.tr("Chưa tải được cửa hàng:")) \(error.localizedDescription)"
             }
         }
     }
@@ -1197,7 +1235,7 @@ struct StoreView: View {
                     }
                 }
             }
-            appState.showToast("Đã mở khóa \(prod.title) trên tài khoản của bạn!")
+            appState.showToast("\(L10n.tr("Đã mở khóa")) \(prod.title)!")
             await loadStoreData()
         } catch {
             appState.showToast(error.localizedDescription)
@@ -1218,12 +1256,12 @@ struct StoreView: View {
             )
             let applied = (res["appearance"] as? String) ?? ""
             guard applied == targetId else {
-                throw KinnectAPIError.serverMessage("Máy chủ chưa xác nhận trang trí.")
+                throw KinnectAPIError.serverMessage(L10n.tr("Máy chủ chưa xác nhận trang trí."))
             }
-            appState.showToast(targetId.isEmpty ? "Đã gỡ trang trí." : "Đã áp dụng \(prod.title)!")
+            appState.showToast(targetId.isEmpty ? L10n.tr("Đã gỡ trang trí.") : "\(L10n.tr("Đã áp dụng")) \(prod.title)!")
             await loadStoreData()
         } catch {
-            appState.showToast("Chưa đổi được phong cách: \(error.localizedDescription)")
+            appState.showToast("\(L10n.tr("Chưa đổi được phong cách:")) \(error.localizedDescription)")
         }
     }
 
@@ -1251,15 +1289,15 @@ struct StoreView: View {
                 UserDefaults.standard.removeObject(forKey: key)
             }
             guard isGiftPack || isDuplicate || ownedList.contains(pkg.id) else {
-                throw KinnectAPIError.serverMessage("Máy chủ chưa xác nhận quyền sử dụng gói.")
+                throw KinnectAPIError.serverMessage(L10n.tr("Máy chủ chưa xác nhận quyền sử dụng gói."))
             }
             UserDefaults.standard.removeObject(forKey: key)
             applyStoreState(res)
-            appState.showToast(isDuplicate ? "Giao dịch đã được ghi nhận trước đó cho \(pkg.title)." : "Đã sở hữu \(pkg.title)!")
+            appState.showToast(isDuplicate ? "\(L10n.tr("Giao dịch đã được ghi nhận trước đó cho")) \(pkg.title)." : "\(L10n.tr("Đã sở hữu")) \(pkg.title)!")
             await loadStoreData()
             await appState.refreshGlobalBadges()
         } catch {
-            appState.showToast("Giao dịch chưa hoàn tất: \(error.localizedDescription)")
+            appState.showToast("\(L10n.tr("Giao dịch chưa hoàn tất:")) \(error.localizedDescription)")
         }
     }
 
@@ -1271,10 +1309,10 @@ struct StoreView: View {
         case "gift", "gifts":
             onOpenWallet?()
         case "member", "membership":
-            appState.showToast("Huy hiệu thành viên được áp dụng tự động trong thời hạn gói.")
+            appState.showToast(L10n.tr("Huy hiệu thành viên được áp dụng tự động trong thời hạn gói."))
         default:
             if pkg.id == "live_game_30" {
-                appState.showToast("Gói đã được ghi nhận. Phát màn hình game trên iOS đang được hoàn thiện.")
+                appState.showToast(L10n.tr("Gói đã được ghi nhận. Phát màn hình game trên iOS đang được hoàn thiện."))
             } else {
                 await equipPackage(pkg)
             }
@@ -1294,12 +1332,12 @@ struct StoreView: View {
                 endpoint, method: "POST", body: KinnectWriteBody.packageApply(productId: productId))
             let applied = res[style ? "appearance" : "liveTheme"] as? String
             guard applied == productId else {
-                throw KinnectAPIError.serverMessage("Máy chủ chưa xác nhận trang trí.")
+                throw KinnectAPIError.serverMessage(L10n.tr("Máy chủ chưa xác nhận trang trí."))
             }
-            appState.showToast(productId.isEmpty ? "Đã gỡ trang bị." : "Đã kích hoạt \(pkg.title)!")
+            appState.showToast(productId.isEmpty ? L10n.tr("Đã gỡ trang bị.") : "\(L10n.tr("Đã kích hoạt")) \(pkg.title)!")
             await loadStoreData()
         } catch {
-            appState.showToast("Chưa kích hoạt được: \(error.localizedDescription)")
+            appState.showToast("\(L10n.tr("Chưa kích hoạt được:")) \(error.localizedDescription)")
         }
     }
 }

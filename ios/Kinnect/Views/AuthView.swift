@@ -168,6 +168,7 @@ struct AuthView: View {
             }
         }
         .onAppear {
+            #if DEBUG
             if let screen = UIReviewFixture.activeScreen {
                 loc.setLanguage(screen.hasSuffix("-en") ? .en : .vi)
                 if let option = CommandLine.arguments.firstIndex(of: "--ui-review-welcome-tab"),
@@ -238,6 +239,7 @@ struct AuthView: View {
                     stage = .forgotPassword
                 }
             }
+            #endif
         }
         .task {
             await loadRememberedAccounts()
@@ -371,9 +373,15 @@ struct AuthView: View {
 
         }
         .task(id: reduceWelcomeMotion) {
+            #if DEBUG
             let forceAutocycle = CommandLine.arguments.contains("--ui-review-welcome-autocycle")
+            let fixtureEnabled = UIReviewFixture.isEnabled
+            #else
+            let forceAutocycle = false
+            let fixtureEnabled = false
+            #endif
             // Respect Reduce Motion unless UI review explicitly opts into autocycle.
-            guard (!UIReviewFixture.isEnabled && !reduceWelcomeMotion) || forceAutocycle else { return }
+            guard (!fixtureEnabled && !reduceWelcomeMotion) || forceAutocycle else { return }
             while !Task.isCancelled {
                 do { try await Task.sleep(nanoseconds: 1_500_000_000) }
                 catch { return }
@@ -554,7 +562,7 @@ struct AuthView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .overlay(alignment: .bottomLeading) {
-                    Text("@minhanh_demo")
+                    Text("@minhanh")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundColor(.white)
                         .padding(8)
@@ -1852,9 +1860,13 @@ struct AuthView: View {
                 await hydrateAuthenticatedMe(fallbackUserDict: userDict, rememberMe: rememberLogin)
             }
         } catch {
+            #if DEBUG
             if UIReviewFixture.isEnabled {
                 appState.applyAuthenticatedUser(KinnectUser.from(UIReviewFixture.currentUserDict), rawDict: UIReviewFixture.currentUserDict, rememberMe: rememberLogin)
-            } else if case KinnectAPIError.requiresAgree18 = error {
+                return
+            }
+            #endif
+            if case KinnectAPIError.requiresAgree18 = error {
                 errorMessage = nil
                 pendingAppleConsent = PendingAppleConsent(
                     appleId: appleId,
@@ -1904,7 +1916,9 @@ struct AuthView: View {
     }
 
     private func loadRememberedAccounts() async {
+        #if DEBUG
         guard !UIReviewFixture.isEnabled else { return }
+        #endif
         guard let res = try? await KinnectAPIClient.shared.requestJSON("/api/remembered"),
               let list = res["accounts"] as? [[String: Any]] else {
             return
@@ -2117,14 +2131,16 @@ struct AuthView: View {
                 await appState.refreshBlockedUsers()
             }
         } catch {
+            #if DEBUG
             if UIReviewFixture.isEnabled {
                 appState.applyAuthenticatedUser(KinnectUser.from(UIReviewFixture.currentUserDict), rawDict: UIReviewFixture.currentUserDict, rememberMe: true)
-            } else {
-                if error.localizedDescription.localizedCaseInsensitiveContains("2 lớp") {
-                    needs2FA = true
-                }
-                errorMessage = error.localizedDescription
+                return
             }
+            #endif
+            if error.localizedDescription.localizedCaseInsensitiveContains("2 lớp") {
+                needs2FA = true
+            }
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -2183,11 +2199,13 @@ struct AuthView: View {
                 await appState.refreshBlockedUsers()
             }
         } catch {
+            #if DEBUG
             if UIReviewFixture.isEnabled {
                 appState.applyAuthenticatedUser(KinnectUser.from(UIReviewFixture.currentUserDict), rawDict: UIReviewFixture.currentUserDict, rememberMe: true)
-            } else {
-                errorMessage = error.localizedDescription
+                return
             }
+            #endif
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -2216,12 +2234,14 @@ struct AuthView: View {
                 infoMessage = (res["message"] as? String) ?? "Tài khoản chưa có email khôi phục đã xác minh. Bạn có thể gửi yêu cầu hỗ trợ quản trị viên."
             }
         } catch {
+            #if DEBUG
             if UIReviewFixture.isEnabled {
-                infoMessage = loc.currentLanguage == .en ? "Demo verification code dispatched." : "Đã gửi mã minh họa thành công."
-            } else {
-                showForgotFallbackButton = true
-                errorMessage = error.localizedDescription
+                infoMessage = loc.currentLanguage == .en ? "Verification code dispatched." : "Đã gửi mã xác nhận thành công."
+                return
             }
+            #endif
+            showForgotFallbackButton = true
+            errorMessage = error.localizedDescription
         }
     }
 

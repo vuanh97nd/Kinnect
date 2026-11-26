@@ -43,6 +43,7 @@ final class LocalizationManager: ObservableObject {
     @Published var currentLanguage: AppLanguage
 
     private init() {
+        #if DEBUG
         if UIReviewFixture.isEnabled {
             let english = UIReviewFixture.activeScreen?.hasSuffix("-en") == true
             self.preference = english ? .en : .vi
@@ -55,6 +56,16 @@ final class LocalizationManager: ObservableObject {
             self.preference = .system
             self.currentLanguage = Self.resolved(.system)
         }
+        #else
+        if let saved = UserDefaults.standard.string(forKey: userDefaultsKey) {
+            let preference = AppLanguagePreference(rawValue: saved) ?? .system
+            self.preference = preference
+            self.currentLanguage = Self.resolved(preference)
+        } else {
+            self.preference = .system
+            self.currentLanguage = Self.resolved(.system)
+        }
+        #endif
     }
 
     func setLanguage(_ lang: AppLanguage) {
@@ -708,11 +719,7 @@ final class LocalizationManager: ObservableObject {
             .en: "Top Up Kinnect Coins"
         ],
 
-        // UGC Report Sheet
-        "An toàn trẻ em · CSAE/CSAM": [
-            .vi: "An toàn trẻ em · CSAE/CSAM",
-            .en: "Child Safety · CSAE/CSAM"
-        ],
+        // Content Report Sheet
         "Không đính kèm ảnh hoặc video vi phạm an toàn trẻ em. Báo cáo của bạn sẽ được ưu tiên xử lý khẩn cấp và chuyển cơ quan chức năng khi cần.": [
             .vi: "Không đính kèm ảnh hoặc video vi phạm an toàn trẻ em. Báo cáo của bạn sẽ được ưu tiên xử lý khẩn cấp và chuyển cơ quan chức năng khi cần.",
             .en: "Do not attach images or videos depicting child exploitation. Your report is prioritized for urgent review and escalated to authorities as required."
@@ -761,9 +768,13 @@ final class LocalizationManager: ObservableObject {
             .vi: "Gửi báo cáo",
             .en: "Submit Report"
         ],
-        "Báo cáo UGC": [
-            .vi: "Báo cáo UGC",
+        "Báo cáo nội dung": [
+            .vi: "Báo cáo nội dung",
             .en: "Report Content"
+        ],
+        "Báo cáo / Chặn": [
+            .vi: "Báo cáo / Chặn",
+            .en: "Report / Block"
         ],
         "Đã gửi báo cáo và chặn người dùng.": [
             .vi: "Đã gửi báo cáo và chặn người dùng.",
@@ -3734,6 +3745,410 @@ final class LocalizationManager: ObservableObject {
         "Ảnh": [
             .vi: "Ảnh",
             .en: "Photo"
+        ],
+        "Đang tải cửa hàng…": [
+            .vi: "Đang tải cửa hàng…",
+            .en: "Loading store…"
+        ],
+        "Nguồn xu": [
+            .vi: "Nguồn xu",
+            .en: "Coin balance"
+        ],
+        "Xu tặng": [
+            .vi: "Xu tặng",
+            .en: "Gift coins"
+        ],
+        "Xu mua": [
+            .vi: "Xu mua",
+            .en: "Purchased coins"
+        ],
+        "Thanh toán bằng Xu mua": [
+            .vi: "Thanh toán bằng Xu mua",
+            .en: "Pay with Purchased coins"
+        ],
+        "xu mua": [
+            .vi: "xu mua",
+            .en: "purchased coins"
+        ],
+        "Khôi phục giao dịch": [
+            .vi: "Khôi phục giao dịch",
+            .en: "Restore purchases"
+        ],
+        "Đã kiểm tra và khôi phục các giao dịch hợp lệ.": [
+            .vi: "Đã kiểm tra và khôi phục các giao dịch hợp lệ.",
+            .en: "Checked and restored valid purchases."
+        ],
+        "Một số giao dịch chưa xác minh được. Hãy thử lại.": [
+            .vi: "Một số giao dịch chưa xác minh được. Hãy thử lại.",
+            .en: "Some purchases could not be verified. Please try again."
+        ],
+        "Chưa khôi phục được:": [
+            .vi: "Chưa khôi phục được:",
+            .en: "Could not restore:"
+        ],
+        "Phong cách mặc định": [
+            .vi: "Phong cách mặc định",
+            .en: "Default style"
+        ],
+        "Đã chuyển về phong cách mặc định": [
+            .vi: "Đã chuyển về phong cách mặc định",
+            .en: "Switched back to default style"
+        ],
+        "Chưa đổi được phong cách:": [
+            .vi: "Chưa đổi được phong cách:",
+            .en: "Could not change style:"
+        ],
+        "Thông tin cửa hàng": [
+            .vi: "Thông tin cửa hàng",
+            .en: "Store information"
+        ],
+        "Quyền lợi gắn với tài khoản Kinnect. Xem thử không thay đổi hồ sơ của bạn. Giá hiển thị quy đổi theo xu hoặc App Store.": [
+            .vi: "Quyền lợi gắn với tài khoản Kinnect. Xem thử không thay đổi hồ sơ của bạn. Giá hiển thị quy đổi theo xu hoặc App Store.",
+            .en: "Benefits are linked to your Kinnect account. Previewing does not modify your profile. Prices are shown in coins or App Store currency."
+        ],
+        "Xác nhận đổi gói?": [
+            .vi: "Xác nhận đổi gói?",
+            .en: "Confirm package exchange?"
+        ],
+        "Đổi ngay": [
+            .vi: "Đổi ngay",
+            .en: "Exchange now"
+        ],
+        "Gói:": [
+            .vi: "Gói:",
+            .en: "Package:"
+        ],
+        "Chi phí:": [
+            .vi: "Chi phí:",
+            .en: "Cost:"
+        ],
+        "Xem ví Kinnect": [
+            .vi: "Xem ví Kinnect",
+            .en: "View Kinnect Wallet"
+        ],
+        "Tùy chọn cửa hàng": [
+            .vi: "Tùy chọn cửa hàng",
+            .en: "Store options"
+        ],
+        "Xem thử miễn phí": [
+            .vi: "Xem thử miễn phí",
+            .en: "Free preview"
+        ],
+        "Thêm sắc màu.\nThêm chất riêng.": [
+            .vi: "Thêm sắc màu.\nThêm chất riêng.",
+            .en: "Add color.\nAdd your style."
+        ],
+        "Xin chào! Đây là bản xem thử.": [
+            .vi: "Xin chào! Đây là bản xem thử.",
+            .en: "Hello! This is a preview."
+        ],
+        "Xem thử không thay đổi hồ sơ thực tế của bạn.": [
+            .vi: "Xem thử không thay đổi hồ sơ thực tế của bạn.",
+            .en: "Previewing does not alter your live profile."
+        ],
+        "Mở khóa vĩnh viễn trên tài khoản Kinnect qua Apple ID.": [
+            .vi: "Mở khóa vĩnh viễn trên tài khoản Kinnect qua Apple ID.",
+            .en: "Permanently unlock on your Kinnect account via Apple ID."
+        ],
+        "Mở khóa qua App Store": [
+            .vi: "Mở khóa qua App Store",
+            .en: "Unlock via App Store"
+        ],
+        "Đang dùng": [
+            .vi: "Đang dùng",
+            .en: "Active"
+        ],
+        "Đã sở hữu": [
+            .vi: "Đã sở hữu",
+            .en: "Owned"
+        ],
+        "Mở Studio Pro": [
+            .vi: "Mở Studio Pro",
+            .en: "Open Studio Pro"
+        ],
+        "Gỡ trang trí": [
+            .vi: "Gỡ trang trí",
+            .en: "Remove decoration"
+        ],
+        "Dùng": [
+            .vi: "Dùng",
+            .en: "Use"
+        ],
+        "Mua": [
+            .vi: "Mua",
+            .en: "Buy"
+        ],
+        "Chưa mở App Store": [
+            .vi: "Chưa mở App Store",
+            .en: "Could not open App Store"
+        ],
+        "Trò chuyện · Miễn phí": [
+            .vi: "Trò chuyện · Miễn phí",
+            .en: "Chat · Free"
+        ],
+        "MIỄN PHÍ": [
+            .vi: "MIỄN PHÍ",
+            .en: "FREE"
+        ],
+        "Phát trực tiếp trò chuyện với bạn bè, bộ lọc làm đẹp và nhận quà tặng hoàn toàn miễn phí.": [
+            .vi: "Phát trực tiếp trò chuyện với bạn bè, bộ lọc làm đẹp và nhận quà tặng hoàn toàn miễn phí.",
+            .en: "Go live to chat with friends, apply beauty filters, and receive gifts completely free."
+        ],
+        "Kho quà Live": [
+            .vi: "Kho quà Live",
+            .en: "Live gift inventory"
+        ],
+        "món quà": [
+            .vi: "món quà",
+            .en: "gifts"
+        ],
+        "Chưa có quà dự trữ trong kho.": [
+            .vi: "Chưa có quà dự trữ trong kho.",
+            .en: "No gifts in inventory yet."
+        ],
+        "Chưa có gói trong mục này": [
+            .vi: "Chưa có gói trong mục này",
+            .en: "No packages in this category"
+        ],
+        "Còn": [
+            .vi: "Còn",
+            .en: "Left"
+        ],
+        "Gia hạn": [
+            .vi: "Gia hạn",
+            .en: "Renew"
+        ],
+        "Mua thêm": [
+            .vi: "Mua thêm",
+            .en: "Buy more"
+        ],
+        "Đang có gói": [
+            .vi: "Đang có gói",
+            .en: "Subscribed"
+        ],
+        "Đổi": [
+            .vi: "Đổi",
+            .en: "Redeem"
+        ],
+        "Mở Studio": [
+            .vi: "Mở Studio",
+            .en: "Open Studio"
+        ],
+        "Xem kho quà": [
+            .vi: "Xem kho quà",
+            .en: "View gift inventory"
+        ],
+        "Đang sử dụng": [
+            .vi: "Đang sử dụng",
+            .en: "In use"
+        ],
+        "Quyền Live Game": [
+            .vi: "Quyền Live Game",
+            .en: "Live Game access"
+        ],
+        "Gỡ trang bị": [
+            .vi: "Gỡ trang bị",
+            .en: "Unequip"
+        ],
+        "Áp dụng": [
+            .vi: "Áp dụng",
+            .en: "Apply"
+        ],
+        "xu tặng": [
+            .vi: "xu tặng",
+            .en: "gift coins"
+        ],
+        "Chưa đủ": [
+            .vi: "Chưa đủ",
+            .en: "Insufficient"
+        ],
+        "Cần": [
+            .vi: "Cần",
+            .en: "Need"
+        ],
+        "hiện có": [
+            .vi: "hiện có",
+            .en: "available"
+        ],
+        "Chưa tải được cửa hàng:": [
+            .vi: "Chưa tải được cửa hàng:",
+            .en: "Could not load store:"
+        ],
+        "Đã mở khóa": [
+            .vi: "Đã mở khóa",
+            .en: "Unlocked"
+        ],
+        "Máy chủ chưa xác nhận trang trí.": [
+            .vi: "Máy chủ chưa xác nhận trang trí.",
+            .en: "Server did not confirm decoration."
+        ],
+        "Đã gỡ trang trí.": [
+            .vi: "Đã gỡ trang trí.",
+            .en: "Decoration removed."
+        ],
+        "Đã áp dụng": [
+            .vi: "Đã áp dụng",
+            .en: "Applied"
+        ],
+        "Máy chủ chưa xác nhận quyền sử dụng gói.": [
+            .vi: "Máy chủ chưa xác nhận quyền sử dụng gói.",
+            .en: "Server did not confirm package entitlement."
+        ],
+        "Giao dịch đã được ghi nhận trước đó cho": [
+            .vi: "Giao dịch đã được ghi nhận trước đó cho",
+            .en: "Purchase was already recorded for"
+        ],
+        "Giao dịch chưa hoàn tất:": [
+            .vi: "Giao dịch chưa hoàn tất:",
+            .en: "Purchase incomplete:"
+        ],
+        "Huy hiệu thành viên được áp dụng tự động trong thời hạn gói.": [
+            .vi: "Huy hiệu thành viên được áp dụng tự động trong thời hạn gói.",
+            .en: "Membership badge applies automatically while the package is active."
+        ],
+        "Gói đã được ghi nhận. Phát màn hình game trên iOS đang được hoàn thiện.": [
+            .vi: "Gói đã được ghi nhận. Phát màn hình game trên iOS đang được hoàn thiện.",
+            .en: "Package recorded. Game screen streaming on iOS is coming soon."
+        ],
+        "Đã gỡ trang bị.": [
+            .vi: "Đã gỡ trang bị.",
+            .en: "Unequipped."
+        ],
+        "Đã kích hoạt": [
+            .vi: "Đã kích hoạt",
+            .en: "Activated"
+        ],
+        "Chưa kích hoạt được:": [
+            .vi: "Chưa kích hoạt được:",
+            .en: "Could not activate:"
+        ],
+        "Chơi game": [
+            .vi: "Chơi game",
+            .en: "Gaming"
+        ],
+        "người xem": [
+            .vi: "người xem",
+            .en: "viewers"
+        ],
+        "Chủ phòng đang tạm dừng màn hình game": [
+            .vi: "Chủ phòng đang tạm dừng màn hình game",
+            .en: "Host paused game screen share"
+        ],
+        "Đang kết nối luồng video Live...": [
+            .vi: "Đang kết nối luồng video Live...",
+            .en: "Connecting to Live stream..."
+        ],
+        "Chào mừng bạn đến với phòng Live của": [
+            .vi: "Chào mừng bạn đến với phòng Live của",
+            .en: "Welcome to Live room by"
+        ],
+        "Cấp quyền camera để xem trước trực tiếp": [
+            .vi: "Cấp quyền camera để xem trước trực tiếp",
+            .en: "Allow camera access for live preview"
+        ],
+        "Xem trước · Chưa phát sóng": [
+            .vi: "Xem trước · Chưa phát sóng",
+            .en: "Preview · Not live yet"
+        ],
+        "Bộ lọc:": [
+            .vi: "Bộ lọc:",
+            .en: "Filter:"
+        ],
+        "Micro": [
+            .vi: "Micro",
+            .en: "Mic"
+        ],
+        "Lật cam": [
+            .vi: "Lật cam",
+            .en: "Flip"
+        ],
+        "Làm đẹp": [
+            .vi: "Làm đẹp",
+            .en: "Beauty"
+        ],
+        "Cần quyền camera và micro để bắt đầu Live.": [
+            .vi: "Cần quyền camera và micro để bắt đầu Live.",
+            .en: "Camera and microphone permissions are required to go live."
+        ],
+        "Phòng Live của": [
+            .vi: "Phòng Live của",
+            .en: "Live room by"
+        ],
+        "Chưa kết nối được máy chủ Live. Vui lòng thử lại.": [
+            .vi: "Chưa kết nối được máy chủ Live. Vui lòng thử lại.",
+            .en: "Could not connect to Live server. Please try again."
+        ],
+        "Camera đang tắt": [
+            .vi: "Camera đang tắt",
+            .en: "Camera off"
+        ],
+        "Báo cáo phòng Live": [
+            .vi: "Báo cáo phòng Live",
+            .en: "Report Live room"
+        ],
+        "Bình luận Live của": [
+            .vi: "Bình luận Live của",
+            .en: "Live comment by"
+        ],
+        "Kết thúc Live?": [
+            .vi: "Kết thúc Live?",
+            .en: "End Live?"
+        ],
+        "Tiếp tục phát": [
+            .vi: "Tiếp tục phát",
+            .en: "Keep streaming"
+        ],
+        "Kết thúc Live": [
+            .vi: "Kết thúc Live",
+            .en: "End Live"
+        ],
+        "Buổi phát trực tiếp sẽ dừng ngay với tất cả người xem.": [
+            .vi: "Buổi phát trực tiếp sẽ dừng ngay với tất cả người xem.",
+            .en: "The live stream will stop immediately for all viewers."
+        ],
+        "kết quả cho": [
+            .vi: "kết quả cho",
+            .en: "results for"
+        ],
+        "Chọn tệp âm thanh từ thiết bị": [
+            .vi: "Chọn tệp âm thanh từ thiết bị",
+            .en: "Choose audio file from device"
+        ],
+        "Không dùng nhạc nền": [
+            .vi: "Không dùng nhạc nền",
+            .en: "No background music"
+        ],
+        "Thư viện âm thanh Kinnect": [
+            .vi: "Thư viện âm thanh Kinnect",
+            .en: "Kinnect audio library"
+        ],
+        "Đang tải danh sách nhạc…": [
+            .vi: "Đang tải danh sách nhạc…",
+            .en: "Loading music catalog…"
+        ],
+        "Chưa có âm thanh trong thư viện.": [
+            .vi: "Chưa có âm thanh trong thư viện.",
+            .en: "No audio tracks in library yet."
+        ],
+        "Nghe thử": [
+            .vi: "Nghe thử",
+            .en: "Preview"
+        ],
+        "Tìm nhạc, nghệ sĩ": [
+            .vi: "Tìm nhạc, nghệ sĩ",
+            .en: "Search tracks, artists"
+        ],
+        "Thêm nhạc nền": [
+            .vi: "Thêm nhạc nền",
+            .en: "Add music"
+        ],
+        "Không tải được thư viện nhạc:": [
+            .vi: "Không tải được thư viện nhạc:",
+            .en: "Could not load music library:"
+        ],
+        "Đã ghi nhận yêu cầu xác minh email.": [
+            .vi: "Đã ghi nhận yêu cầu xác minh email.",
+            .en: "Email verification request recorded."
         ]
     ]
 

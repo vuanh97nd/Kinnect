@@ -184,6 +184,7 @@ struct ProfileView: View {
         .toolbar(.hidden, for: .navigationBar)
         .task {
             if isSelf {
+                #if DEBUG
                 if let screen = UIReviewFixture.activeScreen {
                     switch screen {
                     case "profile-posts": selectedTab = .posts
@@ -197,6 +198,7 @@ struct ProfileView: View {
                     default: break
                     }
                 }
+                #endif
                 await refreshMe()
             } else if let target = targetUser {
                 await refreshPeer(target: target)
@@ -1264,23 +1266,25 @@ struct ProfileView: View {
     }
 
     private func refreshMe() async {
-        let initialId = appState.currentUser?.id ?? "fixture_user_me"
-        if userPosts.isEmpty,
-           let cachedPosts = KinnectAPIClient.shared.cachedJSON(for: "/api/posts?user=\(initialId)"),
-           let items = cachedPosts["posts"] as? [[String: Any]] {
-            self.userPosts = items.map(PostItem.from)
-        }
-        if userShorts.isEmpty,
-           let cachedShorts = KinnectAPIClient.shared.cachedJSON(for: "/api/shorts?user=\(initialId)"),
-           let items = cachedShorts["shorts"] as? [[String: Any]] {
-            self.userShorts = items.map(ShortItem.from)
-        }
-        if let cachedStats = KinnectAPIClient.shared.cachedJSON(for: "/api/users/\(initialId)/stats"),
-           var current = appState.currentUser {
-            if let p = cachedStats["posts"] as? Int { current.postsCount = p }
-            if let fo = cachedStats["followers"] as? Int { current.followersCount = fo }
-            if let fi = cachedStats["following"] as? Int { current.followingCount = fi }
-            appState.currentUser = current
+        let initialId = appState.currentUser?.id ?? ""
+        if !initialId.isEmpty {
+            if userPosts.isEmpty,
+               let cachedPosts = KinnectAPIClient.shared.cachedJSON(for: "/api/posts?user=\(initialId)"),
+               let items = cachedPosts["posts"] as? [[String: Any]] {
+                self.userPosts = items.map(PostItem.from)
+            }
+            if userShorts.isEmpty,
+               let cachedShorts = KinnectAPIClient.shared.cachedJSON(for: "/api/shorts?user=\(initialId)"),
+               let items = cachedShorts["shorts"] as? [[String: Any]] {
+                self.userShorts = items.map(ShortItem.from)
+            }
+            if let cachedStats = KinnectAPIClient.shared.cachedJSON(for: "/api/users/\(initialId)/stats"),
+               var current = appState.currentUser {
+                if let p = cachedStats["posts"] as? Int { current.postsCount = p }
+                if let fo = cachedStats["followers"] as? Int { current.followersCount = fo }
+                if let fi = cachedStats["following"] as? Int { current.followingCount = fi }
+                appState.currentUser = current
+            }
         }
 
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/me"),
@@ -1288,7 +1292,8 @@ struct ProfileView: View {
             let user = KinnectUser.from(userDict)
             appState.updateCurrentUser(user, rawDict: userDict)
         }
-        let myId = appState.currentUser?.id ?? "fixture_user_me"
+        let myId = appState.currentUser?.id ?? ""
+        guard !myId.isEmpty else { return }
         if let statsRes = try? await KinnectAPIClient.shared.requestJSON("/api/users/\(myId)/stats") {
             if var current = appState.currentUser {
                 if let p = statsRes["posts"] as? Int { current.postsCount = p }
@@ -2622,10 +2627,12 @@ struct EditProfileSheet: View {
         isLoading = true
         loadFailed = false
         defer { isLoading = false }
+        #if DEBUG
         if UIReviewFixture.isEnabled {
             isLoaded = true
             return
         }
+        #endif
         do {
             let res = try await KinnectAPIClient.shared.requestJSON("/api/me")
             if let me = res["user"] as? [String: Any] {
@@ -3225,12 +3232,14 @@ struct ChangePasswordSheet: View {
             errorMessage = L10n.tr("Mật khẩu xác nhận không khớp.")
             return
         }
+        #if DEBUG
         if UIReviewFixture.activeScreen != nil {
             appState.currentUser?.hasPassword = true
             appState.showToast(L10n.tr("Đã lưu mật khẩu. Các thiết bị khác đã được đăng xuất."))
             dismiss()
             return
         }
+        #endif
         isSubmitting = true
         defer { isSubmitting = false }
         do {
@@ -3303,6 +3312,7 @@ struct BlockedUsersSheet: View {
     }
 
     private func loadBlocks() async {
+        #if DEBUG
         if UIReviewFixture.isEnabled {
             self.blockedUsers = [
                 KinnectUser.from([
@@ -3320,6 +3330,7 @@ struct BlockedUsersSheet: View {
             ]
             return
         }
+        #endif
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/blocks") {
             let list = (res["users"] as? [[String: Any]]) ?? (res["blocks"] as? [[String: Any]]) ?? []
             self.blockedUsers = list.map { entry in
@@ -3904,6 +3915,7 @@ struct PrivacySettingsSheet: View {
     }
 
     private func loadSettings() async {
+        #if DEBUG
         if UIReviewFixture.activeScreen != nil {
             self.discoverable = true
             self.showDistance = true
@@ -3912,6 +3924,7 @@ struct PrivacySettingsSheet: View {
             self.cloudChatSync = true
             return
         }
+        #endif
         if let res = try? await KinnectAPIClient.shared.requestJSON("/api/me") {
             let user = (res["user"] as? [String: Any]) ?? res
             self.discoverable = (user["discoverable"] as? Bool) ?? ((user["discoverable"] as? Int) == 1)
@@ -3924,11 +3937,13 @@ struct PrivacySettingsSheet: View {
     }
 
     private func saveSettings() async {
+        #if DEBUG
         if UIReviewFixture.activeScreen != nil {
             appState.showToast(L10n.tr("Đã cập nhật quyền riêng tư."))
             dismiss()
             return
         }
+        #endif
         isSaving = true
         defer { isSaving = false }
         do {
@@ -4068,10 +4083,12 @@ struct SupportContactSheet: View {
                 }
             }
             .task {
+                #if DEBUG
                 if UIReviewFixture.activeScreen != nil {
                     contactText = "minhanh@kinnect.vn"
                     noteText = "Cần hỗ trợ hướng dẫn kích hoạt gói Studio Pro trên thiết bị mới."
                 }
+                #endif
             }
         }
     }
@@ -4082,11 +4099,13 @@ struct SupportContactSheet: View {
     }
 
     private func submitSupport() async {
+        #if DEBUG
         if UIReviewFixture.activeScreen != nil {
             appState.showToast(L10n.tr("Đã gửi yêu cầu hỗ trợ thành công."))
             dismiss()
             return
         }
+        #endif
         isSubmitting = true
         defer { isSubmitting = false }
         do {

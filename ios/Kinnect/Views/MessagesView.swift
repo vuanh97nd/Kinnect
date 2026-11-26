@@ -1276,8 +1276,13 @@ struct DirectChatDetailView: View {
     @State private var showForwardSheet = false
     @State private var isPinned = false
     @State private var isMuted = false
+    #if DEBUG
     @State private var showReviewChatMenu = (UIReviewFixture.activeScreen == "chat-menu")
     @State private var showReviewMessageMenu = (UIReviewFixture.activeScreen == "message-menu")
+    #else
+    @State private var showReviewChatMenu = false
+    @State private var showReviewMessageMenu = false
+    #endif
     @State private var showPeerProfile = false
     @State private var replyingToMessage: DirectMessageItem? = nil
     @State private var hasMoreMessages = false
@@ -4795,46 +4800,48 @@ struct ForwardMessageSheet: View {
     }
 
     private func loadTargets() async {
+        #if DEBUG
         if UIReviewFixture.activeScreen != nil {
             self.conversations = [
                 [
                     "peer": [
-                        "id": "fixture_user_fwd_1",
-                        "name": "Hoàng Nam",
-                        "handle": "hoang_nam",
-                        "avatarColor": "#7C3AED"
+                        "id": "u2",
+                        "name": "Lê Hoàng Nam",
+                        "handle": "hoangnam",
+                        "avatarColor": "#2563EB"
                     ]
                 ],
                 [
                     "peer": [
-                        "id": "fixture_user_fwd_2",
-                        "name": "Thanh Trúc",
-                        "handle": "thanh_truc",
+                        "id": "u3",
+                        "name": "Trần Thanh Trúc",
+                        "handle": "thanhtruc",
                         "avatarColor": "#EC4899"
                     ]
                 ]
             ]
             self.groups = [
                 ChatGroupItem.from([
-                    "id": "group-fixture-01",
-                    "name": "Gia đình Kinnect",
-                    "description": "Nhóm trò chuyện chia sẻ",
-                    "avatarColor": "#8A3FFC",
-                    "membersCount": 5,
+                    "id": "fixture_group_1",
+                    "name": "Nhóm Thiết Kế Kinnect",
+                    "description": "Trao đổi ý tưởng sáng tạo và nhiếp ảnh",
+                    "avatarColor": "#6D4AFF",
+                    "membersCount": 4,
                     "lastMessageText": "Hẹn gặp mọi người tối nay nhé!",
                     "unreadCount": 0
                 ])
             ]
             self.friends = [
                 KinnectUser.from([
-                    "id": "fixture_user_fwd_3",
-                    "name": "Võ Minh Khang",
-                    "handle": "minh_khang",
-                    "avatarColor": "#3B82F6"
+                    "id": "u4",
+                    "name": "Linh Nhi",
+                    "handle": "linhnhi",
+                    "avatarColor": "#8B5CF6"
                 ])
             ]
             return
         }
+        #endif
         isLoading = true
         defer { isLoading = false }
         if let cRes = try? await KinnectAPIClient.shared.requestJSON("/api/conversations") {

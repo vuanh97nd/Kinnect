@@ -788,7 +788,9 @@ private struct TwoFactorSettingsSheet: View {
     private func loadStatus() async {
         isLoading = true
         defer { isLoading = false }
+        #if DEBUG
         if UIReviewFixture.isEnabled { return }
+        #endif
         do {
             let res = try await KinnectAPIClient.shared.requestJSON("/api/me/2fa")
             enabled = (res["enabled"] as? Bool) ?? false
@@ -998,12 +1000,14 @@ private struct ChangePasswordSheetView: View {
         }
         isSubmitting = true
         defer { isSubmitting = false }
+        #if DEBUG
         if UIReviewFixture.activeScreen != nil {
             appState.currentUser?.hasPassword = true
             appState.showToast(L10n.tr("Đã lưu mật khẩu. Các thiết bị khác đã được đăng xuất."))
             close()
             return
         }
+        #endif
         do {
             _ = try await KinnectAPIClient.shared.requestJSON(
                 "/api/me/password",
@@ -1165,7 +1169,10 @@ struct AdminConsoleView: View {
     @State private var confirm = false
 
     private var allowed: Bool {
-        UIReviewFixture.activeScreen == "admin" || appState.currentUser?.accountRole == "admin"
+        #if DEBUG
+        if UIReviewFixture.activeScreen == "admin" { return true }
+        #endif
+        return appState.currentUser?.accountRole == "admin"
     }
 
     var body: some View {
@@ -1724,10 +1731,12 @@ private struct RecoveryEmailSheet: View {
     }
 
     private func load() async {
+        #if DEBUG
         if UIReviewFixture.isEnabled {
             status = L10n.tr("Chưa xác minh email khôi phục.")
             return
         }
+        #endif
         do {
             let data = try await KinnectAPIClient.shared.requestJSON("/api/recovery/email")
             if let saved = data["email"] as? String, !saved.isEmpty {
@@ -1743,10 +1752,12 @@ private struct RecoveryEmailSheet: View {
     private func start() async {
         busy = true
         defer { busy = false }
+        #if DEBUG
         if UIReviewFixture.isEnabled {
-            AppState.shared.showToast(L10n.tr("Bản xem giao diện không gửi email."))
+            AppState.shared.showToast(L10n.tr("Đã ghi nhận yêu cầu xác minh email."))
             return
         }
+        #endif
         do {
             let data = try await KinnectAPIClient.shared.requestJSON(
                 "/api/recovery/email/start",
@@ -1787,7 +1798,7 @@ private struct AppReportSheet: View {
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var loc = LocalizationManager.shared
     private let reasons = [
-        "An toàn trẻ em · CSAE/CSAM",
+        "An toàn trẻ em",
         "Quấy rối hoặc bắt nạt",
         "Thù ghét hoặc phân biệt đối xử",
         "Giả mạo tài khoản",

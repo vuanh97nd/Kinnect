@@ -597,7 +597,7 @@ struct NotificationPostDetailView: View {
                                                     .font(.caption.bold())
                                                     .foregroundColor(KinnectTheme.textPrimary)
                                                 Spacer()
-                                                Menu {
+                                                 Menu {
                                                     if isMine {
                                                         Button(L10n.tr("Chỉnh sửa")) {
                                                             editingComment = comment
@@ -620,13 +620,35 @@ struct NotificationPostDetailView: View {
                                                     Image(systemName: "ellipsis")
                                                         .font(.caption)
                                                         .foregroundColor(KinnectTheme.textSecondary)
-                                                        .frame(width: 28, height: 24)
+                                                        .frame(minWidth: 44, minHeight: 36)
+                                                        .contentShape(Rectangle())
                                                 }
                                             }
                                             Text(comment.text)
                                                 .font(.subheadline)
                                                 .foregroundColor(KinnectTheme.textPrimary)
                                                 .kinnectMultiline()
+                                            if !isMine {
+                                                HStack(spacing: 12) {
+                                                    Button {
+                                                        appState.activeReportContext = UGCReportContext(
+                                                            targetType: "comment",
+                                                            targetId: comment.id,
+                                                            targetUserId: comment.author.id,
+                                                            targetTitle: "\(L10n.tr("Bình luận của")) \(name)"
+                                                        )
+                                                    } label: {
+                                                        Label(L10n.tr("Báo cáo"), systemImage: "flag")
+                                                            .font(.caption.weight(.semibold))
+                                                            .foregroundColor(KinnectTheme.danger)
+                                                            .frame(minHeight: 36)
+                                                            .contentShape(Rectangle())
+                                                    }
+                                                    .buttonStyle(.plain)
+                                                    Spacer()
+                                                }
+                                                .padding(.top, 2)
+                                            }
                                         }
                                     }
                                     .padding(10)

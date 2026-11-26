@@ -164,14 +164,10 @@ enum KinnectTheme {
             }
         }
         #else
-        if UIReviewFixture.forceLightMode {
-            style = .light
-        } else {
-            switch mode {
-            case "light": style = .light
-            case "dark": style = .dark
-            default: style = .unspecified
-            }
+        switch mode {
+        case "light": style = .light
+        case "dark": style = .dark
+        default: style = .unspecified
         }
         #endif
         for scene in UIApplication.shared.connectedScenes {

@@ -56,7 +56,9 @@ struct RootMainView: View {
     @AppStorage("app_appearance_mode") private var appearanceMode: String = "system"
 
     private var activeColorScheme: ColorScheme? {
+        #if DEBUG
         if UIReviewFixture.forceLightMode { return .light }
+        #endif
         switch appearanceMode {
         case "light": return .light
         case "dark": return .dark
@@ -79,6 +81,7 @@ struct RootMainView: View {
         }
     }
 
+    #if DEBUG
     // Shared trailing toolbar for all tabs (P1) - static version for UI Review Fixture
     @ToolbarContentBuilder
     static func headerTrailingButtonsStatic() -> some ToolbarContent {
@@ -138,6 +141,7 @@ struct RootMainView: View {
     }
     @State private var fixturePrivatePhotos: [PrivatePhotoItem] = UIReviewFixture.mockPrivatePhotos()
     @State private var fixturePrivateRequests: [PrivateAccessRequestItem] = UIReviewFixture.mockPrivateRequests()
+    #endif
     @State private var splitColumnVisibility: NavigationSplitViewVisibility = .all
 
         // Shared trailing toolbar for all tabs (P1) - instance version
@@ -267,6 +271,7 @@ struct RootMainView: View {
         ZStack(alignment: .top) {
             KinnectTheme.background.ignoresSafeArea()
 
+            #if DEBUG
             if UIReviewFixture.activeScreen == "auth" || UIReviewFixture.activeScreen?.hasPrefix("auth-welcome") == true {
                 AuthView(initialStage: .welcome)
             } else if UIReviewFixture.activeScreen?.hasPrefix("auth-login") == true {
@@ -354,8 +359,8 @@ struct RootMainView: View {
                                     UGCReportSheet(
                                         context: UGCReportContext(
                                             targetType: "user",
-                                            targetId: "fixture_user_peer",
-                                            targetUserId: "fixture_user_peer",
+                                            targetId: "u2",
+                                            targetUserId: "u2",
                                             targetTitle: "Lê Hoàng Nam"
                                         )
                                     )
@@ -456,6 +461,15 @@ struct RootMainView: View {
                                 } else {
                                     authenticatedLayout
                                 }
+            #else
+            if isShowingSplash || (appState.isRestoringSession && appState.currentUser == nil) {
+                KinnectSplashScreen()
+            } else if appState.currentUser == nil {
+                AuthView(initialStage: .welcome)
+            } else {
+                authenticatedLayout
+            }
+            #endif
 
                                 if showProfileDetailSheet && appState.currentUser != nil {
                                     ProfileView(
@@ -502,7 +516,7 @@ struct RootMainView: View {
                                         .zIndex(50)
                                 }
 
-                                if appState.currentLiveRoom != nil && appState.isCurrentLiveHost {
+                                if appState.currentLiveRoom != nil {
                                     LiveRoomFullScreenView()
                                         .transition(.move(edge: .bottom))
                                         .zIndex(40)
@@ -534,6 +548,7 @@ struct RootMainView: View {
                             .modifier(UIReviewDynamicTypeModifier())
                             .task {
                                 await appState.bootstrapSession()
+                                #if DEBUG
                                 if UIReviewFixture.isEnabled {
                                     isShowingSplash = false
                                 } else {
@@ -570,6 +585,12 @@ struct RootMainView: View {
                                         break
                                     }
                                 }
+                                #else
+                                try? await Task.sleep(nanoseconds: 700_000_000)
+                                withAnimation(.easeOut(duration: 0.25)) {
+                                    isShowingSplash = false
+                                }
+                                #endif
                             }
                             .onReceive(NotificationCenter.default.publisher(for: .kinnectNavigateRoute)) { notif in
                                 guard let route = notif.object as? String else { return }
@@ -1012,7 +1033,7 @@ struct RootMainView: View {
                         @ObservedObject private var appState = AppState.shared
                         @ObservedObject private var loc = LocalizationManager.shared
 
-                        private static let childSafetyReason = "An toàn trẻ em · CSAE/CSAM"
+                        private static let childSafetyReason = "An toàn trẻ em"
 
                         @State private var selectedReason = "Nội dung không phù hợp / phản cảm"
                         @State private var details = ""
@@ -1020,7 +1041,7 @@ struct RootMainView: View {
                         @State private var isSubmitting = false
 
                         private let reasons = [
-                            "An toàn trẻ em · CSAE/CSAM",
+                            "An toàn trẻ em",
                             "Nội dung không phù hợp / phản cảm",
                             "Quấy rối, đe dọa hoặc xúc phạm",
                             "Lừa đảo hoặc giả mạo",
@@ -1138,7 +1159,7 @@ struct RootMainView: View {
                                     .padding(16)
                                 }
                                 .background(KinnectTheme.background)
-                                .navigationTitle(L10n.tr("Báo cáo UGC"))
+                                .navigationTitle(L10n.tr("Báo cáo nội dung"))
                                 .navigationBarTitleDisplayMode(.inline)
                                 .toolbar {
                                     ToolbarItem(placement: .cancellationAction) {
@@ -1183,6 +1204,7 @@ struct RootMainView: View {
 
                     private struct UIReviewDynamicTypeModifier: ViewModifier {
     func body(content: Content) -> some View {
+        #if DEBUG
         if UIReviewFixture.forceMaxDynamicType {
             content.dynamicTypeSize(...DynamicTypeSize.accessibility2)
         } else if UIReviewFixture.isEnabled {
@@ -1190,5 +1212,8 @@ struct RootMainView: View {
         } else {
             content
         }
+        #else
+        content
+        #endif
     }
 }

@@ -182,6 +182,7 @@ struct WalletStoreView: View {
             Task { await loadWalletAndStore() }
         }
         .onAppear {
+            #if DEBUG
             if UIReviewFixture.activeScreen == "wallet-topup" {
                 tab = .topup
             } else if UIReviewFixture.activeScreen == "wallet-packages" || UIReviewFixture.activeScreen == "store-packages" {
@@ -189,6 +190,7 @@ struct WalletStoreView: View {
             } else if UIReviewFixture.activeScreen == "wallet" {
                 tab = .wallet
             }
+            #endif
         }
     }
 

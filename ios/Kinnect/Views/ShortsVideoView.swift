@@ -658,10 +658,12 @@ struct ShortClipPlayer: View {
         let origin = KinnectAPIClient.shared.mediaOrigin
         KeychainStore.shared.syncToHTTPCookieStorage(origin: origin)
         guard let remoteURL = ServerConfig.url(for: path, origin: origin) else {
-            if let fixtureURL = UIReviewFixture.samplePlayableVideoURL() {
+            #if DEBUG
+            if UIReviewFixture.isEnabled, let fixtureURL = UIReviewFixture.samplePlayableVideoURL() {
                 setupPlayer(with: AVPlayerItem(url: fixtureURL))
                 return
             }
+            #endif
             failed = true
             return
         }

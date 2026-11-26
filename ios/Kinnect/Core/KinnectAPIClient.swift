@@ -144,9 +144,11 @@ final class KinnectAPIClient {
         isIdempotent: Bool? = nil,
         allowPrivacyAutoRetry: Bool = true
     ) async throws -> [String: Any] {
+        #if DEBUG
         if UIReviewFixture.isEnabled {
             return UIReviewFixture.mockResponse(for: path)
         }
+        #endif
         let bodyRequestId = body?["requestId"] as? String
         let carriesRequestId = !(bodyRequestId ?? "").isEmpty
         let safeToRetryOnFallback = isIdempotent ?? (method == "GET" || method == "HEAD" || (carriesRequestId && method != "POST"))

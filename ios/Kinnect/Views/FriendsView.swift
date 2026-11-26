@@ -232,11 +232,13 @@ struct FriendsView: View {
             await searchDiscoverUsers()
         }
         .onAppear {
+            #if DEBUG
             if UIReviewFixture.activeScreen == "friends-requests" {
                 tab = .requests
             } else if UIReviewFixture.activeScreen == "friends-suggestions" {
                 tab = .friends
             }
+            #endif
         }
         .sheet(item: $selectedProfileUser) { user in
             ProfileView(targetUser: user)

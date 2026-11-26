@@ -3,6 +3,7 @@ import CoreLocation
 import SwiftUI
 
 struct DiscoverView: View {
+    let initialSearchQuery: String
     let onOpenCamera: () -> Void
     @ObservedObject private var appState = AppState.shared
 
@@ -18,8 +19,16 @@ struct DiscoverView: View {
     }
 
     @State private var segment: DiscoverSegment = .forYou
-    @State private var searchQuery: String = ""
-    @State private var hasExecutedSearch: Bool = false
+    @State private var searchQuery: String
+    @State private var hasExecutedSearch: Bool
+
+    init(initialSearchQuery: String = "", onOpenCamera: @escaping () -> Void) {
+        self.initialSearchQuery = initialSearchQuery
+        self.onOpenCamera = onOpenCamera
+        let trimmed = initialSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        _searchQuery = State(initialValue: initialSearchQuery)
+        _hasExecutedSearch = State(initialValue: !trimmed.isEmpty)
+    }
     @State private var selectedRadiusKm: Int = 50
     @State private var people: [KinnectUser] = []
     @State private var posts: [PostItem] = []
@@ -234,6 +243,40 @@ struct DiscoverView: View {
                     } else if visiblePeople.isEmpty {
                         emptyDiscoveryView
                     } else {
+                        let trimmedQ = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !trimmedQ.isEmpty {
+                            HStack(spacing: 8) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundColor(KinnectTheme.accentBright)
+                                Text("\(visiblePeople.count) \(L10n.tr("kết quả cho")) \"\(trimmedQ)\"")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundColor(KinnectTheme.textPrimary)
+                                    .lineLimit(1)
+                                Spacer(minLength: 4)
+                                Button {
+                                    searchQuery = ""
+                                } label: {
+                                    Text(L10n.tr("Xem tất cả"))
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundColor(KinnectTheme.accentBright)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 5)
+                                        .background(Capsule().fill(KinnectTheme.surfaceElevated))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(KinnectTheme.surface)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .stroke(KinnectTheme.accentBright.opacity(0.28), lineWidth: 1)
+                                    )
+                            )
+                        }
                         LazyVGrid(columns: gridColumns, spacing: 8) {
                             ForEach(visiblePeople) { person in
                                 DiscoverSquareUserTile(
@@ -255,26 +298,22 @@ struct DiscoverView: View {
         .background(KinnectTheme.background)
         .navigationTitle("")
         .toolbar(.hidden, for: .navigationBar)
-        .task {
-            if UIReviewFixture.activeScreen == "discover-results" || UIReviewFixture.activeScreen == "discover-search" {
-                if searchQuery.isEmpty {
-                    searchQuery = "cà phê"
-                    hasExecutedSearch = true
-                }
-            }
-            await loadCurrentSegment()
-        }
         .task(id: searchQuery) {
             let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty {
-                guard hasExecutedSearch else { return }
-                hasExecutedSearch = false
-                await loadCurrentSegment()
+                if !hasExecutedSearch && people.isEmpty {
+                    await loadCurrentSegment()
+                } else if hasExecutedSearch {
+                    hasExecutedSearch = false
+                    await loadCurrentSegment()
+                }
                 return
             }
-            try? await Task.sleep(nanoseconds: 350_000_000)
-            guard !Task.isCancelled else { return }
-            hasExecutedSearch = true
+            if !hasExecutedSearch {
+                try? await Task.sleep(nanoseconds: 350_000_000)
+                guard !Task.isCancelled else { return }
+                hasExecutedSearch = true
+            }
             await loadCurrentSegment()
         }
         .sheet(item: $activeFilterType) { filterType in
