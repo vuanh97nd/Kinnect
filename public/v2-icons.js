@@ -119,3 +119,22 @@ Object.assign(window.KN_POSTLOGIN_ICONS || (window.KN_POSTLOGIN_ICONS={}),{"arro
 Object.assign(window.KN_ICONS,{"shopping-bag": "<path d=\"M6 3h12l3 5v13H3V8z\"/><path d=\"M3 8h18M8 8v3a4 4 0 0 0 8 0V8\"/>", "gift": "<path d=\"M3 8h18v4H3z\"/><path d=\"M5 12v9h14v-9M12 8v13\"/><path d=\"M12 8H7.5A2.5 2.5 0 1 1 10 5.5L12 8zm0 0h4.5A2.5 2.5 0 1 0 14 5.5L12 8z\"/>", "palette": "<path d=\"M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 1-3.7 1.3 1.3 0 0 1 1-2.3h2a4 4 0 0 0 4-4c0-5-4-8-9-8z\"/><path d=\"M7 10h.01M10 6h.01M15 6h.01M18 10h.01\"/>"});
 
 window.KN_ICONS.wallet='<path d="M20 8V5H5a3 3 0 0 0 0 6h16v10H5a3 3 0 0 1-3-3V8m19 5h-6v5h6M17 15.5h.01"/>';
+
+// Wave 5 missing Lucide icons (added to both KN_ICONS and KN_POSTLOGIN_ICONS)
+(function () {
+  var extra = {
+    "menu": '<path d="M4 6h16M4 12h16M4 18h16"/>',
+    "flag": '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/>',
+    "sun": '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
+    "circle": '<circle cx="12" cy="12" r="10"/>',
+    "type": '<path d="M4 7V4h16v3M9 20h6M12 4v16"/>',
+    "user-round-x": '<circle cx="10" cy="8" r="5"/><path d="M2 21a8 8 0 0 1 11.87-7"/><path d="m17 17 5 5M22 17l-5 5"/>',
+    "layout-grid": '<rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/>',
+    "upload": '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5M12 3v12"/>',
+    "music": '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+    "file-text": '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M10 9H8M16 13H8M16 17H8"/>',
+    "pause": '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>'
+  };
+  Object.assign(window.KN_ICONS, extra);
+  Object.assign(window.KN_POSTLOGIN_ICONS || (window.KN_POSTLOGIN_ICONS = {}), extra);
+})();

@@ -31,8 +31,13 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
   private final ArrayDeque<EditorProject> undo = new ArrayDeque<>(), redo = new ArrayDeque<>();
   private String selKind; private int selId;
   private float playhead; private boolean playing; private long lastNanos, lastDraw;
-  private boolean dirty, busy, closed, delivered, saveRequested;
-  private File input, saveFile;
+  private boolean dirty, busy, delivered, saveRequested, captioning;
+  private volatile boolean closed;
+  private AlertDialog textEditDialog;
+  private Uri initialUri;
+  private File input, saveFile, deliveredFile;
+  private final Set<File> tempFiles = Collections.synchronizedSet(new HashSet<>());
+  private int captionGeneration;
   private final Map<String, Bitmap> photos = new ConcurrentHashMap<>(), images = new ConcurrentHashMap<>();
   private final Map<String, Bitmap[]> thumbs = new ConcurrentHashMap<>();
   private final Map<Integer, float[]> faceOf = new ConcurrentHashMap<>();
@@ -56,18 +61,26 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
 
   // Export
   private MediaRecorder recorder; private Surface recordSurface; private File rendered; private Bitmap exportFrame;
-  private boolean exporting, armed; private long exportStart, armWait, lastPost; private int exportGeneration; private Future<?> task;
+  private boolean exporting, armed, hardwareRecordSurface = true; private long exportStart, armWait, lastPost; private int exportGeneration; private Future<?> task;
   // Voice-over
   private MediaRecorder mic; private File micFile; private float micStart; private long micStarted; private boolean micRecording; private TextView micTimer; private View micButton;
   private AutoCaptions captions;
+
+  @Override protected void attachBaseContext(Context base) { super.attachBaseContext(I18n.localized(base)); }
 
   private int dp(float x) { return Math.round(x * getResources().getDisplayMetrics().density); }
 
   @Override public void onCreate(Bundle state) {
     super.onCreate(state);
+    NativeApi.shared.initialize(this, ServerConfig.DEFAULT_ORIGIN);
     getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); getWindow().setStatusBarColor(BG); getWindow().setNavigationBarColor(BG);
     build();
-    Uri uri = getIntent().getData(); if (uri == null) { finish(); return; }
+    String extraVid = getIntent().getStringExtra(StudioActivity.EXTRA_VIDEO);
+    String extraImg = getIntent().getStringExtra(StudioActivity.EXTRA_IMAGE);
+    String extraPath = (extraVid != null && !extraVid.isEmpty()) ? extraVid : extraImg;
+    Uri uri = (extraPath != null && !extraPath.isEmpty()) ? Uri.fromFile(new File(extraPath)) : getIntent().getData();
+    if (uri == null) { finish(); return; }
+    initialUri = uri;
     showHint(I18n.t("Đang mở…"), 0);
     loader.execute(() -> {
       try {
@@ -79,11 +92,22 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
   }
 
   // ---------- Loading media ----------
+  private static final long MAX_IMPORT_BYTES = 250L * 1024L * 1024L;
   private File copyIn(Uri uri, String prefix) throws IOException {
     File f = File.createTempFile(prefix, ".media", getCacheDir());
+    tempFiles.add(f);
+    boolean ok = false;
     try (InputStream in = getContentResolver().openInputStream(uri); OutputStream out = new FileOutputStream(f)) {
-      if (in == null) throw new IOException(I18n.t("Không đọc được tệp.")); byte[] b = new byte[65536]; int n;
-      while ((n = in.read(b)) != -1) { if (Thread.currentThread().isInterrupted()) throw new InterruptedIOException(); out.write(b, 0, n); }
+      if (in == null) throw new IOException(I18n.t("Không đọc được tệp.")); byte[] b = new byte[65536]; int n; long copied = 0;
+      while ((n = in.read(b)) != -1) {
+        if (Thread.currentThread().isInterrupted()) throw new InterruptedIOException();
+        copied += n;
+        if (copied > MAX_IMPORT_BYTES) throw new IOException(I18n.t("Tệp quá lớn (tối đa 250 MB)."));
+        out.write(b, 0, n);
+      }
+      ok = true;
+    } finally {
+      if (!ok) { tempFiles.remove(f); f.delete(); }
     }
     return f;
   }
@@ -93,7 +117,9 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     if (o.outWidth <= 0 || o.outHeight <= 0) return null;
     o.inJustDecodeBounds = false; o.inSampleSize = 1; while (Math.max(o.outWidth, o.outHeight) / o.inSampleSize > maxSide) o.inSampleSize *= 2;
     Bitmap bmp = BitmapFactory.decodeFile(f.getPath(), o); if (bmp == null) throw new IOException(I18n.t("Không mở được ảnh."));
-    int orientation = new ExifInterface(f.getPath()).getAttributeInt(ExifInterface.TAG_ORIENTATION, 1); Matrix m = new Matrix();
+    int orientation = 1;
+    try { orientation = new ExifInterface(f.getPath()).getAttributeInt(ExifInterface.TAG_ORIENTATION, 1); } catch (Exception ignored) {}
+    Matrix m = new Matrix();
     if (orientation == 3) m.postRotate(180); else if (orientation == 6) m.postRotate(90); else if (orientation == 8) m.postRotate(270);
     else if (orientation == 2) m.postScale(-1, 1); else if (orientation == 4) m.postScale(1, -1);
     else if (orientation == 5) { m.postRotate(90); m.postScale(-1, 1); } else if (orientation == 7) { m.postRotate(270); m.postScale(-1, 1); }
@@ -105,7 +131,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
   private EditorProject.Clip probe(File f) throws Exception {
     EditorProject.Clip c = new EditorProject.Clip(); c.file = f; c.fx.beautyOn = false;
     Bitmap photo = decodePhoto(f, 2048);
-    if (photo != null) { photos.put(f.getAbsolutePath(), photo); c.video = false; c.width = photo.getWidth(); c.height = photo.getHeight(); c.source = 3600; c.in = 0; c.out = 3; return c; }
+    if (photo != null) { if (closed) { photo.recycle(); throw new InterruptedIOException(); } photos.put(f.getAbsolutePath(), photo); c.video = false; c.width = photo.getWidth(); c.height = photo.getHeight(); c.source = 3600; c.in = 0; c.out = 3; return c; }
     MediaMetadataRetriever r = new MediaMetadataRetriever();
     try {
       r.setDataSource(f.getPath());
@@ -125,7 +151,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     if (thumbs.containsKey(file.getAbsolutePath())) return;
     loader.execute(() -> {
       try {
-        if (!video) { Bitmap p = photos.get(file.getAbsolutePath()); if (p == null) return; thumbs.put(file.getAbsolutePath(), new Bitmap[] { Bitmap.createScaledBitmap(p, Math.max(2, height * p.getWidth() / p.getHeight()), height, true) }); }
+        if (!video) { Bitmap p = photos.get(file.getAbsolutePath()); if (p == null || p.isRecycled() || closed) return; Bitmap scaled = Bitmap.createScaledBitmap(p, Math.max(2, height * p.getWidth() / p.getHeight()), height, true); if (closed) { if (scaled != p) scaled.recycle(); return; } thumbs.put(file.getAbsolutePath(), new Bitmap[] { scaled }); }
         else {
           MediaMetadataRetriever r = new MediaMetadataRetriever();
           try {
@@ -134,11 +160,12 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
               long at = (long) (source * 1e6 * (i + .5f) / n); Bitmap raw = Build.VERSION.SDK_INT >= 27 ? r.getScaledFrameAtTime(at, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, height * 2, height * 2) : r.getFrameAtTime(at, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
               if (raw == null) continue; out[i] = Bitmap.createScaledBitmap(raw, Math.max(2, height * raw.getWidth() / raw.getHeight()), height, true); if (out[i] != raw) raw.recycle();
               for (int k = 0; k < n; k++) if (out[k] == null) out[k] = out[i];
+              if (closed) { for (Bitmap bm : out) if (bm != null && !bm.isRecycled()) bm.recycle(); return; }
               thumbs.put(file.getAbsolutePath(), out.clone()); if (timeline != null) timeline.postInvalidate();
             }
           } finally { try { r.release(); } catch (Exception ignored) {} }
         }
-        if (timeline != null) timeline.postInvalidate();
+        if (!closed && timeline != null) timeline.postInvalidate();
       } catch (Exception | OutOfMemoryError ignored) {}
     });
   }
@@ -167,7 +194,16 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
   private boolean proApplied;private EditorProject proBefore;
   private void build() {
     LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(BG); setContentView(root);
-    root.setOnApplyWindowInsetsListener((v, insets) -> { v.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(), insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom()); return insets; });
+    root.setOnApplyWindowInsetsListener((v, insets) -> {
+      if (Build.VERSION.SDK_INT >= 30) {
+        android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+        android.graphics.Insets ime = insets.getInsets(WindowInsets.Type.ime());
+        v.setPadding(bars.left, bars.top, bars.right, Math.max(bars.bottom, ime.bottom));
+      } else {
+        v.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(), insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
+      }
+      return insets;
+    });
     root.requestApplyInsets();
 
     LinearLayout top = new LinearLayout(this); top.setGravity(Gravity.CENTER_VERTICAL); top.setPadding(dp(4), 0, dp(10), 0);
@@ -228,7 +264,9 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     sheet = new LinearLayout(this); sheet.setOrientation(LinearLayout.VERTICAL); sheet.setBackgroundColor(PANEL); sheet.setVisibility(View.GONE);
     LinearLayout head = new LinearLayout(this); head.setGravity(Gravity.CENTER_VERTICAL); head.setPadding(dp(16), 0, dp(4), 0);
     sheetTitle = label("", 15, INK); sheetTitle.setTypeface(Typeface.DEFAULT_BOLD); head.addView(sheetTitle, new LinearLayout.LayoutParams(0, -2, 1));
-    head.addView(iconButton("check", "Xong", this::closeSheet), new LinearLayout.LayoutParams(dp(46), dp(46)));
+    ImageView sheetDone = iconButton("check", I18n.t("Xong"), this::closeSheet);
+    sheetDone.setOnClickListener(v -> { if (!busy || captioning) closeSheet(); });
+    head.addView(sheetDone, new LinearLayout.LayoutParams(dp(46), dp(46)));
     sheet.addView(head, new LinearLayout.LayoutParams(-1, dp(46)));
     ScrollView body = new ScrollView(this); sheetBody = new LinearLayout(this); sheetBody.setOrientation(LinearLayout.VERTICAL); sheetBody.setPadding(dp(16), 0, dp(16), dp(14));
     body.addView(sheetBody); sheet.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
@@ -290,7 +328,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
         tool("speed", I18n.t("Tốc độ"), clip.speed != 1, this::speedSheet);
         tool("volume", I18n.t("Âm lượng"), clip.volume != 1, this::volumeSheet);
         tool("move", I18n.t("Vị trí"), !clip.keys.isEmpty(), this::transformSheet);
-        tool("rotate", "Xoay", clip.turn != 0, () -> { remember(); clip.turn = (clip.turn + 90) % 360; showHint("Xoay " + clip.turn + "°", 1000); });
+        tool("rotate", I18n.t("Xoay"), clip.turn != 0, () -> { remember(); clip.turn = (clip.turn + 90) % 360; showHint(I18n.t("Xoay") + " " + clip.turn + "°", 1000); });
         tool("flip", I18n.t("Lật"), clip.fx.flipImage, () -> { remember(); clip.fx.flipImage = !clip.fx.flipImage; refreshTools(); });
         tool("filter", I18n.t("Bộ lọc"), !clip.fx.filter.equals("none"), () -> fxSheet("filter"));
         tool("color", I18n.t("Điều chỉnh"), false, this::adjustSheet);
@@ -321,8 +359,31 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     updateButtons();
   }
 
+  private static boolean hasStudioVideoAccess(org.json.JSONObject catalog) {
+    if (catalog == null) return false;
+    if (catalog.optBoolean("studioProFree") || catalog.optBoolean("studioProPermanent")) return true;
+    long now = System.currentTimeMillis();
+    long videoUntil = catalog.optLong("studioVideoUntil", 0L);
+    long photoUntil = catalog.optLong("studioPhotoUntil", 0L);
+    if (videoUntil > 0L || photoUntil > 0L) {
+      return videoUntil > now;
+    }
+    long legacyUntil = catalog.optLong("studioProUntil", 0L);
+    if (legacyUntil > 0L) {
+      return legacyUntil > now;
+    }
+    if (catalog.has("studioVideoUntil") || catalog.has("studioPhotoUntil")) {
+      return false;
+    }
+    org.json.JSONArray ids = catalog.optJSONArray("owned");
+    for (int i = 0; ids != null && i < ids.length(); i++) {
+      if ("kinnect_studio_pro".equals(ids.optString(i))) return true;
+    }
+    return false;
+  }
+
   private void proTemplates(){
-    NativeApi.shared.call("GET","/api/store",null,(catalog,error,status)->{if(closed)return;if(error!=null){showHint(error,2200);return;}boolean owned=catalog.optBoolean("studioProFree");org.json.JSONArray ids=catalog.optJSONArray("owned");for(int i=0;ids!=null&&i<ids.length();i++)if(ids.optString(i).equals("kinnect_studio_pro"))owned=true;
+    NativeApi.shared.call("GET","/api/store",null,(catalog,error,status)->{if(closed)return;if(error!=null||catalog==null){showHint(error!=null?error:I18n.t("Chưa tải được cửa hàng."),2200);return;}boolean owned=hasStudioVideoAccess(catalog);
       if(!owned){new Sheet(this).setTitle("Studio Pro").setMessage(I18n.t("Ba mẫu dựng video Aurora, Travel và Cinema. Các công cụ chỉnh sửa hiện có vẫn miễn phí.")).setPositiveButton(I18n.t("Xem cửa hàng"),(d,w)->startActivity(new Intent(this,StoreActivity.class))).setNegativeButton(I18n.t("Đóng"),null).show();return;}
       new Sheet(this).setTitle("Studio Pro").setItemIcons(new String[]{"wand","map_pin","clapperboard","trash"}).setItems(new String[]{"Aurora","Travel","Cinema",I18n.t("Gỡ mẫu Pro")},(d,index)->{if(project.clips.isEmpty())return;if(index==3){if(proBefore!=null){remember();project=proBefore.copy();proBefore=null;proApplied=false;afterClipsChanged();}return;}if(proBefore==null)proBefore=project.copy();remember();proApplied=true;for(EditorProject.Clip clip:project.clips){clip.fx.filter=index==0?"lavender":index==1?"golden":"cinema";clip.fx.intensity=index==0?.78f:index==1?.65f:.85f;clip.transition=index==0?"fade":index==1?"slideLeft":"black";clip.transitionLength=index==2?.35f:.5f;clip.fx.contrastLevel=index==2?1.12f:1.04f;clip.fx.saturation=index==1?1.12f:1f;}afterClipsChanged();showHint(I18n.t("Đã áp dụng mẫu Studio Pro."),1800);}).show();
     });
@@ -397,7 +458,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
   private LinearLayout openSheet(String title) {
     sheetTitle.setText(title); sheetBody.removeAllViews(); sheet.setVisibility(View.VISIBLE); toolScroll.setVisibility(View.GONE); return sheetBody;
   }
-  private void closeSheet() { if (micRecording) stopMic(); if (sheet == null) return; sheet.setVisibility(View.GONE); toolScroll.setVisibility(View.VISIBLE); refreshTools(); }
+  private void closeSheet() { if (captioning || captions != null) cancelCaptions(); if (micRecording) stopMic(); if (sheet == null) return; sheet.setVisibility(View.GONE); toolScroll.setVisibility(View.VISIBLE); refreshTools(); }
 
   private TextView section(LinearLayout box, String text) { TextView t = label(text, 12, MUTED); t.setPadding(0, dp(10), 0, dp(6)); box.addView(t); return t; }
   private TextView note(LinearLayout box, String text) { TextView t = label(text, 12, MUTED); t.setPadding(0, dp(8), 0, dp(4)); t.setLineSpacing(dp(2), 1); box.addView(t); return t; }
@@ -504,9 +565,9 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     EditorProject.Item item = selectedItem(); if (item == null) return; boolean isClip = item instanceof EditorProject.Clip;
     LinearLayout box = openSheet(isClip ? I18n.t("Vị trí clip") : I18n.t("Vị trí lớp")); float[] pose = item.pose(localTime());
     slider(box, I18n.t("Kích thước"), isClip ? .3f : .1f, 4, pose[EditorProject.SCALE], percent(), v -> item.edit(localTime(), EditorProject.SCALE, v));
-    slider(box, "Ngang", 0, 1, pose[EditorProject.X], v -> Math.round((v - .5f) * 200) + "", v -> item.edit(localTime(), EditorProject.X, v));
+    slider(box, I18n.t("Ngang"), 0, 1, pose[EditorProject.X], v -> Math.round((v - .5f) * 200) + "", v -> item.edit(localTime(), EditorProject.X, v));
     slider(box, I18n.t("Dọc"), 0, 1, pose[EditorProject.Y], v -> Math.round((v - .5f) * 200) + "", v -> item.edit(localTime(), EditorProject.Y, v));
-    slider(box, "Xoay", -180, 180, pose[EditorProject.ROTATION], degrees(), v -> item.edit(localTime(), EditorProject.ROTATION, Math.round(v)));
+    slider(box, I18n.t("Xoay"), -180, 180, pose[EditorProject.ROTATION], degrees(), v -> item.edit(localTime(), EditorProject.ROTATION, Math.round(v)));
     slider(box, I18n.t("Độ mờ"), 0, 1, pose[EditorProject.OPACITY], percent(), v -> item.edit(localTime(), EditorProject.OPACITY, v));
     boolean smooth = item.keys.isEmpty() || item.keys.get(0).smooth;
     chips(box, I18n.t("Chuyển động giữa khung hình chính"), new String[][] { { "smooth", I18n.t("Mượt (ease)") }, { "linear", I18n.t("Đều") } }, smooth ? "smooth" : "linear", id -> { for (EditorProject.Key k : item.keys) k.smooth = id.equals("smooth"); });
@@ -537,6 +598,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     EffectControls.Target target = new EffectControls.Target() {
       public String filter() { return base.filter(); } public String sticker() { return base.sticker(); } public boolean beauty() { return base.beauty(); }
       public float value(String k) { return base.value(k); } public String[][] filters() { return base.filters(); }
+      public String activeLook() { return base.activeLook(); }
       public void filter(String id) { remember(); base.filter(id); } public void sticker(String id) { remember(); base.sticker(id); } public void look(String id) { remember(); base.look(id); }
       public void beginEdit() { remember(); } public void value(String k, float v) { base.value(k, v); dirty = true; }
     };
@@ -567,9 +629,15 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
   private final class TransitionPreview extends View {
     private final String kind; private Bitmap a, b, out; private final EditorRender demo = new EditorRender();
     TransitionPreview(Context c, String kind) { super(c); this.kind = kind; }
+    private void releaseBitmaps() {
+      if (a != null && !a.isRecycled()) a.recycle(); a = null;
+      if (b != null && !b.isRecycled()) b.recycle(); b = null;
+      if (out != null && !out.isRecycled()) out.recycle(); out = null;
+    }
+    @Override protected void onDetachedFromWindow() { releaseBitmaps(); demo.release(); super.onDetachedFromWindow(); }
     @Override protected void onDraw(Canvas canvas) {
       int w = getWidth(), h = getHeight(); if (w <= 0 || h <= 0) return;
-      if (a == null || a.getWidth() != w) { a = card(w, h, 0xff5b3df5, 0xffb388ff, "A"); b = card(w, h, 0xffff7a45, 0xffffd45c, "B"); out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888); }
+      if (a == null || a.isRecycled() || b == null || b.isRecycled() || out == null || out.isRecycled() || a.getWidth() != w || a.getHeight() != h) { releaseBitmaps(); a = card(w, h, 0xff5b3df5, 0xffb388ff, "A"); b = card(w, h, 0xffff7a45, 0xffffd45c, "B"); out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888); }
       long t = SystemClock.uptimeMillis() % 1800; float u = Math.max(0, Math.min(1, (t - 300) / 1000f));
       Canvas c = new Canvas(out); c.drawColor(Color.BLACK); demo.transition(c, kind, u, a, b); canvas.drawBitmap(out, 0, 0, null); postInvalidateOnAnimation();
     }
@@ -591,12 +659,19 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
   private void editText(EditorProject.Layer layer, boolean adding) {
     EditText field = new KinnectInput(this); field.setText(layer.text); field.setHint(I18n.t("Nhập chữ")); field.setSelection(field.getText().length()); field.setMinLines(2); field.setMaxLines(6);
     FrameLayout wrap = new FrameLayout(this); wrap.setPadding(dp(20), dp(8), dp(20), 0); wrap.addView(field);
+    if (textEditDialog != null) {
+      try { if (textEditDialog.isShowing()) textEditDialog.dismiss(); } catch (Exception ignored) {}
+      textEditDialog = null;
+    }
     AlertDialog dialog = new AlertDialog.Builder(this).setTitle(adding ? I18n.t("Thêm chữ") : I18n.t("Sửa chữ")).setView(wrap)
-      .setPositiveButton("Xong", (d, w) -> {
+      .setPositiveButton(I18n.t("Xong"), (d, w) -> {
         String value = field.getText().toString().trim(); if (value.isEmpty()) return;
         remember(); layer.text = value; if (adding) { project.layers.add(layer); select("layer", layer.id); } else refreshTools(); timeline.requestLayout(); timeline.invalidate();
       }).setNegativeButton(I18n.t("Hủy"), null).create();
-    dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE); dialog.show(); field.requestFocus();
+    textEditDialog = dialog;
+    dialog.setOnDismissListener(d -> { if (textEditDialog == dialog) textEditDialog = null; });
+    if (dialog.getWindow() != null) dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+    dialog.show(); field.requestFocus();
   }
 
   private void styleSheet() {
@@ -617,7 +692,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     List<String[]> ins = new ArrayList<>(); for (String[] a : EditorRender.ANIMATIONS) if (words || !a[0].equals("type")) ins.add(a);
     List<String[]> outs = new ArrayList<>(); for (String[] a : EditorRender.ANIMATIONS) if (!a[0].equals("type")) outs.add(a);
     chips(box, I18n.t("Vào"), ins.toArray(new String[0][]), l.animIn, id -> l.animIn = id);
-    chips(box, "Ra", outs.toArray(new String[0][]), l.animOut, id -> l.animOut = id);
+    chips(box, I18n.t("Ra"), outs.toArray(new String[0][]), l.animOut, id -> l.animOut = id);
     slider(box, I18n.t("Thời lượng"), .1f, 1.5f, l.animLength, seconds(), v -> l.animLength = v);
   }
 
@@ -633,7 +708,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     LinearLayout box = openSheet(I18n.t("Nhãn dán"));
     int cell = (getResources().getDisplayMetrics().widthPixels - dp(32)) / 6;
     for (String[] group : STICKERS) {
-      section(box, group[0]); GridLayout grid = new GridLayout(this); grid.setColumnCount(6);
+      section(box, I18n.t(group[0])); GridLayout grid = new GridLayout(this); grid.setColumnCount(6);
       for (String emoji : group[1].split(" ")) {
         TextView t = label(emoji, 26, Color.WHITE); t.setGravity(Gravity.CENTER); t.setBackground(new RippleDrawable(ColorStateList.valueOf(0x33ffffff), null, rounded(Color.WHITE, 10)));
         t.setOnClickListener(v -> { remember(); EditorProject.Layer l = newLayer("sticker", 3); l.text = emoji; l.animIn = "pop"; project.layers.add(l); select("layer", l.id); showHint(I18n.t("Kéo nhãn dán trên khung xem trước để đặt vị trí"), 1800); });
@@ -668,7 +743,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
   private void startMic() {
     if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) { requestPermissions(new String[] { Manifest.permission.RECORD_AUDIO }, MIC); return; }
     try {
-      micFile = File.createTempFile("kinnect-voice-", ".m4a", getCacheDir()); mic = new MediaRecorder();
+      micFile = File.createTempFile("kinnect-voice-", ".m4a", getCacheDir()); tempFiles.add(micFile); mic = new MediaRecorder();
       mic.setAudioSource(MediaRecorder.AudioSource.MIC); mic.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4); mic.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
       mic.setAudioSamplingRate(44100); mic.setAudioEncodingBitRate(128000); mic.setAudioChannels(1); mic.setOutputFile(micFile.getPath()); mic.prepare(); mic.start();
       micRecording = true; micStart = playhead; micStarted = SystemClock.elapsedRealtime(); if (playhead >= project.duration() - .05f) micStart = playhead; playing = playhead < project.duration() - .05f; updateButtons();
@@ -707,21 +782,35 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     action(box, "caption", I18n.t("Tạo phụ đề"), () -> makeCaptions(status));
   }
 
+  private void cancelCaptions() {
+    captionGeneration++;
+    captioning = false;
+    if (task != null && !exporting) { task.cancel(true); task = null; }
+    if (captions != null) { captions.cancel(); captions = null; }
+    busy = false;
+    updateButtons();
+  }
+
   private void makeCaptions(TextView status) {
+    if (busy) return;
     final List<EditorAudio.Source> sources = new ArrayList<>(); float[] starts = project.starts();
     for (int i = 0; i < project.clips.size(); i++) { EditorProject.Clip c = project.clips.get(i); if (!c.video || !c.hasAudio || c.volume <= 0) continue; EditorAudio.Source s = new EditorAudio.Source(); s.file = c.file; s.start = starts[i]; s.length = c.length(); s.in = c.in; s.rate = c.speed; sources.add(s); }
     for (EditorProject.Track t : project.tracks) if (t.kind.equals("voice")) { EditorAudio.Source s = new EditorAudio.Source(); s.file = t.file; s.start = t.start; s.length = t.length; s.in = t.in; s.gain = 1; sources.add(s); }
     if (sources.isEmpty()) { status.setText(I18n.t("Không có giọng nói: các clip đều tắt tiếng hoặc không có âm thanh.")); return; }
-    busy = true; playing = false; status.setText(I18n.t("Đang chuẩn bị âm thanh…")); final long ms = (long) (project.duration() * 1000); final String language = captionLanguage;
+    final int gen = ++captionGeneration;
+    captioning = true; busy = true; playing = false; updateButtons(); status.setText(I18n.t("Đang chuẩn bị âm thanh…")); final long ms = (long) (project.duration() * 1000); final String language = captionLanguage;
     task = worker.submit(() -> {
       try {
         short[] pcm = EditorAudio.speech(this, sources, ms, AutoCaptions.RATE);
+        if (closed || gen != captionGeneration || Thread.currentThread().isInterrupted()) return;
         runOnUiThread(() -> {
-          if (closed) return; captions = new AutoCaptions();
+          if (closed || gen != captionGeneration) return;
+          captions = new AutoCaptions();
           captions.run(this, pcm, language, new AutoCaptions.Listener() {
-            public void progress(int done, int total) { status.setText(I18n.t("Đang nhận dạng giọng nói… ") + done + "/" + total); }
+            public void progress(int done, int total) { if (closed || gen != captionGeneration) return; status.setText(I18n.t("Đang nhận dạng giọng nói… ") + done + "/" + total); }
             public void finished(List<float[]> times, List<String> lines, String error) {
-              busy = false; captions = null;
+              if (closed || gen != captionGeneration) return;
+              captioning = false; busy = false; captions = null; updateButtons();
               if (lines.isEmpty()) { status.setText(error); return; }
               remember(); EditorProject.Layer style = null;
               for (Iterator<EditorProject.Layer> it = project.layers.iterator(); it.hasNext();) { EditorProject.Layer l = it.next(); if (!l.kind.equals("caption")) continue; if (style == null) style = l; if (replaceCaptions) it.remove(); }
@@ -736,7 +825,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
             }
           });
         });
-      } catch (Exception | OutOfMemoryError e) { runOnUiThread(() -> { busy = false; status.setText(I18n.t("Không đọc được âm thanh của video.")); }); }
+      } catch (Exception | OutOfMemoryError e) { runOnUiThread(() -> { if (closed || gen != captionGeneration) return; captioning = false; busy = false; updateButtons(); status.setText(I18n.t("Không đọc được âm thanh của video.")); }); }
     });
   }
 
@@ -791,7 +880,8 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(type);
     if (request == PICK_CLIPS) pick.putExtra(Intent.EXTRA_MIME_TYPES, new String[] { "image/*", "video/*" });
     if (multiple) pick.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-    startActivityForResult(pick, request);
+    try { startActivityForResult(pick, request); }
+    catch (ActivityNotFoundException e) { showHint(I18n.t("Không mở được thư viện tệp."), 1800); }
   }
 
   @Override protected void onActivityResult(int request, int result, Intent data) {
@@ -819,6 +909,7 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
             project.tracks.add(t); select("track", t.id); timeline.requestLayout(); showHint(I18n.t("Đã thêm nhạc"), 1200); });
         } else if (request == PICK_IMAGE) {
           File f = copyIn(uris.get(0), "kinnect-overlay-"); Bitmap b = decodePhoto(f, 1280); if (b == null) throw new IOException(I18n.t("Không phải ảnh."));
+          if (closed) { b.recycle(); return; }
           images.put(f.getAbsolutePath(), b);
           runOnUiThread(() -> { if (closed) return; remember(); EditorProject.Layer l = newLayer("image", 5); l.image = f; l.scale = .8f; project.layers.add(l); select("layer", l.id); showHint(I18n.t("Kéo, chụm hai ngón để đặt lớp phủ"), 1600); });
         }
@@ -890,13 +981,35 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     if (d.surface == null) { if (!d.view.isAvailable()) return false; d.surface = new Surface(d.view.getSurfaceTexture()); }
     if (d.player != null) { d.player.release(); d.player = null; }
     d.clipId = c.id; d.file = c.file; d.prepared = false; d.seeking = false; d.pendingSeek = -1; d.speed = 1;
+    MediaPlayer mp = null;
     try {
-      final MediaPlayer mp = new MediaPlayer(); d.player = mp; mp.setDataSource(c.file.getPath()); mp.setSurface(d.surface); mp.setVolume(0, 0);
+      mp = new MediaPlayer(); d.player = mp; mp.setDataSource(c.file.getPath()); mp.setSurface(d.surface); mp.setVolume(0, 0);
       mp.setOnPreparedListener(p -> { if (d.player == p) d.prepared = true; });
       mp.setOnSeekCompleteListener(p -> { if (d.player != p) return; d.seeking = false; if (d.pendingSeek >= 0) { long s = d.pendingSeek; d.pendingSeek = -1; seek(d, s); } });
       mp.setOnErrorListener((p, a, b) -> { if (d.player == p) { d.prepared = false; d.clipId = -1; } return true; });
       mp.prepareAsync(); return true;
-    } catch (Exception e) { d.clipId = -1; return false; }
+    } catch (Exception e) {
+      if (mp != null) { try { mp.release(); } catch (Exception ignored) {} }
+      if (d.player == mp) d.player = null;
+      d.clipId = -1; return false;
+    }
+  }
+
+  private void applyDeckSpeed(Deck d, float speed) {
+    float clamped = Math.max(0.25f, Math.min(4.0f, speed));
+    if (d.speed == clamped) return;
+    try {
+      d.player.setPlaybackParams(new PlaybackParams().setSpeed(clamped).setPitch(1f));
+      d.speed = clamped;
+    } catch (IllegalArgumentException | IllegalStateException e) {
+      float safe = Math.max(0.5f, Math.min(2.0f, clamped));
+      try {
+        d.player.setPlaybackParams(new PlaybackParams().setSpeed(safe).setPitch(1f));
+      } catch (IllegalArgumentException | IllegalStateException ignored) {
+        try { d.player.setPlaybackParams(new PlaybackParams().setSpeed(1f).setPitch(1f)); } catch (IllegalArgumentException | IllegalStateException ignored2) {}
+      }
+      d.speed = clamped;
+    }
   }
 
   private void seek(Deck d, long ms) { if (!d.prepared) return; if (d.seeking) { d.pendingSeek = ms; return; } d.seeking = true; d.player.seekTo(ms, MediaPlayer.SEEK_CLOSEST); }
@@ -919,13 +1032,13 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
       float vol = exporting || micRecording || !c.hasAudio ? 0 : Math.min(1, c.volume) * weight; d.player.setVolume(vol, vol);
       try {
         if (run) {
-          if (!d.player.isPlaying()) { seek(d, expected); d.player.start(); if (d.speed != c.speed) { d.player.setPlaybackParams(new PlaybackParams().setSpeed(c.speed).setPitch(1)); d.speed = c.speed; } }
-          else { if (d.speed != c.speed) { d.player.setPlaybackParams(new PlaybackParams().setSpeed(c.speed).setPitch(1)); d.speed = c.speed; } if (!d.seeking && Math.abs(d.player.getCurrentPosition() - expected) > 400) seek(d, expected); }
+          if (!d.player.isPlaying()) { seek(d, expected); d.player.start(); applyDeckSpeed(d, c.speed); }
+          else { applyDeckSpeed(d, c.speed); if (!d.seeking && Math.abs(d.player.getCurrentPosition() - expected) > 400) seek(d, expected); }
         } else {
           if (d.player.isPlaying()) d.player.pause();
           if (!d.seeking && Math.abs(d.player.getCurrentPosition() - expected) > 45) seek(d, expected);
         }
-      } catch (IllegalStateException ignored) {}
+      } catch (IllegalStateException | IllegalArgumentException ignored) {}
     }
     // Preload the next video clip so the cut has no gap.
     int last = active.length == 0 ? -1 : active[active.length - 1];
@@ -941,11 +1054,13 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     for (EditorProject.Track tr : project.tracks) {
       alive.add(tr.id); TrackPlayer p = trackPlayers.get(tr.id);
       if (p == null || !p.file.equals(tr.file)) {
-        if (p != null) p.mp.release(); final TrackPlayer np = new TrackPlayer(); np.file = tr.file; np.mp = new MediaPlayer(); trackPlayers.put(tr.id, np);
-        try { np.mp.setDataSource(tr.file.getPath()); np.mp.setOnPreparedListener(m -> np.prepared = true); np.mp.prepareAsync(); } catch (Exception ignored) {}
+        if (p != null && p.mp != null) { try { p.mp.release(); } catch (Exception ignored) {} }
+        final TrackPlayer np = new TrackPlayer(); np.file = tr.file; np.mp = new MediaPlayer(); trackPlayers.put(tr.id, np);
+        try { np.mp.setDataSource(tr.file.getPath()); np.mp.setOnPreparedListener(m -> np.prepared = true); np.mp.prepareAsync(); }
+        catch (Exception e) { try { np.mp.release(); } catch (Exception ignored) {} np.mp = null; }
         continue;
       }
-      if (!p.prepared) continue;
+      if (!p.prepared || p.mp == null) continue;
       float local = t - tr.start; boolean on = run && local >= 0 && local < tr.length && !exporting && !(micRecording && tr.kind.equals("voice"));
       try {
         if (on) {
@@ -955,20 +1070,26 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
         } else if (p.mp.isPlaying()) p.mp.pause();
       } catch (IllegalStateException ignored) {}
     }
-    for (Iterator<Map.Entry<Integer, TrackPlayer>> it = trackPlayers.entrySet().iterator(); it.hasNext();) { Map.Entry<Integer, TrackPlayer> en = it.next(); if (!alive.contains(en.getKey())) { en.getValue().mp.release(); it.remove(); } }
+    for (Iterator<Map.Entry<Integer, TrackPlayer>> it = trackPlayers.entrySet().iterator(); it.hasNext();) { Map.Entry<Integer, TrackPlayer> en = it.next(); if (!alive.contains(en.getKey())) { if (en.getValue().mp != null) en.getValue().mp.release(); it.remove(); } }
+  }
+
+  private float[] denormalizeFace(int clipId, Bitmap bmp) {
+    float[] nf = faceOf.get(clipId);
+    if (nf == null || bmp == null || bmp.isRecycled()) return null;
+    return new float[] { nf[0] * bmp.getWidth(), nf[1] * bmp.getHeight(), nf[2] * bmp.getWidth(), nf[3] };
   }
 
   private Map<Integer, EditorRender.Frame> frames(float t, int maxSide) {
     Map<Integer, EditorRender.Frame> out = new HashMap<>(); int[] active = activeClips(t);
     for (int i : active) {
-      EditorProject.Clip c = project.clips.get(i); EditorRender.Frame f = new EditorRender.Frame(); f.face = faceOf.get(c.id);
+      EditorProject.Clip c = project.clips.get(i); EditorRender.Frame f = new EditorRender.Frame();
       if (c.video) {
         Deck d = deckFor(c, false, Collections.emptySet()); if (d == null || !d.prepared || !d.view.isAvailable()) continue;
         float k = Math.min(1, maxSide / (float) Math.max(c.width, c.height)); int w = Math.max(2, Math.round(c.width * k)), h = Math.max(2, Math.round(c.height * k));
         if (d.frame == null || d.frame.getWidth() != w || d.frame.getHeight() != h) { if (d.frame != null) d.frame.recycle(); d.frame = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888); }
         d.view.getBitmap(d.frame); f.bitmap = d.frame;
       } else f.bitmap = photos.get(c.file.getAbsolutePath());
-      if (f.bitmap != null) out.put(c.id, f);
+      if (f.bitmap != null) { f.face = denormalizeFace(c.id, f.bitmap); out.put(c.id, f); }
     }
     if (active.length > 0 && tick % 6 == 0 && !detecting) { EditorProject.Clip c = project.clips.get(active[active.length - 1]); EditorRender.Frame f = out.get(c.id); if (f != null && c.fx.needsFace()) detect(c.id, f.bitmap); }
     return out;
@@ -976,11 +1097,12 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
 
   private void detect(int clipId, Bitmap source) {
     if (closed || faces.isShutdown()) return; detecting = true; int w = 320, h = Math.max(2, source.getHeight() * w / source.getWidth());
-    Bitmap scaled = Bitmap.createScaledBitmap(source, w, h, true); final Bitmap small = scaled.copy(Bitmap.Config.RGB_565, false); if (scaled != source) scaled.recycle(); final float scale = source.getWidth() / (float) w;
+    Bitmap scaled = Bitmap.createScaledBitmap(source, w, h, true); final Bitmap small = scaled.copy(Bitmap.Config.RGB_565, false); if (scaled != source) scaled.recycle();
+    final int sw = small.getWidth(), sh = small.getHeight();
     try {
       faces.execute(() -> {
-        try { FaceDetector.Face[] found = new FaceDetector.Face[1]; int count = new FaceDetector(320, small.getHeight(), 1).findFaces(small, found);
-          if (count > 0 && found[0].confidence() >= .3f) { PointF mid = new PointF(); found[0].getMidPoint(mid); faceOf.put(clipId, new float[] { mid.x * scale, mid.y * scale, found[0].eyesDistance() * scale, found[0].pose(FaceDetector.Face.EULER_Z) }); }
+        try { FaceDetector.Face[] found = new FaceDetector.Face[1]; int count = new FaceDetector(sw, sh, 1).findFaces(small, found);
+          if (count > 0 && found[0].confidence() >= .3f) { PointF mid = new PointF(); found[0].getMidPoint(mid); faceOf.put(clipId, new float[] { mid.x / sw, mid.y / sh, found[0].eyesDistance() / sw, found[0].pose(FaceDetector.Face.EULER_Z) }); }
           else faceOf.remove(clipId);
         } finally { small.recycle(); detecting = false; }
       });
@@ -1019,51 +1141,89 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
   }
 
   @Override public void onBackPressed() {
-    if (exporting) { cancelExport(I18n.t("Đã hủy xuất.")); return; }
-    if (captions != null) { captions.cancel(); captions = null; busy = false; }
+    if (exporting || (exportCover != null && exportCover.getVisibility() == View.VISIBLE)) { cancelExport(I18n.t("Đã hủy xuất.")); return; }
+    if (captioning || captions != null) { cancelCaptions(); showHint(I18n.t("Đã hủy tạo phụ đề."), 1400); return; }
     if (sheet.getVisibility() == View.VISIBLE) { closeSheet(); return; }
     if (selKind != null) { select(null, 0); return; }
     requestExit();
   }
 
-  private void requestExit(){if(exporting){cancelExport(I18n.t("Đã hủy xuất."));return;}new Sheet(this).setTitle(I18n.t("Thoát Studio Pro?")).setMessage(I18n.t("Thoát không lưu sẽ bỏ chỉnh sửa video hiện tại. Video gốc vẫn được giữ nguyên.")).setPositiveButton(I18n.t("Thoát không lưu"),(d,w)->{if(captions!=null){captions.cancel();captions=null;}if(micRecording)stopMic();setResult(RESULT_CANCELED);finish();}).setNegativeButton(I18n.t("Tiếp tục chỉnh sửa"),null).show();}
+  private void requestExit(){if(exporting||(exportCover!=null&&exportCover.getVisibility()==View.VISIBLE)){cancelExport(I18n.t("Đã hủy xuất."));return;}new Sheet(this).setTitle(I18n.t("Thoát Studio Pro?")).setMessage(I18n.t("Thoát không lưu sẽ bỏ chỉnh sửa video hiện tại. Video gốc vẫn được giữ nguyên.")).setPositiveButton(I18n.t("Thoát không lưu"),(d,w)->{if(captioning||captions!=null)cancelCaptions();if(micRecording)stopMic();setResult(RESULT_CANCELED);finish();}).setNegativeButton(I18n.t("Tiếp tục chỉnh sửa"),null).show();}
 
   // ---------- Export ----------
   private void export(boolean save) {
-    if(proApplied){NativeApi.shared.call("GET","/api/store",null,(catalog,error,status)->{if(closed)return;boolean owned=catalog!=null&&catalog.optBoolean("studioProFree");org.json.JSONArray ids=catalog==null?null:catalog.optJSONArray("owned");for(int i=0;ids!=null&&i<ids.length();i++)if(ids.optString(i).equals("kinnect_studio_pro"))owned=true;if(error!=null||!owned){showHint(I18n.t("Cần xác minh quyền Studio Pro trước khi xuất. Bạn có thể gỡ mẫu Pro để dùng công cụ miễn phí."),3000);return;}exportReady(save);});return;}
+    if (busy || project.clips.isEmpty()) return;
+    if (proApplied) {
+      busy = true;
+      showHint(I18n.t("Đang xác minh Studio Pro…"), 0);
+      NativeApi.shared.call("GET", "/api/store", null, null, (catalog, error, status) -> {
+        if (closed) return;
+        busy = false;
+        boolean owned = hasStudioVideoAccess(catalog);
+        if (error != null || !owned) { showHint(I18n.t("Cần xác minh quyền Studio Pro trước khi xuất. Bạn có thể gỡ mẫu Pro để dùng công cụ miễn phí."), 3000); return; }
+        exportReady(save);
+      }, () -> {
+        if (!closed) {
+          busy = false;
+          showHint(I18n.t("Phiên đã thay đổi, vui lòng thử lại."), 2200);
+        }
+      });
+      return;
+    }
     exportReady(save);
   }
   private void exportReady(boolean save) {
     if (busy || project.clips.isEmpty()) return; saveRequested = save; closeSheet(); playing = false; updateButtons();
     EditorProject.Clip only = project.clips.size() == 1 ? project.clips.get(0) : null;
-    if (!dirty && only != null && only.file.equals(input)) { deliver(input); return; }
+    if (!dirty && only != null && only.file.equals(input)) { deliver(input, !only.video); return; }
     if (project.still()) { exportStill(); return; }
     startExport();
   }
 
   private void exportStill() {
     busy = true;
+    Bitmap output = null;
+    EditorRender stillRender = new EditorRender();
+    EditorProject copy = null;
     try {
       EditorProject.Clip c = project.clips.get(0); Bitmap photo = photos.get(c.file.getAbsolutePath()); if (photo == null) throw new IOException(I18n.t("Ảnh chưa sẵn sàng."));
-      EditorProject copy = project.copy(); float t = c.length() / 2; for (EditorProject.Layer l : copy.layers) { l.start = 0; l.length = c.length(); l.animIn = l.animOut = "none"; }
+      copy = project.copy(); float t = c.length() / 2; for (EditorProject.Layer l : copy.layers) { l.start = 0; l.length = c.length(); l.animIn = l.animOut = "none"; }
       float ratio = project.outputAspect(); int side = Math.max(photo.getWidth(), photo.getHeight()); int w = ratio >= 1 ? side : Math.round(side * ratio), h = ratio >= 1 ? Math.round(side / ratio) : side;
-      Bitmap output = Bitmap.createBitmap(Math.max(2, w), Math.max(2, h), Bitmap.Config.ARGB_8888);
-      Map<Integer, EditorRender.Frame> frames = new HashMap<>(); EditorRender.Frame f = new EditorRender.Frame(); f.bitmap = photo; f.face = faceOf.get(c.id); frames.put(copy.clips.get(0).id, f);
-      new EditorRender().draw(new Canvas(output), copy, t, frames, images, tick, false);
-      File file = File.createTempFile("kinnect-edited-", ".jpg", getCacheDir()); try (OutputStream out = new FileOutputStream(file)) { output.compress(Bitmap.CompressFormat.JPEG, 94, out); } output.recycle();
-      deliver(file);
+      output = Bitmap.createBitmap(Math.max(2, w), Math.max(2, h), Bitmap.Config.ARGB_8888);
+      Map<Integer, EditorRender.Frame> frames = new HashMap<>(); EditorRender.Frame f = new EditorRender.Frame(); f.bitmap = photo; f.face = denormalizeFace(c.id, photo); frames.put(copy.clips.get(0).id, f);
+      stillRender.draw(new Canvas(output), copy, t, frames, images, tick, false);
+      File file = File.createTempFile("kinnect-edited-", ".jpg", getCacheDir()); tempFiles.add(file); try (OutputStream out = new FileOutputStream(file)) { output.compress(Bitmap.CompressFormat.JPEG, 94, out); }
+      deliver(file, true);
     } catch (Exception | OutOfMemoryError error) { busy = false; showHint(I18n.t("Không xuất được ảnh. Hãy thử lại."), 2000); }
+    finally {
+      stillRender.release();
+      if (copy != null) for (EditorProject.Clip cl : copy.clips) if (cl != null && cl.fx != null) cl.fx.release();
+      if (output != null && !output.isRecycled()) output.recycle();
+    }
   }
 
   private void startExport() {
     try {
       busy = true; float ratio = project.outputAspect(); int side = project.exportSide;
-      // The short side gets the chosen resolution (1080p = 1080×1920 for 9:16).
-      int w, h; if (ratio < 1) { w = side & ~1; h = Math.round(side / ratio) & ~1; } else { h = side & ~1; w = Math.round(side * ratio) & ~1; }
-      rendered = File.createTempFile("kinnect-effects-", ".mp4", getCacheDir()); recorder = new MediaRecorder();
+      // The short side gets the chosen resolution, capped at 1920 and aligned to multiples of 16 for H.264 compatibility.
+      int w, h;
+      if (ratio < 1f) { w = side; h = Math.round(side / ratio); } else { h = side; w = Math.round(side * ratio); }
+      int maxDim = Math.max(w, h);
+      if (maxDim > 1920) {
+        float down = 1920f / maxDim;
+        w = Math.round(w * down);
+        h = Math.round(h * down);
+      }
+      w = Math.max(16, Math.min(1920, w & ~15));
+      h = Math.max(16, Math.min(1920, h & ~15));
+      float durSec = Math.max(1f, project.duration());
+      int baseBitrate = side >= 1080 ? 6_000_000 : side >= 720 ? 4_500_000 : 2_500_000;
+      long budgetVideoBps = (long) ((38.0 * 1024.0 * 1024.0 * 8.0) / durSec) - 256_000L;
+      int videoBitrate = (int) Math.max(1_200_000L, Math.min(6_000_000L, Math.min(baseBitrate, budgetVideoBps)));
+      rendered = File.createTempFile("kinnect-effects-", ".mp4", getCacheDir()); tempFiles.add(rendered); recorder = new MediaRecorder();
       recorder.setVideoSource(MediaRecorder.VideoSource.SURFACE); recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4); recorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
-      recorder.setVideoSize(w, h); recorder.setVideoFrameRate(30); recorder.setVideoEncodingBitRate(side >= 1080 ? 10_000_000 : side >= 720 ? 6_000_000 : 3_000_000);
-      recorder.setOutputFile(rendered.getPath()); recorder.prepare(); recordSurface = recorder.getSurface();
+      recorder.setVideoSize(w, h); recorder.setVideoFrameRate(30); recorder.setVideoEncodingBitRate(videoBitrate);
+      recorder.setOutputFile(rendered.getPath()); recorder.prepare(); recordSurface = recorder.getSurface(); hardwareRecordSurface = true;
       if (exportFrame != null) exportFrame.recycle(); exportFrame = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
       exporting = true; armed = false; armWait = SystemClock.elapsedRealtime(); playhead = 0; exportGeneration++;
       exportCover.setVisibility(View.VISIBLE); exportBar.setProgress(0); exportText.setText(I18n.t("Đang chuẩn bị…"));
@@ -1083,8 +1243,21 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     long ms = SystemClock.elapsedRealtime();
     if (ms - lastPost >= 33 || playhead >= duration) {
       lastPost = ms; render.draw(new Canvas(exportFrame), project, playhead, frames(playhead, Math.min(1920, Math.max(exportFrame.getWidth(), exportFrame.getHeight()))), images, tick, false);
-      try { Canvas c = recordSurface.lockHardwareCanvas(); try { c.drawBitmap(exportFrame, 0, 0, null); } finally { recordSurface.unlockCanvasAndPost(c); } }
-      catch (Exception error) { cancelExport(I18n.t("Không xuất được hiệu ứng trên thiết bị này.")); return; }
+      Canvas rc = null;
+      try {
+        if (hardwareRecordSurface) {
+          try { rc = recordSurface.lockHardwareCanvas(); }
+          catch (Exception hwFail) { hardwareRecordSurface = false; rc = null; }
+        }
+        if (rc == null && !hardwareRecordSurface) rc = recordSurface.lockCanvas(null);
+        if (rc == null) throw new IllegalStateException("lockCanvas returned null");
+        rc.drawBitmap(exportFrame, 0, 0, null);
+      } catch (Exception error) {
+        cancelExport(I18n.t("Không xuất được hiệu ứng trên thiết bị này."));
+        return;
+      } finally {
+        if (rc != null) { try { recordSurface.unlockCanvasAndPost(rc); } catch (Exception ignored) {} }
+      }
       if (preview.getHolder().getSurface().isValid()) { Canvas c = null; try { c = preview.getHolder().lockCanvas(); if (c != null) c.drawBitmap(exportFrame, null, new Rect(0, 0, c.getWidth(), c.getHeight()), null); } catch (Exception ignored) {} finally { if (c != null) preview.getHolder().unlockCanvasAndPost(c); } }
       int pct = Math.round(playhead / Math.max(.01f, duration) * 90); exportBar.setProgress(pct); exportText.setText(I18n.t("Đang xuất ") + pct + "%"); timeline.invalidate(); updateTime();
     }
@@ -1105,8 +1278,8 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     final long ms = (long) (project.duration() * 1000); final int generation = exportGeneration; final File video = rendered;
     task = worker.submit(() -> {
       try {
-        File output = File.createTempFile("kinnect-edited-", ".mp4", getCacheDir()); EditorAudio.timeline(this, video, sources, ms, output);
-        runOnUiThread(() -> { if (!closed && generation == exportGeneration) { exportCover.setVisibility(View.GONE); deliver(output); } else output.delete(); });
+        File output = File.createTempFile("kinnect-edited-", ".mp4", getCacheDir()); tempFiles.add(output); EditorAudio.timeline(this, video, sources, ms, output);
+        runOnUiThread(() -> { if (!closed && generation == exportGeneration) { exportCover.setVisibility(View.GONE); deliver(output, false); } else output.delete(); });
       } catch (Exception e) { runOnUiThread(() -> { if (!closed && generation == exportGeneration) cancelExport(I18n.t("Không ghép được âm thanh: ") + e.getMessage()); }); }
     });
   }
@@ -1119,16 +1292,35 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
   }
 
   private void deliver(File file) {
+    deliver(file, project.clips.isEmpty() ? isImageFile(file) : project.still());
+  }
+
+  private boolean isImageFile(File file) {
+    try (InputStream in = new FileInputStream(file)) {
+      byte[] header = new byte[32]; int n = in.read(header);
+      if (n > 0) { String mime = MediaType.sniff(header); if (mime != null) return mime.startsWith("image/"); }
+    } catch (Exception ignored) {}
+    return false;
+  }
+
+  private void deliver(File file, boolean still) {
     if (saveRequested) {
       saveFile = file; busy = false;
       try {
-        byte[] header = new byte[32]; try (InputStream in = new FileInputStream(file)) { in.read(header); } String mime = MediaType.sniff(header); if (mime == null) mime = project.still() ? "image/jpeg" : "video/mp4";
+        byte[] header = new byte[32]; try (InputStream in = new FileInputStream(file)) { in.read(header); } String mime = MediaType.sniff(header); if (mime == null) mime = still ? "image/jpeg" : "video/mp4";
         Intent save = new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(mime).putExtra(Intent.EXTRA_TITLE, "Kinnect-" + System.currentTimeMillis() + (mime.equals("video/mp4") ? ".mp4" : mime.equals("image/png") ? ".png" : mime.equals("image/webp") ? ".webp" : ".jpg"));
         startActivityForResult(save, SAVE);
       } catch (Exception error) { showHint(I18n.t("Không mở được nơi lưu tệp."), 1800); saveRequested = false; }
       return;
     }
-    delivered = file == input; Intent result = new Intent().setData(Uri.fromFile(file)); result.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION); setResult(RESULT_OK, result); finish();
+    if (file == input && initialUri != null && "content".equals(initialUri.getScheme())) {
+      delivered = false; deliveredFile = null;
+      Intent result = new Intent().setData(initialUri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION).putExtra("media_is_image", still);
+      setResult(RESULT_OK, result); finish(); return;
+    }
+    delivered = file == input; deliveredFile = file;
+    Intent result = new Intent().putExtra(still ? StudioActivity.EXTRA_IMAGE : StudioActivity.EXTRA_VIDEO, file.getAbsolutePath()).putExtra("media_is_image", still);
+    setResult(RESULT_OK, result); finish();
   }
 
   private void saved(int result, Intent data) {
@@ -1138,8 +1330,8 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
     task = worker.submit(() -> {
       try (InputStream in = new FileInputStream(file); OutputStream out = getContentResolver().openOutputStream(destination)) {
         if (out == null) throw new IOException(I18n.t("Không mở được nơi lưu.")); byte[] buffer = new byte[65536]; int n; while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
-        runOnUiThread(() -> { busy = false; showHint(I18n.t("✓ Đã lưu về máy"), 1600); });
-      } catch (Exception error) { runOnUiThread(() -> { busy = false; showHint(I18n.t("Không lưu được tệp. Hãy thử lại."), 1800); }); }
+        runOnUiThread(() -> { if (closed) return; busy = false; showHint(I18n.t("✓ Đã lưu về máy"), 1600); });
+      } catch (Exception error) { runOnUiThread(() -> { if (closed) return; busy = false; showHint(I18n.t("Không lưu được tệp. Hãy thử lại."), 1800); }); }
     });
   }
 
@@ -1149,17 +1341,56 @@ public final class MediaEditActivity extends Activity implements Choreographer.F
   }
 
   @Override protected void onDestroy() {
-    closed = true; Choreographer.getInstance().removeFrameCallback(this); if (task != null) task.cancel(true); if (captions != null) captions.cancel();
+    closed = true; captionGeneration++; captioning = false; Choreographer.getInstance().removeFrameCallback(this); if (task != null) task.cancel(true); if (captions != null) { captions.cancel(); captions = null; }
+    if (textEditDialog != null) { try { if (textEditDialog.isShowing()) textEditDialog.dismiss(); } catch (Exception ignored) {} textEditDialog = null; }
     worker.shutdownNow(); loader.shutdownNow(); faces.shutdownNow();
-    for (Deck d : decks) { if (d.player != null) d.player.release(); if (d.surface != null) d.surface.release(); }
-    for (TrackPlayer p : trackPlayers.values()) p.mp.release();
-    if (mic != null) { try { mic.stop(); } catch (Exception ignored) {} mic.release(); }
-    if (recorder != null) { try { recorder.stop(); } catch (Exception ignored) {} recorder.release(); }
-    if (recordSurface != null) recordSurface.release();
-    if (rendered != null) rendered.delete();
-    // Clean up copies the result does not point at.
-    Set<File> files = new HashSet<>(); for (EditorProject.Clip c : project.clips) files.add(c.file);
-    for (File f : files) if (!(delivered && f.equals(input))) f.delete();
+    if (sheetBody != null) sheetBody.removeAllViews();
+    for (Deck d : decks) { if (d.player != null) { try { d.player.release(); } catch (Exception ignored) {} d.player = null; } if (d.surface != null) { d.surface.release(); d.surface = null; } if (d.frame != null && !d.frame.isRecycled()) d.frame.recycle(); d.frame = null; }
+    for (TrackPlayer p : trackPlayers.values()) if (p.mp != null) { try { p.mp.release(); } catch (Exception ignored) {} p.mp = null; }
+    trackPlayers.clear();
+    if (mic != null) { try { mic.stop(); } catch (Exception ignored) {} mic.release(); mic = null; }
+    if (recorder != null) { try { recorder.stop(); } catch (Exception ignored) {} recorder.release(); recorder = null; }
+    if (recordSurface != null) { recordSurface.release(); recordSurface = null; }
+    if (previewFrame != null && !previewFrame.isRecycled()) previewFrame.recycle(); previewFrame = null;
+    if (exportFrame != null && !exportFrame.isRecycled()) exportFrame.recycle(); exportFrame = null;
+    render.release();
+    for (EditorProject.Clip c : project.clips) if (c != null && c.fx != null) c.fx.release();
+    for (EditorProject snap : undo) if (snap != null) for (EditorProject.Clip c : snap.clips) if (c != null && c.fx != null) c.fx.release();
+    for (EditorProject snap : redo) if (snap != null) for (EditorProject.Clip c : snap.clips) if (c != null && c.fx != null) c.fx.release();
+    if (proBefore != null) for (EditorProject.Clip c : proBefore.clips) if (c != null && c.fx != null) c.fx.release();
+    undo.clear(); redo.clear(); proBefore = null;
+    final Set<File> baseFiles = new HashSet<>();
+    if (input != null) baseFiles.add(input);
+    if (rendered != null) baseFiles.add(rendered);
+    if (micFile != null) baseFiles.add(micFile);
+    if (saveFile != null) baseFiles.add(saveFile);
+    for (EditorProject.Clip c : project.clips) if (c.file != null) baseFiles.add(c.file);
+    for (EditorProject.Track t : project.tracks) if (t.file != null) baseFiles.add(t.file);
+    for (EditorProject.Layer l : project.layers) if (l.image != null) baseFiles.add(l.image);
+    final File keepDelivered = deliveredFile;
+    final Runnable releaseShared = () -> {
+      for (Bitmap bm : photos.values()) if (bm != null && !bm.isRecycled()) bm.recycle();
+      photos.clear();
+      for (Bitmap bm : images.values()) if (bm != null && !bm.isRecycled()) bm.recycle();
+      images.clear();
+      for (Bitmap[] arr : thumbs.values()) if (arr != null) for (Bitmap bm : arr) if (bm != null && !bm.isRecycled()) bm.recycle();
+      thumbs.clear();
+      Set<File> files = new HashSet<>(baseFiles);
+      synchronized (tempFiles) { files.addAll(tempFiles); tempFiles.clear(); }
+      for (File f : files) if (f != null && !f.equals(keepDelivered)) f.delete();
+    };
+    if (loader.isTerminated() && worker.isTerminated() && faces.isTerminated()) {
+      releaseShared.run();
+    } else {
+      Thread cleanup = new Thread(() -> {
+        try { loader.awaitTermination(1500, TimeUnit.MILLISECONDS); } catch (InterruptedException ignored) {}
+        try { worker.awaitTermination(1500, TimeUnit.MILLISECONDS); } catch (InterruptedException ignored) {}
+        try { faces.awaitTermination(1500, TimeUnit.MILLISECONDS); } catch (InterruptedException ignored) {}
+        releaseShared.run();
+      }, "kinnect-edit-cleanup");
+      cleanup.setDaemon(true);
+      cleanup.start();
+    }
     super.onDestroy();
   }
 }

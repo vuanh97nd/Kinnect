@@ -23,7 +23,7 @@ final class EditorAudio {
       Pcm b=selected!=null&&musicGain>0?decode(c,selected,temporary):null;if(selected!=null&&musicGain>0&&b==null)throw new IOException(I18n.t("Tệp nhạc không có âm thanh."));
       if(b!=null)music=new PcmMixer(b.file,b.rate,b.channels,b.floating,true);
       if(old==null&&music==null){copy(video,out);return;}
-      v.setDataSource(video.getAbsolutePath());int inputVideo=-1;for(int i=0;i<v.getTrackCount();i++)if(v.getTrackFormat(i).getString(MediaFormat.KEY_MIME).startsWith("video/")){inputVideo=i;break;}
+      v.setDataSource(video.getAbsolutePath());int inputVideo=-1;for(int i=0;i<v.getTrackCount();i++){String mime=v.getTrackFormat(i).getString(MediaFormat.KEY_MIME);if(mime!=null&&mime.startsWith("video/")){inputVideo=i;break;}}
       if(inputVideo<0)throw new IOException(I18n.t("Không có hình ảnh video đã chỉnh."));v.selectTrack(inputVideo);MediaFormat vf=v.getTrackFormat(inputVideo);
       mux=new MediaMuxer(out.getAbsolutePath(),MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);int outVideo=mux.addTrack(vf),outAudio=-1;
       MediaFormat audio=MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC,RATE,2);audio.setInteger(MediaFormat.KEY_AAC_PROFILE,MediaCodecInfo.CodecProfileLevel.AACObjectLC);audio.setInteger(MediaFormat.KEY_BIT_RATE,160000);audio.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE,16384);
@@ -37,19 +37,45 @@ final class EditorAudio {
         else if(index>=0){if(info.size>0&&(info.flags&MediaCodec.BUFFER_FLAG_CODEC_CONFIG)==0){if(!started)throw new IOException(I18n.t("Bộ mã hóa chưa sẵn sàng."));ByteBuffer data=encoder.getOutputBuffer(index);data.position(info.offset);data.limit(info.offset+info.size);mux.writeSampleData(outAudio,data,info);}outputDone=(info.flags&MediaCodec.BUFFER_FLAG_END_OF_STREAM)!=0;encoder.releaseOutputBuffer(index,false);lastProgress=android.os.SystemClock.elapsedRealtime();}
         if(android.os.SystemClock.elapsedRealtime()-lastProgress>15000)throw new IOException(I18n.t("Thiết bị không hoàn tất mã hóa âm thanh."));
       }
-      int capacity=vf.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)?Math.max(1024*1024,vf.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)):1024*1024;ByteBuffer sample=ByteBuffer.allocateDirect(capacity);
-      while(v.getSampleTrackIndex()>=0){if(Thread.currentThread().isInterrupted())throw new InterruptedIOException();if(android.os.Build.VERSION.SDK_INT>=28){long n=v.getSampleSize();if(n>Integer.MAX_VALUE)throw new IOException(I18n.t("Khung hình quá lớn."));if(n>sample.capacity())sample=ByteBuffer.allocateDirect((int)n);}sample.clear();int n=v.readSampleData(sample,0);if(n<0)break;info.set(0,n,v.getSampleTime(),(v.getSampleFlags()&MediaExtractor.SAMPLE_FLAG_SYNC)!=0?MediaCodec.BUFFER_FLAG_KEY_FRAME:0);mux.writeSampleData(outVideo,sample,info);v.advance();}
+      copyVideoTrack(v,vf,mux,outVideo,info);
       mux.stop();started=false;
-    }finally{if(old!=null)old.close();if(music!=null)music.close();if(encoder!=null){try{encoder.stop();}catch(Exception ignored){}encoder.release();}v.release();if(mux!=null){if(started)try{mux.stop();}catch(Exception ignored){}mux.release();}for(File f:temporary)f.delete();}
+    }finally{if(old!=null)try{old.close();}catch(Exception ignored){}if(music!=null)try{music.close();}catch(Exception ignored){}if(encoder!=null){try{encoder.stop();}catch(Exception ignored){}encoder.release();}v.release();if(mux!=null){if(started)try{mux.stop();}catch(Exception ignored){}mux.release();}for(File f:temporary)f.delete();}
+  }
+  private static void copyVideoTrack(MediaExtractor v,MediaFormat vf,MediaMuxer mux,int outVideo,MediaCodec.BufferInfo info)throws IOException{
+    int capacity=vf.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)?Math.max(1024*1024,vf.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)):1024*1024;
+    ByteBuffer sample=ByteBuffer.allocateDirect(capacity);
+    while(v.getSampleTrackIndex()>=0){
+      if(Thread.currentThread().isInterrupted())throw new InterruptedIOException();
+      if(android.os.Build.VERSION.SDK_INT>=28){
+        long size=v.getSampleSize();
+        if(size>Integer.MAX_VALUE)throw new IOException(I18n.t("Khung hình quá lớn."));
+        if(size>sample.capacity())sample=ByteBuffer.allocateDirect((int)size);
+      }
+      sample.clear();
+      int n;
+      while(true){
+        try{n=v.readSampleData(sample,0);break;}
+        catch(IllegalArgumentException tooSmall){
+          if(sample.capacity()>=32*1024*1024)throw tooSmall;
+          sample=ByteBuffer.allocateDirect(sample.capacity()*2);
+        }
+      }
+      if(n<0)break;
+      long sampleTime=v.getSampleTime();
+      if(sampleTime<0){v.advance();continue;}
+      info.set(0,n,sampleTime,(v.getSampleFlags()&MediaExtractor.SAMPLE_FLAG_SYNC)!=0?MediaCodec.BUFFER_FLAG_KEY_FRAME:0);
+      mux.writeSampleData(outVideo,sample,info);
+      v.advance();
+    }
   }
   private static Pcm decode(Context c,Uri uri,List<File> temporary)throws Exception{
     if(uri==null)return null;MediaExtractor e=new MediaExtractor();MediaCodec codec=null;File file=null;
-    try{e.setDataSource(c,uri,null);int track=-1;for(int i=0;i<e.getTrackCount();i++)if(e.getTrackFormat(i).getString(MediaFormat.KEY_MIME).startsWith("audio/")){track=i;break;}if(track<0)return null;
-      e.selectTrack(track);MediaFormat format=e.getTrackFormat(track);file=File.createTempFile("kinnect-pcm-",".raw",c.getCacheDir());temporary.add(file);Pcm result=new Pcm(file);result.rate=format.getInteger(MediaFormat.KEY_SAMPLE_RATE);result.channels=format.getInteger(MediaFormat.KEY_CHANNEL_COUNT);
-      codec=MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME));codec.configure(format,null,null,0);codec.start();boolean inDone=false,outDone=false;MediaCodec.BufferInfo info=new MediaCodec.BufferInfo();long last=android.os.SystemClock.elapsedRealtime();
+    try{e.setDataSource(c,uri,null);int track=-1;for(int i=0;i<e.getTrackCount();i++){String mime=e.getTrackFormat(i).getString(MediaFormat.KEY_MIME);if(mime!=null&&mime.startsWith("audio/")){track=i;break;}}if(track<0)return null;
+      e.selectTrack(track);MediaFormat format=e.getTrackFormat(track);String audioMime=format.getString(MediaFormat.KEY_MIME);if(audioMime==null)return null;file=File.createTempFile("kinnect-pcm-",".raw",c.getCacheDir());temporary.add(file);Pcm result=new Pcm(file);result.rate=format.containsKey(MediaFormat.KEY_SAMPLE_RATE)?format.getInteger(MediaFormat.KEY_SAMPLE_RATE):RATE;result.channels=format.containsKey(MediaFormat.KEY_CHANNEL_COUNT)?Math.max(1,format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)):1;
+      codec=MediaCodec.createDecoderByType(audioMime);codec.configure(format,null,null,0);codec.start();boolean inDone=false,outDone=false;MediaCodec.BufferInfo info=new MediaCodec.BufferInfo();long last=android.os.SystemClock.elapsedRealtime();
       try(OutputStream out=new BufferedOutputStream(new FileOutputStream(file))){while(!outDone){if(Thread.currentThread().isInterrupted())throw new InterruptedIOException();
-        if(!inDone){int i=codec.dequeueInputBuffer(10000);if(i>=0){ByteBuffer input=codec.getInputBuffer(i);input.clear();int n=e.readSampleData(input,0);if(n<0){codec.queueInputBuffer(i,0,0,0,MediaCodec.BUFFER_FLAG_END_OF_STREAM);inDone=true;}else{codec.queueInputBuffer(i,0,n,e.getSampleTime(),0);e.advance();}last=android.os.SystemClock.elapsedRealtime();}}
-        int i=codec.dequeueOutputBuffer(info,10000);if(i==MediaCodec.INFO_OUTPUT_FORMAT_CHANGED){MediaFormat f=codec.getOutputFormat();result.rate=f.getInteger(MediaFormat.KEY_SAMPLE_RATE);result.channels=f.getInteger(MediaFormat.KEY_CHANNEL_COUNT);result.floating=f.containsKey(MediaFormat.KEY_PCM_ENCODING)&&f.getInteger(MediaFormat.KEY_PCM_ENCODING)==AudioFormat.ENCODING_PCM_FLOAT;}
+        if(!inDone){int i=codec.dequeueInputBuffer(10000);if(i>=0){ByteBuffer input=codec.getInputBuffer(i);if(input==null){codec.queueInputBuffer(i,0,0,0,MediaCodec.BUFFER_FLAG_END_OF_STREAM);inDone=true;}else{input.clear();int n;try{n=e.readSampleData(input,0);}catch(IllegalArgumentException tooLarge){e.advance();codec.queueInputBuffer(i,0,0,0,0);n=-2;}if(n!=-2){if(n<0){codec.queueInputBuffer(i,0,0,0,MediaCodec.BUFFER_FLAG_END_OF_STREAM);inDone=true;}else{long sampleTime=e.getSampleTime();if(sampleTime<0){codec.queueInputBuffer(i,0,0,0,0);e.advance();}else{codec.queueInputBuffer(i,0,n,sampleTime,0);e.advance();}}}}last=android.os.SystemClock.elapsedRealtime();}}
+        int i=codec.dequeueOutputBuffer(info,10000);if(i==MediaCodec.INFO_OUTPUT_FORMAT_CHANGED){MediaFormat f=codec.getOutputFormat();if(f.containsKey(MediaFormat.KEY_SAMPLE_RATE))result.rate=f.getInteger(MediaFormat.KEY_SAMPLE_RATE);if(f.containsKey(MediaFormat.KEY_CHANNEL_COUNT))result.channels=Math.max(1,f.getInteger(MediaFormat.KEY_CHANNEL_COUNT));result.floating=f.containsKey(MediaFormat.KEY_PCM_ENCODING)&&f.getInteger(MediaFormat.KEY_PCM_ENCODING)==AudioFormat.ENCODING_PCM_FLOAT;}
         else if(i>=0){if(info.size>0){ByteBuffer data=codec.getOutputBuffer(i);data.position(info.offset);byte[] bytes=new byte[info.size];data.get(bytes);out.write(bytes);}outDone=(info.flags&MediaCodec.BUFFER_FLAG_END_OF_STREAM)!=0;codec.releaseOutputBuffer(i,false);last=android.os.SystemClock.elapsedRealtime();}
         if(android.os.SystemClock.elapsedRealtime()-last>15000)throw new IOException(I18n.t("Không giải mã được âm thanh này."));
       }}return result;
@@ -62,8 +88,13 @@ final class EditorAudio {
   private static final class Placed {PcmMixer pcm;Source s;}
   private static List<Placed> open(Context c,List<Source> sources,List<File> temporary)throws Exception{
     Map<String,Pcm> decoded=new HashMap<>();List<Placed> out=new ArrayList<>();
-    for(Source s:sources){if(s.gain<=0||s.length<=0||s.file==null)continue;String key=s.file.getAbsolutePath();Pcm p=decoded.containsKey(key)?decoded.get(key):decode(c,Uri.fromFile(s.file),temporary);decoded.put(key,p);if(p==null)continue;Placed l=new Placed();l.pcm=new PcmMixer(p.file,p.rate,p.channels,p.floating,false);l.s=s;out.add(l);}
-    return out;
+    try{
+      for(Source s:sources){if(s.gain<=0||s.length<=0||s.file==null)continue;String key=s.file.getAbsolutePath();Pcm p=decoded.containsKey(key)?decoded.get(key):decode(c,Uri.fromFile(s.file),temporary);decoded.put(key,p);if(p==null)continue;Placed l=new Placed();l.pcm=new PcmMixer(p.file,p.rate,p.channels,p.floating,false);l.s=s;out.add(l);}
+      return out;
+    }catch(Exception|Error failure){
+      for(Placed l:out)try{if(l.pcm!=null)l.pcm.close();}catch(Exception ignored){}
+      throw failure;
+    }
   }
   private static float level(List<Placed> placed,double t,int channel)throws IOException{
     float v=0;for(Placed l:placed){Source s=l.s;double local=t-s.start;if(local<0||local>=s.length)continue;double g=s.gain;if(s.fadeIn>0)g*=Math.min(1,local/s.fadeIn);if(s.fadeOut>0)g*=Math.min(1,(s.length-local)/s.fadeOut);v+=l.pcm.at(s.in+local*s.rate,channel)*g;}
@@ -75,7 +106,7 @@ final class EditorAudio {
     List<File> temporary=new ArrayList<>();List<Placed> placed=new ArrayList<>();MediaExtractor v=new MediaExtractor();MediaMuxer mux=null;MediaCodec encoder=null;boolean started=false;
     try{
       placed=open(c,sources,temporary);if(placed.isEmpty()){copy(video,out);return;}
-      v.setDataSource(video.getAbsolutePath());int inputVideo=-1;for(int i=0;i<v.getTrackCount();i++)if(v.getTrackFormat(i).getString(MediaFormat.KEY_MIME).startsWith("video/")){inputVideo=i;break;}
+      v.setDataSource(video.getAbsolutePath());int inputVideo=-1;for(int i=0;i<v.getTrackCount();i++){String mime=v.getTrackFormat(i).getString(MediaFormat.KEY_MIME);if(mime!=null&&mime.startsWith("video/")){inputVideo=i;break;}}
       if(inputVideo<0)throw new IOException(I18n.t("Không có hình ảnh video đã chỉnh."));v.selectTrack(inputVideo);MediaFormat vf=v.getTrackFormat(inputVideo);
       mux=new MediaMuxer(out.getAbsolutePath(),MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);int outVideo=mux.addTrack(vf),outAudio=-1;
       MediaFormat audio=MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC,RATE,2);audio.setInteger(MediaFormat.KEY_AAC_PROFILE,MediaCodecInfo.CodecProfileLevel.AACObjectLC);audio.setInteger(MediaFormat.KEY_BIT_RATE,192000);audio.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE,16384);
@@ -89,8 +120,7 @@ final class EditorAudio {
         else if(index>=0){if(info.size>0&&(info.flags&MediaCodec.BUFFER_FLAG_CODEC_CONFIG)==0){if(!started)throw new IOException(I18n.t("Bộ mã hóa chưa sẵn sàng."));ByteBuffer data=encoder.getOutputBuffer(index);data.position(info.offset);data.limit(info.offset+info.size);mux.writeSampleData(outAudio,data,info);}outputDone=(info.flags&MediaCodec.BUFFER_FLAG_END_OF_STREAM)!=0;encoder.releaseOutputBuffer(index,false);lastProgress=android.os.SystemClock.elapsedRealtime();}
         if(android.os.SystemClock.elapsedRealtime()-lastProgress>15000)throw new IOException(I18n.t("Thiết bị không hoàn tất mã hóa âm thanh."));
       }
-      int capacity=vf.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)?Math.max(1024*1024,vf.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)):1024*1024;ByteBuffer sample=ByteBuffer.allocateDirect(capacity);
-      while(v.getSampleTrackIndex()>=0){if(Thread.currentThread().isInterrupted())throw new InterruptedIOException();if(android.os.Build.VERSION.SDK_INT>=28){long n=v.getSampleSize();if(n>Integer.MAX_VALUE)throw new IOException(I18n.t("Khung hình quá lớn."));if(n>sample.capacity())sample=ByteBuffer.allocateDirect((int)n);}sample.clear();int n=v.readSampleData(sample,0);if(n<0)break;info.set(0,n,v.getSampleTime(),(v.getSampleFlags()&MediaExtractor.SAMPLE_FLAG_SYNC)!=0?MediaCodec.BUFFER_FLAG_KEY_FRAME:0);mux.writeSampleData(outVideo,sample,info);v.advance();}
+      copyVideoTrack(v,vf,mux,outVideo,info);
       mux.stop();started=false;
     }finally{for(Placed l:placed)try{l.pcm.close();}catch(IOException ignored){}if(encoder!=null){try{encoder.stop();}catch(Exception ignored){}encoder.release();}v.release();if(mux!=null){if(started)try{mux.stop();}catch(Exception ignored){}mux.release();}for(File f:temporary)f.delete();}
   }

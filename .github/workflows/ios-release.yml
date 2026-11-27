@@ -70,52 +70,58 @@ jobs:
           mkdir -p build/Payload dist
           cp -R build/Kinnect.xcarchive/Products/Applications/Kinnect.app build/Payload/Kinnect.app
           codesign --force --deep --sign - --entitlements ios/Kinnect/Resources/Kinnect.entitlements build/Payload/Kinnect.app
+          APP_VERSION=$(python3 -c 'import plistlib; p=plistlib.load(open("build/Payload/Kinnect.app/Info.plist","rb")); print(p.get("CFBundleShortVersionString","1.2.16"))')
+          APP_BUILD=$(python3 -c 'import plistlib; p=plistlib.load(open("build/Payload/Kinnect.app/Info.plist","rb")); print(p.get("CFBundleVersion","128"))')
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+          echo "APP_BUILD=$APP_BUILD" >> $GITHUB_ENV
           cd build
-          zip -qry "../dist/Kinnect-1.2.12-ios.ipa" Payload
+          zip -qry "../dist/Kinnect-${APP_VERSION}-ios.ipa" Payload
           cd ../dist
-          cp "Kinnect-1.2.12-ios.ipa" "Kinnect-1.2.12-b124-ios.ipa"
-          cp "Kinnect-1.2.12-ios.ipa" "Kinnect-1.2.12-sideload.ipa"
-          shasum -a 256 "Kinnect-1.2.12-ios.ipa" > "Kinnect-1.2.12-ios.ipa.sha256"
-          shasum -a 256 "Kinnect-1.2.12-b124-ios.ipa" > "Kinnect-1.2.12-b124-ios.ipa.sha256"
-          shasum -a 256 "Kinnect-1.2.12-sideload.ipa" > "Kinnect-1.2.12-sideload.ipa.sha256"
-          ls -lh Kinnect-1.2.12*.ipa
+          cp "Kinnect-${APP_VERSION}-ios.ipa" "Kinnect-${APP_VERSION}-b${APP_BUILD}-ios.ipa"
+          cp "Kinnect-${APP_VERSION}-ios.ipa" "Kinnect-${APP_VERSION}-sideload.ipa"
+          shasum -a 256 "Kinnect-${APP_VERSION}-ios.ipa" > "Kinnect-${APP_VERSION}-ios.ipa.sha256"
+          shasum -a 256 "Kinnect-${APP_VERSION}-b${APP_BUILD}-ios.ipa" > "Kinnect-${APP_VERSION}-b${APP_BUILD}-ios.ipa.sha256"
+          shasum -a 256 "Kinnect-${APP_VERSION}-sideload.ipa" > "Kinnect-${APP_VERSION}-sideload.ipa.sha256"
+          ls -lh "Kinnect-${APP_VERSION}"*.ipa
           python3 -c 'import json,os,plistlib; p=plistlib.load(open("../build/Payload/Kinnect.app/Info.plist","rb")); json.dump({"commit":os.environ["GITHUB_SHA"],"runId":os.environ["GITHUB_RUN_ID"],"version":p["CFBundleShortVersionString"],"build":p["CFBundleVersion"]},open("build-info.json","w"),indent=2)'
 
       - name: Upload IPA to GitHub Actions Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Kinnect-1.2.12-ios-ipa
+          name: Kinnect-${{ env.APP_VERSION || '1.2.16' }}-ios-ipa
           path: |
-            dist/Kinnect-1.2.12-ios.ipa
-            dist/Kinnect-1.2.12-b124-ios.ipa
-            dist/Kinnect-1.2.12-sideload.ipa
+            dist/Kinnect-*-ios.ipa
+            dist/Kinnect-*-b*-ios.ipa
+            dist/Kinnect-*-sideload.ipa
             dist/*.sha256
             dist/build-info.json
           if-no-files-found: error
 
-      - name: Publish downloadable IPA to GitHub Release (ios-v1.2.12)
+      - name: Publish downloadable IPA to GitHub Release (ios-v1.2.16)
         if: startsWith(github.ref, 'refs/tags/ios-v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="ios-v1.2.12"
+          VER="${APP_VERSION:-1.2.16}"
+          BLD="${APP_BUILD:-128}"
+          TAG="${GITHUB_REF_NAME:-ios-v${VER}}"
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release edit "$TAG" \
-              --title "Kinnect iOS 1.2.12 (Build 122)" \
-              --notes "Gói cài đặt Kinnect iOS 1.2.12 Build 122 (.ipa) — Đồng bộ toàn diện Android 1.2.12 (Build 118). Thiết kế tách riêng độc lập Ví Kinnect và Cửa hàng Kinnect theo chuẩn Android. Mở toàn màn hình tất cả các mục chính (Tin nhắn, Thông báo, Cửa hàng, Ví Kinnect, Bạn bè, Hồ sơ), camera viewfinder phần cứng AVFoundation, hiển thị chân dung đầy đủ không bị cắt đầu, sửa lỗi thoát app khi đăng nhập."
+              --title "Kinnect iOS ${VER} (Build ${BLD})" \
+              --notes "Gói cài đặt Kinnect iOS ${VER} Build ${BLD} (.ipa) — Hoàn thiện chuẩn HIG, tương phản Light Mode, VoiceOver, StoreKit, an toàn UGC Livestream và xác nhận thao tác."
             gh release upload "$TAG" \
-              dist/Kinnect-1.2.12-ios.ipa \
-              dist/Kinnect-1.2.12-b122-ios.ipa \
-              dist/Kinnect-1.2.12-sideload.ipa \
+              "dist/Kinnect-${VER}-ios.ipa" \
+              "dist/Kinnect-${VER}-b${BLD}-ios.ipa" \
+              "dist/Kinnect-${VER}-sideload.ipa" \
               dist/*.sha256 \
               --clobber
           else
             gh release create "$TAG" \
-              dist/Kinnect-1.2.12-ios.ipa \
-              dist/Kinnect-1.2.12-b122-ios.ipa \
-              dist/Kinnect-1.2.12-sideload.ipa \
+              "dist/Kinnect-${VER}-ios.ipa" \
+              "dist/Kinnect-${VER}-b${BLD}-ios.ipa" \
+              "dist/Kinnect-${VER}-sideload.ipa" \
               dist/*.sha256 \
-              --title "Kinnect iOS 1.2.12 (Build 122)" \
+              --title "Kinnect iOS ${VER} (Build ${BLD})" \
               --notes "Gói cài đặt Kinnect iOS (.ipa) — Cài đặt lên iPhone/iPad từ Windows qua Sideloadly hoặc AltStore bằng Apple ID cá nhân miễn phí." \
               --prerelease
           fi

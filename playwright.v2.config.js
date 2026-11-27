@@ -1,2 +1,3 @@
 import {defineConfig} from '@playwright/test';
+process.env.KINNECT_ALLOW_BROWSER_APP ||= '1';
 export default defineConfig({testDir:'./e2e',testMatch:'v2-*.spec.js',workers:1,timeout:60000,retries:0,reporter:[['list'],['json',{outputFile:'test-results/v2-results.json'}]],use:{channel:process.env.PLAYWRIGHT_CHANNEL||(process.platform==='win32'?'chrome':'chromium'),headless:true,viewport:{width:390,height:844},actionTimeout:10000,trace:'retain-on-failure',screenshot:'only-on-failure'}});

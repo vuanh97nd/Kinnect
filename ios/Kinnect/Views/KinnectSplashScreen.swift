@@ -3,7 +3,9 @@ import SwiftUI
 /// Startup Splash Screen matching Android 1.2.12 MainActivity.splash() (lines 134-152)
 /// Centered 96dp Logo K, Kinnect title, and animated interlocking dual rings.
 struct KinnectSplashScreen: View {
-    @State private var ringOffset: CGFloat = 16
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var ringOffset: CGFloat = 6
     @State private var pulse: CGFloat = 1.0
 
     var body: some View {
@@ -11,9 +13,34 @@ struct KinnectSplashScreen: View {
             KinnectTheme.background.ignoresSafeArea()
 
             VStack(spacing: 18) {
-                // Centered 96x96 Logo K with elevation shadow
+                // Centered 96x96 Logo K with elevation shadow and concentric rings
                 KinnectBrandLogo(size: 96)
                     .shadow(color: KinnectTheme.accent.opacity(0.35), radius: 16, y: 8)
+                    .background {
+                        ZStack {
+                            Circle()
+                                .stroke(
+                                    KinnectTheme.accentBright.opacity(colorScheme == .dark ? 0.24 : 0.16),
+                                    lineWidth: 1.5
+                                )
+                                .frame(width: 132, height: 132)
+
+                            Circle()
+                                .stroke(
+                                    KinnectTheme.rose.opacity(colorScheme == .dark ? 0.18 : 0.11),
+                                    lineWidth: 1.25
+                                )
+                                .frame(width: 168, height: 168)
+
+                            Circle()
+                                .stroke(
+                                    KinnectTheme.accentBright.opacity(colorScheme == .dark ? 0.11 : 0.07),
+                                    lineWidth: 1
+                                )
+                                .frame(width: 204, height: 204)
+                        }
+                        .accessibilityHidden(true)
+                    }
                     .scaleEffect(pulse)
 
                 // App Brand Title
@@ -38,8 +65,13 @@ struct KinnectSplashScreen: View {
             }
         }
         .onAppear {
+            guard !reduceMotion else {
+                ringOffset = 6
+                pulse = 1.0
+                return
+            }
             withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
-                ringOffset = 5
+                ringOffset = 4
                 pulse = 1.05
             }
         }

@@ -49,7 +49,7 @@ final class TimelineView extends View {
   private float time(float x) { return host.playhead() + (x - getWidth() / 2f) / pps; }
 
   /** Packs layers then tracks into non-overlapping lanes. */
-  private void pack() {
+  private void pack(boolean fromDraw) {
     laneItems.clear(); laneRows.clear(); EditorProject p = host.project();
     List<float[]> ends = new ArrayList<>(); int layerLanes;
     List<EditorProject.Layer> layers = new ArrayList<>(p.layers); Collections.sort(layers, (a, b) -> Float.compare(a.start, b.start));
@@ -58,18 +58,21 @@ final class TimelineView extends View {
     List<EditorProject.Track> tracks = new ArrayList<>(p.tracks); Collections.sort(tracks, (a, b) -> Float.compare(a.start, b.start));
     for (EditorProject.Track t : tracks) { int row = 0; while (row < ends.size() && ends.get(row)[0] > t.start + .001f) row++; if (row == ends.size()) ends.add(new float[1]); ends.get(row)[0] = t.start + t.length; laneItems.add(t); laneRows.add(layerLanes + row); }
     int newLanes = layerLanes + ends.size();
-    if (newLanes != lanes) { lanes = newLanes; requestLayout(); }
+    if (newLanes != lanes) {
+      lanes = newLanes;
+      if (fromDraw) post(this::requestLayout);
+    }
   }
 
   @Override protected void onMeasure(int w, int h) {
-    pack(); int height = Math.round(mainTop + mainH + 10 * dp + Math.max(2, lanes) * (laneH + laneGap) + 8 * dp);
+    pack(false); int height = Math.round(mainTop + mainH + 10 * dp + Math.max(2, lanes) * (laneH + laneGap) + 8 * dp);
     setMeasuredDimension(MeasureSpec.getSize(w), height);
   }
 
   private float laneTop(int row) { return mainTop + mainH + 10 * dp + row * (laneH + laneGap); }
 
   @Override protected void onDraw(Canvas c) {
-    pack(); EditorProject p = host.project(); float w = getWidth(); float[] starts = p.starts(); float duration = p.duration();
+    pack(true); EditorProject p = host.project(); float w = getWidth(); float[] starts = p.starts(); float duration = p.duration();
     c.drawColor(0xff15121d);
     // Ruler: pick a tick spacing that leaves at least ~56dp between labels.
     float[] steps = { .25f, .5f, 1, 2, 5, 10, 15, 30, 60 }; float step = 60; for (float s : steps) if (s * pps >= 56 * dp) { step = s; break; }
@@ -97,7 +100,7 @@ final class TimelineView extends View {
         }
       }
       if (clip.speed != 1 || clip.volume == 0) {
-        String tag = (clip.speed != 1 ? trimNumber(clip.speed) + "×" : "") + (clip.volume == 0 ? (clip.speed != 1 ? " · " : "") + "Tắt tiếng" : "");
+        String tag = (clip.speed != 1 ? trimNumber(clip.speed) + "×" : "") + (clip.volume == 0 ? (clip.speed != 1 ? " · " : "") + I18n.t("Tắt tiếng") : "");
         label.setTextAlign(Paint.Align.LEFT); float tw = label.measureText(tag); fill.setColor(0x99000000);
         c.drawRoundRect(new RectF(box.left + 4 * dp, box.top + 4 * dp, box.left + 12 * dp + tw, box.top + 20 * dp), 4 * dp, 4 * dp, fill);
         label.setColor(Color.WHITE); c.drawText(tag, box.left + 8 * dp, box.top + 16 * dp, label);
@@ -129,10 +132,10 @@ final class TimelineView extends View {
       if (o instanceof EditorProject.Layer) {
         EditorProject.Layer l = (EditorProject.Layer) o; start = l.start; length = l.length; keyed = l; selected = "layer".equals(kind) && sel == l.id;
         color = l.kind.equals("caption") ? 0xff8b5cf6 : l.kind.equals("sticker") ? 0xffd69e2e : l.kind.equals("image") ? 0xff3b82f6 : 0xffe0803a;
-        name = l.kind.equals("image") ? "Lớp phủ ảnh" : l.text.replace('\n', ' ');
+        name = l.kind.equals("image") ? I18n.t("Lớp phủ ảnh") : l.text.replace('\n', ' ');
       } else {
         EditorProject.Track t = (EditorProject.Track) o; start = t.start; length = t.length; selected = "track".equals(kind) && sel == t.id;
-        color = t.kind.equals("voice") ? 0xff0ea5b7 : 0xff22a565; name = (t.kind.equals("voice") ? "Ghi âm" : "Nhạc") + (t.name.isEmpty() ? "" : " · " + t.name);
+        color = t.kind.equals("voice") ? 0xff0ea5b7 : 0xff22a565; name = (t.kind.equals("voice") ? I18n.t("Ghi âm") : I18n.t("Nhạc")) + (t.name.isEmpty() ? "" : " · " + t.name);
       }
       RectF box = new RectF(x(start) + 1 * dp, top, x(start + length) - 1 * dp, top + laneH);
       if (box.right < 0 || box.left > w) continue;
@@ -180,6 +183,21 @@ final class TimelineView extends View {
   // ----- Touch -----
   private static final int NONE = 0, PENDING = 1, SCROLL = 2, TRIM_LEFT = 3, TRIM_RIGHT = 4, MOVE = 5;
   private int mode; private float downX, downY, lastX; private long downAt; private Object hitItem; private boolean longPressed;
+  private final Runnable longPressTask = this::onLongPress;
+
+  private void onLongPress() {
+    if (mode == PENDING && hitItem != null && !(hitItem instanceof EditorProject.Clip)) {
+      longPressed = true; mode = MOVE; select(hitItem); host.beginChange();
+      performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+      ViewParent parent = getParent();
+      if (parent != null) parent.requestDisallowInterceptTouchEvent(true);
+    }
+  }
+
+  @Override protected void onDetachedFromWindow() {
+    removeCallbacks(longPressTask);
+    super.onDetachedFromWindow();
+  }
 
   private Object hit(float px, float py) {
     EditorProject p = host.project(); float t = time(px);
@@ -207,23 +225,25 @@ final class TimelineView extends View {
 
   @Override public boolean onTouchEvent(MotionEvent e) {
     pinch.onTouchEvent(e);
-    if (e.getPointerCount() > 1) { if (mode == SCROLL || mode == PENDING) mode = NONE; getParent().requestDisallowInterceptTouchEvent(true); return true; }
+    if (e.getPointerCount() > 1) { removeCallbacks(longPressTask); if (mode == SCROLL || mode == PENDING) mode = NONE; ViewParent parent = getParent(); if (parent != null) parent.requestDisallowInterceptTouchEvent(true); return true; }
     float px = e.getX(), py = e.getY(); float slop = 8 * dp;
     switch (e.getActionMasked()) {
       case MotionEvent.ACTION_DOWN: {
+        removeCallbacks(longPressTask);
         downX = lastX = px; downY = py; downAt = SystemClock.uptimeMillis(); longPressed = false; mode = PENDING; hitItem = hit(px, py);
         RectF box = selectedBox();
         if (box != null && py >= box.top - 4 * dp && py <= box.bottom + 4 * dp) {
           if (Math.abs(px - box.left) < 16 * dp) { mode = TRIM_LEFT; host.beginChange(); }
           else if (Math.abs(px - box.right) < 16 * dp) { mode = TRIM_RIGHT; host.beginChange(); }
         }
-        if (mode != PENDING) getParent().requestDisallowInterceptTouchEvent(true);
-        else postDelayed(() -> { if (mode == PENDING && hitItem != null && !(hitItem instanceof EditorProject.Clip)) { longPressed = true; mode = MOVE; select(hitItem); host.beginChange(); performHapticFeedback(HapticFeedbackConstants.LONG_PRESS); getParent().requestDisallowInterceptTouchEvent(true); } }, 380);
+        if (mode != PENDING) { ViewParent parent = getParent(); if (parent != null) parent.requestDisallowInterceptTouchEvent(true); }
+        else postDelayed(longPressTask, 380);
         return true; }
       case MotionEvent.ACTION_MOVE: {
         float dx = px - lastX;
         if (mode == PENDING && (Math.abs(px - downX) > slop || Math.abs(py - downY) > slop)) {
-          if (Math.abs(px - downX) > Math.abs(py - downY)) { mode = SCROLL; getParent().requestDisallowInterceptTouchEvent(true); }
+          removeCallbacks(longPressTask);
+          if (Math.abs(px - downX) > Math.abs(py - downY)) { mode = SCROLL; ViewParent parent = getParent(); if (parent != null) parent.requestDisallowInterceptTouchEvent(true); }
           else { mode = NONE; return false; }
         }
         if (mode == SCROLL) { host.scrub(Math.max(0, Math.min(host.project().duration(), host.playhead() - dx / pps)), false); }
@@ -231,11 +251,13 @@ final class TimelineView extends View {
         else if (mode == MOVE) move(dx / pps);
         lastX = px; invalidate(); return true; }
       case MotionEvent.ACTION_UP: {
+        removeCallbacks(longPressTask);
         if (mode == PENDING && !longPressed) tap(px, py);
         else if (mode == SCROLL) host.scrub(host.playhead(), true);
         else if (mode == TRIM_LEFT || mode == TRIM_RIGHT || mode == MOVE) host.changed();
         mode = NONE; invalidate(); return true; }
       case MotionEvent.ACTION_CANCEL:
+        removeCallbacks(longPressTask);
         if (mode == TRIM_LEFT || mode == TRIM_RIGHT || mode == MOVE) host.changed();
         mode = NONE; return true;
     }

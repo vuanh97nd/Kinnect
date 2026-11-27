@@ -7,24 +7,27 @@ struct KinnectTopBar: View {
     @ObservedObject var appState: AppState
     @Binding var activeTopSection: KinnectTopSection?
     var onLogoTap: (() -> Void)? = nil
+    @ObservedObject private var loc = LocalizationManager.shared
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 2) {
             // Left: Brand Logo K (40dp squircle matching Android line 407, no text)
             Button {
                 onLogoTap?()
             } label: {
                 KinnectBrandLogo(size: 40)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Về đầu Bảng tin Kinnect")
+            .accessibilityLabel(L10n.tr("Về đầu Bảng tin Kinnect"))
 
-            Spacer(minLength: 8)
+            Spacer(minLength: 4)
 
             // Trailing icon 1: Notifications (Bell)
             topBarButton(
                 glyph: .notifications,
-                label: "Thông báo",
+                label: L10n.tr("Thông báo"),
                 badgeCount: appState.unreadNotificationsCount,
                 isSelected: activeTopSection == .notifications
             ) {
@@ -34,7 +37,7 @@ struct KinnectTopBar: View {
             // Trailing icon 2: Store / Cửa hàng
             topBarButton(
                 glyph: .store,
-                label: "Cửa hàng",
+                label: L10n.tr("Cửa hàng"),
                 isSelected: activeTopSection == .store
             ) {
                 toggleSection(.store)
@@ -43,7 +46,8 @@ struct KinnectTopBar: View {
             // Trailing icon 3: Friends / Bạn bè
             topBarButton(
                 glyph: .friends,
-                label: "Bạn bè",
+                label: L10n.tr("Bạn bè"),
+                badgeCount: appState.pendingFriendRequestsCount,
                 isSelected: activeTopSection == .friends
             ) {
                 toggleSection(.friends)
@@ -52,7 +56,7 @@ struct KinnectTopBar: View {
             // Trailing icon 4: Messages / Tin nhắn
             topBarButton(
                 glyph: .messages,
-                label: "Tin nhắn",
+                label: L10n.tr("Tin nhắn"),
                 badgeCount: appState.unreadMessagesCount,
                 isSelected: activeTopSection == .messages
             ) {
@@ -90,9 +94,10 @@ struct KinnectTopBar: View {
                     }
                 }
                 .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Tài khoản")
+            .accessibilityLabel(L10n.tr("Tài khoản"))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 6)
@@ -127,14 +132,14 @@ struct KinnectTopBar: View {
                     selected: isSelected,
                     tint: isSelected ? KinnectTheme.accentBright : KinnectTheme.textPrimary
                 )
-                .frame(width: 36, height: 40)
+                .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
 
                 if badgeCount > 0 {
                     Circle()
                         .fill(KinnectTheme.danger)
                         .frame(width: 8, height: 8)
-                        .offset(x: 2, y: 2)
+                        .offset(x: -4, y: 6)
                 }
             }
         }

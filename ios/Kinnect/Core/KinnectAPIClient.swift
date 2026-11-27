@@ -4,22 +4,28 @@ import Foundation
 enum KinnectAPIError: LocalizedError {
     case invalidURL
     case networkError(String)
+    case originUnavailable
     case serverError(status: Int, message: String)
+    case requiresAgree18(String)
     case serverMessage(String)
     case unauthorized
 
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            return "Địa chỉ máy chủ không hợp lệ."
+            return L10n.tr("Địa chỉ máy chủ không hợp lệ.")
         case .networkError(let msg):
             return msg
+        case .originUnavailable:
+            return L10n.tr("Máy chủ chính đang tạm thời gián đoạn. Vui lòng thử lại sau ít phút.")
         case .serverError(_, let message):
+            return message
+        case .requiresAgree18(let message):
             return message
         case .serverMessage(let message):
             return message
         case .unauthorized:
-            return "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
+            return L10n.tr("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
         }
     }
 }
@@ -41,6 +47,10 @@ final class KinnectAPIClient {
     private var defaultOriginBatchCount = 0
     /// Peers blocked until that probe commits or fails. Resumed with a snapshot taken under `originLock`.
     private var fallbackWaiters: [CheckedContinuation<String?, Never>] = []
+    /// Background health-probe state for recovering `defaultOrigin` every 60s when on `fallbackOrigin`.
+    private var lastPrimaryProbeAt: TimeInterval = 0
+    private var primaryProbeInFlight = false
+    private let primaryProbeInterval: TimeInterval = 60.0
 
     private init() {
         let config = URLSessionConfiguration.ephemeral
@@ -51,7 +61,9 @@ final class KinnectAPIClient {
     }
 
     var currentAccountId: String {
-        return KeychainStore.shared.loadAccountId(for: ServerConfig.defaultOrigin)
+        let primary = KeychainStore.shared.loadAccountId(for: ServerConfig.defaultOrigin)
+        if !primary.isEmpty { return primary }
+        return AccountCache.shared.activeAccountId ?? ""
     }
 
     var baseURL: String {
@@ -132,13 +144,18 @@ final class KinnectAPIClient {
         isIdempotent: Bool? = nil,
         allowPrivacyAutoRetry: Bool = true
     ) async throws -> [String: Any] {
+        #if DEBUG
         if UIReviewFixture.isEnabled {
             return UIReviewFixture.mockResponse(for: path)
         }
+        #endif
         let bodyRequestId = body?["requestId"] as? String
         let carriesRequestId = !(bodyRequestId ?? "").isEmpty
         let safeToRetryOnFallback = isIdempotent ?? (method == "GET" || method == "HEAD" || (carriesRequestId && method != "POST"))
         let origin = snapshotOrigin()
+        if origin == ServerConfig.fallbackOrigin {
+            maybeProbePrimary()
+        }
         if origin == ServerConfig.defaultOrigin {
             enterDefaultOriginBatch()
         }
@@ -165,7 +182,7 @@ final class KinnectAPIClient {
             // Overlapping callers share one probe. The decision uses the origin this call already used,
             // not a second unlocked read of `activeOrigin`.
             guard safeToRetryOnFallback, origin == ServerConfig.defaultOrigin else {
-                throw KinnectAPIError.networkError("Không thể kết nối máy chủ Kinnect. Kiểm tra mạng Internet của bạn.")
+                throw KinnectAPIError.networkError(L10n.tr("Không thể kết nối máy chủ Kinnect. Kiểm tra mạng Internet của bạn."))
             }
             return try await resolveOriginForFallbackIfNeeded(
                 failedOrigin: origin,
@@ -246,6 +263,65 @@ final class KinnectAPIClient {
         }
     }
 
+    /// Lightweight 60-second background probe when `activeOrigin == ServerConfig.fallbackOrigin`
+    /// that hits `ServerConfig.defaultOrigin + "/health"` and switches `activeOrigin` back to
+    /// `ServerConfig.defaultOrigin` ONLY when HTTP status is 200.
+    func maybeProbePrimary() {
+        let now = Date().timeIntervalSince1970
+        originLock.lock()
+        guard activeOrigin == ServerConfig.fallbackOrigin,
+              !primaryProbeInFlight,
+              (now - lastPrimaryProbeAt) >= primaryProbeInterval else {
+            originLock.unlock()
+            return
+        }
+        primaryProbeInFlight = true
+        lastPrimaryProbeAt = now
+        originLock.unlock()
+
+        Task.detached(priority: .utility) { [weak self] in
+            guard let self else { return }
+            await self.runPrimaryHealthProbe()
+        }
+    }
+
+    private func runPrimaryHealthProbe() async {
+        defer {
+            originLock.lock()
+            primaryProbeInFlight = false
+            originLock.unlock()
+        }
+        guard let healthURL = ServerConfig.url(for: "/health", origin: ServerConfig.defaultOrigin) else {
+            return
+        }
+        var req = URLRequest(url: healthURL)
+        req.httpMethod = "GET"
+        req.timeoutInterval = 6
+        req.cachePolicy = .reloadIgnoringLocalCacheData
+        req.setValue("KinnectiOS/\(ServerConfig.appVersion) (Build \(ServerConfig.buildNumber))", forHTTPHeaderField: "User-Agent")
+
+        guard let (_, response) = try? await session.data(for: req),
+              let http = response as? HTTPURLResponse,
+              http.statusCode == 200 else {
+            return
+        }
+
+        var switchedBack = false
+        originLock.lock()
+        if activeOrigin == ServerConfig.fallbackOrigin {
+            activeOrigin = ServerConfig.defaultOrigin
+            fallbackProbeStarted = false
+            switchedBack = true
+        }
+        originLock.unlock()
+
+        if switchedBack {
+            await MainActor.run {
+                NativeSocketClient.shared.connectWithKeychainSession()
+            }
+        }
+    }
+
     /// One idempotent transport failure probes `fallbackOrigin`. Peers wait for that result,
     /// then perform their own path on the published snapshot. They do not write `activeOrigin`
     /// and do not copy the default-origin cookie jar.
@@ -270,14 +346,17 @@ final class KinnectAPIClient {
                 committed = true
                 return result
             } catch let fallbackErr as KinnectAPIError {
+                if case .originUnavailable = fallbackErr {
+                    committed = true
+                }
                 throw fallbackErr
             } catch {
-                throw KinnectAPIError.networkError("Không thể kết nối máy chủ Kinnect. Kiểm tra mạng Internet của bạn.")
+                throw KinnectAPIError.networkError(L10n.tr("Không thể kết nối máy chủ Kinnect. Kiểm tra mạng Internet của bạn."))
             }
         }
 
         guard let settledOrigin = await waitForFallbackSettlement(), settledOrigin != failedOrigin else {
-            throw KinnectAPIError.networkError("Không thể kết nối máy chủ Kinnect. Kiểm tra mạng Internet của bạn.")
+            throw KinnectAPIError.networkError(L10n.tr("Không thể kết nối máy chủ Kinnect. Kiểm tra mạng Internet của bạn."))
         }
         do {
             return try await performSingleRequest(
@@ -290,7 +369,7 @@ final class KinnectAPIClient {
         } catch let error as KinnectAPIError {
             throw error
         } catch {
-            throw KinnectAPIError.networkError("Không thể kết nối máy chủ Kinnect. Kiểm tra mạng Internet của bạn.")
+            throw KinnectAPIError.networkError(L10n.tr("Không thể kết nối máy chủ Kinnect. Kiểm tra mạng Internet của bạn."))
         }
     }
 
@@ -323,7 +402,7 @@ final class KinnectAPIClient {
 
         let (data, response) = try await session.data(for: req)
         guard let http = response as? HTTPURLResponse else {
-            throw KinnectAPIError.networkError("Phản hồi máy chủ không hợp lệ.")
+            throw KinnectAPIError.networkError(L10n.tr("Phản hồi máy chủ không hợp lệ."))
         }
 
         KeychainStore.shared.ingestResponseHeaderFields(http.allHeaderFields, responseURL: url, origin: origin)
@@ -334,7 +413,7 @@ final class KinnectAPIClient {
         if http.statusCode == 428 {
             // Server PRIVACY_VERSION is a date string (e.g. "2026-10-29"); never coerce to Int.
             let version = (json["version"] as? String) ?? (json["version"] as? NSNumber)?.stringValue ?? ""
-            let noticeText = (json["error"] as? String) ?? "Cần đồng ý điều khoản bảo vệ dữ liệu cá nhân trước khi thực hiện thao tác này."
+            let noticeText = (json["error"] as? String) ?? L10n.tr("Cần đồng ý điều khoản bảo vệ dữ liệu cá nhân trước khi thực hiện thao tác này.")
             await MainActor.run {
                 AppState.shared.presentPrivacyConsent(version: version, notice: noticeText)
             }
@@ -344,14 +423,29 @@ final class KinnectAPIClient {
         let basePath = path.components(separatedBy: "?").first ?? path
         if http.statusCode == 401
             && basePath != "/api/login"
+            && basePath != "/api/auth/apple"
+            && basePath != "/api/oauth/apple"
+            && basePath != "/api/oauth/app-session"
+            && basePath != "/api/remembered/login"
             && basePath != "/api/me/password"
             && basePath != "/api/recovery/email/start"
             && !basePath.hasPrefix("/api/me/2fa/") {
+            let isUnauthenticatedFallback = (origin == ServerConfig.fallbackOrigin || snapshotOrigin() == ServerConfig.fallbackOrigin)
+                && KeychainStore.shared.sessionCookie(for: ServerConfig.fallbackOrigin).isEmpty
+            if isUnauthenticatedFallback {
+                if method == "GET", let cached = cachedJSON(for: path) {
+                    return cached
+                }
+                throw KinnectAPIError.originUnavailable
+            }
             throw KinnectAPIError.unauthorized
         }
 
         guard (200...299).contains(http.statusCode) else {
-            let msg = json["error"] as? String ?? (json["message"] as? String) ?? "Yêu cầu không thành công (mã \(http.statusCode))."
+            let msg = json["error"] as? String ?? (json["message"] as? String) ?? String(format: L10n.tr("Yêu cầu không thành công (mã %d)."), http.statusCode)
+            if http.statusCode == 400 && ((json["requiresAgree18"] as? Bool) == true) {
+                throw KinnectAPIError.requiresAgree18(msg)
+            }
             throw KinnectAPIError.serverError(status: http.statusCode, message: msg)
         }
 
@@ -387,7 +481,7 @@ final class KinnectAPIClient {
         }
 
         if base == "/api/posts" || base.hasPrefix("/api/posts/") {
-            evictKeys(["/api/posts?limit=25", "/api/posts", "/api/me", "/api/users/\(uid)/posts"])
+            evictKeys(["/api/posts?limit=25", "/api/posts", "/api/posts?user=\(uid)", "/api/me", "/api/users/\(uid)/posts", "feed_posts"])
             if base.hasPrefix("/api/posts/") {
                 let parts = base.split(separator: "/")
                 if parts.count >= 3 {
@@ -398,7 +492,7 @@ final class KinnectAPIClient {
         } else if base == "/api/stories" || base.hasPrefix("/api/stories/") {
             evictKeys(["/api/stories"])
         } else if base == "/api/shorts" || base.hasPrefix("/api/shorts/") {
-            evictKeys(["/api/shorts", "/api/shorts?feed=for", "/api/shorts?feed=following", "shorts_feed_for", "shorts_feed_following"])
+            evictKeys(["/api/shorts", "/api/shorts?feed=for", "/api/shorts?feed=following", "/api/shorts?user=\(uid)", "shorts_feed_for", "shorts_feed_following"])
             if base.hasPrefix("/api/shorts/") {
                 let parts = base.split(separator: "/")
                 if parts.count >= 3 {
@@ -407,7 +501,12 @@ final class KinnectAPIClient {
                 }
             }
         } else if base.hasPrefix("/api/users/") && base.hasSuffix("/block") {
-            evictKeys(["/api/blocks", "/api/conversations", "/api/friends", "/api/posts?limit=25", "/api/posts", "/api/discover"])
+            evictKeys([
+                "/api/blocks", "/api/conversations", "/api/friends",
+                "/api/posts?limit=25", "/api/posts", "feed_posts",
+                "/api/stories", "/api/shorts", "/api/shorts?feed=for", "/api/shorts?feed=following",
+                "shorts_feed_for", "shorts_feed_following", "/api/discover"
+            ])
         } else if base == "/api/me/avatar" || base == "/api/me/cover" {
             evictKeys(["/api/me", "/api/users/\(uid)", "profile_me"])
             AccountCache.shared.evict(forKey: "bin:/api/users/\(uid)/avatar", origin: origin, accountId: uid)
@@ -417,8 +516,12 @@ final class KinnectAPIClient {
             evictKeys(["/api/me", "profile_me"])
         } else if base.hasPrefix("/api/notifications") {
             evictKeys(["/api/notifications"])
-        } else if base.hasPrefix("/api/friends") || base.hasPrefix("/api/friend-requests") || base.hasSuffix("/follow") {
-            evictKeys(["/api/friends", "/api/friend-requests", "/api/friend-suggestions", "/api/discover", "/api/me"])
+        } else if base.hasPrefix("/api/friends")
+            || base.hasPrefix("/api/friend-request")
+            || base.hasSuffix("/friend-request")
+            || base.contains("/friendship")
+            || base.hasSuffix("/follow") {
+            evictKeys(["/api/friends", "/api/friend-requests", "/api/friend-suggestions", "/api/discover", "/api/me", "feed_posts"])
         } else if base.hasPrefix("/api/groups") {
             evictKeys(["/api/groups", "/api/conversations"])
         } else if base.hasPrefix("/api/conversations") || base.hasPrefix("/api/chat-messages") || (base.hasPrefix("/api/users/") && base.contains("/messages")) {
@@ -448,6 +551,9 @@ final class KinnectAPIClient {
         }
         let uid = currentAccountId
         let origin = snapshotOrigin()
+        if origin == ServerConfig.fallbackOrigin {
+            maybeProbePrimary()
+        }
         let cacheKey = "bin:\(path)"
         if !uid.isEmpty, let cached = AccountCache.shared.load(forKey: cacheKey, maxAge: maxAge, origin: origin, accountId: uid) {
             return cached
@@ -468,6 +574,10 @@ final class KinnectAPIClient {
             AccountCache.shared.store(data, forKey: cacheKey, origin: origin, accountId: uid)
         }
         return data
+    }
+
+    func download(for request: URLRequest) async throws -> (URL, URLResponse) {
+        return try await session.download(for: request)
     }
 
     func logoutAndWipe() async {
@@ -509,14 +619,20 @@ enum KinnectAuthenticatedFile {
         if !cookie.isEmpty {
             request.setValue(cookie, forHTTPHeaderField: "Cookie")
         }
-        let (temporary, response) = try await URLSession.shared.download(for: request)
+        let (temporary, response) = try await KinnectAPIClient.shared.download(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw KinnectAPIError.networkError("Không tải được media (mã \((response as? HTTPURLResponse)?.statusCode ?? 0)).")
+            try? FileManager.default.removeItem(at: temporary)
+            throw KinnectAPIError.networkError(String(format: L10n.tr("Không tải được media (mã %d)."), (response as? HTTPURLResponse)?.statusCode ?? 0))
         }
-        if FileManager.default.fileExists(atPath: destination.path) {
-            try? FileManager.default.removeItem(at: destination)
+        do {
+            if FileManager.default.fileExists(atPath: destination.path) {
+                try? FileManager.default.removeItem(at: destination)
+            }
+            try FileManager.default.moveItem(at: temporary, to: destination)
+        } catch {
+            try? FileManager.default.removeItem(at: temporary)
+            throw error
         }
-        try FileManager.default.moveItem(at: temporary, to: destination)
         return destination
     }
 }

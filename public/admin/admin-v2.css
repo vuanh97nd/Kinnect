@@ -1,0 +1,3084 @@
+/* ============================================================================
+   KINNECT · LỚP THIẾT KẾ V2  (admin-v2.css)
+   ----------------------------------------------------------------------------
+   Mục tiêu: giao diện TRỰC QUAN – DỄ DÙNG – ĐẦY ĐỦ – KHÔNG LỖI.
+
+   File này được nạp SAU admin.css và wallet-tools.css nên có quyền ghi đè.
+   Toàn bộ màu sắc, cỡ chữ, khoảng cách đều đi qua biến token — KHÔNG hardcode
+   hex rải rác như bản cũ. Muốn đổi nhận diện chỉ cần sửa khối token bên dưới.
+
+   Thứ tự đọc:
+     1. Token (sáng / tối / màu từng cổng)
+     2. Nền tảng & khả năng truy cập (focus, skip-link, giảm chuyển động)
+     3. Thang chữ — ÉP TỐI THIỂU 12px cho mọi văn bản
+     4. Trang đăng nhập
+     5. Khung làm việc (sidebar / header / nội dung)
+     6. Điều hướng có nhóm
+     7. Thành phần (nút, nhãn, thẻ, số liệu, bảng, biểu mẫu, hộp thoại)
+     8. Khung trao đổi nội bộ
+     9. Di động (ngăn kéo + thanh điều hướng đáy)
+    10. Tiện ích
+   ========================================================================== */
+
+
+/* ============================================================================
+   1. TOKEN THIẾT KẾ
+   ========================================================================== */
+
+:root {
+  /* --- Bề mặt & đường kẻ ------------------------------------------------ */
+  --v2-bg:            #f5f4f9;
+  --v2-surface:       #ffffff;
+  --v2-surface-2:     #f1edfa;
+  --v2-surface-3:     #eae4f7;
+  --v2-line:          #d7cfe6;   /* kẻ trang trí */
+  --v2-line-strong:   #8d80a8;   /* viền trường nhập — đạt 3.65:1 (WCAG 1.4.11) */
+
+  /* --- Chữ -------------------------------------------------------------- */
+  --v2-ink:           #191426;   /* chữ chính          16.0:1 trên trắng */
+  --v2-ink-2:         #453a55;   /* chữ phụ             9.0:1 trên trắng */
+  --v2-ink-3:         #655877;   /* chữ mờ              6.5:1 trên trắng, 5.7:1 trên surface-2 */
+  --v2-ink-inv:       #ffffff;
+
+  /* --- Màu nhấn --------------------------------------------------------- */
+  --v2-accent:        #5a2fc0;   /* 8.1:1 trên trắng */
+  --v2-accent-hover:  #4a24a6;
+  --v2-accent-soft:   #efe8ff;
+  --v2-accent-ink:    #ffffff;
+
+  /* --- Trạng thái ngữ nghĩa -------------------------------------------- */
+  --v2-good:          #146b43;   /* 6.6:1 */
+  --v2-good-soft:     #e2f5ea;
+  --v2-warn:          #8a4a00;   /* 6.9:1 */
+  --v2-warn-soft:     #fdf0dd;
+  --v2-danger:        #a01f1f;   /* 7.8:1 */
+  --v2-danger-soft:   #fdeaea;
+  --v2-info:          #1b5fa8;   /* 6.5:1 */
+  --v2-info-soft:     #e5f0fb;
+
+  /* --- Thang chữ: cân đối, gọn gàng, hiện đại (tối thiểu 12px) ---------- */
+  --v2-fs-xs:         12px;
+  --v2-fs-sm:         13px;
+  --v2-fs-md:         14px;
+  --v2-fs-lg:         15px;
+  --v2-fs-xl:         17px;
+  --v2-fs-2xl:        20px;
+  --v2-fs-3xl:        24px;
+
+  --v2-lh-tight:      1.3;
+  --v2-lh-body:       1.5;
+
+  /* --- Khoảng cách ----------------------------------------------------- */
+  --v2-s1:  4px;
+  --v2-s2:  6px;
+  --v2-s3: 10px;
+  --v2-s4: 14px;
+  --v2-s5: 16px;
+  --v2-s6: 20px;
+  --v2-s8: 24px;
+  --v2-s10: 32px;
+
+  /* --- Bo góc & đổ bóng ------------------------------------------------ */
+  --v2-r-sm:   7px;
+  --v2-r-md:   9px;
+  --v2-r-lg:  12px;
+  --v2-r-xl:  16px;
+  --v2-r-pill: 999px;
+
+  --v2-shadow-1: 0 1px 2px rgba(25, 20, 38, .05);
+  --v2-shadow-2: 0 2px 8px rgba(25, 20, 38, .06), 0 1px 2px rgba(25, 20, 38, .04);
+  --v2-shadow-3: 0 12px 32px rgba(25, 20, 38, .15);
+
+  /* --- Khung ----------------------------------------------------------- */
+  --v2-sidebar-w: 248px;
+  --v2-header-h:  56px;
+  --v2-tap:       44px;          /* WCAG 2.5.5 AAA tap target */
+
+  /* --- Chuyển động ----------------------------------------------------- */
+  --v2-ease: 160ms cubic-bezier(.4, 0, .2, 1);
+}
+
+/* --- Chế độ tối: bật bằng data-theme="dark" trên <html> ----------------- */
+:root[data-theme="dark"] {
+  --v2-bg:            #100e18;
+  --v2-surface:       #1a1725;
+  --v2-surface-2:     #221d30;
+  --v2-surface-3:     #2b2540;
+  --v2-line:          #38304d;
+  --v2-line-strong:   #7d719b;
+
+  --v2-ink:           #f3effa;
+  --v2-ink-2:         #cfc6e0;
+  --v2-ink-3:         #a79cbd;
+  --v2-ink-inv:       #100e18;
+
+  --v2-accent:        #b9a2ff;
+  --v2-accent-hover:  #cbb9ff;
+  --v2-accent-soft:   #2a2143;
+  --v2-accent-ink:    #17102b;
+
+  --v2-good:          #6fdfa4;
+  --v2-good-soft:     #122c20;
+  --v2-warn:          #f7c273;
+  --v2-warn-soft:     #2e2413;
+  --v2-danger:        #ff9a9a;
+  --v2-danger-soft:   #331a1a;
+  --v2-info:          #8cc4ff;
+  --v2-info-soft:     #13243a;
+
+  --v2-shadow-1: 0 1px 2px rgba(0, 0, 0, .4);
+  --v2-shadow-2: 0 2px 8px rgba(0, 0, 0, .45), 0 1px 2px rgba(0, 0, 0, .4);
+  --v2-shadow-3: 0 12px 32px rgba(0, 0, 0, .6);
+}
+
+/* --- Màu nhận diện theo từng cổng --------------------------------------
+   body[data-portal] do admin.js gắn khi đăng nhập. Mỗi cổng có một sắc thái
+   riêng để người dùng biết mình đang ở đâu — nhưng tất cả đều đạt ≥ 4.5:1.
+   ---------------------------------------------------------------------- */
+body[data-portal="admin"]      { --v2-portal: #5a2fc0; --v2-portal-soft: #efe8ff; }
+body[data-portal="support"]    { --v2-portal: #0f6b56; --v2-portal-soft: #e0f4ee; }
+body[data-portal="finance"]    { --v2-portal: #8a4a00; --v2-portal-soft: #fdf0dd; }
+body[data-portal="operations"] { --v2-portal: #1b5fa8; --v2-portal-soft: #e5f0fb; }
+
+:root[data-theme="dark"] body[data-portal="admin"]      { --v2-portal: #b9a2ff; --v2-portal-soft: #2a2143; }
+:root[data-theme="dark"] body[data-portal="support"]    { --v2-portal: #6fdfa4; --v2-portal-soft: #122c20; }
+:root[data-theme="dark"] body[data-portal="finance"]    { --v2-portal: #f7c273; --v2-portal-soft: #2e2413; }
+:root[data-theme="dark"] body[data-portal="operations"] { --v2-portal: #8cc4ff; --v2-portal-soft: #13243a; }
+
+
+/* ============================================================================
+   2. NỀN TẢNG & KHẢ NĂNG TRUY CẬP
+   ========================================================================== */
+
+body {
+  background: var(--v2-bg) !important;
+  color: var(--v2-ink) !important;
+  font-size: var(--v2-fs-md);
+  line-height: var(--v2-lh-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Vòng focus nhìn thấy rõ ở mọi phần tử tương tác (WCAG 2.4.7). */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid var(--v2-accent);
+  outline-offset: 2px;
+  border-radius: var(--v2-r-sm);
+}
+
+/* Bỏ vòng focus mặc định khi đã có vòng tuỳ biến ở trên. */
+:where(a, button, input, select, textarea):focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Liên kết "bỏ qua điều hướng" — chỉ hiện khi tab vào. */
+.v2-skip-link {
+  position: fixed;
+  top: -100px;
+  left: var(--v2-s3);
+  z-index: 9999;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--v2-tap);
+  min-width: var(--v2-tap);
+  padding: 10px 18px;
+  border-radius: var(--v2-r-md);
+  background: var(--v2-accent);
+  color: var(--v2-accent-ink);
+  font-size: var(--v2-fs-md);
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: var(--v2-shadow-3);
+  transition: top var(--v2-ease);
+}
+.v2-skip-link:focus-visible {
+  top: var(--v2-s3);
+  outline-color: var(--v2-ink);
+}
+
+/* Chỉ dành cho trình đọc màn hình. */
+.v2-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Tôn trọng lựa chọn giảm chuyển động của hệ điều hành. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Thanh cuộn mảnh, hợp tông màu. */
+.v2-scroll,
+#sidebar-drawer,
+.chat-messages-container {
+  scrollbar-width: thin;
+  scrollbar-color: var(--v2-line-strong) transparent;
+}
+.v2-scroll::-webkit-scrollbar,
+#sidebar-drawer::-webkit-scrollbar,
+.chat-messages-container::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.v2-scroll::-webkit-scrollbar-thumb,
+#sidebar-drawer::-webkit-scrollbar-thumb,
+.chat-messages-container::-webkit-scrollbar-thumb {
+  background: var(--v2-line-strong);
+  border: 3px solid transparent;
+  border-radius: var(--v2-r-pill);
+  background-clip: content-box;
+}
+
+
+/* ============================================================================
+   3. THANG CHỮ — ÉP TỐI THIỂU 12px
+   ----------------------------------------------------------------------------
+   Bản cũ có 62 selector dùng cỡ 8–11.5px. Ở đây mỗi nhóm được nâng lên theo
+   đúng vai trò của nó thay vì nhân chung một hệ số, để phân cấp thị giác
+   vẫn giữ được: nhãn nhỏ 12px, nội dung 13–14px, tiêu đề 17–26px.
+   ========================================================================== */
+
+/* --- Nhãn nhỏ / eyebrow / siêu dữ liệu -------------------------------- */
+.eyebrow,
+.sidebar-topline,
+aside > .eyebrow,
+.welcome-banner .eyebrow,
+header .eyebrow {
+  font-size: var(--v2-fs-xs) !important;
+  line-height: var(--v2-lh-tight);
+  letter-spacing: .09em;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--v2-ink-3) !important;
+}
+
+/* --- Chú thích, mô tả, gợi ý ----------------------------------------- */
+small,
+#page-description,
+.login-form small,
+.login-art small,
+.login-art p,
+.login-case-hint,
+.caps-warning,
+.activity-item small,
+.timeline-item small,
+.ticket-layout small,
+td small,
+.post-author-info small,
+.identity small,
+.chat-drawer-title small,
+.chat-msg-header,
+.smart-reply-box small,
+.handoff-pills small,
+.quick-reply-chips small,
+.information,
+.card .empty,
+.ai-copilot-tip,
+.welcome-banner p,
+.ops-terminal-wrap,
+.sidebar-topline {
+  font-size: var(--v2-fs-xs) !important;
+  line-height: 1.5;
+}
+
+/* --- Nhãn trạng thái & huy hiệu --------------------------------------- */
+.badge,
+.private-badge,
+.chat-team-badge,
+.nav-count-badge,
+.chat-toggle-btn .badge-count,
+.chat-bubble .ticket-tag,
+.chat-ticket-ref-bar,
+.channel-chip,
+.mobile-nav-item,
+.dept-matrix-btn,
+.ai-btn-sm,
+.ai-chip,
+.ai-smart-indicator,
+.ops-btn,
+.quick-actions button,
+.section-bar .link-button,
+.metric span,
+.activity-item span,
+.activity-item b {
+  font-size: var(--v2-fs-xs) !important;
+  line-height: 1.45;
+}
+
+/* --- Nhãn biểu mẫu ---------------------------------------------------- */
+.login-form label,
+.toolbar label,
+.ticket-layout label,
+.ticket-create label,
+.content-toolbar label,
+.staff-form label,
+.toolbar button,
+.dialog-actions button,
+.identity button,
+.header-tools button,
+.password-toggle-btn,
+.staff-form button {
+  font-size: var(--v2-fs-sm) !important;
+}
+
+/* --- Trường nhập & bảng ----------------------------------------------- */
+.toolbar input,
+.toolbar select,
+.ticket-layout input,
+.ticket-layout select,
+.ticket-layout textarea,
+.staff-form input,
+.staff-form select,
+td button,
+td select,
+table,
+th,
+td {
+  font-size: var(--v2-fs-sm) !important;
+}
+
+/* --- Tiêu đề ---------------------------------------------------------- */
+h1 { font-size: var(--v2-fs-3xl); line-height: 1.2; letter-spacing: -.02em; }
+h2 { font-size: var(--v2-fs-2xl); line-height: 1.25; letter-spacing: -.015em; }
+h3 { font-size: var(--v2-fs-xl);  line-height: 1.3; }
+h4 { font-size: var(--v2-fs-lg);  line-height: 1.35; }
+
+h1, h2, h3, h4 {
+  color: var(--v2-ink);
+  font-weight: 700;
+  margin: 0 0 var(--v2-s2);
+}
+
+/* Đoạn văn mô tả dưới tiêu đề trang. */
+#page-description {
+  color: var(--v2-ink-2) !important;
+  max-width: 78ch;
+  margin: 0 0 var(--v2-s5) !important;
+}
+
+
+/* ============================================================================
+   4. TRANG ĐĂNG NHẬP
+   ========================================================================== */
+
+.login {
+  background: var(--v2-bg);
+}
+
+.login-art {
+  background:
+    radial-gradient(120% 90% at 15% 10%, #6a3fd8 0%, #4a24a6 45%, #2c1470 100%);
+  color: #ffffff;
+  position: relative;
+  overflow: hidden;
+  padding: var(--v2-s10);
+}
+
+.login-art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, .07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, .07) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(70% 60% at 30% 20%, #000 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.login-art > * { position: relative; z-index: 1; }
+
+.login-art h1 {
+  color: #ffffff;
+  font-size: clamp(26px, 3.4vw, 40px);
+  line-height: 1.16;
+  letter-spacing: -.025em;
+  margin-bottom: var(--v2-s4);
+}
+
+.login-art .eyebrow {
+  color: #d9ccff !important;          /* 8.2:1 trên nền tím đậm */
+  letter-spacing: .16em;
+}
+
+.login-art small,
+.login-art p {
+  color: #ded5ff !important;          /* 7.4:1 trên nền tím đậm */
+  max-width: 42ch;
+  display: block;
+}
+
+.mark-wrapper {
+  display: inline-flex;
+  padding: var(--v2-s3);
+  border-radius: var(--v2-r-xl);
+  background: rgba(255, 255, 255, .14);
+  backdrop-filter: blur(6px);
+  margin-bottom: var(--v2-s5);
+}
+
+.login-form {
+  background: var(--v2-surface);
+  padding: clamp(28px, 4vw, 56px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.login-form h2 {
+  font-size: var(--v2-fs-3xl);
+  margin-bottom: var(--v2-s1);
+}
+
+.login-form .muted,
+.login-form small {
+  color: var(--v2-ink-2) !important;
+}
+
+.login-form label {
+  display: block;
+  margin-bottom: var(--v2-s4);
+  color: var(--v2-ink-2);
+  font-weight: 650;
+  letter-spacing: .01em;
+}
+
+.login-form input {
+  display: block;
+  width: 100%;
+  margin-top: var(--v2-s2);
+  padding: 11px 13px;
+  font-size: var(--v2-fs-md);
+  color: var(--v2-ink);
+  background: var(--v2-surface);
+  border: 1.5px solid var(--v2-line-strong);
+  border-radius: var(--v2-r-md);
+  transition: border-color var(--v2-ease), box-shadow var(--v2-ease);
+}
+
+.login-form input::placeholder {
+  color: var(--v2-ink-3);
+  opacity: 1;
+}
+
+.login-form input:focus {
+  border-color: var(--v2-accent);
+  box-shadow: 0 0 0 3px var(--v2-accent-soft);
+  outline: none;
+}
+
+.password-field-wrap { position: relative; }
+
+.password-toggle-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-top: var(--v2-s1);
+  padding: 8px 12px;
+  min-height: var(--v2-tap);
+  min-width: var(--v2-tap);
+  border: 1px solid transparent;
+  border-radius: var(--v2-r-sm);
+  background: transparent;
+  color: var(--v2-ink-2);
+  font-weight: 650;
+  cursor: pointer;
+}
+.password-toggle-btn:hover {
+  background: var(--v2-surface-2);
+  color: var(--v2-ink);
+}
+
+.caps-warning {
+  color: var(--v2-warn) !important;
+  background: var(--v2-warn-soft);
+  border-left: 3px solid var(--v2-warn);
+  border-radius: var(--v2-r-sm);
+  padding: 8px 12px;
+  margin: 0 0 var(--v2-s4);
+}
+
+.login-case-hint {
+  color: var(--v2-ink-3) !important;
+  margin: 0 0 var(--v2-s3);
+}
+
+.login .error,
+#login-error {
+  color: var(--v2-danger) !important;
+  background: var(--v2-danger-soft);
+  border-radius: var(--v2-r-sm);
+  padding: 8px 12px;
+  margin: var(--v2-s3) 0 0;
+  font-size: var(--v2-fs-sm) !important;
+}
+#login-error:empty { padding: 0; background: none; }
+
+.session-notice {
+  margin-top: var(--v2-s5);
+  padding-top: var(--v2-s4);
+  border-top: 1px solid var(--v2-line);
+  color: var(--v2-ink-3) !important;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--v2-tap);
+  min-width: var(--v2-tap);
+  gap: var(--v2-s2);
+  font-size: var(--v2-fs-lg);
+  font-weight: 800;
+  letter-spacing: -.01em;
+  color: var(--v2-ink) !important;
+  text-decoration: none;
+}
+
+.portal-header-tag { margin: var(--v2-s6) 0 var(--v2-s2); }
+
+.orbit { color: rgba(255, 255, 255, .3) !important; }
+
+
+/* ============================================================================
+   5. KHUNG LÀM VIỆC
+   ========================================================================== */
+
+#workspace {
+  display: grid !important;
+  grid-template-columns: var(--v2-sidebar-w) minmax(0, 1fr) !important;
+  min-height: 100vh;
+  align-items: start !important;
+  background: var(--v2-bg);
+}
+
+/* --- Thanh bên -------------------------------------------------------- */
+#sidebar-drawer {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--v2-s1);
+  padding: var(--v2-s4) var(--v2-s3) var(--v2-s4);
+  background: var(--v2-surface);
+  border-right: 1px solid var(--v2-line);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  z-index: 40;
+}
+
+.sidebar-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-s2);
+  padding: 0 var(--v2-s2) var(--v2-s3);
+  border-bottom: 1px solid var(--v2-line);
+  margin-bottom: var(--v2-s3);
+  color: var(--v2-ink-3) !important;
+  letter-spacing: .1em;
+  font-weight: 700;
+}
+
+.portal-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: var(--v2-r-pill);
+  background: var(--v2-portal-soft, var(--v2-accent-soft));
+  color: var(--v2-portal, var(--v2-accent)) !important;
+  font-size: var(--v2-fs-xs) !important;
+  font-weight: 800;
+  letter-spacing: .08em;
+  border: 1px solid currentColor;
+}
+
+#sidebar-drawer .brand {
+  padding: 0 var(--v2-s2);
+  margin-bottom: var(--v2-s1);
+}
+
+#role-label {
+  padding: 0 var(--v2-s2);
+  margin: 0 0 var(--v2-s3) !important;
+  color: var(--v2-ink-3) !important;
+  letter-spacing: .1em;
+  font-weight: 700;
+}
+
+/* --- Khối danh tính ở đáy thanh bên ---------------------------------- */
+.identity {
+  margin-top: auto;
+  padding: var(--v2-s3) var(--v2-s2) 0;
+  border-top: 1px solid var(--v2-line);
+  display: flex;
+  flex-direction: column;
+  gap: var(--v2-s3);
+}
+
+.identity-profile {
+  display: flex;
+  align-items: center;
+  gap: var(--v2-s3);
+  min-width: 0;
+}
+
+.status-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--v2-good);
+  box-shadow: 0 0 0 3px var(--v2-good-soft);
+}
+
+.identity-meta { min-width: 0; }
+
+.identity-meta b {
+  display: block;
+  font-size: var(--v2-fs-sm);
+  color: var(--v2-ink);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.identity-meta small {
+  display: block;
+  color: var(--v2-ink-3) !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.identity button,
+#logout {
+  width: 100%;
+  min-height: var(--v2-tap);
+  padding: 8px 12px;
+  border: 1px solid var(--v2-line-strong);
+  border-radius: var(--v2-r-md);
+  background: var(--v2-surface);
+  color: var(--v2-ink-2);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--v2-ease), color var(--v2-ease), border-color var(--v2-ease);
+}
+.identity button:hover,
+#logout:hover {
+  background: var(--v2-danger-soft);
+  border-color: var(--v2-danger);
+  color: var(--v2-danger);
+}
+
+/* --- Vùng nội dung ---------------------------------------------------- */
+main {
+  margin: 0 !important;
+  padding: var(--v2-s5) var(--v2-s8) 64px !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  max-width: 1440px;
+  align-self: flex-start !important;
+  justify-content: flex-start !important;
+  box-sizing: border-box !important;
+}
+
+header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-s3);
+  padding: 8px 0;
+  margin: 0 0 var(--v2-s2) !important;
+  background: color-mix(in srgb, var(--v2-bg) 90%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--v2-line);
+}
+
+.header-title-group {
+  display: flex;
+  align-items: center;
+  gap: var(--v2-s3);
+  min-width: 0;
+}
+
+#page-title {
+  font-size: var(--v2-fs-2xl);
+  margin: 0;
+  line-height: 1.2;
+  letter-spacing: -.015em;
+}
+
+.header-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.header-tools button {
+  min-height: var(--v2-tap);
+  min-width: var(--v2-tap);
+  padding: 8px 14px;
+  border: 1px solid var(--v2-line-strong);
+  border-radius: var(--v2-r-pill);
+  background: var(--v2-surface);
+  color: var(--v2-ink-2);
+  font-size: var(--v2-fs-sm) !important;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--v2-ease), color var(--v2-ease), border-color var(--v2-ease);
+}
+.header-tools button:hover {
+  background: var(--v2-accent-soft);
+  border-color: var(--v2-accent);
+  color: var(--v2-accent);
+}
+
+.ai-smart-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--v2-r-pill);
+  background: var(--v2-good-soft);
+  color: var(--v2-good) !important;
+  font-weight: 650;
+  border: 1px solid currentColor;
+}
+
+#cloud-data-state {
+  color: var(--v2-info) !important;
+  background: var(--v2-info-soft);
+  border-left: 3px solid var(--v2-info);
+  border-radius: var(--v2-r-sm);
+  padding: 6px 12px;
+  margin: 0 0 var(--v2-s3);
+  font-size: var(--v2-fs-sm) !important;
+}
+
+#content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--v2-s4);
+  width: 100%;
+}
+
+/* Vùng thông báo nổi (toast). */
+#notice {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--v2-s6) + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%) translateY(8px);
+  z-index: 9000;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 12px 20px;
+  border-radius: var(--v2-r-pill);
+  background: var(--v2-ink);
+  color: var(--v2-ink-inv);
+  font-size: var(--v2-fs-sm);
+  font-weight: 650;
+  box-shadow: var(--v2-shadow-3);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--v2-ease), transform var(--v2-ease);
+}
+#notice:not(:empty) {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+
+/* ============================================================================
+   6. ĐIỀU HƯỚNG CÓ NHÓM
+   ----------------------------------------------------------------------------
+   Bản cũ: 13 mục phẳng, không phân nhóm — người dùng phải quét toàn bộ danh
+   sách mỗi lần. Bản mới: chia 5 nhóm có tiêu đề, mục đang mở có thanh dọc
+   bên trái + nền nhấn + chữ đậm, kèm aria-current="page".
+   ========================================================================== */
+
+#navigation {
+  display: flex;
+  flex-direction: column;
+  gap: var(--v2-s1);
+}
+
+/* --- Ô tìm nhanh chức năng ------------------------------------------- */
+.nav-filter {
+  padding: 0 var(--v2-s2) var(--v2-s3);
+}
+
+#v2-nav-filter {
+  width: 100%;
+  min-height: var(--v2-tap);
+  padding: 8px 11px;
+  font-size: var(--v2-fs-sm);
+  color: var(--v2-ink);
+  background: var(--v2-surface-2);
+  border: 1.5px solid var(--v2-line);
+  border-radius: var(--v2-r-md);
+}
+
+#v2-nav-filter::placeholder {
+  color: var(--v2-ink-3);
+  opacity: 1;
+}
+
+#v2-nav-filter:focus {
+  background: var(--v2-surface);
+  border-color: var(--v2-accent);
+  box-shadow: 0 0 0 3px var(--v2-accent-soft);
+  outline: none;
+}
+
+/* Mục bị lọc hoặc nhóm rỗng thì ẩn hẳn. */
+#navigation button[data-v2-hidden="1"],
+.nav-group[data-v2-hidden="1"] {
+  display: none !important;
+}
+
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: var(--v2-s3);
+}
+
+.nav-group:first-child { padding-top: 0; }
+
+.nav-group-title {
+  margin: 0;
+  padding: 0 var(--v2-s3) var(--v2-s1);
+  font-size: var(--v2-fs-xs) !important;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--v2-ink-3) !important;
+}
+
+aside nav button,
+#navigation button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: var(--v2-tap);
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--v2-r-md);
+  background: transparent;
+  color: var(--v2-ink-2) !important;
+  font-size: var(--v2-fs-sm) !important;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--v2-ease), color var(--v2-ease);
+}
+
+aside nav button:hover,
+#navigation button:hover {
+  background: var(--v2-surface-2);
+  color: var(--v2-ink) !important;
+}
+
+aside nav button.active,
+#navigation button.active {
+  background: var(--v2-portal-soft, var(--v2-accent-soft));
+  color: var(--v2-portal, var(--v2-accent)) !important;
+  font-weight: 700;
+  box-shadow: none;
+}
+
+/* Thanh dọc báo vị trí hiện tại — tín hiệu thị giác mạnh hơn đổi màu chữ. */
+aside nav button.active::before,
+#navigation button.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 16px;
+  border-radius: var(--v2-r-pill);
+  background: var(--v2-portal, var(--v2-accent));
+}
+
+aside nav button svg,
+#navigation button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+  opacity: .9;
+}
+
+aside nav button:disabled,
+#navigation button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+/* Huy hiệu số lượng trên mục điều hướng. */
+.nav-count-badge {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 2px 7px;
+  border-radius: var(--v2-r-pill);
+  background: var(--v2-danger);
+  color: #ffffff !important;
+  font-weight: 800;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.chat-toggle-btn .badge-count {
+  display: inline-block;
+  min-width: 20px;
+  padding: 1px 6px;
+  margin-left: 4px;
+  border-radius: var(--v2-r-pill);
+  background: var(--v2-danger);
+  color: #ffffff !important;
+  font-weight: 800;
+}
+
+
+/* ============================================================================
+   7. THÀNH PHẦN
+   ========================================================================== */
+
+/* --- Nút -------------------------------------------------------------- */
+button,
+.dialog-actions button {
+  font-family: inherit;
+  min-height: var(--v2-tap);
+  min-width: var(--v2-tap);
+}
+
+.link-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--v2-tap);
+  min-width: var(--v2-tap);
+}
+
+button.primary,
+.primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--v2-s2);
+  min-height: var(--v2-tap);
+  min-width: var(--v2-tap);
+  padding: 9px 16px;
+  border: 1px solid transparent;
+  border-radius: var(--v2-r-md);
+  background: var(--v2-accent);
+  color: var(--v2-accent-ink) !important;
+  font-size: var(--v2-fs-sm) !important;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background var(--v2-ease), transform var(--v2-ease);
+}
+button.primary:hover,
+.primary:hover { background: var(--v2-accent-hover); }
+button.primary:active,
+.primary:active { transform: translateY(1px); }
+button.primary:disabled,
+.primary:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+button.danger,
+.danger {
+  background: var(--v2-danger) !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+  font-weight: 700;
+}
+
+/* --- Huy hiệu trạng thái --------------------------------------------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--v2-r-pill);
+  background: var(--v2-surface-3);
+  color: var(--v2-ink-2) !important;
+  font-weight: 700;
+  letter-spacing: .01em;
+  white-space: nowrap;
+  border: 1px solid var(--v2-line);
+}
+
+.badge.good {
+  background: var(--v2-good-soft);
+  color: var(--v2-good) !important;
+  border-color: currentColor;
+}
+
+.badge.warn {
+  background: var(--v2-warn-soft);
+  color: var(--v2-warn) !important;
+  border-color: currentColor;
+}
+
+.badge.bad,
+.badge.danger {
+  background: var(--v2-danger-soft);
+  color: var(--v2-danger) !important;
+  border-color: currentColor;
+}
+
+.private-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--v2-r-pill);
+  background: var(--v2-surface-3);
+  color: var(--v2-ink-2) !important;
+  font-weight: 700;
+  border: 1px solid var(--v2-line-strong);
+}
+
+/* --- Thẻ & khối nội dung --------------------------------------------- */
+.card,
+.metric,
+.welcome-banner,
+.ticket-layout,
+.staff-form,
+.activity-item,
+.timeline-item,
+.information {
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r-lg);
+  box-shadow: var(--v2-shadow-1);
+}
+
+.card,
+.welcome-banner,
+.ticket-layout,
+.staff-form {
+  padding: var(--v2-s5);
+}
+
+/* Số liệu tổng quan: số lớn, nhãn nhỏ, canh trái cho dễ quét. */
+.metric {
+  padding: var(--v2-s4) var(--v2-s5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--v2-s1);
+}
+.metric b,
+.metric strong {
+  font-size: var(--v2-fs-3xl);
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  color: var(--v2-ink);
+  font-variant-numeric: tabular-nums;
+}
+.metric span {
+  color: var(--v2-ink-3) !important;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+}
+
+/* --- Trạng thái rỗng -------------------------------------------------- */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--v2-s2);
+  padding: var(--v2-s10) var(--v2-s5);
+  text-align: center;
+  color: var(--v2-ink-3) !important;
+  background: var(--v2-surface);
+  border: 1px dashed var(--v2-line-strong);
+  border-radius: var(--v2-r-lg);
+  font-size: var(--v2-fs-md) !important;
+}
+
+/* --- Bảng dữ liệu ----------------------------------------------------- */
+table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r-lg);
+  overflow: hidden;
+  color: var(--v2-ink-2) !important;
+}
+
+th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 9px 12px;
+  text-align: left;
+  font-size: var(--v2-fs-xs) !important;
+  font-weight: 750;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--v2-ink-3) !important;
+  background: var(--v2-surface-2);
+  border-bottom: 1px solid var(--v2-line);
+  white-space: nowrap;
+}
+
+td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--v2-line);
+  vertical-align: middle;
+}
+
+tbody tr:last-child td { border-bottom: 0; }
+
+tbody tr {
+  transition: background var(--v2-ease);
+}
+
+tbody tr:hover { background: var(--v2-surface-2); }
+
+tbody tr:hover td { color: var(--v2-ink); }
+
+/* Bọc bảng để cuộn ngang trên màn hình hẹp thay vì vỡ bố cục. */
+.v2-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: var(--v2-r-lg);
+}
+
+/* --- Biểu mẫu --------------------------------------------------------- */
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: var(--v2-fs-sm);
+  color: var(--v2-ink);
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line-strong);
+  border-radius: var(--v2-r-md);
+  min-height: var(--v2-tap);
+  padding: 9px 12px;
+  transition: border-color var(--v2-ease), box-shadow var(--v2-ease);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--v2-ink-3);
+  opacity: 1;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--v2-accent);
+  box-shadow: 0 0 0 3px var(--v2-accent-soft);
+  outline: none;
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  background: var(--v2-surface-2);
+  color: var(--v2-ink-3);
+  cursor: not-allowed;
+}
+
+label {
+  color: var(--v2-ink-2);
+  font-weight: 650;
+}
+
+.toolbar,
+.content-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--v2-s3);
+  padding: var(--v2-s3) var(--v2-s4);
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r-lg);
+}
+
+.toolbar label,
+.content-toolbar label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--v2-ink-3) !important;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+/* --- Hộp thoại -------------------------------------------------------- */
+dialog {
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r-xl);
+  padding: var(--v2-s6);
+  background: var(--v2-surface);
+  color: var(--v2-ink);
+  box-shadow: var(--v2-shadow-3);
+  max-width: min(520px, calc(100vw - 32px));
+}
+
+dialog::backdrop {
+  background: rgba(16, 14, 24, .55);
+  backdrop-filter: blur(2px);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--v2-s2);
+  margin-top: var(--v2-s5);
+}
+
+.dialog-actions button {
+  min-height: var(--v2-tap);
+  min-width: var(--v2-tap);
+  padding: 9px 18px;
+  border: 1.5px solid var(--v2-line-strong);
+  border-radius: var(--v2-r-md);
+  background: var(--v2-surface);
+  color: var(--v2-ink-2);
+  font-weight: 650;
+  cursor: pointer;
+}
+.dialog-actions button:hover {
+  background: var(--v2-surface-2);
+  color: var(--v2-ink);
+}
+.dialog-actions button.primary {
+  border-color: transparent;
+  background: var(--v2-accent);
+  color: var(--v2-accent-ink) !important;
+}
+.dialog-actions button.primary:hover { background: var(--v2-accent-hover); }
+
+#secret-value {
+  width: 100%;
+  font-family: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, monospace;
+  font-size: var(--v2-fs-lg);
+  letter-spacing: .06em;
+  padding: 11px 13px;
+  margin: var(--v2-s3) 0;
+  background: var(--v2-surface-2);
+  border: 1.5px dashed var(--v2-line-strong);
+  border-radius: var(--v2-r-md);
+}
+
+/* --- Nút đổi giao diện sáng/tối -------------------------------------- */
+.v2-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--v2-tap);
+  height: var(--v2-tap);
+  min-width: var(--v2-tap);
+  min-height: var(--v2-tap);
+  padding: 0;
+  border-radius: var(--v2-r-pill);
+  border: 1.5px solid var(--v2-line-strong);
+  background: var(--v2-surface);
+  color: var(--v2-ink-2);
+  font-size: var(--v2-fs-lg);
+  cursor: pointer;
+  transition: background var(--v2-ease), color var(--v2-ease);
+}
+.v2-theme-toggle:hover {
+  background: var(--v2-accent-soft);
+  color: var(--v2-accent);
+  border-color: var(--v2-accent);
+}
+
+
+/* ============================================================================
+   8. KHUNG TRAO ĐỔI NỘI BỘ
+   ========================================================================== */
+
+aside#chat-drawer,
+.chat-drawer {
+  position: fixed !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: auto !important;
+  width: 380px !important;
+  max-width: 100vw !important;
+  height: 100dvh !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  background: var(--v2-surface) !important;
+  border-left: 1px solid var(--v2-line) !important;
+  border-right: 0 !important;
+  box-shadow: var(--v2-shadow-3) !important;
+  color: var(--v2-ink) !important;
+  z-index: 1000 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+aside#chat-drawer[hidden],
+.chat-drawer[hidden] {
+  display: none !important;
+}
+
+.chat-drawer-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--v2-line);
+  background: var(--v2-surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.chat-drawer-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.chat-drawer-title .chat-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--v2-accent-soft);
+  color: var(--v2-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.chat-drawer-title h3 {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: var(--v2-ink) !important;
+  margin: 0 !important;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-drawer-title small {
+  color: var(--v2-ink-3) !important;
+  font-size: 12px !important;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-close-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--v2-r-sm);
+  border: 1px solid var(--v2-line);
+  background: var(--v2-surface-2);
+  color: var(--v2-ink-2);
+  font-size: 13px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.chat-close-btn:hover {
+  background: var(--v2-danger-soft);
+  color: var(--v2-danger);
+  border-color: var(--v2-danger);
+}
+
+.chat-channels-bar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 8px 14px;
+  overflow: visible;
+  border-bottom: 1px solid var(--v2-line);
+  background: var(--v2-surface-2);
+  flex-shrink: 0;
+}
+
+.channel-chip {
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  border: 1px solid var(--v2-line-strong);
+  background: var(--v2-surface);
+  color: var(--v2-ink-2) !important;
+  font-size: 12px !important;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background var(--v2-ease), color var(--v2-ease), border-color var(--v2-ease);
+}
+.channel-chip:hover {
+  border-color: var(--v2-accent);
+  color: var(--v2-accent) !important;
+}
+.channel-chip.active {
+  background: var(--v2-accent);
+  border-color: var(--v2-accent);
+  color: var(--v2-accent-ink) !important;
+  font-weight: 700;
+}
+
+.chat-messages-container {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 16px;
+  gap: 10px;
+  background: var(--v2-bg);
+}
+
+.chat-msg-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 88%;
+}
+
+.chat-msg-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--v2-ink-2) !important;
+  font-size: 12px !important;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.chat-msg-header b {
+  font-weight: 700;
+  color: var(--v2-ink);
+  white-space: nowrap;
+}
+
+.chat-msg-header small {
+  font-size: 12px !important;
+  color: var(--v2-ink-3) !important;
+}
+
+.chat-team-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--v2-surface-3);
+  color: var(--v2-ink-2) !important;
+  font-size: 12px !important;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.chat-bubble {
+  border-radius: 12px;
+  padding: 8px 12px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  color: var(--v2-ink);
+  font-size: 12.5px;
+  line-height: 1.45;
+  box-shadow: var(--v2-shadow-1);
+  max-width: 100%;
+}
+
+.own-msg .chat-bubble,
+.chat-bubble.mine {
+  background: var(--v2-accent);
+  border-color: var(--v2-accent);
+  color: var(--v2-accent-ink);
+}
+
+.chat-empty {
+  padding: var(--v2-s8) var(--v2-s4);
+  text-align: center;
+  color: var(--v2-ink-3);
+  font-size: var(--v2-fs-sm);
+}
+
+.chat-send-form {
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--v2-line);
+  background: var(--v2-surface);
+  flex-shrink: 0;
+}
+
+.chat-input-wrap {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+#chat-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto !important;
+  min-height: 36px !important;
+  height: 36px;
+  max-height: 96px;
+  margin: 0 !important;
+  padding: 7px 11px !important;
+  resize: none;
+  font-size: 12.5px !important;
+  line-height: 1.4;
+  border-radius: 8px;
+}
+
+.chat-send-btn {
+  flex: 0 0 auto;
+  min-height: 36px !important;
+  height: 36px;
+  padding: 0 14px !important;
+  border: 0;
+  border-radius: 8px;
+  background: var(--v2-accent);
+  color: var(--v2-accent-ink);
+  font-size: 12.5px !important;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.chat-send-btn:hover { background: var(--v2-accent-hover); }
+
+.chat-ticket-ref-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-s2);
+  padding: var(--v2-s2) var(--v2-s5);
+  background: var(--v2-info-soft);
+  color: var(--v2-info) !important;
+  border-top: 1px solid var(--v2-line);
+  font-weight: 650;
+}
+
+.chat-ticket-ref-bar button {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  color: var(--v2-info);
+  font-weight: 800;
+  cursor: pointer;
+}
+.chat-ticket-ref-bar button:hover { background: var(--v2-surface-3); }
+
+.chat-backdrop {
+  background: rgba(16, 14, 24, .45);
+}
+
+
+/* ============================================================================
+   9. DI ĐỘNG
+   ========================================================================== */
+
+.mobile-menu-btn,
+.mobile-menu-close {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--v2-tap);
+  min-height: var(--v2-tap);
+  padding: 0 14px;
+  border: 1.5px solid var(--v2-line-strong);
+  border-radius: var(--v2-r-md);
+  background: var(--v2-surface);
+  color: var(--v2-ink-2);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mobile-bottom-nav {
+  display: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  gap: 2px;
+  padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px));
+  background: var(--v2-surface);
+  border-top: 1px solid var(--v2-line);
+  box-shadow: 0 -2px 12px rgba(25, 20, 38, .06);
+}
+
+.mobile-nav-item {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 4px;
+  border: 0;
+  border-radius: var(--v2-r-md);
+  background: transparent;
+  color: var(--v2-ink-3) !important;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+/* Chữ và icon phải THỪA KẾ màu của nút — bản cũ đặt màu xám riêng cho
+   `small` nên mục đang chọn không đổi màu theo trạng thái active. */
+.mobile-nav-item small,
+.mobile-nav-item .mobile-nav-icon,
+.mobile-nav-item .mobile-nav-icon-svg {
+  color: inherit !important;
+  stroke: currentColor;
+}
+
+.mobile-nav-item small {
+  font-size: var(--v2-fs-xs) !important;
+  line-height: 1.15;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-nav-icon {
+  font-size: 17px;
+  line-height: 1;
+}
+
+/* Icon SVG ở thanh điều hướng đáy (dùng chung bộ icon với thanh bên). */
+.mobile-nav-icon-svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+
+.mobile-nav-item.active {
+  background: var(--v2-portal-soft, var(--v2-accent-soft));
+  color: var(--v2-portal, var(--v2-accent)) !important;
+  font-weight: 800;
+}
+
+/* --- Điện thoại / máy tính bảng --------------------------------------- */
+@media (max-width: 1024px) {
+  #workspace {
+    grid-template-columns: 1fr !important;
+    display: block !important;
+    position: relative;
+  }
+
+  #sidebar-drawer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(300px, 84vw);
+    height: 100dvh;
+    transform: translateX(-102%);
+    transition: transform 220ms cubic-bezier(.4, 0, .2, 1);
+    z-index: 200;
+    box-shadow: var(--v2-shadow-3);
+  }
+
+  body.mobile-nav-open #sidebar-drawer {
+    transform: translateX(0) !important;
+  }
+
+  .mobile-menu-btn,
+  .mobile-menu-close { display: inline-flex; }
+
+  main {
+    padding: var(--v2-s4) var(--v2-s4) 88px !important;
+  }
+
+  .mobile-bottom-nav { display: flex; }
+
+  header {
+    flex-wrap: wrap;
+    gap: var(--v2-s2);
+  }
+
+  #page-title { font-size: var(--v2-fs-xl); }
+
+  .header-tools button {
+    min-height: var(--v2-tap);
+    padding: 8px 12px;
+  }
+
+  /* Chừa chỗ cho thanh điều hướng đáy để toast không bị che. */
+  #notice {
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (max-width: 640px) {
+  .login { grid-template-columns: 1fr !important; }
+  .login-art { padding: var(--v2-s6); }
+  .login-art h1 { font-size: var(--v2-fs-2xl); }
+  .login-form { padding: var(--v2-s6) var(--v2-s5); }
+
+  h1 { font-size: var(--v2-fs-2xl); }
+  h2 { font-size: var(--v2-fs-xl); }
+
+  .metric b,
+  .metric strong { font-size: var(--v2-fs-2xl); }
+
+  .toolbar,
+  .content-toolbar { padding: var(--v2-s3); }
+
+  .ai-smart-indicator { display: none; }
+
+  .chat-drawer { width: 100vw !important; }
+
+  .dialog-actions { flex-direction: column-reverse; }
+  .dialog-actions button { width: 100%; }
+}
+
+/* --- Màn hình lớn: cho nội dung thở ---------------------------------- */
+@media (min-width: 1600px) {
+  :root { --v2-sidebar-w: 248px; }
+  main { padding-left: var(--v2-s10) !important; padding-right: var(--v2-s10) !important; }
+}
+
+
+/* ============================================================================
+   10. TIỆN ÍCH
+   ========================================================================== */
+
+.muted {
+  color: var(--v2-ink-3) !important;
+}
+
+.v2-stack   { display: flex; flex-direction: column; gap: var(--v2-s4); }
+.v2-row     { display: flex; align-items: center; gap: var(--v2-s3); flex-wrap: wrap; }
+.v2-grid    { display: grid; gap: var(--v2-s4); grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.v2-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* In ấn: bỏ thanh bên và nút, giữ nội dung. */
+@media print {
+  #sidebar-drawer,
+  .header-tools,
+  .mobile-bottom-nav,
+  #notice,
+  .chat-drawer { display: none !important; }
+  #workspace { display: block !important; }
+  main { padding: 0 !important; }
+  body { background: #ffffff !important; color: #000000 !important; }
+}
+
+
+/* ============================================================================
+   11. CHẾ ĐỘ TỐI — TƯƠNG THÍCH THÀNH PHẦN CŨ
+   ----------------------------------------------------------------------------
+   admin.css gán màu cứng cho hơn 120 bộ chọn (nền trắng, chữ tím xám) và ghim
+   nền thanh bên bằng !important. Khối này chỉ chạy khi <html data-theme="dark">
+   nên chế độ sáng không bị ảnh hưởng.
+
+   Nguyên tắc:
+   • Nền sáng  → --v2-surface / --v2-surface-2
+   • Chữ đậm   → --v2-ink        Chữ phụ → --v2-ink-2     Chữ mờ → --v2-ink-3
+   • Nền màu nhạt → bản *-soft tương ứng, chữ dùng bản đặc
+   • Giữ nguyên những bề mặt vốn đã tối ở cả hai chế độ: terminal nhật ký,
+     thông báo nổi, khung media, bong bóng chat của chính mình, nút gửi chat.
+   ========================================================================== */
+
+/* --- 11.1 Khung & bề mặt -------------------------------------------------- */
+
+:root[data-theme="dark"] aside#sidebar-drawer {
+  background: var(--v2-surface) !important;
+  border-right-color: var(--v2-line) !important;
+}
+
+:root[data-theme="dark"] .card,
+:root[data-theme="dark"] .metric,
+:root[data-theme="dark"] .table-wrap,
+:root[data-theme="dark"] .toolbar,
+:root[data-theme="dark"] .empty,
+:root[data-theme="dark"] .empty-card,
+:root[data-theme="dark"] .dept-matrix-card,
+:root[data-theme="dark"] .rep-dossier-card,
+:root[data-theme="dark"] .chat-drawer,
+:root[data-theme="dark"] .chat-send-form,
+:root[data-theme="dark"] .ai-btn-sm,
+:root[data-theme="dark"] .ai-chip,
+:root[data-theme="dark"] .channel-chip,
+:root[data-theme="dark"] .other-msg .chat-bubble,
+:root[data-theme="dark"] dialog {
+  background: var(--v2-surface);
+  border-color: var(--v2-line);
+}
+
+:root[data-theme="dark"] .card .empty,
+:root[data-theme="dark"] .report-text,
+:root[data-theme="dark"] .information,
+:root[data-theme="dark"] .post-body-text,
+:root[data-theme="dark"] .score-gauge,
+:root[data-theme="dark"] .password-toggle-btn,
+:root[data-theme="dark"] .chat-channels-bar,
+:root[data-theme="dark"] .chat-messages-container,
+:root[data-theme="dark"] .policy-row-mild,
+:root[data-theme="dark"] .policy-row-safe,
+:root[data-theme="dark"] .policy-row-severe,
+:root[data-theme="dark"] .mobile-bottom-nav {
+  background: var(--v2-surface-2);
+  border-color: var(--v2-line);
+}
+
+:root[data-theme="dark"] th {
+  background: var(--v2-surface-2);
+  border-color: var(--v2-line);
+}
+
+:root[data-theme="dark"] tbody tr:hover {
+  background: var(--v2-surface-3);
+}
+
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] textarea {
+  background: var(--v2-surface-2);
+  border-color: var(--v2-line-strong);
+  color: var(--v2-ink);
+}
+
+:root[data-theme="dark"] .welcome-banner {
+  background: linear-gradient(110deg, var(--v2-surface-2), var(--v2-surface-3));
+  border-color: var(--v2-line);
+}
+
+:root[data-theme="dark"] .ops-banner,
+:root[data-theme="dark"] .ops-panel {
+  background: var(--v2-surface);
+  border-color: var(--v2-line);
+}
+
+:root[data-theme="dark"] .activity-item:before,
+:root[data-theme="dark"] .timeline-item:before {
+  background: var(--v2-accent);
+  box-shadow: 0 0 0 4px var(--v2-surface);
+}
+
+/* --- 11.2 Chữ ------------------------------------------------------------- */
+
+:root[data-theme="dark"] .brand span,
+:root[data-theme="dark"] .metric b,
+:root[data-theme="dark"] .empty-card .empty-title,
+:root[data-theme="dark"] .activity-item b,
+:root[data-theme="dark"] .post-author-info b,
+:root[data-theme="dark"] .dept-matrix-title,
+:root[data-theme="dark"] .dept-matrix-stat,
+:root[data-theme="dark"] .ai-copilot-title,
+:root[data-theme="dark"] .ai-copilot-summary,
+:root[data-theme="dark"] .ai-brief-title,
+:root[data-theme="dark"] .post-modal-dialog h3,
+:root[data-theme="dark"] .rep-banner h2,
+:root[data-theme="dark"] .rep-dossier-header h3,
+:root[data-theme="dark"] .rep-sub-section h4,
+:root[data-theme="dark"] .ops-banner h2,
+:root[data-theme="dark"] .ops-panel h3,
+:root[data-theme="dark"] .welcome-banner h2,
+:root[data-theme="dark"] .score-gauge b,
+:root[data-theme="dark"] button {
+  color: var(--v2-ink);
+}
+
+:root[data-theme="dark"] td,
+:root[data-theme="dark"] .metric span,
+:root[data-theme="dark"] .empty,
+:root[data-theme="dark"] .empty-card .empty-desc,
+:root[data-theme="dark"] .count,
+:root[data-theme="dark"] .activity-item span,
+:root[data-theme="dark"] .information,
+:root[data-theme="dark"] .report-text,
+:root[data-theme="dark"] .post-body-text,
+:root[data-theme="dark"] .score-gauge span,
+:root[data-theme="dark"] .welcome-banner p,
+:root[data-theme="dark"] .ai-copilot-tip,
+:root[data-theme="dark"] .ai-brief-desc,
+:root[data-theme="dark"] .toolbar label,
+:root[data-theme="dark"] .ticket-layout label,
+:root[data-theme="dark"] .content-toolbar label,
+:root[data-theme="dark"] .chat-msg-header,
+:root[data-theme="dark"] .other-msg .chat-bubble,
+:root[data-theme="dark"] .channel-chip,
+:root[data-theme="dark"] .staff-form label {
+  color: var(--v2-ink-2);
+}
+
+:root[data-theme="dark"] small,
+:root[data-theme="dark"] td small,
+:root[data-theme="dark"] .activity-item small,
+:root[data-theme="dark"] .timeline-item small,
+:root[data-theme="dark"] .post-author-info small,
+:root[data-theme="dark"] .handoff-pills small,
+:root[data-theme="dark"] .quick-reply-chips small,
+:root[data-theme="dark"] .smart-reply-box small,
+:root[data-theme="dark"] .login-case-hint,
+:root[data-theme="dark"] #page-description,
+:root[data-theme="dark"] .sidebar-topline,
+:root[data-theme="dark"] aside > .eyebrow,
+:root[data-theme="dark"] .eyebrow {
+  color: var(--v2-ink-3);
+}
+
+/* --- 11.3 Nút bấm --------------------------------------------------------- */
+
+/* admin.css đặt button { background: white } nên ở chế độ tối mọi nút chưa
+   được thiết kế riêng đều thành chữ sáng trên nền trắng. Đặt lại bề mặt nút
+   trước khi các khối bên dưới tô lại màu chủ đề. */
+:root[data-theme="dark"] button {
+  background: var(--v2-surface-2);
+  border-color: var(--v2-line-strong);
+  color: var(--v2-ink);
+}
+
+:root[data-theme="dark"] button:hover {
+  background: var(--v2-surface-3);
+}
+
+/* --- 11.4 Điều hướng ------------------------------------------------------ */
+
+
+:root[data-theme="dark"] aside nav button,
+:root[data-theme="dark"] nav button {
+  color: var(--v2-ink-2);
+}
+
+:root[data-theme="dark"] aside nav button:hover,
+:root[data-theme="dark"] nav button:hover {
+  background: var(--v2-surface-2);
+  color: var(--v2-ink);
+}
+
+:root[data-theme="dark"] aside nav button.active,
+:root[data-theme="dark"] nav button.active,
+:root[data-theme="dark"] .mobile-nav-item.active {
+  background: var(--v2-portal-soft, var(--v2-accent-soft));
+  color: var(--v2-portal, var(--v2-accent));
+}
+
+:root[data-theme="dark"] .mobile-nav-item {
+  color: var(--v2-ink-2);
+}
+
+:root[data-theme="dark"] .mobile-menu-close {
+  color: var(--v2-ink-2);
+}
+
+:root[data-theme="dark"] .link-button,
+:root[data-theme="dark"] .mobile-menu-btn,
+:root[data-theme="dark"] .password-toggle-btn,
+:root[data-theme="dark"] .ai-btn-sm,
+:root[data-theme="dark"] .dept-matrix-stat {
+  color: var(--v2-accent);
+}
+
+:root[data-theme="dark"] .link-button,
+:root[data-theme="dark"] .mobile-nav-item {
+  background: transparent;
+  border-color: transparent;
+}
+
+/* --- 11.5 Nút chủ đề & nút gửi chat -------------------------------------- */
+
+:root[data-theme="dark"] button.primary {
+  background: var(--v2-accent);
+  border-color: var(--v2-accent);
+  color: var(--v2-accent-ink);
+}
+
+:root[data-theme="dark"] button.primary:hover {
+  background: var(--v2-accent-hover);
+  border-color: var(--v2-accent-hover);
+}
+
+:root[data-theme="dark"] .chat-send-btn,
+:root[data-theme="dark"] .chat-toggle-btn {
+  background: var(--v2-info);
+  border-color: var(--v2-info);
+  color: var(--v2-ink-inv);
+}
+
+:root[data-theme="dark"] .link-button:hover,
+:root[data-theme="dark"] .password-toggle-btn:hover {
+  color: var(--v2-accent-hover);
+}
+
+/* --- 11.6 Huy hiệu & trạng thái ------------------------------------------- */
+
+:root[data-theme="dark"] .badge {
+  background: var(--v2-accent-soft);
+  color: var(--v2-accent);
+}
+
+:root[data-theme="dark"] .badge.good,
+:root[data-theme="dark"] .gate-active {
+  background: var(--v2-good-soft);
+  color: var(--v2-good);
+}
+
+:root[data-theme="dark"] .badge.warn,
+:root[data-theme="dark"] .ops-btn.warn-btn {
+  background: var(--v2-warn-soft);
+  color: var(--v2-warn);
+}
+
+:root[data-theme="dark"] .badge.danger,
+:root[data-theme="dark"] .gate-blocked {
+  background: var(--v2-danger-soft);
+  color: var(--v2-danger);
+}
+
+:root[data-theme="dark"] .badge.info {
+  background: var(--v2-info-soft);
+  color: var(--v2-info);
+}
+
+:root[data-theme="dark"] .ops-btn.success-btn {
+  background: var(--v2-good-soft);
+  color: var(--v2-good);
+}
+
+:root[data-theme="dark"] .private-badge {
+  background: var(--v2-good-soft);
+  color: var(--v2-good);
+}
+
+:root[data-theme="dark"] .policy-row-safe td:nth-child(3) {
+  color: var(--v2-good);
+}
+
+:root[data-theme="dark"] .policy-row-mild td:nth-child(3) {
+  color: var(--v2-accent);
+}
+
+:root[data-theme="dark"] .policy-row-severe td:nth-child(3),
+:root[data-theme="dark"] .danger,
+:root[data-theme="dark"] .error,
+:root[data-theme="dark"] .caps-warning {
+  color: var(--v2-danger);
+}
+
+:root[data-theme="dark"] .ops-banner.maintenance h2 {
+  color: var(--v2-warn);
+}
+
+/* --- 11.7 Trao đổi nội bộ ------------------------------------------------- */
+
+:root[data-theme="dark"] .chat-drawer-header,
+:root[data-theme="dark"] .chat-drawer-title h3 {
+  color: var(--v2-ink);
+}
+
+:root[data-theme="dark"] .channel-chip.active {
+  background: var(--v2-info);
+  border-color: var(--v2-info);
+  color: var(--v2-ink-inv);
+}
+
+:root[data-theme="dark"] .chat-ticket-ref-bar {
+  background: var(--v2-info-soft);
+  color: var(--v2-info);
+}
+
+:root[data-theme="dark"] .chat-ticket-ref-bar button {
+  color: var(--v2-info);
+}
+
+:root[data-theme="dark"] .team-badge-admin {
+  background: var(--v2-accent-soft);
+  color: var(--v2-accent);
+}
+
+:root[data-theme="dark"] .team-badge-support {
+  background: var(--v2-info-soft);
+  color: var(--v2-info);
+}
+
+:root[data-theme="dark"] .team-badge-finance {
+  background: var(--v2-warn-soft);
+  color: var(--v2-warn);
+}
+
+:root[data-theme="dark"] .team-badge-operations {
+  background: var(--v2-good-soft);
+  color: var(--v2-good);
+}
+
+/* --- 11.8 Trang đăng nhập ------------------------------------------------- */
+
+:root[data-theme="dark"] .login-art {
+  background: linear-gradient(145deg, var(--v2-surface-2), var(--v2-surface-3) 55%, var(--v2-surface));
+}
+
+:root[data-theme="dark"] .login-art h1 {
+  color: var(--v2-ink);
+}
+
+:root[data-theme="dark"] .login-art p,
+:root[data-theme="dark"] .login-form label {
+  color: var(--v2-ink-2);
+}
+
+:root[data-theme="dark"] .orbit,
+:root[data-theme="dark"] .orbit span {
+  color: var(--v2-surface-3);
+}
+
+/* --- 11.9 Sắc thái theo cổng ---------------------------------------------- */
+
+:root[data-theme="dark"] [data-portal="support"] .brand span,
+:root[data-theme="dark"] [data-portal="support"] .eyebrow,
+:root[data-theme="dark"] [data-portal="support"] nav button.active {
+  color: var(--v2-good);
+}
+
+:root[data-theme="dark"] [data-portal="finance"] .brand span,
+:root[data-theme="dark"] [data-portal="finance"] .eyebrow,
+:root[data-theme="dark"] [data-portal="finance"] nav button.active {
+  color: var(--v2-warn);
+}
+
+:root[data-theme="dark"] [data-portal="operations"] .brand span,
+:root[data-theme="dark"] [data-portal="operations"] .eyebrow,
+:root[data-theme="dark"] [data-portal="operations"] nav button.active {
+  color: var(--v2-info);
+}
+
+:root[data-theme="dark"] [data-portal="support"] nav button.active {
+  background: var(--v2-good-soft);
+}
+
+:root[data-theme="dark"] [data-portal="finance"] nav button.active {
+  background: var(--v2-warn-soft);
+}
+
+:root[data-theme="dark"] [data-portal="operations"] nav button.active {
+  background: var(--v2-info-soft);
+}
+
+:root[data-theme="dark"] [data-portal="support"] .primary {
+  background: var(--v2-good);
+  border-color: var(--v2-good);
+  color: var(--v2-ink-inv);
+}
+
+:root[data-theme="dark"] [data-portal="finance"] .primary {
+  background: var(--v2-warn);
+  border-color: var(--v2-warn);
+  color: var(--v2-ink-inv);
+}
+
+:root[data-theme="dark"] [data-portal="operations"] .primary {
+  background: var(--v2-info);
+  border-color: var(--v2-info);
+  color: var(--v2-ink-inv);
+}
+
+/* --- 11.10 Giữ nguyên bề mặt tối ở cả hai chế độ --------------------------- */
+
+:root[data-theme="dark"] .ops-terminal-wrap,
+:root[data-theme="dark"] .post-media-box,
+:root[data-theme="dark"] .modal-full-img,
+:root[data-theme="dark"] #notice {
+  background: #181324;
+  color: #e5def5;
+}
+
+/* ============================================================================
+   12. NÂNG CẤP GIAO DIỆN QUẢN TRỊ v10 (COMMAND PALETTE, MODAL UY TÍN,
+       TABS KỸ THUẬT, ACTION INBOX, TÌM KIẾM TỨC THÌ, PHÂN TRANG, SKELETON)
+   ========================================================================== */
+
+/* --- 12.1 Nút mở Bảng lệnh & Thẻ phím tắt kbd ------------------------------ */
+.cmd-trigger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--v2-line-strong);
+  background: var(--v2-surface-2);
+  color: var(--v2-ink-2);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+/* --- 12.2 Bảng Lệnh Nhanh Toàn Cục (Ctrl + K Command Palette) ------------- */
+.v2-cmd-dialog {
+  width: min(640px, calc(100vw - 24px));
+  max-width: 640px;
+  padding: 0;
+  margin: min(10vh, 72px) auto auto;
+  border-radius: var(--v2-r-xl);
+  overflow: hidden;
+}
+
+.v2-cmd-shell {
+  display: flex;
+  flex-direction: column;
+  max-height: min(76vh, 560px);
+}
+
+.v2-cmd-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--v2-line);
+  background: var(--v2-surface);
+}
+
+.v2-cmd-search-ico {
+  font-size: 16px;
+  flex: none;
+  color: var(--v2-ink-3);
+}
+
+#v2-cmd-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 6px 4px;
+  font-size: var(--v2-fs-md) !important;
+  color: var(--v2-ink);
+}
+
+#v2-cmd-input:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.v2-cmd-close-btn {
+  min-width: 36px;
+  min-height: 36px;
+  padding: 4px 10px;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r-sm);
+  background: var(--v2-surface-2);
+  color: var(--v2-ink-2);
+  font-size: var(--v2-fs-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+.v2-cmd-close-btn:hover {
+  border-color: var(--v2-line-strong);
+  color: var(--v2-ink);
+}
+
+.v2-cmd-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--v2-surface);
+}
+
+.v2-cmd-group {
+  padding: 8px 10px 4px;
+  font-size: var(--v2-fs-xs);
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--v2-ink-3);
+}
+
+.v2-cmd-item {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--v2-r-md);
+  background: transparent;
+  color: var(--v2-ink);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--v2-ease), border-color var(--v2-ease);
+}
+
+.v2-cmd-item-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.v2-cmd-item-ico {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--v2-surface-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+}
+
+.v2-cmd-item-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.v2-cmd-item-text b {
+  font-size: var(--v2-fs-sm);
+  font-weight: 650;
+  color: var(--v2-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v2-cmd-item-text small {
+  color: var(--v2-ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v2-cmd-item-hint {
+  flex: none;
+  font-size: var(--v2-fs-xs);
+  font-weight: 700;
+  color: var(--v2-ink-3);
+}
+
+.v2-cmd-item:hover,
+.v2-cmd-item.is-selected {
+  background: var(--v2-portal-soft, var(--v2-accent-soft));
+  border-color: var(--v2-portal, var(--v2-accent));
+}
+
+.v2-cmd-item.is-selected .v2-cmd-item-text b,
+.v2-cmd-item.is-selected .v2-cmd-item-hint {
+  color: var(--v2-portal, var(--v2-accent));
+}
+
+.v2-cmd-empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--v2-ink-3);
+  font-size: var(--v2-fs-sm);
+}
+
+.v2-cmd-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--v2-line);
+  background: var(--v2-surface-2);
+  color: var(--v2-ink-3);
+  font-size: var(--v2-fs-xs);
+}
+
+/* --- 12.3 Hộp thoại Điều chỉnh Điểm Uy tín chuẩn hóa --------------------- */
+.reputation-dialog {
+  width: min(540px, calc(100vw - 24px));
+  max-width: 540px;
+}
+
+.rep-dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rep-dialog-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rep-dialog-head h2 {
+  margin: 0;
+  font-size: var(--v2-fs-xl);
+}
+
+.rep-mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.rep-mode-btn {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1.5px solid var(--v2-line-strong);
+  border-radius: var(--v2-r-md);
+  background: var(--v2-surface);
+  color: var(--v2-ink-2);
+  font-size: var(--v2-fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--v2-ease), border-color var(--v2-ease), color var(--v2-ease);
+}
+
+.rep-mode-btn[data-mode="restore"].is-active {
+  background: var(--v2-good-soft);
+  border-color: var(--v2-good);
+  color: var(--v2-good);
+}
+
+.rep-mode-btn[data-mode="deduct"].is-active {
+  background: var(--v2-danger-soft);
+  border-color: var(--v2-danger);
+  color: var(--v2-danger);
+}
+
+.rep-preset-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rep-preset-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rep-preset-btn {
+  min-height: 34px;
+  padding: 5px 10px;
+  border: 1px solid var(--v2-line-strong);
+  border-radius: var(--v2-r-pill);
+  background: var(--v2-surface-2);
+  color: var(--v2-ink-2);
+  font-size: var(--v2-fs-xs);
+  font-weight: 650;
+  cursor: pointer;
+}
+.rep-preset-btn:hover,
+.rep-preset-btn.is-active {
+  background: var(--v2-accent-soft);
+  border-color: var(--v2-accent);
+  color: var(--v2-accent);
+}
+
+.rep-points-grid {
+  display: grid;
+  grid-template-columns: minmax(120px, 160px) 1fr;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.rep-field-col {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.rep-field-col input,
+.rep-field-col textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.rep-score-preview {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 14px;
+  border-radius: var(--v2-r-md);
+  border: 1px solid var(--v2-line);
+  background: var(--v2-surface-2);
+}
+
+.rep-score-preview strong {
+  font-size: var(--v2-fs-lg);
+  color: var(--v2-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.rep-score-preview[data-tone="good"] {
+  background: var(--v2-good-soft);
+  border-color: var(--v2-good);
+}
+.rep-score-preview[data-tone="warn"] {
+  background: var(--v2-warn-soft);
+  border-color: var(--v2-warn);
+}
+.rep-score-preview[data-tone="danger"] {
+  background: var(--v2-danger-soft);
+  border-color: var(--v2-danger);
+}
+
+/* --- 12.4 Tabs con (Operations 3 Tabs) & Compact Status Bar --------------- */
+.ops-compact-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r-lg);
+  box-shadow: var(--v2-shadow-1);
+}
+
+.ops-compact-bar.is-maintenance {
+  background: var(--v2-warn-soft);
+  border-color: var(--v2-warn);
+}
+
+.ops-compact-meta h2 {
+  margin: 2px 0 4px;
+  font-size: var(--v2-fs-xl);
+}
+
+.ops-compact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.v2-subtabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 5px;
+  background: var(--v2-surface-2);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r-lg);
+  align-self: flex-start;
+}
+
+.v2-subtab-btn {
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--v2-r-md);
+  background: transparent;
+  color: var(--v2-ink-2);
+  font-size: var(--v2-fs-sm);
+  font-weight: 650;
+  cursor: pointer;
+  transition: background var(--v2-ease), color var(--v2-ease), border-color var(--v2-ease);
+}
+
+.v2-subtab-btn:hover {
+  color: var(--v2-ink);
+  background: var(--v2-surface);
+}
+
+.v2-subtab-btn.is-active {
+  background: var(--v2-surface);
+  border-color: var(--v2-line);
+  color: var(--v2-portal, var(--v2-accent));
+  font-weight: 750;
+  box-shadow: var(--v2-shadow-1);
+}
+
+.v2-tabpanel[hidden] {
+  display: none !important;
+}
+
+.v2-tabpanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--v2-s4);
+}
+
+.log-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+/* --- 12.5 Trang Tổng quan (Action Inbox, Clickable Metrics, Compact Banner) */
+.welcome-banner.is-compact {
+  padding: var(--v2-s4) var(--v2-s5);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-s3);
+}
+
+.welcome-banner.is-compact h2 {
+  font-size: var(--v2-fs-xl);
+  margin: 2px 0 4px;
+}
+
+.metric.clickable {
+  cursor: pointer;
+  transition: transform var(--v2-ease), border-color var(--v2-ease), box-shadow var(--v2-ease);
+}
+.metric.clickable:hover {
+  transform: translateY(-2px);
+  border-color: var(--v2-portal, var(--v2-accent));
+  box-shadow: var(--v2-shadow-2);
+}
+
+.priority-inbox-card {
+  border-left: 4px solid var(--v2-portal, var(--v2-accent));
+}
+
+.inbox-action-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.inbox-action-tile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 58px;
+  padding: 10px 14px;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r-md);
+  background: var(--v2-surface-2);
+  color: var(--v2-ink);
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--v2-ease), border-color var(--v2-ease), background var(--v2-ease);
+}
+.inbox-action-tile:hover {
+  transform: translateY(-1px);
+  border-color: var(--v2-portal, var(--v2-accent));
+  background: var(--v2-portal-soft, var(--v2-accent-soft));
+}
+.inbox-action-tile.tone-danger {
+  border-color: var(--v2-danger);
+  background: var(--v2-danger-soft);
+}
+.inbox-action-tile.tone-warn {
+  border-color: var(--v2-warn);
+  background: var(--v2-warn-soft);
+}
+
+.inbox-action-tile-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.inbox-action-tile-meta b {
+  font-size: var(--v2-fs-sm);
+  color: var(--v2-ink);
+}
+.inbox-action-tile-meta small {
+  color: var(--v2-ink-2);
+}
+
+.inbox-zero-banner {
+  padding: 12px 16px;
+  border-radius: var(--v2-r-md);
+  border: 1px solid var(--v2-good);
+  background: var(--v2-good-soft);
+  color: var(--v2-good);
+  font-size: var(--v2-fs-sm);
+  font-weight: 650;
+  margin-bottom: 10px;
+}
+
+/* --- 12.6 Tìm kiếm tức thì, Chip lọc, Bulk Action, Phân trang, Điều hướng phiếu */
+.search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: min(260px, 100%);
+  width: 100%;
+}
+
+.search-input-wrap input {
+  width: 100%;
+  padding-right: 40px;
+  box-sizing: border-box;
+}
+
+.search-clear-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 30px !important;
+  min-height: 30px !important;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--v2-surface-2);
+  color: var(--v2-ink-3);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.search-clear-btn[hidden] {
+  display: none !important;
+}
+.search-clear-btn:hover {
+  background: var(--v2-surface-3);
+  color: var(--v2-ink);
+}
+
+.filter-chips-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-chip {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--v2-line-strong);
+  border-radius: var(--v2-r-pill);
+  background: var(--v2-surface);
+  color: var(--v2-ink-2);
+  font-size: var(--v2-fs-xs);
+  font-weight: 650;
+  cursor: pointer;
+  transition: background var(--v2-ease), color var(--v2-ease), border-color var(--v2-ease);
+}
+.filter-chip:hover {
+  border-color: var(--v2-accent);
+  color: var(--v2-accent);
+}
+.filter-chip.is-active {
+  background: var(--v2-accent);
+  border-color: var(--v2-accent);
+  color: var(--v2-accent-ink);
+  font-weight: 750;
+}
+
+.bulk-action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--v2-r-lg);
+  border: 1.5px solid var(--v2-accent);
+  background: var(--v2-accent-soft);
+}
+.bulk-action-bar[hidden] {
+  display: none !important;
+}
+
+.report-check-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--v2-fs-xs);
+  font-weight: 700;
+  color: var(--v2-ink-2);
+  cursor: pointer;
+}
+.report-check-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  min-width: 18px;
+  padding: 0;
+  margin: 0;
+  accent-color: var(--v2-accent);
+}
+
+.pagination-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r-lg);
+}
+
+.pagination-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.pagination-controls button,
+.pagination-controls select {
+  min-height: 36px;
+  padding: 6px 12px;
+}
+
+.ticket-top-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.ticket-nav-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.finance-filter-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--v2-r-md);
+  background: var(--v2-surface-2);
+  border: 1px solid var(--v2-line);
+  font-size: var(--v2-fs-sm);
+  color: var(--v2-ink-2);
+}
+
+/* --- 12.7 Mobile Nav Badge & Nav Badge Variants --------------------------- */
+.mobile-nav-item {
+  position: relative;
+}
+
+.mobile-nav-badge {
+  position: absolute;
+  top: 4px;
+  right: max(6px, calc(50% - 24px));
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--v2-r-pill);
+  background: var(--v2-danger);
+  color: #ffffff !important;
+  font-size: 12px !important;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+}
+
+.mobile-nav-badge[hidden] {
+  display: none !important;
+}
+
+/* --- 12.8 Skeleton Loading (Khung xương mượt mà) ------------------------- */
+@keyframes v2-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.v2-skeleton-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.v2-skeleton-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.v2-skeleton-box,
+.v2-skeleton-line {
+  background: linear-gradient(90deg, var(--v2-surface-2) 25%, var(--v2-surface-3) 50%, var(--v2-surface-2) 75%);
+  background-size: 200% 100%;
+  animation: v2-shimmer 1.3s ease-in-out infinite;
+  border-radius: var(--v2-r-lg);
+}
+
+.v2-skeleton-box {
+  height: 88px;
+  border: 1px solid var(--v2-line);
+}
+
+.v2-skeleton-card {
+  padding: 18px;
+  border-radius: var(--v2-r-lg);
+  border: 1px solid var(--v2-line);
+  background: var(--v2-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.v2-skeleton-line {
+  height: 16px;
+}
+
+.v2-skeleton-line.w-40 { width: 40%; height: 20px; }
+.v2-skeleton-line.w-70 { width: 70%; }
+.v2-skeleton-line.w-90 { width: 90%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .v2-skeleton-box,
+  .v2-skeleton-line {
+    animation: none;
+  }
+}
+
+/* --- 12.9 Dark Mode & Mobile Responsive cho v10 -------------------------- */
+:root[data-theme="dark"] .v2-subtab-btn.is-active {
+  background: var(--v2-surface);
+  border-color: var(--v2-portal, var(--v2-accent));
+  color: var(--v2-portal, var(--v2-accent));
+}
+
+:root[data-theme="dark"] .filter-chip.is-active {
+  background: var(--v2-accent);
+  border-color: var(--v2-accent);
+  color: var(--v2-accent-ink);
+}
+
+:root[data-theme="dark"] .rep-mode-btn[data-mode="restore"].is-active {
+  background: var(--v2-good-soft);
+  border-color: var(--v2-good);
+  color: var(--v2-good);
+}
+
+:root[data-theme="dark"] .rep-mode-btn[data-mode="deduct"].is-active {
+  background: var(--v2-danger-soft);
+  border-color: var(--v2-danger);
+  color: var(--v2-danger);
+}
+
+:root[data-theme="dark"] .rep-preset-btn.is-active {
+  background: var(--v2-accent-soft);
+  border-color: var(--v2-accent);
+  color: var(--v2-accent);
+}
+
+:root[data-theme="dark"] .search-clear-btn {
+  background: var(--v2-surface-3);
+  border-color: transparent;
+  color: var(--v2-ink-2);
+}
+
+:root[data-theme="dark"] .v2-cmd-item {
+  background: transparent;
+  border-color: transparent;
+}
+
+:root[data-theme="dark"] .v2-cmd-item.is-selected,
+:root[data-theme="dark"] .v2-cmd-item:hover {
+  background: var(--v2-portal-soft, var(--v2-accent-soft));
+  border-color: var(--v2-portal, var(--v2-accent));
+}
+
+:root[data-theme="dark"] .inbox-action-tile {
+  background: var(--v2-surface-2);
+  border-color: var(--v2-line);
+}
+:root[data-theme="dark"] .inbox-action-tile.tone-danger {
+  background: var(--v2-danger-soft);
+  border-color: var(--v2-danger);
+}
+:root[data-theme="dark"] .inbox-action-tile.tone-warn {
+  background: var(--v2-warn-soft);
+  border-color: var(--v2-warn);
+}
+
+@media (max-width: 640px) {
+  .cmd-trigger-btn kbd { display: none; }
+  .v2-cmd-dialog {
+    margin: 12px auto auto;
+    width: calc(100vw - 16px);
+  }
+  .rep-mode-switch,
+  .rep-points-grid {
+    grid-template-columns: 1fr;
+  }
+  .v2-subtabs {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}

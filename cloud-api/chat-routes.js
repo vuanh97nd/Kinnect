@@ -1,5 +1,12 @@
+import {createHash} from 'node:crypto';
 import {createCloudChatRepository} from '../lib/cloud-chat-repository.js';
 import {invalidateUsers} from './realtime.js';
+const normalizeNonce=raw=>{
+ if(typeof raw!=='string')return raw;
+ const trimmed=raw.trim();
+ if(!trimmed)return '';
+ return /^[A-Za-z0-9_-]{16,80}$/.test(trimmed)?trimmed:'req_'+createHash('sha256').update(trimmed).digest('hex').slice(0,28);
+};
 export async function cloudChatRoute({request,env,client,user,json}){
  const path=new URL(request.url).pathname;
  const match=path.match(/^\/api\/cloud\/conversations\/([A-Za-z0-9-]+)\/messages(?:\/([A-Za-z0-9-]+)\/receipt)?$/);
@@ -24,8 +31,9 @@ export async function cloudChatRoute({request,env,client,user,json}){
  try{
   if(request.method==='GET'&&!messageId){
    const list=await repository.list({actor:user.id,conversationId});
+   const senderIds=[...new Set(list.map(m=>m.sender_id))];
    const denied=(await client.query('SELECT target AS id FROM kinnect_core.blocks WHERE actor=$1 UNION SELECT actor AS id FROM kinnect_core.blocks WHERE target=$1',[user.id])).rows.map(x=>x.id);
-   const suspended=(await client.query('SELECT id FROM kinnect_core.users WHERE suspended<>0')).rows.map(x=>x.id);
+   const suspended=senderIds.length?(await client.query('SELECT id FROM kinnect_core.users WHERE id=ANY($1::text[]) AND suspended<>0',[senderIds])).rows.map(x=>x.id):[];
    const excluded=new Set([...denied,...suspended]);
    return json({messages:list.filter(m=>!excluded.has(m.sender_id)).map(m=>({id:m.id,conversationId:m.conversation_id,sender:m.sender_id,body:m.body,created:m.created_at,recalled:!!m.recalled_at}))});
   }
@@ -46,7 +54,8 @@ export async function cloudChatRoute({request,env,client,user,json}){
      if(!friends.rows.length)return json({error:'Chỉ bạn bè được nhắn tin.'},403);
     }
    }
-   const message=await repository.send({actor:user.id,conversationId,nonce:body.nonce,body:body.body,replyTo:body.replyTo||null});
+   const replyTo=typeof body.replyToId==='string'&&body.replyToId.trim()?body.replyToId.trim():(typeof body.replyTo==='string'&&body.replyTo.trim()?body.replyTo.trim():null);
+   const message=await repository.send({actor:user.id,conversationId,nonce:normalizeNonce(body.requestId??body.nonce),body:body.body,replyTo});
    const recipients=await env.CHAT_DB.prepare('SELECT user_id FROM chat_members WHERE conversation_id=? AND left_at IS NULL').bind(conversationId).all();
    await invalidateUsers(env,recipients.results.map(x=>x.user_id));
    return json({message},201);

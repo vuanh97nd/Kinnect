@@ -1,4 +1,598 @@
-const $ = id => document.getElementById(id), state = { user: null, page: 'overview', revision: 0, ticketId: null };
+// ====================================================
+// NOTIFICATION & AUDIO SOUND SYSTEM (REAL-TIME ALERTS)
+// ====================================================
+const arr = v => Array.isArray(v) ? v : [];
+const notificationSound = {
+  ctx: null,
+  init() {
+    if (!this.ctx) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) this.ctx = new AudioCtx();
+    }
+  },
+  play(kind = 'new') {
+    try {
+      this.init();
+      if (!this.ctx) return;
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      if (kind === 'urgent') {
+        // Double sharp alert tone
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(880, now);
+        osc.frequency.setValueAtTime(1100, now + 0.1);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+        osc.start(now);
+        osc.stop(now + 0.35);
+      } else {
+        // Gentle "ting" chime
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, now); // D5
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.15); // A5
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+        osc.start(now);
+        osc.stop(now + 0.4);
+      }
+    } catch {}
+  }
+};
+
+function showDesktopNotification(title, body, url = null) {
+  notificationSound.play(/khẩn|mới|báo cáo/i.test(title + body) ? 'urgent' : 'new');
+  if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    try {
+      const n = new Notification(title, {
+        body,
+        icon: '/admin/mark.svg',
+        tag: 'kinnect-alert-' + Date.now(),
+        renotify: true
+      });
+      if (url) {
+        n.onclick = () => {
+          window.focus();
+          n.close();
+        };
+      }
+    } catch {}
+  }
+}
+
+function requestNotificationPermission() {
+  if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+    Notification.requestPermission().catch(() => {});
+  }
+}
+
+// Chỉ hiện nút "Bật thông báo" khi trình duyệt còn cho phép hỏi (chưa granted, chưa bị chặn).
+// Nhờ vậy không xin quyền ngay khi đăng nhập, và không hiện nút vô dụng khi đã bật/từ chối.
+function syncNotifyButton() {
+  const btn = $('btn-notify');
+  if (!btn) return;
+  const supported = typeof Notification !== 'undefined';
+  btn.hidden = !supported || Notification.permission !== 'default';
+}
+
+const $ = id => document.getElementById(id), state = {
+  user: null,
+  page: 'overview',
+  revision: 0,
+  ticketId: null,
+  opsTab: 'live',
+  navCounts: { tickets: 0, reports: 0, resets: 0, wallet: 0, security: 0 },
+  ticketFilter: { q: '', status: 'all', priority: 'all' },
+  ticketQueueIds: [],
+  ticketSummary: null,
+  userQueryPrefill: '',
+  initialHash: location.hash || ''
+};
+const teamNames = { admin: 'Admin Cấp cao', support: 'Hỗ trợ & Kiểm duyệt', operations: 'Bộ phận Kỹ thuật', finance: 'Bộ phận Tài chính' },
+  statusNames = { open: 'Mới tiếp nhận', in_progress: 'Đang xử lý', waiting: 'Chờ phản hồi', resolved: 'Hoàn tất' },
+  priorityNames = { low: 'Thấp', normal: 'Bình thường', high: 'Cao', urgent: 'Khẩn cấp' };
+
+// ====================================================
+// INTER-DEPARTMENT MESSAGING STATE & LOGIC
+// ====================================================
+const chatState = {
+  activeChannel: 'all',
+  ticketRef: null,
+  messages: [],
+  lastCreated: 0,
+  channelCursor: 0,
+  lastReadTs: 0,
+  lastNotifiedTs: 0,
+  seenIds: new Set(),
+  initialized: false,
+  unreadCount: 0,
+  isOpen: false
+};
+
+function chatStorageKey() {
+  const uid = state.user?.id || state.user?.username || 'anon';
+  return `kinnect:chat_seen:${uid}`;
+}
+
+function loadChatReadState() {
+  try {
+    const raw = localStorage.getItem(chatStorageKey());
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (Number.isFinite(parsed.lastReadTs)) chatState.lastReadTs = Math.max(chatState.lastReadTs, parsed.lastReadTs);
+    if (Number.isFinite(parsed.lastNotifiedTs)) chatState.lastNotifiedTs = Math.max(chatState.lastNotifiedTs, parsed.lastNotifiedTs);
+    if (Number.isFinite(parsed.lastCreated)) chatState.lastCreated = Math.max(chatState.lastCreated, parsed.lastCreated);
+    if (Array.isArray(parsed.seenIds)) {
+      for (const id of parsed.seenIds) if (id) chatState.seenIds.add(id);
+    }
+  } catch {}
+}
+
+function saveChatReadState() {
+  try {
+    const ids = Array.from(chatState.seenIds).slice(-300);
+    localStorage.setItem(chatStorageKey(), JSON.stringify({
+      lastReadTs: chatState.lastReadTs,
+      lastNotifiedTs: chatState.lastNotifiedTs,
+      lastCreated: chatState.lastCreated,
+      seenIds: ids
+    }));
+  } catch {}
+}
+
+function resolveChannelParam(ch) {
+  if (ch === 'internal') {
+    return state.user?.role === 'admin' ? 'admin' : (state.user?.team || 'support');
+  }
+  return ch || 'all';
+}
+
+function updateChatUnreadBadge() {
+  const badge = $('chat-unread-badge');
+  if (!badge) return;
+  if (chatState.unreadCount > 0) {
+    badge.textContent = chatState.unreadCount > 99 ? '99+' : chatState.unreadCount;
+    badge.hidden = false;
+  } else {
+    badge.hidden = true;
+  }
+}
+
+function getAllowedChatTabs(user) {
+  const team = user?.role === 'admin' ? 'admin' : (user?.team || 'support');
+  if (team === 'admin') return new Set(['all', 'support-finance', 'support-operations', 'finance-operations', 'internal']);
+  if (team === 'support') return new Set(['all', 'support-finance', 'support-operations', 'internal']);
+  if (team === 'finance') return new Set(['all', 'support-finance', 'finance-operations', 'internal']);
+  if (team === 'operations') return new Set(['all', 'support-operations', 'finance-operations', 'internal']);
+  return new Set(['all', 'internal']);
+}
+
+function syncChatChannelTabs() {
+  const allowed = getAllowedChatTabs(state.user);
+  if (!allowed.has(chatState.activeChannel)) chatState.activeChannel = 'all';
+  const channelBar = $('chat-channels-bar');
+  if (channelBar) {
+    for (const btn of channelBar.querySelectorAll('button')) {
+      const ch = btn.dataset.channel;
+      const visible = allowed.has(ch);
+      const active = visible && ch === chatState.activeChannel;
+      btn.hidden = !visible;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-selected', active ? 'true' : 'false');
+    }
+  }
+  const titleEl = $('chat-active-channel-name');
+  if (titleEl) {
+    const channelLabels = {
+      all: 'Kênh: Toàn bộ phận',
+      'support-finance': 'Kênh: Hỗ trợ & Tài chính',
+      'support-operations': 'Kênh: Hỗ trợ & Kỹ thuật',
+      'finance-operations': 'Kênh: Tài chính & Kỹ thuật',
+      internal: `Kênh: Nội bộ ${teamNames[state.user?.team] || ''}`
+    };
+    titleEl.textContent = channelLabels[chatState.activeChannel] || `Kênh: ${chatState.activeChannel}`;
+  }
+}
+
+function openChatDrawer(channel = null, ticketId = null) {
+  const drawer = $('chat-drawer');
+  const backdrop = $('chat-backdrop');
+  if (!drawer) return;
+  chatState.isOpen = true;
+  chatState.unreadCount = 0;
+  chatState.lastReadTs = Math.max(chatState.lastReadTs, chatState.lastCreated, Date.now());
+  chatState.lastNotifiedTs = Math.max(chatState.lastNotifiedTs, chatState.lastReadTs);
+  saveChatReadState();
+  updateChatUnreadBadge();
+  drawer.hidden = false;
+  if (backdrop) backdrop.hidden = false;
+
+  if (channel) {
+    const allowed = getAllowedChatTabs(state.user);
+    chatState.activeChannel = allowed.has(channel) ? channel : 'all';
+  }
+  if (ticketId) {
+    chatState.ticketRef = ticketId;
+    if ($('chat-ticket-ref-bar')) $('chat-ticket-ref-bar').hidden = false;
+    if ($('chat-ticket-ref-id')) $('chat-ticket-ref-id').textContent = '#' + ticketId.slice(0, 8);
+  }
+
+  syncChatChannelTabs();
+
+  loadChatMessages(true);
+}
+
+function closeChatDrawer() {
+  const drawer = $('chat-drawer');
+  const backdrop = $('chat-backdrop');
+  if (drawer) drawer.hidden = true;
+  if (backdrop) backdrop.hidden = true;
+  chatState.isOpen = false;
+  chatState.lastReadTs = Math.max(chatState.lastReadTs, chatState.lastCreated, Date.now());
+  chatState.lastNotifiedTs = Math.max(chatState.lastNotifiedTs, chatState.lastReadTs);
+  saveChatReadState();
+}
+
+function timeShort(ts) {
+  if (!ts) return '';
+  const d = new Date(Number(ts));
+  return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+}
+
+function appendChatMessageElement(container, msg) {
+  if (msg && msg.id && container.querySelector(`[data-msg-id="${msg.id}"]`)) return;
+  const isMe = state.user && (msg.sender_id === state.user.id || msg.sender_username === state.user.username);
+  const row = el('div', undefined, `chat-msg-row ${isMe ? 'own-msg' : 'other-msg'}`);
+  if (msg && msg.id) row.dataset.msgId = msg.id;
+
+  const header = el('div', undefined, 'chat-msg-header');
+  const teamBadge = el('span', teamNames[msg.sender_team] || msg.sender_team, `chat-team-badge team-badge-${msg.sender_team}`);
+  const senderText = el('b', isMe ? 'Bạn' : (msg.sender_name || msg.sender_username));
+  const timeText = el('small', timeShort(msg.created));
+  header.append(teamBadge, senderText, timeText);
+
+  const bubble = el('div', undefined, 'chat-bubble');
+  bubble.textContent = msg.content;
+
+  if (msg.ticket_id) {
+    const tag = el('div', `📎 Phiếu #${msg.ticket_id.slice(0, 8)}`, 'ticket-tag');
+    tag.title = 'Bấm để mở phiếu này';
+    tag.onclick = (e) => {
+      e.stopPropagation();
+      closeChatDrawer();
+      openTicket(msg.ticket_id);
+    };
+    bubble.append(tag);
+  }
+
+  row.append(header, bubble);
+  container.append(row);
+}
+
+async function loadChatMessages(clear = false) {
+  const container = $('chat-messages-container');
+  if (!container) return;
+  if (clear) {
+    container.innerHTML = '<div class="chat-empty">Đang tải tin nhắn...</div>';
+    chatState.channelCursor = 0;
+  }
+  try {
+    const channelParam = resolveChannelParam(chatState.activeChannel);
+
+    let url = `messages?channel=${channelParam}`;
+    if (chatState.ticketRef) url += `&ticket_id=${encodeURIComponent(chatState.ticketRef)}`;
+
+    const res = await api(url);
+    const msgs = res.messages || [];
+    container.innerHTML = '';
+    if (msgs.length === 0) {
+      container.innerHTML = '<div class="chat-empty">Chưa có tin nhắn nào trong kênh này. Hãy bắt đầu trao đổi!</div>';
+      return;
+    }
+    const maxTs = Math.max(0, ...msgs.map(m => Number(m.created) || 0));
+    chatState.channelCursor = Math.max(chatState.channelCursor, maxTs);
+    chatState.lastCreated = Math.max(chatState.lastCreated, maxTs);
+    chatState.lastReadTs = Math.max(chatState.lastReadTs, maxTs, Date.now());
+    chatState.lastNotifiedTs = Math.max(chatState.lastNotifiedTs, maxTs);
+    for (const msg of msgs) {
+      if (msg.id) chatState.seenIds.add(msg.id);
+      appendChatMessageElement(container, msg);
+    }
+    saveChatReadState();
+    container.scrollTop = container.scrollHeight;
+  } catch (e) {
+    const errBox = el('div', `Không thể tải tin nhắn: ${e?.message || 'Lỗi không xác định'}`, 'chat-empty');
+    container.replaceChildren(errBox);
+  }
+}
+
+async function sendChatMessage(e) {
+  if (e) e.preventDefault();
+  const input = $('chat-input');
+  if (!input) return;
+  const content = input.value.trim();
+  if (!content) return;
+
+  const sendBtn = $('chat-send-btn');
+  if (sendBtn) sendBtn.disabled = true;
+
+  try {
+    const channelParam = resolveChannelParam(chatState.activeChannel);
+
+    const payload = {
+      channel: channelParam,
+      content,
+      ticket_id: chatState.ticketRef || null
+    };
+
+    const res = await api('messages', payload);
+    input.value = '';
+    const container = $('chat-messages-container');
+    const emptyNotice = container.querySelector('.chat-empty');
+    if (emptyNotice) emptyNotice.remove();
+    if (res.message?.id) chatState.seenIds.add(res.message.id);
+    appendChatMessageElement(container, res.message);
+    container.scrollTop = container.scrollHeight;
+    const msgTs = Number(res.message?.created) || Date.now();
+    chatState.channelCursor = Math.max(chatState.channelCursor, msgTs);
+    chatState.lastCreated = Math.max(chatState.lastCreated, msgTs);
+    chatState.lastReadTs = Math.max(chatState.lastReadTs, msgTs);
+    chatState.lastNotifiedTs = Math.max(chatState.lastNotifiedTs, msgTs);
+    saveChatReadState();
+  } catch (err) {
+    toast(`Lỗi gửi tin: ${err.message}`);
+  } finally {
+    if (sendBtn) sendBtn.disabled = false;
+    input.focus();
+  }
+}
+
+async function checkMessageUpdates() {
+  if (!state.user) return;
+  try {
+    loadChatReadState();
+    const res = await api(`messages?channel=any&since=${chatState.lastCreated}`);
+    const msgs = res.messages || [];
+    if (!chatState.initialized) {
+      // Lần đầu tiên khi mới tải trang: chỉ ghi nhận mốc tin nhắn hiện có, không bật lại thông báo cũ
+      chatState.initialized = true;
+      for (const m of msgs) {
+        if (m.id) chatState.seenIds.add(m.id);
+        const ts = Number(m.created) || 0;
+        if (ts > chatState.lastCreated) chatState.lastCreated = ts;
+        if (ts > chatState.lastNotifiedTs) chatState.lastNotifiedTs = ts;
+      }
+      saveChatReadState();
+      return;
+    }
+
+    if (msgs.length > 0) {
+      const freshOtherMsgs = [];
+      for (const m of msgs) {
+        const ts = Number(m.created) || 0;
+        if (ts > chatState.lastCreated) chatState.lastCreated = ts;
+        const isMe = m.sender_id === state.user.id || m.sender_username === state.user.username;
+        const alreadySeen = (m.id && chatState.seenIds.has(m.id)) || ts <= chatState.lastNotifiedTs || ts <= chatState.lastReadTs;
+        if (m.id) chatState.seenIds.add(m.id);
+        if (!isMe && !alreadySeen) {
+          freshOtherMsgs.push(m);
+        }
+      }
+
+      if (freshOtherMsgs.length > 0) {
+        const maxFreshTs = Math.max(...freshOtherMsgs.map(m => Number(m.created) || 0));
+        chatState.lastNotifiedTs = Math.max(chatState.lastNotifiedTs, maxFreshTs);
+        const lastMsg = freshOtherMsgs[freshOtherMsgs.length - 1];
+        const teamLabel = teamNames[lastMsg.sender_team] || lastMsg.sender_team;
+        if (!chatState.isOpen) {
+          chatState.unreadCount += freshOtherMsgs.length;
+          updateChatUnreadBadge();
+          notificationSound.play('new');
+          toast(`💬 [${teamLabel}] ${lastMsg.sender_name}: ${lastMsg.content.slice(0, 60)}`);
+          showDesktopNotification(`💬 Tin nhắn từ [${teamLabel}]`, `${lastMsg.sender_name}: ${lastMsg.content}`);
+        } else {
+          chatState.lastReadTs = Math.max(chatState.lastReadTs, maxFreshTs, Date.now());
+          notificationSound.play('new');
+        }
+      }
+
+      if (chatState.isOpen) {
+        const activeParam = resolveChannelParam(chatState.activeChannel);
+        const matching = msgs.filter(m => activeParam === 'all' ? m.channel === 'all' : m.channel === activeParam);
+        const container = $('chat-messages-container');
+        if (container && matching.length > 0) {
+          const emptyNotice = container.querySelector('.chat-empty');
+          if (emptyNotice) emptyNotice.remove();
+          for (const m of matching) appendChatMessageElement(container, m);
+          container.scrollTop = container.scrollHeight;
+        }
+      }
+
+      saveChatReadState();
+    }
+  } catch {}
+}
+
+// Background ticket monitoring & auto-refresh (every 12 seconds)
+let ticketTracker = {
+  known: new Map(),
+  initialized: false,
+  timer: null,
+  active: false
+};
+
+function ticketStorageKey() {
+  const uid = state.user?.id || state.user?.username || 'anon';
+  return `kinnect:ticket_seen:${uid}`;
+}
+
+function loadTicketSeenState() {
+  try {
+    const raw = localStorage.getItem(ticketStorageKey());
+    if (!raw) return;
+    const entries = JSON.parse(raw);
+    if (Array.isArray(entries)) {
+      for (const [id, info] of entries) {
+        if (id && info) ticketTracker.known.set(id, info);
+      }
+    }
+  } catch {}
+}
+
+function saveTicketSeenState() {
+  try {
+    const entries = Array.from(ticketTracker.known.entries()).slice(-300);
+    localStorage.setItem(ticketStorageKey(), JSON.stringify(entries));
+  } catch {}
+}
+
+function syncNavBadges() {
+  const counts = state.navCounts || {};
+  const nav = $('navigation');
+  if (nav) {
+    for (const btn of nav.querySelectorAll('button[data-page]')) {
+      const page = btn.dataset.page;
+      const n = Number(counts[page] || 0);
+      let badgeEl = btn.querySelector('.nav-count-badge');
+      if (!badgeEl) {
+        badgeEl = el('span', '', 'nav-count-badge');
+        btn.append(badgeEl);
+      }
+      if (n > 0 && !btn.hidden) {
+        badgeEl.textContent = n > 99 ? '99+' : String(n);
+        badgeEl.hidden = false;
+      } else {
+        badgeEl.textContent = '';
+        badgeEl.hidden = true;
+      }
+    }
+  }
+  const bar = $('mobile-bottom-nav');
+  if (bar) {
+    for (const btn of bar.querySelectorAll('button[data-page]')) {
+      const page = btn.dataset.page;
+      const n = Number(counts[page] || 0);
+      let mBadge = btn.querySelector('.mobile-nav-badge');
+      if (!mBadge) {
+        mBadge = el('span', '', 'mobile-nav-badge');
+        btn.append(mBadge);
+      }
+      if (n > 0) {
+        mBadge.textContent = n > 99 ? '99+' : String(n);
+        mBadge.hidden = false;
+      } else {
+        mBadge.textContent = '';
+        mBadge.hidden = true;
+      }
+    }
+  }
+}
+window.syncNavBadges = syncNavBadges;
+
+async function refreshNavCounts(overviewData = null) {
+  if (!state.user || state.user.mustChange) return;
+  try {
+    const ov = overviewData || await api('overview');
+    const allowed = new Set(getAllowedPages(state.user));
+    const fallbackOpen = state.ticketSummary
+      ? (state.ticketSummary.open || 0) + (state.ticketSummary.in_progress || 0) + (state.ticketSummary.waiting || 0)
+      : 0;
+    state.navCounts = {
+      tickets: allowed.has('tickets') ? Number(ov.openTickets ?? fallbackOpen ?? 0) : 0,
+      reports: allowed.has('reports') ? Number(ov.reports || 0) : 0,
+      resets: allowed.has('resets') ? Number(ov.resets || 0) : 0,
+      wallet: allowed.has('wallet') ? Number(ov.pendingWalletOps || 0) : 0,
+      security: allowed.has('security') ? Number(ov.securityAlerts || 0) : 0
+    };
+    syncNavBadges();
+  } catch {}
+}
+
+async function checkTicketUpdates() {
+  if (!state.user || ticketTracker.active) return;
+  ticketTracker.active = true;
+  try {
+    loadTicketSeenState();
+    const res = await api('tickets');
+    const tickets = res.tickets || [];
+    if (res.summary) {
+      state.ticketSummary = res.summary;
+      if (!state.navCounts) state.navCounts = {};
+      state.navCounts.tickets = (res.summary.open || 0) + (res.summary.in_progress || 0) + (res.summary.waiting || 0);
+      syncNavBadges();
+    }
+    let hasNew = false;
+    let hasStatusChange = false;
+    let firstNew = null;
+    let firstChanged = null;
+
+    if (!ticketTracker.initialized) {
+      // First load: cache all current tickets without re-triggering old notifications
+      ticketTracker.initialized = true;
+      for (const t of tickets) ticketTracker.known.set(t.id, { status: t.status, updated: t.updated });
+      saveTicketSeenState();
+    } else {
+      for (const t of tickets) {
+        if (!ticketTracker.known.has(t.id)) {
+          hasNew = true;
+          firstNew = t;
+          ticketTracker.known.set(t.id, { status: t.status, updated: t.updated });
+        } else {
+          const prev = ticketTracker.known.get(t.id);
+          if (prev.status !== t.status) {
+            hasStatusChange = true;
+            firstChanged = { t, oldStatus: prev.status };
+            ticketTracker.known.set(t.id, { status: t.status, updated: t.updated });
+          }
+        }
+      }
+      if (hasNew || hasStatusChange) saveTicketSeenState();
+
+      if (hasNew && firstNew) {
+        const msg = `Phiếu mới từ ${firstNew.member || firstNew.created_by}: "${firstNew.subject}"`;
+        toast(`🔔 YÊU CẦU MỚI: ${msg}`);
+        showDesktopNotification('🔔 Kinnect: Yêu cầu mới cần xử lý', msg);
+        if (state.page === 'tickets' && !state.ticketId) load('tickets', { skipHash: true });
+      } else if (hasStatusChange && firstChanged) {
+        const t = firstChanged.t;
+        const msg = `Phiếu #${t.id.slice(0, 6)} chuyển sang [${statusNames[t.status] || t.status}]`;
+        toast(`📢 CẬP NHẬT: ${msg}`);
+        showDesktopNotification('📢 Kinnect: Trạng thái phiếu thay đổi', msg);
+        if (state.page === 'tickets') {
+          if (state.ticketId === t.id) openTicket(t.id, { skipHash: true });
+          else if (!state.ticketId) load('tickets', { skipHash: true });
+        }
+      }
+    }
+
+    ticketTracker.pollCycle = (ticketTracker.pollCycle || 0) + 1;
+    if (hasNew || hasStatusChange || ticketTracker.pollCycle % 2 === 0) {
+      refreshNavCounts();
+    }
+
+    // Also poll for new inter-department messages
+    await checkMessageUpdates();
+  } catch {}
+  finally {
+    ticketTracker.active = false;
+  }
+}
+
+function startTicketTracker() {
+  if (ticketTracker.timer) clearInterval(ticketTracker.timer);
+  ticketTracker.known.clear();
+  ticketTracker.initialized = false;
+  ticketTracker.pollCycle = 0;
+  chatState.initialized = false;
+  loadChatReadState();
+  loadTicketSeenState();
+  ticketTracker.timer = setInterval(checkTicketUpdates, 12000);
+  setTimeout(checkTicketUpdates, 2000);
+}
 const names = {
   overview: 'Tổng quan',
   tickets: 'Phiếu phối hợp',
@@ -8,6 +602,7 @@ const names = {
   resets: 'Khôi phục tài khoản',
   wallet: 'Tặng xu & Bù giao dịch',
   finance: 'Tài chính & đối soát',
+  security: 'Giám sát bảo mật AI',
   operations: 'Kỹ thuật & hệ thống',
   content: 'Quản lý nội dung',
   team: 'Nhân sự & phân quyền',
@@ -23,6 +618,7 @@ const shortNames = {
   resets: 'Khôi phục',
   wallet: 'Ví & Xu',
   finance: 'Đối soát',
+  security: 'Bảo mật AI',
   operations: 'Kỹ thuật',
   content: 'Nội dung',
   team: 'Nhân sự',
@@ -40,6 +636,7 @@ const descriptions = {
   activity: 'Nhật ký kiểm toán (Audit Trail) bất biến ghi nhận mọi thao tác của Admin và các bộ phận.',
   password: 'Đổi mật khẩu bảo mật cho tài khoản nhân sự (hỗ trợ chữ HOA, chữ thường, số và ký tự đặc biệt).',
   finance: 'Đối soát sổ cái xu, doanh thu VND, lịch sử tặng quà và lập đề nghị bù xu trình Admin phê duyệt.',
+  security: 'Trung tâm Giám sát Bảo mật AI: phát hiện tấn công brute-force, trích xuất dữ liệu hàng loạt, quản lý cảnh báo và hoàn tác chặn IP.',
   operations: 'Trung tâm điều hành Kỹ thuật (SRE & DevOps): giám sát tài nguyên, điều khiển AI Pipeline và nhật ký máy chủ.',
   content: 'Kiểm tra trực quan nội dung, hình ảnh và video bài đăng gần đây của thành viên.',
   wallet: 'Tách biệt chiến dịch xu tặng và bù xu mua; quy trình Maker-Checker 2 lớp do Admin phê duyệt ghi sổ.'
@@ -69,9 +666,13 @@ async function api(path, data) {
     body: data === undefined ? undefined : JSON.stringify(data)
   });
   const d = await r.json().catch(() => ({}));
+  if(r.headers.get('X-Kinnect-Admin-Hosting')==='cloud'&&$('cloud-data-state')){const at=Number(r.headers.get('X-Kinnect-Replica-Updated'));$('cloud-data-state').hidden=false;$('cloud-data-state').textContent='☁ Quản trị cloud · Tài khoản và ví đọc từ cloud. Dữ liệu nội dung app: '+(at?new Date(at).toLocaleString('vi-VN'):'đang thiết lập đồng bộ')+(at&&Date.now()-at>120000?' — bản đồng bộ cũ; PC chưa cập nhật.':'.');}
   if (!r.ok) {
     if (r.status === 401 && path !== 'login' && path !== 'password') signedOut();
-    throw Error(d.error || 'Không kết nối được máy chủ.');
+    const err = Error(d.error || 'Không kết nối được máy chủ.');
+    err.status = r.status;
+    err.data = d;
+    throw err;
   }
   return d;
 }
@@ -87,21 +688,55 @@ function openMobileNav() {
 }
 
 function signedOut() {
+  if (chatState.isOpen) closeChatDrawer();
+  else {
+    if ($('chat-drawer')) $('chat-drawer').hidden = true;
+    if ($('chat-backdrop')) $('chat-backdrop').hidden = true;
+  }
+  chatState.seenIds.clear();
+  chatState.messages = [];
+  chatState.lastCreated = 0;
+  chatState.channelCursor = 0;
+  chatState.lastReadTs = 0;
+  chatState.lastNotifiedTs = 0;
+  chatState.unreadCount = 0;
+  chatState.ticketRef = null;
+  chatState.activeChannel = 'all';
+  chatState.initialized = false;
+  chatState.isOpen = false;
+  if ($('chat-ticket-ref-bar')) $('chat-ticket-ref-bar').hidden = true;
+  if ($('chat-messages-container')) $('chat-messages-container').replaceChildren();
+  updateChatUnreadBadge();
+
   state.user = null;
   state.ticketId = null;
+  state.ticketQueueIds = [];
+  state.navCounts = { tickets: 0, reports: 0, resets: 0, wallet: 0, security: 0 };
   state.revision++;
+  if (ticketTracker.timer) {
+    clearInterval(ticketTracker.timer);
+    ticketTracker.timer = null;
+  }
+  syncNavBadges();
   closeMobileNav();
   $('workspace').hidden = true;
   $('login').hidden = false;
   $('content').replaceChildren();
   $('password').value = '';
+  if ($('totp-code')) $('totp-code').value = '';
+  if ($('totp-wrap')) $('totp-wrap').hidden = true;
+  if ($('member-360-modal')?.open) $('member-360-modal').close();
+  if ($('post-detail-modal')?.open) $('post-detail-modal').close();
+  if ($('confirm-dialog')?.open) $('confirm-dialog').close();
   if ($('secret-dialog')?.open) $('secret-dialog').close();
+  if ($('reputation-dialog')?.open) $('reputation-dialog').close();
+  if ($('v2-cmd-palette')?.open) $('v2-cmd-palette').close();
   $('secret-value').value = '';
 }
 
 function getAllowedPages(user) {
   return user.role === 'admin'
-    ? ['overview', 'tickets', 'reputation', 'users', 'reports', 'resets', 'wallet', 'finance', 'operations', 'content', 'team', 'activity']
+    ? ['overview', 'tickets', 'reputation', 'users', 'reports', 'resets', 'wallet', 'finance', 'security', 'operations', 'content', 'team', 'activity']
     : user.team === 'finance'
       ? ['overview', 'tickets', 'wallet', 'finance', 'activity', 'password']
       : user.team === 'operations'
@@ -160,6 +795,67 @@ function updateActiveNav(page) {
   }
 }
 
+function currentRouteHash() {
+  if (state.page === 'tickets' && state.ticketId) return '#tickets/' + state.ticketId;
+  if (state.page === 'operations' && state.opsTab && state.opsTab !== 'live') return '#operations/' + state.opsTab;
+  return '#' + (state.page || 'overview');
+}
+
+function setRouteHash(target) {
+  const h = target.startsWith('#') ? target : '#' + target;
+  if (location.hash === h) return;
+  try { history.pushState(null, '', h); } catch { location.hash = h; }
+}
+
+function parseRouteHash(rawHash) {
+  const clean = String(rawHash || '').replace(/^#/, '').replace(/^\/+/, '').trim();
+  if (!clean) return { page: 'overview' };
+  const parts = clean.split('/').filter(Boolean);
+  const head = (parts[0] || 'overview').toLowerCase();
+  if (head === 'tickets' && parts[1]) return { page: 'tickets', ticketId: parts[1] };
+  if (head === 'reputation' && parts[1]) {
+    let repTarget = parts[1];
+    try { repTarget = decodeURIComponent(parts[1]); } catch {}
+    return { page: 'reputation', repTarget };
+  }
+  if (head === 'operations' && ['live', 'controls', 'logs'].includes(parts[1])) {
+    return { page: 'operations', opsTab: parts[1] };
+  }
+  return { page: names[head] ? head : 'overview' };
+}
+
+function navigateFromHash(rawHash, skipPush = true) {
+  if (!state.user) return;
+  if (state.user.mustChange) return load('password', { skipHash: true });
+  const allowed = getAllowedPages(state.user);
+  const parsed = parseRouteHash(rawHash);
+  if (!allowed.includes(parsed.page)) {
+    return load('overview', { skipHash: skipPush });
+  }
+  if (parsed.page === 'operations') {
+    state.opsTab = parsed.opsTab || 'live';
+    return load('operations', { skipHash: skipPush });
+  }
+  if (parsed.page === 'tickets' && parsed.ticketId) {
+    return openTicket(parsed.ticketId, { skipHash: skipPush });
+  }
+  if (parsed.page === 'reputation' && parsed.repTarget) {
+    return showUserReputation(parsed.repTarget, { skipHash: skipPush });
+  }
+  return load(parsed.page, { skipHash: skipPush });
+}
+
+window.addEventListener('popstate', () => {
+  if (!state.user || state.user.mustChange) return;
+  if (location.hash && location.hash === currentRouteHash()) return;
+  navigateFromHash(location.hash || '#overview', true);
+});
+window.addEventListener('hashchange', () => {
+  if (!state.user || state.user.mustChange) return;
+  if (location.hash && location.hash === currentRouteHash()) return;
+  navigateFromHash(location.hash || '#overview', true);
+});
+
 function signedIn(user) {
   state.user = user;
   $('login').hidden = true;
@@ -175,10 +871,22 @@ function signedIn(user) {
   const pages = getAllowedPages(user);
   for (const n of $('navigation').querySelectorAll('button')) n.hidden = !pages.includes(n.dataset.page);
   $('team-nav').hidden = user.role !== 'admin';
-  $('password-nav').hidden = user.role !== 'support';
+  if ($('security-nav')) $('security-nav').hidden = user.role !== 'admin';
+  if ($('password-nav')) $('password-nav').hidden = user.role !== 'support';
+
   for (const n of $('navigation').querySelectorAll('button')) n.disabled = user.mustChange && n.dataset.page !== 'password';
   renderMobileBottomNav(pages, user.mustChange);
-  load(user.mustChange ? 'password' : 'overview');
+  syncChatChannelTabs();
+  syncNotifyButton();
+  syncNavBadges();
+  startTicketTracker();
+  refreshNavCounts();
+  if (user.mustChange) {
+    load('password', { skipHash: true });
+  } else {
+    navigateFromHash(location.hash || state.initialHash || '#overview', true);
+    state.initialHash = '';
+  }
 }
 
 async function confirmAction(title, message) {
@@ -240,16 +948,192 @@ function table(root, head, rows) {
   t.append(body); wrap.append(t); root.append(wrap);
 }
 
-async function mutate(path, data, title, message) {
-  if (!await confirmAction(title, message)) return;
-  const result = await api(path, data);
-  if (result.temporaryPassword) secret(result); else toast('Đã cập nhật.');
-  await load(state.page);
+function renderSkeleton(root, page = '') {
+  root.className = 'v2-skeleton-page';
+  root.replaceChildren();
+  if (['overview', 'tickets', 'finance', 'reputation', 'security', 'operations'].includes(page)) {
+    const kpis = el('div', undefined, 'v2-skeleton-kpis');
+    for (let i = 0; i < 4; i++) kpis.append(el('div', undefined, 'v2-skeleton-box'));
+    root.append(kpis);
+  }
+  const card = el('div', undefined, 'v2-skeleton-card');
+  card.append(
+    el('div', undefined, 'v2-skeleton-line w-40'),
+    el('div', undefined, 'v2-skeleton-line w-90'),
+    el('div', undefined, 'v2-skeleton-line w-70'),
+    el('div', undefined, 'v2-skeleton-line w-90')
+  );
+  root.append(card);
 }
 
-function makePasswordInputWithToggle(placeholder = 'Nhập mật khẩu...', auto = 'current-password', minLen = 0) {
+function makeDebouncedSearch(placeholder, initialValue, onSearch, delay = 250) {
+  const wrap = el('div', undefined, 'search-input-wrap');
+  const input = el('input');
+  input.type = 'search';
+  input.placeholder = placeholder;
+  input.autocomplete = 'off';
+  input.spellcheck = false;
+  if (initialValue) input.value = initialValue;
+
+  const clearBtn = el('button', '✕', 'search-clear-btn');
+  clearBtn.type = 'button';
+  clearBtn.setAttribute('aria-label', 'Xóa từ khóa tìm kiếm');
+  clearBtn.hidden = !input.value;
+
+  let timer = null;
+  const trigger = (immediate = false) => {
+    clearBtn.hidden = !input.value;
+    clearTimeout(timer);
+    if (immediate) {
+      onSearch(input.value);
+    } else {
+      timer = setTimeout(() => onSearch(input.value), delay);
+    }
+  };
+  input.addEventListener('input', () => trigger(false));
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && input.value) {
+      e.preventDefault();
+      input.value = '';
+      trigger(true);
+    }
+  });
+  clearBtn.onclick = () => {
+    input.value = '';
+    trigger(true);
+    input.focus();
+  };
+  wrap.append(input, clearBtn);
+  return { wrap, input };
+}
+
+function renderPaginated(container, items, pageState, drawSlice, pageSizes = [25, 50, 100]) {
+  const list = Array.isArray(items) ? items : [];
+  if (!pageState.size || !pageSizes.includes(pageState.size)) pageState.size = pageSizes[0];
+  const total = list.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageState.size));
+  if (!pageState.page || pageState.page < 1) pageState.page = 1;
+  if (pageState.page > totalPages) pageState.page = totalPages;
+
+  const start = (pageState.page - 1) * pageState.size;
+  const slice = list.slice(start, start + pageState.size);
+
+  const listWrap = el('div');
+  const pagerWrap = el('div');
+  container.append(listWrap, pagerWrap);
+
+  const redraw = () => {
+    const curTotalPages = Math.max(1, Math.ceil(list.length / pageState.size));
+    if (pageState.page > curTotalPages) pageState.page = curTotalPages;
+    if (pageState.page < 1) pageState.page = 1;
+    const sIdx = (pageState.page - 1) * pageState.size;
+    const eIdx = Math.min(list.length, sIdx + pageState.size);
+    listWrap.replaceChildren();
+    drawSlice(listWrap, list.slice(sIdx, eIdx), { start: sIdx, end: eIdx, total: list.length });
+
+    pagerWrap.replaceChildren();
+    if (list.length > pageSizes[0] || curTotalPages > 1) {
+      const bar = el('div', undefined, 'pagination-bar');
+      bar.append(el('span', `Hiển thị ${list.length ? sIdx + 1 : 0}–${eIdx} / ${list.length.toLocaleString('vi-VN')} mục`, 'muted'));
+      const ctrls = el('div', undefined, 'pagination-controls');
+      const sizeSel = selectOptions(pageSizes.map(n => [String(n), `${n} / trang`]), String(pageState.size));
+      sizeSel.setAttribute('aria-label', 'Số dòng mỗi trang');
+      sizeSel.onchange = () => {
+        pageState.size = Number(sizeSel.value) || pageSizes[0];
+        pageState.page = 1;
+        redraw();
+      };
+      const prevBtn = el('button', '← Trước');
+      prevBtn.type = 'button';
+      prevBtn.disabled = pageState.page <= 1;
+      prevBtn.onclick = () => { pageState.page--; redraw(); };
+
+      const nextBtn = el('button', 'Tiếp →');
+      nextBtn.type = 'button';
+      nextBtn.disabled = pageState.page >= curTotalPages;
+      nextBtn.onclick = () => { pageState.page++; redraw(); };
+
+      ctrls.append(sizeSel, prevBtn, el('span', `Trang ${pageState.page} / ${curTotalPages}`), nextBtn);
+      bar.append(ctrls);
+      pagerWrap.append(bar);
+    }
+  };
+  redraw();
+}
+
+const SLA_MINUTES = { urgent: 15, high: 60, normal: 120, low: 240 };
+
+function fmtShortMinutes(mins) {
+  const m = Math.max(1, Math.round(mins));
+  if (m < 60) return `${m}p`;
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  return r ? `${h}h${r}p` : `${h}h`;
+}
+
+function computeSlaInfo(ticket) {
+  if (!ticket) return { label: '—', tone: '' };
+  if (ticket.status === 'resolved') return { label: '✔ Xong SLA', tone: 'good' };
+  const target = SLA_MINUTES[ticket.priority] || 120;
+  const created = Number(ticket.created) || Date.now();
+  const remMins = Math.ceil((created + target * 60000 - Date.now()) / 60000);
+  if (remMins <= 0) return { label: `🔥 Quá hạn ${fmtShortMinutes(Math.abs(remMins))}`, tone: 'danger' };
+  const warnThreshold = Math.min(20, Math.ceil(target * 0.25));
+  if (remMins <= warnThreshold) return { label: `⏳ Còn ${fmtShortMinutes(remMins)}`, tone: 'warn' };
+  return { label: `⏱ Còn ${fmtShortMinutes(remMins)}`, tone: 'info' };
+}
+
+function renderSlaBadge(ticket) {
+  const info = computeSlaInfo(ticket);
+  return badge(info.label, info.tone);
+}
+
+function safeCsvCell(value) {
+  let s = String(value ?? '');
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  return '"' + s.replace(/"/g, '""') + '"';
+}
+
+function exportFinanceCsv(entries) {
+  const header = ['Thời gian', 'Tài khoản', 'Tên hiển thị', 'Loại bút toán', 'Số xu', 'Giá trị VND', 'Thu nền tảng VND', 'Mã tham chiếu'];
+  const lines = [header.map(safeCsvCell).join(',')];
+  for (const e of entries) {
+    lines.push([
+      e.created ? new Date(Number(e.created)).toISOString() : '',
+      e.username ? '@' + e.username : '',
+      e.name || '',
+      e.kind || '',
+      Number(e.coins || 0),
+      Number(e.net_vnd || 0),
+      Number(e.platform_vnd || 0),
+      e.reference || ('TX-' + (e.id || ''))
+    ].map(safeCsvCell).join(','));
+  }
+  const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `kinnect-doi-soat-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast(`Đã xuất ${entries.length} bút toán ra tệp CSV.`);
+}
+
+async function mutate(path, data, title, message) {
+  if (!await confirmAction(title, message)) return false;
+  const result = await api(path, data);
+  if (result.temporaryPassword) secret(result); else toast('Đã cập nhật.');
+  await load(state.page, { skipHash: true });
+  refreshNavCounts();
+  return true;
+}
+
+function makePasswordInputWithToggle(placeholder = 'Nhập mật khẩu...', auto = 'current-password', minLen = 0, inputId = '') {
   const wrap = el('div', undefined, 'password-field-wrap');
   const input = el('input');
+  if (inputId) input.id = inputId;
   input.type = 'password';
   input.autocomplete = auto;
   input.required = true;
@@ -269,25 +1153,31 @@ function makePasswordInputWithToggle(placeholder = 'Nhập mật khẩu...', aut
   return { wrap, input, toggle };
 }
 
-async function load(page) {
+async function load(page, opts = {}) {
   if (!state.user) return;
   state.ticketId = null;
   state.page = page;
+  if (!opts.skipHash) {
+    setRouteHash(page === 'operations' && state.opsTab && state.opsTab !== 'live' ? '#operations/' + state.opsTab : '#' + page);
+  }
   closeMobileNav();
   const rev = ++state.revision;
   $('page-title').textContent = names[page] || page;
   $('page-description').textContent = descriptions[page] || '';
   updateActiveNav(page);
-  const root = el('div', 'Đang tải dữ liệu…', 'muted');
+  const root = el('div');
+  renderSkeleton(root, page);
   $('content').replaceChildren(root);
   try {
     await render(page, root, rev);
     if (rev !== state.revision) root.remove();
+    else root.className = '';
   } catch (e) {
     if (rev === state.revision) {
+      root.className = '';
       root.replaceChildren();
       empty(root, e.message);
-      root.append(button('Thử lại', () => load(page)));
+      root.append(button('Thử lại', () => load(page, { skipHash: true })));
     }
   }
 }
@@ -297,18 +1187,19 @@ async function render(page, root, rev) {
     if (typeof window.renderWalletTools !== 'function') {
       await new Promise((resolve, reject) => {
         const s = document.createElement('script');
-        s.src = '/admin/wallet-tools.js?v=20261109c';
+        s.src = '/admin/wallet-tools.js?v=20261125_ux_v10';
         s.onload = resolve;
         s.onerror = () => reject(new Error('Chưa tải được tệp /admin/wallet-tools.js'));
         document.head.append(s);
       });
     }
     if (typeof window.renderWalletTools === 'function') {
-      return window.renderWalletTools({ root, api, el, button, badge, table, empty, toast, confirmAction, me: state.user, refresh: () => load('wallet'), date });
+      return window.renderWalletTools({ root, api, el, button, badge, table, empty, toast, confirmAction, me: state.user, refresh: () => { refreshNavCounts(); return load('wallet', { skipHash: true }); }, date });
     }
     throw new Error('Chức năng Tặng xu & Bù giao dịch chưa sẵn sàng.');
   }
   if (page === 'reputation') return renderReputationPage(root, rev);
+  if (page === 'security') return renderSecurityPage(root, rev);
   if (page === 'content') return renderContentPage(root, rev);
   if (['tickets', 'finance', 'operations'].includes(page)) return extraRender(page, root, rev);
 
@@ -320,15 +1211,18 @@ async function render(page, root, rev) {
       el('p', 'Mật khẩu có phân biệt chữ HOA, chữ thường, chữ số và ký tự đặc biệt. Bấm vào biểu tượng 👁️ Hiện để kiểm tra chính xác trước khi lưu.', 'muted')
     );
     const inputs = {};
-    for (const [key, label, auto, minL] of [
+    for (const [key, labelText, auto, minL] of [
       ['current', 'Mật khẩu hiện tại', 'current-password', 0],
       ['password', 'Mật khẩu mới (ít nhất 12 ký tự, phân biệt HOA/thường)', 'new-password', 12],
       ['repeat', 'Nhập lại mật khẩu mới', 'new-password', 12]
     ]) {
-      const l = el('label', label);
-      const { wrap, input } = makePasswordInputWithToggle('Nhập ' + label.toLowerCase() + '...', auto, minL);
-      l.append(wrap);
-      form.append(l);
+      const grp = el('div', undefined, 'field-group');
+      const inputId = 'pw-' + key;
+      const l = el('label', labelText);
+      l.htmlFor = inputId;
+      const { wrap, input } = makePasswordInputWithToggle('Nhập ' + labelText.toLowerCase() + '...', auto, minL, inputId);
+      grp.append(l, wrap);
+      form.append(grp);
       inputs[key] = input;
     }
     const submit = el('button', 'Lưu mật khẩu mới', 'primary');
@@ -359,77 +1253,135 @@ async function render(page, root, rev) {
       (isAdmin || isOps) ? api('operations').catch(() => null) : Promise.resolve(null)
     ]);
     if (rev !== state.revision) return;
+    if (queue?.summary) state.ticketSummary = queue.summary;
+    refreshNavCounts(d);
     root.replaceChildren();
 
-    const welcome = el('div', undefined, 'welcome-banner');
+    const openTicketCount = (queue.summary.open || 0) + (queue.summary.in_progress || 0) + (queue.summary.waiting || 0);
+    const unresolvedTickets = arr(queue?.tickets).filter(t => t.status !== 'resolved');
+    state.ticketQueueIds = arr(queue?.tickets).map(t => t.id);
+    state.ticketQueueMeta = new Map(arr(queue?.tickets).map(t => [t.id, t.status]));
+
+    const welcome = el('div', undefined, 'welcome-banner is-compact');
     const copy = el('div');
     const bannerHeading = isAdmin
-      ? 'Trung tâm Điều hành Cấp cao (Executive Command Center)'
+      ? 'Trung tâm Điều hành Cấp cao (Admin Workspace)'
       : isFin
-        ? 'Trung tâm Tài chính & Đối soát Sổ cái (Treasury & Ledger)'
+        ? 'Trung tâm Tài chính & Đối soát Sổ cái'
         : isOps
-          ? 'Trung tâm Kỹ thuật & Vận hành Hạ tầng (SRE & DevOps)'
-          : 'Trung tâm Chăm sóc Cộng đồng & Kiểm duyệt (Trust & Safety)';
-    const bannerDesc = isAdmin
-      ? 'Giám sát liên thông 4 bộ phận, phê duyệt đối soát xu, điều phối phiếu khẩn cấp và kiểm soát toàn diện hệ sinh thái Kinnect.'
-      : isFin
-        ? 'Tra cứu sổ cái xu/VND, kiểm tra yêu cầu từ Hỗ trợ và lập đề nghị bù xu mua trình Admin phê duyệt ghi sổ.'
-        : isOps
-          ? 'Giám sát tài nguyên máy chủ, cổng Cloudflare Tunnel, hàng chờ AI và xử lý phiếu kỹ thuật từ các bộ phận.'
-          : 'Tiếp nhận phản ánh của thành viên, kiểm duyệt bài đăng/ảnh/video, bảo vệ điểm uy tín (100đ) và phối hợp liên bộ phận.';
-
+          ? 'Trung tâm Kỹ thuật & Hạ tầng (SRE)'
+          : 'Trung tâm Hỗ trợ & Kiểm duyệt Cộng đồng';
     copy.append(
-      el('p', new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }), 'eyebrow'),
-      el('h2', bannerHeading),
-      el('p', bannerDesc)
+      el('p', 'CA TRỰC · ' + new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric', year: 'numeric' }), 'eyebrow'),
+      el('h2', bannerHeading)
     );
     const bannerBtns = el('div', undefined, 'actions');
     bannerBtns.append(
-      button(isFin ? '+ Lập đề nghị bù xu' : '+ Tạo phiếu phối hợp', () => isFin ? load('wallet') : newTicket(root), 'primary')
+      button(isFin ? '+ Đề nghị bù xu' : '+ Tạo phiếu phối hợp', () => isFin ? load('wallet') : newTicket(root), 'primary')
     );
     if (isAdmin && d.pendingWalletOps > 0) {
-      bannerBtns.append(button(`🪙 Duyệt ví chờ (${d.pendingWalletOps})`, () => load('wallet'), 'warn-btn'));
+      bannerBtns.append(button(`🪙 Duyệt ví (${d.pendingWalletOps})`, () => load('wallet'), 'warn-btn'));
+    }
+    if (isAdmin && d.securityAlerts > 0) {
+      bannerBtns.append(button(`🚨 Cảnh báo AI (${d.securityAlerts})`, () => load('security'), 'danger'));
     }
     welcome.append(copy, bannerBtns);
     root.append(welcome);
 
     if (isFin && finData) {
       metricCards(root, [
-        ['Bút toán ghi sổ', Number(finData.totals.entries).toLocaleString('vi-VN')],
-        ['Giá trị ghi sổ (VND)', Number(finData.totals.net_vnd).toLocaleString('vi-VN')],
-        ['Đề nghị chờ Admin duyệt', finData.pendingWalletOps ?? d.pendingWalletOps ?? 0],
-        ['Phiếu tài chính đang mở', (queue.summary.open || 0) + (queue.summary.in_progress || 0)]
+        ['Bút toán ghi sổ', Number(finData.totals.entries).toLocaleString('vi-VN'), () => load('finance')],
+        ['Giá trị ghi sổ (VND)', Number(finData.totals.net_vnd).toLocaleString('vi-VN'), () => load('finance')],
+        ['Đề nghị chờ Admin duyệt', finData.pendingWalletOps ?? d.pendingWalletOps ?? 0, () => load('wallet')],
+        ['Phiếu tài chính đang mở', openTicketCount, () => load('tickets')]
       ]);
     } else if (isOps && opsData) {
       metricCards(root, [
-        ['Uptime máy chủ', Math.floor((opsData.uptime || 0) / 60) + ' phút'],
-        ['Bộ nhớ RAM', (opsData.memoryMb || 0) + ' MB'],
-        ['Hàng chờ AI', opsData.ai?.queue || 0],
-        ['Phiếu kỹ thuật mở', (queue.summary.open || 0) + (queue.summary.in_progress || 0)]
+        ['Uptime máy chủ', Math.floor((opsData.uptime || 0) / 60) + ' phút', () => load('operations')],
+        ['Bộ nhớ RAM', (opsData.memoryMb || 0) + ' MB', () => load('operations')],
+        ['Hàng chờ AI', opsData.ai?.queue || 0, () => { state.opsTab = 'logs'; load('operations'); }],
+        ['Phiếu kỹ thuật mở', openTicketCount, () => load('tickets')]
       ]);
     } else if (isAdmin) {
       metricCards(root, [
-        ['Tổng thành viên', Number(d.users || 0).toLocaleString('vi-VN')],
-        ['Phiếu phối hợp đang mở', (queue.summary.open || 0) + (queue.summary.in_progress || 0) + (queue.summary.waiting || 0)],
-        ['Báo cáo & Khôi phục chờ', Number(d.reports || 0) + Number(d.resets || 0)],
-        ['Đề nghị ví chờ duyệt', Number(d.pendingWalletOps || 0)]
+        ['Tổng thành viên', Number(d.users || 0).toLocaleString('vi-VN'), () => load('users')],
+        ['Phiếu đang mở', openTicketCount, () => load('tickets')],
+        ['Báo cáo & Khôi phục chờ', Number(d.reports || 0) + Number(d.resets || 0), () => load(d.reports > 0 ? 'reports' : 'resets')],
+        ['Ví chờ duyệt & Bảo mật', Number(d.pendingWalletOps || 0) + Number(d.securityAlerts || 0), () => load(d.securityAlerts > 0 ? 'security' : 'wallet')]
       ]);
     } else {
       metricCards(root, [
-        ['Báo cáo cần xử lý', d.reports || 0],
-        ['Yêu cầu khôi phục MK', d.resets || 0],
-        ['Phiếu mới tiếp nhận', queue.summary.open || 0],
-        ['Phiếu đang xử lý', queue.summary.in_progress || 0]
+        ['Báo cáo cần xử lý', d.reports || 0, () => load('reports')],
+        ['Yêu cầu khôi phục MK', d.resets || 0, () => load('resets')],
+        ['Phiếu mới tiếp nhận', queue.summary.open || 0, () => load('tickets')],
+        ['Phiếu đang xử lý', queue.summary.in_progress || 0, () => load('tickets')]
       ]);
     }
 
-    // Ma trận Phối hợp Liên Bộ phận (Enterprise Cross-Department Matrix)
+    // Khối 1: Hộp Việc Ưu Tiên Cần Xử Lý Ngay (Action Inbox + Đếm ngược SLA)
+    const inboxCard = el('section', undefined, 'card priority-inbox-card');
+    const inboxHead = el('div', undefined, 'section-bar');
+    inboxHead.append(
+      el('h3', '🎯 Việc Ưu Tiên Cần Xử Lý Ngay'),
+      button('Mở toàn bộ phiếu (' + (queue?.summary?.total || 0) + ') →', () => load('tickets'), 'link-button')
+    );
+    inboxCard.append(inboxHead);
+
+    const actionTiles = [];
+    if (isAdmin && d.securityAlerts > 0) {
+      actionTiles.push({ icon: '🚨', count: d.securityAlerts, label: 'Cảnh báo bảo mật AI đang mở', desc: 'Rà soát ngay dấu hiệu tấn công / chặn IP', tone: 'danger', onClick: () => load('security') });
+    }
+    if ((isAdmin || isFin) && d.pendingWalletOps > 0) {
+      actionTiles.push({ icon: '🪙', count: d.pendingWalletOps, label: 'Đề nghị ví & bù xu chờ duyệt', desc: isAdmin ? 'Cần Admin xác nhận ghi sổ Maker-Checker' : 'Đang chờ Admin phê duyệt', tone: 'warn', onClick: () => load('wallet') });
+    }
+    if ((isAdmin || isSup) && d.reports > 0) {
+      actionTiles.push({ icon: '⚑', count: d.reports, label: 'Báo cáo vi phạm chưa đóng', desc: 'Kiểm tra ảnh/video & xử lý hàng loạt', tone: 'warn', onClick: () => load('reports') });
+    }
+    if ((isAdmin || isSup) && d.resets > 0) {
+      actionTiles.push({ icon: '↺', count: d.resets, label: 'Yêu cầu khôi phục mật khẩu', desc: 'Xác minh chủ tài khoản và cấp MK tạm', tone: 'warn', onClick: () => load('resets') });
+    }
+    if (openTicketCount > 0) {
+      actionTiles.push({ icon: '📋', count: openTicketCount, label: d.urgentTickets > 0 ? `${d.urgentTickets} phiếu Ưu tiên cao / Khẩn cấp` : 'Phiếu phối hợp đang mở', desc: 'Bấm để xử lý liên hoàn theo SLA', tone: d.urgentTickets > 0 ? 'danger' : '', onClick: () => load('tickets') });
+    }
+
+    if (actionTiles.length) {
+      const tileGrid = el('div', undefined, 'inbox-action-grid');
+      for (const item of actionTiles) {
+        const tile = el('button', undefined, 'inbox-action-tile' + (item.tone ? ' tone-' + item.tone : ''));
+        tile.type = 'button';
+        const meta = el('div', undefined, 'inbox-action-tile-meta');
+        meta.append(el('b', `${item.icon} ${item.label}`), el('small', item.desc));
+        tile.append(meta, badge(item.count + ' chờ', item.tone || 'info'));
+        tile.onclick = item.onClick;
+        tileGrid.append(tile);
+      }
+      inboxCard.append(tileGrid);
+    } else {
+      inboxCard.append(el('div', '✨ Tuyệt vời! Không có việc tồn đọng khẩn cấp nào cần duyệt lúc này.', 'inbox-zero-banner'));
+    }
+
+    const previewTickets = (unresolvedTickets.length ? unresolvedTickets : arr(queue?.tickets)).slice(0, 6);
+    if (previewTickets.length) {
+      table(inboxCard, ['Yêu cầu', 'Khách hàng', 'Bộ phận', 'Thời hạn SLA', 'Trạng thái', 'Thao tác'], previewTickets.map(t => [
+        button(t.subject, () => openTicket(t.id), 'link-button'),
+        t.member ? button('@' + t.member.replace(/^@/, ''), () => openMember360Modal(t.member), 'link-button') : '—',
+        teamNames[t.team] || t.team,
+        renderSlaBadge(t),
+        badge(statusNames[t.status], t.status === 'resolved' ? 'good' : t.status === 'in_progress' ? 'info' : 'warn'),
+        button('Xử lý ngay →', () => openTicket(t.id), 'primary')
+      ]));
+    }
+    root.append(inboxCard);
+
+    // Khối 2: Ma trận Phối hợp 4 Bộ phận + Nhật ký Thời gian thực (Lưới 2 cột)
     const dq = d.departmentQueues || {};
+    const grid = el('div', undefined, 'dashboard-grid');
+
     const matrixCard = el('section', undefined, 'card');
     const matrixHead = el('div', undefined, 'section-bar');
     matrixHead.append(
-      el('h3', '🏢 Ma trận Vận hành & Phối hợp Liên Bộ phận (4 Phân hệ)'),
-      button('Mở trung tâm phiếu →', () => load('tickets'), 'link-button')
+      el('h3', '🏢 Ma trận 4 Bộ phận'),
+      button('Điều phối phiếu →', () => load('tickets'), 'link-button')
     );
     matrixCard.append(matrixHead);
     const matrixGrid = el('div', undefined, 'dept-matrix-grid');
@@ -437,74 +1389,60 @@ async function render(page, root, rev) {
       {
         key: 'admin',
         icon: '🛡️',
-        title: 'Ban Quản trị (Admin)',
-        domain: 'admin.kinnect.io.vn',
-        stats: `${dq.admin?.open || 0} phiếu chờ · ${d.pendingWalletOps || 0} duyệt ví`,
-        desc: 'Phê duyệt bù xu/tặng xu, phân công nhân sự, quyết định khiếu nại cấp cao.',
-        actionLabel: isAdmin ? 'Xử lý phiếu Admin' : 'Trình phiếu lên Admin',
+        title: 'Ban Quản trị',
+        domain: 'admin',
+        stats: `${dq.admin || 0} phiếu · ${d.pendingWalletOps || 0} duyệt ví`,
+        actionLabel: isAdmin ? 'Mở phiếu' : 'Trình Admin',
         onClick: () => isAdmin ? load('tickets') : newTicket(root, 'admin')
       },
       {
         key: 'support',
         icon: '🎧',
         title: 'Hỗ trợ & Kiểm duyệt',
-        domain: 'hotro.kinnect.io.vn',
-        stats: `${dq.support?.open || 0} phiếu · ${d.reports || 0} báo cáo · ${d.resets || 0} cấp MK`,
-        desc: 'Tuyến đầu tiếp nhận khách hàng, kiểm duyệt nội dung/ảnh và bảo vệ điểm uy tín 100đ.',
-        actionLabel: (isAdmin || isSup) ? 'Mở Báo cáo & Hỗ trợ' : 'Chuyển phiếu sang Hỗ trợ',
+        domain: 'hotro',
+        stats: `${dq.support || 0} phiếu · ${d.reports || 0} báo cáo · ${d.resets || 0} MK`,
+        actionLabel: (isAdmin || isSup) ? 'Mở Báo cáo' : 'Chuyển Hỗ trợ',
         onClick: () => (isAdmin || isSup) ? load('reports') : newTicket(root, 'support')
       },
       {
         key: 'finance',
         icon: '💳',
-        title: 'Tài chính & Đối soát',
-        domain: 'taichinh.kinnect.io.vn',
-        stats: `${dq.finance?.open || 0} phiếu · ${finData ? Number(finData.totals.entries).toLocaleString('vi-VN') + ' bút toán' : 'Sổ cái xu'}`,
-        desc: 'Đối soát giao dịch nạp xu, kiểm tra biến động ví và lập đề nghị bù xu mua.',
-        actionLabel: (isAdmin || isFin) ? 'Mở Đối soát & Ví' : 'Yêu cầu Tài chính đối soát',
+        title: 'Tài chính & Sổ cái',
+        domain: 'taichinh',
+        stats: `${dq.finance || 0} phiếu · ${finData ? Number(finData.totals.entries).toLocaleString('vi-VN') + ' bút toán' : 'Sổ cái xu'}`,
+        actionLabel: (isAdmin || isFin) ? 'Mở Đối soát' : 'Nhờ Tài chính',
         onClick: () => (isAdmin || isFin) ? load('finance') : newTicket(root, 'finance')
       },
       {
         key: 'operations',
         icon: '⚙️',
-        title: 'Kỹ thuật & Hệ thống',
-        domain: 'kythuat.kinnect.io.vn',
-        stats: `${dq.operations?.open || 0} phiếu · ${opsData ? opsData.memoryMb + ' MB RAM' : 'SRE & AI'}`,
-        desc: 'Giám sát máy chủ, cơ sở dữ liệu, Cloudflare Tunnel và hàng chờ AI.',
-        actionLabel: (isAdmin || isOps) ? 'Mở Trung tâm Kỹ thuật' : 'Báo sự cố cho Kỹ thuật',
+        title: 'Kỹ thuật & SRE',
+        domain: 'kythuat',
+        stats: `${dq.operations || 0} phiếu · ${opsData ? (opsData.memoryMb ? opsData.memoryMb + ' MB' : 'Cloud Live') : 'Giám sát 5s'}`,
+        actionLabel: (isAdmin || isOps) ? 'Mở Kỹ thuật' : 'Báo Kỹ thuật',
         onClick: () => (isAdmin || isOps) ? load('operations') : newTicket(root, 'operations')
       }
     ];
     for (const item of deptItems) {
       const box = el('div', undefined, 'dept-matrix-card dept-' + item.key);
       const topRow = el('div', undefined, 'dept-matrix-top');
-      topRow.append(el('span', item.icon + ' ' + item.title, 'dept-matrix-title'), badge(item.domain));
+      topRow.append(el('span', item.icon + ' ' + item.title, 'dept-matrix-title'), badge(item.domain + '.kinnect.io.vn'));
       box.append(
         topRow,
         el('b', item.stats, 'dept-matrix-stat'),
-        el('p', item.desc, 'muted'),
         button(item.actionLabel + ' →', item.onClick, 'dept-matrix-btn')
       );
       matrixGrid.append(box);
     }
     matrixCard.append(matrixGrid);
-    root.append(matrixCard);
-
-    const grid = el('div', undefined, 'dashboard-grid'), cases = el('section', undefined, 'card'), heading = el('div', undefined, 'section-bar');
-    heading.append(el('h3', '📋 Hàng chờ Phiếu Phối hợp Cần Xử lý'), button('Xem tất cả (' + queue.summary.total + ') →', () => load('tickets'), 'link-button'));
-    cases.append(heading);
-    table(cases, ['Yêu cầu', 'Khách hàng', 'Bộ phận', 'Trạng thái', 'Thao tác'], queue.tickets.slice(0, 6).map(t => [
-      button(t.subject, () => openTicket(t.id), 'link-button'),
-      t.member ? button('@' + t.member.replace(/^@/, ''), () => openMember360Modal(t.member), 'link-button') : '—',
-      teamNames[t.team] || t.team,
-      badge(statusNames[t.status], t.status === 'resolved' ? 'good' : t.status === 'in_progress' ? 'info' : 'warn'),
-      button('Xử lý ngay →', () => openTicket(t.id), 'primary')
-    ]));
 
     const recent = el('section', undefined, 'card');
-    recent.append(el('h3', '⚡ Nhật ký Phối hợp Thời gian thực'));
-    if (!activity.entries.length) recent.append(el('p', 'Chưa có hoạt động mới.', 'muted'));
-    for (const item of activity.entries.slice(0, 6)) {
+    const recentHead = el('div', undefined, 'section-bar');
+    recentHead.append(el('h3', '⚡ Nhật ký Gần nhất'), button('Xem tất cả →', () => load('activity'), 'link-button'));
+    recent.append(recentHead);
+    const actEntries = arr(activity?.entries);
+    if (!actEntries.length) recent.append(el('p', 'Chưa có hoạt động mới.', 'muted'));
+    for (const item of actEntries.slice(0, 7)) {
       const entry = el('div', undefined, 'activity-item');
       entry.append(
         el('b', '@' + item.actor),
@@ -513,44 +1451,24 @@ async function render(page, root, rev) {
       );
       recent.append(entry);
     }
-    grid.append(cases, recent);
+    grid.append(matrixCard, recent);
     root.append(grid);
-
-    const shortcuts = el('div', undefined, 'quick-actions');
-    shortcuts.append(button('📋 Mở hàng chờ phối hợp', () => load('tickets'), 'primary'));
-    if (isAdmin) {
-      shortcuts.append(
-        button('⭐ Điểm uy tín & Vi phạm', () => load('reputation')),
-        button('🪙 Tặng xu & Bù giao dịch', () => load('wallet')),
-        button('👥 Hồ sơ thành viên 360°', () => load('users')),
-        button('🛡️ Quản lý nhân sự', () => load('team')),
-        button('⚑ Xem báo cáo vi phạm', () => load('reports'))
-      );
-    } else if (isFin) {
-      shortcuts.append(
-        button('🪙 Lập đề nghị bù xu', () => load('wallet')),
-        button('📊 Tra cứu và đối soát sổ cái', () => load('finance'))
-      );
-    } else if (isOps) {
-      shortcuts.append(button('💻 Điều khiển Hệ thống & AI', () => load('operations')));
-    } else {
-      shortcuts.append(
-        button('⭐ Điểm uy tín & Vi phạm', () => load('reputation')),
-        button('⚑ Xử lý báo cáo nội dung', () => load('reports')),
-        button('↺ Cấp mật khẩu khôi phục', () => load('resets')),
-        button('👥 Tra cứu thành viên 360°', () => load('users'))
-      );
-    }
-    root.append(shortcuts);
     return;
   }
 
   if (page === 'users') {
     root.replaceChildren();
+    const initialQ = state.userQueryPrefill || '';
+    state.userQueryPrefill = '';
+
     const form = el('form', undefined, 'toolbar');
-    const label = el('label', 'Tìm thành viên'), search = el('input');
-    search.placeholder = 'Tên đăng nhập (@username) hoặc tên hiển thị...';
-    label.append(search);
+    const pageState = { page: 1, size: 25 };
+    const { wrap: searchWrap, input: search } = makeDebouncedSearch('Tên đăng nhập (@username) hoặc tên hiển thị…', initialQ, () => {
+      pageState.page = 1;
+      draw();
+    });
+    const label = el('label', 'Tìm thành viên');
+    label.append(searchWrap);
 
     const sl = el('label', 'Trạng thái'), select = el('select');
     for (const [k, v] of [['all', 'Tất cả'], ['active', 'Hoạt động'], ['suspended', 'Đình chỉ'], ['admin', 'Admin']]) {
@@ -564,9 +1482,7 @@ async function render(page, root, rev) {
     }
     scoreLabel.append(scoreSelect);
 
-    const submit = el('button', 'Tìm kiếm', 'primary');
-    submit.type = 'submit';
-    form.append(label, sl, scoreLabel, submit);
+    form.append(label, sl, scoreLabel);
     const results = el('div');
     root.append(form, results);
 
@@ -575,51 +1491,56 @@ async function render(page, root, rev) {
       const q = ++query;
       results.replaceChildren(el('p', 'Đang tải danh sách thành viên…', 'muted'));
       try {
-        const d = await api('users?q=' + encodeURIComponent(search.value) + '&state=' + select.value + '&score=' + scoreSelect.value);
+        const d = await api('users?q=' + encodeURIComponent(search.value.trim()) + '&state=' + select.value + '&score=' + scoreSelect.value);
         if (q !== query || rev !== state.revision) return;
-        results.replaceChildren(el('p', `Hiển thị ${d.users.length} / ${d.total} thành viên (mặc định 100/100 điểm uy tín khi chưa vi phạm)`, 'count'));
-        table(results, ['Thành viên', 'Điểm uy tín', 'Vai trò', 'Trạng thái', 'Ngày tạo', 'Thao tác phối hợp'], d.users.map(u => {
-          const name = el('div');
-          const nameBtn = button(u.name || u.username, () => openMember360Modal(u.username), 'link-button');
-          name.append(nameBtn, el('small', '@' + u.username));
-          const score = Number.isInteger(u.reputation_score) ? u.reputation_score : 100;
-          const scoreBadge = badge(score + '/100 điểm', score >= 90 ? 'good' : score >= 70 ? 'info' : score >= 50 ? 'warn' : 'danger');
-          scoreBadge.style.cursor = 'pointer';
-          scoreBadge.title = 'Bấm để xem & điều chỉnh hồ sơ uy tín';
-          scoreBadge.onclick = () => showUserReputation(u.id);
+        const userList = arr(d?.users);
+        results.replaceChildren(el('p', `Tìm thấy ${userList.length} / ${d?.total ?? userList.length} thành viên (khởi tạo 100/100 điểm uy tín)`, 'count'));
+        renderPaginated(results, userList, pageState, (holder, slice) => {
+          table(holder, ['Thành viên', 'Điểm uy tín', 'Vai trò', 'Trạng thái', 'Ngày tạo', 'Thao tác phối hợp'], slice.map(u => {
+            const name = el('div');
+            const nameBtn = button(u.name || u.username, () => openMember360Modal(u.username), 'link-button');
+            name.append(nameBtn, el('small', '@' + u.username));
+            const score = Number.isInteger(u.reputation_score) ? u.reputation_score : 100;
+            const scoreBadge = badge(score + '/100 điểm', score >= 90 ? 'good' : score >= 70 ? 'info' : score >= 50 ? 'warn' : 'danger');
+            scoreBadge.style.cursor = 'pointer';
+            scoreBadge.title = 'Bấm để xem & điều chỉnh hồ sơ uy tín';
+            scoreBadge.onclick = () => showUserReputation(u.id);
 
-          const actWrap = el('div', undefined, 'actions');
-          actWrap.append(
-            button('🔍 Hồ sơ 360°', () => openMember360Modal(u.username)),
-            button('📋 Tạo phiếu', () => {
-              load('tickets').then(() => {
-                setTimeout(() => newTicket($('content'), state.user.team, { member: '@' + u.username, subject: 'Hỗ trợ thành viên @' + u.username }), 80);
-              });
-            })
-          );
-          if (state.user.role === 'admin' || state.user.team === 'finance') {
-            actWrap.append(button('🪙 Cấp/Bù xu', () => {
-              window.__WALLET_PREFILL = { kind: state.user.role === 'admin' ? 'gift' : 'paid_correction', username: u.username, title: 'Hỗ trợ xu cho @' + u.username };
-              load('wallet');
-            }));
-          }
-          if (u.role === 'user') {
-            actWrap.append(button(u.suspended ? '🟢 Khôi phục' : '🚫 Đình chỉ', () => mutate('moderate', { action: u.suspended ? 'restore-user' : 'suspend-user', target: u.id }, u.suspended ? 'Khôi phục thành viên?' : 'Đình chỉ thành viên?', '@' + u.username), u.suspended ? '' : 'danger'));
-          }
-          return [
-            name,
-            scoreBadge,
-            u.role === 'admin' ? badge('Admin', 'info') : 'Thành viên',
-            badge(u.suspended ? 'Đình chỉ' : 'Hoạt động', u.suspended ? 'warn' : 'good'),
-            date(u.created),
-            actWrap
-          ];
-        }));
+            const actWrap = el('div', undefined, 'actions');
+            actWrap.append(
+              button('🔍 Hồ sơ 360°', () => openMember360Modal(u.username)),
+              button('📋 Tạo phiếu', () => {
+                load('tickets').then(() => {
+                  if (state.page === 'tickets') {
+                    newTicket($('content').firstElementChild || $('content'), state.user.team, { member: '@' + u.username, subject: 'Hỗ trợ thành viên @' + u.username });
+                  }
+                });
+              })
+            );
+            if (state.user.role === 'admin' || state.user.team === 'finance') {
+              actWrap.append(button('🪙 Cấp/Bù xu', () => {
+                window.__WALLET_PREFILL = { kind: state.user.role === 'admin' ? 'gift' : 'paid_correction', username: u.username, title: 'Hỗ trợ xu cho @' + u.username };
+                load('wallet');
+              }));
+            }
+            if (u.role === 'user') {
+              actWrap.append(button(u.suspended ? '🟢 Khôi phục' : '🚫 Đình chỉ', () => mutate('moderate', { action: u.suspended ? 'restore-user' : 'suspend-user', target: u.id }, u.suspended ? 'Khôi phục thành viên?' : 'Đình chỉ thành viên?', '@' + u.username), u.suspended ? '' : 'danger'));
+            }
+            return [
+              name,
+              scoreBadge,
+              u.role === 'admin' ? badge('Admin', 'info') : 'Thành viên',
+              badge(u.suspended ? 'Đình chỉ' : 'Hoạt động', u.suspended ? 'warn' : 'good'),
+              date(u.created),
+              actWrap
+            ];
+          }));
+        }, [25, 50, 100]);
       } catch (e) { results.replaceChildren(el('p', e.message, 'error')); }
     };
-    form.onsubmit = e => { e.preventDefault(); draw(); };
-    select.onchange = draw;
-    scoreSelect.onchange = draw;
+    form.onsubmit = e => { e.preventDefault(); pageState.page = 1; draw(); };
+    select.onchange = () => { pageState.page = 1; draw(); };
+    scoreSelect.onchange = () => { pageState.page = 1; draw(); };
     await draw();
     return;
   }
@@ -628,66 +1549,218 @@ async function render(page, root, rev) {
     const d = await api('reports');
     if (rev !== state.revision) return;
     root.replaceChildren();
-    if (!d.reports.length) { empty(root, 'Chưa có báo cáo vi phạm nào.'); return; }
-    for (const r of d.reports) {
-      const card = el('article', undefined, 'card'), head = el('div', undefined, 'report-head');
-      const authorLabel = r.subject?.username ? ` · Tác giả: @${r.subject.username}` : '';
-      head.append(
-        el('h3', `⚑ Báo cáo ${r.target_type.toUpperCase()}${authorLabel} · ${date(r.created)}`),
-        badge(r.status === 'open' ? 'Đang mở xử lý' : 'Đã đóng', r.status === 'open' ? 'warn' : 'good')
-      );
-      card.append(head, el('p', 'Lý do báo cáo: ' + (r.reason || 'Không có mô tả')));
-      if (r.subject) {
-        card.append(el('p', r.subject.body || r.subject.username || '(Nội dung đính kèm bên dưới)', 'report-text'));
-        if (r.subject.has_media && r.subject.media_url) {
-          const mediaBox = el('div', undefined, 'post-media-box');
-          mediaBox.style.maxWidth = '420px';
-          mediaBox.style.marginBottom = '12px';
-          if (r.subject.media_type?.startsWith('video/')) {
-            const vid = el('video', undefined, 'post-video-thumb');
-            vid.src = r.subject.media_url;
-            vid.controls = true;
-            mediaBox.append(vid);
-          } else {
-            const img = el('img', undefined, 'post-media-thumb');
-            img.src = r.subject.media_url;
-            img.alt = 'Ảnh bài đăng bị báo cáo';
-            img.onclick = () => openPostDetailModal(r.subject);
-            mediaBox.append(img);
-          }
-          card.append(mediaBox);
+    const reportList = arr(d?.reports);
+    if (!reportList.length) { empty(root, 'Chưa có báo cáo vi phạm nào.'); return; }
+
+    const openCount = reportList.filter(r => r.status === 'open').length;
+    const closedCount = reportList.length - openCount;
+    const fState = {
+      status: openCount > 0 ? 'open' : 'all',
+      type: 'all',
+      q: '',
+      page: 1,
+      size: 12,
+      selected: new Set()
+    };
+
+    const toolbar = el('form', undefined, 'toolbar');
+    const { wrap: searchWrap, input: searchInput } = makeDebouncedSearch('Tìm @tác_giả hoặc lý do báo cáo…', '', val => {
+      fState.q = val.trim().toLowerCase();
+      fState.page = 1;
+      drawReports();
+    });
+    field(toolbar, 'Tìm nhanh báo cáo', searchWrap);
+    toolbar.onsubmit = e => e.preventDefault();
+
+    const statusBar = el('div', undefined, 'filter-chips-bar');
+    const typeBar = el('div', undefined, 'filter-chips-bar');
+    const bulkBar = el('div', undefined, 'bulk-action-bar');
+    bulkBar.hidden = true;
+    const listArea = el('div');
+
+    root.append(toolbar, statusBar, typeBar, bulkBar, listArea);
+
+    function filteredReports() {
+      return reportList.filter(r => {
+        if (fState.status !== 'all' && r.status !== fState.status) return false;
+        if (fState.type !== 'all' && r.target_type !== fState.type) return false;
+        if (fState.q) {
+          const hay = [r.reason, r.target_type, r.subject?.username, r.subject?.name, r.subject?.body].filter(Boolean).join(' ').toLowerCase();
+          if (!hay.includes(fState.q)) return false;
         }
-      }
-      const actions = el('div', undefined, 'actions');
-      if (r.subject && ['post', 'short'].includes(r.target_type)) {
-        actions.append(
-          button(r.subject.hidden ? '👁️ Hiện lại nội dung' : '🚫 Ẩn nội dung vi phạm', () => mutate('moderate', { action: (r.subject.hidden ? 'show-' : 'hide-') + r.target_type, target: r.target_id }, 'Thay đổi hiển thị nội dung?', 'Thao tác được ghi vào nhật ký.'))
-        );
-      }
-      if (r.subject?.username) {
-        actions.append(
-          button('🔍 Hồ sơ 360° @' + r.subject.username, () => openMember360Modal(r.subject.username)),
-          button('⭐ Điểm uy tín', () => showUserReputation(r.subject.userId || r.subject.username))
-        );
-      }
-      actions.append(
-        button('💳 Chuyển Tài chính', () => newTicket(root, 'finance', {
-          member: r.subject?.username ? '@' + r.subject.username : '',
-          subject: 'Đối soát giao dịch từ báo cáo #' + r.id.slice(0, 6),
-          description: `Báo cáo (${r.target_type}): ${r.reason || ''}\nNội dung: ${r.subject?.body || ''}`
-        })),
-        button('💻 Báo Kỹ thuật', () => newTicket(root, 'operations', {
-          member: r.subject?.username ? '@' + r.subject.username : '',
-          subject: 'Kiểm tra kỹ thuật từ báo cáo #' + r.id.slice(0, 6),
-          description: `Báo cáo (${r.target_type}): ${r.reason || ''}`
-        }))
-      );
-      if (r.status === 'open') {
-        actions.append(button('✔ Đóng báo cáo', () => mutate('moderate', { action: 'close-report', target: r.id }, 'Đóng báo cáo?', 'Đánh dấu báo cáo này đã được xử lý.'), 'primary'));
-      }
-      card.append(actions);
-      root.append(card);
+        return true;
+      });
     }
+
+    function syncBulkBar(visibleSlice) {
+      const openSlice = visibleSlice.filter(r => r.status === 'open');
+      const count = fState.selected.size;
+      bulkBar.replaceChildren();
+      bulkBar.hidden = openCount === 0;
+      if (openCount === 0) return;
+
+      const leftInfo = el('div', undefined, 'actions');
+      const selAllBtn = button(
+        openSlice.length && openSlice.every(r => fState.selected.has(r.id)) ? '☐ Bỏ chọn trang này' : `☑ Chọn cả trang (${openSlice.length})`,
+        () => {
+          const allSelected = openSlice.length && openSlice.every(r => fState.selected.has(r.id));
+          for (const item of openSlice) {
+            if (allSelected) fState.selected.delete(item.id);
+            else fState.selected.add(item.id);
+          }
+          drawReports();
+        }
+      );
+      leftInfo.append(selAllBtn, el('span', count > 0 ? `Đã chọn ${count} báo cáo` : 'Chọn báo cáo để xử lý hàng loạt', count > 0 ? '' : 'muted'));
+
+      const rightActs = el('div', undefined, 'actions');
+      if (count > 0) {
+        rightActs.append(
+          button(`✔ Đóng ${count} báo cáo`, async () => {
+            const ids = [...fState.selected];
+            if (!await confirmAction(`Đóng ${ids.length} báo cáo đã chọn?`, 'Toàn bộ báo cáo được chọn sẽ chuyển sang trạng thái Đã đóng.')) return;
+            let ok = 0;
+            for (const rid of ids) {
+              try { await api('moderate', { action: 'close-report', target: rid }); ok++; } catch {}
+            }
+            toast(`Đã đóng ${ok}/${ids.length} báo cáo.`);
+            refreshNavCounts();
+            await load('reports', { skipHash: true });
+          }, 'primary'),
+          button(`🚫 Ẩn nội dung & Đóng (${count})`, async () => {
+            const picked = reportList.filter(r => fState.selected.has(r.id));
+            if (!await confirmAction(`Ẩn nội dung và đóng ${picked.length} báo cáo?`, 'Bài viết / video ngắn vi phạm trong danh sách chọn sẽ bị ẩn ngay lập tức.')) return;
+            const hiddenTargets = new Set();
+            let closed = 0;
+            for (const r of picked) {
+              if (r.subject && ['post', 'short'].includes(r.target_type) && !r.subject.hidden && !hiddenTargets.has(r.target_id)) {
+                try {
+                  await api('moderate', { action: 'hide-' + r.target_type, target: r.target_id });
+                  hiddenTargets.add(r.target_id);
+                } catch {}
+              }
+              try { await api('moderate', { action: 'close-report', target: r.id }); closed++; } catch {}
+            }
+            toast(`Đã ẩn ${hiddenTargets.size} nội dung và đóng ${closed}/${picked.length} báo cáo.`);
+            refreshNavCounts();
+            await load('reports', { skipHash: true });
+          }, 'danger'),
+          button('Bỏ chọn', () => { fState.selected.clear(); drawReports(); })
+        );
+      }
+      bulkBar.append(leftInfo, rightActs);
+    }
+
+    function drawChips() {
+      statusBar.replaceChildren();
+      for (const [k, labelText] of [
+        ['open', `Đang mở (${openCount})`],
+        ['closed', `Đã đóng (${closedCount})`],
+        ['all', `Tất cả (${reportList.length})`]
+      ]) {
+        const chip = button(labelText, () => { fState.status = k; fState.page = 1; drawReports(); }, 'filter-chip' + (fState.status === k ? ' is-active' : ''));
+        statusBar.append(chip);
+      }
+      typeBar.replaceChildren();
+      for (const [k, labelText] of [
+        ['all', 'Mọi loại'],
+        ['post', 'Bài viết'],
+        ['short', 'Video ngắn'],
+        ['user', 'Tài khoản']
+      ]) {
+        const chip = button(labelText, () => { fState.type = k; fState.page = 1; drawReports(); }, 'filter-chip' + (fState.type === k ? ' is-active' : ''));
+        typeBar.append(chip);
+      }
+    }
+
+    function drawReports() {
+      drawChips();
+      listArea.replaceChildren();
+      const filtered = filteredReports();
+      if (!filtered.length) {
+        syncBulkBar([]);
+        empty(listArea, 'Không có báo cáo nào phù hợp bộ lọc hiện tại.');
+        return;
+      }
+      renderPaginated(listArea, filtered, fState, (holder, slice) => {
+        syncBulkBar(slice);
+        for (const r of slice) {
+          const card = el('article', undefined, 'card'), head = el('div', undefined, 'report-head');
+          const leftHead = el('div', undefined, 'actions');
+          if (r.status === 'open') {
+            const chkLabel = el('label', undefined, 'report-check-label');
+            const chk = el('input');
+            chk.type = 'checkbox';
+            chk.checked = fState.selected.has(r.id);
+            chk.onchange = () => {
+              if (chk.checked) fState.selected.add(r.id);
+              else fState.selected.delete(r.id);
+              syncBulkBar(slice);
+            };
+            chkLabel.append(chk, el('span', 'Chọn'));
+            leftHead.append(chkLabel);
+          }
+          const authorLabel = r.subject?.username ? ` · Tác giả: @${r.subject.username}` : '';
+          leftHead.append(el('h3', `⚑ Báo cáo ${r.target_type.toUpperCase()}${authorLabel} · ${date(r.created)}`));
+          head.append(
+            leftHead,
+            badge(r.status === 'open' ? 'Đang mở xử lý' : 'Đã đóng', r.status === 'open' ? 'warn' : 'good')
+          );
+          card.append(head, el('p', 'Lý do báo cáo: ' + (r.reason || 'Không có mô tả')));
+          if (r.subject) {
+            card.append(el('p', r.subject.body || r.subject.username || '(Nội dung đính kèm bên dưới)', 'report-text'));
+            if (r.subject.has_media && r.subject.media_url) {
+              const mediaBox = el('div', undefined, 'post-media-box');
+              mediaBox.style.maxWidth = '420px';
+              mediaBox.style.marginBottom = '12px';
+              if (r.subject.media_type?.startsWith('video/')) {
+                const vid = el('video', undefined, 'post-video-thumb');
+                vid.src = r.subject.media_url;
+                vid.controls = true;
+                mediaBox.append(vid);
+              } else {
+                const img = el('img', undefined, 'post-media-thumb');
+                img.src = r.subject.media_url;
+                img.alt = 'Ảnh bài đăng bị báo cáo';
+                img.onclick = () => openPostDetailModal(r.subject);
+                mediaBox.append(img);
+              }
+              card.append(mediaBox);
+            }
+          }
+          const actions = el('div', undefined, 'actions');
+          if (r.subject && ['post', 'short'].includes(r.target_type)) {
+            actions.append(
+              button(r.subject.hidden ? '👁️ Hiện lại nội dung' : '🚫 Ẩn nội dung vi phạm', () => mutate('moderate', { action: (r.subject.hidden ? 'show-' : 'hide-') + r.target_type, target: r.target_id }, 'Thay đổi hiển thị nội dung?', 'Thao tác được ghi vào nhật ký.'))
+            );
+          }
+          if (r.subject?.username) {
+            actions.append(
+              button('🔍 Hồ sơ 360° @' + r.subject.username, () => openMember360Modal(r.subject.username)),
+              button('⭐ Điểm uy tín', () => showUserReputation(r.subject.userId || r.subject.username))
+            );
+          }
+          actions.append(
+            button('💳 Chuyển Tài chính', () => newTicket(root, 'finance', {
+              member: r.subject?.username ? '@' + r.subject.username : '',
+              subject: 'Đối soát giao dịch từ báo cáo #' + r.id.slice(0, 6),
+              description: `Báo cáo (${r.target_type}): ${r.reason || ''}\nNội dung: ${r.subject?.body || ''}`
+            })),
+            button('💻 Báo Kỹ thuật', () => newTicket(root, 'operations', {
+              member: r.subject?.username ? '@' + r.subject.username : '',
+              subject: 'Kiểm tra kỹ thuật từ báo cáo #' + r.id.slice(0, 6),
+              description: `Báo cáo (${r.target_type}): ${r.reason || ''}`
+            }))
+          );
+          if (r.status === 'open') {
+            actions.append(button('✔ Đóng báo cáo', () => mutate('moderate', { action: 'close-report', target: r.id }, 'Đóng báo cáo?', 'Đánh dấu báo cáo này đã được xử lý.'), 'primary'));
+          }
+          card.append(actions);
+          holder.append(card);
+        }
+      }, [12, 24, 50]);
+    }
+    drawReports();
     return;
   }
 
@@ -695,23 +1768,68 @@ async function render(page, root, rev) {
     const d = await api('resets');
     if (rev !== state.revision) return;
     root.replaceChildren();
-    if (!d.requests.length) { empty(root, 'Không có yêu cầu khôi phục mật khẩu nào.'); return; }
-    for (const r of d.requests) {
-      const card = el('article', undefined, 'card');
-      const head = el('div', undefined, 'report-head');
-      head.append(el('h3', '@' + r.username), badge(r.status === 'open' ? 'Chờ xử lý' : r.status, r.status === 'open' ? 'warn' : 'good'));
-      card.append(head, el('p', 'Liên hệ xác minh: ' + r.contact), el('p', r.note || 'Không có ghi chú', 'report-text'), el('small', date(r.created)));
-      const actions = el('div', undefined, 'actions');
-      actions.append(button('🔍 Xem Hồ sơ 360°', () => openMember360Modal(r.username)));
-      if (r.status === 'open') {
-        if (r.user_id && r.role === 'user') {
-          actions.append(button('🔑 Cấp mật khẩu tạm (1 lần)', () => mutate('resets', { id: r.id, action: 'reset' }, 'Đã xác minh chủ tài khoản?', 'Mật khẩu cũ bị thay thế và các phiên đăng nhập cũ bị thu hồi. Chỉ gửi mật khẩu mới riêng cho đúng chủ tài khoản.'), 'primary'));
-        }
-        actions.append(button('Bỏ qua yêu cầu', () => mutate('resets', { id: r.id, action: 'dismiss' }, 'Bỏ qua yêu cầu?', 'Yêu cầu sẽ được đánh dấu đã bỏ qua.')));
+    const reqList = arr(d?.requests);
+    if (!reqList.length) { empty(root, 'Không có yêu cầu khôi phục mật khẩu nào.'); return; }
+
+    const openCount = reqList.filter(r => r.status === 'open').length;
+    const rState = { status: openCount > 0 ? 'open' : 'all', q: '', page: 1, size: 15 };
+
+    const toolbar = el('form', undefined, 'toolbar');
+    const { wrap: searchWrap } = makeDebouncedSearch('Tìm @username hoặc thông tin liên hệ…', '', val => {
+      rState.q = val.trim().toLowerCase();
+      rState.page = 1;
+      drawResets();
+    });
+    field(toolbar, 'Tìm yêu cầu khôi phục', searchWrap);
+    toolbar.onsubmit = e => e.preventDefault();
+
+    const chipsBar = el('div', undefined, 'filter-chips-bar');
+    const listArea = el('div');
+    root.append(toolbar, chipsBar, listArea);
+
+    function drawResets() {
+      chipsBar.replaceChildren();
+      for (const [k, labelText] of [
+        ['open', `Chờ xử lý (${openCount})`],
+        ['done', `Đã xử lý / Bỏ qua (${reqList.length - openCount})`],
+        ['all', `Tất cả (${reqList.length})`]
+      ]) {
+        chipsBar.append(button(labelText, () => { rState.status = k; rState.page = 1; drawResets(); }, 'filter-chip' + (rState.status === k ? ' is-active' : '')));
       }
-      card.append(actions);
-      root.append(card);
+      listArea.replaceChildren();
+      const filtered = reqList.filter(r => {
+        if (rState.status === 'open' && r.status !== 'open') return false;
+        if (rState.status === 'done' && r.status === 'open') return false;
+        if (rState.q) {
+          const hay = [r.username, r.contact, r.note].filter(Boolean).join(' ').toLowerCase();
+          if (!hay.includes(rState.q)) return false;
+        }
+        return true;
+      });
+      if (!filtered.length) {
+        empty(listArea, 'Không có yêu cầu khôi phục nào phù hợp.');
+        return;
+      }
+      renderPaginated(listArea, filtered, rState, (holder, slice) => {
+        for (const r of slice) {
+          const card = el('article', undefined, 'card');
+          const head = el('div', undefined, 'report-head');
+          head.append(el('h3', '@' + r.username), badge(r.status === 'open' ? 'Chờ xử lý' : r.status, r.status === 'open' ? 'warn' : 'good'));
+          card.append(head, el('p', 'Liên hệ xác minh: ' + r.contact), el('p', r.note || 'Không có ghi chú', 'report-text'), el('small', date(r.created)));
+          const actions = el('div', undefined, 'actions');
+          actions.append(button('🔍 Xem Hồ sơ 360°', () => openMember360Modal(r.username)));
+          if (r.status === 'open') {
+            if (r.user_id && r.role === 'user') {
+              actions.append(button('🔑 Cấp mật khẩu tạm (1 lần)', () => mutate('resets', { id: r.id, action: 'reset' }, 'Đã xác minh chủ tài khoản?', 'Mật khẩu cũ bị thay thế và các phiên đăng nhập cũ bị thu hồi. Chỉ gửi mật khẩu mới riêng cho đúng chủ tài khoản.'), 'primary'));
+            }
+            actions.append(button('Bỏ qua yêu cầu', () => mutate('resets', { id: r.id, action: 'dismiss' }, 'Bỏ qua yêu cầu?', 'Yêu cầu sẽ được đánh dấu đã bỏ qua.')));
+          }
+          card.append(actions);
+          holder.append(card);
+        }
+      }, [15, 30, 60]);
     }
+    drawResets();
     return;
   }
 
@@ -760,7 +1878,7 @@ async function render(page, root, rev) {
     };
     card.append(form);
     root.append(card);
-    table(root, ['Nhân viên', 'Bộ phận', 'Trạng thái', 'Mật khẩu', 'Thao tác'], d.staff.map(s => {
+    table(root, ['Nhân viên', 'Bộ phận', 'Trạng thái', 'Mật khẩu', 'Thao tác'], arr(d?.staff).map(s => {
       const who = el('div', s.name); who.append(el('small', '@' + s.username));
       const actions = el('div', undefined, 'actions');
       actions.append(
@@ -779,7 +1897,36 @@ async function render(page, root, rev) {
     const d = await api('activity');
     if (rev !== state.revision) return;
     root.replaceChildren();
-    table(root, ['Thời gian', 'Người thao tác', 'Hành động', 'Đối tượng'], d.entries.map(e => [date(e.created), '@' + e.actor, actionNames[e.action] || e.action, e.target || '—']));
+    const allEntries = arr(d?.entries);
+    const actState = { q: '', page: 1, size: 25 };
+
+    const toolbar = el('form', undefined, 'toolbar');
+    const { wrap: searchWrap } = makeDebouncedSearch('Lọc theo nhân viên (@actor), hành động hoặc đối tượng…', '', val => {
+      actState.q = val.trim().toLowerCase();
+      actState.page = 1;
+      drawAct();
+    });
+    field(toolbar, 'Tìm trong nhật ký kiểm toán', searchWrap);
+    toolbar.onsubmit = e => e.preventDefault();
+
+    const listArea = el('div');
+    root.append(toolbar, listArea);
+
+    function drawAct() {
+      listArea.replaceChildren();
+      const filtered = actState.q
+        ? allEntries.filter(e => [e.actor, e.action, actionNames[e.action], e.target].filter(Boolean).join(' ').toLowerCase().includes(actState.q))
+        : allEntries;
+      renderPaginated(listArea, filtered, actState, (holder, slice) => {
+        table(holder, ['Thời gian', 'Người thao tác', 'Hành động', 'Đối tượng'], slice.map(e => [
+          date(e.created),
+          '@' + e.actor,
+          actionNames[e.action] || e.action,
+          e.target || '—'
+        ]));
+      }, [25, 50, 100]);
+    }
+    drawAct();
   }
 }
 
@@ -827,16 +1974,19 @@ async function openMember360Modal(query) {
 
     // Thanh thao tác nhanh liên bộ phận
     const quickBar = el('div', undefined, 'actions rep-actions');
-    quickBar.append(
-      button('⭐ Cộng / Khôi phục điểm', async () => {
-        await openAdjustDialog(u.id, u.username, 'restore');
-        openMember360Modal(u.username);
-      }, 'primary'),
-      button('⭐ Trừ điểm vi phạm', async () => {
-        await openAdjustDialog(u.id, u.username, 'deduct');
-        openMember360Modal(u.username);
-      }, 'danger')
-    );
+    const canModerate = state.user.role === 'admin' || state.user.team === 'support';
+    if (canModerate) {
+      quickBar.append(
+        button('⭐ Cộng / Khôi phục điểm', async () => {
+          const res = await openAdjustDialog(u.id, u.username, 'restore', rep.score);
+          if (res) openMember360Modal(u.username);
+        }, 'primary'),
+        button('⭐ Trừ điểm vi phạm', async () => {
+          const res = await openAdjustDialog(u.id, u.username, 'deduct', rep.score);
+          if (res) openMember360Modal(u.username);
+        }, 'danger')
+      );
+    }
     if (state.user.role === 'admin' || state.user.team === 'finance') {
       quickBar.append(button('🪙 Tặng / Bù xu', () => {
         modal.close();
@@ -848,11 +1998,13 @@ async function openMember360Modal(query) {
       button('📋 Tạo phiếu phối hợp', () => {
         modal.close();
         load('tickets').then(() => {
-          setTimeout(() => newTicket($('content'), state.user.team, { member: '@' + u.username, subject: 'Hỗ trợ khách hàng @' + u.username }), 80);
+          if (state.page === 'tickets') {
+            newTicket($('content').firstElementChild || $('content'), state.user.team, { member: '@' + u.username, subject: 'Hỗ trợ khách hàng @' + u.username });
+          }
         });
       })
     );
-    if (u.role === 'user') {
+    if (u.role === 'user' && canModerate) {
       quickBar.append(
         button(u.suspended ? '🟢 Mở khóa tài khoản' : '🚫 Đình chỉ tài khoản', async () => {
           if (!await confirmAction(u.suspended ? 'Khôi phục tài khoản?' : 'Đình chỉ tài khoản?', '@' + u.username)) return;
@@ -874,10 +2026,11 @@ async function openMember360Modal(query) {
     );
     modal.append(statsGrid);
 
-    if (d.tickets?.length) {
+    const mTickets = arr(d?.tickets);
+    if (mTickets.length) {
       const tSec = el('div', undefined, 'rep-sub-section');
-      tSec.append(el('h4', '📋 Phiếu Phối hợp Liên quan (' + d.tickets.length + ')'));
-      table(tSec, ['Tiêu đề phiếu', 'Bộ phận', 'Trạng thái', 'Cập nhật', 'Mở'], d.tickets.slice(0, 5).map(t => [
+      tSec.append(el('h4', '📋 Phiếu Phối hợp Liên quan (' + mTickets.length + ')'));
+      table(tSec, ['Tiêu đề phiếu', 'Bộ phận', 'Trạng thái', 'Cập nhật', 'Mở'], mTickets.slice(0, 5).map(t => [
         t.subject,
         teamNames[t.team] || t.team,
         badge(statusNames[t.status] || t.status, t.status === 'resolved' ? 'good' : 'warn'),
@@ -887,10 +2040,11 @@ async function openMember360Modal(query) {
       modal.append(tSec);
     }
 
-    if (d.wallet?.entries?.length) {
+    const mEntries = arr(d?.wallet?.entries);
+    if (mEntries.length) {
       const wSec = el('div', undefined, 'rep-sub-section');
-      wSec.append(el('h4', '💳 Sổ cái Giao dịch Xu Gần đây (' + d.wallet.entries.length + ')'));
-      table(wSec, ['Thời gian', 'Loại', 'Số xu', 'Giá trị VND', 'Mã tham chiếu'], d.wallet.entries.slice(0, 5).map(e => [
+      wSec.append(el('h4', '💳 Sổ cái Giao dịch Xu Gần đây (' + mEntries.length + ')'));
+      table(wSec, ['Thời gian', 'Loại', 'Số xu', 'Giá trị VND', 'Mã tham chiếu'], mEntries.slice(0, 5).map(e => [
         date(e.created),
         e.kind,
         Number(e.coins).toLocaleString('vi-VN') + ' xu',
@@ -900,10 +2054,11 @@ async function openMember360Modal(query) {
       modal.append(wSec);
     }
 
-    if (d.posts?.length) {
+    const mPosts = arr(d?.posts);
+    if (mPosts.length) {
       const pSec = el('div', undefined, 'rep-sub-section');
-      pSec.append(el('h4', '📝 Bài đăng Gần đây (' + d.posts.length + ')'));
-      table(pSec, ['Thời gian', 'Nội dung', 'Đính kèm', 'Trạng thái', 'Thao tác'], d.posts.slice(0, 5).map(p => [
+      pSec.append(el('h4', '📝 Bài đăng Gần đây (' + mPosts.length + ')'));
+      table(pSec, ['Thời gian', 'Nội dung', 'Đính kèm', 'Trạng thái', 'Thao tác'], mPosts.slice(0, 5).map(p => [
         date(p.created),
         (p.body || '').slice(0, 80) || '(Chỉ có ảnh/video)',
         p.has_media ? badge(p.media_type?.startsWith('video/') ? '🎬 Video' : '🖼️ Ảnh', 'good') : '—',
@@ -1029,21 +2184,24 @@ async function renderReputationPage(root, rev) {
   if (!violationsData.violations.length) {
     empty(violationsCard, 'Chưa có vi phạm nào được ghi nhận gần đây.');
   } else {
-    table(violationsCard, ['Thời gian', 'Thành viên', 'Loại vi phạm', 'Điểm trừ', 'Bằng chứng / Lý do AI', 'Thao tác'], violationsData.violations.map(v => {
-      const who = el('div', v.name || v.username); who.append(el('small', '@' + v.username));
-      const vName = violationsData.violationTypes[v.violation_type]?.name || v.violation_type;
-      const penaltyBadge = badge('-' + v.deducted_points + ' điểm', 'warn');
-      const reasonEl = el('div', v.ai_reason, 'cell-content');
-      if (v.ai_evidence) reasonEl.append(el('small', 'Bằng chứng: ' + v.ai_evidence));
-      return [
-        date(v.created),
-        who,
-        badge(vName),
-        penaltyBadge,
-        reasonEl,
-        button('Xem hồ sơ', () => showUserReputation(v.user_id))
-      ];
-    }));
+    const vPageState = { page: 1, size: 20 };
+    renderPaginated(violationsCard, violationsData.violations, vPageState, (holder, slice) => {
+      table(holder, ['Thời gian', 'Thành viên', 'Loại vi phạm', 'Điểm trừ', 'Bằng chứng / Lý do AI', 'Thao tác'], slice.map(v => {
+        const who = el('div', v.name || v.username); who.append(el('small', '@' + v.username));
+        const vName = violationsData.violationTypes[v.violation_type]?.name || v.violation_type;
+        const penaltyBadge = badge('-' + v.deducted_points + ' điểm', 'warn');
+        const reasonEl = el('div', v.ai_reason, 'cell-content');
+        if (v.ai_evidence) reasonEl.append(el('small', 'Bằng chứng: ' + v.ai_evidence));
+        return [
+          date(v.created),
+          who,
+          badge(vName),
+          penaltyBadge,
+          reasonEl,
+          button('Xem hồ sơ', () => showUserReputation(v.user_id))
+        ];
+      }));
+    }, [20, 50, 100]);
   }
   root.append(violationsCard);
 }
@@ -1085,8 +2243,8 @@ function renderDossierView(container, dossier) {
 
   const actionRow = el('div', undefined, 'actions rep-actions');
   actionRow.append(
-    button('+ Khôi phục / Cộng điểm', () => openAdjustDialog(rep.userId, rep.username, 'restore'), 'primary'),
-    button('- Trừ điểm vi phạm', () => openAdjustDialog(rep.userId, rep.username, 'deduct'), 'danger'),
+    button('+ Khôi phục / Cộng điểm', () => openAdjustDialog(rep.userId, rep.username, 'restore', rep.score), 'primary'),
+    button('- Trừ điểm vi phạm', () => openAdjustDialog(rep.userId, rep.username, 'deduct', rep.score), 'danger'),
     button('🔍 Xem Hồ sơ 360°', () => openMember360Modal(rep.username))
   );
   card.append(actionRow);
@@ -1121,55 +2279,228 @@ function renderDossierView(container, dossier) {
   container.append(card);
 }
 
-async function openAdjustDialog(userId, username, action) {
-  const isRestore = action === 'restore';
-  const points = prompt(isRestore ? `Nhập số điểm cần KHÔI PHỤC cho @${username} (1–100):` : `Nhập số điểm muốn TRỪ của @${username} (1–100):`, isRestore ? '10' : '5');
-  if (points === null) return null;
-  const numPoints = parseInt(points, 10);
-  if (!Number.isInteger(numPoints) || numPoints < 1 || numPoints > 100) {
-    toast('Số điểm phải là số nguyên từ 1 đến 100.');
-    return null;
-  }
-  const reason = prompt('Nhập lý do điều chỉnh điểm (ít nhất 5 ký tự):', isRestore ? 'Đã giải quyết khiếu nại thành công' : 'Vi phạm chuẩn mực ứng xử');
-  if (!reason || reason.trim().length < 5) {
-    toast('Lý do phải có ít nhất 5 ký tự.');
-    return null;
-  }
-  try {
-    const res = await api('reputation/adjust', {
-      userId,
-      action,
-      points: numPoints,
-      reason: reason.trim()
-    });
-    toast(isRestore ? `Đã khôi phục +${numPoints} điểm cho @${username}` : `Đã trừ -${numPoints} điểm của @${username}`);
-    const area = document.querySelector('.rep-dossier-area');
-    if (area && res.dossier) renderDossierView(area, res.dossier);
-    else if (state.page !== 'tickets') load(state.page);
-    return res;
-  } catch (err) {
-    toast(err.message);
-    return null;
-  }
+const REP_PRESETS = {
+  deduct: [
+    { pts: 2, label: '-2đ Spam nhẹ', reason: 'Nhắc nhở hành vi gửi tin nhắn / bình luận rác nhẹ' },
+    { pts: 3, label: '-3đ Avatar nhạy cảm', reason: 'Gỡ ảnh đại diện chưa phù hợp chuẩn mực cộng đồng' },
+    { pts: 5, label: '-5đ Bài viết / Ngôn từ', reason: 'Nội dung hoặc ngôn từ chưa phù hợp chuẩn mực ứng xử' },
+    { pts: 10, label: '-10đ Lừa đảo / Kỳ thị', reason: 'Vi phạm nghiêm trọng: lừa đảo xu hoặc phát ngôn kỳ thị' },
+    { pts: 25, label: '-25đ Nguy cấp', reason: 'Đe dọa bạo lực hoặc vi phạm an toàn mức nguy cấp' }
+  ],
+  restore: [
+    { pts: 3, label: '+3đ Đã sửa Avatar', reason: 'Thành viên đã cập nhật ảnh đại diện hợp lệ theo nhắc nhở' },
+    { pts: 5, label: '+5đ Hoàn điểm nhẹ', reason: 'Xem xét lại phản ánh, khôi phục điểm uy tín cho thành viên' },
+    { pts: 10, label: '+10đ Giải quyết khiếu nại', reason: 'Đã xác minh và giải quyết khiếu nại thành công' },
+    { pts: 'max', label: 'Về 100đ tối đa', reason: 'Rà soát nội dung hợp lệ và khôi phục trọn vẹn 100/100 điểm uy tín' }
+  ]
+};
+
+function repTierLabel(score) {
+  if (score >= 90) return { text: 'Chuẩn mực (90–100đ)', tone: 'good' };
+  if (score >= 70) return { text: 'Khá (70–89đ)', tone: 'good' };
+  if (score >= 50) return { text: 'Cảnh báo (50–69đ · Chặn Live)', tone: 'warn' };
+  return { text: 'Hạn chế (<50đ)', tone: 'danger' };
 }
 
-async function showUserReputation(userId) {
+function openAdjustDialog(userId, username, initialAction = 'restore', currentScore = null) {
+  const dialog = $('reputation-dialog');
+  const form = $('reputation-dialog-form');
+  if (!dialog || !form) return Promise.resolve(null);
+
+  const titleEl = $('rep-dialog-title');
+  const currentEl = $('rep-dialog-current');
+  const btnRestore = $('rep-mode-restore');
+  const btnDeduct = $('rep-mode-deduct');
+  const chipsWrap = $('rep-preset-chips');
+  const ptsInput = $('rep-points-input');
+  const reasonInput = $('rep-reason-input');
+  const previewBox = $('rep-score-preview');
+  const previewVal = $('rep-preview-value');
+  const previewTier = $('rep-preview-tier');
+  const errEl = $('rep-dialog-error');
+  const cancelBtn = $('rep-cancel-btn');
+  const submitBtn = $('rep-submit-btn');
+
+  let activeAction = initialAction === 'deduct' ? 'deduct' : 'restore';
+  let baseScore = Number.isFinite(Number(currentScore)) ? Number(currentScore) : null;
+  let activeDialog = true;
+  let resolvedValue = null;
+
+  titleEl.textContent = 'Điều chỉnh điểm uy tín @' + username;
+  currentEl.textContent = baseScore === null
+    ? 'Đang tải điểm uy tín hiện tại của @' + username + '…'
+    : `Điểm hiện tại: ${baseScore}/100 (${repTierLabel(baseScore).text})`;
+  errEl.textContent = '';
+
+  const updatePreview = () => {
+    const base = baseScore === null ? 100 : baseScore;
+    const rawPts = parseInt(ptsInput.value, 10);
+    const pts = Number.isInteger(rawPts) && rawPts > 0 ? Math.min(100, rawPts) : 0;
+    const after = activeAction === 'restore' ? Math.min(100, base + pts) : Math.max(0, base - pts);
+    const tier = repTierLabel(after);
+    previewVal.textContent = `${baseScore === null ? '?' : base} → ${after} điểm`;
+    previewTier.textContent = tier.text;
+    previewBox.dataset.tone = tier.tone;
+  };
+
+  const renderPresets = () => {
+    chipsWrap.replaceChildren();
+    const list = REP_PRESETS[activeAction] || [];
+    for (const item of list) {
+      const chip = el('button', item.label, 'rep-preset-btn');
+      chip.type = 'button';
+      chip.onclick = () => {
+        for (const c of chipsWrap.querySelectorAll('.rep-preset-btn')) c.classList.remove('is-active');
+        chip.classList.add('is-active');
+        if (item.pts === 'max') {
+          const base = baseScore === null ? 90 : baseScore;
+          ptsInput.value = String(Math.max(1, 100 - base));
+        } else {
+          ptsInput.value = String(item.pts);
+        }
+        reasonInput.value = item.reason;
+        errEl.textContent = '';
+        updatePreview();
+      };
+      chipsWrap.append(chip);
+    }
+  };
+
+  const setMode = (mode, resetInputs = true) => {
+    activeAction = mode === 'deduct' ? 'deduct' : 'restore';
+    btnRestore.classList.toggle('is-active', activeAction === 'restore');
+    btnRestore.setAttribute('aria-pressed', activeAction === 'restore' ? 'true' : 'false');
+    btnDeduct.classList.toggle('is-active', activeAction === 'deduct');
+    btnDeduct.setAttribute('aria-pressed', activeAction === 'deduct' ? 'true' : 'false');
+    submitBtn.textContent = activeAction === 'restore' ? '✔ Xác nhận cộng / khôi phục' : '⚠️ Xác nhận trừ điểm';
+    submitBtn.className = activeAction === 'restore' ? 'primary' : 'danger';
+    renderPresets();
+    if (resetInputs) {
+      const firstPreset = REP_PRESETS[activeAction][activeAction === 'restore' ? 2 : 1] || REP_PRESETS[activeAction][0];
+      ptsInput.value = String(firstPreset?.pts && Number.isInteger(firstPreset.pts) ? firstPreset.pts : 5);
+      reasonInput.value = firstPreset?.reason || '';
+    }
+    errEl.textContent = '';
+    updatePreview();
+  };
+
+  btnRestore.onclick = () => setMode('restore', true);
+  btnDeduct.onclick = () => setMode('deduct', true);
+  ptsInput.oninput = () => {
+    for (const c of chipsWrap.querySelectorAll('.rep-preset-btn')) c.classList.remove('is-active');
+    errEl.textContent = '';
+    updatePreview();
+  };
+  reasonInput.oninput = () => { errEl.textContent = ''; };
+
+  setMode(activeAction, true);
+
+  if (baseScore === null) {
+    api('reputation/user/' + encodeURIComponent(userId)).then(dossier => {
+      if (!activeDialog) return;
+      const s = Number(dossier?.reputation?.score);
+      if (Number.isFinite(s)) {
+        baseScore = s;
+        currentEl.textContent = `Điểm hiện tại: ${baseScore}/100 (${repTierLabel(baseScore).text})`;
+        updatePreview();
+      }
+    }).catch(() => {});
+  }
+
+  return new Promise(resolve => {
+    const cleanup = () => {
+      activeDialog = false;
+      form.onsubmit = null;
+      cancelBtn.onclick = null;
+      dialog.onclick = null;
+    };
+
+    cancelBtn.onclick = () => {
+      resolvedValue = null;
+      dialog.close('cancel');
+    };
+    dialog.onclick = e => {
+      if (e.target === dialog) {
+        resolvedValue = null;
+        dialog.close('cancel');
+      }
+    };
+    dialog.addEventListener('close', () => {
+      const out = resolvedValue;
+      cleanup();
+      resolve(out);
+    }, { once: true });
+
+    form.onsubmit = async e => {
+      e.preventDefault();
+      errEl.textContent = '';
+      const numPoints = parseInt(ptsInput.value, 10);
+      if (!Number.isInteger(numPoints) || numPoints < 1 || numPoints > 100) {
+        errEl.textContent = 'Số điểm phải là số nguyên từ 1 đến 100.';
+        ptsInput.focus();
+        return;
+      }
+      const cleanReason = reasonInput.value.trim();
+      if (cleanReason.length < 5) {
+        errEl.textContent = 'Vui lòng nhập lý do rõ ràng (tối thiểu 5 ký tự).';
+        reasonInput.focus();
+        return;
+      }
+      submitBtn.disabled = true;
+      try {
+        const res = await api('reputation/adjust', {
+          userId,
+          action: activeAction,
+          points: numPoints,
+          reason: cleanReason
+        });
+        toast(activeAction === 'restore' ? `Đã khôi phục +${numPoints} điểm cho @${username}` : `Đã trừ -${numPoints} điểm của @${username}`);
+        const area = document.querySelector('.rep-dossier-area');
+        if (area && res.dossier) renderDossierView(area, res.dossier);
+        resolvedValue = { ...res, action: activeAction, points: numPoints, reason: cleanReason };
+        dialog.close('saved');
+      } catch (err) {
+        errEl.textContent = err.message || 'Không lưu được điều chỉnh điểm.';
+      } finally {
+        submitBtn.disabled = false;
+      }
+    };
+
+    if (typeof dialog.showModal === 'function') dialog.showModal();
+    requestAnimationFrame(() => reasonInput.focus());
+  });
+}
+
+async function showUserReputation(userId, opts = {}) {
   state.page = 'reputation';
+  if (!opts.skipHash) setRouteHash('#reputation/' + encodeURIComponent(userId));
   updateActiveNav('reputation');
   $('page-title').textContent = names.reputation;
   $('page-description').textContent = descriptions.reputation;
-  const root = el('div', 'Đang tải hồ sơ uy tín…', 'muted');
+  const rev = ++state.revision;
+  const root = el('div');
+  renderSkeleton(root, 'reputation');
   $('content').replaceChildren(root);
-  await renderReputationPage(root, ++state.revision);
   try {
+    await renderReputationPage(root, rev);
+    if (rev !== state.revision) return;
     const dossier = await api('reputation/user/' + encodeURIComponent(userId));
+    if (rev !== state.revision) return;
     const area = root.querySelector('.rep-dossier-area');
     if (area) {
       renderDossierView(area, dossier);
       area.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   } catch (err) {
-    toast(err.message);
+    if (rev === state.revision) {
+      if (!root.querySelector('.rep-dossier-area')) {
+        root.replaceChildren();
+        empty(root, err.message);
+      }
+      toast(err.message);
+    }
+  } finally {
+    if (rev === state.revision) root.className = '';
   }
 }
 
@@ -1210,28 +2541,91 @@ $('login-form').onsubmit = async e => {
   $('login-error').textContent = '';
   try {
     const cleanUsername = $('username').value.trim().replace(/^@/, '').toLowerCase();
-    const d = await api('login', { username: cleanUsername, password: $('password').value });
+    const totpVal = ($('totp-code')?.value || '').trim();
+    const d = await api('login', { username: cleanUsername, password: $('password').value, ...(totpVal ? { totpCode: totpVal } : {}) });
     $('password').value = '';
+    if ($('totp-code')) $('totp-code').value = '';
+    if ($('totp-wrap')) $('totp-wrap').hidden = true;
     if ($('password').type === 'text') {
       $('password').type = 'password';
       if ($('toggle-password')) $('toggle-password').textContent = '👁️ Hiện';
     }
     signedIn(d.user);
   } catch (e) {
+    if (e.data?.requires2fa && $('totp-wrap')) {
+      $('totp-wrap').hidden = false;
+      $('totp-code')?.focus();
+    }
     $('login-error').textContent = e.message;
   } finally {
     if (b) b.disabled = false;
   }
 };
 
-$('logout').onclick = async () => { try { await api('logout', {}); signedOut(); } catch (e) { toast(e.message); } };
+$('logout').onclick = async () => {
+  try {
+    await api('logout', {});
+    try { history.replaceState(null, '', '#'); } catch {}
+    signedOut();
+  } catch (e) { toast(e.message); }
+};
 $('refresh').onclick = () => state.ticketId ? openTicket(state.ticketId) : load(state.page);
+if ($('btn-notify')) $('btn-notify').onclick = async () => {
+  try { await Notification.requestPermission(); } catch {}
+  syncNotifyButton();
+  toast(Notification.permission === 'granted' ? 'Đã bật thông báo phiếu mới.' : 'Trình duyệt đã chặn thông báo. Bật lại trong cài đặt trang.');
+};
 for (const b of $('navigation').querySelectorAll('button')) b.onclick = () => load(b.dataset.page);
+
+// Chat event bindings
+if ($('btn-toggle-chat')) {
+  $('btn-toggle-chat').onclick = () => {
+    if (chatState.isOpen) closeChatDrawer();
+    else openChatDrawer();
+  };
+}
+if ($('chat-drawer-close')) {
+  $('chat-drawer-close').onclick = closeChatDrawer;
+}
+if ($('chat-backdrop')) {
+  $('chat-backdrop').onclick = closeChatDrawer;
+}
+if ($('chat-channels-bar')) {
+  for (const b of $('chat-channels-bar').querySelectorAll('button')) {
+    b.onclick = () => {
+      const allowed = getAllowedChatTabs(state.user);
+      const ch = b.dataset.channel;
+      if (!allowed.has(ch)) return;
+      chatState.activeChannel = ch;
+      syncChatChannelTabs();
+      loadChatMessages(true);
+    };
+  }
+}
+if ($('chat-remove-ticket-ref')) {
+  $('chat-remove-ticket-ref').onclick = () => {
+    chatState.ticketRef = null;
+    if ($('chat-ticket-ref-bar')) $('chat-ticket-ref-bar').hidden = true;
+    loadChatMessages(true);
+  };
+}
+if ($('chat-send-form')) {
+  $('chat-send-form').onsubmit = sendChatMessage;
+}
+if ($('chat-input')) {
+  $('chat-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendChatMessage();
+    }
+  });
+}
 
 // Department visual detection
 const support = location.hostname === 'hotro.kinnect.io.vn', finance = location.hostname === 'taichinh.kinnect.io.vn', operations = location.hostname === 'kythuat.kinnect.io.vn';
 const portalKey = finance ? 'finance' : operations ? 'operations' : support ? 'support' : 'admin';
 document.body.setAttribute('data-portal', portalKey);
+if ($('portal-badge')) $('portal-badge').textContent = portalKey.toUpperCase();
 
 $('portal-label').textContent = finance ? 'CỔNG BỘ PHẬN TÀI CHÍNH' : operations ? 'CỔNG BỘ PHẬN KỸ THUẬT' : support ? 'CỔNG HỖ TRỢ & KIỂM DUYỆT' : 'CỔNG ADMIN CẤP CAO NHẤT';
 $('portal-note').textContent = finance || support || operations ? 'Đăng nhập bằng tài khoản nhân sự do Admin cấp.' : 'Đăng nhập bằng tài khoản Admin Kinnect.';
@@ -1246,10 +2640,6 @@ if ($('portal-art-desc')) {
 
 api('me').then(d => signedIn(d.user)).catch(() => {});
 
-const teamNames = { admin: 'Admin Cấp cao', support: 'Hỗ trợ & Kiểm duyệt', operations: 'Bộ phận Kỹ thuật', finance: 'Bộ phận Tài chính' },
-  statusNames = { open: 'Mới tiếp nhận', in_progress: 'Đang xử lý', waiting: 'Chờ phản hồi', resolved: 'Hoàn tất' },
-  priorityNames = { low: 'Thấp', normal: 'Bình thường', high: 'Cao', urgent: 'Khẩn cấp' };
-
 function selectOptions(options, value) {
   const s = el('select');
   for (const [k, v] of options) {
@@ -1261,9 +2651,22 @@ function selectOptions(options, value) {
 function field(form, title, input) { const l = el('label', title); l.append(input); form.append(l); return input; }
 function metricCards(root, items) {
   const row = el('div', undefined, 'metrics');
-  for (const [label, value] of items) {
-    const c = el('div', undefined, 'metric');
+  for (const item of items) {
+    const [label, value, onClick] = item;
+    const c = el('div', undefined, onClick ? 'metric clickable' : 'metric');
     c.append(el('span', label), el('b', value));
+    if (typeof onClick === 'function') {
+      c.setAttribute('role', 'button');
+      c.tabIndex = 0;
+      c.title = 'Bấm để mở trang chi tiết';
+      c.onclick = onClick;
+      c.onkeydown = e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      };
+    }
     row.append(c);
   }
   root.append(row);
@@ -1271,28 +2674,51 @@ function metricCards(root, items) {
 
 async function extraRender(page, root, rev) {
   if (page === 'tickets') {
-    const data = await api('tickets');
+    const f = state.ticketFilter || (state.ticketFilter = { q: '', status: 'all', priority: 'all' });
+    const pState = { page: 1, size: 25 };
+    const initialQuery = 'tickets?q=' + encodeURIComponent(f.q || '') + (f.status && f.status !== 'all' ? '&state=' + encodeURIComponent(f.status) : '');
+    const data = await api(initialQuery);
     if (rev !== state.revision) return;
+    if (data?.summary) {
+      state.ticketSummary = data.summary;
+      state.navCounts.tickets = (data.summary.open || 0) + (data.summary.in_progress || 0) + (data.summary.waiting || 0);
+      syncNavBadges();
+    }
     root.replaceChildren();
     metricCards(root, [
-      ['Tất cả phiếu', data.summary.total],
-      ['Mới tiếp nhận', data.summary.open],
-      ['Đang xử lý', data.summary.in_progress],
-      ['Hoàn tất', data.summary.resolved]
+      ['Tất cả phiếu', data.summary.total, () => { status.value = 'all'; f.status = 'all'; pState.page = 1; draw(); }],
+      ['Mới tiếp nhận', data.summary.open, () => { status.value = 'open'; f.status = 'open'; pState.page = 1; draw(); }],
+      ['Đang xử lý', data.summary.in_progress, () => { status.value = 'in_progress'; f.status = 'in_progress'; pState.page = 1; draw(); }],
+      ['Hoàn tất', data.summary.resolved, () => { status.value = 'resolved'; f.status = 'resolved'; pState.page = 1; draw(); }]
     ]);
 
     const top = el('div', undefined, 'section-bar');
     top.append(el('h3', '📋 Hàng chờ Phối hợp Liên Bộ phận'), button('+ Tiếp nhận & Điều phối yêu cầu', () => newTicket(root), 'primary'));
     root.append(top);
 
-    const form = el('form', undefined, 'toolbar'), search = el('input');
-    search.placeholder = 'Tìm tiêu đề, nội dung hoặc @khách_hàng…';
-    const status = selectOptions([['all', 'Tất cả trạng thái'], ...Object.entries(statusNames)]);
-    field(form, 'Tìm kiếm', search);
+    const form = el('form', undefined, 'toolbar');
+    const { wrap: searchWrap, input: search } = makeDebouncedSearch('Tìm tiêu đề, nội dung hoặc @khách_hàng…', f.q || '', val => {
+      f.q = val;
+      pState.page = 1;
+      draw();
+    });
+    const status = selectOptions([['all', 'Tất cả trạng thái'], ...Object.entries(statusNames)], f.status || 'all');
+    const prioritySel = selectOptions([['all', 'Mọi mức ưu tiên'], ...Object.entries(priorityNames)], f.priority || 'all');
+    const resetBtn = button('Đặt lại', () => {
+      f.q = '';
+      f.status = 'all';
+      f.priority = 'all';
+      search.value = '';
+      searchWrap.querySelector('.search-clear-btn').hidden = true;
+      status.value = 'all';
+      prioritySel.value = 'all';
+      pState.page = 1;
+      draw();
+    });
+    field(form, 'Tìm kiếm', searchWrap);
     field(form, 'Trạng thái', status);
-    const filterBtn = el('button', 'Lọc danh sách', 'primary');
-    filterBtn.type = 'submit';
-    form.append(filterBtn);
+    field(form, 'Mức ưu tiên', prioritySel);
+    form.append(resetBtn);
     root.append(form);
     const results = el('div');
     root.append(results);
@@ -1301,32 +2727,42 @@ async function extraRender(page, root, rev) {
     const draw = async (initial) => {
       const q = ++query;
       try {
-        const d = initial || await api('tickets?q=' + encodeURIComponent(search.value) + (status.value === 'all' ? '' : '&state=' + status.value));
+        const d = initial || await api('tickets?q=' + encodeURIComponent(f.q || '') + (f.status === 'all' ? '' : '&state=' + encodeURIComponent(f.status)));
         if (q !== query || rev !== state.revision) return;
-        results.replaceChildren(el('p', `Hiển thị ${d.tickets.length} / ${d.total} phiếu phối hợp`, 'count'));
-        table(results, ['Mã & Yêu cầu', 'Khách hàng', 'Ưu tiên', 'Bộ phận xử lý', 'Phụ trách', 'Trạng thái', 'Thao tác'], d.tickets.map(t => {
-          const titleCell = el('div');
-          titleCell.append(
-            button(t.subject, () => openTicket(t.id), 'link-button'),
-            el('small', '#' + t.id.slice(0, 8).toUpperCase() + ' · ' + date(t.updated))
-          );
-          const memberCell = t.member
-            ? button('@' + t.member.replace(/^@/, ''), () => openMember360Modal(t.member), 'link-button')
-            : '—';
-          return [
-            titleCell,
-            memberCell,
-            badge(priorityNames[t.priority], ['urgent', 'high'].includes(t.priority) ? 'warn' : ''),
-            teamNames[t.team] || t.team,
-            t.assigneeUsername ? '@' + t.assigneeUsername : 'Chưa gán',
-            badge(statusNames[t.status], t.status === 'resolved' ? 'good' : t.status === 'in_progress' ? 'info' : 'warn'),
-            button('Xử lý →', () => openTicket(t.id), 'primary')
-          ];
-        }));
+        const rawList = arr(d?.tickets);
+        const ticketList = (f.priority && f.priority !== 'all')
+          ? rawList.filter(t => t.priority === f.priority)
+          : rawList;
+        state.ticketQueueIds = ticketList.map(t => t.id);
+        state.ticketQueueMeta = new Map(ticketList.map(t => [t.id, t.status]));
+        results.replaceChildren(el('p', `Hiển thị ${ticketList.length} phiếu phối hợp` + (f.priority !== 'all' ? ` (đã lọc theo ưu tiên)` : ''), 'count'));
+        renderPaginated(results, ticketList, pState, (holder, slice) => {
+          table(holder, ['Mã & Yêu cầu', 'Khách hàng', 'Ưu tiên', 'Thời hạn SLA', 'Bộ phận xử lý', 'Phụ trách', 'Trạng thái', 'Thao tác'], slice.map(t => {
+            const titleCell = el('div');
+            titleCell.append(
+              button(t.subject, () => openTicket(t.id), 'link-button'),
+              el('small', '#' + t.id.slice(0, 8).toUpperCase() + ' · ' + date(t.updated))
+            );
+            const memberCell = t.member
+              ? button('@' + t.member.replace(/^@/, ''), () => openMember360Modal(t.member), 'link-button')
+              : '—';
+            return [
+              titleCell,
+              memberCell,
+              badge(priorityNames[t.priority], ['urgent', 'high'].includes(t.priority) ? 'warn' : ''),
+              renderSlaBadge(t),
+              teamNames[t.team] || t.team,
+              t.assigneeUsername ? '@' + t.assigneeUsername : 'Chưa gán',
+              badge(statusNames[t.status], t.status === 'resolved' ? 'good' : t.status === 'in_progress' ? 'info' : 'warn'),
+              button('Xử lý →', () => openTicket(t.id), 'primary')
+            ];
+          }));
+        }, [25, 50, 100]);
       } catch (e) { toast(e.message); }
     };
-    form.onsubmit = e => { e.preventDefault(); draw(); };
-    status.onchange = () => draw();
+    form.onsubmit = e => { e.preventDefault(); f.q = search.value; pState.page = 1; draw(); };
+    status.onchange = () => { f.status = status.value; pState.page = 1; draw(); };
+    prioritySel.onchange = () => { f.priority = prioritySel.value; pState.page = 1; draw(); };
     await draw(data);
     return;
   }
@@ -1339,43 +2775,81 @@ async function extraRender(page, root, rev) {
       ['Bút toán ghi sổ', Number(d.totals.entries).toLocaleString('vi-VN')],
       ['Giá trị ghi sổ (VND)', Number(d.totals.net_vnd).toLocaleString('vi-VN')],
       ['Doanh thu nền tảng (VND)', Number(d.totals.platform_vnd || 0).toLocaleString('vi-VN')],
-      ['Đề nghị ví chờ duyệt', Number(d.pendingWalletOps || 0).toLocaleString('vi-VN')]
+      ['Đề nghị ví chờ duyệt', Number(d.pendingWalletOps || 0).toLocaleString('vi-VN'), () => load('wallet')]
     ]);
     root.append(el('p', 'Sổ cái đối soát tập trung. Mọi yêu cầu cộng/bù xu mua cho thành viên đều được lập qua công cụ Ví & Xu và cần Admin phê duyệt ghi sổ.', 'information'));
 
+    const finState = { q: '', kind: 'all', window: 'all', page: 1, size: 25 };
+    let currentFiltered = [];
+
     const topActions = el('div', undefined, 'actions');
-    topActions.style.marginBottom = '16px';
+    topActions.style.marginBottom = '12px';
     topActions.append(
       button('🪙 Mở công cụ Tặng xu & Bù giao dịch', () => load('wallet'), 'primary'),
-      button('📋 Tạo phiếu đối soát trình Admin', () => newTicket(root, 'admin'), '')
+      button('📋 Tạo phiếu đối soát trình Admin', () => newTicket(root, 'admin'), ''),
+      button('📥 Xuất CSV Đối soát (Excel)', () => exportFinanceCsv(currentFiltered))
     );
     root.append(topActions);
 
-    const toolbar = el('form', undefined, 'toolbar'), search = el('input');
-    search.placeholder = 'Tên tài khoản (@username) hoặc mã tham chiếu giao dịch...';
+    const toolbar = el('form', undefined, 'toolbar');
+    const { wrap: searchWrap, input: search } = makeDebouncedSearch('Tên tài khoản (@username) hoặc mã tham chiếu…', '', val => {
+      finState.q = val;
+      finState.page = 1;
+      draw();
+    });
     const kindSelect = selectOptions([
       ['all', 'Tất cả bút toán'],
       ['coin_purchase', 'Nạp xu mua (coin_purchase)'],
       ['gift_transfer', 'Tặng quà Live / Bài viết'],
       ['admin_trial', 'Xu tặng / Khuyến mại']
     ], 'all');
-    field(toolbar, 'Tra cứu giao dịch', search);
+    field(toolbar, 'Tra cứu giao dịch', searchWrap);
     field(toolbar, 'Loại bút toán', kindSelect);
-    const searchBtn = el('button', 'Tra cứu', 'primary');
-    searchBtn.type = 'submit';
-    toolbar.append(searchBtn);
     root.append(toolbar);
-    const results = el('div');
-    root.append(results);
 
-    let query = 0;
-    const draw = async (initial) => {
-      const q = ++query;
-      try {
-        const data = initial || await api('finance?q=' + encodeURIComponent(search.value) + '&kind=' + encodeURIComponent(kindSelect.value));
-        if (q !== query || rev !== state.revision) return;
-        results.replaceChildren();
-        table(results, ['Thời gian', 'Tài khoản', 'Loại', 'Xu', 'VND', 'Tham chiếu', 'Thao tác đối soát'], data.entries.map(e => {
+    const timeChips = el('div', undefined, 'filter-chips-bar');
+    const summaryBar = el('div', undefined, 'finance-filter-summary');
+    const results = el('div');
+    root.append(timeChips, summaryBar, results);
+
+    function drawTimeChips() {
+      timeChips.replaceChildren();
+      for (const [k, labelText] of [
+        ['all', 'Tất cả thời gian'],
+        ['today', 'Hôm nay'],
+        ['7d', '7 ngày qua'],
+        ['30d', '30 ngày qua']
+      ]) {
+        timeChips.append(button(labelText, () => {
+          finState.window = k;
+          finState.page = 1;
+          paintFiltered(lastFetchedEntries);
+        }, 'filter-chip' + (finState.window === k ? ' is-active' : '')));
+      }
+    }
+
+    let lastFetchedEntries = arr(d?.entries);
+
+    function paintFiltered(entries) {
+      lastFetchedEntries = entries;
+      drawTimeChips();
+      const now = Date.now();
+      const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+      const minTs = finState.window === 'today' ? startOfToday.getTime()
+        : finState.window === '7d' ? now - 7 * 86400000
+        : finState.window === '30d' ? now - 30 * 86400000
+        : 0;
+      currentFiltered = minTs ? entries.filter(e => Number(e.created || 0) >= minTs) : entries;
+      const sumCoins = currentFiltered.reduce((acc, e) => acc + Number(e.coins || 0), 0);
+      const sumVnd = currentFiltered.reduce((acc, e) => acc + Number(e.net_vnd || 0), 0);
+      summaryBar.replaceChildren(
+        el('b', `${currentFiltered.length} bút toán đang hiển thị`),
+        el('span', `Tổng xu: ${sumCoins.toLocaleString('vi-VN')} xu`),
+        el('span', `Tổng VND: ${sumVnd.toLocaleString('vi-VN')} đ`)
+      );
+      results.replaceChildren();
+      renderPaginated(results, currentFiltered, finState, (holder, slice) => {
+        table(holder, ['Thời gian', 'Tài khoản', 'Loại', 'Xu', 'VND', 'Tham chiếu', 'Thao tác đối soát'], slice.map(e => {
           const act = el('div', undefined, 'actions');
           if (e.username) {
             act.append(
@@ -1402,10 +2876,20 @@ async function extraRender(page, root, rev) {
             act
           ];
         }));
+      }, [25, 50, 100]);
+    }
+
+    let query = 0;
+    const draw = async (initial) => {
+      const q = ++query;
+      try {
+        const data = initial || await api('finance?q=' + encodeURIComponent(finState.q.trim()) + '&kind=' + encodeURIComponent(finState.kind));
+        if (q !== query || rev !== state.revision) return;
+        paintFiltered(arr(data?.entries));
       } catch (e) { toast(e.message); }
     };
-    toolbar.onsubmit = e => { e.preventDefault(); draw(); };
-    kindSelect.onchange = () => draw();
+    toolbar.onsubmit = e => { e.preventDefault(); finState.q = search.value; finState.page = 1; draw(); };
+    kindSelect.onchange = () => { finState.kind = kindSelect.value; finState.page = 1; draw(); };
     await draw(d);
     return;
   }
@@ -1419,149 +2903,558 @@ async function extraRender(page, root, rev) {
 }
 
 // ----------------------------------------------------
-// BỘ PHẬN KỸ THUẬT & HẠ TẦNG (SRE & DEVOPS CONSOLE)
+// BỘ PHẬN KỸ THUẬT & HẠ TẦNG (SRE & DEVOPS CONSOLE — 3 TABS)
 // ----------------------------------------------------
 async function renderOperationsPage(root, rev) {
   const d = await api('operations');
   if (rev !== state.revision) return;
   root.replaceChildren();
 
-  const banner = el('div', undefined, 'ops-banner' + (d.maintenanceMode ? ' maintenance' : ''));
-  const bLeft = el('div');
-  bLeft.append(
-    el('p', 'KINNECT SRE & OPERATIONS COMMAND CENTER', 'eyebrow'),
-    el('h2', d.maintenanceMode ? '⚠️ HỆ THỐNG ĐANG Ở CHẾ ĐỘ BẢO TRÌ' : '🟢 HỆ THỐNG HOẠT ĐỘNG BÌNH THƯỜNG (OPERATIONAL)'),
-    el('p', `Máy chủ: ${d.platform} · Cổng dịch vụ: 4 Ingress Hosts (Admin, Hỗ trợ, Kỹ thuật, Tài chính) · Bộ nhớ heap: ${d.memoryDetail?.heapUsed || 0} MB`, 'muted')
-  );
-  const bRight = el('div', undefined, 'header-tools');
-  bRight.append(
-    badge(d.maintenanceMode ? 'ĐANG BẢO TRÌ' : 'HOẠT ĐỘNG 100%', d.maintenanceMode ? 'warn' : 'good')
-  );
-  banner.append(bLeft, bRight);
-  root.append(banner);
+  let activeTab = ['live', 'controls', 'logs'].includes(state.opsTab) ? state.opsTab : 'live';
 
+  const compactBar = el('div', undefined, 'ops-compact-bar' + (d.maintenanceMode ? ' is-maintenance' : ''));
+  const metaLeft = el('div', undefined, 'ops-compact-meta');
+  const svcLine = d.cloudHosting
+    ? `Nền tảng: ${d.platform} · Máy chủ PC: ${d.infrastructure?.pc?.status || 'chưa rõ'}`
+    : `Node PID ${d.services?.server?.pid || '—'} · Tunnel: ${d.services?.tunnel?.status || '—'}${d.services?.tunnel?.pid ? ' (#' + d.services.tunnel.pid + ')' : ''} · SFU: ${d.services?.sfu?.status || '—'} · Watchdog: ${d.services?.watchdog?.status || 'stopped'}${d.services?.watchdog?.pid ? ' (#' + d.services.watchdog.pid + ')' : ''}`;
+  metaLeft.append(
+    el('p', 'KINNECT SRE & OPERATIONS', 'eyebrow'),
+    el('h2', d.maintenanceMode ? '⚠️ HỆ THỐNG ĐANG Ở CHẾ ĐỘ BẢO TRÌ' : '🟢 Hạ tầng & API đang hoạt động'),
+    el('p', svcLine, 'muted')
+  );
+  const metaRight = el('div', undefined, 'ops-compact-actions');
+  metaRight.append(
+    badge(d.maintenanceMode ? 'ĐANG BẢO TRÌ' : 'API PHẢN HỒI', d.maintenanceMode ? 'warn' : 'good'),
+    button(d.maintenanceMode ? '🟢 Tắt Bảo trì' : '⚠️ Bật Bảo trì', async () => {
+      const res = await api('operations/action', { action: 'toggle-maintenance' });
+      toast(res.message);
+      load('operations', { skipHash: true });
+    }, d.maintenanceMode ? 'success-btn ops-btn' : 'warn-btn ops-btn')
+  );
+  compactBar.append(metaLeft, metaRight);
+  root.append(compactBar);
+
+  const tabBar = el('div', undefined, 'v2-subtabs');
+  tabBar.setAttribute('role', 'tablist');
+  tabBar.setAttribute('aria-label', 'Chế độ xem trung tâm kỹ thuật');
+
+  const panelLive = el('div', undefined, 'v2-tabpanel');
+  const panelControls = el('div', undefined, 'v2-tabpanel');
+  const panelLogs = el('div', undefined, 'v2-tabpanel');
+  panelLive.id = 'ops-panel-live'; panelLive.setAttribute('role', 'tabpanel');
+  panelControls.id = 'ops-panel-controls'; panelControls.setAttribute('role', 'tabpanel');
+  panelLogs.id = 'ops-panel-logs'; panelLogs.setAttribute('role', 'tabpanel');
+
+  const tabDefs = [
+    { key: 'live', label: '📡 Giám sát Cụm Máy chủ (Live 5s)', panel: panelLive },
+    { key: 'controls', label: '⚙️ Điều khiển, CSDL & Sao lưu', panel: panelControls },
+    { key: 'logs', label: '📜 Nhật ký & Hàng chờ AI', panel: panelLogs }
+  ];
+  const tabBtns = new Map();
+
+  let drawLogsFn = null;
+  function selectTab(nextTab, syncUrl = true) {
+    activeTab = tabDefs.some(t => t.key === nextTab) ? nextTab : 'live';
+    state.opsTab = activeTab;
+    for (const def of tabDefs) {
+      const b = tabBtns.get(def.key);
+      const isOn = def.key === activeTab;
+      if (b) {
+        b.classList.toggle('is-active', isOn);
+        b.setAttribute('aria-selected', isOn ? 'true' : 'false');
+      }
+      def.panel.hidden = !isOn;
+    }
+    if (syncUrl && state.page === 'operations') {
+      setRouteHash(activeTab === 'live' ? '#operations' : '#operations/' + activeTab);
+    }
+    if (activeTab === 'live' && typeof window.__opsMonitorAttach === 'function') {
+      window.__opsMonitorAttach();
+    }
+    if (activeTab === 'logs' && typeof drawLogsFn === 'function') {
+      drawLogsFn();
+    }
+  }
+
+  for (const def of tabDefs) {
+    const b = button(def.label, () => selectTab(def.key, true), 'v2-subtab-btn');
+    b.setAttribute('role', 'tab');
+    b.setAttribute('aria-controls', def.panel.id);
+    b.dataset.opsTab = def.key;
+    tabBtns.set(def.key, b);
+    tabBar.append(b);
+  }
+  root.append(tabBar, panelLive, panelControls, panelLogs);
+
+  // Tab 1: Live Server Monitor + Kiến trúc Hạ tầng
+  const liveMount = el('div');
+  liveMount.id = 'ops-live-mount';
+  panelLive.append(liveMount);
+  if (d.infrastructure) {
+    const infra = d.infrastructure, card = el('section', undefined, 'card');
+    card.append(el('h3', d.cloudHosting ? 'Cloud quản trị & hạ tầng app' : 'Máy chủ chính, cloud dự phòng & nguồn dữ liệu'));
+    const gateway = infra.cloud.services?.find(s => s.service === 'kinnect-allocation' || s.origin?.includes('kinnect-allocation'));
+    const cloudApi = infra.cloud.services?.find(s => s.origin?.includes('kinnect-cloud-api'));
+    const status = value => value === 'reachable' ? 'Đã phản hồi' : value === 'unreachable' ? 'Chưa kết nối được' : value === 'unhealthy' ? 'Chưa đạt kiểm tra' : 'Chưa kiểm tra';
+    table(card, ['Thành phần', 'Vai trò thực tế', 'Trạng thái'], [
+      d.cloudHosting ? ['Cloud quản trị', 'Đang phục vụ độc lập bốn cổng quản trị', 'API đang phản hồi'] : ['Máy chủ PC', 'Đang phục vụ bốn cổng quản trị', 'API đang phản hồi'],
+      ['Cloud gateway', 'Tuyến dự phòng cho các API app đã triển khai', status(gateway?.status)],
+      ['Cloud API + PostgreSQL', 'Nguồn mặc định cho tài khoản và sổ cái ví', status(cloudApi?.status)],
+      d.cloudHosting ? ['Nhân sự, phiếu và nhật ký', 'Lưu bền vững trên cloud', 'Độc lập máy PC'] : ['Nhân sự và phiếu quản trị', 'Hiện lưu trên máy chủ PC', 'Chưa chuyển lên cloud']
+    ]);
+    panelLive.append(card);
+  }
+
+  // Tab 2: Điều khiển, CSDL & Sao lưu
   const hours = Math.floor(d.uptime / 3600);
   const mins = Math.floor((d.uptime % 3600) / 60);
-  metricCards(root, [
+  const diskLabel = d.disk ? `${d.disk.freeGb} GB trống / ${d.disk.totalGb} GB (${d.disk.usedPct}%)` : '—';
+  const savedMb = d.media ? (Number(d.media.bytesSaved || 0) / 1048576).toFixed(1) : '0.0';
+  const opsCards = [
     ['Uptime Máy chủ', `${hours}h ${mins}m`],
-    ['Bộ nhớ RAM (RSS)', `${d.memoryMb} MB`],
+    ['Bộ nhớ RAM (RSS)', d.cloudHosting ? 'Serverless — không đo RSS' : `${d.memoryMb} MB`],
     ['Cơ sở dữ liệu', `${d.database?.sizeMb || 0} MB (${d.database?.tables || 0} bảng)`],
     ['Hàng chờ AI', `${d.ai?.queue || 0} việc (${d.ai?.failed || 0} lỗi)`]
-  ]);
+  ];
+  if (!d.cloudHosting || d.disk) opsCards.splice(3, 0, ['Ổ đĩa dữ liệu', diskLabel]);
+  if (!d.cloudHosting || d.media) opsCards.splice(4, 0, ['Nén Media FFmpeg', d.media?.ffmpegAvailable ? `${d.media.videosCompressed || 0} video · ${d.media.imagesCompressed || 0} ảnh (-${savedMb} MB)` : 'Chưa bật']);
+  metricCards(panelControls, opsCards);
 
   const controlsGrid = el('div', undefined, 'ops-controls-grid');
 
   const p1 = el('div', undefined, 'ops-panel');
   p1.append(
     el('h3', '⚡ Điều khiển Cụm Dịch vụ & Server'),
-    el('p', `Tiến trình: Node.js (PID: ${d.services?.server?.pid || '3000'}) · Port: 3000 · SFU: Port 7885`, 'muted')
+    el('p', d.cloudHosting
+      ? 'Cổng quản trị chạy trên cloud. Các lệnh bên dưới gửi đến máy chủ app PC qua kênh xác thực.'
+      : `Heap đang dùng: ${d.memoryDetail?.heapUsed || 0} MB · Phiên bản Node: ${d.platform}`, 'muted')
   );
   const btnGroup1 = el('div', undefined, 'ops-btn-group');
   btnGroup1.append(
-    button(d.maintenanceMode ? '🟢 Tắt Bảo trì (Mở App)' : '⚠️ Bật Chế độ Bảo trì', async () => {
-      const res = await api('operations/action', { action: 'toggle-maintenance' });
-      toast(res.message);
-      load('operations');
-    }, d.maintenanceMode ? 'success-btn ops-btn' : 'warn-btn ops-btn'),
     button('🔄 Khởi động lại Server', async () => {
       if (!await confirmAction('Khởi động lại dịch vụ máy chủ?', 'Các kết nối sẽ tự động kết nối lại sau vài giây.')) return;
       const res = await api('operations/action', { action: 'restart-server' });
       toast(res.message);
-      setTimeout(() => load('operations'), 2000);
+      if (!res.scheduled) return;
+      for (let attempt = 0; attempt < 40; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        try {
+          const response = await fetch(res.healthPath?.startsWith('/api/console/health') ? res.healthPath : '/api/console/health', { cache: 'no-store', signal: AbortSignal.timeout(1500) });
+          const health = await response.json();
+          if (response.ok && health.ok && health.instanceId && health.instanceId !== res.instanceId) {
+            if (res.preserveSession) {
+              toast('Đã xác nhận máy chủ app mới hoạt động; phiên quản trị cloud được giữ nguyên.');
+              load('operations', { skipHash: true });
+            } else {
+              signedOut();
+              toast('Đã xác nhận máy chủ mới hoạt động. Vui lòng đăng nhập lại.');
+            }
+            return;
+          }
+        } catch {}
+      }
+      toast('Chưa xác nhận được máy chủ mới. Kiểm tra trạng thái dịch vụ trước khi thử lại.');
     }, 'ops-btn'),
     button('🧹 Dọn dẹp RAM & Cache', async () => {
       const res = await api('operations/action', { action: 'purge-cache' });
       toast(res.message);
-      load('operations');
+      load('operations', { skipHash: true });
     }, 'ops-btn')
   );
   p1.append(btnGroup1);
 
   const p2 = el('div', undefined, 'ops-panel');
   p2.append(
-    el('h3', '🗄️ Quản trị & Tối ưu Cơ sở dữ liệu'),
+    el('h3', '🗄️ Quản trị & Sao lưu Cơ sở dữ liệu'),
     el('p', `SQLite Engine · ${d.database?.tables || 0} Bảng · ${d.database?.users || 0} Thành viên · ${d.database?.violations || 0} Vi phạm ghi nhận`, 'muted')
   );
   const btnGroup2 = el('div', undefined, 'ops-btn-group');
   btnGroup2.append(
-    button('⚡ Tối ưu CSDL (Vacuum & Optimize)', async () => {
+    button('⚡ Tối ưu CSDL (Vacuum)', async () => {
       const res = await api('operations/action', { action: 'optimize-db' });
       toast(res.message);
-      load('operations');
+      load('operations', { skipHash: true });
     }, 'ops-btn'),
-    button('🔍 Kiểm tra Toàn vẹn (Integrity Check)', async () => {
+    button('🔍 Kiểm tra Toàn vẹn', async () => {
       const res = await api('operations/action', { action: 'check-integrity' });
       toast(res.message);
+    }, 'ops-btn'),
+    button('💾 Sao lưu DB ngay (VACUUM INTO)', async () => {
+      const res = await api('operations/action', { action: 'create-backup' });
+      toast(res.message);
+      load('operations', { skipHash: true });
+    }, 'success-btn ops-btn'),
+    button('🧹 Cắt gọn Logs (>2MB)', async () => {
+      const res = await api('operations/action', { action: 'rotate-logs' });
+      toast(res.message);
+      load('operations', { skipHash: true });
     }, 'ops-btn')
   );
+  if (d.backups?.length) {
+    const latest = d.backups[0];
+    p2.append(el('p', `Bản sao lưu gần nhất: ${latest.name} (${latest.sizeMb} MB · ${date(latest.updated)}) · Tổng ${d.backups.length} bản gần đây.`, 'muted'));
+  }
   p2.append(btnGroup2);
 
   const p3 = el('div', undefined, 'ops-panel');
   p3.append(
-    el('h3', '🤖 Điều khiển Động cơ Trí tuệ Nhân tạo (AI)'),
-    el('p', `Kiểm duyệt tự động: ${d.ai?.moderation ? 'BẬT' : 'TẮT'} · Trợ lý AI Hỗ trợ: ${d.ai?.support ? 'BẬT' : 'TẮT'} · Trạng thái: ${d.ai?.ready ? 'Sẵn sàng' : 'Chưa cấu hình'}`, 'muted')
+    el('h3', '🤖 Điều khiển Động cơ AI'),
+    el('p', `Kiểm duyệt tự động: ${d.ai?.moderation ? 'BẬT' : 'TẮT'} · Trợ lý AI: ${d.ai?.support ? 'BẬT' : 'TẮT'} · Trạng thái: ${d.ai?.ready ? 'Sẵn sàng' : 'Chưa cấu hình'}`, 'muted')
   );
   const btnGroup3 = el('div', undefined, 'ops-btn-group');
   btnGroup3.append(
     button(d.ai?.moderation ? 'Tắt Kiểm duyệt AI' : 'Bật Kiểm duyệt AI', async () => {
       const res = await api('operations/action', { action: 'toggle-ai-moderation' });
       toast(res.message);
-      load('operations');
+      load('operations', { skipHash: true });
     }, d.ai?.moderation ? 'warn-btn ops-btn' : 'success-btn ops-btn'),
     button(d.ai?.support ? 'Tắt Trợ lý AI' : 'Bật Trợ lý AI', async () => {
       const res = await api('operations/action', { action: 'toggle-ai-support' });
       toast(res.message);
-      load('operations');
+      load('operations', { skipHash: true });
     }, d.ai?.support ? 'warn-btn ops-btn' : 'success-btn ops-btn'),
-    button('⚠️ Xả hàng chờ AI bị tắc', async () => {
+    button('⚠️ Xả hàng chờ AI', async () => {
       const res = await api('operations/action', { action: 'flush-ai-queue' });
       toast(res.message);
-      load('operations');
+      load('operations', { skipHash: true });
     }, 'ops-btn')
   );
+  if (state.user.role !== 'admin') for (const control of [...btnGroup3.children].slice(0, 2)) { control.disabled = true; control.title = 'Chỉ Admin thay đổi chính sách AI hỗ trợ và kiểm duyệt.'; }
   p3.append(btnGroup3);
 
   controlsGrid.append(p1, p2, p3);
-  root.append(controlsGrid);
+  panelControls.append(controlsGrid);
 
+  // Tab 3: Nhật ký có lọc + Tác vụ AI
   const logsPanel = el('div', undefined, 'card');
   const lHeader = el('div', undefined, 'section-bar');
   lHeader.append(
-    el('h3', '📜 Nhật ký Hệ thống Thời gian thực (Live System Logs)'),
+    el('h3', '📜 Nhật ký Hệ thống Thời gian thực'),
     button('Làm mới Logs ↻', () => drawLogs(), 'link-button')
   );
+  const logFilterState = { kind: 'all', q: '' };
+  let cachedLogs = [];
+
+  const logFilterBar = el('div', undefined, 'log-filter-bar');
+  const logChips = el('div', undefined, 'filter-chips-bar');
+  const { wrap: logSearchWrap } = makeDebouncedSearch('Lọc nội dung nhật ký…', '', val => {
+    logFilterState.q = val.trim().toLowerCase();
+    paintLogs();
+  }, 200);
+  logFilterBar.append(logChips, logSearchWrap);
+
   const terminal = el('div', undefined, 'ops-terminal-wrap');
   terminal.textContent = 'Đang tải nhật ký...';
-  logsPanel.append(lHeader, terminal);
-  root.append(logsPanel);
+  logsPanel.append(lHeader, logFilterBar, terminal);
+  panelLogs.append(logsPanel);
+
+  function paintLogs() {
+    logChips.replaceChildren();
+    for (const [k, labelText] of [
+      ['all', 'Tất cả'],
+      ['error', '⚠️ Chỉ Lỗi'],
+      ['server', 'SERVER'],
+      ['tunnel', 'TUNNEL']
+    ]) {
+      logChips.append(button(labelText, () => {
+        logFilterState.kind = k;
+        paintLogs();
+      }, 'filter-chip' + (logFilterState.kind === k ? ' is-active' : '')));
+    }
+    const filtered = cachedLogs.filter(item => {
+      if (logFilterState.kind === 'error' && item.level !== 'error' && !/error|fail|exception/i.test(item.msg || '')) return false;
+      if (['server', 'tunnel'].includes(logFilterState.kind) && item.service !== logFilterState.kind) return false;
+      if (logFilterState.q && !(String(item.msg || '').toLowerCase().includes(logFilterState.q) || String(item.service || '').toLowerCase().includes(logFilterState.q))) return false;
+      return true;
+    });
+    terminal.replaceChildren();
+    if (!filtered.length) {
+      terminal.textContent = cachedLogs.length ? 'Không có dòng nhật ký nào khớp bộ lọc.' : 'Chưa có dữ liệu nhật ký mới.';
+      return;
+    }
+    for (const item of filtered) {
+      const line = el('div', undefined, 'ops-log-line');
+      const svc = String(item.service || 'log');
+      const tag = el('span', `[${svc.toUpperCase()}]`, 'ops-log-tag ' + svc + (item.level === 'error' ? ' error' : ''));
+      const time = el('span', new Date(item.time).toLocaleTimeString('vi-VN'), 'muted');
+      const msg = el('span', item.msg);
+      line.append(tag, time, msg);
+      terminal.append(line);
+    }
+    terminal.scrollTop = terminal.scrollHeight;
+  }
 
   async function drawLogs() {
     try {
       const res = await api('operations/logs');
-      terminal.replaceChildren();
-      if (!res.logs || !res.logs.length) {
-        terminal.textContent = 'Chưa có dữ liệu nhật ký mới.';
-        return;
-      }
-      for (const item of res.logs) {
-        const line = el('div', undefined, 'ops-log-line');
-        const tag = el('span', `[${item.service.toUpperCase()}]`, 'ops-log-tag ' + item.service + (item.level === 'error' ? ' error' : ''));
-        const time = el('span', new Date(item.time).toLocaleTimeString('vi-VN'), 'muted');
-        const msg = el('span', item.msg);
-        line.append(tag, time, msg);
-        terminal.append(line);
-      }
-      terminal.scrollTop = terminal.scrollHeight;
+      cachedLogs = arr(res?.logs);
+      paintLogs();
     } catch (e) {
       terminal.textContent = 'Không tải được nhật ký: ' + e.message;
     }
   }
-  drawLogs();
+  drawLogsFn = drawLogs;
 
   const jobsCard = el('div', undefined, 'card');
   jobsCard.append(el('h3', '📋 Tác vụ AI Gần nhất (AI Jobs Pipeline)'));
-  table(jobsCard, ['Thời gian', 'Loại tác vụ', 'Trạng thái', 'Số lần thử'], d.jobs.map(j => [date(j.created), j.kind, j.state, j.attempts]));
-  root.append(jobsCard);
+  const jobsPageState = { page: 1, size: 15 };
+  renderPaginated(jobsCard, arr(d?.jobs), jobsPageState, (holder, slice) => {
+    table(holder, ['Thời gian', 'Loại tác vụ', 'Trạng thái', 'Số lần thử'], slice.map(j => [date(j.created), j.kind, j.state, j.attempts]));
+  }, [15, 30, 50]);
+  panelLogs.append(jobsCard);
+
+  selectTab(activeTab, false);
+}
+
+// ----------------------------------------------------
+// TRUNG TÂM GIÁM SÁT BẢO MẬT AI (CHỈ ADMIN CẤP CAO)
+// ----------------------------------------------------
+async function renderSecurityPage(root, rev) {
+  const [ov, alertsRes, mitRes] = await Promise.all([
+    api('security'),
+    api('security/alerts?limit=50'),
+    api('security/mitigations?limit=50')
+  ]);
+  if (rev !== state.revision) return;
+  root.replaceChildren();
+
+  const cfg = ov.config || {};
+  const prov = ov.provider || {};
+  const metrics = ov.metrics || {};
+  const alerts = arr(alertsRes?.alerts || ov.alerts);
+  const mitigations = arr(mitRes?.mitigations || ov.activeMitigations);
+
+  state.navCounts.security = Number(metrics.openAlerts || 0);
+  syncNavBadges();
+
+  const banner = el('div', undefined, 'ops-banner' + (metrics.openAlerts > 0 ? ' maintenance' : ''));
+  const bLeft = el('div');
+  bLeft.append(
+    el('p', 'KINNECT AI SECURITY MONITOR', 'eyebrow'),
+    el('h2', cfg.autoResponseEnabled ? '🛡️ Giám sát & Tự động Phòng vệ BẬT' : '👁️ Chế độ Giám sát & Cảnh báo (An toàn)'),
+    el('p', `AI Phân tích: ${prov.configuredProvider || 'auto'} · DeepSeek: ${prov.deepseekConfigured ? 'Sẵn sàng' : 'Chưa'} · NVIDIA: ${prov.nvidiaConfigured ? 'Sẵn sàng' : 'Chưa'} · Cloudflare: ${prov.cloudflareConfigured ? 'Sẵn sàng' : 'Chưa'} · Dự phòng cục bộ: Sẵn sàng`, 'muted')
+  );
+  const bRight = el('div', undefined, 'header-tools');
+  bRight.append(badge(cfg.enabled === false ? 'Đang tắt' : 'Đang giám sát', cfg.enabled === false ? 'warn' : 'good'));
+  banner.append(bLeft, bRight);
+  root.append(banner);
+
+  metricCards(root, [
+    ['Cảnh báo đang mở', Number(metrics.openAlerts || 0).toLocaleString('vi-VN')],
+    ['Mức Cao / Nguy cấp', Number(metrics.criticalOrHighAlerts || 0).toLocaleString('vi-VN')],
+    ['Đang phong tỏa / Siết tải', Number(metrics.activeMitigations || 0).toLocaleString('vi-VN')],
+    ['Sự kiện an ninh (24h)', Number(metrics.eventsLast24h || 0).toLocaleString('vi-VN')]
+  ]);
+
+  const ctrlGrid = el('div', undefined, 'ops-controls-grid');
+
+  const cfgCard = el('div', undefined, 'ops-panel');
+  cfgCard.append(
+    el('h3', '⚙️ Chính sách Phòng vệ Tự động'),
+    el('p', 'Mặc định hệ thống chỉ ghi nhận sự kiện và cảnh báo cho Admin; chỉ tự động giới hạn IP khi bạn bật Tự động phòng vệ và bằng chứng vượt ngưỡng định lượng.', 'muted')
+  );
+  const cfgBtns = el('div', undefined, 'ops-btn-group');
+  cfgBtns.append(
+    button(cfg.autoResponseEnabled ? '⏸ Tắt Tự động chặn (Chỉ cảnh báo)' : '🛡️ Bật Tự động phòng vệ', async () => {
+      const next = !cfg.autoResponseEnabled;
+      if (!await confirmAction(next ? 'Bật tự động phòng vệ?' : 'Chuyển về chế độ chỉ cảnh báo?', next ? 'Hệ thống được phép tự áp dụng giới hạn IP có thời hạn TTL khi bằng chứng định lượng vượt ngưỡng.' : 'Hệ thống ngừng tự chặn IP và chỉ gửi cảnh báo cho Admin xem xét.')) return;
+      await api('security/config', { autoResponseEnabled: next });
+      toast(next ? 'Đã bật chế độ Tự động phòng vệ AI.' : 'Đã chuyển về chế độ Chỉ giám sát & cảnh báo.');
+      load('security', { skipHash: true });
+    }, cfg.autoResponseEnabled ? 'warn-btn ops-btn' : 'success-btn ops-btn'),
+    button(cfg.enabled === false ? '▶ Bật lại Cảm biến' : '⏹ Tạm dừng Cảm biến', async () => {
+      const next = cfg.enabled === false;
+      if (!await confirmAction(next ? 'Bật cảm biến an ninh?' : 'Tạm dừng cảm biến an ninh?', 'Thay đổi này được ghi nhận vào nhật ký kiểm toán.')) return;
+      await api('security/config', { enabled: next });
+      toast(next ? 'Đã bật Cảm biến giám sát an ninh.' : 'Đã tạm dừng Cảm biến giám sát an ninh.');
+      load('security', { skipHash: true });
+    }, 'ops-btn')
+  );
+  cfgCard.append(cfgBtns);
+
+  const simCard = el('div', undefined, 'ops-panel');
+  simCard.append(
+    el('h3', '🧪 Diễn tập Kịch bản Bảo mật'),
+    el('p', 'Tạo sự kiện mô phỏng trên dải IP thử nghiệm (203.0.113.77) để kiểm tra luồng phân tích AI, làm sạch dữ liệu nhạy cảm và sinh cảnh báo.', 'muted')
+  );
+  const simBtns = el('div', undefined, 'ops-btn-group');
+  for (const [scenario, labelText] of [
+    ['brute_force', '🧪 Diễn tập Brute-force'],
+    ['data_exfiltration', '🧪 Diễn tập Rò rỉ dữ liệu'],
+    ['privilege_escalation', '🧪 Diễn tập Vượt quyền']
+  ]) {
+    simBtns.append(button(labelText, async () => {
+      if (!await confirmAction('Chạy kịch bản diễn tập bảo mật?', `Tạo dữ liệu kiểm thử "${scenario}" với IP 203.0.113.77 (không ảnh hưởng người dùng thật).`)) return;
+      const res = await api('security/simulate', { scenario, ip: '203.0.113.77' });
+      toast(`Diễn tập xong (${res.scenario}): đã ghi nhận ${res.alertsCreated ?? 0} cảnh báo mới.`);
+      refreshNavCounts();
+      load('security', { skipHash: true });
+    }, 'ops-btn'));
+  }
+  simCard.append(simBtns);
+
+  ctrlGrid.append(cfgCard, simCard);
+  root.append(ctrlGrid);
+
+  const manualCard = el('form', undefined, 'card');
+  manualCard.append(
+    el('h3', '🚧 Áp dụng Giới hạn / Phong tỏa Thủ công (Có thời hạn TTL)'),
+    el('p', 'Áp dụng biện pháp hẹp cho 1 IP hoặc tài khoản cụ thể; có thể hoàn tác bất cứ lúc nào ở bảng bên dưới.', 'muted')
+  );
+  const manualGrid = el('div', undefined, 'form-grid');
+  const mAction = selectOptions([
+    ['rate_limit_ip', 'Siết tần suất (rate_limit_ip)'],
+    ['temp_block_ip', 'Chặn tạm IP (temp_block_ip)'],
+    ['throttle_export', 'Hạn chế truy xuất hàng loạt (throttle_export)']
+  ], 'rate_limit_ip');
+  const mTargetType = selectOptions([['ip', 'Địa chỉ IP'], ['user', 'Tài khoản'], ['route', 'Tuyến API']], 'ip');
+  const mTarget = el('input');
+  mTarget.required = true;
+  mTarget.maxLength = 120;
+  mTarget.placeholder = 'Ví dụ: 203.0.113.77';
+  const mTtl = el('input');
+  mTtl.type = 'number';
+  mTtl.min = '60';
+  mTtl.max = '86400';
+  mTtl.value = '900';
+  const mReason = el('input');
+  mReason.required = true;
+  mReason.maxLength = 260;
+  mReason.placeholder = 'Lý do áp dụng (vd: Phát hiện dò mật khẩu bất thường)...';
+  field(manualGrid, 'Biện pháp', mAction);
+  field(manualGrid, 'Loại đối tượng', mTargetType);
+  field(manualGrid, 'Giá trị mục tiêu', mTarget);
+  field(manualGrid, 'Thời hạn (giây)', mTtl);
+  manualCard.append(manualGrid);
+  field(manualCard, 'Lý do áp dụng', mReason);
+  const mSubmit = el('button', '🛡️ Áp dụng biện pháp tạm thời', 'primary');
+  mSubmit.type = 'submit';
+  manualCard.append(mSubmit);
+  manualCard.onsubmit = async e => {
+    e.preventDefault();
+    const val = mTarget.value.trim();
+    if (!val) { toast('Vui lòng nhập giá trị mục tiêu.'); return; }
+    if (!await confirmAction('Áp dụng giới hạn bảo mật?', `${mAction.value} -> ${mTargetType.value}: ${val} (${mTtl.value}s)`)) return;
+    mSubmit.disabled = true;
+    try {
+      await api('security/mitigations', {
+        action: mAction.value,
+        targetType: mTargetType.value,
+        targetValue: val,
+        ttlSeconds: Number(mTtl.value || 900),
+        reason: mReason.value.trim()
+      });
+      toast('Đã áp dụng biện pháp bảo mật thành công.');
+      load('security', { skipHash: true });
+    } catch (err) { toast(err.message); } finally { mSubmit.disabled = false; }
+  };
+  root.append(manualCard);
+
+  const sevLabels = { low: 'Thấp', medium: 'Trung bình', high: 'Cao', critical: 'Nguy cấp' };
+  const alertStatusLabels = { open: 'Đang mở', acknowledged: 'Đã ghi nhận', resolved: 'Đã xử lý', false_positive: 'Báo nhầm' };
+
+  const secFilter = { status: metrics.openAlerts > 0 ? 'open' : 'all', q: '', page: 1, size: 15 };
+  const alertsCard = el('section', undefined, 'card');
+  alertsCard.append(el('h3', `🚨 Cảnh báo Bảo mật Gần nhất (${alerts.length})`));
+  const secFilterBar = el('div', undefined, 'log-filter-bar');
+  const secChips = el('div', undefined, 'filter-chips-bar');
+  const { wrap: secSearchWrap } = makeDebouncedSearch('Lọc IP, tài khoản, loại cảnh báo…', '', val => {
+    secFilter.q = val.trim().toLowerCase();
+    secFilter.page = 1;
+    drawAlerts();
+  }, 220);
+  secFilterBar.append(secChips, secSearchWrap);
+  const alertsListArea = el('div');
+  alertsCard.append(secFilterBar, alertsListArea);
+
+  function drawAlerts() {
+    secChips.replaceChildren();
+    for (const [k, labelText] of [
+      ['open', `Đang mở (${alerts.filter(a => a.status === 'open' || a.status === 'acknowledged').length})`],
+      ['done', 'Đã xử lý / Báo nhầm'],
+      ['all', `Tất cả (${alerts.length})`]
+    ]) {
+      secChips.append(button(labelText, () => {
+        secFilter.status = k;
+        secFilter.page = 1;
+        drawAlerts();
+      }, 'filter-chip' + (secFilter.status === k ? ' is-active' : '')));
+    }
+    const filtered = alerts.filter(a => {
+      if (secFilter.status === 'open' && !['open', 'acknowledged'].includes(a.status)) return false;
+      if (secFilter.status === 'done' && ['open', 'acknowledged'].includes(a.status)) return false;
+      if (secFilter.q) {
+        const hay = [a.threatType, a.subjectIp, a.subjectActor, a.summary].filter(Boolean).join(' ').toLowerCase();
+        if (!hay.includes(secFilter.q)) return false;
+      }
+      return true;
+    });
+    alertsListArea.replaceChildren();
+    renderPaginated(alertsListArea, filtered, secFilter, (holder, slice) => {
+      table(holder, ['Thời gian', 'Mức độ', 'Loại & Nguồn', 'Tóm tắt phân tích AI', 'Trạng thái', 'Thao tác'], slice.map(a => {
+        const typeBox = el('div');
+        typeBox.append(el('b', a.threatType || 'anomaly'), el('small', `${a.subjectIp || '—'}${a.subjectActor ? ' · @' + a.subjectActor : ''}`));
+        const sumBox = el('div', a.summary || '', 'cell-content');
+        if (Array.isArray(a.evidence) && a.evidence.length) {
+          sumBox.append(el('small', 'Bằng chứng: ' + a.evidence.slice(0, 2).join(' | ')));
+        }
+        const acts = el('div', undefined, 'actions');
+        if (a.status === 'open' || a.status === 'acknowledged') {
+          acts.append(
+            button('✔ Đã xử lý', async () => {
+              await api('security/alerts', { id: a.id, status: 'resolved' });
+              toast('Đã đánh dấu cảnh báo đã xử lý.');
+              refreshNavCounts();
+              load('security', { skipHash: true });
+            }, 'primary'),
+            button('Báo nhầm', async () => {
+              await api('security/alerts', { id: a.id, status: 'false_positive' });
+              toast('Đã đánh dấu báo nhầm.');
+              refreshNavCounts();
+              load('security', { skipHash: true });
+            })
+          );
+        }
+        return [
+          date(a.created),
+          badge(sevLabels[a.severity] || a.severity, ['high', 'critical'].includes(a.severity) ? 'danger' : a.severity === 'medium' ? 'warn' : ''),
+          typeBox,
+          sumBox,
+          badge(alertStatusLabels[a.status] || a.status, a.status === 'resolved' ? 'good' : a.status === 'open' ? 'warn' : ''),
+          acts.childNodes.length ? acts : '—'
+        ];
+      }));
+    }, [15, 30, 50]);
+  }
+  drawAlerts();
+  root.append(alertsCard);
+
+  const mitCard = el('section', undefined, 'card');
+  mitCard.append(el('h3', `🛡️ Lịch sử Phong tỏa & Giới hạn (${mitigations.length})`));
+  const mitPageState = { page: 1, size: 15 };
+  renderPaginated(mitCard, mitigations, mitPageState, (holder, slice) => {
+    table(holder, ['Biện pháp', 'Mục tiêu', 'Lý do & Bằng chứng', 'Trạng thái', 'Hết hạn', 'Thao tác'], slice.map(m => {
+      const infoBox = el('div', m.reason || '—', 'cell-content');
+      if (m.evidenceSummary) infoBox.append(el('small', m.evidenceSummary));
+      const acts = m.active
+        ? button('🔓 Gỡ chặn', async () => {
+            if (!await confirmAction('Hoàn tác biện pháp bảo mật?', `Gỡ ${m.action} khỏi ${m.targetType}: ${m.targetValue}`)) return;
+            await api('security/mitigations', { action: 'revert', id: m.id, reason: 'Hoàn tác bởi Admin' });
+            toast('Đã gỡ bỏ giới hạn thành công.');
+            load('security', { skipHash: true });
+          }, 'danger')
+        : el('small', m.revertedBy ? `Gỡ bởi ${m.revertedBy}` : 'Hết hiệu lực');
+      return [
+        badge(m.action),
+        `${m.targetType}: ${m.targetValue}`,
+        infoBox,
+        badge(m.active ? 'Đang hiệu lực' : 'Đã gỡ / hết hạn', m.active ? 'danger' : 'good'),
+        date(m.expires),
+        acts
+      ];
+    }));
+  }, [15, 30, 50]);
+  root.append(mitCard);
 }
 
 // ----------------------------------------------------
@@ -1570,10 +3463,14 @@ async function renderOperationsPage(root, rev) {
 async function renderContentPage(root, rev) {
   root.replaceChildren();
 
+  const cState = { q: '', filter: 'all', page: 1, size: 18 };
   const toolbar = el('form', undefined, 'content-toolbar');
-  const searchInput = el('input');
-  searchInput.placeholder = 'Tìm nội dung bài đăng, tác giả (@username)...';
-  field(toolbar, 'Tìm kiếm bài đăng', searchInput);
+  const { wrap: searchWrap, input: searchInput } = makeDebouncedSearch('Tìm nội dung bài đăng, tác giả (@username)…', '', val => {
+    cState.q = val.trim();
+    cState.page = 1;
+    fetchAndRender();
+  });
+  field(toolbar, 'Tìm kiếm bài đăng', searchWrap);
 
   const filterSelect = selectOptions([
     ['all', 'Tất cả bài viết'],
@@ -1582,10 +3479,6 @@ async function renderContentPage(root, rev) {
     ['hidden', 'Đã bị ẩn']
   ], 'all');
   field(toolbar, 'Bộ lọc trạng thái & đính kèm', filterSelect);
-
-  const searchBtn = el('button', 'Tìm kiếm', 'primary');
-  searchBtn.type = 'submit';
-  toolbar.append(searchBtn);
   root.append(toolbar);
 
   const container = el('div');
@@ -1593,86 +3486,88 @@ async function renderContentPage(root, rev) {
 
   const fetchAndRender = async () => {
     container.replaceChildren(el('p', 'Đang tải danh sách bài viết và ảnh đính kèm…', 'muted'));
-    const q = searchInput.value.trim();
+    const q = cState.q;
     const filter = filterSelect.value;
     try {
       const d = await api('content?q=' + encodeURIComponent(q) + '&filter=' + encodeURIComponent(filter));
       if (rev !== state.revision) return;
       container.replaceChildren();
+      const postList = arr(d?.posts);
 
-      if (!d.posts || !d.posts.length) {
+      if (!postList.length) {
         empty(container, 'Không có bài đăng nào phù hợp.');
         return;
       }
 
-      container.append(el('p', `Hiển thị ${d.posts.length} bài đăng gần nhất:`, 'count'));
+      container.append(el('p', `Tìm thấy ${postList.length} bài đăng gần nhất:`, 'count'));
 
-      const grid = el('div', undefined, 'posts-grid');
-      for (const p of d.posts) {
-        const card = el('div', undefined, 'post-item-card');
+      renderPaginated(container, postList, cState, (holder, slice) => {
+        const grid = el('div', undefined, 'posts-grid');
+        for (const p of slice) {
+          const card = el('div', undefined, 'post-item-card');
 
-        const header = el('div', undefined, 'post-header-meta');
-        const authorBox = el('div', undefined, 'post-author-info');
-        authorBox.append(
-          el('b', p.name || p.username),
-          el('small', '@' + p.username + ' · ' + date(p.created))
-        );
+          const header = el('div', undefined, 'post-header-meta');
+          const authorBox = el('div', undefined, 'post-author-info');
+          authorBox.append(
+            el('b', p.name || p.username),
+            el('small', '@' + p.username + ' · ' + date(p.created))
+          );
 
-        const badgesBox = el('div', undefined, 'post-badges');
-        badgesBox.append(
-          badge(p.hidden ? 'Đã ẩn' : 'Đang hiện', p.hidden ? 'warn' : 'good'),
-          badge(p.visibility === 'public' ? 'Công khai' : p.visibility === 'private' ? 'Riêng tư' : 'Bạn bè', 'info')
-        );
-        if (p.has_media) {
-          badgesBox.append(badge(p.media_type?.startsWith('video/') ? '🎬 Video' : '🖼️ Có ảnh', 'good'));
-        }
-        header.append(authorBox, badgesBox);
-        card.append(header);
-
-        if (p.body) {
-          card.append(el('div', p.body, 'post-body-text'));
-        }
-
-        if (p.has_media && p.media_url) {
-          const mediaBox = el('div', undefined, 'post-media-box');
-          if (p.media_type?.startsWith('video/')) {
-            const vid = el('video', undefined, 'post-video-thumb');
-            vid.src = p.media_url;
-            vid.controls = true;
-            vid.preload = 'metadata';
-            mediaBox.append(vid);
-          } else {
-            const img = el('img', undefined, 'post-media-thumb');
-            img.src = p.media_url;
-            img.alt = 'Ảnh bài đăng';
-            img.loading = 'lazy';
-            img.title = 'Bấm để xem ảnh lớn chi tiết';
-            img.onclick = () => openPostDetailModal(p);
-            mediaBox.append(img);
+          const badgesBox = el('div', undefined, 'post-badges');
+          badgesBox.append(
+            badge(p.hidden ? 'Đã ẩn' : 'Đang hiện', p.hidden ? 'warn' : 'good'),
+            badge(p.visibility === 'public' ? 'Công khai' : p.visibility === 'private' ? 'Riêng tư' : 'Bạn bè', 'info')
+          );
+          if (p.has_media) {
+            badgesBox.append(badge(p.media_type?.startsWith('video/') ? '🎬 Video' : '🖼️ Có ảnh', 'good'));
           }
-          card.append(mediaBox);
+          header.append(authorBox, badgesBox);
+          card.append(header);
+
+          if (p.body) {
+            card.append(el('div', p.body, 'post-body-text'));
+          }
+
+          if (p.has_media && p.media_url) {
+            const mediaBox = el('div', undefined, 'post-media-box');
+            if (p.media_type?.startsWith('video/')) {
+              const vid = el('video', undefined, 'post-video-thumb');
+              vid.src = p.media_url;
+              vid.controls = true;
+              vid.preload = 'metadata';
+              mediaBox.append(vid);
+            } else {
+              const img = el('img', undefined, 'post-media-thumb');
+              img.src = p.media_url;
+              img.alt = 'Ảnh bài đăng';
+              img.loading = 'lazy';
+              img.title = 'Bấm để xem ảnh lớn chi tiết';
+              img.onclick = () => openPostDetailModal(p);
+              mediaBox.append(img);
+            }
+            card.append(mediaBox);
+          }
+
+          const footer = el('div', undefined, 'post-footer-actions');
+          const viewBtn = button('👁️ Xem chi tiết', () => openPostDetailModal(p));
+          const toggleBtn = button(
+            p.hidden ? 'Hiện bài' : 'Ẩn bài',
+            async () => {
+              await mutate('moderate', { action: p.hidden ? 'show-post' : 'hide-post', target: p.id }, 'Thay đổi hiển thị bài viết?', 'Thao tác sẽ được ghi vào nhật ký.');
+            },
+            p.hidden ? '' : 'danger'
+          );
+          const dossierBtn = button('🔍 Hồ sơ 360°', () => openMember360Modal(p.username));
+
+          const actionGroup = el('div', undefined, 'actions');
+          actionGroup.append(viewBtn, toggleBtn, dossierBtn);
+          footer.append(actionGroup);
+          card.append(footer);
+
+          grid.append(card);
         }
-
-        const footer = el('div', undefined, 'post-footer-actions');
-        const viewBtn = button('👁️ Xem chi tiết', () => openPostDetailModal(p));
-        const toggleBtn = button(
-          p.hidden ? 'Hiện bài' : 'Ẩn bài',
-          async () => {
-            await mutate('moderate', { action: p.hidden ? 'show-post' : 'hide-post', target: p.id }, 'Thay đổi hiển thị bài viết?', 'Thao tác sẽ được ghi vào nhật ký.');
-            fetchAndRender();
-          },
-          p.hidden ? '' : 'danger'
-        );
-        const dossierBtn = button('🔍 Hồ sơ 360°', () => openMember360Modal(p.username));
-
-        const actionGroup = el('div', undefined, 'actions');
-        actionGroup.append(viewBtn, toggleBtn, dossierBtn);
-        footer.append(actionGroup);
-        card.append(footer);
-
-        grid.append(card);
-      }
-      container.append(grid);
+        holder.append(grid);
+      }, [18, 36, 72]);
     } catch (err) {
       container.replaceChildren(el('p', err.message, 'error'));
     }
@@ -1680,9 +3575,11 @@ async function renderContentPage(root, rev) {
 
   toolbar.onsubmit = e => {
     e.preventDefault();
+    cState.q = searchInput.value.trim();
+    cState.page = 1;
     fetchAndRender();
   };
-  filterSelect.onchange = () => fetchAndRender();
+  filterSelect.onchange = () => { cState.page = 1; fetchAndRender(); };
   await fetchAndRender();
 }
 
@@ -1719,6 +3616,7 @@ function openPostDetailModal(p) {
       const a = el('a');
       a.href = p.media_url;
       a.target = '_blank';
+      a.rel = 'noopener noreferrer';
       a.title = 'Mở ảnh kích thước đầy đủ trong tab mới';
       const img = el('img', undefined, 'modal-full-img');
       img.src = p.media_url;
@@ -1732,9 +3630,8 @@ function openPostDetailModal(p) {
   const hideBtn = button(
     p.hidden ? 'Hiện bài' : 'Ẩn bài viết',
     async () => {
-      await mutate('moderate', { action: p.hidden ? 'show-post' : 'hide-post', target: p.id }, 'Thay đổi hiển thị bài viết?', 'Thao tác sẽ được ghi sổ.');
-      modal.close();
-      load(state.page);
+      const ok = await mutate('moderate', { action: p.hidden ? 'show-post' : 'hide-post', target: p.id }, 'Thay đổi hiển thị bài viết?', 'Thao tác sẽ được ghi sổ.');
+      if (ok) modal.close();
     },
     p.hidden ? '' : 'danger'
   );
@@ -1755,8 +3652,10 @@ function openPostDetailModal(p) {
 // TIẾP NHẬN PHIẾU MỚI & PHÂN TÍCH ĐIỀU PHỐI BẰNG AI
 // ----------------------------------------------------
 function newTicket(root, defaultTeam, prefill = {}) {
-  const existing = root.querySelector('.ticket-create');
-  if (existing) existing.remove();
+  const scope = $('content') || root;
+  if (scope) {
+    for (const existing of scope.querySelectorAll('.ticket-create')) existing.remove();
+  }
 
   const form = el('form', undefined, 'card ticket-create');
   form.append(
@@ -1809,10 +3708,15 @@ function newTicket(root, defaultTeam, prefill = {}) {
       description: description.value,
       member: member.value
     });
-    team.value = res.recommendedTeam || team.value;
-    priority.value = res.recommendedPriority || priority.value;
+    const recTeam = res.recommendedTeam || res.team || team.value;
+    const recPriority = res.recommendedPriority || res.priority || priority.value;
+    team.value = recTeam;
+    priority.value = recPriority;
     aiInsightBox.hidden = false;
-    aiInsightBox.textContent = `🤖 AI Gợi ý: Chuyển [${teamNames[res.recommendedTeam] || res.recommendedTeam}] · Ưu tiên [${priorityNames[res.recommendedPriority] || res.recommendedPriority}] · SLA mục tiêu: ${res.slaTargetMinutes || 60} phút. (${res.summary || ''})`;
+    const teamDisplay = teamNames[recTeam] || recTeam;
+    const priorityDisplay = priorityNames[recPriority] || recPriority;
+    const sla = res.slaTargetMinutes || (recPriority === 'urgent' ? 15 : recPriority === 'high' ? 60 : recPriority === 'low' ? 240 : 120);
+    aiInsightBox.textContent = `🤖 AI Gợi ý: Chuyển [${teamDisplay}] · Ưu tiên [${priorityDisplay}] · SLA mục tiêu: ${sla} phút. (${res.summary || ''})`;
   });
   actions.append(submit, aiBtn, button('Hủy', () => form.remove()));
   form.append(actions);
@@ -1839,32 +3743,66 @@ function newTicket(root, defaultTeam, prefill = {}) {
 // ----------------------------------------------------
 // MÀN HÌNH XỬ LÝ PHIẾU TOÀN DIỆN (TICKET WORKBENCH)
 // ----------------------------------------------------
-async function openTicket(id) {
+async function openTicket(id, opts = {}) {
   state.page = 'tickets';
   state.ticketId = id;
+  if (!opts.skipHash) setRouteHash('#tickets/' + id);
   closeMobileNav();
   const rev = ++state.revision;
   updateActiveNav('tickets');
   $('page-title').textContent = 'Xử lý Phiếu Phối hợp';
-  $('page-description').textContent = 'Thao tác xử lý 1 chạm, đối soát 360° khách hàng và bàn giao liên bộ phận nhịp nhàng.';
-  const root = el('div', 'Đang tải chi tiết phiếu…', 'muted');
+  $('page-description').textContent = 'Thao tác xử lý 1 chạm, đối soát 360° khách hàng và xử lý phiếu liên hoàn theo SLA.';
+  const root = el('div');
+  renderSkeleton(root, 'tickets');
   $('content').replaceChildren(root);
 
   try {
-    const [d, teamRes] = await Promise.all([
+    const needQueue = !state.ticketQueueIds?.length || !state.ticketQueueIds.includes(id);
+    const [d, teamRes, qRes] = await Promise.all([
       api('tickets/' + encodeURIComponent(id)),
-      state.user.role === 'admin' ? api('team').catch(() => ({ staff: [] })) : Promise.resolve({ staff: [] })
+      state.user.role === 'admin' ? api('team').catch(() => ({ staff: [] })) : Promise.resolve({ staff: [] }),
+      needQueue ? api('tickets').catch(() => null) : Promise.resolve(null)
     ]);
     if (rev !== state.revision) return;
+    if (qRes?.tickets) {
+      state.ticketQueueIds = arr(qRes.tickets).map(x => x.id);
+      state.ticketQueueMeta = new Map(arr(qRes.tickets).map(x => [x.id, x.status]));
+    }
     const t = d.ticket;
+    if (t && t.id) {
+      ticketTracker.known.set(t.id, { status: t.status, updated: t.updated });
+      if (state.ticketQueueMeta) state.ticketQueueMeta.set(t.id, t.status);
+      saveTicketSeenState();
+    }
     root.className = '';
     root.replaceChildren();
 
+    const queueIds = arr(state.ticketQueueIds);
+    const curIdx = queueIds.indexOf(t.id);
+    const prevId = curIdx > 0 ? queueIds[curIdx - 1] : null;
+    const nextId = curIdx >= 0 && curIdx < queueIds.length - 1 ? queueIds[curIdx + 1] : null;
+    const nextOpenId = queueIds.find((qid, idx) => idx > Math.max(-1, curIdx) && (state.ticketQueueMeta?.get(qid) !== 'resolved'))
+      || queueIds.find(qid => qid !== t.id && (state.ticketQueueMeta?.get(qid) !== 'resolved'))
+      || null;
+
     const topNav = el('div', undefined, 'ticket-top-bar');
-    topNav.append(
-      button('← Về hàng chờ phiếu', () => load('tickets')),
-      el('span', `Mã phiếu: #${t.id.slice(0, 8).toUpperCase()} · Phiên bản #${t.version}`, 'muted')
-    );
+    topNav.append(button('← Về hàng chờ phiếu', () => load('tickets')));
+    const navGroup = el('div', undefined, 'ticket-nav-group');
+    if (queueIds.length > 1 && curIdx >= 0) {
+      const prevBtn = button('← Trước', () => prevId && openTicket(prevId));
+      prevBtn.disabled = !prevId;
+      const nextBtn = button('Tiếp →', () => nextId && openTicket(nextId));
+      nextBtn.disabled = !nextId;
+      navGroup.append(prevBtn, el('span', `Phiếu ${curIdx + 1} / ${queueIds.length}`, 'muted'), nextBtn);
+    } else {
+      navGroup.append(el('span', `Mã phiếu: #${t.id.slice(0, 8).toUpperCase()} · v${t.version}`, 'muted'));
+    }
+    navGroup.append(button('🔗 Sao chép link', async () => {
+      const url = location.origin + location.pathname + '#tickets/' + t.id;
+      try { await navigator.clipboard.writeText(url); toast('Đã sao chép liên kết phiếu #' + t.id.slice(0, 8).toUpperCase()); }
+      catch { toast(url); }
+    }));
+    topNav.append(navGroup);
     root.append(topNav);
 
     // 1. Thanh Thao Tác Nhanh 1 Chạm (1-Click Quick Status & Resolution Bar)
@@ -1877,19 +3815,27 @@ async function openTicket(id) {
     quickInfo.lastChild.append(
       badge('Trạng thái: ' + statusNames[t.status], t.status === 'resolved' ? 'good' : t.status === 'in_progress' ? 'info' : 'warn'),
       badge('Bộ phận: ' + (teamNames[t.team] || t.team)),
-      badge('Ưu tiên: ' + (priorityNames[t.priority] || t.priority), ['urgent', 'high'].includes(t.priority) ? 'warn' : '')
+      badge('Ưu tiên: ' + (priorityNames[t.priority] || t.priority), ['urgent', 'high'].includes(t.priority) ? 'warn' : ''),
+      renderSlaBadge(t)
     );
     const quickBtns = el('div', undefined, 'actions');
 
-    const quickProcess = async (newStatus, defaultMsg) => {
+    const quickProcess = async (newStatus, defaultMsg, nextTicketId = null) => {
       const res = await api('tickets/' + t.id + '/events', {
         action: 'process',
         status: newStatus,
         message: defaultMsg,
         version: t.version
       });
-      toast('Đã chuyển trạng thái phiếu sang: ' + statusNames[res.ticket.status]);
-      await openTicket(id);
+      if (state.ticketQueueMeta) state.ticketQueueMeta.set(t.id, res.ticket.status);
+      refreshNavCounts();
+      if (nextTicketId) {
+        toast('Đã hoàn tất phiếu & chuyển sang phiếu kế tiếp!');
+        await openTicket(nextTicketId);
+      } else {
+        toast('Đã chuyển trạng thái phiếu sang: ' + statusNames[res.ticket.status]);
+        await openTicket(id, { skipHash: true });
+      }
     };
 
     if (t.status !== 'resolved') {
@@ -1899,10 +3845,14 @@ async function openTicket(id) {
       if (t.status !== 'waiting') {
         quickBtns.append(button('⏳ Chờ phản hồi / đối soát', () => quickProcess('waiting', 'Đang chờ thông tin phản hồi hoặc kết quả kiểm tra liên bộ phận.')));
       }
-      quickBtns.append(button('✔ Xử lý xong & Hoàn tất phiếu', () => quickProcess('resolved', 'Đã giải quyết hoàn tất yêu cầu trên phiếu phối hợp.'), 'success-btn ops-btn'));
+      quickBtns.append(button('✔ Hoàn tất phiếu', () => quickProcess('resolved', 'Đã giải quyết hoàn tất yêu cầu trên phiếu phối hợp.'), 'success-btn ops-btn'));
+      if (nextOpenId && nextOpenId !== t.id) {
+        quickBtns.append(button('⚡ Hoàn tất & Sang phiếu tiếp →', () => quickProcess('resolved', 'Đã giải quyết hoàn tất yêu cầu trên phiếu phối hợp.', nextOpenId), 'primary'));
+      }
     } else if (state.user.role === 'admin') {
       quickBtns.append(button('↺ Mở lại phiếu để xử lý tiếp', () => quickProcess('open', 'Admin mở lại phiếu để tiếp tục xử lý.'), 'warn-btn ops-btn'));
     }
+    quickBtns.append(button('💬 Trao đổi liên bộ phận về phiếu', () => openChatDrawer('all', t.id), 'ops-btn'));
     quickBar.append(quickInfo, quickBtns);
     root.append(quickBar);
 
@@ -1911,13 +3861,49 @@ async function openTicket(id) {
       right = el('div'),
       card = el('article', undefined, 'card');
 
+    const evList = arr(d?.events);
     card.append(
       el('p', 'NỘI DUNG YÊU CẦU #' + t.id.slice(0, 8).toUpperCase(), 'eyebrow'),
       el('h2', t.subject),
       el('p', t.description, 'report-text'),
-      el('small', 'Khởi tạo bởi ' + (d.events[0]?.actor_name || t.created_by) + ' · ' + date(t.created))
+      el('small', 'Khởi tạo bởi ' + (evList[0]?.actor_name || t.created_by) + ' · ' + date(t.created))
     );
     left.append(card);
+
+    // 1.5 AI Copilot Assistant Card
+    const aiCard = el('div', undefined, 'card ai-copilot-card');
+    aiCard.innerHTML = '<p class="eyebrow">🤖 AI TRỢ LÝ PHÂN TÍCH THÔNG MINH</p><p class="muted">Đang phân tích yêu cầu bằng AI...</p>';
+    left.append(aiCard);
+
+    api('ai/analyze', {
+      subject: t.subject,
+      description: t.description,
+      member: t.member,
+      team: t.team,
+      priority: t.priority
+    }).then(aiRes => {
+      if (rev !== state.revision) return;
+      const a = aiRes?.analysis;
+      if (!a) return;
+      aiCard.replaceChildren();
+      const aiHead = el('p', '🤖 AI TRỢ LÝ PHÂN TÍCH THÔNG MINH', 'eyebrow');
+      const aiSummary = el('p', '💡 ' + a.summary);
+      const aiSug = el('p', '👉 Gợi ý hành động: ' + a.actionSuggestion, 'muted');
+      const aiActions = el('div', undefined, 'actions');
+      if (a.autoResponse) {
+        aiActions.append(button('⚡ Điền phản hồi gợi ý của AI', () => {
+          const msgInput = document.querySelector('.ticket-process-form textarea') || document.querySelector('main textarea');
+          if (msgInput) {
+            msgInput.value = a.autoResponse;
+            msgInput.focus();
+          }
+          toast('Đã nạp nội dung phản hồi của AI vào khung xử lý!');
+        }, 'primary'));
+      }
+      aiCard.append(aiHead, aiSummary, aiSug, aiActions);
+    }).catch(() => {
+      aiCard.hidden = true;
+    });
 
     // 2. Trung tâm Thao tác Trực tiếp Khách hàng ngay trong Phiếu (In-Ticket Customer 360° Action Center)
     const memberCard = el('div', undefined, 'card customer-action-card');
@@ -1942,22 +3928,26 @@ async function openTicket(id) {
 
         const mActions = el('div', undefined, 'actions');
         mActions.style.marginTop = '14px';
+        const canModerate = state.user.role === 'admin' || state.user.team === 'support';
         mActions.append(
-          button('🔍 Mở Hồ sơ 360°', () => openMember360Modal(u.username), 'primary'),
-          button('⭐ Cộng / Trừ điểm uy tín', async () => {
-            const act = confirm('Bấm OK để KHÔI PHỤC (+ điểm) hoặc Cancel để TRỪ điểm vi phạm của @' + u.username) ? 'restore' : 'deduct';
-            const adjusted = await openAdjustDialog(u.id, u.username, act);
-            if (adjusted) {
-              await api('tickets/' + t.id + '/events', {
-                action: 'process',
-                status: 'in_progress',
-                message: `Đã điều chỉnh điểm uy tín (${act === 'restore' ? 'Khôi phục' : 'Trừ điểm'}) cho @${u.username}. Điểm hiện tại: ${adjusted.dossier?.reputation?.score ?? 100}/100.`,
-                version: t.version
-              }).catch(() => {});
-              await openTicket(id);
-            }
-          })
+          button('🔍 Mở Hồ sơ 360°', () => openMember360Modal(u.username), 'primary')
         );
+        if (canModerate) {
+          mActions.append(
+            button('⭐ Cộng / Trừ điểm uy tín', async () => {
+              const adjusted = await openAdjustDialog(u.id, u.username, rep.score < 100 ? 'restore' : 'deduct', rep.score);
+              if (adjusted) {
+                await api('tickets/' + t.id + '/events', {
+                  action: 'process',
+                  status: 'in_progress',
+                  message: `Đã điều chỉnh điểm uy tín (${adjusted.action === 'restore' ? 'Khôi phục +' : 'Trừ -'}${adjusted.points}đ) cho @${u.username}: ${adjusted.reason}. Điểm hiện tại: ${adjusted.dossier?.reputation?.score ?? 100}/100.`,
+                  version: t.version
+                }).catch(() => {});
+                await openTicket(id, { skipHash: true });
+              }
+            })
+          );
+        }
         if (state.user.role === 'admin' || state.user.team === 'finance') {
           mActions.append(button('🪙 Tặng / Bù xu ngay', () => {
             window.__WALLET_PREFILL = {
@@ -1970,7 +3960,7 @@ async function openTicket(id) {
             load('wallet');
           }));
         }
-        if (u.role === 'user') {
+        if (u.role === 'user' && canModerate) {
           mActions.append(
             button(u.suspended ? '🟢 Mở khóa tài khoản' : '🚫 Đình chỉ tài khoản', async () => {
               if (!await confirmAction(u.suspended ? 'Mở khóa tài khoản?' : 'Đình chỉ tài khoản?', '@' + u.username)) return;
@@ -1997,8 +3987,8 @@ async function openTicket(id) {
 
     // 3. Lịch sử phối hợp
     const history = el('div', undefined, 'card timeline');
-    history.append(el('h3', '📜 Lịch sử Phối hợp Liên Bộ phận'), el('p', `Hiển thị ${d.events.length} / ${d.eventTotal || d.events.length} cập nhật`, 'count'));
-    for (const event of d.events) {
+    history.append(el('h3', '📜 Lịch sử Phối hợp Liên Bộ phận'), el('p', `Hiển thị ${evList.length} / ${d?.eventTotal || evList.length} cập nhật`, 'count'));
+    for (const event of evList) {
       const item = el('div', undefined, 'timeline-item');
       item.append(
         el('b', event.actor_name || event.actor),
@@ -2195,7 +4185,23 @@ const actionNames = {
   'wallet-reject': 'Từ chối đề nghị điều chỉnh ví',
   'reputation-restore': 'Khôi phục điểm uy tín',
   'reputation-deduct': 'Trừ điểm uy tín vi phạm',
-  'ai-dispatch-ticket': 'AI điều phối phiếu tự động'
+  'ai-dispatch-ticket': 'AI điều phối phiếu tự động',
+  'update-security-config': 'Cập nhật cấu hình bảo mật AI',
+  'security-alert:resolved': 'Xử lý cảnh báo bảo mật',
+  'security-alert:acknowledged': 'Xác nhận cảnh báo bảo mật',
+  'security-alert:false_positive': 'Đánh dấu cảnh báo nhầm',
+  'revert-security-mitigation': 'Gỡ phong tỏa bảo mật',
+  'apply-security-mitigation': 'Áp dụng phong tỏa bảo mật',
+  'simulate-security-scenario': 'Diễn tập kịch bản bảo mật',
+  'toggle-maintenance': 'Bật/Tắt chế độ bảo trì',
+  'optimize-db': 'Tối ưu hóa SQLite',
+  'check-integrity': 'Kiểm tra toàn vẹn CSDL',
+  'create-backup': 'Sao lưu CSDL khẩn cấp',
+  'rotate-logs': 'Cắt gọn tệp nhật ký',
+  'flush-ai-queue': 'Xả hàng chờ AI',
+  'toggle-ai-moderation': 'Bật/Tắt kiểm duyệt AI',
+  'toggle-ai-support': 'Bật/Tắt trợ lý AI',
+  'restart-server': 'Khởi động lại máy chủ'
 };
 
 const iconPaths = {
@@ -2207,6 +4213,7 @@ const iconPaths = {
   resets: ['M3 11a9 9 0 1 1 3 8', 'M3 4v7h7', 'M12 7v5l3 2'],
   wallet: ['M3 6h18v14H3z', 'M3 6l14-4v4', 'M16 12h5v4h-5z'],
   finance: ['M3 6h18v14H3z', 'M3 6l14-4v4', 'M16 12h5v4h-5z'],
+  security: ['M12 3l8 4v5c0 5-4 8-8 10-4-2-8-5-8-10V7z', 'M12 8v4', 'M12 16h.01'],
   operations: ['M3 4h18v6H3z', 'M3 14h18v6H3z', 'M7 7h.01M7 17h.01'],
   content: ['M4 3h16v18H4z', 'M8 7h8M8 11h8M8 15h5'],
   team: ['M12 3l8 4v5c0 5-4 8-8 10-4-2-8-5-8-10V7z', 'M9 12l2 2 4-4'],
@@ -2224,5 +4231,9 @@ for (const b of $('navigation').querySelectorAll('button')) {
     p.setAttribute('d', d);
     svg.append(p);
   }
-  b.replaceChildren(svg, document.createTextNode(names[page]));
+  b.dataset.navLabel = names[page];
+  const labelSpan = el('span', names[page], 'nav-item-label');
+  const countBadge = el('span', '', 'nav-count-badge');
+  countBadge.hidden = true;
+  b.replaceChildren(svg, labelSpan, countBadge);
 }

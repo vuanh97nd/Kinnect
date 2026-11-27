@@ -68,6 +68,15 @@ final class FxEngine {
     if (id.equals("lips")) lips = .78f;
   }
 
+  void release() {
+    if (composition != null && !composition.isRecycled()) composition.recycle();
+    composition = null;
+    if (blurred != null && !blurred.isRecycled()) blurred.recycle();
+    blurred = null;
+    if (deepBlurred != null && !deepBlurred.isRecycled()) deepBlurred.recycle();
+    deepBlurred = null;
+  }
+
   FxEngine copy() {
     FxEngine e = new FxEngine();
     e.exposure = exposure; e.contrastLevel = contrastLevel; e.saturation = saturation; e.temperature = temperature;
@@ -322,8 +331,8 @@ final class FxEngine {
     if (compare) { c.drawColor(Color.BLACK); drawFit(c, src, 0, 1, false); return; }
     float k = Math.min(1, Math.max(c.getWidth(), c.getHeight()) / (float) Math.max(src.getWidth(), src.getHeight()));
     int w = Math.max(2, Math.round(src.getWidth() * k)), h = Math.max(2, Math.round(src.getHeight() * k));
-    if (composition == null || composition.getWidth() != w || composition.getHeight() != h) {
-      if (composition != null) composition.recycle();
+    if (composition == null || composition.isRecycled() || composition.getWidth() != w || composition.getHeight() != h) {
+      if (composition != null && !composition.isRecycled()) composition.recycle();
       composition = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
     }
     Canvas stage = new Canvas(composition);
@@ -383,13 +392,13 @@ final class FxEngine {
     // Tầng 2 (blemish): làm dịu đốm nâu/mụn và quầng thâm dưới mắt nhưng bảo toàn mắt, chân mày, cánh mũi và môi.
     if (beautyOn && (smooth > 0.01f || blemish > 0.01f) && face != null && fe > 6f) {
       int bw = Math.max(10, src.getWidth() / 6), bh = Math.max(10, src.getHeight() / 6);
-      if (blurred == null || blurred.getWidth() != bw || blurred.getHeight() != bh) {
-        if (blurred != null) blurred.recycle();
+      if (blurred == null || blurred.isRecycled() || blurred.getWidth() != bw || blurred.getHeight() != bh) {
+        if (blurred != null && !blurred.isRecycled()) blurred.recycle();
         blurred = Bitmap.createBitmap(bw, bh, Bitmap.Config.ARGB_8888);
       }
       int dw = Math.max(6, src.getWidth() / 13), dh = Math.max(6, src.getHeight() / 13);
-      if (deepBlurred == null || deepBlurred.getWidth() != dw || deepBlurred.getHeight() != dh) {
-        if (deepBlurred != null) deepBlurred.recycle();
+      if (deepBlurred == null || deepBlurred.isRecycled() || deepBlurred.getWidth() != dw || deepBlurred.getHeight() != dh) {
+        if (deepBlurred != null && !deepBlurred.isRecycled()) deepBlurred.recycle();
         deepBlurred = Bitmap.createBitmap(dw, dh, Bitmap.Config.ARGB_8888);
       }
       soft.setColorFilter(null);
@@ -487,6 +496,8 @@ final class FxEngine {
   /** Bắt sáng đồng tử (Google Camera Portrait Light / Eye Catchlight) giúp đôi mắt trong veo và có hồn. */
   private void enhanceEyes(Canvas c, float fx, float fy, float fe, float fa, float strength) {
     if (fe < 10f || strength <= 0.02f) return;
+    shape.setShader(null);
+    shape.setAlpha(255);
     c.save();
     c.rotate(fa, fx, fy);
     int glintAlpha = Math.round(Math.min(140, 38 + strength * 78));
@@ -508,6 +519,8 @@ final class FxEngine {
   /** Tô sắc môi hồng đào tự nhiên kèm ánh bóng nhẹ ở môi dưới. */
   private void enhanceLips(Canvas c, float fx, float fy, float fe, float fa, float strength) {
     if (fe < 10f || strength <= 0.02f) return;
+    shape.setShader(null);
+    shape.setAlpha(255);
     c.save();
     c.rotate(fa, fx, fy);
     float mx = fx, my = fy + fe * 1.12f;
@@ -546,6 +559,16 @@ final class FxEngine {
   }
 
   private void buildMesh(int cw, int ch, float fx, float fy, float fe, float fa) {
+    if (fe <= 0f) {
+      int k = 0;
+      for (int j = 0; j <= MH; j++) {
+        for (int i = 0; i <= MW; i++) {
+          mesh[k++] = cw * i / (float) MW;
+          mesh[k++] = ch * j / (float) MH;
+        }
+      }
+      return;
+    }
     double rad = Math.toRadians(fa);
     float cos = (float) Math.cos(rad), sin = (float) Math.sin(rad);
     float lx = fx - cos * fe / 2f, ly = fy - sin * fe / 2f;
@@ -607,6 +630,9 @@ final class FxEngine {
 
   /** Má hồng 3D chạy dọc xương gò má (Cheekbone Contour Blush). */
   private void cheeks(Canvas c, float fx, float fy, float fe, float fa, int color) {
+    if (fe <= 0f) return;
+    shape.setShader(null);
+    shape.setAlpha(255);
     c.save();
     c.rotate(fa, fx, fy);
     for (int s = -1; s <= 1; s += 2) {
@@ -667,6 +693,7 @@ final class FxEngine {
    * Hệ thống AR Sticker vẽ vector chuyên sâu (bám góc nghiêng mặt + chuyển động vật lý mượt mà).
    */
   private void sticker(Canvas c, float x, float y, float e, float a, int tick) {
+    if (e <= 0f) return;
     c.save();
     c.rotate(a, x, y);
     shape.setShader(null);

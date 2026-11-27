@@ -277,6 +277,17 @@ func TestSingleUplinkFansOutAndRevocationStopsDelivery(t *testing.T) {
 	case <-time.After(200 * time.Millisecond):
 	}
 	receive(two)
+	// Subscription-only revision bump (e.g., viewer-one blocks/unblocks): existing host uplink and viewer-two downlink must stay alive without re-offer.
+	send(message{Type: "sync", Room: "test-room", Revision: 2, Publishers: []publisherSpec{{ID: "host", Mode: "video"}}, Members: []memberSpec{members[0], members[2]}})
+	select {
+	case rev := <-ack:
+		if rev != 2 {
+			t.Fatalf("expected synced revision 2, got %d", rev)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("subscription-only revision bump timeout")
+	}
+	receive(two)
 	peers.Lock()
 	count := 0
 	for id := range receivers {
@@ -288,7 +299,7 @@ func TestSingleUplinkFansOutAndRevocationStopsDelivery(t *testing.T) {
 	if count != 1 {
 		t.Fatal("publisher needs exactly one uplink")
 	}
-	send(message{Type: "signal", Room: "test-room", Revision: 1, From: "viewer-two", To: "@sfu", Description: &offer})
+	send(message{Type: "signal", Room: "test-room", Revision: 2, From: "viewer-two", To: "@sfu", Description: &offer})
 	select {
 	case <-problems:
 	case <-time.After(3 * time.Second):

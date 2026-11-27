@@ -3,6 +3,7 @@ import SwiftUI
 struct KinnectMediaTile: View {
     let path: String
     var kind: String = "image"
+    var thumbnailUrl: String = ""
     @State private var expanded = false
     @StateObject private var thumbnail = VideoThumbnailLoader()
     private var isVideo: Bool { kind.lowercased().contains("video") || path.lowercased().contains(".mp4") }
@@ -12,7 +13,11 @@ struct KinnectMediaTile: View {
             if isVideo {
                 ZStack {
                     RoundedRectangle(cornerRadius: 14, style: .continuous).fill(KinnectTheme.surfaceElevated)
-                    if let image = thumbnail.image {
+                    if !thumbnailUrl.isEmpty {
+                        KinnectRemoteImageView(rawURL: thumbnailUrl, contentMode: .fill, cornerRadius: 14, maxHeight: 260)
+                            .frame(maxWidth: .infinity, maxHeight: 260)
+                            .clipped()
+                    } else if let image = thumbnail.image {
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFill()
@@ -31,7 +36,11 @@ struct KinnectMediaTile: View {
             }
         }
         .buttonStyle(.plain)
-        .task(id: path) { if isVideo { thumbnail.load(urlString: path) } }
+        .task(id: "\(path)|\(thumbnailUrl)") {
+            if isVideo && thumbnailUrl.isEmpty {
+                thumbnail.load(urlString: path)
+            }
+        }
         .accessibilityLabel(isVideo ? "Xem video toàn màn hình" : "Xem ảnh toàn màn hình")
         .fullScreenCover(isPresented: $expanded) {
             ZStack(alignment: .topTrailing) {

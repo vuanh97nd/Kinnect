@@ -11,6 +11,9 @@ test('Google OAuth rejects mismatched state, keeps tokens out of URLs and create
  const base='http://127.0.0.1:'+app.server.address().port;
  const start=await fetch(base+'/api/oauth/google/start',{redirect:'manual'});assert.equal(start.status,302);const authorization=new URL(start.headers.get('location')),cookie=start.headers.get('set-cookie').split(';')[0];assert.equal(authorization.searchParams.get('redirect_uri'),'https://app.example/api/oauth/google/callback');
  const wrong=await fetch(base+'/api/oauth/google/callback?code=ok&state=wrong',{headers:{Cookie:cookie}});assert.match(await wrong.text(),/oauth_error=state/);assert.equal(providerRequests,0);
+ const delStart=await fetch(base+'/api/oauth/google/start?returnTo=/delete-account',{redirect:'manual'});const delState=new URL(delStart.headers.get('location')).searchParams.get('state'),delCookie=delStart.headers.get('set-cookie').split(';')[0];
+ const delUnlinked=await fetch(base+'/api/oauth/google/callback?code=ok&state='+delState,{headers:{Cookie:delCookie}});assert.match(await delUnlinked.text(),/\/delete-account\?oauth_error=not_found/);
+ providerRequests=0;
  const callback=await fetch(base+'/api/oauth/google/callback?code=ok&state='+authorization.searchParams.get('state'),{headers:{Cookie:cookie}});const ticket=(await callback.text()).match(/ticket=([a-f0-9]+)/)[1];assert.equal(providerRequests,2);
  const complete=await fetch(base+'/api/oauth/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticket,username:'google_member',agree18:true,acceptPrivacyNotice:true})});assert.equal(complete.status,200);const session=complete.headers.get('set-cookie').split(';')[0];const me=await (await fetch(base+'/api/me',{headers:{Cookie:session}})).json();assert.equal(me.user.username,'google_member');assert.ok(!JSON.stringify(me).includes('google-access-token'));
 });

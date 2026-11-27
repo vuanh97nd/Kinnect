@@ -1,4 +1,6 @@
 import http from 'node:http';
+import {createHash} from 'node:crypto';
+import {readdirSync,readFileSync} from 'node:fs';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createApp} from '../server.js';
@@ -81,4 +83,31 @@ test('finance portal is isolated, team changes revoke privileges, and cases conn
  assert.equal((await req('/api/console/me',{portal:'taichinh',cookie:relog.cookie})).status,401);
  assert.equal((await req('/api/console/login',{portal:'taichinh',method:'POST',data:{username:'finance01',password:'finance-new-password-123!'}})).status,401);
  assert.equal((await req('/api/console/login',{portal:'hotro',method:'POST',data:{username:'finance01',password:'finance-new-password-123!'}})).status,200);
+});
+
+test('overview counts openTickets/securityAlerts and admin UI v10 assets stay unified without prompt/confirm traps',async t=>{
+ const a=await setup(t),{req}=a;
+ await req('/api/console/tickets',{method:'POST',cookie:a.adminCookie,data:{subject:'Ticket badge check',description:'Verify openTickets count',team:'support',priority:'urgent'}});
+ const ov=await req('/api/console/overview',{cookie:a.adminCookie});
+ assert.equal(ov.status,200);
+ assert.equal(typeof ov.body.openTickets,'number');
+ assert.ok(ov.body.openTickets>=1);
+ assert.equal(typeof ov.body.securityAlerts,'number');
+
+ const pubDir=new URL('../public/admin/',import.meta.url);
+ const cloudDir=new URL('../cloud-admin/assets/admin/',import.meta.url);
+ const files=readdirSync(pubDir).sort();
+ assert.deepEqual(files,readdirSync(cloudDir).sort());
+ for(const name of files){
+  const h1=createHash('sha256').update(readFileSync(new URL(name,pubDir))).digest('hex');
+  const h2=createHash('sha256').update(readFileSync(new URL(name,cloudDir))).digest('hex');
+  assert.equal(h1,h2,`Asset parity mismatch for ${name}`);
+ }
+ const html=readFileSync(new URL('index.html',pubDir),'utf8');
+ assert.ok(html.includes('?v=20261125_ux_v10'));
+ assert.ok(html.includes('id="reputation-dialog"'));
+ assert.ok(html.includes('id="v2-cmd-palette"'));
+ assert.ok(html.includes('id="v2-cmd-trigger"'));
+ const adminJs=readFileSync(new URL('admin.js',pubDir),'utf8');
+ assert.equal(/\b(prompt|confirm)\s*\(/.test(adminJs),false,'admin.js must not call window.prompt() or window.confirm()');
 });

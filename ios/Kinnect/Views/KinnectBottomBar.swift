@@ -12,24 +12,24 @@ import UIKit
 /// Active tabs feature the Google Pixel M3 pill highlight shape (64x32pt, PRIMARY_SOFT) behind the icon.
 struct KinnectBottomBar: View {
     @Binding var selectedTab: KinnectNavTab
+    var isTopSectionActive: Bool = false
     var onCreateTap: () -> Void
+    @ObservedObject private var loc = LocalizationManager.shared
 
     var body: some View {
         HStack(spacing: 0) {
             // Tab 1: Bảng tin
             tabButton(
                 tab: .feed,
-                title: "Bảng tin",
-                glyph: .feed,
-                systemImage: "house.fill"
+                title: L10n.tr("Bảng tin"),
+                glyph: .feed
             )
 
             // Tab 2: Khám phá
             tabButton(
                 tab: .discover,
-                title: "Khám phá",
-                glyph: .discover,
-                systemImage: "magnifyingglass"
+                title: L10n.tr("Khám phá"),
+                glyph: .discover
             )
 
             // Tab 3: Center FAB "Tạo" (Google Material 3 squircle FAB matching Android line 481-491)
@@ -61,22 +61,20 @@ struct KinnectBottomBar: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Tạo nội dung")
+            .accessibilityLabel(L10n.tr("Tạo nội dung"))
 
             // Tab 4: Video (Explicit "Video" label below icon)
             tabButton(
                 tab: .video,
-                title: "Video",
-                glyph: .video,
-                systemImage: "play.rectangle.fill"
+                title: L10n.tr("Video"),
+                glyph: .video
             )
 
             // Tab 5: Live
             tabButton(
                 tab: .live,
-                title: "Live",
-                glyph: .live,
-                systemImage: "dot.radiowaves.left.and.right"
+                title: L10n.tr("Live"),
+                glyph: .live
             )
         }
         .padding(.horizontal, 4)
@@ -92,10 +90,9 @@ struct KinnectBottomBar: View {
     private func tabButton(
         tab: KinnectNavTab,
         title: String,
-        glyph: KinnectGlyph,
-        systemImage: String
+        glyph: KinnectGlyph
     ) -> some View {
-        let isSelected = (selectedTab == tab)
+        let isSelected = !isTopSectionActive && (selectedTab == tab)
         return Button {
             let generator = UIImpactFeedbackGenerator(style: .light)
             generator.impactOccurred()
@@ -129,7 +126,7 @@ struct KinnectBottomBar: View {
                     .foregroundColor(isSelected ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
                     .lineLimit(1)
             }
-            .frame(maxWidth: .infinity)
+            .frame(minWidth: 44, maxWidth: .infinity, minHeight: 44)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

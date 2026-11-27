@@ -45,7 +45,7 @@ final class PushKitManager: NSObject, ObservableObject, PKPushRegistryDelegate {
             guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {
                 return
             }
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 UIApplication.shared.registerForRemoteNotifications()
             }
         }
@@ -106,7 +106,7 @@ final class PushKitManager: NSObject, ObservableObject, PKPushRegistryDelegate {
         // Keep callbacks available even on a cold background launch.
         // Report to CallKit immediately; reconnect signalling in parallel, without
         // waiting for network access before presenting the system incoming UI.
-        DispatchQueue.main.async {
+        Task { @MainActor in
             _ = AppState.shared
             NativeSocketClient.shared.connectWithKeychainSession()
         }
@@ -118,7 +118,8 @@ final class PushKitManager: NSObject, ObservableObject, PKPushRegistryDelegate {
             fromVoIPPush: true,
             completion: completion
         )
-        DispatchQueue.main.asyncAfter(deadline: .now() + 45) {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 45_000_000_000)
             let current = NativeWebRTCManager.shared.activeCall
             if current?.callId == callId && current?.state == .ringingIncoming {
                 NativeWebRTCManager.shared.endOrRejectCurrentCall(sendSocket: false)

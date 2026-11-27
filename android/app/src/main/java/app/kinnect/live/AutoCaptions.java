@@ -28,7 +28,7 @@ final class AutoCaptions {
     float[] energy = new float[frames];
     for (int f = 0; f < frames; f++) { double sum = 0; for (int i = f * frame; i < (f + 1) * frame; i++) sum += pcm[i] * (double) pcm[i]; energy[f] = (float) Math.sqrt(sum / frame); }
     float[] sorted = energy.clone(); Arrays.sort(sorted);
-    float floor = sorted[frames / 5], threshold = Math.max(350, floor * 2.8f);
+    float floor = sorted[frames / 20], threshold = Math.max(350, floor * 2.8f);
     int start = -1, quiet = 0;
     for (int f = 0; f <= frames; f++) {
       boolean loud = f < frames && energy[f] > threshold;
@@ -49,17 +49,45 @@ final class AutoCaptions {
   }
 
   private final Handler main = new Handler(Looper.getMainLooper());
-  private SpeechRecognizer recognizer; private boolean cancelled;
+  private SpeechRecognizer recognizer, pendingDownloadRecognizer; private boolean cancelled;
+  private ParcelFileDescriptor readSide;
 
-  void cancel() { cancelled = true; main.removeCallbacksAndMessages(null); if (recognizer != null) { recognizer.cancel(); recognizer.destroy(); recognizer = null; } }
+  private void closeReadSide() {
+    if (readSide != null) {
+      try { readSide.close(); } catch (IOException ignored) {}
+      readSide = null;
+    }
+  }
+
+  private void destroyRecognizer(SpeechRecognizer target) {
+    if (target == null) return;
+    try { target.cancel(); } catch (RuntimeException ignored) {}
+    try { target.destroy(); } catch (RuntimeException ignored) {}
+  }
+
+  void cancel() {
+    cancelled = true;
+    main.removeCallbacksAndMessages(null);
+    closeReadSide();
+    destroyRecognizer(recognizer);
+    recognizer = null;
+    destroyRecognizer(pendingDownloadRecognizer);
+    pendingDownloadRecognizer = null;
+  }
 
   /** Must be called on the main thread. */
   void run(Context context, short[] pcm, String language, Listener listener) {
     final List<int[]> parts = segments(pcm);
     final List<float[]> times = new ArrayList<>(); final List<String> lines = new ArrayList<>();
     if (parts.isEmpty()) { listener.finished(times, lines, I18n.t("Không tìm thấy giọng nói trong video.")); return; }
-    recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(context);
+    try {
+      recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(context.getApplicationContext());
+    } catch (RuntimeException e) {
+      finish(listener, times, lines, I18n.t("Bộ nhận dạng giọng nói trên máy đang bận hoặc chưa được cấp quyền."));
+      return;
+    }
     final int[] index = { 0 };
+    final int[] busyRetries = { 0 };
     final Runnable[] next = new Runnable[1];
     next[0] = () -> {
       if (cancelled) return;
@@ -76,6 +104,8 @@ final class AutoCaptions {
         .putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_SAMPLING_RATE, RATE);
       ParcelFileDescriptor[] pipe;
       try { pipe = ParcelFileDescriptor.createPipe(); } catch (IOException e) { finish(listener, times, lines, I18n.t("Không mở được luồng âm thanh.")); return; }
+      closeReadSide();
+      readSide = pipe[0];
       intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE, pipe[0]);
       final ParcelFileDescriptor writeEnd = pipe[1];
       new Thread(() -> {
@@ -88,37 +118,101 @@ final class AutoCaptions {
           if (fill > 0) out.write(buffer, 0, fill);
         } catch (IOException ignored) {}
       }, "kinnect-captions").start();
-      final Runnable advance = () -> { if (answered[0]) return; answered[0] = true; try { pipe[0].close(); } catch (IOException ignored) {} index[0]++; main.post(next[0]); };
-      main.postDelayed(() -> { if (!answered[0] && recognizer != null) recognizer.cancel(); advance.run(); }, 25000);
+      final Runnable[] timeoutRef = new Runnable[1];
+      final Runnable advance = () -> {
+        if (answered[0]) return;
+        answered[0] = true;
+        if (timeoutRef[0] != null) main.removeCallbacks(timeoutRef[0]);
+        try { pipe[0].close(); } catch (IOException ignored) {}
+        if (readSide == pipe[0]) readSide = null;
+        busyRetries[0] = 0;
+        index[0]++;
+        main.post(next[0]);
+      };
+      timeoutRef[0] = () -> { if (!answered[0] && recognizer != null) { try { recognizer.cancel(); } catch (RuntimeException ignored) {} } advance.run(); };
+      main.postDelayed(timeoutRef[0], 25000);
       recognizer.setRecognitionListener(new RecognitionListener() {
         public void onReadyForSpeech(Bundle b) {} public void onBeginningOfSpeech() {} public void onRmsChanged(float v) {}
         public void onBufferReceived(byte[] b) {} public void onEndOfSpeech() {} public void onPartialResults(Bundle b) {} public void onEvent(int t, Bundle b) {}
         public void onResults(Bundle b) {
-          ArrayList<String> found = b.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+          if (answered[0] || cancelled) return;
+          ArrayList<String> found = b == null ? null : b.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
           if (found != null && !found.isEmpty() && !found.get(0).trim().isEmpty()) place(found.get(0).trim(), part[0] / (float) RATE, part[1] / (float) RATE, times, lines);
           advance.run();
         }
         public void onError(int error) {
-          if (answered[0]) return;
+          if (answered[0] || cancelled) return;
           if (error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE || error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED) {
             answered[0] = true;
-            try { recognizer.triggerModelDownload(intent); } catch (Exception ignored) {}
+            if (timeoutRef[0] != null) main.removeCallbacks(timeoutRef[0]);
+            closeReadSide();
+            final SpeechRecognizer downloading = recognizer;
+            recognizer = null;
+            if (downloading != null) {
+              Intent downloadIntent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                .putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
+                .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true);
+              try {
+                downloading.triggerModelDownload(downloadIntent);
+                destroyRecognizer(pendingDownloadRecognizer);
+                pendingDownloadRecognizer = downloading;
+                main.postDelayed(() -> {
+                  if (pendingDownloadRecognizer == downloading) pendingDownloadRecognizer = null;
+                  destroyRecognizer(downloading);
+                }, 4000);
+              } catch (Exception ignored) {
+                destroyRecognizer(downloading);
+              }
+            }
             finish(listener, times, lines, I18n.t("Máy chưa có gói nhận dạng giọng nói ngoại tuyến cho ngôn ngữ này. Android đang tải gói (cần Wi-Fi); hãy thử lại sau vài phút."));
             return;
           }
-          if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY && index[0] == 0) {
-            answered[0] = true; finish(listener, times, lines, I18n.t("Bộ nhận dạng giọng nói trên máy đang bận hoặc chưa được cấp quyền.")); return;
+          if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
+            answered[0] = true;
+            if (timeoutRef[0] != null) main.removeCallbacks(timeoutRef[0]);
+            try { pipe[0].close(); } catch (IOException ignored) {}
+            if (readSide == pipe[0]) readSide = null;
+            if (busyRetries[0] < 3) {
+              busyRetries[0]++;
+              try { if (recognizer != null) recognizer.cancel(); } catch (Exception ignored) {}
+              main.postDelayed(next[0], 350);
+              return;
+            }
+            if (index[0] == 0) {
+              finish(listener, times, lines, I18n.t("Bộ nhận dạng giọng nói trên máy đang bận hoặc chưa được cấp quyền."));
+              return;
+            }
+            busyRetries[0] = 0;
+            index[0]++;
+            main.postDelayed(next[0], 350);
+            return;
+          }
+          if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
+            answered[0] = true;
+            if (timeoutRef[0] != null) main.removeCallbacks(timeoutRef[0]);
+            finish(listener, times, lines, I18n.t("Bộ nhận dạng giọng nói trên máy đang bận hoặc chưa được cấp quyền."));
+            return;
           }
           advance.run();  // no speech in this part: move on
         }
       });
-      recognizer.startListening(intent);
+      try {
+        recognizer.startListening(intent);
+      } catch (RuntimeException e) {
+        answered[0] = true;
+        if (timeoutRef[0] != null) main.removeCallbacks(timeoutRef[0]);
+        try { pipe[0].close(); } catch (IOException ignored) {}
+        if (readSide == pipe[0]) readSide = null;
+        finish(listener, times, lines, I18n.t("Bộ nhận dạng giọng nói trên máy đang bận hoặc chưa được cấp quyền."));
+      }
     };
     next[0].run();
   }
 
   private void finish(Listener listener, List<float[]> times, List<String> lines, String error) {
-    if (recognizer != null) { recognizer.destroy(); recognizer = null; }
+    closeReadSide();
+    if (recognizer != null) { destroyRecognizer(recognizer); recognizer = null; }
     if (!cancelled) listener.finished(times, lines, error != null ? error : lines.isEmpty() ? I18n.t("Không nhận ra lời nói nào. Hãy thử video có giọng nói rõ hơn.") : null);
   }
 

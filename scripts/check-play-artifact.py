@@ -1,17 +1,33 @@
 from pathlib import Path
-import json,subprocess,xml.etree.ElementTree as E,zipfile,struct,hashlib,sys
+import json,subprocess,tempfile,xml.etree.ElementTree as E,zipfile,struct,hashlib,sys
 r=Path(__file__).resolve().parents[1];jdk=next((r/'work/android-tools/jdk').glob('jdk-*'))/'bin';cfg=json.loads((r/'work/play-tools/tools.json').read_text());out=r/'dist/google-play'
 aab=Path(sys.argv[1]) if len(sys.argv)>1 else out/'Kinnect-1.2.10-play.aab'
 apk=out/(aab.stem.replace('-play','-play-test')+'.apk')
-raw=subprocess.run([str(jdk/'java.exe'),'-jar',cfg['bundletool'],'dump','manifest','--bundle='+str(aab),'--module=base'],text=True,capture_output=True,check=True).stdout;root=E.fromstring(raw);ns='{http://schemas.android.com/apk/res/android}';assert root.find('uses-sdk').get(ns+'targetSdkVersion')=='36';assert root.get('package')=='app.kinnect.live';assert root.find('application').get(ns+'debuggable','false')=='false';assert root.find('application').get(ns+'usesCleartextTraffic')=='false'
-permissions={p.get(ns+'name')for p in root.findall('uses-permission')};forbidden={'REQUEST_INSTALL_PACKAGES','READ_MEDIA_IMAGES','READ_MEDIA_VIDEO','READ_EXTERNAL_STORAGE','REQUEST_IGNORE_BATTERY_OPTIMIZATIONS','ACCESS_NOTIFICATION_POLICY','FOREGROUND_SERVICE_MICROPHONE','FOREGROUND_SERVICE_CAMERA','FOREGROUND_SERVICE_PHONE_CALL'};assert not any(p.split('.')[-1] in forbidden for p in permissions)
+raw=subprocess.run([str(jdk/'java.exe'),'-jar',cfg['bundletool'],'dump','manifest','--bundle='+str(aab),'--module=base'],text=True,capture_output=True,check=True).stdout;root=E.fromstring(raw);ns='{http://schemas.android.com/apk/res/android}';assert root.find('uses-sdk').get(ns+'targetSdkVersion')=='36';assert root.get('package')=='app.kinnect.live';assert root.find('application').get(ns+'debuggable','false')=='false';assert root.find('application').get(ns+'usesCleartextTraffic')=='false';assert root.find('application').get(ns+'extractNativeLibs','false').lower()!='true'
+permissions={p.get(ns+'name')for p in root.findall('uses-permission')};forbidden={'REQUEST_INSTALL_PACKAGES','READ_MEDIA_IMAGES','READ_MEDIA_VIDEO','READ_EXTERNAL_STORAGE','REQUEST_IGNORE_BATTERY_OPTIMIZATIONS','ACCESS_NOTIFICATION_POLICY','FOREGROUND_SERVICE','FOREGROUND_SERVICE_MICROPHONE','FOREGROUND_SERVICE_CAMERA','FOREGROUND_SERVICE_PHONE_CALL','FOREGROUND_SERVICE_MEDIA_PROJECTION','SYSTEM_ALERT_WINDOW','MANAGE_OWN_CALLS'};assert not any(p.split('.')[-1] in forbidden for p in permissions)
 assert not any('LAUNCHER' in E.tostring(q,encoding='unicode') or 'app.kinnect.audit' in E.tostring(q,encoding='unicode') for q in root.findall('queries'))
 assert not any('microphone' in s.get(ns+'foregroundServiceType','') for s in root.find('application').findall('service'))
-components=[x.get(ns+'name','')for x in root.find('application')];assert not any('ApkUpdateActivity'in x or 'ApkUpdateProvider'in x or 'FarmGame'in x for x in components)
+components=[x.get(ns+'name','')for x in root.find('application')];assert not any('ApkUpdateActivity'in x or 'ApkUpdateProvider'in x or 'FarmGame'in x or 'LiveGameService'in x for x in components)
 assert 'com.android.vending.BILLING' in permissions
 elf=[]
+dexdump=Path(cfg['buildTools'])/'dexdump.exe'
 with zipfile.ZipFile(apk) as z:
- dex=b''.join(z.read(n)for n in z.namelist()if n.endswith('.dex'));assert b'ApkUpdateActivity'not in dex and b'ApkUpdateProvider'not in dex;assert b'market://details?id='in dex
+ dex_names=[n for n in z.namelist()if n.endswith('.dex')]
+ dex=b''.join(z.read(n)for n in dex_names);assert b'ApkUpdateActivity'not in dex and b'ApkUpdateProvider'not in dex and b'FOREGROUND_SERVICE_MICROPHONE'not in dex and b'getForegroundServiceType'not in dex and 'Kéo để di chuyển bình luận'.encode('utf-8') not in dex;assert b'market://details?id='in dex
+ if dexdump.exists():
+  with tempfile.TemporaryDirectory() as td:
+   for dn in dex_names:
+    dp=Path(td)/Path(dn).name;dp.write_bytes(z.read(dn))
+    dump=subprocess.run([str(dexdump),'-d',str(dp)],encoding='utf-8',errors='replace',capture_output=True,check=True).stdout
+    cls=''
+    for line in dump.splitlines():
+     if 'Class descriptor' in line: cls=line.strip()
+     if 'Lapp/kinnect/live/LiveGameLaunch;' in cls:
+      assert 'queryIntentActivities' not in line, line
+     if 'Lapp/kinnect/live/LiveGameService;' in cls:
+      assert not any(tok in line for tok in ('startForeground','getForegroundServiceType','MediaProjection','FOREGROUND_SERVICE_MICROPHONE')), line
+     if 'Lapp/kinnect/live/GameCommentOverlay;' in cls:
+      assert not any(tok in line for tok in ('WindowManager','canDrawOverlays')), line
  for n in z.namelist():
   if not n.endswith('.so')or not any(abi in n for abi in ['arm64-v8a','x86_64']):continue
   d=z.read(n);end='<' if d[5]==1 else '>';off=struct.unpack_from(end+'Q',d,32)[0];size,count=struct.unpack_from(end+'HH',d,54);align=[]

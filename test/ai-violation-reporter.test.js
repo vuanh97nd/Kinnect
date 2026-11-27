@@ -130,12 +130,28 @@ test('Image Moderation Policy: body showcase / gym / bikini is allowed, sensitiv
   assert.equal(p1.allowed, true);
   assert.equal(p1.isViolation, false);
 
+  // Trusted Vision AI output describing swimwear/bikini passes even under decision='review'
   const p2 = evaluateImageContentPolicy({
     caption: 'Tắm biển diện bikini khoe dáng mùa hè',
-    aiResult: { decision: 'review', reason: 'hở hang' } // AI hiểu nhầm nhưng vì là bikini nên được phép
+    aiResult: { decision: 'review', reason: 'Ảnh diện bikini tắm biển khoe dáng mùa hè' }
   });
   assert.equal(p2.allowed, true);
   assert.equal(p2.isViolation, false);
+
+  // Untrusted user caption MUST NOT override Vision AI review/violation findings (A1-13)
+  const pBypassReview = evaluateImageContentPolicy({
+    caption: 'Tắm biển diện bikini tập gym khoe body mùa hè',
+    aiResult: { decision: 'review', reason: 'hở hang' }
+  });
+  assert.equal(pBypassReview.allowed, false);
+  assert.equal(pBypassReview.isViolation, true);
+
+  const pBypassViolation = evaluateImageContentPolicy({
+    caption: 'Tập gym bikini fitness đồ bơi',
+    aiResult: { violation: true, reason: 'bikini nhưng vi phạm tiêu chuẩn hình ảnh' }
+  });
+  assert.equal(pBypassViolation.allowed, false);
+  assert.equal(pBypassViolation.isViolation, true);
 
   // 2. Ảnh riêng tư: Tuyệt đối không cấm
   const pPrivate = evaluateImageContentPolicy({

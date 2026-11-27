@@ -53,9 +53,24 @@ enum KinnectTheme {
         static let radiusPill: CGFloat = 999
 
     static let accent = Color(red: 0.49, green: 0.23, blue: 0.93)           // #7C3AED
-    static let accentBright = Color(red: 0.65, green: 0.33, blue: 0.97)     // #A855F7
+    /// Adaptive brand accent for text, icons, and active badges: vivid #BC85FF (>6.5:1 WCAG AA) in Dark Mode,
+    /// high-contrast #6E29D9 (>5.3:1 WCAG AA on light surfaces & white foreground) in Light Mode.
+    static var accentBright: Color {
+        Color(UIColor { trait in
+            trait.userInterfaceStyle == .light
+                ? UIColor(red: 0.43, green: 0.16, blue: 0.85, alpha: 1.0)
+                : UIColor(red: 0xBC / 255.0, green: 0x85 / 255.0, blue: 0xFF / 255.0, alpha: 1.0)
+        })
+    }
+    static var accentText: Color { accentBright }
     static let accentLight = Color(red: 0.58, green: 0.44, blue: 1.00)
-    static let accentSoft = Color(red: 0.93, green: 0.91, blue: 1.00)
+    static var accentSoft: Color {
+        Color(UIColor { trait in
+            trait.userInterfaceStyle == .light
+                ? UIColor(red: 0.93, green: 0.91, blue: 1.00, alpha: 1.0)
+                : UIColor(red: 0x2D / 255.0, green: 0x24 / 255.0, blue: 0x48 / 255.0, alpha: 1.0)
+        })
+    }
 
     static var textPrimary: Color {
         Color(UIColor { trait in
@@ -68,13 +83,26 @@ enum KinnectTheme {
     static var textSecondary: Color {
         Color(UIColor { trait in
             trait.userInterfaceStyle == .light
-                ? UIColor(red: 0.45, green: 0.40, blue: 0.55, alpha: 1.0)
+                ? UIColor(red: 0x5C / 255.0, green: 0x54 / 255.0, blue: 0x70 / 255.0, alpha: 1.0)
                 : UIColor(red: 0.72, green: 0.69, blue: 0.84, alpha: 1.0)
         })
     }
 
     static var textTertiary: Color {
-        textSecondary.opacity(0.65)
+        Color(UIColor { trait in
+            trait.userInterfaceStyle == .light
+                ? UIColor(red: 0x7A / 255.0, green: 0x72 / 255.0, blue: 0x8E / 255.0, alpha: 1.0)
+                : UIColor(red: 0.65, green: 0.62, blue: 0.78, alpha: 1.0)
+        })
+    }
+
+    /// High-contrast placeholder color for inputs (#5C5470 Light >= 5.81:1 / #A9A2C6 Dark >= 6.36:1).
+    static var inputPlaceholder: Color {
+        Color(UIColor { trait in
+            trait.userInterfaceStyle == .light
+                ? UIColor(red: 0x5C / 255.0, green: 0x54 / 255.0, blue: 0x70 / 255.0, alpha: 1.0)
+                : UIColor(red: 0xA9 / 255.0, green: 0xA2 / 255.0, blue: 0xC6 / 255.0, alpha: 1.0)
+        })
     }
 
     // MARK: - Typography Fonts
@@ -95,16 +123,77 @@ enum KinnectTheme {
 
     static let rose = Color(red: 0.93, green: 0.28, blue: 0.60)
     static let emerald = Color(red: 0.09, green: 0.64, blue: 0.45)
-    static let online = Color(red: 0.13, green: 0.77, blue: 0.37)
-    static let success = Color(red: 0.13, green: 0.77, blue: 0.37)
+    /// Adaptive WCAG AA compliant green for text & badges (#1F7A4D light / #75C89C dark).
+    static var success: Color {
+        Color(UIColor { trait in
+            trait.userInterfaceStyle == .light
+                ? UIColor(red: 0x1F / 255.0, green: 0x7A / 255.0, blue: 0x4D / 255.0, alpha: 1.0)
+                : UIColor(red: 0x75 / 255.0, green: 0xC8 / 255.0, blue: 0x9C / 255.0, alpha: 1.0)
+        })
+    }
+    static var online: Color { success }
+    /// Vivid #21C45E strictly for non-text status indicator dots.
+    static let onlineDot = Color(red: 0x21 / 255.0, green: 0xC4 / 255.0, blue: 0x5E / 255.0)
     static let callGreen = Color(red: 0.19, green: 0.82, blue: 0.35)
     static let callRed = Color(red: 1.0, green: 0.27, blue: 0.23)
-    static let amber = Color(red: 0.96, green: 0.62, blue: 0.04)
-    static let warning = Color(red: 0.96, green: 0.62, blue: 0.04)
-    static let danger = Color(red: 0.94, green: 0.27, blue: 0.27)
+    /// Adaptive amber/warning: WCAG AA compliant #B45309 in Light Mode, vivid #F59E0B in Dark Mode.
+    static var amber: Color {
+        Color(UIColor { trait in
+            trait.userInterfaceStyle == .light
+                ? UIColor(red: 0xB4 / 255.0, green: 0x53 / 255.0, blue: 0x09 / 255.0, alpha: 1.0)
+                : UIColor(red: 0.96, green: 0.62, blue: 0.04, alpha: 1.0)
+        })
+    }
+    static var warning: Color { amber }
+    /// Adaptive WCAG AA compliant danger/destructive red (#C2365A light / #D56579 dark).
+    static var danger: Color {
+        Color(UIColor { trait in
+            trait.userInterfaceStyle == .light
+                ? UIColor(red: 0xC2 / 255.0, green: 0x36 / 255.0, blue: 0x5A / 255.0, alpha: 1.0)
+                : UIColor(red: 0xD5 / 255.0, green: 0x65 / 255.0, blue: 0x79 / 255.0, alpha: 1.0)
+        })
+    }
+    /// High-contrast LIVE badge & CTA red (#D61F26, >= 5.05:1 with white text).
+    static let liveRed = Color(red: 0xD6 / 255.0, green: 0x1F / 255.0, blue: 0x26 / 255.0)
+    /// WCAG AA compliant purple preset for avatars (#9E34B0, >= 5.5:1 with white text).
+    static let avatarPurplePreset = Color(red: 0x9E / 255.0, green: 0x34 / 255.0, blue: 0xB0 / 255.0)
 
     static var surfaceBg: Color { background }
     static var cardBg: Color { surface }
+
+    @MainActor
+    static func applyWindowAppearance(_ mode: String) {
+        let style: UIUserInterfaceStyle
+        #if DEBUG
+        if UIReviewFixture.isEnabled,
+           let screenName = UIReviewFixture.activeScreen,
+           UIReviewFixture.requiresDarkAppearance(for: screenName) {
+            style = .dark
+        } else if let overrideLight = UIReviewFixture.overrideLightMode {
+            style = overrideLight ? .light : .dark
+        } else if UIReviewFixture.forceLightMode {
+            style = .light
+        } else {
+            switch mode {
+            case "light": style = .light
+            case "dark": style = .dark
+            default: style = .unspecified
+            }
+        }
+        #else
+        switch mode {
+        case "light": style = .light
+        case "dark": style = .dark
+        default: style = .unspecified
+        }
+        #endif
+        for scene in UIApplication.shared.connectedScenes {
+            guard let windowScene = scene as? UIWindowScene else { continue }
+            for window in windowScene.windows {
+                window.overrideUserInterfaceStyle = style
+            }
+        }
+    }
 
     static let primaryGradient = LinearGradient(
         colors: [
@@ -118,12 +207,12 @@ enum KinnectTheme {
     static let brandGradient = primaryGradient
 
     static func relativeTime(from timestampMs: Int64) -> String {
-        guard timestampMs > 0 else { return "Vừa xong" }
+        guard timestampMs > 0 else { return L10n.tr("Vừa xong") }
         let seconds = max(0, Int((Int64(Date().timeIntervalSince1970 * 1000) - timestampMs) / 1000))
-        if seconds < 45 { return "Vừa xong" }
-        if seconds < 3600 { return "\(seconds / 60) phút" }
-        if seconds < 86400 { return "\(seconds / 3600) giờ" }
-        return "\(seconds / 86400) ngày"
+        if seconds < 45 { return L10n.tr("Vừa xong") }
+        if seconds < 3600 { return "\(seconds / 60) \(L10n.tr("phút"))" }
+        if seconds < 86400 { return "\(seconds / 3600) \(L10n.tr("giờ"))" }
+        return "\(seconds / 86400) \(L10n.tr("ngày"))"
     }
 }
 
@@ -223,7 +312,7 @@ struct KinnectAvatarView: View {
                 } else {
                     ZStack {
                         LinearGradient(
-                            colors: [Color(hex: colorHex), KinnectTheme.accent],
+                            colors: [resolvedLeadingColor, KinnectTheme.accent],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -242,7 +331,7 @@ struct KinnectAvatarView: View {
 
             if isOnline {
                 Circle()
-                    .fill(KinnectTheme.online)
+                    .fill(KinnectTheme.onlineDot)
                     .frame(width: max(10, size * 0.25), height: max(10, size * 0.25))
                     .overlay(Circle().stroke(KinnectTheme.surface, lineWidth: 2))
             }
@@ -252,8 +341,8 @@ struct KinnectAvatarView: View {
                 loadedImage = mem
                 return
             }
+            loadedImage = nil
             guard !avatarURL.isEmpty else {
-                loadedImage = nil
                 return
             }
             if let data = await KinnectAPIClient.shared.fetchBinaryData(path: avatarURL),
@@ -264,14 +353,22 @@ struct KinnectAvatarView: View {
         }
     }
 
-    private var initials: String {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return "K" }
-        let parts = trimmed.split(separator: " ")
-        if parts.count >= 2, let first = parts.first?.first, let last = parts.last?.first {
-            return String([first, last]).uppercased()
+    private var resolvedLeadingColor: Color {
+        let normalized = colorHex.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if normalized == "#EC4899" || normalized == "EC4899" {
+            return KinnectTheme.avatarPurplePreset
         }
-        return String(trimmed.prefix(1)).uppercased()
+        return Color(hex: colorHex)
+    }
+
+    private var initials: String {
+        let words = name
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+        guard !words.isEmpty else { return "K" }
+        let letters = words.suffix(2).compactMap { $0.first }
+        let result = String(letters).uppercased()
+        return result.isEmpty ? "K" : result
     }
 }
 
@@ -336,10 +433,12 @@ struct KinnectRemoteImageView: View {
             }
         }
         .task(id: rawURL) {
+            failed = false
             if let mem = ImageMemoryCache.shared.image(forKey: rawURL) {
                 image = mem
                 return
             }
+            image = nil
             guard !rawURL.isEmpty else {
                 failed = true
                 return
@@ -382,32 +481,55 @@ extension View {
 
 // MARK: - Skeleton Shimmer Loading (Micro-interactions & UX Parity)
 public struct KinnectShimmerModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var phase: CGFloat = -1.0
 
     public func body(content: Content) -> some View {
+        let sweepBase: Color = (colorScheme == .light) ? Color.black : Color.white
+        let sweepPeakOpacity: Double = (colorScheme == .light) ? 0.08 : 0.12
         content
             .overlay(
-                GeometryReader { geo in
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.0),
-                            Color.white.opacity(0.12),
-                            Color.white.opacity(0.0)
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                    .frame(width: geo.size.width * 1.5)
-                    .offset(x: phase * geo.size.width)
+                Group {
+                    if !reduceMotion {
+                        GeometryReader { geo in
+                            LinearGradient(
+                                colors: [
+                                    sweepBase.opacity(0.0),
+                                    sweepBase.opacity(sweepPeakOpacity),
+                                    sweepBase.opacity(0.0)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                            .frame(width: geo.size.width * 1.5)
+                            .offset(x: phase * geo.size.width)
+                        }
+                    }
                 }
             )
             .clipped()
             .onAppear {
+                guard !reduceMotion else { return }
                 withAnimation(
                     .linear(duration: 1.4)
                     .repeatForever(autoreverses: false)
                 ) {
                     phase = 1.8
+                }
+            }
+            .onChange(of: reduceMotion) { reduced in
+                if reduced {
+                    withAnimation(nil) {
+                        phase = -1.0
+                    }
+                } else {
+                    withAnimation(
+                        .linear(duration: 1.4)
+                        .repeatForever(autoreverses: false)
+                    ) {
+                        phase = 1.8
+                    }
                 }
             }
     }
@@ -483,5 +605,140 @@ public struct StorySkeletonStrip: View {
             .padding(.vertical, 6)
         }
         .kinnectShimmer()
+    }
+}
+
+// MARK: - iPad-Safe UIActivityViewController Presenter
+enum KinnectShareSheet {
+    @MainActor
+    static func present(items: [Any]) {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let activeScene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
+        let keyWindow = activeScene?.windows.first(where: { $0.isKeyWindow }) ?? activeScene?.windows.first
+        guard var topVC = keyWindow?.rootViewController else { return }
+        while let presented = topVC.presentedViewController {
+            topVC = presented
+        }
+        let activityVC = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        if let popover = activityVC.popoverPresentationController {
+            popover.sourceView = topVC.view
+            popover.sourceRect = CGRect(x: topVC.view.bounds.midX, y: topVC.view.bounds.midY, width: 1, height: 1)
+            popover.permittedArrowDirections = []
+        }
+        topVC.present(activityVC, animated: true)
+    }
+}
+
+// MARK: - Modal-Visible Bottom Toast Snackbar (Pass-Through UIWindow)
+@MainActor
+private final class PassThroughToastWindow: UIWindow {
+    var toastHitRect: CGRect = .zero
+
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        guard !isHidden, alpha > 0, !toastHitRect.isEmpty, toastHitRect.contains(point) else {
+            return nil
+        }
+        return super.hitTest(point, with: event)
+    }
+}
+
+private struct ToastPillFrameKey: PreferenceKey {
+    static let defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        let next = nextValue()
+        if next != .zero {
+            value = next
+        }
+    }
+}
+
+private struct KinnectToastOverlayView: View {
+    @ObservedObject private var appState = AppState.shared
+    let onFrameChange: (CGRect) -> Void
+
+    var body: some View {
+        VStack {
+            Spacer()
+            if let toast = appState.toastMessage, !toast.isEmpty {
+                HStack(spacing: 10) {
+                    Text(toast)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundColor(.white)
+                        .kinnectMultiline()
+                        .multilineTextAlignment(.leading)
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.white.opacity(0.75))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 11)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color(red: 0.11, green: 0.09, blue: 0.16).opacity(0.96))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                        )
+                        .shadow(color: .black.opacity(0.28), radius: 10, y: 4)
+                )
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(key: ToastPillFrameKey.self, value: geo.frame(in: .global))
+                    }
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .onTapGesture {
+                    appState.dismissToast()
+                }
+                .accessibilityAddTraits(.isButton)
+                .accessibilityLabel("\(toast). \(L10n.tr("Chạm để đóng"))")
+                .padding(.horizontal, 16)
+                .padding(.bottom, appState.currentUser != nil ? 76 : 20)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .animation(.spring(response: 0.28, dampingFraction: 0.85), value: appState.toastMessage)
+        .onPreferenceChange(ToastPillFrameKey.self) { frame in
+            onFrameChange(frame)
+        }
+    }
+}
+
+@MainActor
+final class KinnectToastPresenter {
+    static let shared = KinnectToastPresenter()
+    private var window: PassThroughToastWindow?
+    private var hostingController: UIHostingController<KinnectToastOverlayView>?
+
+    private init() {}
+
+    func sync(visible: Bool) {
+        if !visible {
+            window?.toastHitRect = .zero
+            window?.isHidden = true
+            return
+        }
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        guard let activeScene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first else {
+            return
+        }
+        if window == nil || window?.windowScene !== activeScene {
+            let win = PassThroughToastWindow(windowScene: activeScene)
+            win.backgroundColor = .clear
+            win.windowLevel = .statusBar + 50
+            win.isOpaque = false
+            let host = UIHostingController(rootView: KinnectToastOverlayView { [weak win] frame in
+                win?.toastHitRect = frame
+            })
+            host.view.backgroundColor = .clear
+            win.rootViewController = host
+            self.window = win
+            self.hostingController = host
+        }
+        if let primaryStyle = activeScene.windows.first(where: { $0 !== window && $0.isKeyWindow })?.overrideUserInterfaceStyle {
+            window?.overrideUserInterfaceStyle = primaryStyle
+        }
+        window?.isHidden = false
     }
 }

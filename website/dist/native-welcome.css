@@ -21,3 +21,88 @@ html{height:100%}body{width:100%;height:100dvh;min-height:560px;overflow:hidden}
 @keyframes kinnect-ring-left{to{transform:translateX(-5px)}}@keyframes kinnect-ring-right{to{transform:translateX(5px)}}
 @media(prefers-color-scheme:dark){.kinnect-boot{background:#151419}.kinnect-boot>.kinnect-boot-tagline{color:#b1aabd}}
 @media(prefers-reduced-motion:reduce){.kinnect-boot-rings>i{animation:none;transform:translateX(-5px)}.kinnect-boot-rings>i+i{transform:translateX(5px)}}
+
+/* Accessible standalone layout, >= 14px footer links, >= 4.5:1 contrast, >= 44px tap targets */
+html {
+  min-height: 100%;
+  height: auto;
+}
+body {
+  min-height: 100dvh;
+  height: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.page {
+  min-height: 100dvh;
+  height: auto;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+.brand {
+  text-decoration: none;
+  color: #5B21B6;
+  min-height: 44px;
+}
+.login {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  background: #5B21B6;
+}
+.cta {
+  background: #5B21B6;
+}
+.showcase {
+  flex: 1 1 320px;
+  min-height: 300px;
+}
+.platform-support a {
+  min-height: 48px;
+  padding: 6px 8px;
+  color: #3B2E52;
+  background: #ffffffd9;
+  border-color: #d8cfe8;
+}
+.platform-support b {
+  font-size: 12px;
+  color: #271b3d;
+}
+.platform-support small {
+  font-size: 11px;
+  color: #524668;
+}
+.welcome-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 2px 6px;
+  margin-top: 10px;
+  padding-top: 6px;
+  border-top: 1px solid #e4dcf2;
+  flex-shrink: 0;
+}
+.welcome-footer .age-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #3B2E52;
+}
+.welcome-footer a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 8px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #5B21B6;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.welcome-footer a:hover {
+  color: #4C1D95;
+}

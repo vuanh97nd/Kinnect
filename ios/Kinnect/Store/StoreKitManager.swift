@@ -12,10 +12,16 @@ final class StoreKitManager: ObservableObject {
     private var updatesTask: Task<Void, Never>?
 
     private init() {
-        updatesTask = Task {
+        updatesTask = Task { [weak self] in
             for await result in Transaction.updates {
+                guard let self else { break }
                 if case .verified(let transaction) = result {
-                    _ = try? await verifyWithBackendAndFinish(result: result, transaction: transaction)
+                    do {
+                        _ = try await self.verifyWithBackendAndFinish(result: result, transaction: transaction)
+                        NotificationCenter.default.post(name: .kinnectStoreUpdated, object: transaction.productID)
+                    } catch {
+                        print("[KinnectStoreKit] Deferred transaction update verification: \(error.localizedDescription)")
+                    }
                 }
             }
         }
@@ -30,11 +36,9 @@ final class StoreKitManager: ObservableObject {
         guard !unique.isEmpty else { return }
         do {
             let products = try await Product.products(for: unique)
-            var map: [String: Product] = [:]
             for product in products {
-                map[product.id] = product
+                self.storeKitProducts[product.id] = product
             }
-            self.storeKitProducts = map
         } catch {
             print("[KinnectStoreKit] Failed to fetch App Store products: \(error.localizedDescription)")
         }
@@ -58,23 +62,57 @@ final class StoreKitManager: ObservableObject {
     func restorePurchases() async throws -> RestoreOutcome {
         try await AppStore.sync()
         var outcome = RestoreOutcome()
+        var handledIds = Set<UInt64>()
         for await entitlement in Transaction.currentEntitlements {
             guard case .verified(let transaction) = entitlement else { outcome.unverified += 1; continue }
-            if transaction.revocationDate != nil { outcome.revoked.append(transaction.productID); continue }
+            handledIds.insert(transaction.id)
+            if transaction.revocationDate != nil {
+                do {
+                    _ = try await verifyWithBackendAndFinish(result: entitlement, transaction: transaction)
+                    outcome.revoked.append(transaction.productID)
+                } catch {
+                    outcome.failed.append(transaction.productID)
+                }
+                continue
+            }
             do {
-                _ = try await verifyWithBackendAndFinish(result: entitlement, transaction: transaction)
-                outcome.reconciled.append(transaction.productID)
+                let response = try await verifyWithBackendAndFinish(result: entitlement, transaction: transaction)
+                if (response["state"] as? String) == "CANCELLED" {
+                    outcome.revoked.append(transaction.productID)
+                } else {
+                    outcome.reconciled.append(transaction.productID)
+                }
             } catch {
                 outcome.failed.append(transaction.productID)
             }
         }
+        // Also submit revoked non-consumable transactions excluded from currentEntitlements so backend reconciles refunds.
+        for await result in Transaction.all {
+            guard case .verified(let transaction) = result else { continue }
+            guard !handledIds.contains(transaction.id),
+                  transaction.revocationDate != nil else { continue }
+            handledIds.insert(transaction.id)
+            do {
+                _ = try await verifyWithBackendAndFinish(result: result, transaction: transaction)
+                outcome.revoked.append(transaction.productID)
+            } catch {
+                outcome.failed.append(transaction.productID)
+            }
+        }
+        NotificationCenter.default.post(name: .kinnectStoreUpdated, object: nil)
         return outcome
     }
 
     /// Initiates a real StoreKit 2 purchase and verifies the signed transaction on the Kinnect server.
     /// Binds deterministic appAccountToken UUID to ensure account ownership integrity.
     /// Never mocks or fabricates purchase success when StoreKit products are unavailable.
-    func purchaseDigitalProduct(productId: String, accountUuid: UUID? = nil) async throws -> [String: Any] {
+    /// Returns `nil` quietly when the user cancels the App Store purchase sheet.
+    func purchaseDigitalProduct(productId: String, accountUuid: String?) async throws -> [String: Any]? {
+        let parsed = accountUuid.flatMap(UUID.init(uuidString:))
+        return try await purchaseDigitalProduct(productId: productId, accountUuid: parsed)
+    }
+
+    func purchaseDigitalProduct(productId: String, accountUuid: UUID? = nil) async throws -> [String: Any]? {
         if storeKitProducts[productId] == nil {
             await loadProducts(productIds: [productId])
         }
@@ -89,8 +127,9 @@ final class StoreKitManager: ObservableObject {
         defer { isPurchasing = false }
 
         let state = try await KinnectAPIClient.shared.requestJSON("/api/store")
+        let resolvedAccount = (state["accountUuid"] as? String).flatMap(UUID.init(uuidString:)) ?? accountUuid
         guard state["appleBillingReady"] as? Bool == true,
-              let raw = state["accountUuid"] as? String, let serverAccount = UUID(uuidString: raw) else {
+              let serverAccount = resolvedAccount else {
             throw KinnectAPIError.serverMessage("App Store chưa mở thanh toán cho tài khoản này.")
         }
         // Always bind purchases to the server's authenticated account, including callers without a UUID.
@@ -106,7 +145,7 @@ final class StoreKitManager: ObservableObject {
                 throw KinnectAPIError.serverMessage("Chữ ký giao dịch StoreKit không hợp lệ: \(verificationError.localizedDescription)")
             }
         case .userCancelled:
-            throw KinnectAPIError.serverMessage("Bạn đã hủy giao dịch trên App Store.")
+            return nil
         case .pending:
             throw KinnectAPIError.serverMessage("Giao dịch đang chờ phê duyệt từ App Store.")
         @unknown default:

@@ -52,7 +52,26 @@ test("room lifecycle, chat, signaling isolation, host disconnect and HTTP", asyn
     c.id = (await c.get("welcome")).id;
     return c;
   }
-  assert.equal((await fetch(url + "/health")).status, 200);
+  const localHealthRes = await fetch(url + "/health");
+  assert.equal(localHealthRes.status, 200);
+  assert.equal(localHealthRes.headers.get("x-content-type-options"), "nosniff");
+  const localHealth = await localHealthRes.json();
+  assert.equal(localHealth.ok, true);
+  assert.equal(typeof localHealth.pid, "number");
+  assert.equal(typeof localHealth.telemetry?.uptime, "number");
+
+  const proxiedHealthRes = await fetch(url + "/health", {
+    headers: { "CF-Connecting-IP": "203.0.113.9", "X-Forwarded-Proto": "https" },
+  });
+  assert.equal(proxiedHealthRes.status, 200);
+  assert.equal(proxiedHealthRes.headers.get("strict-transport-security"), "max-age=31536000; includeSubDomains");
+  const proxiedHealth = await proxiedHealthRes.json();
+  assert.equal(proxiedHealth.ok, true);
+  assert.equal(proxiedHealth.instanceId, localHealth.instanceId);
+  assert.equal(typeof proxiedHealth.liveSfu?.configured, "boolean");
+  assert.equal(proxiedHealth.pid, undefined);
+  assert.equal(proxiedHealth.telemetry, undefined);
+
   assert.match(await (await fetch(url)).text(), /Kinnect/);
   assert.equal((await fetch(url + "/missing")).status, 404);
   const host = await connect(),

@@ -2,7 +2,7 @@ import pg from 'pg';
 import {createPostgresIdentity} from '../lib/postgres-identity.js';
 import {createPostgresWallet} from '../lib/postgres-wallet.js';
 import {cloudChatRoute} from './chat-routes.js';
-import {createHash} from 'node:crypto';
+import {createHash,timingSafeEqual} from 'node:crypto';
 import {backendRpc} from './backend-rpc.js';
 import {register} from './registration.js';
 import {profile} from './profile.js';
@@ -15,12 +15,18 @@ import {basicFeed,basicVideos,syncFeed} from './basic-feed.js';
 export {AuthLimits} from './auth-limits.js';
 export {UserEvents} from './realtime.js';
 const json=(value,status=200,headers={})=>Response.json(value,{status,headers:{'Cache-Control':'no-store',...headers}});
+const encoder=new TextEncoder();
+const safeEqual=(a,b)=>{
+ if(typeof a!=='string'||typeof b!=='string')return false;
+ const ba=encoder.encode(a),bb=encoder.encode(b);
+ return ba.length>0&&ba.length===bb.length&&timingSafeEqual(ba,bb);
+};
 const cookie=req=>(req.headers.get('Cookie')||'').split(';').map(x=>x.trim()).find(x=>x.startsWith('kinnect_session='))?.slice(16)||'';
 export default {async fetch(request,env){
  const path=new URL(request.url).pathname;
  if(path==='/health')return json({ok:true,service:'kinnect-cloud-api',preview:true,productionRouting:false});
  // Isolated integration environment until full route parity and data reconciliation.
- if(!env.PREVIEW_KEY||request.headers.get('X-Kinnect-Preview')!==env.PREVIEW_KEY)return json({error:'Not found'},404);
+ if(!env.PREVIEW_KEY||!safeEqual(request.headers.get('X-Kinnect-Preview')||'',env.PREVIEW_KEY))return json({error:'Not found'},404);
  if(path==='/internal/d1-query')return backendRpc(request,env);
  if(path==='/internal/auth-limit'){
   if(request.method!=='POST')return json({error:'Method not allowed'},405);
@@ -49,7 +55,8 @@ export default {async fetch(request,env){
   if(!['GET','POST','DELETE'].includes(request.method))return json({error:'Method not allowed'},405);
   if(!['GET','HEAD'].includes(request.method)){
    if(!request.headers.get('Content-Type')?.startsWith('application/json'))return json({error:'JSON required'},415);
-   const origin=request.headers.get('Origin');if(origin&&new URL(origin).origin!==new URL(request.url).origin)return json({error:'Origin rejected'},403);
+   const origin=request.headers.get('Origin');
+   if(origin){let parsed;try{parsed=new URL(origin);}catch{return json({error:'Origin rejected'},403);}if(parsed.origin!==new URL(request.url).origin)return json({error:'Origin rejected'},403);}
   }
   stage='postgres-connect';await client.connect();stage='identity';const identity=createPostgresIdentity({client});
   if(path==='/internal/feed-sync')return syncFeed(request,client,json);
@@ -79,6 +86,19 @@ export default {async fetch(request,env){
    }
    const user=await identity.verify(typeof input?.username==='string'?input.username.trim().toLowerCase():null,input?.password);
    if(!user)return json({error:'Thông tin đăng nhập không đúng hoặc tài khoản không khả dụng.'},401);
+   let has2fa=Boolean(user.profile?.two_factor_enabled||user.profile?.twoFactorEnabled);
+   if(!has2fa){
+    try{
+     const tbl=await client.query("SELECT 1 FROM information_schema.tables WHERE table_schema='kinnect_core' AND table_name='user_totp'");
+     if(tbl.rows.length){
+      const totp=await client.query('SELECT enabled FROM kinnect_core.user_totp WHERE user_id=$1',[user.id]);
+      if(Number(totp.rows[0]?.enabled)===1||totp.rows[0]?.enabled===true)has2fa=true;
+     }
+    }catch(totpErr){
+     if(totpErr?.code!=='42P01')throw totpErr;
+    }
+   }
+   if(has2fa)return json({error:'Tài khoản đã bật xác thực 2 lớp (2FA). Vui lòng đăng nhập qua máy chủ chính.',requires2fa:true},403);
    const token=await identity.createSession(user.id);
    return json({user:profile(user,true)},200,{'Set-Cookie':`kinnect_session=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=604800`});
   }
@@ -98,6 +118,7 @@ export default {async fetch(request,env){
    if(request.method!=='GET'||request.headers.get('Upgrade')?.toLowerCase()!=='websocket')return json({error:'WebSocket required'},426);
    const hash=createHash('sha256').update(token).digest('hex');
    const result=await client.query('SELECT expires FROM kinnect_core.sessions WHERE token_hash=$1',[hash]);
+   if(!result.rows.length)return json({error:'Vui lòng đăng nhập.'},401);
    const forwarded=new Headers(request.headers);forwarded.set('X-User-Id',user.id);forwarded.set('X-Session-Hash',hash);forwarded.set('X-Session-Expires',String(result.rows[0].expires));
    return await env.USER_EVENTS.get(env.USER_EVENTS.idFromName(user.id)).fetch(new Request(request,{headers:forwarded}));
   }
@@ -106,7 +127,9 @@ export default {async fetch(request,env){
   if(path==='/api/wallet'&&request.method==='GET')return json(await createPostgresWallet({client}).state(user.id));
   if(path==='/api/logout'&&request.method==='POST'){
    const tokenHash=createHash('sha256').update(token).digest('hex');await client.query('DELETE FROM kinnect_core.sessions WHERE token_hash=$1',[tokenHash]);
-   await env.USER_EVENTS.get(env.USER_EVENTS.idFromName(user.id)).fetch('https://events/revoke',{method:'POST',body:JSON.stringify({tokenHash})});
+   try{
+    await env.USER_EVENTS?.get(env.USER_EVENTS.idFromName(user.id)).fetch('https://events/revoke',{method:'POST',body:JSON.stringify({tokenHash})});
+   }catch{}
    return json({ok:true},200,{'Set-Cookie':'kinnect_session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0'});
   }
   return json({error:'Method not allowed'},405);

@@ -107,6 +107,10 @@ final class KeychainStore {
         syncToHTTPCookieStorage(origin: origin)
     }
 
+    func sessionCookie(for origin: String = ServerConfig.defaultOrigin) -> String {
+        loadSessionCookie(for: origin)
+    }
+
     func loadSessionCookie(for origin: String = ServerConfig.defaultOrigin) -> String {
         let key = originKey(origin)
         lock.lock()
@@ -239,6 +243,27 @@ final class KeychainStore {
         }
     }
 
+    func clearOrigin(_ origin: String) {
+        let key = originKey(origin)
+        lock.lock()
+        memorySessionCookie.removeValue(forKey: key)
+        memoryDeviceCookie.removeValue(forKey: key)
+        memoryAccountId.removeValue(forKey: key)
+        deleteItemLocked(account: "session:\(key)")
+        deleteItemLocked(account: "device:\(key)")
+        deleteItemLocked(account: "uid:\(key)")
+        lock.unlock()
+
+        if let url = URL(string: key) ?? URL(string: origin),
+           let cookies = HTTPCookieStorage.shared.cookies(for: url) {
+            for c in cookies where c.name == "kinnect_session" || c.name == "kinnect_device" {
+                HTTPCookieStorage.shared.deleteCookie(c)
+            }
+        }
+    }
+
+    /// Wipes all origins in memory, Keychain, and HTTPCookieStorage.
+    /// Call ONLY on explicit user logout or confirmed account deletion.
     func clearAll() {
         lock.lock()
         memorySessionCookie.removeAll()
@@ -259,10 +284,11 @@ final class KeychainStore {
     }
 
     private func originKey(_ origin: String) -> String {
-        if origin == ServerConfig.fallbackOrigin {
-            return ServerConfig.defaultOrigin
+        if let normalized = ServerConfig.normalize(origin) {
+            return normalized
         }
-        return ServerConfig.normalize(origin) ?? ServerConfig.defaultOrigin
+        let trimmed = origin.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? ServerConfig.defaultOrigin : trimmed
     }
 
     private func setStringLocked(_ value: String, account: String) {

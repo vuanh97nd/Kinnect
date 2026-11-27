@@ -35,15 +35,27 @@ if (bar && getBlock) {
 // Menu trên điện thoại
 const menuBtn = document.querySelector(".menu-btn");
 const menu = document.getElementById("menu");
+function closeMobileMenu() {
+  if (!menuBtn || !menu) return;
+  menu.classList.remove("open");
+  menuBtn.setAttribute("aria-expanded", "false");
+  menuBtn.setAttribute("aria-label", "Mở menu");
+}
 menuBtn?.addEventListener("click", () => {
   const open = menu.classList.toggle("open");
   menuBtn.setAttribute("aria-expanded", String(open));
   menuBtn.setAttribute("aria-label", open ? "Đóng menu" : "Mở menu");
 });
 menu?.addEventListener("click", (e) => {
-  if (e.target.closest("a")) {
-    menu.classList.remove("open");
-    menuBtn?.setAttribute("aria-expanded", "false");
+  if (e.target.closest("a")) closeMobileMenu();
+});
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".site-header")) closeMobileMenu();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && menuBtn?.getAttribute("aria-expanded") === "true") {
+    closeMobileMenu();
+    menuBtn.focus();
   }
 });
 
@@ -105,24 +117,3 @@ faqs.forEach((d) =>
     if (d.open) faqs.forEach((o) => o !== d && (o.open = false));
   }),
 );
-
-// The app validates its own HttpOnly cookie in a first-party hidden frame.
-const sessionLink = document.querySelector("[data-session-link]");
-if (sessionLink) {
-  const appOrigin = "https://app.kinnect.io.vn";
-  const sessionFrame = document.createElement("iframe");
-  sessionFrame.hidden = true;
-  sessionFrame.title = "Kiểm tra phiên Kinnect";
-  sessionFrame.src = appOrigin + "/?website-session=1";
-  window.addEventListener("message", (event) => {
-    if (event.origin !== appOrigin || event.source !== sessionFrame.contentWindow || event.data?.type !== "kinnect:session-status" || typeof event.data.authenticated !== "boolean") return;
-    sessionLink.textContent = event.data.authenticated ? "Mở Kinnect" : "Đăng nhập";
-    if (event.data.authenticated && ["/", "/index.html"].includes(window.location.pathname)) window.location.replace(appOrigin + "/");
-  });
-  const check = () => sessionFrame.contentWindow?.postMessage({ type: "kinnect:check-session" }, appOrigin);
-  sessionFrame.addEventListener("load", check);
-  window.addEventListener("pageshow", check);
-  window.addEventListener("focus", check);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) check(); });
-  document.body.append(sessionFrame);
-}

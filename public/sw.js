@@ -1,4 +1,4 @@
-const CACHE = 'kinnect-static-v34-brand106-download';
+const CACHE = 'kinnect-static-v35-w5w07';
 self.addEventListener('message', event => { if(event.data === 'SKIP_WAITING') self.skipWaiting(); });
 const STATIC = ['/v2.css','/v2.js','/v2-icons.js','/camera.js','/media-editor.js','/media-editor.css','/kinnect-logo-v106.svg','/apple-touch-icon.png','/offline.html'];
 // Cài đặt từng tệp riêng để một tệp lỗi không làm hỏng toàn bộ việc đăng ký SW.
@@ -11,11 +11,12 @@ self.addEventListener('install', event => {
   }));
 });
 self.addEventListener('activate', event => { event.waitUntil(self.clients.claim().then(() => caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('kinnect-static-') && key !== CACHE).map(key => caches.delete(key)))))); });
+const OFFLINE_FALLBACK_HTML = '<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Kinnect — Cần kết nối mạng</title></head><body><main><h1>Kết nối đang tạm nghỉ.</h1><p>Kiểm tra Wi-Fi hoặc dữ liệu di động rồi thử lại.</p><a href="/">Thử kết nối lại ↗</a></main></body></html>';
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (event.request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/') || url.pathname.startsWith('/download/')) return;
   if (event.request.mode === 'navigate') {
-    const offlinePage = () => caches.match('/offline.html');
+    const offlinePage = () => caches.match('/offline.html').then(r => r || new Response(OFFLINE_FALLBACK_HTML, { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } }));
     event.respondWith(self.navigator.onLine === false
       ? offlinePage()
       : fetch(event.request, { cache: "no-store" }).catch(offlinePage));
@@ -27,7 +28,7 @@ self.addEventListener('fetch', event => {
     event.respondWith(fetch(event.request, { cache: "no-store" }).then(response => {
       if (response.ok) { const copy = response.clone(); event.waitUntil(caches.open(CACHE).then(cache => cache.put(url.pathname, copy))); }
       return response;
-    }).catch(() => caches.match(url.pathname)));
+    }).catch(() => caches.match(url.pathname).then(response => response || Response.error())));
   }
 });
 
@@ -64,12 +65,14 @@ async function endCall(d) {
   if (d.reason === 'answered' || d.reason === 'declined') {
     // Safari yêu cầu mỗi push phải hiện thông báo: hiện bản tóm tắt im lặng rồi đóng.
     const n = await self.registration.showNotification('Kinnect', { body: d.reason === 'answered' ? 'Cuộc gọi đã được trả lời' : 'Đã từ chối cuộc gọi', tag: 'kinnect-call-done', silent: true, icon: '/kinnect-logo-v106.svg' });
-    setTimeout(() => self.registration.getNotifications({ tag: 'kinnect-call-done' }).then(l => l.forEach(x => x.close())), 3000);
+    await wait(3000);
+    const doneList = await self.registration.getNotifications({ tag: 'kinnect-call-done' });
+    doneList.forEach(x => x.close());
     return n;
   }
   return self.registration.showNotification(d.from?.name || 'Kinnect', {
     body: d.mode === 'audio' ? 'Cuộc gọi thoại nhỡ' : 'Cuộc gọi video nhỡ', icon: d.icon || '/kinnect-logo-v106.svg', badge: '/kinnect-logo-v106.svg',
-    tag: 'kinnect-missed-' + d.callId, data: { url: d.from ? '/?chat=' + encodeURIComponent(d.from.id) : '/' },
+    tag: 'kinnect-missed-' + d.callId, data: { url: d.from ? '/?s=inbox&chat=' + encodeURIComponent(d.from.id) : '/' },
   });
 }
 async function broadcast(message) { (await clients.matchAll({ type: 'window', includeUncontrolled: true })).forEach(c => c.postMessage(message)); }

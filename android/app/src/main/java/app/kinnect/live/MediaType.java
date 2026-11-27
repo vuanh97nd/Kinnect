@@ -15,6 +15,7 @@ public final class MediaType {
     if(at(b,0,"RIFF")&&at(b,8,"WEBP"))return "image/webp";
     if(b.length>=16 && at(b,4,"ftyp")){
       for(String brand:new String[]{"heic","heix","hevc","hevx","mif1","msf1","avif","avis"})if(at(b,8,brand))return "image/heif";
+      if(at(b,8,"M4A ")||at(b,8,"M4B "))return "audio/mp4";
       return "video/mp4";
     }
     return null;

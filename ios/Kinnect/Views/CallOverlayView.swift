@@ -3,11 +3,18 @@ import SwiftUI
 /// Modern Fullscreen Call Overlay matching iOS FaceTime and Android NativeCalls.
 /// Separated clean modes: Incoming Ringing, Active Video with Floating PiP & Bottom Capsule, and Active Audio.
 struct CallOverlayView: View {
+    private static let callAcceptGreen = Color(red: 0x18 / 255.0, green: 0x66 / 255.0, blue: 0x3E / 255.0)
+    private static let callHangupRed = Color(red: 0xB9 / 255.0, green: 0x1C / 255.0, blue: 0x47 / 255.0)
+
     @ObservedObject private var webrtc = NativeWebRTCManager.shared
     @State private var connectedAt: Date?
     @State private var showControls: Bool = true
     @State private var haloPulsing: Bool = false
     @State private var isMinimized: Bool = false
+    @State private var pipOffset: CGSize = .zero
+    @GestureState private var pipDragTranslation: CGSize = .zero
+    @State private var isPipSwapped: Bool = false
+    @State private var showQuickReplySheet: Bool = false
 
     var body: some View {
         if let call = webrtc.activeCall {
@@ -22,8 +29,17 @@ struct CallOverlayView: View {
                     audioCallView(call)
                 }
             }
+            .preferredColorScheme(.dark)
+            .kinnectActionSheet(
+                isPresented: $showQuickReplySheet,
+                title: L10n.tr("Nhắn tin"),
+                message: call.peerUser.name,
+                items: quickReplyItems(for: call)
+            )
             .onAppear {
                 isMinimized = false
+                pipOffset = .zero
+                isPipSwapped = false
                 updateTimer(state: call.state, callConnectedAt: call.connectedAt)
                 haloPulsing = true
             }
@@ -35,6 +51,8 @@ struct CallOverlayView: View {
             }
             .onChange(of: call.callId) { _ in
                 isMinimized = false
+                pipOffset = .zero
+                isPipSwapped = false
                 connectedAt = webrtc.activeCall?.connectedAt
                 updateTimer(state: webrtc.activeCall?.state ?? call.state, callConnectedAt: webrtc.activeCall?.connectedAt)
             }
@@ -57,10 +75,14 @@ struct CallOverlayView: View {
                         .font(.subheadline.bold())
                         .foregroundColor(.white)
                         .lineLimit(1)
-                    if call.state == .connected, let start = call.connectedAt ?? connectedAt {
+                    if call.isReconnecting {
+                        Text(L10n.tr("Đang kết nối lại…"))
+                            .font(.caption2.weight(.semibold))
+                            .foregroundColor(.yellow)
+                    } else if call.state == .connected, let start = call.connectedAt ?? connectedAt {
                         callDurationText(since: start)
                             .font(.caption2.monospacedDigit().weight(.semibold))
-                            .foregroundColor(.green)
+                            .foregroundColor(KinnectTheme.online)
                     } else {
                         Text(status(call))
                             .font(.caption2)
@@ -70,31 +92,43 @@ struct CallOverlayView: View {
 
                 Spacer()
 
-                Button {
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) {
-                        isMinimized = false
+                HStack(spacing: 12) {
+                    Button {
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) {
+                            isMinimized = false
+                        }
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(Color.white.opacity(0.18))
+                                .frame(width: 36, height: 36)
+                            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                     }
-                } label: {
-                    Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.white)
-                        .frame(width: 36, height: 36)
-                        .background(Circle().fill(Color.white.opacity(0.18)))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Mở rộng cuộc gọi")
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(L10n.tr("Mở rộng cuộc gọi"))
 
-                Button {
-                    webrtc.endOrRejectCurrentCall()
-                } label: {
-                    Image(systemName: "phone.down.fill")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.white)
-                        .frame(width: 36, height: 36)
-                        .background(Circle().fill(Color.red))
+                    Button {
+                        webrtc.endOrRejectCurrentCall()
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(Self.callHangupRed)
+                                .frame(width: 36, height: 36)
+                            Image(systemName: "phone.down.fill")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(L10n.tr("Kết thúc cuộc gọi"))
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Kết thúc cuộc gọi")
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -105,7 +139,7 @@ struct CallOverlayView: View {
                     .shadow(color: .black.opacity(0.45), radius: 12, y: 4)
             )
             .padding(.horizontal, 16)
-            .padding(.top, 54)
+            .padding(.top, 10)
             .onTapGesture {
                 withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) {
                     isMinimized = false
@@ -119,8 +153,11 @@ struct CallOverlayView: View {
     // MARK: - Video Call View (FaceTime / Sleek Unobstructed Layout)
     private func videoCallView(_ call: ActiveCallSession) -> some View {
         ZStack {
-            // Fullscreen Remote Video Track
-            if let track = webrtc.remoteVideoTrack {
+            // Fullscreen Primary Video Track (Remote by default, or Local when swapped)
+            if isPipSwapped, let localTrack = webrtc.localVideoTrack, !webrtc.isCameraOff {
+                WebRTCVideoRendererView(track: localTrack, mirror: webrtc.usingFrontCamera)
+                    .ignoresSafeArea()
+            } else if !isPipSwapped, let track = webrtc.remoteVideoTrack {
                 WebRTCVideoRendererView(track: track, mirror: false)
                     .ignoresSafeArea()
             } else {
@@ -141,7 +178,11 @@ struct CallOverlayView: View {
                         Text(call.peerUser.name)
                             .font(.system(size: 26, weight: .bold))
                             .foregroundColor(.white)
-                        if call.state == .connected, let start = call.connectedAt ?? connectedAt {
+                        if call.isReconnecting {
+                            Text(L10n.tr("Đang kết nối lại…"))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(.yellow)
+                        } else if call.state == .connected, let start = call.connectedAt ?? connectedAt {
                             callDurationText(since: start)
                                 .font(.subheadline.monospacedDigit().weight(.semibold))
                                 .foregroundColor(.white.opacity(0.9))
@@ -165,6 +206,38 @@ struct CallOverlayView: View {
                     }
                 }
 
+            // Persistent Caller Name + Duration Pill when controls are hidden
+            if !showControls {
+                VStack {
+                    VStack(spacing: 2) {
+                        Text(call.peerUser.name)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.white)
+                        if call.isReconnecting {
+                            Text(L10n.tr("Đang kết nối lại…"))
+                                .font(.caption2.weight(.semibold))
+                                .foregroundColor(.yellow)
+                        } else if call.state == .connected, let start = call.connectedAt ?? connectedAt {
+                            callDurationText(since: start)
+                                .font(.caption2.monospacedDigit().weight(.semibold))
+                                .foregroundColor(.white.opacity(0.9))
+                        } else {
+                            Text(status(call))
+                                .font(.caption2)
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(Color.black.opacity(0.45)))
+                    .padding(.top, 12)
+
+                    Spacer()
+                }
+                .allowsHitTesting(false)
+                .transition(.opacity)
+            }
+
             // Floating Top Bar with Gradient
             if showControls {
                 VStack {
@@ -179,19 +252,25 @@ struct CallOverlayView: View {
                                 .foregroundColor(.white)
                                 .frame(width: 44, height: 44)
                                 .background(Circle().fill(Color.black.opacity(0.45)))
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Thu nhỏ cuộc gọi")
+                        .accessibilityLabel(L10n.tr("Thu nhỏ cuộc gọi"))
 
                         Spacer()
 
-                        if webrtc.remoteVideoTrack != nil {
+                        if webrtc.remoteVideoTrack != nil || isPipSwapped {
                             VStack(spacing: 3) {
                                 Text(call.peerUser.name)
                                     .font(.system(size: 18, weight: .bold))
                                     .foregroundColor(.white)
                                     .shadow(color: .black.opacity(0.6), radius: 4)
-                                if call.state == .connected, let start = call.connectedAt ?? connectedAt {
+                                if call.isReconnecting {
+                                    Text(L10n.tr("Đang kết nối lại…"))
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundColor(.yellow)
+                                        .shadow(color: .black.opacity(0.6), radius: 4)
+                                } else if call.state == .connected, let start = call.connectedAt ?? connectedAt {
                                     callDurationText(since: start)
                                         .font(.caption.monospacedDigit().weight(.semibold))
                                         .foregroundColor(.white.opacity(0.95))
@@ -215,9 +294,10 @@ struct CallOverlayView: View {
                                 .foregroundColor(.white)
                                 .frame(width: 44, height: 44)
                                 .background(Circle().fill(Color.black.opacity(0.45)))
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Đổi camera")
+                        .accessibilityLabel(L10n.tr("Đổi camera"))
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 10)
@@ -236,39 +316,97 @@ struct CallOverlayView: View {
                 .transition(.opacity)
             }
 
-            // Floating Local Video PiP in Top-Trailing Corner
+            // Floating Local Video PiP in Top-Trailing Corner (Drag + Tap to Swap)
             VStack {
                 HStack {
                     Spacer()
-                    if let track = webrtc.localVideoTrack, !webrtc.isCameraOff {
-                        WebRTCVideoRendererView(track: track, mirror: webrtc.usingFrontCamera)
+                    Group {
+                        if isPipSwapped {
+                            if let remoteTrack = webrtc.remoteVideoTrack {
+                                WebRTCVideoRendererView(track: remoteTrack, mirror: false)
+                                    .frame(width: 104, height: 148)
+                                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                            .stroke(Color.white.opacity(0.4), lineWidth: 1.5)
+                                    )
+                                    .shadow(color: .black.opacity(0.5), radius: 8, x: 0, y: 4)
+                            } else {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .fill(Color(red: 0.12, green: 0.13, blue: 0.18))
+                                    KinnectAvatarView(
+                                        name: call.peerUser.name,
+                                        avatarURL: call.peerUser.avatarUrl,
+                                        colorHex: call.peerUser.avatarColor,
+                                        size: 48
+                                    )
+                                }
+                                .frame(width: 104, height: 148)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .stroke(Color.white.opacity(0.35), lineWidth: 1)
+                                )
+                                .shadow(color: .black.opacity(0.5), radius: 8, x: 0, y: 4)
+                            }
+                        } else if let track = webrtc.localVideoTrack, !webrtc.isCameraOff {
+                            WebRTCVideoRendererView(track: track, mirror: webrtc.usingFrontCamera)
+                                .frame(width: 104, height: 148)
+                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .stroke(Color.white.opacity(0.4), lineWidth: 1.5)
+                                )
+                                .shadow(color: .black.opacity(0.5), radius: 8, x: 0, y: 4)
+                        } else if webrtc.isCameraOff {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(Color(red: 0.12, green: 0.13, blue: 0.18))
+                                VStack(spacing: 4) {
+                                    Image(systemName: "video.slash.fill")
+                                        .font(.system(size: 22))
+                                        .foregroundColor(.white.opacity(0.7))
+                                    Text(L10n.tr("Camera tắt"))
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.7))
+                                }
+                            }
                             .frame(width: 104, height: 148)
-                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .stroke(Color.white.opacity(0.4), lineWidth: 1.5)
+                                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
                             )
                             .shadow(color: .black.opacity(0.5), radius: 8, x: 0, y: 4)
-                    } else if webrtc.isCameraOff {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(Color(red: 0.12, green: 0.13, blue: 0.18))
-                            VStack(spacing: 4) {
-                                Image(systemName: "video.slash.fill")
-                                    .font(.system(size: 22))
-                                    .foregroundColor(.white.opacity(0.7))
-                                Text("Camera tắt")
-                                    .font(.system(size: 10, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.7))
-                            }
                         }
-                        .frame(width: 104, height: 148)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                        )
-                        .shadow(color: .black.opacity(0.5), radius: 8, x: 0, y: 4)
                     }
+                    .offset(
+                        x: pipOffset.width + pipDragTranslation.width,
+                        y: pipOffset.height + pipDragTranslation.height
+                    )
+                    .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                            isPipSwapped.toggle()
+                        }
+                    }
+                    .gesture(
+                        DragGesture()
+                            .updating($pipDragTranslation) { value, state, _ in
+                                state = value.translation
+                            }
+                            .onEnded { value in
+                                let maxX: CGFloat = 24
+                                let minX: CGFloat = -(UIScreen.main.bounds.width - 140)
+                                let minY: CGFloat = -20
+                                let maxY: CGFloat = max(120, UIScreen.main.bounds.height - 280)
+                                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                                    pipOffset.width = min(maxX, max(minX, pipOffset.width + value.translation.width))
+                                    pipOffset.height = min(maxY, max(minY, pipOffset.height + value.translation.height))
+                                }
+                            }
+                    )
+                    .accessibilityLabel(L10n.tr("Khung hình xem trước"))
+                    .accessibilityHint(L10n.tr("Chạm để đổi khung hình, kéo để di chuyển"))
                 }
                 .padding(.trailing, 16)
                 .padding(.top, 68)
@@ -283,7 +421,7 @@ struct CallOverlayView: View {
                     HStack(spacing: 18) {
                         controlButton(
                             icon: webrtc.isCameraOff ? "video.slash.fill" : "video.fill",
-                            title: "Camera",
+                            title: L10n.tr("Camera"),
                             isActive: !webrtc.isCameraOff
                         ) {
                             webrtc.toggleCamera()
@@ -291,7 +429,7 @@ struct CallOverlayView: View {
 
                         controlButton(
                             icon: webrtc.isMicMuted ? "mic.slash.fill" : "mic.fill",
-                            title: "Mic",
+                            title: L10n.tr("Mic"),
                             isActive: !webrtc.isMicMuted
                         ) {
                             webrtc.toggleMute()
@@ -299,7 +437,7 @@ struct CallOverlayView: View {
 
                         controlButton(
                             icon: webrtc.isSpeakerOn ? "speaker.wave.3.fill" : "speaker.fill",
-                            title: "Loa",
+                            title: L10n.tr("Loa"),
                             isActive: webrtc.isSpeakerOn
                         ) {
                             webrtc.toggleSpeaker()
@@ -313,15 +451,17 @@ struct CallOverlayView: View {
                                     .font(.system(size: 22, weight: .bold))
                                     .foregroundColor(.white)
                                     .frame(width: 56, height: 56)
-                                    .background(Color.red, in: Circle())
-                                    .shadow(color: .red.opacity(0.4), radius: 6)
-                                Text("Kết thúc")
+                                    .background(Self.callHangupRed, in: Circle())
+                                    .shadow(color: Self.callHangupRed.opacity(0.4), radius: 6)
+                                Text(L10n.tr("Kết thúc"))
                                     .font(.system(size: 11, weight: .medium))
                                     .foregroundColor(.white)
                             }
+                            .frame(minWidth: 56, minHeight: 56)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Kết thúc cuộc gọi")
+                        .accessibilityLabel(L10n.tr("Kết thúc cuộc gọi"))
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 16)
@@ -342,17 +482,17 @@ struct CallOverlayView: View {
     private func incomingCallView(_ call: ActiveCallSession) -> some View {
         ZStack {
             LinearGradient(
-                colors: [Color(red: 0.14, green: 0.16, blue: 0.22), .black],
+                colors: [Color(red: 0.08, green: 0.10, blue: 0.15), .black],
                 startPoint: .top,
                 endPoint: .bottom
             ).ignoresSafeArea()
 
             VStack(spacing: 24) {
                 VStack(spacing: 8) {
-                    Label(call.mode == "video" ? "Cuộc gọi video đến" : "Cuộc gọi thoại đến",
+                    Label(L10n.tr(call.mode == "video" ? "Cuộc gọi video đến" : "Cuộc gọi thoại đến"),
                           systemImage: call.mode == "video" ? "video.fill" : "phone.fill")
                         .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.75))
+                        .foregroundColor(.white.opacity(0.85))
                         .padding(.top, 40)
                 }
 
@@ -386,12 +526,66 @@ struct CallOverlayView: View {
                     Text(call.peerUser.name)
                         .font(.system(size: 30, weight: .bold))
                         .foregroundColor(.white)
-                    Text("Kinnect")
+                    Text(L10n.tr("Đang đổ chuông..."))
                         .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(.white.opacity(0.85))
                 }
 
                 Spacer()
+
+                // Secondary quick actions: Reply with message / Answer audio-only
+                HStack(spacing: 28) {
+                    Button {
+                        showQuickReplySheet = true
+                    } label: {
+                        VStack(spacing: 6) {
+                            Image(systemName: "message.fill")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.white)
+                            Text(L10n.tr("Nhắn tin"))
+                                .font(.caption.weight(.medium))
+                                .foregroundColor(.white.opacity(0.92))
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .frame(minWidth: 72, minHeight: 44)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(Color.white.opacity(0.14))
+                        )
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(L10n.tr("Nhắn tin"))
+
+                    if call.mode == "video" {
+                        Button {
+                            webrtc.activeCall?.mode = "audio"
+                            webrtc.isCameraOff = true
+                            CallKitManager.shared.requestAnswerCall(callId: call.callId)
+                        } label: {
+                            VStack(spacing: 6) {
+                                Image(systemName: "phone.fill")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundColor(.white)
+                                Text(L10n.tr("Chỉ âm thanh"))
+                                    .font(.caption.weight(.medium))
+                                    .foregroundColor(.white.opacity(0.92))
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .frame(minWidth: 72, minHeight: 44)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(Color.white.opacity(0.14))
+                            )
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(L10n.tr("Chỉ âm thanh"))
+                    }
+                }
+                .padding(.bottom, 4)
 
                 // Action Buttons: Decline & Accept
                 HStack(spacing: 60) {
@@ -399,19 +593,23 @@ struct CallOverlayView: View {
                         webrtc.endOrRejectCurrentCall()
                     } label: {
                         VStack(spacing: 8) {
-                            Image(systemName: "phone.down.fill")
-                                .font(.system(size: 28, weight: .bold))
-                                .foregroundColor(.white)
-                                .frame(width: 72, height: 72)
-                                .background(Color.red, in: Circle())
-                                .shadow(color: .red.opacity(0.5), radius: 8)
-                            Text("Từ chối")
+                            ZStack {
+                                Image(systemName: "phone.down.fill")
+                                    .font(.system(size: 28, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 72, height: 72)
+                                    .background(Self.callHangupRed, in: Circle())
+                                    .shadow(color: Self.callHangupRed.opacity(0.5), radius: 8)
+                            }
+                            .frame(width: 86, height: 86)
+                            Text(L10n.tr("Từ chối"))
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundColor(.white)
                         }
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Từ chối cuộc gọi")
+                    .accessibilityLabel(L10n.tr("Từ chối cuộc gọi"))
 
                     Button {
                         CallKitManager.shared.requestAnswerCall(callId: call.callId)
@@ -419,7 +617,7 @@ struct CallOverlayView: View {
                         VStack(spacing: 8) {
                             ZStack {
                                 Circle()
-                                    .stroke(Color.green.opacity(0.4), lineWidth: 4)
+                                    .stroke(KinnectTheme.onlineDot.opacity(0.45), lineWidth: 4)
                                     .frame(width: 86, height: 86)
                                     .scaleEffect(haloPulsing ? 1.15 : 1.0)
                                     .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: haloPulsing)
@@ -428,19 +626,50 @@ struct CallOverlayView: View {
                                     .font(.system(size: 28, weight: .bold))
                                     .foregroundColor(.white)
                                     .frame(width: 72, height: 72)
-                                    .background(Color.green, in: Circle())
-                                    .shadow(color: .green.opacity(0.5), radius: 8)
+                                    .background(Self.callAcceptGreen, in: Circle())
+                                    .shadow(color: Self.callAcceptGreen.opacity(0.5), radius: 8)
                             }
-                            Text("Trả lời")
+                            .frame(width: 86, height: 86)
+                            Text(L10n.tr("Trả lời"))
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundColor(.white)
                         }
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Trả lời cuộc gọi")
+                    .accessibilityLabel(L10n.tr("Trả lời cuộc gọi"))
                 }
                 .padding(.bottom, 48)
             }
+        }
+    }
+
+    private func quickReplyItems(for call: ActiveCallSession) -> [KinnectActionSheetItem] {
+        let presets = [
+            "Tôi sẽ gọi lại sau.",
+            "Đang bận, nhắn tin nhé!",
+            "Tôi đang trong cuộc họp."
+        ]
+        return presets.map { text in
+            let localized = L10n.tr(text)
+            return KinnectActionSheetItem(title: localized, glyph: .messages) {
+                sendQuickReplyAndReject(text: localized, peerId: call.peerUser.id)
+            }
+        }
+    }
+
+    private func sendQuickReplyAndReject(text: String, peerId: String) {
+        webrtc.endOrRejectCurrentCall()
+        Task {
+            _ = try? await KinnectAPIClient.shared.requestJSON(
+                "/api/users/\(peerId)/messages",
+                method: "POST",
+                body: [
+                    "body": text,
+                    "text": text,
+                    "requestId": UUID().uuidString
+                ]
+            )
         }
     }
 
@@ -454,10 +683,33 @@ struct CallOverlayView: View {
             ).ignoresSafeArea()
 
             VStack(spacing: 24) {
-                Label("Kinnect Audio", systemImage: "phone.fill")
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.75))
-                    .padding(.top, 40)
+                HStack {
+                    Button {
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) {
+                            isMinimized = true
+                        }
+                    } label: {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: 44, height: 44)
+                            .background(Circle().fill(Color.black.opacity(0.45)))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(L10n.tr("Thu nhỏ cuộc gọi"))
+
+                    Spacer()
+
+                    Label(L10n.tr("Kinnect Audio"), systemImage: "phone.fill")
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.75))
+
+                    Spacer()
+
+                    Color.clear.frame(width: 44, height: 44)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
 
                 Spacer()
 
@@ -488,7 +740,11 @@ struct CallOverlayView: View {
                     Text(call.peerUser.name)
                         .font(.system(size: 28, weight: .bold))
                         .foregroundColor(.white)
-                    if call.state == .connected, let start = call.connectedAt ?? connectedAt {
+                    if call.isReconnecting {
+                        Text(L10n.tr("Đang kết nối lại…"))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.yellow)
+                    } else if call.state == .connected, let start = call.connectedAt ?? connectedAt {
                         callDurationText(since: start)
                             .font(.title3.monospacedDigit().weight(.semibold))
                             .foregroundColor(.white.opacity(0.9))
@@ -505,7 +761,7 @@ struct CallOverlayView: View {
                 HStack(spacing: 28) {
                     controlButton(
                         icon: webrtc.isSpeakerOn ? "speaker.wave.3.fill" : "speaker.fill",
-                        title: "Loa",
+                        title: L10n.tr("Loa"),
                         isActive: webrtc.isSpeakerOn
                     ) {
                         webrtc.toggleSpeaker()
@@ -513,7 +769,7 @@ struct CallOverlayView: View {
 
                     controlButton(
                         icon: webrtc.isMicMuted ? "mic.slash.fill" : "mic.fill",
-                        title: "Mic",
+                        title: L10n.tr("Mic"),
                         isActive: !webrtc.isMicMuted
                     ) {
                         webrtc.toggleMute()
@@ -527,15 +783,17 @@ struct CallOverlayView: View {
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundColor(.white)
                                 .frame(width: 60, height: 60)
-                                .background(Color.red, in: Circle())
-                                .shadow(color: .red.opacity(0.4), radius: 6)
-                            Text("Kết thúc")
+                                .background(Self.callHangupRed, in: Circle())
+                                .shadow(color: Self.callHangupRed.opacity(0.4), radius: 6)
+                            Text(L10n.tr("Kết thúc"))
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(.white)
                         }
+                        .frame(minWidth: 60, minHeight: 60)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Kết thúc cuộc gọi")
+                    .accessibilityLabel(L10n.tr("Kết thúc cuộc gọi"))
                 }
                 .padding(.horizontal, 24)
                 .padding(.vertical, 16)
@@ -578,12 +836,13 @@ struct CallOverlayView: View {
     }
 
     private func status(_ call: ActiveCallSession) -> String {
+        if call.isReconnecting { return L10n.tr("Đang kết nối lại…") }
         switch call.state {
-        case .ringingIncoming: return call.mode == "video" ? "Cuộc gọi video đến…" : "Cuộc gọi đến…"
-        case .dialingOutgoing: return "Đang gọi…"
-        case .connecting: return "Đang kết nối…"
-        case .connected: return "Đã kết nối"
-        case .ended: return "Đã kết thúc"
+        case .ringingIncoming: return L10n.tr(call.mode == "video" ? "Cuộc gọi video đến…" : "Cuộc gọi đến…")
+        case .dialingOutgoing: return L10n.tr("Đang gọi…")
+        case .connecting: return L10n.tr("Đang kết nối…")
+        case .connected: return L10n.tr("Đã kết nối")
+        case .ended: return L10n.tr("Đã kết thúc")
         }
     }
 
@@ -601,6 +860,8 @@ struct CallOverlayView: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.white.opacity(0.85))
             }
+            .frame(minWidth: 54, minHeight: 54)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)

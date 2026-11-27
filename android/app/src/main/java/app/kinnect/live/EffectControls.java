@@ -14,10 +14,12 @@ final class EffectControls {
   private static final int GCAM_AMBER = 0xfffdd663;
   private static final int M3_BLUE = 0xff8b5cf6;
 
+  private static final java.util.WeakHashMap<Object, String> ACTIVE_LOOKS = new java.util.WeakHashMap<>();
+
   interface Target {
     String filter(); String sticker(); boolean beauty(); float value(String key);
     void filter(String id); void sticker(String id); void value(String key, float value); void look(String id);
-    String[][] filters(); default void beginEdit() {}
+    String[][] filters(); default void beginEdit() {} default String activeLook() { return beauty() ? "" : "off"; }
   }
 
   static Target forEditor(final FxEngine fx) {
@@ -28,8 +30,9 @@ final class EffectControls {
       public float value(String k) { return fx.get(k); }
       public void filter(String id) { fx.filter = id; }
       public void sticker(String id) { fx.sticker = id; }
-      public void value(String k, float v) { fx.beautyOn = true; fx.set(k, v); }
-      public void look(String id) { fx.applyLook(id); }
+      public void value(String k, float v) { fx.beautyOn = true; ACTIVE_LOOKS.remove(fx); fx.set(k, v); }
+      public void look(String id) { ACTIVE_LOOKS.put(fx, id); fx.applyLook(id); }
+      public String activeLook() { return !fx.beautyOn ? "off" : (ACTIVE_LOOKS.containsKey(fx) ? ACTIVE_LOOKS.get(fx) : ""); }
       public String[][] filters() { return FxEngine.FILTERS; }
     };
   }
@@ -44,19 +47,26 @@ final class EffectControls {
       public void sticker(String id) { fx.sticker = id; }
       public void value(String k, float v) {
         fx.beautyOn = true;
+        ACTIVE_LOOKS.remove(fx);
         if (k.equals("smooth")) fx.smooth = v;
         else if (k.equals("blemish")) fx.blemish = v;
         else if (k.equals("eyes")) fx.eyes = v;
         else fx.lips = v;
       }
       public void look(String id) {
-        fx.beautyOn = !id.equals("off");
+        ACTIVE_LOOKS.put(fx, id);
+        if (id.equals("off")) {
+          fx.beautyOn = false;
+          return;
+        }
+        fx.beautyOn = true;
         fx.smooth = id.equals("glass") ? .78f : .55f;
         fx.blemish = id.equals("glass") ? .85f : .5f;
         fx.eyes = id.equals("doll") ? .72f : id.equals("eyes") ? .9f : id.equals("peach") ? .14f : .08f;
         fx.lips = id.equals("doll") ? .27f : id.equals("lips") ? .78f : id.equals("peach") ? .13f : .05f;
         if (id.equals("peach")) { fx.smooth = .62f; fx.blemish = .65f; }
       }
+      public String activeLook() { return !fx.beautyOn ? "off" : (ACTIVE_LOOKS.containsKey(fx) ? ACTIVE_LOOKS.get(fx) : ""); }
       public String[][] filters() { return LiveEffects.FILTERS; }
     };
   }
@@ -78,6 +88,7 @@ final class EffectControls {
       HorizontalScrollView scroll = new HorizontalScrollView(c);
       scroll.setHorizontalScrollBarEnabled(false);
       LinearLayout choices = new LinearLayout(c);
+      String activePreset = target.beauty() ? target.activeLook() : "off";
       for (String[] item : new String[][] {
         { "off", "none", "Gốc" },
         { "natural", "look_natural", "Tự nhiên" },
@@ -87,8 +98,8 @@ final class EffectControls {
         { "eyes", "eyes", "Mắt to" },
         { "lips", "lips", "Môi đầy" }
       }) {
-        boolean isOff = item[0].equals("off") && !target.beauty();
-        View b = tile(c, item[1], null, item[2], ink, soft, isOff, activeColor);
+        boolean isSelected = item[0].equals(activePreset);
+        View b = tile(c, item[1], null, item[2], ink, soft, isSelected, activeColor);
         b.setOnClickListener(v -> {
           target.look(item[0]);
           changed.run();
@@ -156,6 +167,12 @@ final class EffectControls {
           replacePanel(box, c, tab, target, changed);
         });
         row.addView(b, new LinearLayout.LayoutParams(0, -2, 1));
+      }
+      int rem = catalog.length % columns;
+      if (rem != 0 && row != null) {
+        for (int k = 0; k < columns - rem; k++) {
+          row.addView(new View(c), new LinearLayout.LayoutParams(0, 1, 1));
+        }
       }
     }
     return box;

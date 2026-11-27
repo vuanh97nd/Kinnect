@@ -5,7 +5,12 @@ final class KinnectButton extends Button {
   super(c);
   setTypeface(ApprovedTypography.font(c,Typeface.BOLD));
   // M3 chuẩn chiều cao nút bấm
-  setMinHeight(Math.round(48 * c.getResources().getDisplayMetrics().density));
+  int min = UiMetrics.dpRaw(c, 48);
+  setMinHeight(min);
+  setMinimumHeight(min);
+  setMinWidth(min);
+  setMinimumWidth(min);
+  setGravity(android.view.Gravity.CENTER);
   setAllCaps(false); // Chữ thường theo M3
  }
  @Override public void setTypeface(Typeface face,int style){super.setTypeface(ApprovedTypography.font(getContext(),style));}

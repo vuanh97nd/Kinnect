@@ -1,10 +1,25 @@
 package app.kinnect.live;
 import android.content.*;
+import android.os.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.json.JSONObject;
-/** Notification "decline" button and BOOT_COMPLETED: no UI needed. */
+/** Handles incoming call notification "decline" action without launching UI. */
 public final class CallActionReceiver extends BroadcastReceiver {
- @Override public void onReceive(Context c,Intent i){if(i==null)return;String a=i.getAction();
-  if(Distribution.PLAY&&"stop-sync".equals(a)){if(!KinnectService.ACTION_TOKEN.equals(i.getStringExtra("token")))return;c.getSharedPreferences("play_privacy",0).edit().putBoolean("background_messages",false).apply();KinnectService.stop(c);return;}
-  if("decline".equals(a)){if(!KinnectService.ACTION_TOKEN.equals(i.getStringExtra("token")))return;JSONObject m=KinnectService.pendingIncoming;if(m!=null)KinnectService.send(NativeSocket.json("type","call-decline","callId",m.optString("callId")));KinnectService.clearCall();return;}
-  if("restart-service".equals(a)||Intent.ACTION_BOOT_COMPLETED.equals(a)||Intent.ACTION_MY_PACKAGE_REPLACED.equals(a)||"android.intent.action.QUICKBOOT_POWERON".equals(a)){NativeApi.shared.initialize(c,ServerConfig.DEFAULT_ORIGIN);if(!NativeApi.shared.cookieFor(ServerConfig.DEFAULT_ORIGIN).isEmpty())KinnectService.start(c);}}
+ @Override public void onReceive(Context c,Intent i){if(i==null)return;
+  if("decline".equals(i.getAction())){
+   String token=i.getStringExtra("token");
+   if(token==null||(!KinnectService.ACTION_TOKEN.equals(token)&&!KinnectService.actionToken(c).equals(token)))return;
+   JSONObject m=KinnectService.pendingIncoming;
+   String callId=m!=null?m.optString("callId"):i.getStringExtra("callId");
+   KinnectService.cancelCallNotification(c);
+   KinnectService.clearCall(c);
+   if(callId!=null&&!callId.isEmpty()){
+    final PendingResult pending=goAsync();
+    final AtomicBoolean done=new AtomicBoolean(false);
+    final Runnable finishOnce=()->{if(done.compareAndSet(false,true))try{pending.finish();}catch(Exception ignored){}};
+    new Handler(Looper.getMainLooper()).postDelayed(finishOnce,7000);
+    KinnectService.declineCall(c,callId,finishOnce);
+   }
+  }
+ }
 }

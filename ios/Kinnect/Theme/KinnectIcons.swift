@@ -37,6 +37,11 @@ enum KinnectGlyph: String, CaseIterable {
     case save
     case microphone
     case eye
+    case eyeOff
+    case lock
+    case moon
+    case help
+    case info
     case shield
     case report
     case block
@@ -45,13 +50,8 @@ enum KinnectGlyph: String, CaseIterable {
     case chevronRight
 
     // Semantic aliases used in Auth / Profile views
-    static var lock: KinnectGlyph { .shield }
-    static var eyeOff: KinnectGlyph { .eye }
     static var games: KinnectGlyph { .game }
     static var settings: KinnectGlyph { .more }
-    static var moon: KinnectGlyph { .studio }
-    static var help: KinnectGlyph { .report }
-    static var info: KinnectGlyph { .profile }
 
     var label: String {
         switch self {
@@ -90,6 +90,11 @@ enum KinnectGlyph: String, CaseIterable {
         case .save: return "Lưu"
         case .microphone: return "Micro"
         case .eye: return "Người xem"
+        case .eyeOff: return "Ẩn"
+        case .lock: return "Khóa"
+        case .moon: return "Giao diện"
+        case .help: return "Trợ giúp"
+        case .info: return "Thông tin"
         case .shield: return "An toàn"
         case .report: return "Báo cáo"
         case .block: return "Chặn"
@@ -527,6 +532,60 @@ enum KinnectGlyph: String, CaseIterable {
             p.addCurve(to: CGPoint(x: 12, y: 16), control1: CGPoint(x: 6.7, y: 8), control2: CGPoint(x: 6.7, y: 16))
             p.addCurve(to: CGPoint(x: 12, y: 8), control1: CGPoint(x: 17.3, y: 16), control2: CGPoint(x: 17.3, y: 8))
             p.closeSubpath()
+        case .eyeOff:
+            p.move(to: CGPoint(x: 1, y: 12))
+            p.addCurve(to: CGPoint(x: 23, y: 12), control1: CGPoint(x: 6, y: 2), control2: CGPoint(x: 18, y: 2))
+            p.addCurve(to: CGPoint(x: 1, y: 12), control1: CGPoint(x: 18, y: 22), control2: CGPoint(x: 6, y: 22))
+            p.closeSubpath()
+            p.move(to: CGPoint(x: 12, y: 8.5))
+            p.addCurve(to: CGPoint(x: 12, y: 15.5), control1: CGPoint(x: 7.5, y: 8.5), control2: CGPoint(x: 7.5, y: 15.5))
+            p.addCurve(to: CGPoint(x: 12, y: 8.5), control1: CGPoint(x: 16.5, y: 15.5), control2: CGPoint(x: 16.5, y: 8.5))
+            p.closeSubpath()
+            p.move(to: CGPoint(x: 3, y: 3))
+            p.addLine(to: CGPoint(x: 21, y: 21))
+        case .lock:
+            p.move(to: CGPoint(x: 7, y: 11))
+            p.addLine(to: CGPoint(x: 17, y: 11))
+            p.addQuadCurve(to: CGPoint(x: 19, y: 13), control: CGPoint(x: 19, y: 11))
+            p.addLine(to: CGPoint(x: 19, y: 20))
+            p.addQuadCurve(to: CGPoint(x: 17, y: 22), control: CGPoint(x: 19, y: 22))
+            p.addLine(to: CGPoint(x: 7, y: 22))
+            p.addQuadCurve(to: CGPoint(x: 5, y: 20), control: CGPoint(x: 5, y: 22))
+            p.addLine(to: CGPoint(x: 5, y: 13))
+            p.addQuadCurve(to: CGPoint(x: 7, y: 11), control: CGPoint(x: 5, y: 11))
+            p.closeSubpath()
+            p.move(to: CGPoint(x: 8, y: 11))
+            p.addLine(to: CGPoint(x: 8, y: 7.5))
+            p.addCurve(to: CGPoint(x: 16, y: 7.5), control1: CGPoint(x: 8, y: 2), control2: CGPoint(x: 16, y: 2))
+            p.addLine(to: CGPoint(x: 16, y: 11))
+            p.move(to: CGPoint(x: 12, y: 15.5))
+            p.addLine(to: CGPoint(x: 12, y: 17.5))
+        case .moon:
+            p.move(to: CGPoint(x: 14.5, y: 3))
+            p.addCurve(to: CGPoint(x: 14.5, y: 21), control1: CGPoint(x: 3, y: 4), control2: CGPoint(x: 3, y: 20))
+            p.addCurve(to: CGPoint(x: 21, y: 16), control1: CGPoint(x: 17.5, y: 21), control2: CGPoint(x: 19.8, y: 19))
+            p.addCurve(to: CGPoint(x: 14.5, y: 3), control1: CGPoint(x: 13, y: 17.5), control2: CGPoint(x: 10.5, y: 8))
+            p.closeSubpath()
+        case .help:
+            p.move(to: CGPoint(x: 12, y: 2))
+            p.addCurve(to: CGPoint(x: 12, y: 22), control1: CGPoint(x: -1.3, y: 2), control2: CGPoint(x: -1.3, y: 22))
+            p.addCurve(to: CGPoint(x: 12, y: 2), control1: CGPoint(x: 25.3, y: 22), control2: CGPoint(x: 25.3, y: 2))
+            p.closeSubpath()
+            p.move(to: CGPoint(x: 9.2, y: 9.2))
+            p.addCurve(to: CGPoint(x: 14.8, y: 9.5), control1: CGPoint(x: 9.5, y: 6.5), control2: CGPoint(x: 14.8, y: 6.5))
+            p.addCurve(to: CGPoint(x: 12, y: 13.5), control1: CGPoint(x: 14.8, y: 11.5), control2: CGPoint(x: 12, y: 12))
+            p.addLine(to: CGPoint(x: 12, y: 14.2))
+            p.move(to: CGPoint(x: 12, y: 17.4))
+            p.addLine(to: CGPoint(x: 12, y: 17.6))
+        case .info:
+            p.move(to: CGPoint(x: 12, y: 2))
+            p.addCurve(to: CGPoint(x: 12, y: 22), control1: CGPoint(x: -1.3, y: 2), control2: CGPoint(x: -1.3, y: 22))
+            p.addCurve(to: CGPoint(x: 12, y: 2), control1: CGPoint(x: 25.3, y: 22), control2: CGPoint(x: 25.3, y: 2))
+            p.closeSubpath()
+            p.move(to: CGPoint(x: 12, y: 7.2))
+            p.addLine(to: CGPoint(x: 12, y: 7.4))
+            p.move(to: CGPoint(x: 12, y: 11))
+            p.addLine(to: CGPoint(x: 12, y: 17))
         case .shield:
             p.move(to: CGPoint(x: 12, y: 2))
             p.addLine(to: CGPoint(x: 21, y: 6))

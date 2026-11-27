@@ -1,1 +1,67 @@
-<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Xóa tài khoản Kinnect</title><link rel="icon" href="/kinnect-logo-v106.svg"><link rel="stylesheet" href="/account-deletion.css"><script src="/account-deletion.js" defer></script></head><body><main><img src="/kinnect-logo-v106.svg" width="64" height="64" alt="Kinnect"><h1>Xóa tài khoản Kinnect</h1><p>Bạn có thể thực hiện ngay trên trình duyệt, không cần cài ứng dụng.</p><p>Thao tác sẽ xóa hồ sơ, ảnh, bài viết, video, tin nhắn và dữ liệu gắn với tài khoản khỏi hệ thống đang hoạt động, thu hồi mọi phiên đăng nhập. Nội dung bạn gửi trong nhóm cũng bị xóa; nhóm có thành viên khác được chuyển chủ sở hữu. Không thể khôi phục tài khoản sau khi hoàn tất.</p><form id="login"><h2>Xác thực tài khoản</h2><label>Tên đăng nhập<input name="username" autocomplete="username" required></label><label>Mật khẩu<input name="password" type="password" autocomplete="current-password" required></label><button>Đăng nhập để tiếp tục</button><p><a href="/?s=login">Đăng nhập Google/Facebook hoặc khôi phục mật khẩu</a>, sau đó quay lại trang này.</p></form><form id="confirm" hidden><p id="identity"></p><label>Nhập lại tên đăng nhập để xác nhận<input name="confirmUsername" autocomplete="off" required></label><label>Mật khẩu (nếu được yêu cầu xác thực lại)<input name="password" type="password" autocomplete="current-password"></label><label class="check"><input name="confirmed" type="checkbox" required>Tôi hiểu đây là thao tác xóa vĩnh viễn.</label><button class="danger">Xóa vĩnh viễn tài khoản và dữ liệu</button></form><p id="status" role="status" aria-live="polite"></p><p>Không đăng nhập được? Gửi yêu cầu riêng tới <a href="mailto:anhvn53@wru.vn?subject=Yeu%20cau%20xoa%20tai%20khoan%20Kinnect">anhvn53@wru.vn</a>. Chỉ gửi tên đăng nhập và thông tin để liên hệ; không gửi mật khẩu, OTP hoặc ảnh nhạy cảm. Mr Ánh sẽ xác minh quyền sở hữu trước khi xử lý.</p><p><a href="https://kinnect.io.vn/privacy">Chính sách quyền riêng tư</a> · <a href="/">Quay lại Kinnect</a></p></main></body></html>
+<!doctype html>
+<html lang="vi">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Xóa tài khoản Kinnect</title>
+    <link rel="icon" href="/kinnect-logo-v106.svg">
+    <link rel="stylesheet" href="/account-deletion.css">
+    <script src="/account-deletion.js" defer></script>
+</head>
+
+<body>
+    <main><img src="/kinnect-logo-v106.svg" width="64" height="64" alt="Kinnect">
+        <h1>Xóa tài khoản Kinnect</h1>
+        <p>Bạn có thể thực hiện ngay trên trình duyệt mà không cần cài ứng dụng, hoặc thực hiện trực tiếp trong ứng dụng
+            tại mục <b>Cài đặt &amp; riêng tư → Xóa tài khoản và dữ liệu</b>.</p>
+        <p>Thao tác sẽ xóa vĩnh viễn hồ sơ, ảnh, bài viết, video, tin nhắn và dữ liệu gắn với tài khoản khỏi hệ thống
+            đang hoạt động, đồng thời thu hồi mọi phiên đăng nhập. Nội dung bạn gửi trong nhóm cũng bị xóa; nhóm còn
+            thành viên khác sẽ được chuyển chủ sở hữu. Không thể khôi phục tài khoản sau khi hoàn tất.</p>
+        <form id="login">
+            <h2>Xác thực tài khoản</h2>
+            <div id="creds-wrap"><label>Tên đăng nhập<input name="username" autocomplete="username"
+                        required></label><label>Mật khẩu<input name="password" type="password"
+                        autocomplete="current-password" required></label></div><label id="totp-wrap" hidden>Mã xác thực
+                2 lớp (6 chữ số hoặc mã khôi phục)<input name="totpCode" autocomplete="one-time-code"
+                    inputmode="text"></label><button type="submit">Đăng nhập để tiếp tục</button>
+            <div id="oauth-links" class="oauth-section">
+                <p class="oauth-label">Hoặc xác thực bằng tài khoản liên kết:</p>
+                <div class="oauth-grid"><a class="oauth-btn"
+                        href="/api/oauth/google/start?returnTo=/delete-account">Tiếp tục với Google</a><a
+                        class="oauth-btn" href="/api/oauth/facebook/start?returnTo=/delete-account">Tiếp tục với
+                        Facebook</a></div>
+                <p class="apple-hint">Tài khoản đăng nhập bằng Apple có thể xác thực lại trực tiếp bằng nút <b>Sign in
+                        with Apple</b> trong ứng dụng iOS (mục <b>Cài đặt &amp; riêng tư → Xóa tài khoản và dữ
+                        liệu</b>).</p>
+            </div>
+        </form>
+        <form id="confirm" hidden>
+            <p id="identity"></p><label>Nhập lại tên đăng nhập để xác nhận<input name="confirmUsername"
+                    autocomplete="off" required></label><label id="confirm-password-wrap">Mật khẩu xác thực lại (bỏ
+                trống nếu dùng tài khoản liên kết)<input name="password" type="password"
+                    autocomplete="current-password"></label><label id="confirm-totp-wrap" hidden>Mã xác thực 2 lớp (6
+                chữ số hoặc mã khôi phục)<input name="totpCode" autocomplete="one-time-code" inputmode="text"></label>
+            <div id="reauth-oauth-hint" class="oauth-section" hidden>
+                <p class="oauth-label">Phiên đăng nhập đã quá 10 phút. Nếu dùng tài khoản liên kết không mật khẩu, hãy
+                    xác thực lại bên dưới:</p>
+                <div class="oauth-grid"><a class="oauth-btn" href="/api/oauth/google/start?returnTo=/delete-account">Xác
+                        thực lại với Google</a><a class="oauth-btn"
+                        href="/api/oauth/facebook/start?returnTo=/delete-account">Xác thực lại với Facebook</a></div>
+                <p class="apple-hint">Tài khoản đăng nhập bằng Apple có thể xác thực lại trực tiếp bằng nút <b>Sign in
+                        with Apple</b> trong ứng dụng iOS.</p>
+            </div><label class="check"><input name="confirmed" type="checkbox" required>Tôi hiểu đây là thao tác xóa
+                vĩnh viễn và không thể khôi phục.</label><button class="danger" type="submit">Xóa vĩnh viễn tài khoản và
+                dữ liệu</button>
+        </form>
+        <p id="status" role="status" aria-live="polite"></p>
+        <p>Không đăng nhập được trên trình duyệt? Bạn có thể xóa trực tiếp trong ứng dụng tại <b>Cài đặt &amp; riêng tư
+                → Xóa tài khoản và dữ liệu</b> (bao gồm tài khoản dùng <b>Sign in with Apple</b> trên iOS) hoặc gửi yêu
+            cầu tới <a href="mailto:anhvn53@wru.vn?subject=Yeu%20cau%20xoa%20tai%20khoan%20Kinnect">anhvn53@wru.vn</a>.
+            Chỉ gửi tên đăng nhập và thông tin liên hệ để xác minh; tuyệt đối không gửi mật khẩu hay mã OTP.</p>
+        <p><a href="https://kinnect.io.vn/privacy">Chính sách quyền riêng tư</a> · <a href="https://kinnect.io.vn">Trang
+                chủ Kinnect</a></p>
+    </main>
+</body>
+
+</html>

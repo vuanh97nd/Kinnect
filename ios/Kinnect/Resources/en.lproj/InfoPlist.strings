@@ -1,0 +1,5 @@
+"NSCameraUsageDescription" = "Kinnect needs access to your Camera for video calls, live streaming, and capturing photos and videos to post.";
+"NSMicrophoneUsageDescription" = "Kinnect needs access to your Microphone to transmit audio during voice calls, video calls, live streams, and video recording.";
+"NSLocationWhenInUseUsageDescription" = "Kinnect uses your location when you enable Nearby to discover friends close to you.";
+"NSPhotoLibraryUsageDescription" = "Kinnect needs access to your Photo Library so you can choose profile photos, post photos, and short videos.";
+"NSPhotoLibraryAddUsageDescription" = "Kinnect needs permission to save photos and videos to your Photo Library.";

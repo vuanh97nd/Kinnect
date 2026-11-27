@@ -18,6 +18,13 @@ local.properties
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+*.db
+*.db-shm
+*.db-wal
+change_password*.txt
+artifact_url.txt
+android/app/google-services.json
+android/play-release/google-services.json
 /test-results/
 /playwright-report/
 mail.env
@@ -32,6 +39,7 @@ turn.env
 
 ai.env
 billing.env
+push.env
 cloud-db.env
 gateway.env
 cloud-api-server.env
@@ -47,6 +55,7 @@ android/play-release/local.properties
 !website/dist/**
 __pycache__/
 *.pyc
+.wrangler/
 
 chat-db.env
 

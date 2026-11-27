@@ -84,14 +84,20 @@ func (c *control) send(m message) {
 	_ = c.ws.SetWriteDeadline(time.Now().Add(5 * time.Second))
 	_ = c.ws.WriteJSON(m)
 }
-func (c *control) drop(id string) {
+func (c *control) dropLocked(id string) []*webrtc.PeerConnection {
 	r := c.rooms[id]
 	delete(c.rooms, id)
-	if r != nil {
-		for _, p := range r.peers {
-			_ = p.pc.Close()
-		}
+	if r == nil {
+		return nil
 	}
+	for _, pub := range r.publishers {
+		pub.upstream = nil
+	}
+	pcs := make([]*webrtc.PeerConnection, 0, len(r.peers))
+	for _, p := range r.peers {
+		pcs = append(pcs, p.pc)
+	}
+	return pcs
 }
 func newPublisher(mode string) (*publisher, error) {
 	a, e := webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus, ClockRate: 48000, Channels: 2, SDPFmtpLine: "minptime=10;useinbandfec=1"}, "audio", "kinnect")
@@ -110,13 +116,38 @@ func contains(ids []string, id string) bool {
 	}
 	return false
 }
+func samePublishers(existing map[string]*publisher, specs []publisherSpec) bool {
+	if len(existing) != len(specs) {
+		return false
+	}
+	seen := make(map[string]bool, len(specs))
+	for _, s := range specs {
+		if seen[s.ID] {
+			return false
+		}
+		seen[s.ID] = true
+		pub, ok := existing[s.ID]
+		if !ok || pub.withVideo != (s.Mode != "audio") {
+			return false
+		}
+	}
+	return true
+}
 func (c *control) newPeer(roomID, memberID, pubID string, r *room, up bool) (*peer, error) {
+	pub := r.publishers[pubID]
+	if pub == nil {
+		return nil, errors.New("publisher missing")
+	}
 	pc, e := c.api.NewPeerConnection(webrtc.Configuration{ICEServers: r.ice})
 	if e != nil {
 		return nil, e
 	}
 	p := &peer{pc: pc, publisher: pubID, member: memberID, upstream: up}
 	revision := r.revision
+	peerKey := key(memberID, pubID)
+	if up {
+		peerKey = key(memberID, "@sfu")
+	}
 	pc.OnICECandidate(func(ice *webrtc.ICECandidate) {
 		if ice == nil {
 			return
@@ -126,29 +157,44 @@ func (c *control) newPeer(roomID, memberID, pubID string, r *room, up bool) (*pe
 		if up {
 			from = "@sfu"
 		}
-		c.send(message{Type: "signal", Room: roomID, Revision: revision, From: from, To: memberID, Candidate: &value})
+		c.mu.Lock()
+		curRev := revision
+		if cur := c.rooms[roomID]; cur == r {
+			curRev = cur.revision
+		}
+		c.mu.Unlock()
+		c.send(message{Type: "signal", Room: roomID, Revision: curRev, From: from, To: memberID, Candidate: &value})
 	})
 	pc.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
 		if s == webrtc.PeerConnectionStateFailed {
-			c.send(message{Type: "media-error", Room: roomID, Revision: revision, To: memberID, Error: "Media connection failed"})
+			c.mu.Lock()
+			curRev := revision
+			if cur := c.rooms[roomID]; cur == r {
+				curRev = cur.revision
+				if r.peers[peerKey] == p {
+					delete(r.peers, peerKey)
+				}
+				if up && pub.upstream == p {
+					pub.upstream = nil
+				}
+			}
+			c.mu.Unlock()
+			c.send(message{Type: "media-error", Room: roomID, Revision: curRev, To: memberID, Error: "Media connection failed"})
 			_ = pc.Close()
 		}
 	})
-	pub := r.publishers[pubID]
-	if pub == nil {
-		_ = pc.Close()
-		return nil, errors.New("publisher missing")
-	}
 	if up {
-		pub.upstream = p
 		if _, e = pc.AddTransceiverFromKind(webrtc.RTPCodecTypeAudio, webrtc.RTPTransceiverInit{Direction: webrtc.RTPTransceiverDirectionRecvonly}); e != nil {
+			_ = pc.Close()
 			return nil, e
 		}
 		if pub.withVideo {
 			if _, e = pc.AddTransceiverFromKind(webrtc.RTPCodecTypeVideo, webrtc.RTPTransceiverInit{Direction: webrtc.RTPTransceiverDirectionRecvonly}); e != nil {
+				_ = pc.Close()
 				return nil, e
 			}
 		}
+		pub.upstream = p
 		pc.OnTrack(func(track *webrtc.TrackRemote, _ *webrtc.RTPReceiver) {
 			output := pub.audio
 			if track.Kind() == webrtc.RTPCodecTypeVideo {
@@ -228,23 +274,42 @@ func (c *control) syncRoom(m message) error {
 	if m.Room == "" || len(m.Members) > 5001 || len(m.Publishers) > 4 || m.Revision < 1 {
 		return errors.New("invalid room")
 	}
+	type pendingSub struct {
+		member string
+		pub    string
+		id     string
+	}
+	var toClose []*webrtc.PeerConnection
+	var errMsgs []message
+	var toCreate []pendingSub
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	r := c.rooms[m.Room]
 	if r != nil && m.Revision < r.revision {
+		c.mu.Unlock()
 		return errors.New("stale room")
 	}
-	if r == nil || m.Revision != r.revision {
-		c.drop(m.Room)
+	if r != nil && m.Revision != r.revision && samePublishers(r.publishers, m.Publishers) {
+		// Subscription-only revision bump (e.g. viewer block/unblock): preserve active uplinks & unchanged viewer downlinks.
+		r.revision = m.Revision
+	} else if r == nil || m.Revision != r.revision {
+		toClose = append(toClose, c.dropLocked(m.Room)...)
 		r = &room{revision: m.Revision, publishers: map[string]*publisher{}, members: map[string]memberSpec{}, peers: map[string]*peer{}, ice: m.ICE}
 		c.rooms[m.Room] = r
 		for _, s := range m.Publishers {
 			p, e := newPublisher(s.Mode)
 			if e != nil {
+				delete(c.rooms, m.Room)
+				c.mu.Unlock()
+				for _, pc := range toClose {
+					_ = pc.Close()
+				}
 				return e
 			}
 			r.publishers[s.ID] = p
 		}
+	}
+	if len(m.ICE) > 0 {
+		r.ice = m.ICE
 	}
 	next := map[string]memberSpec{}
 	for _, s := range m.Members {
@@ -255,102 +320,173 @@ func (c *control) syncRoom(m message) error {
 		spec, ok := next[p.member]
 		keep := ok && ((p.upstream && spec.Publisher) || (!p.upstream && contains(spec.Subscriptions, p.publisher)))
 		if !keep {
-			_ = p.pc.Close()
+			if p.upstream {
+				if pub := r.publishers[p.publisher]; pub != nil && pub.upstream == p {
+					pub.upstream = nil
+				}
+			}
+			toClose = append(toClose, p.pc)
 			delete(r.peers, id)
 		}
 	}
+	seen := map[string]bool{}
+	rev := r.revision
 	for member, spec := range next {
 		for _, pub := range spec.Subscriptions {
 			if _, ok := r.publishers[pub]; !ok {
-				return errors.New("unknown publisher")
-			}
-			id := key(member, pub)
-			if r.peers[id] != nil {
+				errMsgs = append(errMsgs, message{Type: "media-error", Room: m.Room, Revision: rev, To: member, Error: "Unknown publisher"})
 				continue
 			}
-			p, e := c.newPeer(m.Room, member, pub, r, false)
-			if e != nil {
-				return e
+			id := key(member, pub)
+			if r.peers[id] != nil || seen[id] {
+				continue
 			}
-			r.peers[id] = p
-			offer, e := p.pc.CreateOffer(nil)
-			if e != nil {
-				return e
-			}
-			if e = p.pc.SetLocalDescription(offer); e != nil {
-				return e
-			}
-			c.send(message{Type: "signal", Room: m.Room, Revision: r.revision, From: pub, To: member, Description: &offer})
+			seen[id] = true
+			toCreate = append(toCreate, pendingSub{member: member, pub: pub, id: id})
 		}
+	}
+	c.mu.Unlock()
+	for _, pc := range toClose {
+		_ = pc.Close()
+	}
+	for _, msg := range errMsgs {
+		c.send(msg)
+	}
+	for _, sub := range toCreate {
+		c.mu.Lock()
+		if c.rooms[m.Room] != r || r.peers[sub.id] != nil {
+			c.mu.Unlock()
+			continue
+		}
+		p, e := c.newPeer(m.Room, sub.member, sub.pub, r, false)
+		if e != nil {
+			c.mu.Unlock()
+			c.send(message{Type: "media-error", Room: m.Room, Revision: rev, To: sub.member, Error: "Media setup failed"})
+			continue
+		}
+		r.peers[sub.id] = p
+		c.mu.Unlock()
+		offer, e := p.pc.CreateOffer(nil)
+		if e == nil {
+			e = p.pc.SetLocalDescription(offer)
+		}
+		if e != nil {
+			c.mu.Lock()
+			if c.rooms[m.Room] == r && r.peers[sub.id] == p {
+				delete(r.peers, sub.id)
+			}
+			c.mu.Unlock()
+			_ = p.pc.Close()
+			c.send(message{Type: "media-error", Room: m.Room, Revision: rev, To: sub.member, Error: "Media setup failed"})
+			continue
+		}
+		c.send(message{Type: "signal", Room: m.Room, Revision: rev, From: sub.pub, To: sub.member, Description: &offer})
 	}
 	return nil
 }
 func (c *control) signalPeer(m message) error {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	r := c.rooms[m.Room]
 	if r == nil || m.Revision != r.revision {
+		c.mu.Unlock()
 		return errors.New("stale room")
 	}
 	member, ok := r.members[m.From]
 	if !ok {
+		c.mu.Unlock()
 		return errors.New("unknown member")
 	}
 	up := m.To == "@sfu"
 	id := key(m.From, m.To)
 	p := r.peers[id]
 	if up && !member.Publisher {
+		c.mu.Unlock()
 		return errors.New("viewer cannot publish")
 	}
 	if !up && !contains(member.Subscriptions, m.To) {
+		c.mu.Unlock()
 		return errors.New("subscription denied")
 	}
+	created := false
 	if p == nil {
 		if !up {
+			c.mu.Unlock()
 			return errors.New("peer not ready")
 		}
 		var e error
 		p, e = c.newPeer(m.Room, m.From, m.From, r, true)
 		if e != nil {
+			c.mu.Unlock()
 			return e
 		}
 		r.peers[id] = p
+		created = true
 	}
+	rev := r.revision
 	p.mu.Lock()
-	defer p.mu.Unlock()
+	failPeer := func(err error) error {
+		if created {
+			if r.peers[id] == p {
+				delete(r.peers, id)
+			}
+			if pub := r.publishers[p.publisher]; pub != nil && pub.upstream == p {
+				pub.upstream = nil
+			}
+		}
+		p.mu.Unlock()
+		c.mu.Unlock()
+		if created {
+			_ = p.pc.Close()
+		}
+		return err
+	}
 	if m.Candidate != nil {
 		if !p.remote {
 			if len(p.pending) >= 100 {
-				return errors.New("too many candidates")
+				return failPeer(errors.New("too many candidates"))
 			}
 			p.pending = append(p.pending, *m.Candidate)
+			p.mu.Unlock()
+			c.mu.Unlock()
 			return nil
 		}
-		return p.pc.AddICECandidate(*m.Candidate)
+		e := p.pc.AddICECandidate(*m.Candidate)
+		if e != nil {
+			return failPeer(e)
+		}
+		p.mu.Unlock()
+		c.mu.Unlock()
+		return nil
 	}
 	if m.Description == nil {
-		return errors.New("missing signal")
+		return failPeer(errors.New("missing signal"))
 	}
 	if up && m.Description.Type != webrtc.SDPTypeOffer || !up && m.Description.Type != webrtc.SDPTypeAnswer {
-		return errors.New("invalid description")
+		return failPeer(errors.New("invalid description"))
 	}
 	if e := p.pc.SetRemoteDescription(*m.Description); e != nil {
-		return e
+		return failPeer(e)
 	}
 	p.remote = true
 	for _, ice := range p.pending {
 		_ = p.pc.AddICECandidate(ice)
 	}
 	p.pending = nil
+	var reply *message
 	if up {
 		answer, e := p.pc.CreateAnswer(nil)
 		if e != nil {
-			return e
+			return failPeer(e)
 		}
 		if e = p.pc.SetLocalDescription(answer); e != nil {
-			return e
+			return failPeer(e)
 		}
-		c.send(message{Type: "signal", Room: m.Room, Revision: r.revision, From: "@sfu", To: m.From, Description: &answer})
+		reply = &message{Type: "signal", Room: m.Room, Revision: rev, From: "@sfu", To: m.From, Description: &answer}
+	}
+	p.mu.Unlock()
+	c.mu.Unlock()
+	if reply != nil {
+		c.send(*reply)
 	}
 	return nil
 }
@@ -396,11 +532,15 @@ func handler(secret string, api *webrtc.API) http.Handler {
  active.Store(c,true)
  defer active.Delete(c)
 		defer func() {
+			var toClose []*webrtc.PeerConnection
 			c.mu.Lock()
 			for id := range c.rooms {
-				c.drop(id)
+				toClose = append(toClose, c.dropLocked(id)...)
 			}
 			c.mu.Unlock()
+			for _, pc := range toClose {
+				_ = pc.Close()
+			}
 			_ = ws.Close()
 		}()
 		ws.SetReadLimit(4 << 20)
@@ -425,8 +565,11 @@ func handler(secret string, api *webrtc.API) http.Handler {
 				e = c.signalPeer(m)
 			case "delete":
 				c.mu.Lock()
-				c.drop(m.Room)
+				toClose := c.dropLocked(m.Room)
 				c.mu.Unlock()
+				for _, pc := range toClose {
+					_ = pc.Close()
+				}
 			case "ping":
 				c.send(message{Type: "pong"})
 			}

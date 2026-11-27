@@ -1,0 +1,671 @@
+/* ==========================================================================
+   KINNECT · BẢNG GIÁM SÁT KỸ THUẬT (ops-monitor)
+   Đi kèm: admin/ops-monitor.js · Tài liệu: OPS-MONITORING-DESIGN.md
+   Phụ thuộc token của admin-v2.css, có giá trị dự phòng để chạy độc lập.
+   ========================================================================== */
+
+.ops-mon {
+  --om-bg: var(--v2-surface, #ffffff);
+  --om-bg-2: var(--v2-surface-2, #f6f5fa);
+  --om-line: var(--v2-line, #e4dff0);
+  --om-ink: var(--v2-ink, #1d1729);
+  --om-ink-2: var(--v2-ink-2, #4a3f5c);
+  --om-ink-3: var(--v2-ink-3, #655877);
+  --om-accent: var(--v2-accent, #5a2fc0);
+  --om-accent-soft: var(--v2-accent-soft, #efe9fd);
+  --om-accent-ink: var(--v2-accent-ink, #4a24a8);
+
+  --om-good: #0f6b46;
+  --om-good-soft: #e2f5ea;
+  --om-warn: #8a4a00;
+  --om-warn-soft: #fdefdc;
+  --om-danger: #a32020;
+  --om-danger-soft: #fdeaea;
+  --om-info: #1b5fa8;
+  --om-info-soft: #e6f0fb;
+
+  margin: 0 0 20px;
+  display: grid;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--om-ink);
+}
+
+:root[data-theme="dark"] .ops-mon {
+  --om-bg: #17141f;
+  --om-bg-2: #1f1b2a;
+  --om-line: #332c45;
+  --om-ink: #f2eefb;
+  --om-ink-2: #cfc6e2;
+  --om-ink-3: #a99ec0;
+  --om-accent: #b79bff;
+  --om-accent-soft: #2a2140;
+  --om-accent-ink: #d9c9ff;
+  --om-good: #6fd6a4;
+  --om-good-soft: #123024;
+  --om-warn: #f0b45e;
+  --om-warn-soft: #35260f;
+  --om-danger: #ff9a9a;
+  --om-danger-soft: #3a1717;
+  --om-info: #8cc2f5;
+  --om-info-soft: #12263a;
+}
+
+/* ---------- Thanh tiêu đề + trạng thái làm mới ---------- */
+
+.ops-mon-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ops-mon-head h3 {
+  margin: 0 0 3px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.ops-mon-sub {
+  margin: 0;
+  font-size: 12px;
+  color: var(--om-ink-3);
+}
+
+.ops-mon-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--om-line);
+  background: var(--om-bg-2);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--om-ink-2);
+  white-space: nowrap;
+}
+
+.ops-mon-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--om-good);
+  flex: none;
+}
+
+.ops-mon-live[data-state="stale"] .ops-mon-dot { background: var(--om-warn); }
+.ops-mon-live[data-state="dead"] .ops-mon-dot { background: var(--om-danger); }
+.ops-mon-live[data-state="stale"] { color: var(--om-warn); border-color: var(--om-warn); }
+.ops-mon-live[data-state="dead"] { color: var(--om-danger); border-color: var(--om-danger); }
+
+@keyframes ops-mon-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.82); }
+}
+
+.ops-mon-live[data-state="live"] .ops-mon-dot {
+  animation: ops-mon-pulse 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ops-mon-live[data-state="live"] .ops-mon-dot { animation: none; }
+}
+
+/* ---------- Dải KPI ---------- */
+
+.ops-mon-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
+  gap: 12px;
+}
+
+.ops-mon-kpi {
+  position: relative;
+  padding: 12px 14px;
+  border: 1px solid var(--om-line);
+  border-radius: 10px;
+  background: var(--om-bg);
+  overflow: hidden;
+}
+
+.ops-mon-kpi-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--om-ink-3);
+  margin-bottom: 5px;
+}
+
+.ops-mon-kpi-value {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 21px;
+  font-weight: 750;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.ops-mon-kpi-value small {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--om-ink-3);
+  letter-spacing: 0;
+}
+
+.ops-mon-kpi-note {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+  color: var(--om-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.ops-mon-kpi-note.up { color: var(--om-warn); font-weight: 650; }
+.ops-mon-kpi-note.down { color: var(--om-good); font-weight: 650; }
+
+.ops-mon-kpi::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--om-accent);
+  opacity: 0.85;
+}
+
+.ops-mon-kpi[data-tone="warn"]::after { background: var(--om-warn); }
+.ops-mon-kpi[data-tone="danger"]::after { background: var(--om-danger); }
+.ops-mon-kpi[data-tone="good"]::after { background: var(--om-good); }
+
+/* ---------- Cảnh báo AI ---------- */
+
+.ops-mon-alerts {
+  display: grid;
+  gap: 10px;
+}
+
+.ops-mon-alert {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  padding: 13px 16px;
+  border: 1px solid var(--om-line);
+  border-left-width: 4px;
+  border-radius: 10px;
+  background: var(--om-bg);
+}
+
+.ops-mon-alert[data-sev="watch"] { border-left-color: var(--om-info); background: var(--om-info-soft); }
+.ops-mon-alert[data-sev="warning"] { border-left-color: var(--om-warn); background: var(--om-warn-soft); }
+.ops-mon-alert[data-sev="critical"] { border-left-color: var(--om-danger); background: var(--om-danger-soft); }
+.ops-mon-alert[data-sev="good"] { border-left-color: var(--om-good); background: var(--om-good-soft); }
+
+.ops-mon-alert-tag {
+  align-self: start;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  border: 1px solid currentColor;
+}
+
+.ops-mon-alert[data-sev="watch"] .ops-mon-alert-tag { color: var(--om-info); }
+.ops-mon-alert[data-sev="warning"] .ops-mon-alert-tag { color: var(--om-warn); }
+.ops-mon-alert[data-sev="critical"] .ops-mon-alert-tag { color: var(--om-danger); }
+.ops-mon-alert[data-sev="good"] .ops-mon-alert-tag { color: var(--om-good); }
+
+.ops-mon-alert-body { display: grid; gap: 4px; min-width: 0; }
+
+.ops-mon-alert-title {
+  font-size: 14px;
+  font-weight: 750;
+  color: var(--om-ink);
+}
+
+.ops-mon-alert-detail {
+  font-size: 12.5px;
+  color: var(--om-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.ops-mon-alert-rec {
+  display: flex;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--om-ink);
+}
+
+.ops-mon-alert-rec::before {
+  content: "▸";
+  color: var(--om-accent);
+  font-weight: 800;
+  flex: none;
+}
+
+.ops-mon-alert-eta {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.06);
+  font-weight: 700;
+}
+
+:root[data-theme="dark"] .ops-mon-alert-eta { background: rgba(255, 255, 255, 0.12); }
+
+/* ---------- Lưới thẻ server ---------- */
+
+.ops-mon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+  gap: 12px;
+}
+
+.ops-mon-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px 15px;
+  border: 1px solid var(--om-line);
+  border-radius: 12px;
+  background: var(--om-bg);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ops-mon-card:hover {
+  border-color: var(--om-accent);
+  box-shadow: 0 4px 16px rgba(25, 20, 38, 0.07);
+}
+
+.ops-mon-card[data-health="degraded"] { border-color: var(--om-warn); }
+.ops-mon-card[data-health="offline"] { border-color: var(--om-danger); opacity: 0.82; }
+
+.ops-mon-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ops-mon-card-name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+.ops-mon-card-meta {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--om-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------------ *
+ * Thanh thao tác trên từng thẻ máy chủ
+ * ------------------------------------------------------------------ */
+
+.ops-mon-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding-top: 9px;
+  border-top: 1px dashed var(--om-line);
+}
+
+.ops-mon-acts-safe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1 1 auto;
+}
+
+/* Thao tác phá huỷ luôn nằm riêng bên phải, tách khỏi nhóm an toàn. */
+.ops-mon-acts-risky {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.ops-mon-act {
+  min-height: 29px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  border: 1px solid var(--om-line);
+  background: var(--om-bg-2);
+  color: var(--om-ink-2);
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.ops-mon-act:hover:not(:disabled) {
+  border-color: var(--om-accent);
+  background: var(--om-accent-soft);
+  color: var(--om-accent-ink);
+}
+
+.ops-mon-act:focus-visible {
+  outline: 3px solid var(--om-accent);
+  outline-offset: 2px;
+}
+
+.ops-mon-act:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.ops-mon-act.is-danger {
+  border-color: var(--om-danger);
+  background: transparent;
+  color: var(--om-danger);
+}
+
+.ops-mon-act.is-danger:hover:not(:disabled) {
+  background: var(--om-danger-soft);
+  color: var(--om-danger);
+}
+
+.ops-mon-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.ops-mon-status[data-s="online"] { color: var(--om-good); background: var(--om-good-soft); border-color: var(--om-good); }
+.ops-mon-status[data-s="degraded"] { color: var(--om-warn); background: var(--om-warn-soft); border-color: var(--om-warn); }
+.ops-mon-status[data-s="offline"] { color: var(--om-danger); background: var(--om-danger-soft); border-color: var(--om-danger); }
+
+/* Con số lớn: người đang dùng của riêng server này */
+.ops-mon-users {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ops-mon-users b {
+  font-size: 19px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.ops-mon-users span {
+  font-size: 12px;
+  color: var(--om-ink-3);
+  font-weight: 600;
+}
+
+/* Sparkline */
+.ops-mon-spark {
+  display: block;
+  width: 100%;
+  height: 34px;
+  overflow: visible;
+}
+
+.ops-mon-spark .om-spark-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.ops-mon-spark .om-spark-area { stroke: none; opacity: 0.16; }
+
+/* Thanh tải */
+.ops-mon-bar {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--om-bg-2);
+  overflow: hidden;
+  border: 1px solid var(--om-line);
+}
+
+.ops-mon-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--om-good);
+  transition: width 0.4s ease, background-color 0.3s ease;
+}
+
+.ops-mon-bar[data-level="watch"] > i { background: #b98a12; }
+.ops-mon-bar[data-level="warning"] > i { background: var(--om-warn); }
+.ops-mon-bar[data-level="critical"] > i { background: var(--om-danger); }
+
+.ops-mon-bar-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--om-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.ops-mon-bar-label b { color: var(--om-ink-2); font-weight: 700; }
+
+/* Lưới thông số nhỏ trong thẻ */
+.ops-mon-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  padding-top: 9px;
+  border-top: 1px dashed var(--om-line);
+  font-variant-numeric: tabular-nums;
+}
+
+.ops-mon-stat {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 12px;
+  min-width: 0;
+}
+
+.ops-mon-stat > span {
+  color: var(--om-ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ops-mon-stat > b {
+  font-weight: 700;
+  color: var(--om-ink-2);
+  white-space: nowrap;
+}
+
+.ops-mon-stat[data-tone="warn"] > b { color: var(--om-warn); }
+.ops-mon-stat[data-tone="danger"] > b { color: var(--om-danger); }
+
+/* ---------- Bảng chi tiết ---------- */
+
+.ops-mon-tablewrap {
+  border: 1px solid var(--om-line);
+  border-radius: 12px;
+  background: var(--om-bg);
+  overflow: hidden;
+}
+
+.ops-mon-tablewrap > summary {
+  padding: 13px 16px;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--om-ink);
+}
+
+.ops-mon-tablewrap > summary::-webkit-details-marker { display: none; }
+
+.ops-mon-tablewrap > summary::before {
+  content: "▸";
+  color: var(--om-accent);
+  font-weight: 800;
+  transition: transform 0.15s ease;
+}
+
+.ops-mon-tablewrap[open] > summary::before { transform: rotate(90deg); }
+
+.ops-mon-scroll {
+  overflow-x: auto;
+  border-top: 1px solid var(--om-line);
+}
+
+.ops-mon-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ops-mon-table th,
+.ops-mon-table td {
+  padding: 9px 12px;
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--om-line);
+}
+
+.ops-mon-table th:first-child,
+.ops-mon-table td:first-child {
+  text-align: left;
+  position: sticky;
+  left: 0;
+  background: var(--om-bg);
+  z-index: 1;
+}
+
+.ops-mon-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--om-bg-2);
+  font-size: 12px;
+  font-weight: 750;
+  color: var(--om-ink-3);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--om-line);
+}
+
+.ops-mon-table thead th:first-child { z-index: 3; }
+
+.ops-mon-table tbody tr:hover td { background: var(--om-bg-2); }
+
+.ops-mon-table tbody tr:last-child td { border-bottom: 0; }
+
+.ops-mon-table td.warn { color: var(--om-warn); font-weight: 700; }
+.ops-mon-table td.danger { color: var(--om-danger); font-weight: 700; }
+.ops-mon-table td.good { color: var(--om-good); font-weight: 700; }
+
+/* ---------- Khung xương / lỗi ---------- */
+
+.ops-mon-skeleton {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+  gap: 12px;
+}
+
+.ops-mon-skeleton > div {
+  height: 158px;
+  border-radius: 12px;
+  border: 1px solid var(--om-line);
+  background: linear-gradient(90deg, var(--om-bg-2) 25%, var(--om-bg) 50%, var(--om-bg-2) 75%);
+  background-size: 300% 100%;
+  animation: ops-mon-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes ops-mon-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ops-mon-skeleton > div { animation: none; }
+}
+
+.ops-mon-error {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  padding: 18px;
+  border: 1px solid var(--om-danger);
+  border-radius: 12px;
+  background: var(--om-danger-soft);
+  color: var(--om-ink);
+  font-size: 13px;
+}
+
+.ops-mon-error button {
+  padding: 8px 16px;
+  min-height: 40px;
+  border-radius: 8px;
+  border: 1px solid var(--om-danger);
+  background: var(--om-bg);
+  color: var(--om-danger);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ops-mon-error button:hover { background: var(--om-danger); color: #fff; }
+
+/* ---------- Màn hình hẹp ---------- */
+
+@media (max-width: 640px) {
+  .ops-mon-kpis { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+  .ops-mon-kpi { padding: 12px 13px; }
+  .ops-mon-kpi-value { font-size: 23px; }
+  .ops-mon-grid { grid-template-columns: 1fr; }
+  .ops-mon-alert { grid-template-columns: 1fr; gap: 8px; }
+  .ops-mon-alert-tag { justify-self: start; }
+}
+
+@media print {
+  .ops-mon-live,
+  .ops-mon-error button { display: none; }
+  .ops-mon-card { break-inside: avoid; }
+}
+
+/* ------------------------------------------------------------------ *
+ * Tương thích trang Operations cũ
+ * Khung nhật ký (terminal) có nền tối ở CẢ hai chủ đề. Chữ .muted bên
+ * trong dùng var(--v2-ink-3), nên chỉ cần nạp lại biến đó bằng tông sáng
+ * tại đây — không cần !important và không đụng tới quy tắc của admin-v2.
+ * ------------------------------------------------------------------ */
+
+.ops-terminal-wrap {
+  --v2-ink-3: #c3bcd4;
+}
+

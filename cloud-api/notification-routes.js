@@ -1,11 +1,34 @@
 import{profile}from'./profile.js';
+import{D1_QUERIES}from'./d1-queries.js';
+const DELIVERY_RECEIPT_SQL=`INSERT INTO chat_receipts(message_id,user_id,delivered_at)
+ SELECT z.id,?,? FROM chat_messages z JOIN chat_members m ON m.conversation_id=z.conversation_id
+ WHERE m.user_id=? AND m.left_at IS NULL AND z.sender_id<>? AND z.created_at>=m.joined_at
+ AND NOT EXISTS (SELECT 1 FROM chat_receipts r WHERE r.message_id = z.id AND r.user_id = ? AND r.delivered_at IS NOT NULL)
+ ON CONFLICT(message_id,user_id) DO UPDATE SET delivered_at=COALESCE(chat_receipts.delivered_at,excluded.delivered_at)`;
+const DELIVERY_RECEIPT_SQL_LEGACY=`INSERT INTO chat_receipts(message_id,user_id,delivered_at)
+ SELECT z.id,?,? FROM chat_messages z JOIN chat_members m ON m.conversation_id=z.conversation_id
+ WHERE m.user_id=? AND m.left_at IS NULL AND z.sender_id<>? AND z.created_at>=m.joined_at
+ ON CONFLICT(message_id,user_id) DO UPDATE SET delivered_at=COALESCE(chat_receipts.delivered_at,excluded.delivered_at)`;
+const HAS_OPTIMIZED_DELIVERY_SQL=new Set(D1_QUERIES.map(s=>s.replace(/\s+/g,' ').trim())).has(DELIVERY_RECEIPT_SQL.replace(/\s+/g,' ').trim());
+const matchesDirectPair=(raw,actor)=>{
+ if(!raw||typeof raw!=='string')return false;
+ try{const ids=JSON.parse(raw);return Array.isArray(ids)&&ids.includes(actor);}catch{return false;}
+};
 export async function notificationRoute({request,client,env,user,json}){
  if(new URL(request.url).pathname!=='/api/notifications')return null;
  if(request.method==='GET'){
-  await env.CHAT_DB.prepare(`INSERT INTO chat_receipts(message_id,user_id,delivered_at)
-   SELECT z.id,?,? FROM chat_messages z JOIN chat_members m ON m.conversation_id=z.conversation_id
-   WHERE m.user_id=? AND m.left_at IS NULL AND z.sender_id<>? AND z.created_at>=m.joined_at
-   ON CONFLICT(message_id,user_id) DO UPDATE SET delivered_at=COALESCE(chat_receipts.delivered_at,excluded.delivered_at)`).bind(user.id,Date.now(),user.id,user.id).run();
+  const now=Date.now();
+  if(HAS_OPTIMIZED_DELIVERY_SQL){
+   await env.CHAT_DB.prepare(DELIVERY_RECEIPT_SQL).bind(user.id,now,user.id,user.id,user.id).run();
+  }else{
+   try{
+    await env.CHAT_DB.prepare(DELIVERY_RECEIPT_SQL).bind(user.id,now,user.id,user.id,user.id).run();
+   }catch(err){
+    if(String(err?.message||'').includes('Unregistered chat query')){
+     await env.CHAT_DB.prepare(DELIVERY_RECEIPT_SQL_LEGACY).bind(user.id,now,user.id,user.id).run();
+    }else throw err;
+   }
+  }
   const notifications=(await client.query(`SELECT n.* FROM kinnect_core.notifications n JOIN kinnect_core.users a ON a.id=n.actor
    WHERE n.user_id=$1 AND a.suspended=0 AND NOT EXISTS(SELECT 1 FROM kinnect_core.blocks b WHERE (b.actor=$1 AND b.target=a.id) OR (b.actor=a.id AND b.target=$1)) ORDER BY n.created DESC,n.id DESC LIMIT 100`,[user.id])).rows;
   const actors=new Map((await client.query('SELECT * FROM kinnect_core.users WHERE id=ANY($1::text[])',[[...new Set(notifications.map(n=>n.actor))]])).rows.map(u=>[u.id,u]));
@@ -19,7 +42,7 @@ export async function notificationRoute({request,client,env,user,json}){
     ORDER BY m.created_at DESC,m.id DESC LIMIT 1) body FROM json_each(?) n`).bind(user.id,user.id,JSON.stringify(metadata)).all()).results;
   const preferences=(await env.CHAT_DB.prepare(`SELECT c.id,c.kind,p.muted,c.direct_pair FROM chat_preferences p JOIN chat_conversations c ON c.id=p.conversation_id WHERE p.user_id=?`).bind(user.id).all()).results;
   const pending=Number((await client.query("SELECT COUNT(*) n FROM kinnect_core.friendships WHERE (low_id=$1 OR high_id=$1) AND requester<>$1 AND status='pending'",[user.id])).rows[0].n);
-  return json({friendRequestsPending:pending,notifications:notifications.map(n=>{const p=preferences.find(p=>p.kind==='group'?p.id===n.ref:p.direct_pair&&JSON.parse(p.direct_pair).includes(n.actor));const body=previews.find(x=>x.notification_id===n.id)?.body||'';return{...n,created:Number(n.created),actor:profile(actors.get(n.actor)),preview:body.startsWith('{')?'':body.replace(/\s+/g,' ').slice(0,160),commentId:null,muted:!!p?.muted};})});
+  return json({friendRequestsPending:pending,notifications:notifications.map(n=>{const p=preferences.find(p=>p.kind==='group'?p.id===n.ref:matchesDirectPair(p.direct_pair,n.actor));const body=previews.find(x=>x.notification_id===n.id)?.body||'';return{...n,created:Number(n.created),actor:profile(actors.get(n.actor)),preview:body.startsWith('{')?'':body.replace(/\s+/g,' ').slice(0,160),commentId:null,muted:!!p?.muted};})});
  }
  if(request.method==='POST'){
   const raw=await request.text();if(raw.length>8192)return json({error:'Dữ liệu quá lớn.'},413);let b;try{b=JSON.parse(raw);}catch{return json({error:'JSON không hợp lệ.'},400);}

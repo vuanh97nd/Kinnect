@@ -11,11 +11,11 @@ enum KinnectNavTab: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .feed: return "Bảng tin"
-        case .discover: return "Khám phá"
-        case .create: return "Tạo"
-        case .video: return "Video"
-        case .live: return "Live"
+        case .feed: return L10n.tr("Bảng tin")
+        case .discover: return L10n.tr("Khám phá")
+        case .create: return L10n.tr("Tạo")
+        case .video: return L10n.tr("Video")
+        case .live: return L10n.tr("Live")
         }
     }
 
@@ -26,16 +26,6 @@ enum KinnectNavTab: String, CaseIterable, Identifiable {
         case .create: return .add
         case .video: return .video
         case .live: return .live
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .feed: return "house.fill"
-        case .discover: return "magnifyingglass"
-        case .create: return "plus.circle.fill"
-        case .video: return "play.rectangle.fill"
-        case .live: return "dot.radiowaves.left.and.right"
         }
     }
 }
@@ -55,6 +45,7 @@ struct RootMainView: View {
     typealias TopSection = KinnectTopSection
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var webrtc = NativeWebRTCManager.shared
+    @ObservedObject private var loc = LocalizationManager.shared
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var selectedTab: KinnectNavTab = .feed
@@ -65,7 +56,17 @@ struct RootMainView: View {
     @AppStorage("app_appearance_mode") private var appearanceMode: String = "system"
 
     private var activeColorScheme: ColorScheme? {
+        #if DEBUG
+        if UIReviewFixture.isEnabled,
+           let screenName = UIReviewFixture.activeScreen,
+           UIReviewFixture.requiresDarkAppearance(for: screenName) {
+            return .dark
+        }
+        if let overrideLight = UIReviewFixture.overrideLightMode {
+            return overrideLight ? .light : .dark
+        }
         if UIReviewFixture.forceLightMode { return .light }
+        #endif
         switch appearanceMode {
         case "light": return .light
         case "dark": return .dark
@@ -88,6 +89,7 @@ struct RootMainView: View {
         }
     }
 
+    #if DEBUG
     // Shared trailing toolbar for all tabs (P1) - static version for UI Review Fixture
     @ToolbarContentBuilder
     static func headerTrailingButtonsStatic() -> some ToolbarContent {
@@ -95,7 +97,7 @@ struct RootMainView: View {
             // Notifications
             Button { } label: {
                 KinnectIcon(glyph: .notifications, size: 22, tint: KinnectTheme.textPrimary)
-                    .frame(width: 38, height: 44)
+                    .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -104,7 +106,7 @@ struct RootMainView: View {
             // Store
             Button { } label: {
                 KinnectIcon(glyph: .store, size: 22, tint: KinnectTheme.textPrimary)
-                    .frame(width: 38, height: 44)
+                    .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -113,7 +115,7 @@ struct RootMainView: View {
             // Friends
             Button { } label: {
                 KinnectIcon(glyph: .friends, size: 22, tint: KinnectTheme.textPrimary)
-                    .frame(width: 38, height: 44)
+                    .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -122,7 +124,7 @@ struct RootMainView: View {
             // Messages
             Button { } label: {
                 KinnectIcon(glyph: .messages, size: 22, tint: KinnectTheme.textPrimary)
-                    .frame(width: 38, height: 44)
+                    .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -138,7 +140,7 @@ struct RootMainView: View {
                             .font(.caption2.bold())
                             .foregroundStyle(.white)
                     )
-                    .frame(width: 38, height: 44)
+                    .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -147,6 +149,7 @@ struct RootMainView: View {
     }
     @State private var fixturePrivatePhotos: [PrivatePhotoItem] = UIReviewFixture.mockPrivatePhotos()
     @State private var fixturePrivateRequests: [PrivateAccessRequestItem] = UIReviewFixture.mockPrivateRequests()
+    #endif
     @State private var splitColumnVisibility: NavigationSplitViewVisibility = .all
 
         // Shared trailing toolbar for all tabs (P1) - instance version
@@ -171,11 +174,11 @@ struct RootMainView: View {
                             .offset(x: 2, y: -2)
                     }
                 }
-                .frame(width: 38, height: 44)
+                .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Thông báo")
+            .accessibilityLabel(L10n.tr("Thông báo"))
 
             // Store
             Button {
@@ -187,27 +190,35 @@ struct RootMainView: View {
                     selected: activeTopSection == .store,
                     tint: activeTopSection == .store ? KinnectTheme.accentBright : KinnectTheme.textPrimary
                 )
-                .frame(width: 38, height: 44)
+                .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Cửa hàng")
+            .accessibilityLabel(L10n.tr("Cửa hàng"))
 
             // Friends
             Button {
                 activeTopSection = (activeTopSection == .friends) ? nil : .friends
             } label: {
-                KinnectIcon(
-                    glyph: .friends,
-                    size: 22,
-                    selected: activeTopSection == .friends,
-                    tint: activeTopSection == .friends ? KinnectTheme.accentBright : KinnectTheme.textPrimary
-                )
-                .frame(width: 38, height: 44)
+                ZStack(alignment: .topTrailing) {
+                    KinnectIcon(
+                        glyph: .friends,
+                        size: 22,
+                        selected: activeTopSection == .friends,
+                        tint: activeTopSection == .friends ? KinnectTheme.accentBright : KinnectTheme.textPrimary
+                    )
+                    if appState.pendingFriendRequestsCount > 0 {
+                        Circle()
+                            .fill(KinnectTheme.danger)
+                            .frame(width: 8, height: 8)
+                            .offset(x: 2, y: -2)
+                    }
+                }
+                .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Bạn bè")
+            .accessibilityLabel(L10n.tr("Bạn bè"))
 
             // Messages
             Button {
@@ -227,40 +238,43 @@ struct RootMainView: View {
                             .offset(x: 2, y: -2)
                     }
                 }
-                .frame(width: 38, height: 44)
+                .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Tin nhắn")
+            .accessibilityLabel(L10n.tr("Tin nhắn"))
 
             // Profile
             Button {
                 activeTopSection = (activeTopSection == .profile) ? nil : .profile
             } label: {
-                if let u = appState.currentUser {
-                    KinnectAvatarView(
-                        name: u.name,
-                        avatarURL: u.avatarUrl,
-                        colorHex: u.avatarColor,
-                        size: 28,
-                        isOnline: false
-                    )
-                    .overlay(
-                        Circle()
-                            .stroke(activeTopSection == .profile ? KinnectTheme.accentBright : Color.clear, lineWidth: 2)
-                    )
-                } else {
-                    KinnectIcon(
-                        glyph: .profile,
-                        size: 22,
-                        selected: activeTopSection == .profile,
-                        tint: activeTopSection == .profile ? KinnectTheme.accentBright : KinnectTheme.textPrimary
-                    )
+                Group {
+                    if let u = appState.currentUser {
+                        KinnectAvatarView(
+                            name: u.name,
+                            avatarURL: u.avatarUrl,
+                            colorHex: u.avatarColor,
+                            size: 28,
+                            isOnline: false
+                        )
+                        .overlay(
+                            Circle()
+                                .stroke(activeTopSection == .profile ? KinnectTheme.accentBright : Color.clear, lineWidth: 2)
+                        )
+                    } else {
+                        KinnectIcon(
+                            glyph: .profile,
+                            size: 22,
+                            selected: activeTopSection == .profile,
+                            tint: activeTopSection == .profile ? KinnectTheme.accentBright : KinnectTheme.textPrimary
+                        )
+                    }
                 }
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
             }
-            .frame(width: 36, height: 44)
             .buttonStyle(.plain)
-            .accessibilityLabel("Tài khoản")
+            .accessibilityLabel(L10n.tr("Tài khoản"))
         }
     }
 
@@ -268,6 +282,7 @@ struct RootMainView: View {
         ZStack(alignment: .top) {
             KinnectTheme.background.ignoresSafeArea()
 
+            #if DEBUG
             if UIReviewFixture.activeScreen == "auth" || UIReviewFixture.activeScreen?.hasPrefix("auth-welcome") == true {
                 AuthView(initialStage: .welcome)
             } else if UIReviewFixture.activeScreen?.hasPrefix("auth-login") == true {
@@ -315,12 +330,7 @@ struct RootMainView: View {
                                         CameraStudioView(initialMode: .video)
                                     }
                                 } else if UIReviewFixture.activeScreen == "studio-pro-sheet" {
-                                    NavigationStack {
-                                        StudioProSheet(
-                                            appliedEffect: .constant("Cinematic Teal & Orange"),
-                                            onApply: { _ in }
-                                        )
-                                    }
+                                    CameraStudioView(initialMode: .photo)
                                 } else if UIReviewFixture.activeScreen == "group-chat-detail" {
                                     NavigationStack {
                                         GroupChatDetailView(group: ChatGroupItem.from(UIReviewFixture.fixtureGroupDict), onLeftGroup: {})
@@ -343,8 +353,8 @@ struct RootMainView: View {
                                 } else if UIReviewFixture.activeScreen == "privacy-consent" {
                                     PrivacyConsentSheet(
                                         request: PrivacyConsentRequest(
-                                            version: "2026.11",
-                                            notice: "Chính sách quyền riêng tư và điều khoản dịch vụ Kinnect. Cam kết bảo mật theo tiêu chuẩn Apple và pháp luật Việt Nam."
+                                            version: "2026-10-29",
+                                            notice: L10n.tr("Chính sách quyền riêng tư và điều khoản dịch vụ Kinnect. Cam kết bảo mật theo tiêu chuẩn Apple và pháp luật Việt Nam.")
                                         ),
                                         recordOnServer: false,
                                         onAccepted: {}
@@ -355,8 +365,8 @@ struct RootMainView: View {
                                     UGCReportSheet(
                                         context: UGCReportContext(
                                             targetType: "user",
-                                            targetId: "fixture_user_peer",
-                                            targetUserId: "fixture_user_peer",
+                                            targetId: "u2",
+                                            targetUserId: "u2",
                                             targetTitle: "Lê Hoàng Nam"
                                         )
                                     )
@@ -457,6 +467,54 @@ struct RootMainView: View {
                                 } else {
                                     authenticatedLayout
                                 }
+            #else
+            if isShowingSplash || (appState.isRestoringSession && appState.currentUser == nil) {
+                KinnectSplashScreen()
+            } else if appState.currentUser == nil {
+                AuthView(initialStage: .welcome)
+            } else {
+                authenticatedLayout
+            }
+            #endif
+
+                                if showProfileDetailSheet && appState.currentUser != nil {
+                                    ProfileView(
+                                        onBack: {
+                                            withAnimation(.easeInOut(duration: 0.22)) {
+                                                showProfileDetailSheet = false
+                                            }
+                                        },
+                                        onOpenWallet: {
+                                            showProfileDetailSheet = false
+                                            activeTopSection = .wallet
+                                        },
+                                        onOpenFriends: {
+                                            showProfileDetailSheet = false
+                                            activeTopSection = .friends
+                                        },
+                                        onOpenStore: {
+                                            showProfileDetailSheet = false
+                                            activeTopSection = .store
+                                        }
+                                    )
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .background(KinnectTheme.background.ignoresSafeArea())
+                                    .transition(.asymmetric(
+                                        insertion: .move(edge: .trailing),
+                                        removal: .move(edge: .trailing)
+                                    ))
+                                    .zIndex(30)
+                                }
+
+                                if showCameraStudioSheet && appState.currentUser != nil {
+                                    CameraStudioView(onClose: { showCameraStudioSheet = false })
+                                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                        .transition(.asymmetric(
+                                            insertion: .move(edge: .bottom),
+                                            removal: .move(edge: .bottom)
+                                        ))
+                                        .zIndex(35)
+                                }
 
                                 if webrtc.activeCall != nil {
                                     CallOverlayView()
@@ -464,33 +522,39 @@ struct RootMainView: View {
                                         .zIndex(50)
                                 }
 
-                                if appState.currentLiveRoom != nil && appState.isCurrentLiveHost {
+                                if appState.currentLiveRoom != nil {
                                     LiveRoomFullScreenView()
                                         .transition(.move(edge: .bottom))
                                         .zIndex(40)
                                 }
-
-                                if let toast = appState.toastMessage {
-                                    Text(toast)
-                                        .font(.footnote.weight(.semibold))
-                                        .foregroundColor(.white)
-                                        .kinnectMultiline()
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 10)
-                                        .background(
-                                            Capsule()
-                                                .fill(KinnectTheme.surfaceElevated)
-                                                .overlay(Capsule().stroke(KinnectTheme.accentBright.opacity(0.6), lineWidth: 1))
-                                        )
-                                        .padding(.top, 12)
-                                        .padding(.horizontal, 16)
-                                        .zIndex(100)
-                                }
                             }
                             .preferredColorScheme(activeColorScheme)
+                            .onAppear {
+                                KinnectTheme.applyWindowAppearance(appearanceMode)
+                                if appState.currentUser != nil && !isShowingSplash,
+                                   let pending = appState.consumePendingPushRoute() {
+                                    applyNavigationRoute(pending)
+                                }
+                            }
+                            .onChange(of: appearanceMode) { newMode in
+                                KinnectTheme.applyWindowAppearance(newMode)
+                            }
+                            .onChange(of: isShowingSplash) { showing in
+                                if !showing && appState.currentUser != nil,
+                                   let pending = appState.consumePendingPushRoute() {
+                                    applyNavigationRoute(pending)
+                                }
+                            }
+                            .onChange(of: appState.currentUser != nil) { loggedIn in
+                                if loggedIn && !isShowingSplash,
+                                   let pending = appState.consumePendingPushRoute() {
+                                    applyNavigationRoute(pending)
+                                }
+                            }
                             .modifier(UIReviewDynamicTypeModifier())
                             .task {
                                 await appState.bootstrapSession()
+                                #if DEBUG
                                 if UIReviewFixture.isEnabled {
                                     isShowingSplash = false
                                 } else {
@@ -527,27 +591,17 @@ struct RootMainView: View {
                                         break
                                     }
                                 }
+                                #else
+                                try? await Task.sleep(nanoseconds: 700_000_000)
+                                withAnimation(.easeOut(duration: 0.25)) {
+                                    isShowingSplash = false
+                                }
+                                #endif
                             }
                             .onReceive(NotificationCenter.default.publisher(for: .kinnectNavigateRoute)) { notif in
                                 guard let route = notif.object as? String else { return }
-                                switch route {
-                                case "notifications":
-                                    activeTopSection = .notifications
-                                case "messages":
-                                    activeTopSection = .messages
-                                case "profile":
-                                    activeTopSection = .profile
-                                case "friends":
-                                    activeTopSection = .friends
-                                case "video", "shorts":
-                                    activeTopSection = nil
-                                    selectedTab = .video
-                                case "feed":
-                                    activeTopSection = nil
-                                    selectedTab = .feed
-                                default:
-                                    break
-                                }
+                                applyNavigationRoute(route)
+                                _ = appState.consumePendingPushRoute()
                             }
                             .sheet(item: $appState.activeReportContext) { context in
                                 UGCReportSheet(context: context)
@@ -556,6 +610,39 @@ struct RootMainView: View {
                                 PrivacyConsentSheet(request: req, recordOnServer: true, onAccepted: {})
                             }
                         }
+
+    private func applyNavigationRoute(_ route: String) {
+        showProfileDetailSheet = false
+        showCameraStudioSheet = false
+        switch route.lowercased() {
+        case "notifications":
+            activeTopSection = .notifications
+        case "messages":
+            activeTopSection = .messages
+        case "profile":
+            activeTopSection = .profile
+        case "friends":
+            activeTopSection = .friends
+        case "store", "shop":
+            activeTopSection = .store
+        case "wallet":
+            activeTopSection = .wallet
+        case "live":
+            activeTopSection = nil
+            selectedTab = .live
+        case "video", "shorts":
+            activeTopSection = nil
+            selectedTab = .video
+        case "discover":
+            activeTopSection = nil
+            selectedTab = .discover
+        case "feed":
+            activeTopSection = nil
+            selectedTab = .feed
+        default:
+            break
+        }
+    }
 
     @ViewBuilder
     private var authenticatedLayout: some View {
@@ -569,12 +656,16 @@ struct RootMainView: View {
     private var iPadSplitView: some View {
         NavigationSplitView {
             List {
-                Section("Điều hướng") {
+                Section(L10n.tr("Điều hướng")) {
                     ForEach(KinnectNavTab.allCases) { tab in
-                        let isSelected = (activeTopSection == nil && selectedTab == tab)
+                        let isSelected = (tab != .create && activeTopSection == nil && selectedTab == tab)
                         Button {
-                            activeTopSection = nil
-                            selectedTab = tab
+                            if tab == .create {
+                                showCameraStudioSheet = true
+                            } else {
+                                activeTopSection = nil
+                                selectedTab = tab
+                            }
                         } label: {
                             HStack(spacing: 12) {
                                 KinnectIcon(
@@ -604,79 +695,106 @@ struct RootMainView: View {
                     }
                 }
 
-                Section("Liên lạc & Cá nhân") {
+                Section(L10n.tr("Liên lạc & Cá nhân")) {
                     Button {
                         activeTopSection = .messages
                     } label: {
                         HStack(spacing: 12) {
-                            KinnectIcon(glyph: .messages, size: 24, tint: KinnectTheme.accentBright)
-                            Text("Tin nhắn")
-                                .foregroundColor(KinnectTheme.textPrimary)
+                            KinnectIcon(glyph: .messages, size: 24, selected: activeTopSection == .messages, tint: activeTopSection == .messages ? KinnectTheme.accentBright : KinnectTheme.accentBright)
+                            Text(L10n.tr("Tin nhắn"))
+                                .foregroundColor(activeTopSection == .messages ? KinnectTheme.accentBright : KinnectTheme.textPrimary)
                             Spacer()
                             if appState.unreadMessagesCount > 0 {
                                 badgePill(appState.unreadMessagesCount)
                             }
                         }
                         .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                     }
+                    .listRowBackground(activeTopSection == .messages ? KinnectTheme.accent.opacity(0.22) : Color.clear)
 
                     Button {
                         activeTopSection = .profile
                     } label: {
                         HStack(spacing: 12) {
-                            KinnectIcon(glyph: .profile, size: 24, tint: KinnectTheme.textPrimary)
-                            Text("Hồ sơ cá nhân")
-                                .foregroundColor(KinnectTheme.textPrimary)
+                            KinnectIcon(glyph: .profile, size: 24, selected: activeTopSection == .profile, tint: activeTopSection == .profile ? KinnectTheme.accentBright : KinnectTheme.textPrimary)
+                            Text(L10n.tr("Hồ sơ cá nhân"))
+                                .foregroundColor(activeTopSection == .profile ? KinnectTheme.accentBright : KinnectTheme.textPrimary)
                         }
                         .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                     }
+                    .listRowBackground(activeTopSection == .profile ? KinnectTheme.accent.opacity(0.22) : Color.clear)
                 }
 
-                Section("Tiện ích") {
+                Section(L10n.tr("Tiện ích")) {
                     Button {
                         showCameraStudioSheet = true
                     } label: {
                         HStack(spacing: 12) {
                             KinnectIcon(glyph: .camera, size: 24, tint: KinnectTheme.accentBright)
-                            Text("Tạo ảnh / Video")
+                            Text(L10n.tr("Tạo ảnh / Video"))
                                 .foregroundColor(KinnectTheme.textPrimary)
                         }
                         .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                     }
                     Button {
                         activeTopSection = .friends
                     } label: {
                         HStack(spacing: 12) {
-                            KinnectIcon(glyph: .friends, size: 24, tint: KinnectTheme.textPrimary)
-                            Text("Bạn bè")
-                                .foregroundColor(KinnectTheme.textPrimary)
+                            KinnectIcon(glyph: .friends, size: 24, selected: activeTopSection == .friends, tint: activeTopSection == .friends ? KinnectTheme.accentBright : KinnectTheme.textPrimary)
+                            Text(L10n.tr("Bạn bè"))
+                                .foregroundColor(activeTopSection == .friends ? KinnectTheme.accentBright : KinnectTheme.textPrimary)
+                            Spacer()
+                            if appState.pendingFriendRequestsCount > 0 {
+                                badgePill(appState.pendingFriendRequestsCount)
+                            }
                         }
                         .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                     }
+                    .listRowBackground(activeTopSection == .friends ? KinnectTheme.accent.opacity(0.22) : Color.clear)
                     Button {
                         activeTopSection = .notifications
                     } label: {
                         HStack(spacing: 12) {
-                            KinnectIcon(glyph: .notifications, size: 24, tint: KinnectTheme.textPrimary)
-                            Text("Thông báo")
-                                .foregroundColor(KinnectTheme.textPrimary)
+                            KinnectIcon(glyph: .notifications, size: 24, selected: activeTopSection == .notifications, tint: activeTopSection == .notifications ? KinnectTheme.accentBright : KinnectTheme.textPrimary)
+                            Text(L10n.tr("Thông báo"))
+                                .foregroundColor(activeTopSection == .notifications ? KinnectTheme.accentBright : KinnectTheme.textPrimary)
                             Spacer()
                             if appState.unreadNotificationsCount > 0 {
                                 badgePill(appState.unreadNotificationsCount)
                             }
                         }
                         .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                     }
+                    .listRowBackground(activeTopSection == .notifications ? KinnectTheme.accent.opacity(0.22) : Color.clear)
+                    Button {
+                        activeTopSection = .store
+                    } label: {
+                        HStack(spacing: 12) {
+                            KinnectIcon(glyph: .store, size: 24, selected: activeTopSection == .store, tint: activeTopSection == .store ? KinnectTheme.accentBright : KinnectTheme.accentBright)
+                            Text(L10n.tr("Cửa hàng Kinnect"))
+                                .foregroundColor(activeTopSection == .store ? KinnectTheme.accentBright : KinnectTheme.textPrimary)
+                        }
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .listRowBackground(activeTopSection == .store ? KinnectTheme.accent.opacity(0.22) : Color.clear)
                     Button {
                         activeTopSection = .wallet
                     } label: {
                         HStack(spacing: 12) {
-                            KinnectIcon(glyph: .wallet, size: 24, tint: KinnectTheme.warning)
-                            Text("Ví Kinnect & Cửa hàng Kinnect")
-                                .foregroundColor(KinnectTheme.textPrimary)
+                            KinnectIcon(glyph: .wallet, size: 24, selected: activeTopSection == .wallet, tint: KinnectTheme.warning)
+                            Text(L10n.tr("Ví Kinnect"))
+                                .foregroundColor(activeTopSection == .wallet ? KinnectTheme.accentBright : KinnectTheme.textPrimary)
                         }
                         .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                     }
+                    .listRowBackground(activeTopSection == .wallet ? KinnectTheme.accent.opacity(0.22) : Color.clear)
                 }
             }
             .scrollContentBackground(.hidden)
@@ -719,34 +837,11 @@ struct RootMainView: View {
                             }
                         }
                     )
+                    .zIndex(2)
                 }
 
                 ZStack {
-                    if showProfileDetailSheet {
-                        ProfileView(
-                            onBack: {
-                                withAnimation(.easeInOut(duration: 0.22)) {
-                                    showProfileDetailSheet = false
-                                }
-                            },
-                            onOpenWallet: {
-                                showProfileDetailSheet = false
-                                activeTopSection = .wallet
-                            },
-                            onOpenFriends: {
-                                showProfileDetailSheet = false
-                                activeTopSection = .friends
-                            },
-                            onOpenStore: {
-                                showProfileDetailSheet = false
-                                activeTopSection = .store
-                            }
-                        )
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .trailing),
-                            removal: .move(edge: .trailing)
-                        ))
-                    } else if let section = activeTopSection {
+                    if let section = activeTopSection {
                         sectionBodyView(section)
                             .transition(.opacity)
                     } else {
@@ -768,30 +863,26 @@ struct RootMainView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+                .zIndex(0)
 
                 // Material 3 Bottom Navigation Bar (Android 1.2.12 lines 473-515)
-                KinnectBottomBar(selectedTab: Binding(
-                    get: { selectedTab },
-                    set: { newTab in
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            activeTopSection = nil
-                            showProfileDetailSheet = false
-                            selectedTab = newTab
+                KinnectBottomBar(
+                    selectedTab: Binding(
+                        get: { selectedTab },
+                        set: { newTab in
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                activeTopSection = nil
+                                showProfileDetailSheet = false
+                                selectedTab = newTab
+                            }
                         }
-                    }
-                )) {
+                    ),
+                    isTopSectionActive: activeTopSection != nil
+                ) {
                     showCameraStudioSheet = true
                 }
-            }
-
-            // FULL SCREEN CAMERA STUDIO (TẠO ẢNH / VIDEO)
-            if showCameraStudioSheet {
-                CameraStudioView(onClose: { showCameraStudioSheet = false })
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .bottom),
-                        removal: .move(edge: .bottom)
-                    ))
-                    .zIndex(35)
+                .zIndex(2)
             }
         }
     }
@@ -853,7 +944,7 @@ struct RootMainView: View {
                 }
             )
         case .messages:
-            NavigationStack {
+            if horizontalSizeClass == .regular {
                 MessagesView(
                     initialScope: .direct,
                     onOpenFriends: {
@@ -867,6 +958,22 @@ struct RootMainView: View {
                         }
                     }
                 )
+            } else {
+                NavigationStack {
+                    MessagesView(
+                        initialScope: .direct,
+                        onOpenFriends: {
+                            withAnimation(.easeInOut(duration: 0.22)) {
+                                activeTopSection = .friends
+                            }
+                        },
+                        onBack: {
+                            withAnimation(.easeInOut(duration: 0.22)) {
+                                activeTopSection = nil
+                            }
+                        }
+                    )
+                }
             }
         case .profile:
             AccountMenuView(
@@ -919,7 +1026,7 @@ struct RootMainView: View {
                             case .discover:
                                 DiscoverView(onOpenCamera: { showCameraStudioSheet = true })
                             case .create:
-                                CameraStudioView()
+                                CameraStudioView(onClose: { selectedTab = .feed })
                             case .video:
                                 ShortsVideoView()
                             case .live:
@@ -940,7 +1047,17 @@ struct RootMainView: View {
                     struct UGCReportSheet: View {
                         let context: UGCReportContext
                         @Environment(\.dismiss) private var dismiss
+                        @Environment(\.colorScheme) private var colorScheme
                         @ObservedObject private var appState = AppState.shared
+                        @ObservedObject private var loc = LocalizationManager.shared
+
+                        private static let childSafetyReason = "An toàn trẻ em"
+
+                        private var childSafetyInk: Color {
+                            colorScheme == .dark
+                                ? Color(.sRGB, red: 0xFF / 255.0, green: 0x8F / 255.0, blue: 0xA3 / 255.0, opacity: 1.0)
+                                : Color(.sRGB, red: 0xA3 / 255.0, green: 0x1E / 255.0, blue: 0x43 / 255.0, opacity: 1.0)
+                        }
 
                         @State private var selectedReason = "Nội dung không phù hợp / phản cảm"
                         @State private var details = ""
@@ -948,6 +1065,7 @@ struct RootMainView: View {
                         @State private var isSubmitting = false
 
                         private let reasons = [
+                            "An toàn trẻ em",
                             "Nội dung không phù hợp / phản cảm",
                             "Quấy rối, đe dọa hoặc xúc phạm",
                             "Lừa đảo hoặc giả mạo",
@@ -961,14 +1079,14 @@ struct RootMainView: View {
                                     VStack(alignment: .leading, spacing: 16) {
                                         HStack(spacing: 10) {
                                             KinnectIcon(glyph: .report, size: 24, selected: true, tint: KinnectTheme.danger)
-                                            Text("Báo cáo vi phạm: \(context.targetTitle)")
+                                            Text("\(L10n.tr("Báo cáo vi phạm")): \(context.targetTitle)")
                                                 .font(.headline)
                                                 .foregroundColor(KinnectTheme.textPrimary)
                                                 .kinnectMultiline()
                                         }
 
                                         VStack(alignment: .leading, spacing: 8) {
-                                            Text("Lý do báo cáo")
+                                            Text(L10n.tr("Lý do báo cáo"))
                                                 .font(.subheadline.weight(.semibold))
                                                 .foregroundColor(KinnectTheme.textSecondary)
 
@@ -978,28 +1096,60 @@ struct RootMainView: View {
                                                 } label: {
                                                     HStack(spacing: 10) {
                                                         Image(systemName: selectedReason == reason ? "checkmark.circle.fill" : "circle")
-                                                            .foregroundColor(selectedReason == reason ? KinnectTheme.accentBright : KinnectTheme.textSecondary)
-                                                        Text(reason)
-                                                            .font(.subheadline)
-                                                            .foregroundColor(KinnectTheme.textPrimary)
+                                                            .foregroundColor(selectedReason == reason ? (reason == Self.childSafetyReason ? childSafetyInk : KinnectTheme.accentBright) : KinnectTheme.textSecondary)
+                                                        Text(L10n.tr(reason))
+                                                            .font(.subheadline.weight(reason == Self.childSafetyReason ? .semibold : .regular))
+                                                            .foregroundColor(reason == Self.childSafetyReason ? childSafetyInk : KinnectTheme.textPrimary)
                                                             .kinnectMultiline()
                                                         Spacer()
                                                     }
-                                                    .padding(10)
+                                                    .padding(.horizontal, 12)
+                                                    .padding(.vertical, 10)
+                                                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                                                     .background(
                                                         RoundedRectangle(cornerRadius: 12)
-                                                            .fill(KinnectTheme.surfaceElevated)
+                                                            .fill(reason == Self.childSafetyReason ? KinnectTheme.danger.opacity(0.10) : KinnectTheme.surfaceElevated)
+                                                            .overlay(
+                                                                RoundedRectangle(cornerRadius: 12)
+                                                                    .stroke(reason == Self.childSafetyReason && selectedReason == reason ? childSafetyInk.opacity(0.65) : Color.clear, lineWidth: 1)
+                                                            )
                                                     )
+                                                    .contentShape(Rectangle())
                                                 }
+                                                .buttonStyle(.plain)
+                                            }
+
+                                            if selectedReason == Self.childSafetyReason {
+                                                HStack(alignment: .top, spacing: 8) {
+                                                    Image(systemName: "exclamationmark.shield.fill")
+                                                        .font(.subheadline)
+                                                        .foregroundColor(childSafetyInk)
+                                                        .padding(.top, 2)
+                                                    Text(L10n.tr("Không đính kèm ảnh hoặc video vi phạm an toàn trẻ em. Báo cáo của bạn sẽ được ưu tiên xử lý khẩn cấp và chuyển cơ quan chức năng khi cần."))
+                                                        .font(.caption)
+                                                        .foregroundColor(childSafetyInk)
+                                                        .kinnectMultiline()
+                                                }
+                                                .padding(12)
+                                                .background(
+                                                    RoundedRectangle(cornerRadius: 12)
+                                                        .fill(KinnectTheme.danger.opacity(0.12))
+                                                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(childSafetyInk.opacity(0.40), lineWidth: 1))
+                                                )
                                             }
                                         }
 
                                         VStack(alignment: .leading, spacing: 6) {
-                                            Text("Chi tiết bổ sung (tùy chọn)")
+                                            Text(L10n.tr("Chi tiết bổ sung (tùy chọn)"))
                                                 .font(.subheadline.weight(.semibold))
                                                 .foregroundColor(KinnectTheme.textSecondary)
 
-                                            TextField("Mô tả thêm...", text: $details, axis: .vertical)
+                                            TextField(
+                                                "",
+                                                text: $details,
+                                                prompt: Text(L10n.tr("Mô tả thêm...")).foregroundColor(KinnectTheme.inputPlaceholder),
+                                                axis: .vertical
+                                            )
                                                 .lineLimit(3...6)
                                                 .padding(12)
                                                 .background(RoundedRectangle(cornerRadius: 12).fill(KinnectTheme.surfaceElevated))
@@ -1010,12 +1160,13 @@ struct RootMainView: View {
                                             Toggle(isOn: $alsoBlockUser) {
                                                 HStack(spacing: 8) {
                                                     KinnectIcon(glyph: .block, size: 20, tint: KinnectTheme.danger)
-                                                    Text("Đồng thời chặn người dùng này và ẩn toàn bộ nội dung của họ")
+                                                    Text(L10n.tr("Đồng thời chặn người dùng này và ẩn toàn bộ nội dung của họ"))
                                                         .font(.subheadline)
                                                         .foregroundColor(KinnectTheme.textPrimary)
                                                         .kinnectMultiline()
                                                 }
                                             }
+                                            .frame(minHeight: 44)
                                             .tint(KinnectTheme.danger)
                                         }
 
@@ -1027,7 +1178,7 @@ struct RootMainView: View {
                                                 if isSubmitting {
                                                     ProgressView().tint(.white)
                                                 } else {
-                                                    Text("Gửi báo cáo")
+                                                    Text(L10n.tr("Gửi báo cáo"))
                                                         .font(.headline)
                                                 }
                                                 Spacer()
@@ -1042,11 +1193,19 @@ struct RootMainView: View {
                                     .padding(16)
                                 }
                                 .background(KinnectTheme.background)
-                                .navigationTitle("Báo cáo UGC")
+                                .navigationTitle(L10n.tr("Báo cáo nội dung"))
                                 .navigationBarTitleDisplayMode(.inline)
                                 .toolbar {
                                     ToolbarItem(placement: .cancellationAction) {
-                                        Button("Đóng") { dismiss() }
+                                        Button {
+                                            dismiss()
+                                        } label: {
+                                            Text(L10n.tr("Đóng"))
+                                                .foregroundColor(KinnectTheme.textPrimary)
+                                                .frame(minWidth: 44, minHeight: 44)
+                                                .contentShape(Rectangle())
+                                        }
+                                        .buttonStyle(.plain)
                                     }
                                 }
                             }
@@ -1071,9 +1230,12 @@ struct RootMainView: View {
                                     requestId: reqId
                                 )
                                 if alsoBlockUser, let uid = context.targetUserId, !uid.isEmpty {
-                                    await appState.blockUser(userId: uid, userName: context.targetTitle)
+                                    let blocked = await appState.blockUser(userId: uid, userName: context.targetTitle, silentToast: true)
+                                    if blocked {
+                                        appState.showToast(L10n.tr("Đã gửi báo cáo và chặn người dùng."))
+                                    }
                                 } else {
-                                    appState.showToast("Đã gửi báo cáo vi phạm. Cảm ơn bạn đã giữ cộng đồng an toàn.")
+                                    appState.showToast(L10n.tr("Đã gửi báo cáo vi phạm. Cảm ơn bạn đã giữ cộng đồng an toàn."))
                                 }
                                 dismiss()
                             } catch {
@@ -1084,6 +1246,7 @@ struct RootMainView: View {
 
                     private struct UIReviewDynamicTypeModifier: ViewModifier {
     func body(content: Content) -> some View {
+        #if DEBUG
         if UIReviewFixture.forceMaxDynamicType {
             content.dynamicTypeSize(...DynamicTypeSize.accessibility2)
         } else if UIReviewFixture.isEnabled {
@@ -1091,5 +1254,8 @@ struct RootMainView: View {
         } else {
             content
         }
+        #else
+        content
+        #endif
     }
 }

@@ -1,3 +1,4 @@
+import StoreKit
 import SwiftUI
 import UIKit
 
@@ -40,7 +41,13 @@ struct WalletStoreView: View {
     @State private var entries: [WalletEntryItem] = []
     @State private var packages: [StorePackageItem] = []
     @State private var digitalProducts: [StoreDigitalProduct] = []
+    @State private var showStudioFromWalletStore: Bool = false
     @State private var accountUuid: UUID? = nil
+    @State private var appleBillingReady: Bool = false
+    @State private var trialPackagePurchases: Bool = false
+    @State private var activeMembershipId: String = ""
+    @State private var transactionInProgress: Bool = false
+    @State private var confirmBuyPackage: StorePackageItem? = nil
     @State private var isLoading = false
     @State private var showWalletInfoAlert: Bool = false
     @State private var showStoreMenuDialog: Bool = false
@@ -117,14 +124,26 @@ struct WalletStoreView: View {
         .confirmationDialog("Cửa hàng", isPresented: $showStoreMenuDialog, titleVisibility: .visible) {
             Button("Khôi phục giao dịch") {
                 Task {
-                    _ = try? await storeKit.restorePurchases()
-                    await loadWalletAndStore()
+                    do {
+                        let outcome = try await storeKit.restorePurchases()
+                        await loadWalletAndStore()
+                        appState.showToast(outcome.failed.isEmpty
+                            ? "Đã kiểm tra và khôi phục các giao dịch hợp lệ."
+                            : "Một số giao dịch chưa xác minh được. Hãy thử lại.")
+                    } catch {
+                        appState.showToast("Chưa khôi phục được: \(error.localizedDescription)")
+                    }
                 }
             }
             Button("Phong cách mặc định") {
                 Task {
-                    _ = try? await KinnectAPIClient.shared.requestJSON("/api/store/style", method: "POST", body: ["productId": ""])
-                    appState.showToast("Đã chuyển về phong cách mặc định")
+                    do {
+                        _ = try await KinnectAPIClient.shared.requestJSON("/api/store/style", method: "POST", body: ["productId": ""])
+                        appState.showToast("Đã chuyển về phong cách mặc định")
+                        await loadWalletAndStore()
+                    } catch {
+                        appState.showToast("Chưa đổi được phong cách: \(error.localizedDescription)")
+                    }
                 }
             }
             Button("Thông tin") {
@@ -137,10 +156,33 @@ struct WalletStoreView: View {
         } message: {
             Text("Quyền lợi gắn với tài khoản Kinnect. Xem thử không thay đổi hồ sơ. Giá thanh toán chỉ hiển thị khi App Store sẵn sàng.")
         }
+        .alert(
+            "Xác nhận đổi gói?",
+            isPresented: Binding(
+                get: { confirmBuyPackage != nil },
+                set: { if !$0 { confirmBuyPackage = nil } }
+            ),
+            presenting: confirmBuyPackage
+        ) { pkg in
+            Button("Hủy", role: .cancel) { confirmBuyPackage = nil }
+            Button("Đổi ngay (\(pkg.priceCoins) xu)") {
+                confirmBuyPackage = nil
+                Task { await buyPackage(pkg) }
+            }
+        } message: { pkg in
+            Text("Gói: \(pkg.title)\nChi phí: \(pkg.priceCoins.formattedWithSeparator()) xu Kinnect.")
+        }
+        .fullScreenCover(isPresented: $showStudioFromWalletStore) {
+            CameraStudioView(initialMode: .photo, onClose: { showStudioFromWalletStore = false })
+        }
         .task {
             await loadWalletAndStore()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .kinnectStoreUpdated)) { _ in
+            Task { await loadWalletAndStore() }
+        }
         .onAppear {
+            #if DEBUG
             if UIReviewFixture.activeScreen == "wallet-topup" {
                 tab = .topup
             } else if UIReviewFixture.activeScreen == "wallet-packages" || UIReviewFixture.activeScreen == "store-packages" {
@@ -148,6 +190,7 @@ struct WalletStoreView: View {
             } else if UIReviewFixture.activeScreen == "wallet" {
                 tab = .wallet
             }
+            #endif
         }
     }
 
@@ -334,9 +377,11 @@ struct WalletStoreView: View {
 
                             Spacer(minLength: 8)
 
-                            Text((entry.currency == "vnd" || entry.creatorVnd > 0)
-                                 ? "+\(entry.creatorVnd.formattedWithSeparator())đ"
-                                 : (entry.direction == "credit" ? "+\(entry.amount.formattedWithSeparator()) xu" : "-\(entry.amount.formattedWithSeparator()) xu"))
+                            Text(isBalanceHidden
+                                 ? "••••"
+                                 : ((entry.currency == "vnd" || entry.creatorVnd > 0)
+                                     ? "+\(entry.creatorVnd.formattedWithSeparator())đ"
+                                     : (entry.direction == "credit" ? "+\(entry.amount.formattedWithSeparator()) xu" : "-\(entry.amount.formattedWithSeparator()) xu")))
                                 .font(.subheadline.bold())
                                 .foregroundColor(entry.direction == "credit" || entry.creatorVnd > 0 ? KinnectTheme.online : KinnectTheme.textPrimary)
                                 .layoutPriority(1)
@@ -732,7 +777,7 @@ struct WalletStoreView: View {
 
                         if pkg.kind == "gifts" || pkg.kind == "gift" || pkg.kind == "studio" {
                             Button {
-                                Task { await buyPackage(pkg) }
+                                confirmBuyPackage = pkg
                             } label: {
                                 Text(pkg.kind == "studio" ? "Gia hạn" : "Mua thêm")
                                     .font(.caption.bold())
@@ -749,26 +794,35 @@ struct WalletStoreView: View {
                                         )
                                     )
                             }
+                            .disabled(transactionInProgress)
                         }
                     } else {
+                        let isAlternateMembershipBlocked = (pkg.kind == "member" || pkg.kind == "membership")
+                            && !activeMembershipId.isEmpty
+                            && activeMembershipId != pkg.id
                         Button {
-                            Task { await buyPackage(pkg) }
+                            confirmBuyPackage = pkg
                         } label: {
-                            Text("Đổi gói")
+                            Text(isAlternateMembershipBlocked ? "Đang có gói khác" : "Đổi gói")
                                 .font(.caption.bold())
-                                .foregroundColor(.white)
+                                .foregroundColor(isAlternateMembershipBlocked ? KinnectTheme.textSecondary : .white)
                                 .padding(.horizontal, 18)
                                 .padding(.vertical, 9)
                                 .background(
                                     Capsule().fill(
-                                        LinearGradient(
-                                            colors: [Color(hex: pkg.accentColor), KinnectTheme.accentBright],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
+                                        isAlternateMembershipBlocked
+                                            ? AnyShapeStyle(KinnectTheme.surfaceElevated)
+                                            : AnyShapeStyle(
+                                                LinearGradient(
+                                                    colors: [Color(hex: pkg.accentColor), KinnectTheme.accentBright],
+                                                    startPoint: .leading,
+                                                    endPoint: .trailing
+                                                )
+                                            )
                                     )
                                 )
                         }
+                        .disabled(transactionInProgress || isAlternateMembershipBlocked)
                     }
                 }
             }
@@ -782,14 +836,14 @@ struct WalletStoreView: View {
         )
     }
 
-    // MARK: - 3. Nạp xu StoreKit
+    // MARK: - 3. Mở khóa StoreKit
     private var storeKitSectionView: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Nạp xu Kinnect")
+                Text("Mở khóa trực tiếp qua App Store")
                     .font(.headline.bold())
                     .foregroundColor(KinnectTheme.textPrimary)
-                Text("Xu nạp được sử dụng để tặng quà trải nghiệm cho thần tượng trong phòng Live và mở khóa các gói trang trí hồ sơ độc quyền.")
+                Text("Các gói bên dưới mở khóa tính năng Studio Pro và phong cách hồ sơ mua một lần qua Apple ID (không phải gói nạp xu).")
                     .font(.caption)
                     .foregroundColor(KinnectTheme.textSecondary)
                     .kinnectMultiline()
@@ -798,31 +852,81 @@ struct WalletStoreView: View {
             ForEach(digitalProducts) { prod in
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(prod.title)
-                            .font(.subheadline.bold())
-                            .foregroundColor(KinnectTheme.textPrimary)
+                        HStack(spacing: 6) {
+                            Text(prod.title)
+                                .font(.subheadline.bold())
+                                .foregroundColor(KinnectTheme.textPrimary)
+                            if prod.equipped {
+                                Text("Đang dùng")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 2)
+                                    .background(Capsule().fill(KinnectTheme.online))
+                            } else if prod.owned {
+                                Text("Đã sở hữu")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(KinnectTheme.online)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 2)
+                                    .background(Capsule().fill(KinnectTheme.online.opacity(0.16)))
+                            }
+                        }
                         Text(prod.description)
                             .font(.caption)
                             .foregroundColor(KinnectTheme.textSecondary)
                         HStack(spacing: 4) {
-                            KinnectIcon(glyph: .coin, size: 14, selected: true, tint: KinnectTheme.warning)
-                            Text(prod.coinsGranted > 0 ? "Gói xu chính thức" : "Gói nâng cấp Kinnect")
+                            Image(systemName: prod.kind == "studio" ? "wand.and.stars" : "paintpalette.fill")
+                                .font(.caption2)
+                                .foregroundColor(KinnectTheme.accentBright)
+                            Text(prod.kind == "studio" ? "Mở khóa công cụ Studio Pro" : "Mở khóa phong cách hồ sơ")
                                 .font(.caption2.bold())
-                                .foregroundColor(KinnectTheme.warning)
+                                .foregroundColor(KinnectTheme.accentBright)
                         }
                     }
                     Spacer()
-                    Button {
-                        Task { await purchaseStoreKitProduct(prod) }
-                    } label: {
-                        Text(storeKit.storeKitProducts[prod.id]?.displayPrice ?? prod.priceLabel)
-                            .font(.caption.bold())
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 9)
-                            .background(Capsule().fill(KinnectTheme.primaryGradient))
-                            .foregroundColor(.white)
+                    if prod.owned {
+                        if prod.kind == "studio" {
+                            Button {
+                                showStudioFromWalletStore = true
+                            } label: {
+                                Text("Mở Studio")
+                                    .font(.caption.bold())
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 9)
+                                    .background(Capsule().fill(KinnectTheme.primaryGradient))
+                                    .foregroundColor(.white)
+                            }
+                        } else {
+                            Button {
+                                Task { await toggleDigitalStyle(prod) }
+                            } label: {
+                                Text(prod.equipped ? "Gỡ trang trí" : "Áp dụng")
+                                    .font(.caption.bold())
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 9)
+                                    .background(Capsule().fill(prod.equipped ? KinnectTheme.surfaceElevated : KinnectTheme.online))
+                                    .foregroundColor(prod.equipped ? KinnectTheme.textPrimary : .white)
+                            }
+                            .disabled(transactionInProgress)
+                        }
+                    } else {
+                        let skProduct = storeKit.storeKitProducts[prod.id]
+                        let canBuyApple = appleBillingReady && skProduct != nil
+                        Button {
+                            Task { await purchaseStoreKitProduct(prod) }
+                        } label: {
+                            Text(canBuyApple ? skProduct!.displayPrice : "Chưa mở App Store")
+                                .font(.caption.bold())
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 9)
+                                .background(
+                                    Capsule().fill(canBuyApple ? AnyShapeStyle(KinnectTheme.primaryGradient) : AnyShapeStyle(KinnectTheme.surfaceElevated))
+                                )
+                                .foregroundColor(canBuyApple ? .white : KinnectTheme.textSecondary)
+                        }
+                        .disabled(!canBuyApple || storeKit.isPurchasing || transactionInProgress)
                     }
-                    .disabled(storeKit.isPurchasing)
                 }
                 .kinnectCard()
             }
@@ -886,8 +990,9 @@ struct WalletStoreView: View {
         if packages.isEmpty, let cachedS = KinnectAPIClient.shared.cachedJSON(for: "/api/store") {
             let rawPkgs = cachedS["packages"] as? [[String: Any]] ?? []
             let ownedIds = Set(cachedS["ownedPackages"] as? [String] ?? [])
-            self.packages = rawPkgs.map { dict in
+            self.packages = rawPkgs.compactMap { dict in
                 var item = StorePackageItem.from(dict)
+                guard item.id != "live_game_30" else { return nil }
                 item.owned = ownedIds.contains(item.id)
                 return item
             }
@@ -906,18 +1011,22 @@ struct WalletStoreView: View {
             if let uuidStr = sRes["accountUuid"] as? String, let uuid = UUID(uuidString: uuidStr) {
                 self.accountUuid = uuid
             }
+            self.appleBillingReady = (sRes["appleBillingReady"] as? Bool) == true
+            self.trialPackagePurchases = (sRes["trialPackagePurchases"] as? Bool) == true
             let rawPkgs = sRes["packages"] as? [[String: Any]] ?? []
             let ownedIds = Set(sRes["ownedPackages"] as? [String] ?? [])
             let expiries = sRes["packageExpiries"] as? [String: Any] ?? [:]
             let liveTheme = sRes["liveTheme"] as? String ?? ""
             let membership = sRes["membership"] as? String ?? ""
+            self.activeMembershipId = membership
             let activeStyle = (sRes["appearance"] as? String)
                 ?? (sRes["activeStyle"] as? String)
                 ?? (sRes["profileStyle"] as? String)
                 ?? (sRes["style"] as? String)
                 ?? ""
-            self.packages = rawPkgs.map { dict in
+            self.packages = rawPkgs.compactMap { dict in
                 var item = StorePackageItem.from(dict)
+                guard item.id != "live_game_30" else { return nil }
                 item.owned = ownedIds.contains(item.id)
                 if let raw = expiries[item.id] as? NSNumber {
                     item.expiresAt = raw.int64Value
@@ -926,7 +1035,19 @@ struct WalletStoreView: View {
                 return item
             }
             let rawProds = sRes["products"] as? [[String: Any]] ?? []
-            self.digitalProducts = rawProds.map(StoreDigitalProduct.from)
+            let isStudioProPermanent = (sRes["studioProPermanent"] as? Bool) == true
+            var directOwned = Set(sRes["owned"] as? [String] ?? [])
+            if isStudioProPermanent {
+                directOwned.insert("kinnect_studio_pro")
+            } else {
+                directOwned.remove("kinnect_studio_pro")
+            }
+            self.digitalProducts = rawProds.map { dict in
+                var item = StoreDigitalProduct.from(dict)
+                item.owned = (item.id == "kinnect_studio_pro") ? isStudioProPermanent : directOwned.contains(item.id)
+                item.equipped = !item.id.isEmpty && item.kind == "style" && item.id == activeStyle
+                return item
+            }
             let invList = sRes["giftInventory"] as? [[String: Any]] ?? []
             var mergedTotals: [String: Int] = [:]
             var orderedIds: [String] = []
@@ -945,11 +1066,18 @@ struct WalletStoreView: View {
         }
     }
 
+    @MainActor
     private func buyPackage(_ pkg: StorePackageItem) async {
-        let reqId = KinnectWriteBody.packageRequestId()
-        let source = giftedCoins >= pkg.priceCoins ? "gifted" : "purchased"
+        guard !transactionInProgress else { return }
+        transactionInProgress = true
+        defer { transactionInProgress = false }
+        let source = (trialPackagePurchases && giftedCoins >= pkg.priceCoins) ? "gifted" : "purchased"
+        let key = "kinnect-package-request:" + ServerConfig.currentOrigin + ":"
+            + (appState.currentUser?.id ?? "") + ":" + pkg.id + ":" + source
+        let reqId = UserDefaults.standard.string(forKey: key) ?? KinnectWriteBody.packageRequestId()
+        UserDefaults.standard.set(reqId, forKey: key)
         do {
-            _ = try await KinnectAPIClient.shared.requestJSON(
+            let res = try await KinnectAPIClient.shared.requestJSON(
                 "/api/store/packages/buy",
                 method: "POST",
                 body: KinnectWriteBody.packageBuy(
@@ -960,14 +1088,29 @@ struct WalletStoreView: View {
                 ),
                 requestId: reqId
             )
-            appState.showToast("Đã đổi gói '\(pkg.title)' thành công!")
+            let isDuplicate = (res["duplicate"] as? Bool) == true
+            let isGiftPack = pkg.id.hasPrefix("gift_") || pkg.kind == "gifts"
+            let confirmedOwned = (res["ownedPackages"] as? [String] ?? []).contains(pkg.id)
+            if isGiftPack || isDuplicate || confirmedOwned {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
+            guard confirmedOwned || isGiftPack || isDuplicate else {
+                throw KinnectAPIError.serverMessage("Máy chủ chưa xác nhận quyền sử dụng gói.")
+            }
+            appState.showToast(isDuplicate
+                ? "Giao dịch đã được ghi nhận trước đó cho '\(pkg.title)'."
+                : "Đã đổi gói '\(pkg.title)' thành công!")
             await loadWalletAndStore()
         } catch {
-            appState.showToast(error.localizedDescription)
+            appState.showToast("Giao dịch chưa hoàn tất: \(error.localizedDescription)")
         }
     }
 
+    @MainActor
     private func applyPackage(_ pkg: StorePackageItem) async {
+        guard !transactionInProgress else { return }
+        transactionInProgress = true
+        defer { transactionInProgress = false }
         let productId = pkg.equipped ? "" : pkg.id
         let isStylePackage = pkg.kind == "style" || pkg.id.hasPrefix("style_")
         do {
@@ -984,16 +1127,46 @@ struct WalletStoreView: View {
                     body: KinnectWriteBody.packageApply(productId: productId)
                 )
             }
+            appState.showToast(productId.isEmpty ? "Đã gỡ trang bị." : "Đã áp dụng \(pkg.title)!")
             await loadWalletAndStore()
         } catch {
-            appState.showToast(error.localizedDescription)
+            appState.showToast("Chưa áp dụng được: \(error.localizedDescription)")
         }
     }
 
-    private func purchaseStoreKitProduct(_ prod: StoreDigitalProduct) async {
+    @MainActor
+    private func toggleDigitalStyle(_ prod: StoreDigitalProduct) async {
+        guard !transactionInProgress else { return }
+        transactionInProgress = true
+        defer { transactionInProgress = false }
+        let targetId = prod.equipped ? "" : prod.id
         do {
-            _ = try await storeKit.purchaseDigitalProduct(productId: prod.id, accountUuid: self.accountUuid)
-            appState.showToast("Xác minh giao dịch StoreKit thành công!")
+            let res = try await KinnectAPIClient.shared.requestJSON(
+                "/api/store/style",
+                method: "POST",
+                body: ["productId": targetId]
+            )
+            let applied = (res["appearance"] as? String) ?? ""
+            guard applied == targetId else {
+                throw KinnectAPIError.serverMessage("Máy chủ chưa xác nhận trang trí.")
+            }
+            appState.showToast(targetId.isEmpty ? "Đã gỡ trang trí." : "Đã áp dụng \(prod.title)!")
+            await loadWalletAndStore()
+        } catch {
+            appState.showToast("Chưa đổi được phong cách: \(error.localizedDescription)")
+        }
+    }
+
+    @MainActor
+    private func purchaseStoreKitProduct(_ prod: StoreDigitalProduct) async {
+        guard !transactionInProgress && !storeKit.isPurchasing else { return }
+        transactionInProgress = true
+        defer { transactionInProgress = false }
+        do {
+            guard (try await storeKit.purchaseDigitalProduct(productId: prod.id, accountUuid: self.accountUuid)) != nil else {
+                return
+            }
+            appState.showToast("Giao dịch thành công! Đã cộng quyền lợi vào tài khoản.")
             await loadWalletAndStore()
         } catch {
             appState.showToast(error.localizedDescription)

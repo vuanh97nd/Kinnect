@@ -7,11 +7,11 @@ import java.util.*;
 /** Draws one frame of an EditorProject: background, clips with transitions, then layers. */
 final class EditorRender {
   static final String[][] TRANSITIONS = {
-    {"none",I18n.t("Không")},{"fade",I18n.t("Mờ dần")},{"black",I18n.t("Qua đen")},{"white",I18n.t("Lóe sáng")},{"slideLeft",I18n.t("Trượt trái")},{"slideRight",I18n.t("Trượt phải")},
-    {"push",I18n.t("Đẩy lên")},{"zoomIn",I18n.t("Phóng to")},{"zoomOut",I18n.t("Thu nhỏ")},{"wipe",I18n.t("Quét ngang")},{"circle",I18n.t("Vòng tròn")},{"blur",I18n.t("Nhòe")},{"spin","Xoay"}};
-  static final String[][] ANIMATIONS = {{"none",I18n.t("Không")},{"fade",I18n.t("Mờ dần")},{"pop",I18n.t("Bật lên")},{"slide",I18n.t("Trượt lên")},{"zoom",I18n.t("Thu phóng")},{"wipe",I18n.t("Quét")},{"type",I18n.t("Đánh máy")}};
-  static final String[][] STYLES = {{"stroke",I18n.t("Viền đen")},{"plain",I18n.t("Bóng đổ")},{"box",I18n.t("Nền tối")},{"label",I18n.t("Nhãn màu")},{"neon","Neon"}};
-  static final String[][] FONTS = {{"sans-serif",I18n.t("Mặc định")},{"sans-serif-black",I18n.t("Đậm")},{"sans-serif-condensed",I18n.t("Hẹp")},{"serif",I18n.t("Có chân")},{"monospace",I18n.t("Máy chữ")},{"casual",I18n.t("Viết tay")},{"cursive",I18n.t("Nghệ thuật")}};
+    {"none","Không"},{"fade","Mờ dần"},{"black","Qua đen"},{"white","Lóe sáng"},{"slideLeft","Trượt trái"},{"slideRight","Trượt phải"},
+    {"push","Đẩy lên"},{"zoomIn","Phóng to"},{"zoomOut","Thu nhỏ"},{"wipe","Quét ngang"},{"circle","Vòng tròn"},{"blur","Nhòe"},{"spin","Xoay"}};
+  static final String[][] ANIMATIONS = {{"none","Không"},{"fade","Mờ dần"},{"pop","Bật lên"},{"slide","Trượt lên"},{"zoom","Thu phóng"},{"wipe","Quét"},{"type","Đánh máy"}};
+  static final String[][] STYLES = {{"stroke","Viền đen"},{"plain","Bóng đổ"},{"box","Nền tối"},{"label","Nhãn màu"},{"neon","Neon"}};
+  static final String[][] FONTS = {{"sans-serif","Mặc định"},{"sans-serif-black","Đậm"},{"sans-serif-condensed","Hẹp"},{"serif","Có chân"},{"monospace","Máy chữ"},{"casual","Viết tay"},{"cursive","Nghệ thuật"}};
 
   /** A clip frame ready to draw: the decoded picture plus face info for beauty effects. */
   static final class Frame { Bitmap bitmap; float[] face; }
@@ -25,8 +25,9 @@ final class EditorRender {
 
   void draw(Canvas out, EditorProject p, float t, Map<Integer, Frame> frames, Map<String, Bitmap> images, int tick, boolean editing) {
     int w = out.getWidth(), h = out.getHeight(); bounds.clear(); angles.clear();
-    if (layerA == null || layerA.getWidth() != w || layerA.getHeight() != h) {
-      if (layerA != null) { layerA.recycle(); layerB.recycle(); }
+    if (layerA == null || layerA.isRecycled() || layerB == null || layerB.isRecycled() || layerA.getWidth() != w || layerA.getHeight() != h) {
+      if (layerA != null && !layerA.isRecycled()) layerA.recycle();
+      if (layerB != null && !layerB.isRecycled()) layerB.recycle();
       layerA = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888); layerB = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
     }
     float[] starts = p.starts(); int current = p.clipAt(t);
@@ -51,7 +52,7 @@ final class EditorRender {
     else if (b.equals("blur") && f != null && f.bitmap != null && !f.bitmap.isRecycled()) {
       // Cheap blur: shrink to a few dozen pixels, then stretch back with filtering.
       int sw = Math.max(4, out.getWidth() / 24), sh = Math.max(4, out.getHeight() / 24);
-      if (blurSmall == null || blurSmall.getWidth() != sw || blurSmall.getHeight() != sh) { if (blurSmall != null) blurSmall.recycle(); blurSmall = Bitmap.createBitmap(sw, sh, Bitmap.Config.ARGB_8888); }
+      if (blurSmall == null || blurSmall.isRecycled() || blurSmall.getWidth() != sw || blurSmall.getHeight() != sh) { if (blurSmall != null && !blurSmall.isRecycled()) blurSmall.recycle(); blurSmall = Bitmap.createBitmap(sw, sh, Bitmap.Config.ARGB_8888); }
       Canvas c = new Canvas(blurSmall); float k = Math.max(sw / (float) f.bitmap.getWidth(), sh / (float) f.bitmap.getHeight());
       c.save(); c.translate(sw / 2f, sh / 2f); c.scale(k, k); c.drawBitmap(f.bitmap, -f.bitmap.getWidth() / 2f, -f.bitmap.getHeight() / 2f, paint); c.restore();
       out.drawBitmap(blurSmall, null, new Rect(0, 0, out.getWidth(), out.getHeight()), paint); out.drawColor(0x66000000);
@@ -91,8 +92,11 @@ final class EditorRender {
       case "circle": { composite(out, a, 255); Path path = new Path(); path.addCircle(w / 2f, h / 2f, e * (float) Math.hypot(w, h) / 2, Path.Direction.CW);
         out.save(); out.clipPath(path); composite(out, b, 255); out.restore(); break; }
       case "blur": { float k = 1 - Math.abs(u - .5f) * 2; int div = 1 + Math.round(k * 20);
-        Bitmap src = u < .5f ? a : b; Bitmap small = Bitmap.createScaledBitmap(src, Math.max(2, w / div), Math.max(2, h / div), true);
-        out.drawBitmap(small, null, new Rect(0, 0, w, h), paint); small.recycle(); break; }
+        Bitmap src = u < .5f ? a : b;
+        if (div <= 1) { out.drawBitmap(src, 0, 0, paint); }
+        else { Bitmap small = Bitmap.createScaledBitmap(src, Math.max(2, w / div), Math.max(2, h / div), true);
+          out.drawBitmap(small, null, new Rect(0, 0, w, h), paint); if (small != src) small.recycle(); }
+        break; }
       case "spin": out.save(); out.rotate(e * 180, w / 2f, h / 2f); out.scale(1 - e * .5f, 1 - e * .5f, w / 2f, h / 2f); composite(out, a, Math.round((1 - e) * 255)); out.restore();
         out.save(); out.rotate((e - 1) * 180, w / 2f, h / 2f); out.scale(.5f + e * .5f, .5f + e * .5f, w / 2f, h / 2f); composite(out, b, Math.round(e * 255)); out.restore(); break;
       default: composite(out, a, 255); composite(out, b, Math.round(e * 255));
@@ -171,6 +175,17 @@ final class EditorRender {
     text.setColor(fill); layout.draw(c); text.clearShadowLayer();
     c.restore();
     return box;
+  }
+
+  void release() {
+    if (layerA != null && !layerA.isRecycled()) layerA.recycle();
+    layerA = null;
+    if (layerB != null && !layerB.isRecycled()) layerB.recycle();
+    layerB = null;
+    if (blurSmall != null && !blurSmall.isRecycled()) blurSmall.recycle();
+    blurSmall = null;
+    bounds.clear();
+    angles.clear();
   }
 
   private static int luma(int c) { return (Color.red(c) * 299 + Color.green(c) * 587 + Color.blue(c) * 114) / 1000; }

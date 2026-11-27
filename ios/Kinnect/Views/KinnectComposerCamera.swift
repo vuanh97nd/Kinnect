@@ -8,11 +8,16 @@ struct KinnectComposerCamera: UIViewControllerRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()
-        picker.sourceType = .camera
-        let supported = UIImagePickerController.availableMediaTypes(for: .camera) ?? [UTType.image.identifier]
-        picker.mediaTypes = supported.filter { $0 == UTType.image.identifier || $0 == UTType.movie.identifier }
-        picker.videoMaximumDuration = 60
-        picker.videoQuality = .typeMedium
+        let sourceType: UIImagePickerController.SourceType =
+            UIImagePickerController.isSourceTypeAvailable(.camera) ? .camera : .photoLibrary
+        picker.sourceType = sourceType
+        let supported = UIImagePickerController.availableMediaTypes(for: sourceType) ?? [UTType.image.identifier]
+        let filtered = supported.filter { $0 == UTType.image.identifier || $0 == UTType.movie.identifier }
+        picker.mediaTypes = filtered.isEmpty ? [UTType.image.identifier] : filtered
+        if sourceType == .camera {
+            picker.videoMaximumDuration = 60
+            picker.videoQuality = .typeMedium
+        }
         picker.delegate = context.coordinator
         return picker
     }

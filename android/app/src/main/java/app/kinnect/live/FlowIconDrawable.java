@@ -26,17 +26,23 @@ final class FlowIconDrawable extends Drawable {
     if (n.contains("trash") || n.contains("block") || n.contains("log_out") || (n.contains("off") && n.contains("location"))) {
       return new int[] { 0xffea4335, 0xffc5221f }; // Google Red 500 -> 700
     }
-    if (n.contains("heart") || n.contains("live") || n.contains("radio")) {
-      return new int[] { 0xffe91e63, 0xffc2185b }; // Material Pink
+    if (n.contains("heart") || n.contains("live") || n.contains("radio") || n.contains("store")) {
+      return new int[] { 0xffec4899, 0xffdb2777 }; // Material Pink
     }
     if (n.contains("message") || n.contains("inbox") || n.contains("phone") || n.contains("call")) {
       return new int[] { 0xff1e8e3e, 0xff137333 }; // Google Green 600 -> 700
     }
-    if (n.contains("wallet") || n.contains("shopping") || n.contains("gift")) {
-      return new int[] { 0xfff9ab00, 0xffe37400 }; // Google Amber/Orange
+    if (n.contains("wallet") || n.contains("shopping") || n.contains("gift") || n.contains("bell")) {
+      return new int[] { 0xfff59e0b, 0xffd97706 }; // Google Amber/Orange
     }
     if (n.contains("video") || n.contains("clapper") || n.contains("image")) {
       return new int[] { 0xffff6d00, 0xffe65100 }; // Deep Coral
+    }
+    if (n.contains("help") || n.contains("about") || n.contains("info")) {
+      return new int[] { 0xff0d9488, 0xff0f766e }; // Material Teal
+    }
+    if (n.contains("settings") || n.contains("key_round")) {
+      return new int[] { 0xff6366f1, 0xff4f46e5 }; // Material Indigo
     }
     if (n.contains("compass") || n.contains("shield") || n.contains("lock") || n.contains("location") || n.contains("distance") || n.contains("globe")) {
       return new int[] { 0xff1a73e8, 0xff174ea6 }; // Google Blue 600 -> 800

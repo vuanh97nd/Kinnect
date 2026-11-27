@@ -74,12 +74,12 @@ final class IntroArt extends View {
     float[][] spots = { { cx - r * 0.62f, cy - r * 0.82f }, { cx + r * 0.62f, cy + r * 0.05f }, { cx, cy + r * 0.98f } };
     paint.setTextSize(dp(12.5f));
     for (int i = 0; i < chips.length; i++) {
-      float w = paint.measureText(chips[i]) + dp(24), h = dp(32);
+      String t = I18n.t(chips[i]);
+      float w = paint.measureText(t) + dp(24), h = dp(32);
       float x = Math.max(w / 2 + dp(4), Math.min(getWidth() - w / 2 - dp(4), spots[i][0])), y = spots[i][1];
       paint.setColor(0xffffffff);
       c.drawRoundRect(new RectF(x - w / 2, y - h / 2, x + w / 2, y + h / 2), h / 2, h / 2, paint);
       paint.setColor(i == 2 ? 0xffff4f9a : 0xff1c1e21);
-      String t = chips[i];
       if (t.startsWith("● ")) {
         paint.setColor(0xff22c55e);
         float tw = paint.measureText(t);

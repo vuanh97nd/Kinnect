@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test",
+    "test": "node --test test/*.test.js",
     "moderate": "node scripts/moderate.js",
     "test:e2e": "playwright test",
     "admin": "node scripts/admin.js",

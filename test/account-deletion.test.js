@@ -26,4 +26,20 @@ test('deletion requires ownership confirmation, reauthentication for old session
  assert.equal((await app.request('/me/account-deletion',{cookie:a.cookie,method:'DELETE',data:{confirmUsername:a.username,confirmDelete:true,password:'strong-password'}})).status,200);
 });
 test('a deletion failure rolls back all prior data changes',async t=>{const app=await setup(t),a=await app.register('delete_rollback');app.social.db.exec("CREATE TRIGGER stop_deletion BEFORE DELETE ON users BEGIN SELECT RAISE(ABORT,'injected rollback'); END");const result=await app.request('/me/account-deletion',{cookie:a.cookie,method:'DELETE',data:{confirmUsername:a.username,confirmDelete:true}});assert.equal(result.status,500);assert.equal((await app.request('/me',{cookie:a.cookie})).status,200);});
+test('OAuth-linked account with 2FA enabled reports twoFactorEnabled and accepts totpCode reauthentication on stale session',async t=>{
+ const app=await setup(t),a=await app.register('delete_oauth_2fa'),db=app.social.db;
+ db.prepare("INSERT INTO oauth_accounts(provider,subject,user_id,email,created) VALUES('google','sub-del-2fa',?,'a@b.test',1)").run(a.id);
+ const setup2fa=await app.request('/me/2fa/setup',{cookie:a.cookie,method:'POST',data:{password:'strong-password'}});
+ assert.equal(setup2fa.status,200);
+ db.prepare('UPDATE user_totp SET enabled=1 WHERE user_id=?').run(a.id);
+ db.prepare('DELETE FROM recent_auth').run();
+ const info=await app.request('/me/account-deletion',{cookie:a.cookie});
+ assert.equal(info.status,200);
+ assert.equal(info.body.requiresPassword,true);
+ assert.equal(info.body.twoFactorEnabled,true);
+ assert.deepEqual(info.body.oauthProviders,['google']);
+ assert.equal((await app.request('/me/account-deletion',{cookie:a.cookie,method:'DELETE',data:{confirmUsername:a.username,confirmDelete:true,totpCode:'000000'}})).status,403);
+ const del=await app.request('/me/account-deletion',{cookie:a.cookie,method:'DELETE',data:{confirmUsername:a.username,confirmDelete:true,totpCode:setup2fa.body.backupCodes[0]}});
+ assert.equal(del.status,200);
+});
 

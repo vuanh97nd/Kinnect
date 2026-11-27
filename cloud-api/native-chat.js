@@ -4,6 +4,13 @@ import{createCloudChatRepository}from'../lib/cloud-chat-repository.js';
 import{invalidateUsers}from'./realtime.js';
 const fail=(status,message)=>{throw Object.assign(Error(message),{status});};
 const pairId=(a,b)=>'dm-'+createHash('sha256').update(JSON.stringify([a,b].sort())).digest('hex').slice(0,32);
+const attachmentKind=mime=>mime?.startsWith('image/')?'image':mime?.startsWith('video/')?'video':mime?.startsWith('audio/')?'audio':'file';
+const normalizeNonce=raw=>{
+ if(typeof raw!=='string')return randomUUID();
+ const trimmed=raw.trim();
+ if(!trimmed)return randomUUID();
+ return /^[A-Za-z0-9_-]{16,80}$/.test(trimmed)?trimmed:'req_'+createHash('sha256').update(trimmed).digest('hex').slice(0,28);
+};
 const SQL={
  summaries:`SELECT c.*,p.hidden,p.muted,p.pinned,p.unread,
  (SELECT json_group_array(json_object('user_id',x.user_id,'role',x.role,'joined_at',x.joined_at)) FROM chat_members x WHERE x.conversation_id=c.id AND x.left_at IS NULL) members_json,
@@ -34,11 +41,26 @@ export async function nativeChatRoute({request,env,client,user,json}){
  if(!['/api/conversations','/api/groups'].includes(path)&&!dm&&!group)return null;
  const db=env.CHAT_DB;
  const blocked=(await client.query('SELECT target AS id FROM kinnect_core.blocks WHERE actor=$1 UNION SELECT actor AS id FROM kinnect_core.blocks WHERE target=$1',[user.id])).rows.map(x=>x.id);
- const banned=(await client.query('SELECT id FROM kinnect_core.users WHERE suspended<>0')).rows.map(x=>x.id),excluded=[...new Set([...blocked,...banned])];
+ const blockedSet=new Set(blocked);
+ const suspendedIn=async ids=>{
+  const uniq=[...new Set((ids||[]).filter(x=>typeof x==='string'&&x))];
+  if(!uniq.length)return [];
+  return (await client.query('SELECT id FROM kinnect_core.users WHERE id=ANY($1::text[]) AND suspended<>0',[uniq])).rows.map(x=>x.id);
+ };
+ const excludedFor=async ids=>[...new Set([...blocked,...await suspendedIn(ids)])];
  const statement=(key,...values)=>db.prepare(SQL[key]).bind(...values),rows=async(key,...values)=>(await statement(key,...values).all()).results;
  async function people(ids){if(!ids.length)return new Map();return new Map((await client.query('SELECT * FROM kinnect_core.users WHERE id=ANY($1::text[]) AND suspended=0',[ids])).rows.map(u=>[u.id,u]));}
- async function context(id){const c=await statement('conversation',id,user.id).first();if(!c)fail(404,'Không tìm thấy cuộc trò chuyện.');const members=await rows('members',id);if(c.kind==='direct'&&members.some(m=>excluded.includes(m.user_id)))fail(404,'Không tìm thấy cuộc trò chuyện.');return{c,members};}
- async function summary(c,members,cachedUsers){
+ async function context(id){
+  const c=await statement('conversation',id,user.id).first();if(!c)fail(404,'Không tìm thấy cuộc trò chuyện.');
+  const members=await rows('members',id);
+  if(c.kind==='direct'){
+   const memberIds=members.map(m=>m.user_id);
+   if(memberIds.some(uid=>blockedSet.has(uid))||(await suspendedIn(memberIds)).length)fail(404,'Không tìm thấy cuộc trò chuyện.');
+  }
+  return{c,members};
+ }
+ async function summary(c,members,cachedUsers,excludedList){
+  const excluded=excludedList||await excludedFor(members.map(m=>m.user_id));
   const users=cachedUsers||await people(members.map(m=>m.user_id));
   const last=Object.hasOwn(c,'last_json')?(c.last_json?JSON.parse(c.last_json):null):await statement('last',c.id,user.id,JSON.stringify(excluded)).first(),unread=Object.hasOwn(c,'unread_count')?{n:c.unread_count}:await statement('unread',c.id,user.id,user.id,JSON.stringify(excluded),user.id).first();
   const common={conversationId:c.id,pinned:!!c.pinned,muted:!!c.muted,unread:Math.max(c.unread?1:0,Number(unread.n)),last:last?{body:last.recalled_at?'Tin nhắn đã được thu hồi':last.body.slice(0,120),created:last.created_at,mine:last.sender_id===user.id,name:users.get(last.sender_id)?.name||''}:null};
@@ -48,21 +70,28 @@ export async function nativeChatRoute({request,env,client,user,json}){
  async function body(){const raw=await request.text();if(raw.length>8192)fail(413,'Tệp cần máy chủ media trên PC.');let b;try{b=JSON.parse(raw);}catch{fail(400,'JSON không hợp lệ.');}if(!b||typeof b!=='object'||Array.isArray(b))fail(400,'JSON không hợp lệ.');return b;}
  try{
   if(request.method==='GET'&&['/api/conversations','/api/groups'].includes(path)){
-   const contexts=await rows('summaries',user.id,JSON.stringify(excluded),user.id,user.id,JSON.stringify(excluded),user.id,user.id,path==='/api/groups'?'group':'direct');
+   let contexts=await rows('summaries',user.id,JSON.stringify(blocked),user.id,user.id,JSON.stringify(blocked),user.id,user.id,path==='/api/groups'?'group':'direct');
    for(const c of contexts)c.members=JSON.parse(c.members_json||'[]');
-   const users=await people([...new Set(contexts.flatMap(c=>c.members.map(m=>m.user_id)))]);
-   const result=[];for(const c of contexts){const value=await summary(c,c.members,users);if(value)result.push(value);}
+   const memberIds=[...new Set(contexts.flatMap(c=>{const ids=c.members.map(m=>m.user_id);if(c.last_json){try{const l=JSON.parse(c.last_json);if(l?.sender_id)ids.push(l.sender_id);}catch{}}return ids;}))];
+   const banned=await suspendedIn(memberIds);
+   const excluded=[...new Set([...blocked,...banned])];
+   if(banned.length){
+    contexts=await rows('summaries',user.id,JSON.stringify(excluded),user.id,user.id,JSON.stringify(excluded),user.id,user.id,path==='/api/groups'?'group':'direct');
+    for(const c of contexts)c.members=JSON.parse(c.members_json||'[]');
+   }
+   const users=await people(memberIds);
+   const result=[];for(const c of contexts){const value=await summary(c,c.members,users,excluded);if(value)result.push(value);}
    result.sort((a,b)=>(b.last?.created||b.created||0)-(a.last?.created||a.created||0));return json(path==='/api/groups'?{groups:result}:{users:result});
   }
   if(path==='/api/groups'&&request.method==='POST'){
    const b=await body(),name=typeof b.name==='string'?b.name.trim().slice(0,80):'';if(!Array.isArray(b.members))fail(400,'Danh sách thành viên không hợp lệ.');const ids=[...new Set(b.members)].filter(x=>x!==user.id);
-   if(!name||!ids.length||ids.length>49||ids.some(x=>typeof x!=='string'||excluded.includes(x)))fail(400,'Tên hoặc thành viên nhóm không hợp lệ.');
+   if(!name||!ids.length||ids.length>49||ids.some(x=>typeof x!=='string'||blockedSet.has(x)))fail(400,'Tên hoặc thành viên nhóm không hợp lệ.');
    if((await people(ids)).size!==ids.length)fail(400,'Không tìm thấy thành viên.');if((await statement('totalGroups',user.id).first()).n>=100)fail(400,'Bạn đã tham gia tối đa 100 nhóm.');
    const id=randomUUID(),now=Date.now();await db.batch([statement('createGroup',id,name,user.id,now),statement('addMembers',id,now,JSON.stringify([user.id,...ids].map(uid=>({id:uid,role:uid===user.id?'owner':'member'}))))]);
    const ctx=await context(id);await invalidateUsers(env,[user.id,...ids]);return json({group:await summary(ctx.c,ctx.members)},201);
   }
   let conversationId,peer;
-  if(dm){peer=dm[1];if(peer===user.id||excluded.includes(peer))fail(404,'Không tìm thấy người dùng.');const person=(await people([peer])).get(peer);if(!person)fail(404,'Không tìm thấy người dùng.');conversationId=pairId(user.id,peer);
+  if(dm){peer=dm[1];if(peer===user.id||blockedSet.has(peer))fail(404,'Không tìm thấy người dùng.');const person=(await people([peer])).get(peer);if(!person)fail(404,'Không tìm thấy người dùng.');conversationId=pairId(user.id,peer);
    const existing=await statement('byId',conversationId).first();
    if(request.method==='POST'){
     const mode=person.profile.dm_mode||'everyone';if(mode==='nobody')fail(403,'Không thể gửi tin nhắn.');if(mode==='friends'){const p=[user.id,peer].sort();if(!(await client.query("SELECT 1 FROM kinnect_core.friendships WHERE low_id=$1 AND high_id=$2 AND status='accepted'",p)).rows.length)fail(403,'Chỉ bạn bè được nhắn tin.');}
@@ -72,26 +101,31 @@ export async function nativeChatRoute({request,env,client,user,json}){
   if(!conversationId)fail(405,'Phương thức không hỗ trợ.');
   const repository=createCloudChatRepository({db,authorize:async(_,id)=>{await context(id);return true;}}),ctx=await context(conversationId);
   if(request.method==='GET'){
-   const list=(await repository.list({actor:user.id,conversationId,limit:100})).filter(m=>!excluded.includes(m.sender_id));
+   const rawList=await repository.list({actor:user.id,conversationId,limit:100});
+   const rawIds=JSON.stringify(rawList.map(m=>m.id));
+   const reactions=await rows('reactions',rawIds);
+   const excluded=await excludedFor([...ctx.members.map(m=>m.user_id),...rawList.map(m=>m.sender_id),...reactions.map(r=>r.user_id)]);
+   const list=rawList.filter(m=>!excluded.includes(m.sender_id));
    const messageIds=JSON.stringify(list.map(m=>m.id)),at=Date.now();const acknowledged=await statement('markRead',user.id,at,at,conversationId,user.id,user.id,messageIds).run();
    if(acknowledged.meta?.changes)await invalidateUsers(env,ctx.members.filter(m=>m.user_id!==user.id).map(m=>m.user_id));
-   const receipts=await rows('receipts',messageIds),reactions=await rows('reactions',messageIds),pins=await rows('pins',messageIds),files=await rows('files',messageIds),users=await people(ctx.members.map(m=>m.user_id));
+   const receipts=await rows('receipts',messageIds),pins=await rows('pins',messageIds),files=await rows('files',messageIds),users=await people(ctx.members.map(m=>m.user_id));
    await statement('reveal',conversationId,user.id).run();
    await client.query(dm?"UPDATE kinnect_core.notifications SET seen=1 WHERE user_id=$1 AND actor=$2 AND kind IN ('message','missed_call')":"UPDATE kinnect_core.notifications SET seen=1 WHERE user_id=$1 AND ref=$2 AND kind='group_message'",[user.id,dm?peer:conversationId]);
    return json({messages:list.reverse().map(m=>{
     const seen=receipts.filter(r=>r.message_id===m.id),react=reactions.filter(r=>r.message_id===m.id&&!excluded.includes(r.user_id)),f=files.find(f=>f.message_id===m.id),r=seen.find(r=>r.user_id===peer)||{};
     const counts={};for(const item of react)counts[item.reaction]=(counts[item.reaction]||0)+1;
-    return{id:m.id,sender:m.sender_id,...(dm?{recipient:peer===m.sender_id?user.id:peer}:{group_id:conversationId,author:users.has(m.sender_id)?{...profile(users.get(m.sender_id)),groupRole:ctx.members.find(x=>x.user_id===m.sender_id)?.role||'member'}:null}),body:m.body,created:m.created_at,recalled:!!m.recalled_at,pinned:!m.recalled_at&&pins.some(p=>p.message_id===m.id),reactions:m.recalled_at?{}:counts,myReaction:m.recalled_at?null:react.find(r=>r.user_id===user.id)?.reaction||null,mentions:[],privateAlbum:null,receipt:dm?{deliveredAt:r.delivered_at||null,seenAt:r.seen_at||null}:{deliveredCount:seen.filter(x=>x.delivered_at!==null).length,seenCount:seen.filter(x=>x.seen_at!==null).length},attachment:f&&!m.recalled_at?{id:f.id,name:f.name,type:f.mime_type,size:f.byte_size,url:'/api/chat-attachments/'+f.id,kind:f.mime_type.split('/')[0]}:null};
+    return{id:m.id,sender:m.sender_id,...(dm?{recipient:peer===m.sender_id?user.id:peer}:{group_id:conversationId,author:users.has(m.sender_id)?{...profile(users.get(m.sender_id)),groupRole:ctx.members.find(x=>x.user_id===m.sender_id)?.role||'member'}:null}),body:m.body,created:m.created_at,recalled:!!m.recalled_at,pinned:!m.recalled_at&&pins.some(p=>p.message_id===m.id),reactions:m.recalled_at?{}:counts,myReaction:m.recalled_at?null:react.find(r=>r.user_id===user.id)?.reaction||null,mentions:[],privateAlbum:null,receipt:dm?{deliveredAt:r.delivered_at||null,seenAt:r.seen_at||null}:{deliveredCount:seen.filter(x=>x.delivered_at!==null).length,seenCount:seen.filter(x=>x.seen_at!==null).length},attachment:f&&!m.recalled_at?{id:f.id,name:f.name,type:f.mime_type,size:f.byte_size,url:'/api/chat-attachments/'+f.id,kind:attachmentKind(f.mime_type)}:null};
    })});
   }
   if(request.method==='POST'){
    const b=await body();if(b.attachment)fail(503,'Tệp đính kèm cần máy chủ media trên PC.');
-   const message=await repository.send({actor:user.id,conversationId,nonce:b.requestId||b.nonce||randomUUID(),body:typeof b.body==='string'?b.body.trim().slice(0,2000):'',replyTo:null});
+   const replyTo=typeof b.replyToId==='string'&&b.replyToId.trim()?b.replyToId.trim():(typeof b.replyTo==='string'&&b.replyTo.trim()?b.replyTo.trim():null);
+   const message=await repository.send({actor:user.id,conversationId,nonce:normalizeNonce(b.requestId??b.nonce),body:typeof b.body==='string'?b.body.trim().slice(0,2000):'',replyTo});
    await client.query(`INSERT INTO kinnect_core.notifications(id,user_id,actor,kind,ref,seen,created)
     SELECT 'chat_'||md5($1||':'||u.id),u.id,$2,$3,$4,0,$5 FROM kinnect_core.users u
     WHERE u.id=ANY($6::text[]) AND u.id<>$2 AND u.suspended=0 AND NOT EXISTS(SELECT 1 FROM kinnect_core.blocks b WHERE (b.actor=u.id AND b.target=$2) OR (b.actor=$2 AND b.target=u.id)) ON CONFLICT(id) DO NOTHING`,[message.id,user.id,dm?'message':'group_message',dm?message.id:conversationId,message.created_at,ctx.members.map(m=>m.user_id)]);
    await statement('revealAll',conversationId,conversationId).run();await invalidateUsers(env,ctx.members.map(m=>m.user_id));
-   return json({message:{id:message.id,sender:message.sender_id,...(dm?{recipient:peer}:{group_id:conversationId}),body:message.body,created:message.created_at}},201);
+   return json({message:{id:message.id,sender:message.sender_id,...(dm?{recipient:peer}:{group_id:conversationId}),body:message.body,created:message.created_at,...(message.reply_to?{replyToId:message.reply_to}:{})}},201);
   }
   fail(405,'Phương thức không hỗ trợ.');
  }catch(error){if(error.status)return json({error:error.message},error.status);if(error.message?.startsWith('Invalid'))return json({error:'Tin nhắn không hợp lệ.'},400);throw error;}

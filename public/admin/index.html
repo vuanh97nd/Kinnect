@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="vi">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,viewport-fit=cover">
@@ -8,16 +9,17 @@
   <meta name="color-scheme" content="light dark">
   <title>Kinnect · Không gian Quản trị Thông minh</title>
   <link rel="icon" href="/admin/mark.svg">
-  <script src="/admin/theme-boot.js?v=20261110_p0_v7"></script>
-  <link rel="stylesheet" href="/admin/admin.css?v=20261110_p0_v7">
-  <link rel="stylesheet" href="/admin/wallet-tools.css?v=20261110_p0_v7">
-  <link rel="stylesheet" href="/admin/admin-v2.css?v=20261110_p0_v7">
-  <link rel="stylesheet" href="/admin/ops-monitor.css?v=20261110_p0_v7">
-  <script src="/admin/wallet-tools.js?v=20261110_p0_v7" defer></script>
-  <script src="/admin/admin.js?v=20261110_p0_v7" defer></script>
-  <script src="/admin/admin-v2.js?v=20261110_p0_v7" defer></script>
-  <script src="/admin/ops-monitor.js?v=20261110_p0_v7" defer></script>
+  <script src="/admin/theme-boot.js?v=20261125_ux_v10"></script>
+  <link rel="stylesheet" href="/admin/admin.css?v=20261125_ux_v10">
+  <link rel="stylesheet" href="/admin/wallet-tools.css?v=20261125_ux_v10">
+  <link rel="stylesheet" href="/admin/admin-v2.css?v=20261125_ux_v10">
+  <link rel="stylesheet" href="/admin/ops-monitor.css?v=20261125_ux_v10">
+  <script src="/admin/wallet-tools.js?v=20261125_ux_v10" defer></script>
+  <script src="/admin/admin.js?v=20261125_ux_v10" defer></script>
+  <script src="/admin/admin-v2.js?v=20261125_ux_v10" defer></script>
+  <script src="/admin/ops-monitor.js?v=20261125_ux_v10" defer></script>
 </head>
+
 <body>
   <div id="notice" role="status" aria-live="polite"></div>
 
@@ -42,15 +44,25 @@
       <h2>Chào mừng trở lại.</h2>
       <p class="muted" id="portal-note">Đăng nhập tài khoản quản trị Kinnect.</p>
       <form id="login-form">
-        <label>Tên đăng nhập
-          <input id="username" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="30" placeholder="Nhập tên đăng nhập (hỗ trợ cả chữ HOA / thường)...">
-        </label>
-        <label>Mật khẩu
+        <div class="field-group">
+          <label for="username">Tên đăng nhập</label>
+          <input id="username" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="30"
+            placeholder="Tên đăng nhập (vd: admin)">
+        </div>
+        <div class="field-group">
+          <label for="password">Mật khẩu</label>
           <div class="password-field-wrap">
-            <input id="password" type="password" autocomplete="current-password" required maxlength="128" placeholder="Nhập mật khẩu (có phân biệt HOA / thường)...">
-            <button type="button" id="toggle-password" class="password-toggle-btn" aria-label="Hiện hoặc ẩn mật khẩu">👁️ Hiện</button>
+            <input id="password" type="password" autocomplete="current-password" required maxlength="128"
+              placeholder="Nhập mật khẩu...">
+            <button type="button" id="toggle-password" class="password-toggle-btn"
+              aria-label="Hiện hoặc ẩn mật khẩu">👁️ Hiện</button>
           </div>
-        </label>
+        </div>
+        <div class="field-group" id="totp-wrap" hidden>
+          <label for="totp-code">Mã xác thực 2 lớp (2FA)</label>
+          <input id="totp-code" inputmode="numeric" autocomplete="one-time-code" maxlength="12"
+            placeholder="Nhập mã 6 số hoặc mã dự phòng...">
+        </div>
         <p id="caps-warning" class="caps-warning" hidden>⚠️ Đang bật phím Caps Lock (chữ HOA)</p>
         <button class="primary" type="submit">Đăng nhập →</button>
         <p id="login-error" class="error" role="alert"></p>
@@ -83,6 +95,7 @@
         <button data-page="resets">↺ Khôi phục tài khoản</button>
         <button data-page="wallet">🪙 Tặng xu & Bù giao dịch</button>
         <button data-page="finance">📊 Tài chính & đối soát</button>
+        <button data-page="security" id="security-nav">🚨 Giám sát bảo mật AI</button>
         <button data-page="operations">💻 Kỹ thuật & hệ thống</button>
         <button data-page="content">📝 Nội dung</button>
         <button data-page="team" id="team-nav">🛡️ Nhân sự & phân quyền</button>
@@ -104,14 +117,17 @@
     <main>
       <header>
         <div class="header-title-group">
-          <button type="button" id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Mở menu điều hướng">☰ Menu</button>
+          <button type="button" id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Mở menu điều hướng">☰
+            Menu</button>
           <div>
             <p class="eyebrow" id="header-eyebrow">KINNECT / WORKSPACE</p>
             <h1 id="page-title">Tổng quan</h1>
           </div>
         </div>
         <div class="header-tools">
-          <button type="button" id="btn-toggle-chat" class="chat-toggle-btn" title="Trao đổi nội bộ giữa các bộ phận">💬 Trao đổi nội bộ <span id="chat-unread-badge" class="badge-count" hidden>0</span></button>
+          <button type="button" id="v2-cmd-trigger" class="cmd-trigger-btn" title="Tìm nhanh trang, @thành_viên, #mã_phiếu (Ctrl+K)">🔍 Tìm nhanh <kbd>Ctrl K</kbd></button>
+          <button type="button" id="btn-toggle-chat" class="chat-toggle-btn" title="Trao đổi nội bộ giữa các bộ phận">💬
+            Trao đổi nội bộ <span id="chat-unread-badge" class="badge-count" hidden>0</span></button>
           <span class="ai-smart-indicator" id="ai-smart-indicator">🤖 AI Trợ lý Bật</span>
           <button type="button" id="btn-notify" hidden title="Bật thông báo khi có phiếu mới">🔔 Bật thông báo</button>
           <button id="refresh">Làm mới ↻</button>
@@ -139,10 +155,11 @@
 
     <!-- Thanh chọn kênh bộ phận -->
     <div class="chat-channels-bar" id="chat-channels-bar" role="tablist">
-      <button type="button" class="channel-chip active" data-channel="all">🌐 Toàn bộ phận</button>
-      <button type="button" class="channel-chip" data-channel="support-finance">🤝 Hỗ trợ & Tài chính</button>
-      <button type="button" class="channel-chip" data-channel="support-operations">⚡ Hỗ trợ & Kỹ thuật</button>
-      <button type="button" class="channel-chip" data-channel="internal">🔒 Nội bộ nhóm</button>
+      <button type="button" class="channel-chip active" role="tab" aria-selected="true" data-channel="all">🌐 Toàn bộ phận</button>
+      <button type="button" class="channel-chip" role="tab" aria-selected="false" data-channel="support-finance">🤝 Hỗ trợ & Tài chính</button>
+      <button type="button" class="channel-chip" role="tab" aria-selected="false" data-channel="support-operations">⚡ Hỗ trợ & Kỹ thuật</button>
+      <button type="button" class="channel-chip" role="tab" aria-selected="false" data-channel="finance-operations">⚙️ Tài chính & Kỹ thuật</button>
+      <button type="button" class="channel-chip" role="tab" aria-selected="false" data-channel="internal">🔒 Nội bộ nhóm</button>
     </div>
 
     <!-- Danh sách tin nhắn -->
@@ -159,7 +176,8 @@
     <!-- Khung nhập và gửi tin nhắn -->
     <form id="chat-send-form" class="chat-send-form">
       <div class="chat-input-wrap">
-        <textarea id="chat-input" placeholder="Nhập tin nhắn trao đổi... (Enter gửi, Shift+Enter xuống dòng)" rows="2" maxlength="2000"></textarea>
+        <textarea id="chat-input" placeholder="Nhập tin nhắn trao đổi... (Enter gửi, Shift+Enter xuống dòng)" rows="2"
+          maxlength="2000"></textarea>
         <button type="submit" id="chat-send-btn" class="chat-send-btn" title="Gửi tin nhắn">➤ Gửi</button>
       </div>
     </form>
@@ -190,5 +208,61 @@
       <button id="secret-close" type="button">Đã lưu</button>
     </div>
   </dialog>
+
+  <!-- Hộp thoại Điều chỉnh Điểm Uy tín chuẩn hóa -->
+  <dialog id="reputation-dialog" class="reputation-dialog" aria-labelledby="rep-dialog-title">
+    <form id="reputation-dialog-form" class="rep-dialog-form">
+      <div class="rep-dialog-head">
+        <p class="eyebrow">ĐIỀU CHỈNH ĐIỂM UY TÍN</p>
+        <h2 id="rep-dialog-title">Điều chỉnh điểm uy tín</h2>
+        <p class="muted" id="rep-dialog-current"></p>
+      </div>
+      <div class="rep-mode-switch" role="group" aria-label="Chọn hành động điều chỉnh">
+        <button type="button" id="rep-mode-restore" class="rep-mode-btn" data-mode="restore" aria-pressed="false">🟢 Cộng / Khôi phục điểm</button>
+        <button type="button" id="rep-mode-deduct" class="rep-mode-btn" data-mode="deduct" aria-pressed="false">🔴 Trừ điểm vi phạm</button>
+      </div>
+      <div class="rep-preset-block">
+        <small class="muted">Chọn nhanh theo biểu phí:</small>
+        <div id="rep-preset-chips" class="rep-preset-chips"></div>
+      </div>
+      <div class="rep-points-grid">
+        <div class="rep-field-col">
+          <label for="rep-points-input">Số điểm (1–100)</label>
+          <input id="rep-points-input" type="number" min="1" max="100" step="1" inputmode="numeric" required>
+        </div>
+        <div id="rep-score-preview" class="rep-score-preview">
+          <small class="muted">Dự kiến sau điều chỉnh</small>
+          <strong id="rep-preview-value">100 → 100 điểm</strong>
+          <small id="rep-preview-tier">Chuẩn mực</small>
+        </div>
+      </div>
+      <div class="rep-field-col">
+        <label for="rep-reason-input">Lý do &amp; căn cứ (tối thiểu 5 ký tự)</label>
+        <textarea id="rep-reason-input" rows="2" maxlength="500" required placeholder="Ghi rõ căn cứ xác minh hoặc mức vi phạm áp dụng..."></textarea>
+      </div>
+      <p id="rep-dialog-error" class="error" role="alert"></p>
+      <div class="dialog-actions">
+        <button id="rep-cancel-btn" type="button">Hủy</button>
+        <button id="rep-submit-btn" class="primary" type="submit">Xác nhận điều chỉnh</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Bảng Lệnh Nhanh Toàn Cục (Ctrl + K) -->
+  <dialog id="v2-cmd-palette" class="v2-cmd-dialog" aria-label="Bảng lệnh tìm kiếm nhanh">
+    <div class="v2-cmd-shell">
+      <div class="v2-cmd-head">
+        <span class="v2-cmd-search-ico" aria-hidden="true">🔍</span>
+        <input id="v2-cmd-input" type="search" autocomplete="off" spellcheck="false" placeholder="Gõ tên trang, @username mở Hồ sơ 360°, #mã_phiếu, hoặc lệnh…" aria-label="Tìm nhanh trang, thành viên, phiếu hoặc lệnh">
+        <button type="button" id="v2-cmd-close" class="v2-cmd-close-btn" aria-label="Đóng bảng lệnh">Esc</button>
+      </div>
+      <div id="v2-cmd-results" class="v2-cmd-list" role="listbox" aria-label="Kết quả gợi ý"></div>
+      <div class="v2-cmd-footer">
+        <span>↑↓ di chuyển · Enter mở · Esc đóng</span>
+        <span>Mẹo: gõ <code>@tên</code> xem Hồ sơ 360°, <code>#mã</code> tìm phiếu</span>
+      </div>
+    </div>
+  </dialog>
 </body>
+
 </html>

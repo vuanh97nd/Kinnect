@@ -36,12 +36,24 @@ final class LiveEffects implements VideoProcessor {
 
   void close() { closed = true; sink = null; face = null; worker.shutdownNow(); }
 
+  /** Called from NativeRtc teardown AFTER camera capture has stopped. */
+  void releaseBuffers() {
+    Bitmap ov = overlay;
+    overlay = null;
+    if (ov != null && !ov.isRecycled()) ov.recycle();
+    pixels = null;
+    beautyY = null;
+    beautyU = null;
+    beautyV = null;
+  }
+
   @Override
   public void onFrameCaptured(VideoFrame frame) {
     VideoSink out = sink;
     if (out == null || closed) return;
     if (filter.equals("none") && sticker.equals("none") && !beautyOn) { out.onFrame(frame); return; }
     VideoFrame.I420Buffer src = frame.getBuffer().toI420();
+    if (src == null) return;
     try {
       int rotation = frame.getRotation();
       int w = src.getWidth(), h = src.getHeight();
@@ -222,8 +234,10 @@ final class LiveEffects implements VideoProcessor {
     }
 
     if (eyes > .01f || lips > .01f) {
-      YuvBeauty.warpPlane(Y, stride, w, h, original, ex - cos * e * .5f, ey - sin * e * .5f, e * .58f, e * .42f, eyes);
-      YuvBeauty.warpPlane(Y, stride, w, h, original, ex + cos * e * .5f, ey + sin * e * .5f, e * .58f, e * .42f, eyes);
+      for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) original[y * stride + x] = Y.get(y * stride + x);
+      float eyeRx = e * .45f, eyeRy = Math.min(e * .42f, e * .45f);
+      YuvBeauty.warpPlane(Y, stride, w, h, original, ex - cos * e * .5f, ey - sin * e * .5f, eyeRx, eyeRy, eyes);
+      YuvBeauty.warpPlane(Y, stride, w, h, original, ex + cos * e * .5f, ey + sin * e * .5f, eyeRx, eyeRy, eyes);
       YuvBeauty.warpPlane(Y, stride, w, h, original, ex - sin * e * 1.12f, ey + cos * e * 1.12f, e * .65f, e * .37f, lips);
       for (ByteBuffer plane : new ByteBuffer[] { U, V }) {
         int s = plane == U ? su : sv, cw = (w + 1) / 2, ch = (h + 1) / 2;
@@ -234,8 +248,8 @@ final class LiveEffects implements VideoProcessor {
         }
         byte[] before = plane == U ? beautyU : beautyV;
         for (int y = 0; y < ch; y++) for (int x = 0; x < cw; x++) before[y * s + x] = plane.get(y * s + x);
-        YuvBeauty.warpPlane(plane, s, cw, ch, before, (ex - cos * e * .5f) / 2, (ey - sin * e * .5f) / 2, e * .29f, e * .21f, eyes);
-        YuvBeauty.warpPlane(plane, s, cw, ch, before, (ex + cos * e * .5f) / 2, (ey + sin * e * .5f) / 2, e * .29f, e * .21f, eyes);
+        YuvBeauty.warpPlane(plane, s, cw, ch, before, (ex - cos * e * .5f) / 2, (ey - sin * e * .5f) / 2, eyeRx / 2f, eyeRy / 2f, eyes);
+        YuvBeauty.warpPlane(plane, s, cw, ch, before, (ex + cos * e * .5f) / 2, (ey + sin * e * .5f) / 2, eyeRx / 2f, eyeRy / 2f, eyes);
         YuvBeauty.warpPlane(plane, s, cw, ch, before, (ex - sin * e * 1.12f) / 2, (ey + cos * e * 1.12f) / 2, e * .325f, e * .185f, lips);
       }
     }

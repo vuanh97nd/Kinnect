@@ -204,7 +204,11 @@ public final class StoreUi implements StoreBilling.Events {
 
     if (kind.equals("live") && !id.equals("live_game_30")) {
 
-      return id.equals(catalog.optString("liveDecoration", catalog.optString("liveTheme")));
+      String liveDeco = catalog.isNull("liveDecoration") ? "" : catalog.optString("liveDecoration");
+
+      if (liveDeco.isEmpty()) liveDeco = catalog.isNull("liveTheme") ? "" : catalog.optString("liveTheme");
+
+      return id.equals(liveDeco);
 
     }
 
@@ -270,7 +274,7 @@ public final class StoreUi implements StoreBilling.Events {
 
             errBox.addView(ui.text(tr("Chưa tải được cửa hàng."), 15, ui.ink, true));
 
-            errBox.addView(ui.action(tr("Thử lại"), "refresh_cw", () -> load(true)), 12);
+            ui.add(errBox, ui.action(tr("Thử lại"), "refresh_cw", () -> load(true)), 12);
 
             container.addView(errBox);
 
@@ -296,7 +300,9 @@ public final class StoreUi implements StoreBilling.Events {
 
           for (int i = 0; i < products.length(); i++) {
 
-            ids.add(products.optJSONObject(i).optString("id"));
+            JSONObject item = products.optJSONObject(i);
+
+            if (item != null) ids.add(item.optString("id"));
 
           }
 
@@ -364,17 +370,23 @@ public final class StoreUi implements StoreBilling.Events {
 
     chip.setGravity(Gravity.CENTER_VERTICAL);
 
+    int raw48 = ui.dpRaw(48);
+
+    chip.setMinimumHeight(raw48);
+
+    chip.setMinimumWidth(raw48);
+
     chip.setPadding(ui.dp(9), 0, ui.dp(9), 0);
 
     chip.setBackground(ui.round(ui.soft, 99));
 
     ImageView icon = new ImageView(activity);
 
-    icon.setImageDrawable(ui.glyph("wallet", ui.purple, 16));
+    icon.setImageDrawable(ui.glyph("wallet", ui.purpleText, 16));
 
     chip.addView(icon, new LinearLayout.LayoutParams(ui.dp(16), ui.dp(16)));
 
-    TextView amt = ui.text(balanceText(), 13, ui.purple, true);
+    TextView amt = ui.text(balanceText(), 13, ui.purpleText, true);
 
     amt.setPadding(ui.dp(6), 0, 0, 0);
 
@@ -418,11 +430,11 @@ public final class StoreUi implements StoreBilling.Events {
 
     ImageView tagIcon = new ImageView(activity);
 
-    tagIcon.setImageDrawable(ui.glyph("store", ui.purple, 14));
+    tagIcon.setImageDrawable(ui.glyph("store", 0xffe9d5ff, 14));
 
     tag.addView(tagIcon, new LinearLayout.LayoutParams(ui.dp(14), ui.dp(14)));
 
-    TextView tagText = ui.text("KINNECT SHOP", 11, ui.purple, true);
+    TextView tagText = ui.text("KINNECT SHOP", 11, 0xffe9d5ff, true);
 
     tagText.setLetterSpacing(0.12f);
 
@@ -528,7 +540,9 @@ public final class StoreUi implements StoreBilling.Events {
 
     });
 
-    head.addView(close, new LinearLayout.LayoutParams(ui.dp(28), ui.dp(28)));
+    int closeSize = Math.max(ui.dp(48), Math.round(48 * activity.getResources().getDisplayMetrics().density));
+
+    head.addView(close, new LinearLayout.LayoutParams(closeSize, closeSize));
 
     banner.addView(head);
 
@@ -538,7 +552,9 @@ public final class StoreUi implements StoreBilling.Events {
 
     int avatarSize = ui.dp(76);
 
-    FrameLayout.LayoutParams haloLp = new FrameLayout.LayoutParams(avatarSize, avatarSize, Gravity.CENTER_HORIZONTAL);
+    LinearLayout.LayoutParams haloLp = new LinearLayout.LayoutParams(avatarSize, avatarSize);
+
+    haloLp.gravity = Gravity.CENTER_HORIZONTAL;
 
     haloLp.topMargin = ui.dp(10);
 
@@ -556,7 +572,11 @@ public final class StoreUi implements StoreBilling.Events {
 
     balloon.setPadding(ui.dp(16), ui.dp(9), ui.dp(16), ui.dp(9));
 
-    GradientDrawable balBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{first, last});
+    int bgFirst = wcagAdapt(first, Color.WHITE, 0xff141024, 4.5);
+
+    int bgLast = wcagAdapt(last, Color.WHITE, 0xff141024, 4.5);
+
+    GradientDrawable balBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{bgFirst, bgLast});
 
     balBg.setCornerRadius(ui.dp(16));
 
@@ -598,28 +618,6 @@ public final class StoreUi implements StoreBilling.Events {
 
 
 
-  private void confirmBuyPlan(JSONObject p) {
-
-    String name = p.optString("name");
-
-    long coins = p.optLong("priceCoins");
-
-    new Sheet(activity)
-
-      .setTitle(tr("Xác nhận đổi gói?"))
-
-      .setMessage(tr("Gói") + ": " + name + "\n" + tr("Chi phí") + ": " + amount(coins) + " " + tr("xu Kinnect."))
-
-      .setPositiveButton(tr("Đổi ngay") + " (" + amount(coins) + " " + tr("xu)"), (d, w) -> buyPlan(p))
-
-      .setNegativeButton(tr("Hủy"), null)
-
-      .show();
-
-  }
-
-
-
   public void draw() {
 
     if (closed || container == null) return;
@@ -630,19 +628,27 @@ public final class StoreUi implements StoreBilling.Events {
 
       headerActionContainer.removeAllViews();
 
+      int raw48 = ui.dpRaw(48);
+
       if (catalog != null) {
 
-        headerActionContainer.addView(walletChip(), new LinearLayout.LayoutParams(-2, ui.dp(32)));
+        LinearLayout chip = walletChip();
+
+        headerActionContainer.addView(chip, new LinearLayout.LayoutParams(-2, raw48));
+
+        UiMetrics.enforceMinTouchTarget(chip);
 
       }
 
       FrameLayout options = ui.icon("ellipsis", tr("Tùy chọn cửa hàng"), this::storeMenu);
 
-      LinearLayout.LayoutParams op = new LinearLayout.LayoutParams(ui.dp(36), ui.dp(36));
+      LinearLayout.LayoutParams op = new LinearLayout.LayoutParams(raw48, raw48);
 
       op.leftMargin = ui.dp(4);
 
       headerActionContainer.addView(options, op);
+
+      UiMetrics.enforceMinTouchTarget(options);
 
     }
 
@@ -668,17 +674,17 @@ public final class StoreUi implements StoreBilling.Events {
 
     tabs.setPadding(0, ui.dp(10), 0, ui.dp(8));
 
-    for (String key : new String[]{"style", "live", "studio", "gifts", "member", "owned"}) {
+    for (String key : new String[]{"style", "studio", "live", "gifts", "member", "owned"}) {
 
       String title = key.equals("style") ? tr("Phong cách")
 
-          : key.equals("live") ? tr("Gói Live")
+          : key.equals("studio") ? tr("Studio")
 
-          : key.equals("studio") ? tr("Gói Studio")
+          : key.equals("live") ? tr("Live")
 
-          : key.equals("gifts") ? tr("Quà tặng")
+          : key.equals("gifts") ? tr("Quà")
 
-          : key.equals("member") ? tr("Hội viên")
+          : key.equals("member") ? tr("Thành viên")
 
           : tr("Của tôi");
 
@@ -690,17 +696,33 @@ public final class StoreUi implements StoreBilling.Events {
 
       tab.setPadding(ui.dp(12), ui.dp(5), ui.dp(12), ui.dp(5));
 
-      tab.setCompoundDrawablesRelative(ui.glyph(key.equals("style") ? "palette" : key.equals("live") ? "radio" : key.equals("studio") ? "clapperboard" : key.equals("gifts") ? "gift" : key.equals("member") ? "crown" : "check", selectedTab.equals(key) ? Color.WHITE : ui.purple, 16), null, null, null);
+      tab.setCompoundDrawablesRelative(ui.glyph(key.equals("style") ? "palette" : key.equals("live") ? "radio" : key.equals("studio") ? "clapperboard" : key.equals("gifts") ? "gift" : key.equals("member") ? "crown" : "check", selectedTab.equals(key) ? Color.WHITE : ui.purpleText, 16), null, null, null);
 
       tab.setCompoundDrawablePadding(ui.dp(4));
 
       tab.setMinLines(1);
 
-      tab.setMinHeight(ui.dp(32));
+      int raw48 = ui.dpRaw(48);
 
-      if (!selectedTab.equals(key)) {
+      tab.setMinHeight(raw48);
 
-        tab.setTextColor(ui.purple);
+      tab.setMinimumHeight(raw48);
+
+      tab.setMinWidth(raw48);
+
+      tab.setMinimumWidth(raw48);
+
+      tab.setGravity(Gravity.CENTER);
+
+      if (selectedTab.equals(key)) {
+
+        tab.setTextColor(Color.WHITE);
+
+        tab.setBackground(gradient(WebDesign.HERO_GRADIENT[0], WebDesign.HERO_GRADIENT[1], 99));
+
+      } else {
+
+        tab.setTextColor(ui.purpleText);
 
         tab.setBackground(ui.round(ui.soft, 14));
 
@@ -711,6 +733,8 @@ public final class StoreUi implements StoreBilling.Events {
       at.setMargins(0, 0, ui.dp(6), 0);
 
       tabs.addView(tab, at);
+
+      UiMetrics.enforceMinTouchTarget(tab);
 
       if (selectedTab.equals(key)) {
 
@@ -774,6 +798,24 @@ public final class StoreUi implements StoreBilling.Events {
 
       if (selectedTab.equals("studio")) {
 
+        if (Distribution.PLAY && catalog.optBoolean("billingReady")) {
+
+          JSONArray products = catalog.optJSONArray("products");
+
+          List<JSONObject> studioProducts = new ArrayList<>();
+
+          for (int i = 0; products != null && i < products.length(); i++) {
+
+            JSONObject p = products.optJSONObject(i);
+
+            if (p != null && "studio".equals(p.optString("kind"))) studioProducts.add(p);
+
+          }
+
+          if (!studioProducts.isEmpty()) productGrid(body, studioProducts);
+
+        }
+
         JSONArray studioPlans = catalog.optJSONArray("packages");
 
         List<JSONObject> videoPlans = new ArrayList<>(), photoPlans = new ArrayList<>();
@@ -804,7 +846,7 @@ public final class StoreUi implements StoreBilling.Events {
 
         free.addView(ui.text("Trò chuyện", 16, ui.ink, true));
 
-        free.addView(ui.text("Miễn phí", 12, ui.purple, true));
+        free.addView(ui.text("Miễn phí", 12, ui.purpleText, true));
 
         ui.add(body, free, 8);
 
@@ -820,7 +862,7 @@ public final class StoreUi implements StoreBilling.Events {
 
           JSONObject p = plans.optJSONObject(i);
 
-          if (p != null && selectedTab.equals(p.optString("kind"))) gridPlans.add(p);
+          if (p != null && selectedTab.equals(p.optString("kind")) && !(Distribution.PLAY && "live_game_30".equals(p.optString("id")))) gridPlans.add(p);
 
         }
 
@@ -828,21 +870,21 @@ public final class StoreUi implements StoreBilling.Events {
 
       }
 
-    } else if (selectedTab.equals("style") && catalog.optJSONArray("packages") == null) {
+    } else if ((selectedTab.equals("style") || selectedTab.equals("studio")) && catalog.optJSONArray("packages") == null) {
 
       JSONArray products = catalog.optJSONArray("products");
 
-      List<JSONObject> styleProducts = new ArrayList<>();
+      List<JSONObject> kindProducts = new ArrayList<>();
 
       for (int i = 0; products != null && i < products.length(); i++) {
 
         JSONObject p = products.optJSONObject(i);
 
-        if (p != null && "style".equals(p.optString("kind"))) styleProducts.add(p);
+        if (p != null && selectedTab.equals(p.optString("kind"))) kindProducts.add(p);
 
       }
 
-      productGrid(body, styleProducts);
+      productGrid(body, kindProducts);
 
     } else {
 
@@ -870,13 +912,21 @@ public final class StoreUi implements StoreBilling.Events {
 
       JSONArray products = catalog.optJSONArray("products");
 
+      boolean studioPermanent = catalog.optBoolean("studioProPermanent");
+
       for (int i = 0; products != null && i < products.length(); i++) {
 
         JSONObject p = products.optJSONObject(i);
 
-        if (p == null || !owns(p.optString("id"))) continue;
+        if (p == null) continue;
+
+        String pid = p.optString("id");
+
+        if (!owns(pid) && !(pid.equals("kinnect_studio_pro") && studioPermanent)) continue;
 
         if (p.optString("kind").equals("style")) styleTiles.add(product(p, false));
+
+        else if (p.optString("kind").equals("studio") && studioPermanent) studioTiles.add(product(p, false));
 
       }
 
@@ -884,7 +934,7 @@ public final class StoreUi implements StoreBilling.Events {
 
       if (catalog.optLong("studioPhotoUntil") > System.currentTimeMillis()) studioTiles.add(studioLineTile(false));
 
-      if (catalog.optLong("liveGameUntil") > System.currentTimeMillis()) liveTiles.add(livePassTile());
+      if (!Distribution.PLAY && catalog.optLong("liveGameUntil") > System.currentTimeMillis()) liveTiles.add(livePassTile());
 
       LinearLayout invBox = null;
 
@@ -1002,11 +1052,51 @@ public final class StoreUi implements StoreBilling.Events {
 
   private void buyPlan(JSONObject p) {
 
+    if (Distribution.PLAY && p != null && "live_game_30".equals(p.optString("id"))) return;
+
     PackagePurchase.buy(activity, p, catalog, () -> load(false), () -> usePackage(p));
 
   }
 
 
+
+  private boolean isConsumableGift(JSONObject p) {
+
+    String kind = p.optString("kind"), id = p.optString("id");
+
+    return "gifts".equals(kind) || id.startsWith("gift_");
+
+  }
+
+  private boolean isStackableStudio(JSONObject p) {
+
+    String kind = p.optString("kind"), id = p.optString("id");
+
+    return "studio".equals(kind) || id.startsWith("studio_");
+
+  }
+
+  private boolean isMembership(JSONObject p) {
+
+    String kind = p.optString("kind"), id = p.optString("id");
+
+    return "member".equals(kind) || id.startsWith("member_");
+
+  }
+
+  private boolean studioLineActive(JSONObject p) {
+
+    if (catalog == null || !isStackableStudio(p)) return false;
+
+    String line = p.optString("line");
+
+    if ("video".equals(line)) return catalog.optLong("studioVideoUntil") > System.currentTimeMillis();
+
+    if ("photo".equals(line)) return catalog.optLong("studioPhotoUntil") > System.currentTimeMillis();
+
+    return catalog.optLong("studioProUntil") > System.currentTimeMillis();
+
+  }
 
   private void usePackage(JSONObject p) {
 
@@ -1022,7 +1112,7 @@ public final class StoreUi implements StoreBilling.Events {
 
     if (kind.equals("style")) {
 
-      apply(isEquipped(p) && selectedTab.equals("owned") ? "" : id);
+      apply(isEquipped(p) ? "" : id);
 
       return;
 
@@ -1032,15 +1122,17 @@ public final class StoreUi implements StoreBilling.Events {
 
       try {
 
-        String target = isEquipped(p) && selectedTab.equals("owned") ? "" : id;
+        final String target = isEquipped(p) ? "" : id;
 
         NativeApi.shared.call("POST", "/api/store/packages/apply", new JSONObject().put("productId", target), (data, error, status) -> {
+
+          if (closed || activity.isFinishing() || activity.isDestroyed()) return;
 
           if (error != null) message(tr("Chưa áp dụng được."));
 
           else {
 
-            message("Đã áp dụng phong cách.");
+            message(target.isEmpty() ? tr("Đã gỡ trang trí.") : tr("Đã áp dụng phong cách."));
 
             load(false);
 
@@ -1058,11 +1150,17 @@ public final class StoreUi implements StoreBilling.Events {
 
     if (id.equals("live_game_30")) {
 
-      activity.startActivity(new Intent(activity, StudioActivity.class).putExtra(StudioActivity.EXTRA_MODE, "live"));
+      if (!Distribution.PLAY) {
+
+        activity.startActivity(new Intent(activity, StudioActivity.class).putExtra(StudioActivity.EXTRA_MODE, "live"));
+
+      }
 
       return;
 
     }
+
+    if (isMembership(p)) return;
 
     selectedTab = "owned";
 
@@ -1076,13 +1174,17 @@ public final class StoreUi implements StoreBilling.Events {
 
     try {
 
-      NativeApi.shared.call("POST", "/api/store/style", new JSONObject().put("productId", id), (data, error, status) -> {
+      final String target = id == null ? "" : id;
+
+      NativeApi.shared.call("POST", "/api/store/style", new JSONObject().put("productId", target), (data, error, status) -> {
+
+        if (closed || activity.isFinishing() || activity.isDestroyed()) return;
 
         if (error != null) message(error);
 
         else {
 
-          message(tr("Đã áp dụng phong cách."));
+          message(target.isEmpty() ? tr("Đã gỡ trang trí.") : tr("Đã áp dụng phong cách."));
 
           load(false);
 
@@ -1140,17 +1242,41 @@ public final class StoreUi implements StoreBilling.Events {
 
 
 
+  private static int ribbonColor(String tier) {
+
+    return "legendary".equals(tier) ? 0xfffbbf24
+
+        : "epic".equals(tier) ? 0xffd8b4fe
+
+        : "rare".equals(tier) ? 0xff7dd3fc
+
+        : Color.WHITE;
+
+  }
+
   private TextView chipAction(String label, boolean enabled, Runnable click) {
 
     TextView t = ui.text(label, 10, Color.WHITE, true);
 
     t.setGravity(Gravity.CENTER);
 
+    t.setSingleLine(true);
+
+    int raw48 = ui.dpRaw(48);
+
+    t.setMinHeight(raw48);
+
+    t.setMinimumHeight(raw48);
+
+    t.setMinWidth(raw48);
+
+    t.setMinimumWidth(raw48);
+
     t.setPadding(ui.dp(10), ui.dp(4), ui.dp(10), ui.dp(4));
 
     t.setBackground(ui.round(enabled ? ui.purple : ui.soft, 99));
 
-    if (!enabled) t.setTextColor(ui.muted);
+    if (!enabled) t.setTextColor(ui.mutedStrict);
 
     if (enabled && click != null) t.setOnClickListener(v -> click.run());
 
@@ -1164,9 +1290,19 @@ public final class StoreUi implements StoreBilling.Events {
 
     String id = p.optString("id"), kind = p.optString("kind"), tier = p.optString("tier");
 
-    boolean studio = kind.equals("studio");
+    boolean studio = isStackableStudio(p);
+
+    boolean gift = isConsumableGift(p);
+
+    boolean member = isMembership(p);
+
+    boolean available = p.optBoolean("available", true);
 
     boolean active = ownsPackage(id);
+
+    boolean lineActive = active || studioLineActive(p);
+
+    int v = variant();
 
     LinearLayout card = tileCard();
 
@@ -1186,7 +1322,7 @@ public final class StoreUi implements StoreBilling.Events {
 
         ribbon.setPadding(ui.dp(8), ui.dp(3), ui.dp(8), ui.dp(3));
 
-        ribbon.setTextColor(StorePackageDesign.tierColor(tier, ui.purple));
+        ribbon.setTextColor(ribbonColor(tier));
 
         ribbon.setBackground(ui.round(0xcc111018, 99));
 
@@ -1200,13 +1336,13 @@ public final class StoreUi implements StoreBilling.Events {
 
       if (active) {
 
-        TextView badge = ui.badge(isEquipped(p) ? tr("Đang dùng") : tr("Đã có"));
+        TextView badge = ui.badge((member || isEquipped(p)) ? tr("Đang dùng") : tr("Đã có"));
 
         badge.setTextSize(9);
 
         badge.setPadding(ui.dp(8), ui.dp(3), ui.dp(8), ui.dp(3));
 
-        badge.setTextColor(0xff4ade80);
+        badge.setTextColor(0xff75c89c);
 
         badge.setBackground(ui.round(0xcc111018, 99));
 
@@ -1244,7 +1380,7 @@ public final class StoreUi implements StoreBilling.Events {
 
     String descText = ident != null && ident.length > 1 ? ident[1] : kindLabel(kind);
 
-    TextView meta = ui.text(descText, 11, ui.muted, false);
+    TextView meta = ui.text(descText, 11, ui.mutedStrict, false);
 
     meta.setMaxLines(1);
 
@@ -1258,7 +1394,7 @@ public final class StoreUi implements StoreBilling.Events {
 
     // Coin price chip
 
-    TextView price = ui.text(amount(p.optLong("priceCoins")) + " " + tr("xu"), 13, 0xfff59e0b, true);
+    TextView price = ui.text(amount(p.optLong("priceCoins")) + " " + tr("xu"), 13, v == 1 ? 0xfffbbf24 : 0xffb45309, true);
 
     price.setCompoundDrawablesRelative(CoinBalanceCard.coin(activity, ui.dp(13)), null, null, null);
 
@@ -1282,11 +1418,21 @@ public final class StoreUi implements StoreBilling.Events {
 
 
 
-    TextView previewBtn = chipAction(tr("Xem thử"), true, () -> previewPlan(p));
+    TextView previewBtn = chipAction(studio && lineActive ? tr("Mở") : tr("Xem thử"), true, () -> {
 
-    previewBtn.setBackground(ui.round(0x1affffff, 99));
+      if (studio && lineActive) usePackage(p);
 
-    previewBtn.setTextColor(ui.purple);
+      else previewPlan(p);
+
+    });
+
+    GradientDrawable prevBg = ui.round(ui.soft, 99);
+
+    prevBg.setStroke(Math.max(1, ui.dp(1)), WebDesign.LINE[v]);
+
+    previewBtn.setBackground(prevBg);
+
+    previewBtn.setTextColor(v == 1 ? WebDesign.STORE_DARK_PREVIEW_TEXT : WebDesign.PURPLE_TEXT_STRICT[0]);
 
     LinearLayout.LayoutParams prp = new LinearLayout.LayoutParams(0, -2, 1);
 
@@ -1294,23 +1440,83 @@ public final class StoreUi implements StoreBilling.Events {
 
     actionRow.addView(previewBtn, prp);
 
+    UiMetrics.enforceMinTouchTarget(previewBtn);
 
 
-    String actionText = active ? (isEquipped(p) ? tr("Gỡ") : tr("Dùng")) : tr("Đổi");
 
-    TextView buyBtn = chipAction(actionText, true, () -> {
+    TextView buyBtn;
 
-      if (active) usePackage(p);
+    if (gift) {
 
-      else confirmBuyPlan(p);
+      buyBtn = available ? chipAction(active ? tr("Mua thêm") : tr("Đổi"), true, () -> buyPlan(p)) : chipAction(tr("Sắp ra mắt"), false, null);
 
-    });
+      if (available) buyBtn.setBackground(gradient(WebDesign.HERO_GRADIENT[0], WebDesign.HERO_GRADIENT[1], 99));
 
-    if (active && isEquipped(p)) {
+    } else if (studio) {
 
-      buyBtn.setBackground(ui.round(0x2e4ade80, 99));
+      if (available) {
 
-      buyBtn.setTextColor(0xff4ade80);
+        buyBtn = chipAction(lineActive ? tr("Gia hạn") : tr("Đổi"), true, () -> buyPlan(p));
+
+        buyBtn.setBackground(gradient(WebDesign.HERO_GRADIENT[0], WebDesign.HERO_GRADIENT[1], 99));
+
+      }
+
+      else if (lineActive) buyBtn = chipAction(tr("Dùng"), true, () -> usePackage(p));
+
+      else buyBtn = chipAction(tr("Sắp ra mắt"), false, null);
+
+    } else if (member) {
+
+      boolean hasOtherMembership = !active && catalog != null && !catalog.optString("membership").isEmpty();
+
+      if (active) {
+
+        buyBtn = chipAction(tr("Đang dùng"), false, null);
+
+        buyBtn.setBackground(ui.round(WebDesign.STORE_DARK_REMOVE_BG, 99));
+
+        buyBtn.setTextColor(Color.WHITE);
+
+      } else if (hasOtherMembership) {
+
+        buyBtn = chipAction(tr("Đang có gói"), false, null);
+
+      } else if (!available) {
+
+        buyBtn = chipAction(tr("Sắp ra mắt"), false, null);
+
+      } else {
+
+        buyBtn = chipAction(tr("Đổi"), true, () -> buyPlan(p));
+
+        buyBtn.setBackground(gradient(WebDesign.HERO_GRADIENT[0], WebDesign.HERO_GRADIENT[1], 99));
+
+      }
+
+    } else if (active) {
+
+      boolean eq = isEquipped(p);
+
+      buyBtn = chipAction(eq ? tr("Gỡ") : tr("Dùng"), true, () -> usePackage(p));
+
+      if (eq) {
+
+        buyBtn.setBackground(ui.round(WebDesign.STORE_DARK_REMOVE_BG, 99));
+
+        buyBtn.setTextColor(Color.WHITE);
+
+      }
+
+    } else if (!available) {
+
+      buyBtn = chipAction(tr("Sắp ra mắt"), false, null);
+
+    } else {
+
+      buyBtn = chipAction(tr("Đổi"), true, () -> buyPlan(p));
+
+      buyBtn.setBackground(gradient(WebDesign.HERO_GRADIENT[0], WebDesign.HERO_GRADIENT[1], 99));
 
     }
 
@@ -1320,11 +1526,13 @@ public final class StoreUi implements StoreBilling.Events {
 
     actionRow.addView(buyBtn, byp);
 
+    UiMetrics.enforceMinTouchTarget(buyBtn);
+
 
 
     card.addView(actionRow);
 
-    card.setOnClickListener(v -> showPlan(p));
+    card.setOnClickListener(w -> showPlan(p));
 
     return card;
 
@@ -1526,7 +1734,7 @@ public final class StoreUi implements StoreBilling.Events {
 
     String untilText = passUntil > 4102444800000L ? tr("Không giới hạn") : tr("Hết hạn") + " · " + new java.text.SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(new Date(passUntil));
 
-    TextView meta = ui.text(untilText, 10, ui.muted, false);
+    TextView meta = ui.text(untilText, 10, ui.mutedStrict, false);
 
     meta.setMaxLines(1);
 
@@ -1540,7 +1748,7 @@ public final class StoreUi implements StoreBilling.Events {
 
     footer.setPadding(0, ui.dp(4), 0, 0);
 
-    footer.addView(ui.text(tr("Đang dùng"), 10, ui.purple, true), new LinearLayout.LayoutParams(0, -2, 1));
+    footer.addView(ui.text(tr("Đang dùng"), 10, ui.purpleText, true), new LinearLayout.LayoutParams(0, -2, 1));
 
     card.addView(footer);
 
@@ -1590,7 +1798,7 @@ public final class StoreUi implements StoreBilling.Events {
 
     card.addView(name);
 
-    TextView meta = ui.text(durationText(until), 10, ui.muted, false);
+    TextView meta = ui.text(durationText(until), 10, ui.mutedStrict, false);
 
     meta.setMaxLines(1);
 
@@ -1604,7 +1812,7 @@ public final class StoreUi implements StoreBilling.Events {
 
     footer.setPadding(0, ui.dp(4), 0, 0);
 
-    footer.addView(ui.text(tr("Đã có"), 10, ui.purple, true), new LinearLayout.LayoutParams(0, -2, 1));
+    footer.addView(ui.text(tr("Đã có"), 10, ui.purpleText, true), new LinearLayout.LayoutParams(0, -2, 1));
 
     card.addView(footer);
 
@@ -1664,9 +1872,9 @@ public final class StoreUi implements StoreBilling.Events {
 
     String id = p.optString("id");
 
-    boolean studio = p.optString("kind").equals("studio"), free = studio && catalog.optBoolean("studioProFree"), owned = owns(id), applied = id.equals(catalog.optString("appearance"));
+    boolean studio = p.optString("kind").equals("studio"), free = studio && catalog.optBoolean("studioProFree"), permanent = id.equals("kinnect_studio_pro") && catalog.optBoolean("studioProPermanent"), owned = id.equals("kinnect_studio_pro") ? permanent : owns(id), applied = id.equals(catalog.optString("appearance"));
 
-    String state = free ? "Miễn phí" : owned ? (applied ? "Đang dùng" : "Đã có") : (Distribution.PLAY && catalog.optBoolean("billingReady") && prices.containsKey(id) ? "Mua một lần" : "Chưa mở bán");
+    String state = free ? "Miễn phí" : owned ? (applied ? "Đang dùng" : (permanent ? "Vĩnh viễn" : "Đã có")) : (Distribution.PLAY && catalog.optBoolean("billingReady") && prices.containsKey(id) ? "Mua một lần" : "Chưa mở bán");
 
     LinearLayout card = tileCard();
 
@@ -1692,7 +1900,7 @@ public final class StoreUi implements StoreBilling.Events {
 
     card.addView(name);
 
-    TextView meta = ui.text(studio ? tr("Studio") : tr("Phong cách"), 10, ui.muted, false);
+    TextView meta = ui.text(studio ? tr("Studio") : tr("Phong cách"), 10, ui.mutedStrict, false);
 
     meta.setPadding(0, ui.dp(1), 0, 0);
 
@@ -1702,25 +1910,27 @@ public final class StoreUi implements StoreBilling.Events {
 
     footer.setPadding(0, ui.dp(4), 0, 0);
 
-    footer.addView(ui.text(state, 10, owned || free ? ui.purple : ui.muted, true), new LinearLayout.LayoutParams(0, -2, 1));
+    footer.addView(ui.text(state, 10, owned || free ? ui.purpleText : ui.mutedStrict, true), new LinearLayout.LayoutParams(0, -2, 1));
 
     if (actions) {
+
+      TextView chip = null;
 
       if (free || owned) {
 
         if (studio) {
 
-          footer.addView(chipAction(tr("Mở"), true, this::chooseMedia), new LinearLayout.LayoutParams(-2, -2));
+          chip = chipAction(tr("Mở"), true, this::chooseMedia);
 
         } else if (!applied) {
 
-          footer.addView(chipAction(tr("Dùng"), true, () -> apply(id)), new LinearLayout.LayoutParams(-2, -2));
+          chip = chipAction(tr("Dùng"), true, () -> apply(id));
 
         }
 
       } else if (Distribution.PLAY && catalog.optBoolean("billingReady") && prices.containsKey(id)) {
 
-        footer.addView(chipAction(prices.get(id), true, () -> {
+        chip = chipAction(prices.get(id), true, () -> {
 
           if (busy) return;
 
@@ -1732,11 +1942,19 @@ public final class StoreUi implements StoreBilling.Events {
 
             .setNegativeButton(tr("Hủy"), null).show();
 
-        }), new LinearLayout.LayoutParams(-2, -2));
+        });
 
       } else {
 
-        footer.addView(chipAction(tr("Xem thử"), true, () -> showProduct(p)), new LinearLayout.LayoutParams(-2, -2));
+        chip = chipAction(tr("Xem thử"), true, () -> showProduct(p));
+
+      }
+
+      if (chip != null) {
+
+        footer.addView(chip, new LinearLayout.LayoutParams(-2, -2));
+
+        UiMetrics.enforceMinTouchTarget(chip);
 
       }
 
@@ -1758,23 +1976,69 @@ public final class StoreUi implements StoreBilling.Events {
 
     String id = p.optString("id");
 
-    boolean active = ownsPackage(id);
+    if (Distribution.PLAY && "live_game_30".equals(id)) return;
+
+    boolean active = ownsPackage(id), gift = isConsumableGift(p), studio = isStackableStudio(p), member = isMembership(p), available = p.optBoolean("available", true), lineActive = active || studioLineActive(p);
 
     try {
 
       JSONObject details = new JSONObject(p.toString());
 
-      details.put("actionLabel", active ? (isEquipped(p) && selectedTab.equals("owned") ? "Gỡ trang bị" : "Dùng ngay") : "Mua gói");
+      if (!details.has("available")) details.put("available", available);
 
       details.put("adminAccess", catalog != null && catalog.optBoolean("adminAccess"));
 
-      StorePackageDesign.details(activity, details, p.optBoolean("available") ? () -> {
+      Runnable action = null;
 
-        if (active) usePackage(p);
+      if (gift) {
 
-        else buyPlan(p);
+        details.put("actionLabel", active ? "Mua thêm" : "Mua gói");
 
-      } : null);
+        if (available) action = () -> buyPlan(p);
+
+      } else if (studio) {
+
+        if (available) {
+
+          details.put("actionLabel", lineActive ? "Gia hạn" : "Mua gói");
+
+          action = () -> buyPlan(p);
+
+        } else if (lineActive) {
+
+          details.put("actionLabel", "Dùng ngay");
+
+          action = () -> usePackage(p);
+
+        }
+
+      } else if (member) {
+
+        boolean hasMembership = catalog != null && !catalog.optString("membership").isEmpty();
+
+        if (!active && !hasMembership && available) {
+
+          details.put("actionLabel", "Mua gói");
+
+          action = () -> buyPlan(p);
+
+        }
+
+      } else if (active) {
+
+        details.put("actionLabel", isEquipped(p) ? "Gỡ trang bị" : "Dùng ngay");
+
+        action = () -> usePackage(p);
+
+      } else if (available) {
+
+        details.put("actionLabel", "Mua gói");
+
+        action = () -> buyPlan(p);
+
+      }
+
+      StorePackageDesign.details(activity, details, action);
 
     } catch (JSONException ignored) {}
 
@@ -1786,6 +2050,8 @@ public final class StoreUi implements StoreBilling.Events {
 
     String id = p.optString("id");
 
+    boolean studio = p.optString("kind").equals("studio"), permanent = id.equals("kinnect_studio_pro") && catalog != null && catalog.optBoolean("studioProPermanent"), owned = id.equals("kinnect_studio_pro") ? permanent : owns(id), free = studio && catalog != null && catalog.optBoolean("studioProFree");
+
     String description = p.optString(I18n.current().equals("en") ? "descriptionEn" : "description");
 
     if (id.equals("kinnect_studio_pro") && catalog != null && catalog.optBoolean("studioProFree")) {
@@ -1794,7 +2060,7 @@ public final class StoreUi implements StoreBilling.Events {
 
     }
 
-    if (!owns(id) && !(id.equals("kinnect_studio_pro") && catalog != null && catalog.optBoolean("studioProFree")) && !prices.containsKey(id)) {
+    if (!owned && !free && !prices.containsKey(id)) {
 
       description += "\n\n" + tr("Giá dự kiến, chưa phải giá thanh toán") + ": " + java.text.NumberFormat.getIntegerInstance(new Locale("vi", "VN")).format(p.optInt("referenceVnd")) + "đ";
 
@@ -1802,7 +2068,11 @@ public final class StoreUi implements StoreBilling.Events {
 
     Sheet sheet = new Sheet(activity).setTitle(p.optString("name")).setMessage(description + "\n\n" + tr("Xem thử không thay đổi hồ sơ hoặc cấp quyền sử dụng.")).setView(preview(p));
 
-    if (owns(id) && p.optString("kind").equals("style") && catalog != null && !id.equals(catalog.optString("appearance"))) {
+    if (studio && (free || owned)) {
+
+      sheet.setPositiveButton(tr("Mở"), (d, w) -> chooseMedia()).setNegativeButton(tr("Đóng"), null);
+
+    } else if (owned && p.optString("kind").equals("style") && catalog != null && !id.equals(catalog.optString("appearance"))) {
 
       sheet.setPositiveButton(tr("Dùng"), (d, w) -> apply(id)).setNegativeButton(tr("Đóng"), null);
 
@@ -1818,6 +2088,47 @@ public final class StoreUi implements StoreBilling.Events {
 
 
 
+  private static double wcagLinear(int c) {
+    double s = c / 255.0;
+    return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  }
+
+  private static double wcagLuminance(int color) {
+    return 0.2126 * wcagLinear((color >> 16) & 0xff)
+        + 0.7152 * wcagLinear((color >> 8) & 0xff)
+        + 0.0722 * wcagLinear(color & 0xff);
+  }
+
+  private static double wcagContrast(int a, int b) {
+    double l1 = wcagLuminance(a), l2 = wcagLuminance(b);
+    return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+  }
+
+  private static int wcagComposite(int fg, int bg) {
+    int a = (fg >>> 24) & 0xff;
+    if (a >= 255) return 0xff000000 | (fg & 0x00ffffff);
+    int r = (((fg >> 16) & 0xff) * a + ((bg >> 16) & 0xff) * (255 - a) + 127) / 255;
+    int g = (((fg >> 8) & 0xff) * a + ((bg >> 8) & 0xff) * (255 - a) + 127) / 255;
+    int b = ((fg & 0xff) * a + (bg & 0xff) * (255 - a) + 127) / 255;
+    return 0xff000000 | ((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff);
+  }
+
+  private static int wcagBlend(int from, int to, double t) {
+    int r = (int) Math.round(((from >> 16) & 0xff) * (1.0 - t) + ((to >> 16) & 0xff) * t);
+    int g = (int) Math.round(((from >> 8) & 0xff) * (1.0 - t) + ((to >> 8) & 0xff) * t);
+    int b = (int) Math.round((from & 0xff) * (1.0 - t) + (to & 0xff) * t);
+    return 0xff000000 | ((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff);
+  }
+
+  private static int wcagAdapt(int accent, int against, int target, double minRatio) {
+    int base = wcagComposite(accent, against);
+    for (int i = 0; i <= 200; i++) {
+      int candidate = i == 0 ? base : wcagBlend(base, target, i / 200.0);
+      if (wcagContrast(candidate, against) >= minRatio) return candidate;
+    }
+    return 0xff000000 | (target & 0x00ffffff);
+  }
+
   private View preview(JSONObject product) {
 
     LinearLayout box = new LinearLayout(activity);
@@ -1828,7 +2139,15 @@ public final class StoreUi implements StoreBilling.Events {
 
     JSONArray colors = product.optJSONArray("colors");
 
-    int color = Color.parseColor(colors != null && colors.length() > 0 ? colors.optString(0) : "#7c3aed");
+    int color = parseColor(colors, 0, 0xff7c3aed);
+
+    int v = variant();
+
+    int cardBg = WebDesign.CARD[v];
+
+    int demoColor = wcagAdapt(color, cardBg, v == 1 ? 0xfff8f7fc : 0xff141024, 4.5);
+
+    int pillBg = wcagAdapt(color, Color.WHITE, 0xff141024, 4.5);
 
     TextView demo = new KinnectText(activity);
 
@@ -1836,13 +2155,13 @@ public final class StoreUi implements StoreBilling.Events {
 
     demo.setTextSize(22);
 
-    demo.setTextColor(color);
+    demo.setTextColor(demoColor);
 
     demo.setGravity(Gravity.CENTER);
 
-    GradientDrawable frame = round(WebDesign.CARD[variant()], 18);
+    GradientDrawable frame = round(cardBg, 18);
 
-    frame.setStroke(dp(3), color);
+    frame.setStroke(dp(3), demoColor);
 
     demo.setPadding(dp(16), dp(18), dp(16), dp(18));
 
@@ -1862,7 +2181,7 @@ public final class StoreUi implements StoreBilling.Events {
 
     chat.setPadding(dp(16), dp(16), dp(16), dp(16));
 
-    chat.setBackground(round(color, 18));
+    chat.setBackground(round(pillBg, 18));
 
     LinearLayout.LayoutParams at = new LinearLayout.LayoutParams(-1, -2);
 
@@ -2002,6 +2321,26 @@ public final class StoreUi implements StoreBilling.Events {
 
 
 
+  private static int parseColor(JSONArray colors, int idx, int fallback) {
+
+    if (colors == null || idx < 0 || idx >= colors.length()) return fallback;
+
+    String raw = colors.optString(idx, "");
+
+    if (raw == null || raw.trim().isEmpty()) return fallback;
+
+    try {
+
+      return Color.parseColor(raw.trim());
+
+    } catch (IllegalArgumentException ignored) {
+
+      return fallback;
+
+    }
+
+  }
+
   private static final class StoreArt extends View {
 
     private final JSONObject product;
@@ -2050,9 +2389,9 @@ public final class StoreUi implements StoreBilling.Events {
 
       JSONArray colors = product.optJSONArray("colors");
 
-      int a = Color.parseColor(colors != null && colors.length() > 0 ? colors.optString(0) : "#7c3aed");
+      int a = parseColor(colors, 0, 0xff7c3aed);
 
-      int b = Color.parseColor(colors != null && colors.length() > 1 ? colors.optString(1) : "#c026d3");
+      int b = parseColor(colors, 1, 0xffc026d3);
 
       paint.setShader(new LinearGradient(0, 0, 300, 178, a, b, Shader.TileMode.CLAMP));
 

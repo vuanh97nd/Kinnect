@@ -22,14 +22,19 @@ public final class ApkUpdateActivity extends Activity {
  public static void open(Activity from,String version,String url,String digest,long size){
   from.startActivity(new Intent(from,ApkUpdateActivity.class).putExtra("version",version).putExtra("url",url).putExtra("digest",digest).putExtra("size",size));
  }
+ @Override protected void attachBaseContext(Context base){super.attachBaseContext(I18n.localized(base));}
  private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
- @Override public void onCreate(Bundle state){super.onCreate(state);setTitle(I18n.t("Cập nhật Kinnect"));
-  LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(24),dp(40),dp(24),dp(24));root.setGravity(Gravity.CENTER);root.setBackgroundColor(0xfff6f5fa);
+ @Override public void onCreate(Bundle state){boolean dark=WebTheme.isDark(this);int v=dark?1:0;setTheme(getResources().getIdentifier(dark?"Kinnect.App.Dark":"Kinnect.App.Light","style",getPackageName()));super.onCreate(state);setTitle(I18n.t("Cập nhật Kinnect"));
+  int bg=WebDesign.BG[v],ink=WebDesign.INK[v],muted=WebDesign.MUTED[v],purple=WebDesign.PURPLE[v],line=WebDesign.LINE[v];
+  getWindow().setStatusBarColor(bg);getWindow().setNavigationBarColor(bg);getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+  LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(24),dp(40),dp(24),dp(24));root.setGravity(Gravity.CENTER);root.setBackgroundColor(bg);
+  root.setOnApplyWindowInsetsListener((view,insets)->{if(Build.VERSION.SDK_INT>=30){android.graphics.Insets bars=insets.getInsets(WindowInsets.Type.systemBars());view.setPadding(dp(24)+bars.left,dp(40)+bars.top,dp(24)+bars.right,dp(24)+bars.bottom);}else{view.setPadding(dp(24)+insets.getSystemWindowInsetLeft(),dp(40)+insets.getSystemWindowInsetTop(),dp(24)+insets.getSystemWindowInsetRight(),dp(24)+insets.getSystemWindowInsetBottom());}return insets;});
   ImageView logo=new ImageView(this);logo.setImageResource(getResources().getIdentifier("kinnect_logo","drawable",getPackageName()));root.addView(logo,new LinearLayout.LayoutParams(dp(72),dp(72)));
-  TextView title=new KinnectText(this);title.setText(I18n.t("Cập nhật Kinnect ")+getIntent().getStringExtra("version"));title.setTextSize(22);title.setTextColor(0xff271b3d);title.setGravity(Gravity.CENTER);title.setPadding(0,dp(20),0,dp(20));root.addView(title);
-  status=new KinnectText(this);status.setGravity(Gravity.CENTER);status.setTextColor(0xff625674);status.setText(I18n.t("Đang chuẩn bị tải…"));root.addView(status);
-  bar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);bar.setMax(100);LinearLayout.LayoutParams row=new LinearLayout.LayoutParams(-1,dp(24));row.topMargin=dp(20);root.addView(bar,row);
-  Button cancel=new KinnectButton(this);cancel.setText(I18n.t("Huỷ cập nhật"));cancel.setOnClickListener(v->finish());root.addView(cancel);setContentView(root);
+  String version=getIntent()!=null?getIntent().getStringExtra("version"):null;if(version==null)version="";
+  TextView title=new KinnectText(this);title.setText(version.isEmpty()?I18n.t("Cập nhật Kinnect"):I18n.t("Cập nhật Kinnect ")+version);title.setTextSize(22);title.setTextColor(ink);title.setGravity(Gravity.CENTER);title.setPadding(0,dp(20),0,dp(20));root.addView(title);
+  status=new KinnectText(this);status.setGravity(Gravity.CENTER);status.setTextColor(muted);status.setText(I18n.t("Đang chuẩn bị tải…"));root.addView(status);
+  bar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);bar.setMax(100);bar.setProgressTintList(android.content.res.ColorStateList.valueOf(purple));bar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(line));LinearLayout.LayoutParams row=new LinearLayout.LayoutParams(-1,dp(24));row.topMargin=dp(20);root.addView(bar,row);
+  Button cancel=new KinnectButton(this);cancel.setText(I18n.t("Huỷ cập nhật"));cancel.setTextColor(ink);cancel.setOnClickListener(w->finish());LinearLayout.LayoutParams cancelLp=new LinearLayout.LayoutParams(-2,-2);cancelLp.topMargin=dp(16);root.addView(cancel,cancelLp);setContentView(root);
   new Thread(this::download,"kinnect-apk-download").start();
  }
  private HttpURLConnection connect(String url)throws Exception{
