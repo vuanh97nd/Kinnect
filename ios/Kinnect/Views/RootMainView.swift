@@ -1165,8 +1165,9 @@ struct RootMainView: View {
                                                         .foregroundColor(KinnectTheme.textPrimary)
                                                         .kinnectMultiline()
                                                 }
+                                                .padding(.vertical, 4)
+                                                .frame(minHeight: 44, alignment: .leading)
                                             }
-                                            .frame(minHeight: 44)
                                             .tint(KinnectTheme.danger)
                                         }
 
@@ -1192,6 +1193,7 @@ struct RootMainView: View {
                                     }
                                     .padding(16)
                                 }
+                                .clipped()
                                 .background(KinnectTheme.background)
                                 .navigationTitle(L10n.tr("Báo cáo nội dung"))
                                 .navigationBarTitleDisplayMode(.inline)

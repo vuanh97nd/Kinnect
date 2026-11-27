@@ -3989,14 +3989,18 @@ public class MainActivity extends Activity {
     if (blockSwitch != null) {
       LinearLayout blockRow = row();
       blockRow.setGravity(Gravity.CENTER_VERTICAL);
-      blockRow.setPadding(dp(12), dp(6), dp(12), dp(6));
+      blockRow.setPadding(dp(12), dp(4), dp(12), dp(4));
+      blockRow.setMinimumHeight(raw48);
       blockRow.setBackground(outlined(CARD, 12));
       TextView blockText = label(I18n.t("Đồng thời chặn người dùng này"), 14, TEXT);
       blockRow.addView(blockText, new LinearLayout.LayoutParams(0, -2, 1));
       blockSwitch.setChecked(false);
-      blockRow.addView(blockSwitch);
+      blockSwitch.setMinimumWidth(raw48);
+      blockSwitch.setMinimumHeight(raw48);
+      blockRow.addView(blockSwitch, new LinearLayout.LayoutParams(-2, raw48));
       UiMetrics.enforceMinTouchTarget(blockSwitch, 48);
-      body.addView(blockRow, new LinearLayout.LayoutParams(-1, Math.max(dp(48), raw48)));
+      blockRow.setOnClickListener(v -> blockSwitch.toggle());
+      body.addView(blockRow, new LinearLayout.LayoutParams(-1, -2));
       UiMetrics.enforceMinTouchTarget(blockRow, 48);
     }
 
@@ -7132,8 +7136,8 @@ public class MainActivity extends Activity {
     JSONObject host = json("id", room.optString("hostId"), "name", room.optString("host"), "avatar",
         room.isNull("avatar") ? "" : room.optString("avatar"));
     avatar(host, holder, 68);
-    ring.addView(holder);
-    center.addView(ring);
+    ring.addView(holder, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
+    center.addView(ring, new LinearLayout.LayoutParams(-2, -2));
     col.addView(center, new LinearLayout.LayoutParams(-1, -2));
 
     LinearLayout info = column();
@@ -7632,9 +7636,11 @@ public class MainActivity extends Activity {
     HorizontalScrollView emojiScroll = new HorizontalScrollView(this);
     emojiScroll.setHorizontalScrollBarEnabled(false);
     LinearLayout emojis = row();
-    emojis.setPadding(dp(12), dp(6), dp(12), dp(2));
+    emojis.setPadding(dp(6), dp(6), dp(6), dp(2));
     int emojiWash = 0xff1c1726;
-    for (final String e : new String[] { "😍", "😂", "🔥", "👏", "🥰", "😮", "😢", "💜" }) {
+    final String[] shortEmojis = new String[] { "😍", "😂", "🔥", "👏", "🥰", "😮", "😢", "💜" };
+    for (int idx = 0; idx < shortEmojis.length; idx++) {
+      final String e = shortEmojis[idx];
       TextView t = label(e, 20, WHITE);
       t.setGravity(Gravity.CENTER);
       t.setBackground(pressable(emojiWash, 99));
@@ -7644,7 +7650,7 @@ public class MainActivity extends Activity {
         input.requestFocus();
       });
       LinearLayout.LayoutParams ep = new LinearLayout.LayoutParams(raw48, raw48);
-      ep.rightMargin = dp(6);
+      ep.rightMargin = (idx < shortEmojis.length - 1) ? dp(2) : 0;
       emojis.addView(t, ep);
       UiMetrics.enforceMinTouchTarget(t, 48);
     }
@@ -12325,9 +12331,11 @@ public class MainActivity extends Activity {
     HorizontalScrollView emojiScroll = new HorizontalScrollView(this);
     emojiScroll.setHorizontalScrollBarEnabled(false);
     LinearLayout emojis = row();
-    emojis.setPadding(dp(12), dp(6), dp(12), dp(4));
+    emojis.setPadding(dp(6), dp(6), dp(6), dp(4));
     int emojiWash = 0xff1c1726;
-    for (final String em : new String[] { "❤️", "😂", "🔥", "👏", "🥰", "😮", "😢", "💜" }) {
+    final String[] commentEmojis = new String[] { "❤️", "😂", "🔥", "👏", "🥰", "😮", "😢", "💜" };
+    for (int idx = 0; idx < commentEmojis.length; idx++) {
+      final String em = commentEmojis[idx];
       TextView et = label(em, 20, WHITE);
       et.setGravity(Gravity.CENTER);
       et.setBackground(pressable(emojiWash, 99));
@@ -12337,7 +12345,7 @@ public class MainActivity extends Activity {
         value.setSelection(value.length());
       });
       LinearLayout.LayoutParams ep = new LinearLayout.LayoutParams(raw48, raw48);
-      ep.rightMargin = dp(6);
+      ep.rightMargin = (idx < commentEmojis.length - 1) ? dp(2) : 0;
       emojis.addView(et, ep);
       UiMetrics.enforceMinTouchTarget(et, 48);
     }

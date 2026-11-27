@@ -1854,7 +1854,7 @@ struct CameraStudioView: View {
     }
 
     private var mediaEditMode: some View {
-        ZStack {
+        VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     mediaEditHeader
@@ -1866,17 +1866,19 @@ struct CameraStudioView: View {
                 .padding(.bottom, 16)
             }
             .clipped()
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                mediaEditPublishSection
-                    .padding(.horizontal, 16)
-                    .padding(.top, 10)
-                    .padding(.bottom, 12)
-                    .background(
-                        Color(red: 0.08, green: 0.06, blue: 0.16)
-                            .ignoresSafeArea(edges: .bottom)
-                    )
-                    .overlay(Divider().background(KinnectTheme.borderSoft), alignment: .top)
-            }
+
+            Divider().background(KinnectTheme.borderSoft)
+
+            mediaEditPublishSection
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 12)
+                .background(
+                    Color(red: 0.08, green: 0.06, blue: 0.16)
+                        .ignoresSafeArea(edges: .bottom)
+                )
+        }
+        .overlay {
             if let vp = videoProject {
                 StudioExportProgressHUD(project: vp)
             }
